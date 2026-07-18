@@ -1,0 +1,252 @@
+{
+  "_meta": {
+    "file": "Chapter 1 — Garage. Buildable content data.",
+    "usage": "Maps to the ScriptableObjects in the design doc (ChapterDefinition, GeneratorDefinition, UpgradeDefinition, EventDefinition, Song/CoverDefinition, AlbumPrestige config). Either hand-author SOs from these values or write a small importer. All numbers are starter values for tuning; the Records capstone gate is the primary pacing knob.",
+    "currencies": {
+      "cash": "run-scoped; earned by tap + generators; spent on gear/upgrades",
+      "fans": "run-scoped; performance meter; sets the album (demo) Records payout; loosely coupled to Cash by design",
+      "rehearsal": "run-scoped; fills the Learn Covers bars",
+      "records": "PERMANENT; each Record buffs global income; cumulative Records gate the capstone"
+    }
+  },
+
+  "chapter": {
+    "id": "ch01_garage",
+    "index": 1,
+    "name": "Garage / Basement",
+    "theme": "The band forms in a garage and plays its first backyard show.",
+    "storyBeatOpen": "It starts in the garage. Just you, a beat-up amp, and a handful of songs you half-know. Time to make some noise.",
+    "storyBeatCapstone": "The backyard's packed. You plug in, count off, and for three minutes the whole neighborhood is yours. Someone's already asking when the next one is — and a guy named Dave offers to haul your gear. You've got your first roadie.",
+    "capstoneRecordsGate": 30
+  },
+
+  "constants": {
+    "generatorCostGrowth": 1.15,
+    "recordBuffPerRecord": 0.02,
+    "recordBuffMode": "additive",
+    "incomeFormulaNote": "globalIncome = sum(gen.baseOutput * gen.count * genBuffs) * (1 + 0.02 * records) * encoreBoost. Catalog/Roadie multipliers are not present in Ch1.",
+    "tapBaseValue": 1
+  },
+
+  "generators": [
+    {
+      "id": "practice_amp",
+      "name": "Practice Amp",
+      "produces": "cash",
+      "baseCost": 60,
+      "costGrowth": 1.15,
+      "baseOutput": 0.4,
+      "unlock": { "type": "cashEarnedTotal", "value": 100 },
+      "note": "First automation. Unlocks the instant the Stage-0 goal (earn 100 Cash by tapping) is met."
+    },
+    {
+      "id": "drummer",
+      "name": "Drummer",
+      "produces": "cash",
+      "baseCost": 500,
+      "costGrowth": 1.15,
+      "baseOutput": 3,
+      "unlock": { "type": "ownedCount", "generator": "practice_amp", "value": 5 },
+      "note": "First bandmate. Buying the first one triggers the play_for_crowd content unlock (Fans)."
+    },
+    {
+      "id": "bassist",
+      "name": "Bassist",
+      "produces": "cash",
+      "baseCost": 4000,
+      "costGrowth": 1.15,
+      "baseOutput": 20,
+      "unlock": { "type": "ownedCount", "generator": "drummer", "value": 5 }
+    },
+    {
+      "id": "guitarist",
+      "name": "Guitarist",
+      "produces": "cash",
+      "baseCost": 30000,
+      "costGrowth": 1.15,
+      "baseOutput": 130,
+      "unlock": { "type": "ownedCount", "generator": "bassist", "value": 5 }
+    }
+  ],
+
+  "upgrades": [
+    {
+      "id": "stage_presence",
+      "name": "Stage Presence",
+      "type": "buff",
+      "scope": "run",
+      "cost": { "currency": "cash", "amount": 250 },
+      "gate": { "currency": "cash", "amount": 250 },
+      "payload": { "effect": "tapValueAdd", "value": 1 },
+      "note": "+1 Cash per tap."
+    },
+    {
+      "id": "amp_strings",
+      "name": "New Strings",
+      "type": "buff",
+      "scope": "run",
+      "cost": { "currency": "cash", "amount": 500 },
+      "gate": { "currency": "cash", "amount": 500 },
+      "payload": { "effect": "generatorOutputMultiplier", "generator": "practice_amp", "value": 2.0 }
+    },
+    {
+      "id": "kit_upgrade",
+      "name": "Bigger Kit",
+      "type": "buff",
+      "scope": "run",
+      "cost": { "currency": "cash", "amount": 5000 },
+      "gate": { "currency": "cash", "amount": 5000 },
+      "payload": { "effect": "generatorOutputMultiplier", "generator": "drummer", "value": 2.0 }
+    },
+    {
+      "id": "tight_set",
+      "name": "Tight Set",
+      "type": "buff",
+      "scope": "run",
+      "cost": { "currency": "cash", "amount": 20000 },
+      "gate": { "currency": "fans", "amount": 30 },
+      "payload": { "effect": "allCashPerSecMultiplier", "value": 1.5 },
+      "note": "Example of an upgrade gated on Fans, not Cash — demonstrates the gating web (§4). You must build a crowd, not just money, to buy it."
+    },
+
+    {
+      "id": "play_for_crowd",
+      "name": "Play for a Crowd",
+      "type": "contentUnlock",
+      "scope": "permanentInChapter",
+      "cost": { "currency": "cash", "amount": 0 },
+      "gate": { "type": "ownedCount", "generator": "drummer", "value": 1 },
+      "payload": { "effect": "unlockSystem", "system": "fans" },
+      "note": "Stage 2. Recruiting your first Drummer means you can perform — unlocks the Fans meter."
+    },
+    {
+      "id": "learn_covers",
+      "name": "Learn Some Covers",
+      "type": "contentUnlock",
+      "scope": "permanentInChapter",
+      "cost": { "currency": "cash", "amount": 0 },
+      "gate": { "currency": "fans", "amount": 25 },
+      "payload": { "effect": "unlockSystem", "system": "covers" },
+      "note": "Stage 3. Unlocks the three Learn Covers bars and the Rehearsal tick."
+    },
+    {
+      "id": "cut_demo",
+      "name": "Cut a Demo",
+      "type": "contentUnlock",
+      "scope": "permanentInChapter",
+      "cost": { "currency": "cash", "amount": 0 },
+      "gate": { "type": "compound", "all": [ { "currency": "fans", "amount": 50 }, { "coversCompleted": 1 } ] },
+      "payload": { "effect": "unlockSystem", "system": "album" },
+      "note": "Stage 4. Unlocks the Release/Cut-a-Demo (prestige) button. This is the core teaching moment."
+    }
+  ],
+
+  "covers": {
+    "system": "Learn Covers",
+    "scope": "run",
+    "unlockedBy": "learn_covers",
+    "rehearsal": {
+      "pointsPerSec": 1,
+      "pointsPerTap": 2,
+      "note": "Rehearsal points fill cover bars. Passive tick plus taps, so covers advance from engagement, not from Cash."
+    },
+    "bars": [
+      { "id": "cover_1", "name": "Three-Chord Anthem", "fillRequirement": 120, "reward": { "effect": "fanRateMultiplier", "value": 1.15 } },
+      { "id": "cover_2", "name": "Parking-Lot Standard", "fillRequirement": 300, "reward": { "effect": "fanRateMultiplier", "value": 1.15 } },
+      { "id": "cover_3", "name": "The Crowd-Pleaser", "fillRequirement": 600, "reward": { "effect": "fanRateMultiplier", "value": 1.20 } }
+    ],
+    "note": "Run-scoped: reset each demo but refill faster as the run gets stronger. Cover_1 is on the critical path (gates cut_demo). Cover buffs stack multiplicatively on fan rate."
+  },
+
+  "fans": {
+    "unlockedBy": "play_for_crowd",
+    "baseFansPerSec": 0.2,
+    "perBandmateOwnedBonus": 0.02,
+    "perBandmateNote": "Applies per owned unit of bandmate generators (drummer/bassist/guitarist), not practice_amp. Ties fan rate to band size.",
+    "coverBonusesApply": true,
+    "couplingNote": "fanRate is intentionally NOT a function of Cash or Cash/sec — only band size, covers, and time — so income alone cannot shortcut the demo payout (§11)."
+  },
+
+  "album": {
+    "id": "cut_demo",
+    "displayName": "Cut a Demo",
+    "unlock": { "type": "compound", "all": [ { "currency": "fans", "amount": 50 }, { "coversCompleted": 1 } ] },
+    "resets": [ "cash", "generators.owned", "upgrades.buff", "fans", "covers", "rehearsal" ],
+    "keeps": [ "records", "upgrades.contentUnlock", "roadies" ],
+    "recordsFormula": "floor( (fansThisRun / 5) ^ 0.5 )",
+    "recordsFormulaExamples": { "50fans": 3, "125fans": 5, "500fans": 10, "2000fans": 20 },
+    "note": "Releasing resets the run and awards Records. Each Record = +2% permanent global income, so the next run is faster."
+  },
+
+  "events": [
+    {
+      "id": "garage_jam",
+      "name": "Garage Jam Challenge",
+      "availableWhen": { "type": "recordsAtLeast", "value": 1 },
+      "availableNote": "Introduced in Stage 6, after the player has released at least one demo, so the prestige loop is understood first.",
+      "type": "challenge",
+      "baselineReset": true,
+      "baselineResetNote": "On entry the chapter economy resets to a fixed baseline for the event's duration, so tiers scale independently of the player's Records.",
+      "tiers": [
+        {
+          "tier": 1,
+          "debuff": { "effect": "automationDisabled", "note": "Generators paused — tap only." },
+          "goal": { "currency": "cash", "amount": 500 },
+          "timerSeconds": 60,
+          "failable": true,
+          "reward": { "effect": "tapValueMultiplier", "value": 1.25, "scope": "permanentInChapter" }
+        },
+        {
+          "tier": 2,
+          "debuff": { "effect": "automationDisabled" },
+          "goal": { "currency": "cash", "amount": 2500 },
+          "timerSeconds": 60,
+          "failable": true,
+          "reward": { "effect": "tapValueMultiplier", "value": 1.50, "scope": "permanentInChapter" }
+        },
+        {
+          "tier": 3,
+          "debuff": { "effect": "automationDisabled" },
+          "goal": { "currency": "cash", "amount": 10000 },
+          "timerSeconds": 45,
+          "failable": true,
+          "reward": { "effect": "tapValueMultiplier", "value": 2.0, "scope": "permanentInChapter" }
+        }
+      ],
+      "failNote": "On a timed fail the event resets; the player can quit anytime. Cost is time only, never permanent progress.",
+      "tuningNote": "Reward magnitude is the dial that sets how essential this event is (§6.1). As written it's a helpful-but-skippable tap booster; raise the reward to make it soft-required for reasonable pacing."
+    }
+  ],
+
+  "capstone": {
+    "id": "backyard_party",
+    "name": "Play the Backyard Party",
+    "unlock": { "type": "cumulativeRecordsAtLeast", "value": 30 },
+    "onComplete": {
+      "grantRoadies": 1,
+      "roadieSystemUIUnlocked": false,
+      "roadieNote": "First Roadie is a story reward here. The allocation/replay system stays locked until Chapter 2.",
+      "fireStoryBeat": "storyBeatCapstone",
+      "advanceToChapter": 2
+    }
+  },
+
+  "progression": [
+    { "stage": 0, "name": "First Notes", "unlocks": "tap only", "gate": "start", "goal": "earn 100 Cash by tapping", "target": "~1-2 min" },
+    { "stage": 1, "name": "First Gear", "unlocks": "practice_amp, then drummer/bassist/guitarist by ownership", "gate": "100 Cash earned" },
+    { "stage": 2, "name": "Play for a Crowd", "unlocks": "Fans meter", "gate": "own 1 Drummer" },
+    { "stage": 3, "name": "Learn Covers", "unlocks": "cover bars + rehearsal", "gate": "25 Fans" },
+    { "stage": 4, "name": "Cut a Demo", "unlocks": "album/prestige button", "gate": "50 Fans + 1 cover", "target": "~5 min from install" },
+    { "stage": 5, "name": "The Loop", "unlocks": "repeat demos, accumulate Records", "gate": "first demo released" },
+    { "stage": 6, "name": "Garage Jam", "unlocks": "garage_jam event", "gate": "1+ Records" },
+    { "stage": 7, "name": "Backyard Party", "unlocks": "capstone → Chapter 2 + first Roadie", "gate": "30 cumulative Records" }
+  ],
+
+  "balanceTargets": {
+    "timeToFirstDemoSeconds": 300,
+    "capstoneRecordsGate": 30,
+    "estDemoCyclesToCapstone": "8-12",
+    "primaryPacingKnob": "capstoneRecordsGate — raise/lower before touching generator or fan curves",
+    "tuneAgainst": "a player with full multiplier stack active (here just Encore up to 4x + records); confirm the chapter still takes meaningful play time"
+  }
+}
