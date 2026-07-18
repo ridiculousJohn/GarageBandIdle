@@ -1,0 +1,33 @@
+# Auto-detect text files, normalize line endings on checkin.
+* text=auto
+
+# Force LF for source and text files.
+*.cs      text eol=lf diff=csharp
+*.json    text eol=lf
+*.md      text eol=lf
+*.shader  text eol=lf
+
+# Unity YAML files. Use Unity's SmartMerge (UnityYAMLMerge) as the merge tool.
+# Configure git once per machine:
+#   git config merge.unityyamlmerge.name "Unity SmartMerge (UnityYAMLMerge)"
+#   git config merge.unityyamlmerge.driver '"<UnityInstallPath>/Editor/Data/Tools/UnityYAMLMerge" merge -p %O %B %A %A'
+*.unity       text merge=unityyamlmerge eol=lf
+*.prefab      text merge=unityyamlmerge eol=lf
+*.asset       text merge=unityyamlmerge eol=lf
+*.mat         text merge=unityyamlmerge eol=lf
+*.anim        text merge=unityyamlmerge eol=lf
+*.controller  text merge=unityyamlmerge eol=lf
+*.meta        text merge=unityyamlmerge eol=lf
+
+# Binary asset types, routed through Git LFS.
+# Already-committed files of these types need "git lfs migrate import --include=..." to move into LFS.
+*.png  filter=lfs diff=lfs merge=lfs -text
+*.jpg  filter=lfs diff=lfs merge=lfs -text
+*.psd  filter=lfs diff=lfs merge=lfs -text
+*.fbx  filter=lfs diff=lfs merge=lfs -text
+*.wav  filter=lfs diff=lfs merge=lfs -text
+*.mp3  filter=lfs diff=lfs merge=lfs -text
+*.ogg  filter=lfs diff=lfs merge=lfs -text
+*.ttf  filter=lfs diff=lfs merge=lfs -text
+*.otf  filter=lfs diff=lfs merge=lfs -text
+*.dll  filter=lfs diff=lfs merge=lfs -text
