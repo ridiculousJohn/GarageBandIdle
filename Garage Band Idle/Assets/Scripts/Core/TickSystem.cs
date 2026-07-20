@@ -17,6 +17,14 @@ namespace RidiculousGaming.GarageBandIdle
         // slice; until then they are clamped rather than simulated as live ticks
         private const double MaxCatchUpSeconds = 5.0;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        [SerializeField]
+        [Tooltip("Debug: fast-forwards the economy by scaling elapsed time. Time.timeScale has no " +
+            "effect on the wall-clock tick, so this is the testing speed knob. Ignored in release builds.")]
+        [Min(0f)]
+        private float _debugTimeMultiplier = 1f;
+#endif
+
         private DateTime _lastUpdateUtc;
         private double _accumulator;
 
@@ -36,6 +44,12 @@ namespace RidiculousGaming.GarageBandIdle
                 delta = 0;
             if (delta > MaxCatchUpSeconds)
                 delta = MaxCatchUpSeconds;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // after the clamps: those guard the real wall clock, while this scales
+            // simulated time, so fast-forward isn't capped by MaxCatchUpSeconds
+            delta *= _debugTimeMultiplier;
+#endif
 
             _accumulator += delta;
             while (_accumulator >= TickInterval)

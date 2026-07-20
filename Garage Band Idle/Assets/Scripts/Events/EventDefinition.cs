@@ -70,6 +70,7 @@ namespace RidiculousGaming.GarageBandIdle.Events
 
         [Header("Goal")]
         [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
         private string _goalCurrencyId;
 
         [SerializeField]

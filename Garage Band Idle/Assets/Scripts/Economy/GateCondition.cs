@@ -33,10 +33,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private string _type;
 
         [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
         [Tooltip("Currency id, for the currency-based types.")]
         private string _currencyId;
 
         [SerializeField]
+        [DefinitionId(typeof(GeneratorDefinition))]
         [Tooltip("Generator id, for the ownedCount type.")]
         private string _generatorId;
 

@@ -25,7 +25,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Generator = generator;
             _producesDefinition = game.Currencies.GetDefinition(generator.Definition.ProducesCurrencyId);
 
-            _buyButton.onClick.AddListener(() => _game.BuyGenerator(Generator));
+            _buyButton.onClick.AddListener(HandleBuyClicked);
             Generator.OwnedChanged += Refresh;
 
             gameObject.SetActive(Generator.Unlocked);
@@ -34,8 +34,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void OnDestroy()
         {
+            _buyButton.onClick.RemoveListener(HandleBuyClicked);
             if (Generator != null)
                 Generator.OwnedChanged -= Refresh;
+        }
+
+        private void HandleBuyClicked()
+        {
+            _game.BuyGenerator(Generator);
         }
 
         public void Show()

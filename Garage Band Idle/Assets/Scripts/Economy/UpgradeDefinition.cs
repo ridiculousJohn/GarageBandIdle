@@ -37,6 +37,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         [Header("Cost")]
         [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
         [Tooltip("Currency id the purchase deducts from (content unlocks cost 0).")]
         private string _costCurrencyId;
 
@@ -94,6 +95,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private double _value;
 
         [SerializeField]
+        [DefinitionId(typeof(GeneratorDefinition))]
         [Tooltip("Target generator id, for generator-scoped effects.")]
         private string _generatorId;
 

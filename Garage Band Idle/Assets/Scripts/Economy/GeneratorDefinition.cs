@@ -19,6 +19,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private string _displayName;
 
         [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
         [Tooltip("Currency id this generator produces — and is bought with.")]
         private string _producesCurrencyId;
 

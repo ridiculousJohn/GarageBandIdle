@@ -10,11 +10,24 @@ namespace RidiculousGaming.GarageBandIdle.UI
         [SerializeField] private Button _jamButton;
         [SerializeField] private TextMeshProUGUI _jamLabel;
 
+        private ChapterContext _context;
+
         public void Initialize(ChapterContext context)
         {
+            _context = context;
             var cashDefinition = context.Game.Currencies.GetDefinition(GameManager.CashCurrencyId);
             _jamLabel.text = $"JAM\n<size=44>+{NumberFormatter.Format(context.Chapter.TapBaseValue, cashDefinition)} per tap</size>";
-            _jamButton.onClick.AddListener(() => context.Game.Jam());
+            _jamButton.onClick.AddListener(HandleJamClicked);
+        }
+
+        private void OnDestroy()
+        {
+            _jamButton.onClick.RemoveListener(HandleJamClicked);
+        }
+
+        private void HandleJamClicked()
+        {
+            _context.Game.Jam();
         }
     }
 }

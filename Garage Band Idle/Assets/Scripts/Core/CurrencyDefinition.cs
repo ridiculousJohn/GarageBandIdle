@@ -18,6 +18,7 @@ namespace RidiculousGaming.GarageBandIdle
         private string _displayName;
 
         [SerializeField]
+        [DefinitionId(typeof(CurrencyGroupDefinition))]
         [Tooltip("Id of the CurrencyGroupDefinition this currency belongs to.")]
         private string _groupId;
 
