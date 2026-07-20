@@ -2,51 +2,44 @@ using System;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // Runtime state for one generator. Constructed from hardcoded values in this
-    // slice; a data-driven GeneratorDefinition supplies the same parameters in a
-    // later slice. Cost follows the standard idle curve: baseCost * costGrowth^owned.
+    // Runtime state for one generator, wrapping its GeneratorDefinition asset.
+    // State lives here keyed by the definition; the definition itself is
+    // immutable content.
     public class Generator
     {
-        private readonly BigNumber _baseCost;
-        private readonly double _costGrowth;
-        private readonly BigNumber _ratePerSecondPerUnit;
-
-        public string DisplayName { get; }
-
-        // currency this generator produces and is bought with
-        public string CurrencyId { get; }
+        public GeneratorDefinition Definition { get; }
 
         public int Owned { get; private set; }
+
+        // set once by GeneratorSystem when the definition's unlock conditions are met
+        public bool Unlocked { get; private set; }
 
         // fires after a successful purchase changes Owned; code-only subscribers
         public event Action OwnedChanged;
 
-        public Generator(string displayName, string currencyId, BigNumber baseCost, double costGrowth, BigNumber ratePerSecondPerUnit)
+        public Generator(GeneratorDefinition definition)
         {
-            DisplayName = displayName;
-            CurrencyId = currencyId;
-            _baseCost = baseCost;
-            _costGrowth = costGrowth;
-            _ratePerSecondPerUnit = ratePerSecondPerUnit;
+            Definition = definition;
         }
 
-        public BigNumber NextCost => _baseCost * BigNumber.Pow(_costGrowth, Owned);
-        public BigNumber RatePerUnit => _ratePerSecondPerUnit;
-        public BigNumber ProductionPerSecond => _ratePerSecondPerUnit * Owned;
+        public BigNumber NextCost => CostCalculator.Cost(Definition, Owned);
 
-        public BigNumber Produce(double seconds) => ProductionPerSecond * seconds;
+        // base production before global multipliers (those apply in ProductionCalculator)
+        public BigNumber ProductionPerSecond => (BigNumber)Definition.BaseOutput * Owned;
 
         // buys one unit if affordable; deducts the cost and bumps Owned
         public bool TryBuy(CurrencyManager currencies)
         {
             var cost = NextCost;
-            if (currencies.Get(CurrencyId) < cost)
+            if (currencies.Get(Definition.ProducesCurrencyId) < cost)
                 return false;
 
-            currencies.Add(CurrencyId, -cost);
+            currencies.Add(Definition.ProducesCurrencyId, -cost);
             Owned++;
             OwnedChanged?.Invoke();
             return true;
         }
+
+        internal void MarkUnlocked() => Unlocked = true;
     }
 }

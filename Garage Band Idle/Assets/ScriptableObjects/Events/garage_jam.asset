@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f02b2e2936c9644e8fdfc8b1a7a46b8, type: 3}
+  m_Name: garage_jam
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Events.EventDefinition
+  _id: garage_jam
+  _displayName: Garage Jam Challenge
+  _type: challenge
+  _availableWhen:
+  - _type: currencyEarnedTotal
+    _currencyId: records
+    _generatorId: 
+    _flagId: 
+    _amount: 1
+  _baselineReset: 1
+  _tiers:
+  - _tier: 1
+    _debuffEffect: automationDisabled
+    _goalCurrencyId: cash
+    _goalAmount: 500
+    _timerSeconds: 60
+    _failable: 1
+    _rewardEffect: tapValueMultiplier
+    _rewardValue: 1.25
+    _rewardScope: permanentInChapter
+  - _tier: 2
+    _debuffEffect: automationDisabled
+    _goalCurrencyId: cash
+    _goalAmount: 2500
+    _timerSeconds: 60
+    _failable: 1
+    _rewardEffect: tapValueMultiplier
+    _rewardValue: 1.5
+    _rewardScope: permanentInChapter
+  - _tier: 3
+    _debuffEffect: automationDisabled
+    _goalCurrencyId: cash
+    _goalAmount: 10000
+    _timerSeconds: 45
+    _failable: 1
+    _rewardEffect: tapValueMultiplier
+    _rewardValue: 2
+    _rewardScope: permanentInChapter

@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3400de75cef473e48a80f169483871bc, type: 3}
+  m_Name: practice_amp
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.GeneratorDefinition
+  _id: practice_amp
+  _displayName: Practice Amp
+  _producesCurrencyId: cash
+  _baseCost: 60
+  _costGrowth: 1.15
+  _baseOutput: 0.4
+  _unlock:
+  - _type: currencyEarnedTotal
+    _currencyId: cash
+    _generatorId: 
+    _flagId: 
+    _amount: 100

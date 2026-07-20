@@ -28,6 +28,22 @@
     "tapBaseValue": 1
   },
 
+  "sections": [
+    {
+      "id": "garage_floor",
+      "name": "The Garage Floor",
+      "modules": [ "module/currency-header", "module/tap" ],
+      "note": "No visibleWhen: visible from chapter start. Modules are addressable prefab addresses; sections reveal as a group when their conditions hold (progressive reveal, design doc section 2)."
+    },
+    {
+      "id": "the_band",
+      "name": "The Band",
+      "modules": [ "module/generator-list" ],
+      "visibleWhen": { "type": "cashEarnedTotal", "value": 100 },
+      "note": "Appears with the Stage-0 goal; the practice_amp row unlocks at the same moment. Later sections gate on flags set by content unlocks, e.g. { \"type\": \"flagSet\", \"flag\": \"fans\" }."
+    }
+  ],
+
   "generators": [
     {
       "id": "practice_amp",

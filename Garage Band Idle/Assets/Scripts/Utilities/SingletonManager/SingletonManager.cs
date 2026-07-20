@@ -53,7 +53,19 @@ namespace RidiculousGaming.Utilities
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-        private static void ClearOnLoadRuntime() => Clear();
+        private static void ClearOnLoadRuntime()
+        {
+            Clear();
+
+            // With domain reload disabled statics survive exiting play mode, and
+            // Application.quitting fires on play-mode exit: OnQuitting latched
+            // _quitting = true and unsubscribed itself, which made GetInstance
+            // return null for every play session after the first. This hook runs
+            // on every play-mode entry, so undo both here.
+            _quitting = false;
+            Application.quitting -= OnQuitting;
+            Application.quitting += OnQuitting;
+        }
 
         public static bool IsAllocated<T>() where T : MonoBehaviour
         {

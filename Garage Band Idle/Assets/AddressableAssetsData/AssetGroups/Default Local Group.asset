@@ -1,0 +1,167 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Default Local Group
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: Default Local Group
+  m_GUID: 7e88b09079791284ba6172b641ee646d
+  m_SerializeEntries:
+  - m_GUID: 009e2e31a438007458c00cb04ca197fe
+    m_Address: generator/guitarist
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - generator
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 03f4ec6e88827fa4fa1780d20308bde7
+    m_Address: upgrade/kit_upgrade
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 14d433f0357bac846ae5965a44e4bb44
+    m_Address: generator/drummer
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - generator
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1a3c5e7f9b204d68e8a0c2b4d6f85963
+    m_Address: module/generator-list
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - module
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1ff546827aa28974cbe7999fa6e36b3c
+    m_Address: upgrade/learn_covers
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 220a64090d7522f4197adae3e6cba203
+    m_Address: cover/cover_1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - cover
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 22448b83a4dc18d4abc83b27242ed4ed
+    m_Address: event/garage_jam
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - event
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24e5002afd7266047bdc30dd8effa674
+    m_Address: upgrade/cut_demo
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2b6865bf1f175334b939718cb16a7903
+    m_Address: generator/bassist
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - generator
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 300f533775e67694ab808a8c555de778
+    m_Address: cover/cover_2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - cover
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 44d8f97d56374da4dad122c0bd578fd2
+    m_Address: cover/cover_3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - cover
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5d73ec3441964bcb9b7e504af3e46b25
+    m_Address: currency/Records
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - currency
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5eb497434d44df24f8c91ba2ce505837
+    m_Address: upgrade/tight_set
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6042f16ca9c5ada48a421eb3958661b9
+    m_Address: upgrade/play_for_crowd
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6dfda3c9f5fea7d4497d8a78e2ac8645
+    m_Address: upgrade/stage_presence
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7e3a5c9b1f264d80b4a6c8e0d2f41739
+    m_Address: module/currency-header
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - module
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8d598602cd5ff8840afefc493693dca8
+    m_Address: generator/practice_amp
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - generator
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9f5c7e3a1b486d20c6e8a0b2d4f63851
+    m_Address: module/tap
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - module
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c0817b7a99914dda9e77a6246aa6e70f
+    m_Address: currency-group/Permanent
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - currency-group
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ca9efcfe00b04139968b6ee89cfef8db
+    m_Address: currency/Fans
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - currency
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d0d8ee061d494e289722acf5846c96bd
+    m_Address: currency-group/Run
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - currency-group
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: da80299a70a642698ac9d17878e6ed62
+    m_Address: currency/Cash
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - currency
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e1571e7fc2db3634e8551a687714abec
+    m_Address: upgrade/amp_strings
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f1a7795fdd6886e488430f6abfe35c19
+    m_Address: chapter/ch01_garage
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - chapter
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: a84e26c054cc3934abc54db007d36bf0, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 2eb37ad2e7f24b54e94d98d3919cf6cc, type: 2}
+    - {fileID: 11400000, guid: 7299d9a96c93fbe4381b68c262e180cf, type: 2}

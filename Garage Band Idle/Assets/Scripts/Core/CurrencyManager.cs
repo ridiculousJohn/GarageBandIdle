@@ -12,6 +12,7 @@ namespace RidiculousGaming.GarageBandIdle
         private readonly Dictionary<string, CurrencyDefinition> _definitions = new();
         private readonly Dictionary<string, CurrencyGroupDefinition> _groups = new();
         private readonly Dictionary<string, BigNumber> _balances = new();
+        private readonly Dictionary<string, BigNumber> _lifetimeEarned = new();
 
         // fires on every balance change with the currency id and new balance;
         // UI listens here, nothing polls
@@ -59,6 +60,7 @@ namespace RidiculousGaming.GarageBandIdle
 
                 _definitions.Add(definition.Id, definition);
                 _balances.Add(definition.Id, definition.StartingValue);
+                _lifetimeEarned.Add(definition.Id, BigNumber.Zero);
             }
         }
 
@@ -73,6 +75,14 @@ namespace RidiculousGaming.GarageBandIdle
 
         public BigNumber Get(string id)
         {
+            // null/empty guards on every id entry point: content mistakes must
+            // report loudly, never throw out of a Dictionary
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogError("CurrencyManager: Get with a null or empty currency id. Returning zero.");
+                return BigNumber.Zero;
+            }
+
             if (_balances.TryGetValue(id, out var balance))
                 return balance;
 
@@ -80,10 +90,46 @@ namespace RidiculousGaming.GarageBandIdle
             return BigNumber.Zero;
         }
 
-        public void Add(string id, BigNumber amount) => Set(id, Get(id) + amount);
+        public void Add(string id, BigNumber amount)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogError("CurrencyManager: Add with a null or empty currency id. Ignoring.");
+                return;
+            }
+
+            // positive additions accrue into the lifetime-earned stat backing
+            // earned-total unlock gates; spends (negative adds) never lower it
+            if (amount > BigNumber.Zero && _lifetimeEarned.ContainsKey(id))
+                _lifetimeEarned[id] += amount;
+
+            Set(id, Get(id) + amount);
+        }
+
+        // total ever earned (starting value excluded); used by earned-total gates
+        public BigNumber GetLifetimeEarned(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogError("CurrencyManager: GetLifetimeEarned with a null or empty currency id. Returning zero.");
+                return BigNumber.Zero;
+            }
+
+            if (_lifetimeEarned.TryGetValue(id, out var earned))
+                return earned;
+
+            Debug.LogError($"CurrencyManager: GetLifetimeEarned on unknown currency id '{id}'. Returning zero.");
+            return BigNumber.Zero;
+        }
 
         public void Set(string id, BigNumber value)
         {
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogError("CurrencyManager: Set with a null or empty currency id. Ignoring.");
+                return;
+            }
+
             if (!_balances.ContainsKey(id))
             {
                 Debug.LogError($"CurrencyManager: Set on unknown currency id '{id}'. Ignoring.");

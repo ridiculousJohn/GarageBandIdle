@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6db6dd836707e824da7c6a25a84bf763, type: 3}
+  m_Name: ch01_garage
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.ChapterDefinition
+  _id: ch01_garage
+  _index: 1
+  _displayName: Garage / Basement
+  _theme: The band forms in a garage and plays its first backyard show.
+  _storyBeatOpen: It starts in the garage. Just you, a beat-up amp, and a handful
+    of songs you half-know. Time to make some noise.
+  _storyBeatCapstone: "The backyard's packed. You plug in, count off, and for three
+    minutes the whole neighborhood is yours. Someone's already asking when the next
+    one is \u2014 and a guy named Dave offers to haul your gear. You've got your
+    first roadie."
+  _capstoneRecordsGate: 30
+  _tapBaseValue: 1
+  _recordBuffPerRecord: 0.02
+  _fans:
+    _baseFansPerSec: 0.2
+    _perBandmateOwnedBonus: 0.02
+  _rehearsal:
+    _pointsPerSec: 1
+    _pointsPerTap: 2
+  _sections:
+  - _id: garage_floor
+    _displayName: The Garage Floor
+    _moduleAddresses:
+    - module/currency-header
+    - module/tap
+    _visibleWhen: []
+  - _id: the_band
+    _displayName: The Band
+    _moduleAddresses:
+    - module/generator-list
+    _visibleWhen:
+    - _type: currencyEarnedTotal
+      _currencyId: cash
+      _generatorId: 
+      _flagId: 
+      _amount: 100
+  _generators:
+  - {fileID: 11400000, guid: 8d598602cd5ff8840afefc493693dca8, type: 2}
+  - {fileID: 11400000, guid: 14d433f0357bac846ae5965a44e4bb44, type: 2}
+  - {fileID: 11400000, guid: 2b6865bf1f175334b939718cb16a7903, type: 2}
+  - {fileID: 11400000, guid: 009e2e31a438007458c00cb04ca197fe, type: 2}
+  _upgrades:
+  - {fileID: 11400000, guid: 6dfda3c9f5fea7d4497d8a78e2ac8645, type: 2}
+  - {fileID: 11400000, guid: e1571e7fc2db3634e8551a687714abec, type: 2}
+  - {fileID: 11400000, guid: 03f4ec6e88827fa4fa1780d20308bde7, type: 2}
+  - {fileID: 11400000, guid: 5eb497434d44df24f8c91ba2ce505837, type: 2}
+  - {fileID: 11400000, guid: 6042f16ca9c5ada48a421eb3958661b9, type: 2}
+  - {fileID: 11400000, guid: 1ff546827aa28974cbe7999fa6e36b3c, type: 2}
+  - {fileID: 11400000, guid: 24e5002afd7266047bdc30dd8effa674, type: 2}
+  _covers:
+  - {fileID: 11400000, guid: 220a64090d7522f4197adae3e6cba203, type: 2}
+  - {fileID: 11400000, guid: 300f533775e67694ab808a8c555de778, type: 2}
+  - {fileID: 11400000, guid: 44d8f97d56374da4dad122c0bd578fd2, type: 2}
+  _events:
+  - {fileID: 11400000, guid: 22448b83a4dc18d4abc83b27242ed4ed, type: 2}

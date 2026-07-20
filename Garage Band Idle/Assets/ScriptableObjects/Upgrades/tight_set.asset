@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da0688336f1d57f48bbcb6016a7a2455, type: 3}
+  m_Name: tight_set
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
+  _id: tight_set
+  _displayName: Tight Set
+  _type: buff
+  _scope: run
+  _costCurrencyId: cash
+  _costAmount: 20000
+  _gate:
+  - _type: currencyBalance
+    _currencyId: fans
+    _generatorId: 
+    _flagId: 
+    _amount: 30
+  _payload:
+    _effect: allCashPerSecMultiplier
+    _value: 1.5
+    _generatorId: 
+    _systemId: 
