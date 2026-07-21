@@ -14,23 +14,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: amp_strings
   _displayName: New Strings
-  _type: 0
-  _scope: 0
+  _type: 1
+  _scope: 1
   _costCurrencyId: cash
   _costAmount: 500
   _gate:
-    rid: 5051021673168896011
+    rid: 5051021673598812171
   _payload:
-    rid: 5051021673168896012
+    rid: 5051021673598812172
   references:
     version: 2
     RefIds:
-    - rid: 5051021673168896011
+    - rid: 5051021673598812171
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
         _amount: 500
-    - rid: 5051021673168896012
+    - rid: 5051021673598812172
       type: {class: GeneratorOutputMultiplierPayload, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         _generatorId: practice_amp

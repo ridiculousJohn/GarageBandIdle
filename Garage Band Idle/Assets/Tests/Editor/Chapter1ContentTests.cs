@@ -177,6 +177,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
 
+            Assert.AreEqual("fans", chapter.Fans.CurrencyId, "accrual currency comes from the JSON fans block");
+            Assert.AreEqual("fans", chapter.Fans.RevealFlagId, "activation flag comes from the JSON fans block");
             Assert.AreEqual(0.2, chapter.Fans.BaseFansPerSec, 1e-9);
             Assert.AreEqual(0.02, chapter.Fans.PerBandmateOwnedBonus, 1e-9);
         }

@@ -16,6 +16,8 @@ namespace RidiculousGaming.GarageBandIdle
         {
             foreach (var chapter in database.Chapters.All)
             {
+                context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)");
+                ValidateFlag(chapter.Fans.RevealFlagId, context, $"Chapter '{chapter.Id}' (fans revealFlag)");
                 ValidateIds(chapter.SectionIds, database.Sections, $"Chapter '{chapter.Id}' (sections)");
                 ValidateIds(chapter.GeneratorIds, database.Generators, $"Chapter '{chapter.Id}' (generators)");
                 ValidateIds(chapter.UpgradeIds, database.Upgrades, $"Chapter '{chapter.Id}' (upgrades)");
@@ -35,6 +37,10 @@ namespace RidiculousGaming.GarageBandIdle
 
             foreach (var upgrade in database.Upgrades.All)
             {
+                if (upgrade.Type == UpgradeType.None)
+                    Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has type None (uninitialized).");
+                if (upgrade.Scope == ContentScope.None)
+                    Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has scope None (uninitialized).");
                 ConditionEvaluator.Validate(upgrade.Gate, context, $"Upgrade '{upgrade.Id}' (gate)");
                 if (upgrade.Payload == null)
                     Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload.");
@@ -44,6 +50,10 @@ namespace RidiculousGaming.GarageBandIdle
 
             foreach (var group in database.BarGroups.All)
             {
+                if (group.FillMode == BarFillMode.None)
+                    Debug.LogError($"ContentValidator: Bar group '{group.Id}' has fill mode None (uninitialized).");
+                if (group.Scope == ContentScope.None)
+                    Debug.LogError($"ContentValidator: Bar group '{group.Id}' has scope None (uninitialized).");
                 ValidateFlag(group.RevealFlagId, context, $"Bar group '{group.Id}' (revealFlag)");
                 ValidateIds(group.BarIds, database.Bars, $"Bar group '{group.Id}' (bars)");
             }
@@ -69,6 +79,14 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 if (reward is SetFlagReward setFlag)
                     ValidateFlag(setFlag.FlagId, context, $"Reward '{reward.Id}' (setFlag)");
+                var scope = reward switch
+                {
+                    FanRateMultiplierReward fanRate => fanRate.Scope,
+                    TapValueMultiplierReward tapValue => tapValue.Scope,
+                    _ => (ContentScope?)null,
+                };
+                if (scope == ContentScope.None)
+                    Debug.LogError($"ContentValidator: Reward '{reward.Id}' has scope None (uninitialized).");
             }
         }
 

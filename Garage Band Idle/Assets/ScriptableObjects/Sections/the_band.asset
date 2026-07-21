@@ -17,11 +17,11 @@ MonoBehaviour:
   _moduleAddresses:
   - module/generator-list
   _visibleWhen:
-    rid: 5051021673168896010
+    rid: 5051021673598812170
   references:
     version: 2
     RefIds:
-    - rid: 5051021673168896010
+    - rid: 5051021673598812170
       type: {class: CurrencyEarnedTotalCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash

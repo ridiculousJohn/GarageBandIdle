@@ -15,4 +15,4 @@ MonoBehaviour:
   _id: fan_rate_x1_20
   _displayName: "Fan Rate \xD71.20"
   _value: 1.2
-  _scope: 0
+  _scope: 1

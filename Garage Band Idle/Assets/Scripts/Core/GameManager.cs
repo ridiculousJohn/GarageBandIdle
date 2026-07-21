@@ -22,10 +22,12 @@ namespace RidiculousGaming.GarageBandIdle
         // CurrencyManager) so the currency set remains open
         public const string CashCurrencyId = "cash";
         public const string RecordsCurrencyId = "records";
-        public const string FansCurrencyId = "fans";
 
-        // the fans flag doubles as the fan system's activation switch —
-        // play_for_crowd's setFlag payload latches it
+        // UI display touchpoints only (CurrencyHeaderModule/TapModule name what
+        // they show); the fan SYSTEM takes its ids from the chapter's fans
+        // config. The playable pass (slice 10) replaces these with a
+        // data-driven currency header.
+        public const string FansCurrencyId = "fans";
         public const string FansUnlockFlagId = "fans";
 
         public ContentDatabase Database { get; private set; }
@@ -74,7 +76,7 @@ namespace RidiculousGaming.GarageBandIdle
                 Flags = new FlagSystem(CurrentChapter.FlagIds);
                 Generators = new GeneratorSystem(Resolve(Database.Generators, CurrentChapter.GeneratorIds, "generator"), Currencies);
                 Upgrades = new UpgradeSystem(Resolve(Database.Upgrades, CurrentChapter.UpgradeIds, "upgrade"), Currencies, Flags);
-                Fans = new FanSystem(CurrentChapter.Fans, FansCurrencyId, FansUnlockFlagId, Currencies, Generators, Flags);
+                Fans = new FanSystem(CurrentChapter.Fans, Currencies, Generators, Flags);
                 Rewards = new RewardManager(Database.Rewards.All);
                 Sections = Resolve(Database.Sections, CurrentChapter.SectionIds, "section");
 

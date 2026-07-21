@@ -5,13 +5,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // What kind of upgrade this is — a closed, code-defined set (ContentScope
     // has the rationale). The chapter JSON spells these "buff" / "contentUnlock".
+    // Explicit values: the numbers are the serialization contract, and zero is
+    // reserved for the uninitialized state (see ContentScope). Append with new
+    // values only.
     public enum UpgradeType
     {
+        None = 0,
+
         // run-scoped stat buff, re-bought each run
-        Buff,
+        Buff = 1,
 
         // reveals a system/currency/generator; permanent within the chapter
-        ContentUnlock,
+        ContentUnlock = 2,
     }
 
     // One upgrade (design doc section 4). Gates are the shared Condition type;

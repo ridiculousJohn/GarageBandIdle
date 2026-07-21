@@ -26,6 +26,8 @@ MonoBehaviour:
   _tapBaseValue: 1
   _recordBuffPerRecord: 0.02
   _fans:
+    _currencyId: fans
+    _revealFlagId: fans
     _baseFansPerSec: 0.2
     _perBandmateOwnedBonus: 0.02
   _rehearsal:

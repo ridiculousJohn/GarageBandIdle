@@ -14,23 +14,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: stage_presence
   _displayName: Stage Presence
-  _type: 0
-  _scope: 0
+  _type: 1
+  _scope: 1
   _costCurrencyId: cash
   _costAmount: 250
   _gate:
-    rid: 5051021673168896025
+    rid: 5051021673598812185
   _payload:
-    rid: 5051021673168896026
+    rid: 5051021673598812186
   references:
     version: 2
     RefIds:
-    - rid: 5051021673168896025
+    - rid: 5051021673598812185
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
         _amount: 250
-    - rid: 5051021673168896026
+    - rid: 5051021673598812186
       type: {class: TapValueAddPayload, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         _value: 1

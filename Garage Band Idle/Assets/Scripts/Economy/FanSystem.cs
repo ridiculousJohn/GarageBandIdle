@@ -9,26 +9,23 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     public class FanSystem
     {
         private readonly FansConfig _config;
-        private readonly string _fansCurrencyId;
-        private readonly string _activationFlagId;
         private readonly CurrencyManager _currencies;
         private readonly GeneratorSystem _generators;
         private readonly FlagSystem _flags;
 
-        public FanSystem(FansConfig config, string fansCurrencyId, string activationFlagId,
-            CurrencyManager currencies, GeneratorSystem generators, FlagSystem flags)
+        // the accrual currency and activation flag come from the chapter's fans
+        // config (JSON), not from code
+        public FanSystem(FansConfig config, CurrencyManager currencies, GeneratorSystem generators, FlagSystem flags)
         {
             _config = config;
-            _fansCurrencyId = fansCurrencyId;
-            _activationFlagId = activationFlagId;
             _currencies = currencies;
             _generators = generators;
             _flags = flags;
 
-            _currencies.ValidateReference(fansCurrencyId, "FanSystem (accrual)");
+            _currencies.ValidateReference(config.CurrencyId, "FanSystem (accrual)");
         }
 
-        public bool Active => _flags.IsSet(_activationFlagId);
+        public bool Active => _flags.IsSet(_config.RevealFlagId);
 
         private BigNumber _rateMultiplier = BigNumber.One;
 
@@ -59,7 +56,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             var rate = RatePerSecond;
             if (rate > BigNumber.Zero)
-                _currencies.Add(_fansCurrencyId, rate * seconds);
+                _currencies.Add(_config.CurrencyId, rate * seconds);
         }
     }
 }

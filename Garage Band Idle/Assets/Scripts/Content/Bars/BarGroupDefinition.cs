@@ -6,11 +6,16 @@ namespace RidiculousGaming.GarageBandIdle.Content
     // How a bar group distributes its fill currency — a closed, code-defined
     // set: the bar system has one fill behavior per mode. The chapter JSON
     // spells these "perBar" (etc.).
+    // Explicit values: the numbers are the serialization contract, and zero is
+    // reserved for the uninitialized state (see ContentScope). Append with new
+    // values only.
     public enum BarFillMode
     {
+        None = 0,
+
         // player-directed: each bar accrues its own progress and the player
         // chooses which bar the fill currency pours into
-        PerBar,
+        PerBar = 1,
     }
 
     // An ordered group of fillable bars that reveals as one unit (Learn Covers).

@@ -361,6 +361,12 @@ capped; checksum rejects edits.
 > - Minimal but legible UI, laid out through the module registry: current Cash/Fans/Rehearsal/Records,
 >   generator rows, upgrade list, cover bars, Release button, event entry, collect screen. Use a
 >   `NumberFormatter` for big-number display (1.23K / 4.56M / etc.).
+> - Make the currency header data-driven: it currently names its currencies through hardcoded ids
+>   (`GameManager.CashCurrencyId` / `FansCurrencyId` / `FansUnlockFlagId`, read by
+>   `CurrencyHeaderModule` and `TapModule`). Replace those UI consts with display driven by the
+>   chapter's revealed currencies, so a chapter with different currencies needs no UI code change.
+>   (The fan SYSTEM already takes its currency/flag from the chapter's `fans` config — this is the
+>   remaining UI half.)
 >
 > Goal: a new player can play Chapter 1 start to finish — tap, build, learn a cover, cut a demo,
 > loop, do the event, and hit the Backyard Party capstone. Stop here.

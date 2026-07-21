@@ -90,7 +90,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var generators = new GeneratorSystem(
                 new[] { TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true) },
                 currencies);
-            var fans = new FanSystem(new FansConfig(0.2, 0.02), "fans", "fans", currencies, generators, flags);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
 
             fans.Tick(10);
             Assert.AreEqual(0.0, currencies.Get("fans").ToDouble(), 1e-9, "no accrual before the flag");
@@ -110,7 +110,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var flags = new FlagSystem();
             flags.Set("fans");
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            var fans = new FanSystem(new FansConfig(0.2, 0.02), "fans", "fans", currencies, generators, flags);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
             var context = new Content.RewardContext(currencies, flags, fans);
 
             TestContent.MakeFanRateReward("boost_a", 1.15).Apply(context);
@@ -138,7 +138,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var flags = new FlagSystem();
             flags.Set("fans");
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            var fans = new FanSystem(new FansConfig(0.2, 0.02), "fans", "fans", currencies, generators, flags);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
             var rewards = new Content.RewardManager(new Content.RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -168,7 +168,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true),
                 TestContent.MakeGenerator("bassist", "cash", 4000, 1.15, 20, isBandmate: true),
             }, currencies);
-            var fans = new FanSystem(new FansConfig(0.2, 0.02), "fans", "fans", currencies, generators, flags);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
 
             TestContent.BuyTimes(generators.Get("drummer"), currencies, 2);
             TestContent.BuyTimes(generators.Get("bassist"), currencies, 1);

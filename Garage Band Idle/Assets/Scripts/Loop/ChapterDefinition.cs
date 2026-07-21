@@ -134,11 +134,21 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 #endif
     }
 
-    // Fan accrual tuning (design doc section 6): fan rate is a function of band
-    // size and time only, never Cash.
+    // Fan accrual config (design doc section 6): fan rate is a function of band
+    // size and time only, never Cash. The currency accrued into and the flag
+    // that activates accrual are chapter data, not code bindings.
     [Serializable]
     public class FansConfig
     {
+        [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
+        [Tooltip("Currency id the fan system accrues into.")]
+        private string _currencyId;
+
+        [SerializeField]
+        [Tooltip("Flag that activates fan accrual (the single reveal registry).")]
+        private string _revealFlagId;
+
         [SerializeField]
         private double _baseFansPerSec;
 
@@ -146,14 +156,18 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         [Tooltip("Bonus fans/sec per owned bandmate unit (not gear like the practice amp).")]
         private double _perBandmateOwnedBonus;
 
+        public string CurrencyId => _currencyId;
+        public string RevealFlagId => _revealFlagId;
         public double BaseFansPerSec => _baseFansPerSec;
         public double PerBandmateOwnedBonus => _perBandmateOwnedBonus;
 
         public FansConfig() { }
 
 #if UNITY_EDITOR
-        public FansConfig(double baseFansPerSec, double perBandmateOwnedBonus)
+        public FansConfig(string currencyId, string revealFlagId, double baseFansPerSec, double perBandmateOwnedBonus)
         {
+            _currencyId = currencyId;
+            _revealFlagId = revealFlagId;
             _baseFansPerSec = baseFansPerSec;
             _perBandmateOwnedBonus = perBandmateOwnedBonus;
         }

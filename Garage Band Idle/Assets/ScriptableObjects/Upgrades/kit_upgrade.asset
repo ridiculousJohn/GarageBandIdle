@@ -14,23 +14,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: kit_upgrade
   _displayName: Bigger Kit
-  _type: 0
-  _scope: 0
+  _type: 1
+  _scope: 1
   _costCurrencyId: cash
   _costAmount: 5000
   _gate:
-    rid: 5051021673168896016
+    rid: 5051021673598812176
   _payload:
-    rid: 5051021673168896017
+    rid: 5051021673598812177
   references:
     version: 2
     RefIds:
-    - rid: 5051021673168896016
+    - rid: 5051021673598812176
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
         _amount: 5000
-    - rid: 5051021673168896017
+    - rid: 5051021673598812177
       type: {class: GeneratorOutputMultiplierPayload, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         _generatorId: drummer

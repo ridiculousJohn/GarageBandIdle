@@ -207,7 +207,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
                 data.chapter.capstoneRecordsGate,
                 data.constants?.tapBaseValue ?? 1, data.constants?.recordBuffPerRecord ?? 0,
-                new FansConfig(data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0),
+                new FansConfig(data.fans?.currency, data.fans?.revealFlag,
+                    data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0),
                 new RehearsalConfig(data.rehearsal?.perSec ?? 0, data.rehearsal?.perTap ?? 0),
                 flagIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds);
             EditorUtility.SetDirty(chapterAsset);
@@ -704,6 +705,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         [Serializable]
         private class FansBlock
         {
+            public string currency;
+            public string revealFlag;
             public double baseFansPerSec;
             public double perBandmateOwnedBonus;
         }
