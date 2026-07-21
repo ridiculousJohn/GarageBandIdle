@@ -18,6 +18,23 @@ namespace RidiculousGaming.GarageBandIdle.Content
         PerBar = 1,
     }
 
+    // How fill currency moves from the shared pool into the target bar - the
+    // trigger, orthogonal to BarFillMode's bookkeeping. A closed, code-defined
+    // set: one transfer behavior per mode. The chapter JSON spells these
+    // "continuous" (etc.). Future modes (tap a fixed chunk, dump the pool) are
+    // appended values, not new systems.
+    // Explicit values: the numbers are the serialization contract, and zero is
+    // reserved for the uninitialized state. Append with new values only.
+    public enum BarFillDelivery
+    {
+        None = 0,
+
+        // accrued fill currency streams through the pool into the group's
+        // active bar as it arrives; the pool only holds a balance when no bar
+        // is selected
+        Continuous = 1,
+    }
+
     // An ordered group of fillable bars that reveals as one unit (Learn Covers).
     // Reveal runs through the flag registry like all content; the group's scope
     // drives reset on album release. Fill behavior arrives with the bars slice.
@@ -41,6 +58,9 @@ namespace RidiculousGaming.GarageBandIdle.Content
         private BarFillMode _fillMode;
 
         [SerializeField]
+        private BarFillDelivery _delivery;
+
+        [SerializeField]
         [Tooltip("Reset logic acts on this field.")]
         private ContentScope _scope;
 
@@ -53,18 +73,20 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public string DisplayName => _displayName;
         public string RevealFlagId => _revealFlagId;
         public BarFillMode FillMode => _fillMode;
+        public BarFillDelivery Delivery => _delivery;
         public ContentScope Scope => _scope;
         public IReadOnlyList<string> BarIds => _barIds;
 
 #if UNITY_EDITOR
         // importer-only: bar group assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, string revealFlagId,
-            BarFillMode fillMode, ContentScope scope, List<string> barIds)
+            BarFillMode fillMode, BarFillDelivery delivery, ContentScope scope, List<string> barIds)
         {
             _id = id;
             _displayName = displayName;
             _revealFlagId = revealFlagId;
             _fillMode = fillMode;
+            _delivery = delivery;
             _scope = scope;
             _barIds = barIds;
         }

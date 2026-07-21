@@ -99,6 +99,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - section
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4445c72faf464ace99621e00cc4815a3
+    m_Address: module/bar-list
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - module
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4a52d7e60acfe554b91531a7b74c64e8
     m_Address: bar/cover_1
     m_ReadOnly: 0
@@ -206,6 +212,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e2c4830beaf714b4799b42021de585e5
+    m_Address: section/rehearsal_space
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - section
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f1a7795fdd6886e488430f6abfe35c19
     m_Address: chapter/ch01_garage

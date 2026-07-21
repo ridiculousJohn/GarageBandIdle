@@ -18,6 +18,14 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)");
                 ValidateFlag(chapter.Fans.RevealFlagId, context, $"Chapter '{chapter.Id}' (fans revealFlag)");
+
+                // a chapter without a fill currency is legal; one that declares it
+                // must resolve both the currency and its activation flag
+                if (!string.IsNullOrEmpty(chapter.Rehearsal.CurrencyId))
+                {
+                    context.Currencies.ValidateReference(chapter.Rehearsal.CurrencyId, $"Chapter '{chapter.Id}' (rehearsal currency)");
+                    ValidateFlag(chapter.Rehearsal.RevealFlagId, context, $"Chapter '{chapter.Id}' (rehearsal revealFlag)");
+                }
                 ValidateIds(chapter.SectionIds, database.Sections, $"Chapter '{chapter.Id}' (sections)");
                 ValidateIds(chapter.GeneratorIds, database.Generators, $"Chapter '{chapter.Id}' (generators)");
                 ValidateIds(chapter.UpgradeIds, database.Upgrades, $"Chapter '{chapter.Id}' (upgrades)");
@@ -52,6 +60,8 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 if (group.FillMode == BarFillMode.None)
                     Debug.LogError($"ContentValidator: Bar group '{group.Id}' has fill mode None (uninitialized).");
+                if (group.Delivery == BarFillDelivery.None)
+                    Debug.LogError($"ContentValidator: Bar group '{group.Id}' has delivery None (uninitialized).");
                 if (group.Scope == ContentScope.None)
                     Debug.LogError($"ContentValidator: Bar group '{group.Id}' has scope None (uninitialized).");
                 ValidateFlag(group.RevealFlagId, context, $"Bar group '{group.Id}' (revealFlag)");

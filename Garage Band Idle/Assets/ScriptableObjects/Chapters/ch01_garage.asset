@@ -31,6 +31,8 @@ MonoBehaviour:
     _baseFansPerSec: 0.2
     _perBandmateOwnedBonus: 0.02
   _rehearsal:
+    _currencyId: rehearsal
+    _revealFlagId: covers
     _pointsPerSec: 1
     _pointsPerTap: 2
   _flagIds:
@@ -40,6 +42,7 @@ MonoBehaviour:
   _sectionIds:
   - garage_floor
   - the_band
+  - rehearsal_space
   _generatorIds:
   - practice_amp
   - drummer

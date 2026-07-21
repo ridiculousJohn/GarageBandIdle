@@ -5,7 +5,7 @@
     "modelNotes": {
       "conditions": "Every gate/unlock/visibility/availability rule is a single discriminated Condition shape — always an object with a `type` field — evaluated by ONE ConditionEvaluator. No bare/heterogeneous shapes. Types used in Ch1: `currency` (current balance ≥ amount), `currencyEarnedTotal` (lifetime earned ≥ value), `ownedCount` (generator owned ≥ value), `flagSet` (a flag is set), `barsCompleted` (≥ value bars completed in a group), `recordsCumulative` (cumulative Records ≥ value), `compound` (all/any of nested Conditions).",
       "flags": "One flag registry drives every progressive reveal. A content-unlock upgrade's payload is `setFlag`; a reward's payload can also be `setFlag`; sections, currencies, bar groups, and any gated content reveal on a `flagSet` Condition. There is no separate `unlockSystem` code path — revealing a system = setting its flag.",
-      "bars": "A 'Learn Covers' cover is a generic fillable BAR. A bar declares `fillCurrency` (a currency id) + `fillRequirement` + `reward`; the fill logic reads `fillCurrency` and never hardcodes covers. Rehearsal is an ordinary run-scoped currency with its own earn config (per-sec tick + per-tap yield). Bars and their fill currency meet only through the `fillCurrency` id — mirrors how generators declare `produces`.",
+      "bars": "A 'Learn Covers' cover is a generic fillable BAR. A bar declares `fillCurrency` (a currency id) + `fillRequirement` + `reward`; the fill logic reads `fillCurrency` and never hardcodes covers. Rehearsal is an ordinary run-scoped currency with its own earn config (per-sec tick + per-tap yield). Bars and their fill currency meet only through the `fillCurrency` id — mirrors how generators declare `produces`. A group also declares `delivery` (how currency moves from pool to bar: `continuous` in Ch1) as per-group data, so a chapter that wants tap-to-pour is a data change, not a new system.",
       "addressables": "Chapters, Generators, Upgrades, Events, Bars, Currencies, CurrencyGroups, and Rewards are all loaded by Addressables label. Managers build their registries from whatever assets carry the label — no hardcoded lists, no direct scene/asset references."
     },
     "currencies": {
@@ -54,6 +54,13 @@
       "modules": [ "module/generator-list" ],
       "visibleWhen": { "type": "currencyEarnedTotal", "currency": "cash", "value": 100 },
       "note": "Appears with the Stage-0 goal; the practice_amp row unlocks at the same moment. Later sections gate on flags, e.g. { \"type\": \"flagSet\", \"flag\": \"fans\" }."
+    },
+    {
+      "id": "rehearsal_space",
+      "name": "The Rehearsal Space",
+      "modules": [ "module/bar-list" ],
+      "visibleWhen": { "type": "flagSet", "flag": "covers" },
+      "note": "The bars region: Learn Covers rows plus the Rehearsal readout. Gates on the covers flag (set by learn_covers at 25 Fans) — the same flag that activates Rehearsal accrual and reveals the bar group, so the whole system appears as one moment."
     }
   ],
 
@@ -205,6 +212,8 @@
         "name": "Learn Covers",
         "revealFlag": "covers",
         "fillMode": "perBar",
+        "delivery": "continuous",
+        "deliveryNote": "How fill currency moves from the pool into the target — orthogonal to fillMode's bookkeeping. `continuous`: accrued Rehearsal streams into the group's active (player-selected) bar as it arrives; the pool only holds a balance when no bar is selected. Future modes (tap a fixed chunk, dump the pool) are new delivery values, not new systems.",
         "fillModeNote": "perBar / player-directed: each bar accrues its OWN progress by draining the shared Rehearsal pool; the player chooses which bar to pour Rehearsal into. Bars are independent (not cumulative thresholds on one counter). Totals: 120 + 300 + 600 = 1020 Rehearsal to finish all three.",
         "bars": [
           { "id": "cover_1", "name": "Three-Chord Anthem",  "fillCurrency": "rehearsal", "fillRequirement": 120, "reward": "fan_rate_x1_15" },

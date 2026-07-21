@@ -30,6 +30,11 @@ namespace RidiculousGaming.GarageBandIdle.Content
         // startup check for content holding a reward id (bars, event tiers)
         public bool Contains(string id) => !string.IsNullOrEmpty(id) && _byId.ContainsKey(id);
 
+        // display lookup for UI naming a payoff; boot validation already
+        // reported unknown ids, so a miss here returns null quietly
+        public RewardDefinition Get(string id)
+            => !string.IsNullOrEmpty(id) && _byId.TryGetValue(id, out var reward) ? reward : null;
+
         public void Apply(string rewardId, RewardContext context)
         {
             if (!_byId.TryGetValue(rewardId ?? "", out var reward))

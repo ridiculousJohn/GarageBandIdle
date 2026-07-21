@@ -179,6 +179,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 var groupAsset = LoadOrCreate<BarGroupDefinition>($"{BarGroupsFolder}/{group.id}.asset");
                 groupAsset.EditorInitialize(group.id, group.name, group.revealFlag,
                     ToFillMode(group.fillMode, $"bar group '{group.id}'"),
+                    ToDelivery(group.delivery, $"bar group '{group.id}'"),
                     ToScope(data.bars.scope, $"bar group '{group.id}'"), barIds);
                 EditorUtility.SetDirty(groupAsset);
                 barGroupIds.Add(group.id);
@@ -209,7 +210,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 data.constants?.tapBaseValue ?? 1, data.constants?.recordBuffPerRecord ?? 0,
                 new FansConfig(data.fans?.currency, data.fans?.revealFlag,
                     data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0),
-                new RehearsalConfig(data.rehearsal?.perSec ?? 0, data.rehearsal?.perTap ?? 0),
+                new RehearsalConfig(data.rehearsal?.currency, data.rehearsal?.revealFlag,
+                    data.rehearsal?.perSec ?? 0, data.rehearsal?.perTap ?? 0),
                 flagIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds);
             EditorUtility.SetDirty(chapterAsset);
 
@@ -490,6 +492,18 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
         }
 
+        private static BarFillDelivery ToDelivery(string delivery, string context)
+        {
+            switch (delivery)
+            {
+                case "continuous":
+                    return BarFillDelivery.Continuous;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown delivery '{delivery}'. Defaulting to continuous.");
+                    return BarFillDelivery.Continuous;
+            }
+        }
+
         // "rehearsal" to "Rehearsal" — display names for currencies the JSON
         // declares by id only
         private static string ToDisplayName(string id)
@@ -689,6 +703,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string name;
             public string revealFlag;
             public string fillMode;
+            public string delivery;
             public BarBlock[] bars;
         }
 

@@ -20,11 +20,11 @@ MonoBehaviour:
   _costGrowth: 1.15
   _baseOutput: 20
   _unlock:
-    rid: 5051021673832906752
+    rid: 5051021674712399872
   references:
     version: 2
     RefIds:
-    - rid: 5051021673832906752
+    - rid: 5051021674712399872
       type: {class: OwnedCountCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _generatorId: drummer

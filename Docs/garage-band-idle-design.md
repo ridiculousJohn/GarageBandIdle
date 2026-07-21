@@ -170,7 +170,10 @@ Moment-to-moment play draws on the systems defined elsewhere:
   a passive tick), so progress comes from engagement rather than Cash. When a group offers several bars
   at once, filling is **player-directed**: the player chooses which bar to pour the fill currency into
   and each bar tracks its own progress independently — a small prioritization decision rather than an
-  automatic sequence. **[rev]**
+  automatic sequence. *Delivery* — how currency moves from the pool into the chosen bar — is per-group
+  data, separate from that bookkeeping: Chapter 1 uses `continuous` (accrued currency streams into the
+  active bar; selecting a bar IS the interaction), and future chapters can add tap-a-chunk or
+  dump-the-pool variants as new delivery values rather than new systems. **[rev]**
 - **Fans** — accrue from performing (tap plus a passive rate that scales with income). Fan rate is
   tuned loosely relative to Cash so that income alone does not determine the album payout.
 - **Capstone gig** — unlocks at the Records gate; grants a Roadie and fires a story beat (§10).

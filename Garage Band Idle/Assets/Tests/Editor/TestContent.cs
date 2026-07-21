@@ -66,6 +66,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
+        public static BarDefinition MakeBar(string id, string fillCurrencyId,
+            double fillRequirement, string rewardId = null)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<BarDefinition>());
+            definition.EditorInitialize(id, id, fillCurrencyId, fillRequirement, rewardId);
+            return definition;
+        }
+
+        public static BarGroupDefinition MakeBarGroup(string id, string revealFlagId,
+            List<string> barIds, BarFillMode fillMode = BarFillMode.PerBar,
+            BarFillDelivery delivery = BarFillDelivery.Continuous,
+            ContentScope scope = ContentScope.Run)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<BarGroupDefinition>());
+            definition.EditorInitialize(id, id, revealFlagId, fillMode, delivery, scope, barIds);
+            return definition;
+        }
+
         public static FanRateMultiplierReward MakeFanRateReward(string id, double value, ContentScope scope = ContentScope.Run)
         {
             var definition = Track(ScriptableObject.CreateInstance<FanRateMultiplierReward>());

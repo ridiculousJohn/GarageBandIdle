@@ -174,25 +174,41 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 #endif
     }
 
-    // Rehearsal earn tuning: the fill currency accrues from a passive tick plus
-    // Jam taps (engagement, never Cash) — behavior arrives in the bars slice.
+    // Rehearsal earn config (design doc section 3): the fill currency accrues
+    // from a passive tick plus Jam taps (engagement, never Cash). Modelled like
+    // FansConfig - the currency accrued into and the flag that activates accrual
+    // are chapter data, not code bindings. A chapter with no fill currency
+    // leaves the currency id empty and the system stays dormant.
     [Serializable]
     public class RehearsalConfig
     {
+        [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
+        [Tooltip("Currency id the rehearsal earn accrues into. Empty = no fill currency this chapter.")]
+        private string _currencyId;
+
+        [SerializeField]
+        [Tooltip("Flag that activates rehearsal accrual (the single reveal registry).")]
+        private string _revealFlagId;
+
         [SerializeField]
         private double _pointsPerSec;
 
         [SerializeField]
         private double _pointsPerTap;
 
+        public string CurrencyId => _currencyId;
+        public string RevealFlagId => _revealFlagId;
         public double PointsPerSec => _pointsPerSec;
         public double PointsPerTap => _pointsPerTap;
 
         public RehearsalConfig() { }
 
 #if UNITY_EDITOR
-        public RehearsalConfig(double pointsPerSec, double pointsPerTap)
+        public RehearsalConfig(string currencyId, string revealFlagId, double pointsPerSec, double pointsPerTap)
         {
+            _currencyId = currencyId;
+            _revealFlagId = revealFlagId;
             _pointsPerSec = pointsPerSec;
             _pointsPerTap = pointsPerTap;
         }

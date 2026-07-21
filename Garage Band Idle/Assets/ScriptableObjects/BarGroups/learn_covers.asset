@@ -16,6 +16,7 @@ MonoBehaviour:
   _displayName: Learn Covers
   _revealFlagId: covers
   _fillMode: 1
+  _delivery: 1
   _scope: 1
   _barIds:
   - cover_1

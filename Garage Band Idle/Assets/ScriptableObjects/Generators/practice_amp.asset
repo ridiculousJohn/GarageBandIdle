@@ -20,11 +20,11 @@ MonoBehaviour:
   _costGrowth: 1.15
   _baseOutput: 0.4
   _unlock:
-    rid: 5051021673832906779
+    rid: 5051021674712399900
   references:
     version: 2
     RefIds:
-    - rid: 5051021673832906779
+    - rid: 5051021674712399900
       type: {class: CurrencyEarnedTotalCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash

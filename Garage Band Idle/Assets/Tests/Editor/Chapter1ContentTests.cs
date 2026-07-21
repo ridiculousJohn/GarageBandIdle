@@ -251,7 +251,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Sections_MatchJson()
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
-            CollectionAssert.AreEqual(new[] { "garage_floor", "the_band" }, chapter.SectionIds);
+            CollectionAssert.AreEqual(new[] { "garage_floor", "the_band", "rehearsal_space" }, chapter.SectionIds);
 
             var garageFloor = LoadById<SectionDefinition>(SectionsFolder, "garage_floor");
             Assert.IsNull(garageFloor.VisibleWhen, "garage_floor is visible from chapter start");
@@ -262,6 +262,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNotNull(visibleWhen, "the_band reveals on an earned-total condition");
             Assert.AreEqual("cash", visibleWhen.CurrencyId);
             Assert.AreEqual(100, visibleWhen.Value, 1e-9);
+
+            var rehearsalSpace = LoadById<SectionDefinition>(SectionsFolder, "rehearsal_space");
+            var coversGate = rehearsalSpace.VisibleWhen as FlagSetCondition;
+            Assert.IsNotNull(coversGate, "rehearsal_space reveals on a flag condition");
+            Assert.AreEqual("covers", coversGate.FlagId);
+            CollectionAssert.AreEqual(new[] { "module/bar-list" }, rehearsalSpace.ModuleAddresses);
         }
 
         [Test]
@@ -273,7 +279,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var group = LoadById<BarGroupDefinition>(BarGroupsFolder, "learn_covers");
             Assert.AreEqual("covers", group.RevealFlagId);
             Assert.AreEqual(BarFillMode.PerBar, group.FillMode);
+            Assert.AreEqual(BarFillDelivery.Continuous, group.Delivery);
             Assert.AreEqual(ContentScope.Run, group.Scope);
+
+            // the fill currency's earn config rides on the chapter, like fans
+            var chapterRehearsal = LoadRequired<ChapterDefinition>(ChapterPath).Rehearsal;
+            Assert.AreEqual("rehearsal", chapterRehearsal.CurrencyId);
+            Assert.AreEqual("covers", chapterRehearsal.RevealFlagId);
+            Assert.AreEqual(1, chapterRehearsal.PointsPerSec, 1e-9);
+            Assert.AreEqual(2, chapterRehearsal.PointsPerTap, 1e-9);
             CollectionAssert.AreEqual(new[] { "cover_1", "cover_2", "cover_3" }, group.BarIds);
 
             foreach (var (barId, requirement, rewardId) in new[]
