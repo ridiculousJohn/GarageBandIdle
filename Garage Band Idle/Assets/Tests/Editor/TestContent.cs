@@ -48,26 +48,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         public static GeneratorDefinition MakeGenerator(string id, string produces,
-            double baseCost, double costGrowth, double baseOutput, List<GateCondition> unlock = null,
+            double baseCost, double costGrowth, double baseOutput, Condition unlock = null,
             bool isBandmate = false)
         {
             var definition = Track(ScriptableObject.CreateInstance<GeneratorDefinition>());
-            definition.EditorInitialize(id, id, produces, isBandmate, baseCost, costGrowth, baseOutput,
-                unlock ?? new List<GateCondition>());
+            definition.EditorInitialize(id, id, produces, isBandmate, baseCost, costGrowth, baseOutput, unlock);
             return definition;
         }
 
-        public static UpgradeDefinition MakeUpgrade(string id, string type, string scope,
-            List<GateCondition> gate, UpgradePayload payload,
+        public static UpgradeDefinition MakeUpgrade(string id, UpgradeType type, ContentScope scope,
+            Condition gate, UpgradePayload payload,
             string costCurrencyId = "cash", double costAmount = 0)
         {
             var definition = Track(ScriptableObject.CreateInstance<UpgradeDefinition>());
             definition.EditorInitialize(id, id, type, scope, costCurrencyId, costAmount,
-                gate ?? new List<GateCondition>(), payload ?? new UpgradePayload());
+                gate, payload ?? new UpgradePayload());
             return definition;
         }
 
-        public static FanRateMultiplierReward MakeFanRateReward(string id, double value, string scope = "run")
+        public static FanRateMultiplierReward MakeFanRateReward(string id, double value, ContentScope scope = ContentScope.Run)
         {
             var definition = Track(ScriptableObject.CreateInstance<FanRateMultiplierReward>());
             definition.EditorInitialize(id, id, value, scope);
@@ -93,6 +92,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             };
             return new CurrencyManager(groups, currencies);
         }
+
+        // evaluation context over live test systems; no ContentDatabase, which
+        // makes Validate fall back to the systems themselves
+        public static ConditionContext MakeContext(CurrencyManager currencies,
+            GeneratorSystem generators = null, FlagSystem flags = null)
+            => new(currencies, generators, flags);
 
         // grants exactly enough cash for each purchase so tests control balances
         public static void BuyTimes(Generator generator, CurrencyManager currencies, int times)

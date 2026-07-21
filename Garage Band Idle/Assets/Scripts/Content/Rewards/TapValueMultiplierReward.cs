@@ -13,11 +13,11 @@ namespace RidiculousGaming.GarageBandIdle.Content
         private double _value;
 
         [SerializeField]
-        [Tooltip("One of the UpgradeDefinition Scope* constants; reset logic acts on this field.")]
-        private string _scope;
+        [Tooltip("Reset logic acts on this field.")]
+        private ContentScope _scope;
 
         public double Value => _value;
-        public string Scope => _scope;
+        public ContentScope Scope => _scope;
 
         public override void Apply(RewardContext context)
         {
@@ -27,7 +27,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         }
 
 #if UNITY_EDITOR
-        public void EditorInitialize(string id, string displayName, double value, string scope)
+        public void EditorInitialize(string id, string displayName, double value, ContentScope scope)
         {
             EditorInitializeBase(id, displayName);
             _value = value;

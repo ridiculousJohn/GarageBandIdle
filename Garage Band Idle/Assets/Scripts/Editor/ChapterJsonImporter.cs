@@ -17,19 +17,21 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
     // Re-running updates existing assets in place (stable paths keyed by id).
     // Every definition asset in the project is then marked addressable
     // (address "<label>/<id>", one label per type) — runtime discovery loads
-    // by label, so no asset lives in Resources.
+    // by label, so no asset lives in Resources and no chapter holds a direct
+    // asset reference: content links by string id, resolved at load.
     //
-    // The JSON's varied gate shapes ({currency,amount}, cashEarnedTotal,
-    // ownedCount, recordsAtLeast, compound) all normalize into GateCondition
-    // lists with generic types — e.g. cashEarnedTotal becomes
-    // currencyEarnedTotal + currencyId "cash" — so runtime handlers never
-    // hardcode a currency.
+    // Every gate/unlock/visibility/availability rule in the JSON is one
+    // discriminated Condition shape ({ "type": ... }), mapped 1:1 onto the
+    // Condition subclass family — no bespoke gate shapes survive import.
     public static class ChapterJsonImporter
     {
         private const string ChaptersFolder = "Assets/ScriptableObjects/Chapters";
+        private const string SectionsFolder = "Assets/ScriptableObjects/Sections";
+        private const string CurrenciesFolder = "Assets/ScriptableObjects/Currencies";
         private const string GeneratorsFolder = "Assets/ScriptableObjects/Generators";
         private const string UpgradesFolder = "Assets/ScriptableObjects/Upgrades";
-        private const string CoversFolder = "Assets/ScriptableObjects/Covers";
+        private const string BarsFolder = "Assets/ScriptableObjects/Bars";
+        private const string BarGroupsFolder = "Assets/ScriptableObjects/BarGroups";
         private const string EventsFolder = "Assets/ScriptableObjects/Events";
         private const string RewardsFolder = "Assets/ScriptableObjects/Rewards";
 
@@ -58,12 +60,34 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             EnsureFolders();
 
-            // rewards first: covers and event tiers resolve their reward ids to
-            // these assets, so the pool must exist before anything references it
-            var rewards = new Dictionary<string, RewardDefinition>();
+            // flags: the chapter's declared reveal registry
+            var flagIds = new List<string>();
+            foreach (var flag in data.flags ?? Array.Empty<FlagBlock>())
+            {
+                if (string.IsNullOrEmpty(flag.id))
+                    Debug.LogError("ChapterJsonImporter: flags array contains an entry with an empty id. Skipping it.");
+                else if (flagIds.Contains(flag.id))
+                    Debug.LogError($"ChapterJsonImporter: duplicate flag id '{flag.id}'. Keeping the first.");
+                else
+                    flagIds.Add(flag.id);
+            }
+
+            // a chapter can declare a fill currency (rehearsal); generate it like
+            // any other content so bars' fillCurrency ids resolve on load
+            if (!string.IsNullOrEmpty(data.rehearsal?.currency))
+            {
+                var currencyAsset = LoadOrCreate<CurrencyDefinition>($"{CurrenciesFolder}/{data.rehearsal.currency}.asset");
+                currencyAsset.EditorInitialize(data.rehearsal.currency,
+                    ToDisplayName(data.rehearsal.currency), data.rehearsal.scope);
+                EditorUtility.SetDirty(currencyAsset);
+            }
+
+            // rewards first: bars and event tiers reference the pool by id, so
+            // report a missing reward against the content that names it
+            var rewardIds = new List<string>();
             foreach (var block in data.rewards ?? Array.Empty<RewardEntryBlock>())
             {
-                if (rewards.ContainsKey(block.id))
+                if (rewardIds.Contains(block.id))
                 {
                     Debug.LogError($"ChapterJsonImporter: duplicate reward id '{block.id}'. Keeping the first.");
                     continue;
@@ -76,14 +100,16 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     case "fanRateMultiplier":
                     {
                         var reward = LoadOrCreateReward<FanRateMultiplierReward>(path);
-                        reward.EditorInitialize(block.id, block.name, block.value, block.scope);
+                        reward.EditorInitialize(block.id, block.name, block.value,
+                            ToScope(block.scope, $"reward '{block.id}'"));
                         asset = reward;
                         break;
                     }
                     case "tapValueMultiplier":
                     {
                         var reward = LoadOrCreateReward<TapValueMultiplierReward>(path);
-                        reward.EditorInitialize(block.id, block.name, block.value, block.scope);
+                        reward.EditorInitialize(block.id, block.name, block.value,
+                            ToScope(block.scope, $"reward '{block.id}'"));
                         asset = reward;
                         break;
                     }
@@ -100,64 +126,80 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 }
 
                 EditorUtility.SetDirty(asset);
-                rewards.Add(block.id, asset);
+                rewardIds.Add(block.id);
             }
 
-            var generators = new List<GeneratorDefinition>();
+            var sectionIds = new List<string>();
+            foreach (var block in data.sections ?? Array.Empty<SectionBlock>())
+            {
+                var asset = LoadOrCreate<SectionDefinition>($"{SectionsFolder}/{block.id}.asset");
+                asset.EditorInitialize(block.id, block.name,
+                    new List<string>(block.modules ?? Array.Empty<string>()), ToCondition(block.visibleWhen));
+                EditorUtility.SetDirty(asset);
+                sectionIds.Add(block.id);
+            }
+
+            var generatorIds = new List<string>();
             foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
             {
                 var asset = LoadOrCreate<GeneratorDefinition>($"{GeneratorsFolder}/{block.id}.asset");
                 asset.EditorInitialize(block.id, block.name, block.produces, block.isBandmate,
-                    block.baseCost, block.costGrowth, block.baseOutput, ToConditions(block.unlock));
+                    block.baseCost, block.costGrowth, block.baseOutput, ToCondition(block.unlock));
                 EditorUtility.SetDirty(asset);
-                generators.Add(asset);
+                generatorIds.Add(block.id);
             }
 
-            var upgrades = new List<UpgradeDefinition>();
+            var upgradeIds = new List<string>();
             foreach (var block in data.upgrades ?? Array.Empty<UpgradeBlock>())
             {
                 var asset = LoadOrCreate<UpgradeDefinition>($"{UpgradesFolder}/{block.id}.asset");
-                asset.EditorInitialize(block.id, block.name, block.type, block.scope,
-                    block.cost?.currency, block.cost?.amount ?? 0, ToConditions(block.gate),
+                asset.EditorInitialize(block.id, block.name,
+                    ToUpgradeType(block.type, $"upgrade '{block.id}'"),
+                    ToScope(block.scope, $"upgrade '{block.id}'"),
+                    block.cost?.currency, block.cost?.amount ?? 0, ToCondition(block.gate),
                     new UpgradePayload(block.payload?.effect, block.payload?.value ?? 0,
-                        block.payload?.generator, block.payload?.system));
+                        block.payload?.generator, block.payload?.flag));
                 EditorUtility.SetDirty(asset);
-                upgrades.Add(asset);
+                upgradeIds.Add(block.id);
             }
 
-            var covers = new List<CoverDefinition>();
-            foreach (var bar in data.covers?.bars ?? Array.Empty<CoverBarBlock>())
+            var barGroupIds = new List<string>();
+            var barCount = 0;
+            foreach (var group in data.bars?.groups ?? Array.Empty<BarGroupBlock>())
             {
-                var asset = LoadOrCreate<CoverDefinition>($"{CoversFolder}/{bar.id}.asset");
-                asset.EditorInitialize(bar.id, bar.name, bar.fillRequirement,
-                    ResolveReward(bar.reward, rewards, $"cover '{bar.id}'"));
-                EditorUtility.SetDirty(asset);
-                covers.Add(asset);
+                var barIds = new List<string>();
+                foreach (var bar in group.bars ?? Array.Empty<BarBlock>())
+                {
+                    var barAsset = LoadOrCreate<BarDefinition>($"{BarsFolder}/{bar.id}.asset");
+                    barAsset.EditorInitialize(bar.id, bar.name, bar.fillCurrency, bar.fillRequirement, bar.reward);
+                    EditorUtility.SetDirty(barAsset);
+                    barIds.Add(bar.id);
+                    barCount++;
+                }
+
+                var groupAsset = LoadOrCreate<BarGroupDefinition>($"{BarGroupsFolder}/{group.id}.asset");
+                groupAsset.EditorInitialize(group.id, group.name, group.revealFlag,
+                    ToFillMode(group.fillMode, $"bar group '{group.id}'"),
+                    ToScope(data.bars.scope, $"bar group '{group.id}'"), barIds);
+                EditorUtility.SetDirty(groupAsset);
+                barGroupIds.Add(group.id);
             }
 
-            var events = new List<EventDefinition>();
+            var eventIds = new List<string>();
             foreach (var block in data.events ?? Array.Empty<EventBlock>())
             {
                 var tiers = new List<EventTier>();
                 foreach (var tier in block.tiers ?? Array.Empty<TierBlock>())
                 {
-                    tiers.Add(new EventTier(tier.tier, tier.debuff?.effect,
-                        tier.goal?.currency, tier.goal?.amount ?? 0, tier.timerSeconds, tier.failable,
-                        ResolveReward(tier.reward, rewards, $"event '{block.id}' tier {tier.tier}")));
+                    tiers.Add(new EventTier(tier.tier, tier.debuff?.effect, ToCondition(tier.goal),
+                        tier.timerSeconds, tier.failable, tier.reward));
                 }
 
                 var asset = LoadOrCreate<EventDefinition>($"{EventsFolder}/{block.id}.asset");
                 asset.EditorInitialize(block.id, block.name, block.type,
-                    ToConditions(block.availableWhen), block.baselineReset, tiers);
+                    ToCondition(block.availableWhen), block.baselineReset, tiers);
                 EditorUtility.SetDirty(asset);
-                events.Add(asset);
-            }
-
-            var sections = new List<ChapterSection>();
-            foreach (var block in data.sections ?? Array.Empty<SectionBlock>())
-            {
-                sections.Add(new ChapterSection(block.id, block.name,
-                    new List<string>(block.modules ?? Array.Empty<string>()), ToConditions(block.visibleWhen)));
+                eventIds.Add(block.id);
             }
 
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
@@ -166,42 +208,95 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 data.chapter.capstoneRecordsGate,
                 data.constants?.tapBaseValue ?? 1, data.constants?.recordBuffPerRecord ?? 0,
                 new FansConfig(data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0),
-                new RehearsalConfig(data.covers?.rehearsal?.pointsPerSec ?? 0, data.covers?.rehearsal?.pointsPerTap ?? 0),
-                sections, generators, upgrades, covers, events);
+                new RehearsalConfig(data.rehearsal?.perSec ?? 0, data.rehearsal?.perTap ?? 0),
+                flagIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds);
             EditorUtility.SetDirty(chapterAsset);
 
             MarkAllContentAddressable();
 
             AssetDatabase.SaveAssets();
-            var summary = $"Imported '{data.chapter.id}' — {generators.Count} generators, " +
-                $"{upgrades.Count} upgrades, {covers.Count} covers, {events.Count} events, " +
-                $"{rewards.Count} rewards. All content marked addressable.";
+            var summary = $"Imported '{data.chapter.id}' — {flagIds.Count} flags, {sectionIds.Count} sections, " +
+                $"{generatorIds.Count} generators, {upgradeIds.Count} upgrades, {barGroupIds.Count} bar groups " +
+                $"({barCount} bars), {eventIds.Count} events, {rewardIds.Count} rewards. All content marked addressable.";
             Debug.Log($"ChapterJsonImporter: {summary}");
-            EditorUtility.DisplayDialog("Chapter import", summary, "OK");
+            if (!Application.isBatchMode)
+                EditorUtility.DisplayDialog("Chapter import", summary, "OK");
         }
 
         // Sweeps every definition asset in the project (including hand-authored
         // currencies/groups) into Addressables: address "<label>/<asset name>",
-        // one label per type. Safe to re-run; entries are created or updated.
+        // one label per type. Safe to re-run; entries are created or updated,
+        // and entries whose asset was deleted are removed.
         [MenuItem("GarageBandIdle/Mark Content Addressable")]
         public static void MarkAllContentAddressable()
         {
             // creates Assets/AddressableAssetsData + settings on first use
             var settings = AddressableAssetSettingsDefaultObject.GetSettings(true);
 
+            RemoveStaleEntries(settings);
+
             int count = 0;
             count += MarkType<CurrencyDefinition>(settings, ContentLabels.Currency);
             count += MarkType<CurrencyGroupDefinition>(settings, ContentLabels.CurrencyGroup);
             count += MarkType<ChapterDefinition>(settings, ContentLabels.Chapter);
+            count += MarkType<SectionDefinition>(settings, ContentLabels.Section);
             count += MarkType<GeneratorDefinition>(settings, ContentLabels.Generator);
             count += MarkType<UpgradeDefinition>(settings, ContentLabels.Upgrade);
-            count += MarkType<CoverDefinition>(settings, ContentLabels.Cover);
+            count += MarkType<BarDefinition>(settings, ContentLabels.Bar);
+            count += MarkType<BarGroupDefinition>(settings, ContentLabels.BarGroup);
             count += MarkType<EventDefinition>(settings, ContentLabels.Event);
             count += MarkType<RewardDefinition>(settings, ContentLabels.Reward);
             count += MarkModulePrefabs(settings);
 
             AssetDatabase.SaveAssets();
             Debug.Log($"ChapterJsonImporter: {count} definition assets marked addressable.");
+        }
+
+        // Deleted assets leave dangling Addressables entries behind (they show as
+        // Missing in the Groups window); drop them, then drop any label no entry
+        // uses and no code loads, so retired content types don't linger.
+        private static void RemoveStaleEntries(AddressableAssetSettings settings)
+        {
+            var dangling = new List<AddressableAssetEntry>();
+            foreach (var group in settings.groups)
+            {
+                if (group == null)
+                    continue;
+                foreach (var entry in group.entries)
+                {
+                    if (string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(entry.guid)))
+                        dangling.Add(entry);
+                }
+            }
+            foreach (var entry in dangling)
+            {
+                Debug.Log($"ChapterJsonImporter: removing stale addressable entry '{entry.address}' (asset deleted).");
+                settings.RemoveAssetEntry(entry.guid);
+            }
+
+            var knownLabels = new HashSet<string>
+            {
+                ContentLabels.Currency, ContentLabels.CurrencyGroup, ContentLabels.Chapter,
+                ContentLabels.Section, ContentLabels.Generator, ContentLabels.Upgrade,
+                ContentLabels.Bar, ContentLabels.BarGroup, ContentLabels.Event,
+                ContentLabels.Reward, ContentLabels.Module,
+            };
+            var usedLabels = new HashSet<string>();
+            foreach (var group in settings.groups)
+            {
+                if (group == null)
+                    continue;
+                foreach (var entry in group.entries)
+                    usedLabels.UnionWith(entry.labels);
+            }
+            foreach (var label in new List<string>(settings.GetLabels()))
+            {
+                if (!knownLabels.Contains(label) && !usedLabels.Contains(label))
+                {
+                    Debug.Log($"ChapterJsonImporter: removing unused addressable label '{label}'.");
+                    settings.RemoveLabel(label);
+                }
+            }
         }
 
         // Module prefabs live under Assets/Prefabs/Modules; the file name is the
@@ -237,78 +332,133 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return guids.Length;
         }
 
-        // Normalizes every gate/unlock shape in the JSON into a flat all-must-hold
-        // condition list (compound gates flatten; single gates become one entry).
-        private static List<GateCondition> ToConditions(GateBlock gate)
+        // Maps a JSON condition ({ "type": ... }) onto the Condition subclass
+        // family. An absent gate means no gate: JsonUtility materializes absent
+        // objects as empty instances, so an empty type returns null (always met).
+        private static Condition ToCondition(ConditionBlock block)
         {
-            var conditions = new List<GateCondition>();
-            if (gate == null)
-                return conditions;
+            if (block == null || string.IsNullOrEmpty(block.type))
+                return null;
 
-            if (gate.type == "compound")
+            if (block.type == "compound")
             {
-                foreach (var leaf in gate.all ?? Array.Empty<GateLeafBlock>())
+                var all = ToConditionList(block.all);
+                var any = ToConditionList(block.any);
+                if (all.Count == 0 && any.Count == 0)
                 {
-                    if (leaf.coversCompleted > 0)
-                        conditions.Add(new GateCondition(GateCondition.TypeCoversCompleted, null, null, null, leaf.coversCompleted));
-                    else if (!string.IsNullOrEmpty(leaf.flag))
-                        conditions.Add(new GateCondition(GateCondition.TypeFlagSet, null, null, leaf.flag, 0));
-                    else if (!string.IsNullOrEmpty(leaf.currency))
-                        conditions.Add(new GateCondition(GateCondition.TypeCurrencyBalance, leaf.currency, null, null, leaf.amount));
-                    else
-                        Debug.LogWarning("ChapterJsonImporter: compound gate has an empty leaf; skipping it.");
+                    Debug.LogError("ChapterJsonImporter: compound condition has no children. Importing no gate.");
+                    return null;
                 }
-                return conditions;
+                return new CompoundCondition(all, any);
             }
 
-            switch (gate.type)
+            return ToSimpleCondition(block.type, block.currency, block.amount,
+                block.generator, block.flag, block.group, block.value);
+        }
+
+        private static List<Condition> ToConditionList(ConditionLeafBlock[] blocks)
+        {
+            var conditions = new List<Condition>();
+            foreach (var block in blocks ?? Array.Empty<ConditionLeafBlock>())
             {
-                case null:
-                case "":
-                    // A bare { currency, amount } gate — but note JsonUtility
-                    // materializes ABSENT gate objects as empty instances, so a
-                    // typeless gate with no currency means "no gate at all".
-                    if (!string.IsNullOrEmpty(gate.currency))
-                        conditions.Add(new GateCondition(GateCondition.TypeCurrencyBalance, gate.currency, null, null, gate.amount));
-                    break;
-                case "cashEarnedTotal":
-                    conditions.Add(new GateCondition(GateCondition.TypeCurrencyEarnedTotal, "cash", null, null, gate.value));
-                    break;
-                case "recordsAtLeast":
-                    // Records are never spent, so cumulative == earned total
-                    conditions.Add(new GateCondition(GateCondition.TypeCurrencyEarnedTotal, "records", null, null, gate.value));
-                    break;
-                case "ownedCount":
-                    conditions.Add(new GateCondition(GateCondition.TypeOwnedCount, null, gate.generator, null, gate.value));
-                    break;
-                case "flagSet":
-                    conditions.Add(new GateCondition(GateCondition.TypeFlagSet, null, null, gate.flag, 0));
-                    break;
-                default:
-                    Debug.LogWarning($"ChapterJsonImporter: gate type '{gate.type}' has no normalization; importing it verbatim.");
-                    conditions.Add(new GateCondition(gate.type, gate.currency, gate.generator, gate.flag, gate.value != 0 ? gate.value : gate.amount));
-                    break;
+                if (string.IsNullOrEmpty(block.type))
+                {
+                    Debug.LogError("ChapterJsonImporter: compound condition has a child with no type. Skipping it.");
+                    continue;
+                }
+                if (block.type == "compound")
+                {
+                    // JsonUtility cannot express recursive DTOs; extend the leaf
+                    // shape if a chapter ever needs deeper nesting
+                    Debug.LogError("ChapterJsonImporter: nested compound conditions are not supported by the importer. Skipping it.");
+                    continue;
+                }
+
+                var condition = ToSimpleCondition(block.type, block.currency, block.amount,
+                    block.generator, block.flag, block.group, block.value);
+                if (condition != null)
+                    conditions.Add(condition);
             }
             return conditions;
         }
 
+        private static Condition ToSimpleCondition(string type, string currency, double amount,
+            string generator, string flag, string group, double value)
+        {
+            switch (type)
+            {
+                case "currency":
+                    return new CurrencyBalanceCondition(currency, amount);
+                case "currencyEarnedTotal":
+                    return new CurrencyEarnedTotalCondition(currency, value);
+                case "ownedCount":
+                    return new OwnedCountCondition(generator, value);
+                case "flagSet":
+                    return new FlagSetCondition(flag);
+                case "barsCompleted":
+                    return new BarsCompletedCondition(group, value);
+                case "recordsCumulative":
+                    return new RecordsCumulativeCondition(value);
+                default:
+                    Debug.LogError($"ChapterJsonImporter: condition type '{type}' maps to no Condition subclass. Importing no gate.");
+                    return null;
+            }
+        }
+
+        // Scope is a closed, code-defined set (ContentScope); the strings here
+        // are the JSON spellings, and anything else is a content error.
+        private static ContentScope ToScope(string scope, string context)
+        {
+            switch (scope)
+            {
+                case "run":
+                    return ContentScope.Run;
+                case "permanentInChapter":
+                    return ContentScope.PermanentInChapter;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown scope '{scope}'. Defaulting to run.");
+                    return ContentScope.Run;
+            }
+        }
+
+        private static UpgradeType ToUpgradeType(string type, string context)
+        {
+            switch (type)
+            {
+                case "buff":
+                    return UpgradeType.Buff;
+                case "contentUnlock":
+                    return UpgradeType.ContentUnlock;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown type '{type}'. Defaulting to buff.");
+                    return UpgradeType.Buff;
+            }
+        }
+
+        private static BarFillMode ToFillMode(string fillMode, string context)
+        {
+            switch (fillMode)
+            {
+                case "perBar":
+                    return BarFillMode.PerBar;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown fillMode '{fillMode}'. Defaulting to perBar.");
+                    return BarFillMode.PerBar;
+            }
+        }
+
+        // "rehearsal" to "Rehearsal" — display names for currencies the JSON
+        // declares by id only
+        private static string ToDisplayName(string id)
+            => string.IsNullOrEmpty(id) ? id : char.ToUpperInvariant(id[0]) + id.Substring(1);
+
         private static void EnsureFolders()
         {
             var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            foreach (var folder in new[] { ChaptersFolder, GeneratorsFolder, UpgradesFolder, CoversFolder, EventsFolder, RewardsFolder })
+            foreach (var folder in new[] { ChaptersFolder, SectionsFolder, CurrenciesFolder, GeneratorsFolder,
+                UpgradesFolder, BarsFolder, BarGroupsFolder, EventsFolder, RewardsFolder })
                 Directory.CreateDirectory(Path.Combine(projectRoot, folder));
             AssetDatabase.Refresh();
-        }
-
-        private static RewardDefinition ResolveReward(string rewardId, Dictionary<string, RewardDefinition> rewards, string context)
-        {
-            if (string.IsNullOrEmpty(rewardId))
-                return null;
-            if (rewards.TryGetValue(rewardId, out var reward))
-                return reward;
-
-            Debug.LogError($"ChapterJsonImporter: {context} references unknown reward id '{rewardId}'.");
-            return null;
         }
 
         // like LoadOrCreate, but a reward id whose type changed in the JSON needs
@@ -345,13 +495,21 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public ChapterBlock chapter;
             public ConstantsBlock constants;
+            public FlagBlock[] flags;
             public SectionBlock[] sections;
             public GeneratorBlock[] generators;
             public UpgradeBlock[] upgrades;
             public RewardEntryBlock[] rewards;
-            public CoversBlock covers;
+            public RehearsalBlock rehearsal;
+            public BarsBlock bars;
             public FansBlock fans;
             public EventBlock[] events;
+        }
+
+        [Serializable]
+        private class FlagBlock
+        {
+            public string id;
         }
 
         // one entry in the shared reward pool; which fields matter depends on type
@@ -391,28 +549,36 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string id;
             public string name;
             public string[] modules;
-            public GateBlock visibleWhen;
+            public ConditionBlock visibleWhen;
         }
 
+        // the discriminated Condition shape; which fields matter depends on type
         [Serializable]
-        private class GateBlock
+        private class ConditionBlock
         {
             public string type;
             public string currency;
             public double amount;
             public string generator;
             public string flag;
+            public string group;
             public double value;
-            public GateLeafBlock[] all;
+            public ConditionLeafBlock[] all;
+            public ConditionLeafBlock[] any;
         }
 
+        // compound children: the same shape minus nesting (JsonUtility cannot
+        // express recursive DTOs)
         [Serializable]
-        private class GateLeafBlock
+        private class ConditionLeafBlock
         {
+            public string type;
             public string currency;
             public double amount;
+            public string generator;
             public string flag;
-            public double coversCompleted;
+            public string group;
+            public double value;
         }
 
         [Serializable]
@@ -425,7 +591,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public double baseCost;
             public double costGrowth;
             public double baseOutput;
-            public GateBlock unlock;
+            public ConditionBlock unlock;
         }
 
         [Serializable]
@@ -441,7 +607,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string effect;
             public double value;
             public string generator;
-            public string system;
+            public string flag;
         }
 
         [Serializable]
@@ -452,29 +618,43 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string type;
             public string scope;
             public CostBlock cost;
-            public GateBlock gate;
+            public ConditionBlock gate;
             public PayloadBlock payload;
-        }
-
-        [Serializable]
-        private class CoversBlock
-        {
-            public RehearsalBlock rehearsal;
-            public CoverBarBlock[] bars;
         }
 
         [Serializable]
         private class RehearsalBlock
         {
-            public double pointsPerSec;
-            public double pointsPerTap;
+            public string currency;
+            public string scope;
+            public string revealFlag;
+            public double perSec;
+            public double perTap;
         }
 
         [Serializable]
-        private class CoverBarBlock
+        private class BarsBlock
+        {
+            public BarGroupBlock[] groups;
+            public string scope;
+        }
+
+        [Serializable]
+        private class BarGroupBlock
         {
             public string id;
             public string name;
+            public string revealFlag;
+            public string fillMode;
+            public BarBlock[] bars;
+        }
+
+        [Serializable]
+        private class BarBlock
+        {
+            public string id;
+            public string name;
+            public string fillCurrency;
             public double fillRequirement;
             public string reward; // reward pool id
         }
@@ -492,7 +672,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string id;
             public string name;
             public string type;
-            public GateBlock availableWhen;
+            public ConditionBlock availableWhen;
             public bool baselineReset;
             public TierBlock[] tiers;
         }
@@ -502,7 +682,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public int tier;
             public DebuffBlock debuff;
-            public CostBlock goal;
+            public ConditionBlock goal;
             public double timerSeconds;
             public bool failable;
             public string reward; // reward pool id

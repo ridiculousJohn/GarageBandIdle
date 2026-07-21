@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
@@ -39,9 +38,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         [Tooltip("Production per second per owned unit.")]
         private double _baseOutput;
 
-        [SerializeField]
-        [Tooltip("All conditions must hold for the generator to reveal.")]
-        private List<GateCondition> _unlock = new();
+        [SerializeReference]
+        [Tooltip("Must hold for the generator to reveal; none = visible from start.")]
+        private Condition _unlock;
 
         public string Id => _id;
         public string DisplayName => _displayName;
@@ -50,12 +49,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public double BaseCost => _baseCost;
         public double CostGrowth => _costGrowth;
         public double BaseOutput => _baseOutput;
-        public IReadOnlyList<GateCondition> Unlock => _unlock;
+        public Condition Unlock => _unlock;
 
 #if UNITY_EDITOR
         // importer-only: generator assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, string producesCurrencyId, bool isBandmate,
-            double baseCost, double costGrowth, double baseOutput, List<GateCondition> unlock)
+            double baseCost, double costGrowth, double baseOutput, Condition unlock)
         {
             _id = id;
             _displayName = displayName;

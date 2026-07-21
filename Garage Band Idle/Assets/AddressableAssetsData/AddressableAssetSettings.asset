@@ -102,16 +102,17 @@ MonoBehaviour:
     m_ProfileVersion: 1
   m_LabelTable:
     m_LabelNames:
-    - default
     - currency
     - currency-group
     - chapter
     - generator
     - upgrade
-    - cover
     - event
     - module
     - reward
+    - section
+    - bar
+    - bar-group
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: 3a8acf251fe8c334ab180ebe77f2bee3, type: 2}

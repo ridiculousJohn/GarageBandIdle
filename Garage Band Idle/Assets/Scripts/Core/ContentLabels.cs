@@ -9,9 +9,11 @@ namespace RidiculousGaming.GarageBandIdle
         public const string Currency = "currency";
         public const string CurrencyGroup = "currency-group";
         public const string Chapter = "chapter";
+        public const string Section = "section";
         public const string Generator = "generator";
         public const string Upgrade = "upgrade";
-        public const string Cover = "cover";
+        public const string Bar = "bar";
+        public const string BarGroup = "bar-group";
         public const string Event = "event";
         public const string Reward = "reward";
         public const string Module = "module";

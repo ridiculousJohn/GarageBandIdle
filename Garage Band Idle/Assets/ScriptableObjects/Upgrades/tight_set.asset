@@ -14,18 +14,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: tight_set
   _displayName: Tight Set
-  _type: buff
-  _scope: run
+  _type: 0
+  _scope: 0
   _costCurrencyId: cash
   _costAmount: 20000
   _gate:
-  - _type: currencyBalance
-    _currencyId: fans
-    _generatorId: 
-    _flagId: 
-    _amount: 30
+    rid: 5051021673004531721
   _payload:
     _effect: allCashPerSecMultiplier
     _value: 1.5
     _generatorId: 
-    _systemId: 
+    _flagId: 
+  references:
+    version: 2
+    RefIds:
+    - rid: 5051021673004531721
+      type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _currencyId: fans
+        _amount: 30

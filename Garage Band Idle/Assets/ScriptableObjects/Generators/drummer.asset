@@ -20,8 +20,12 @@ MonoBehaviour:
   _costGrowth: 1.15
   _baseOutput: 3
   _unlock:
-  - _type: ownedCount
-    _currencyId: 
-    _generatorId: practice_amp
-    _flagId: 
-    _amount: 5
+    rid: 5051021673004531713
+  references:
+    version: 2
+    RefIds:
+    - rid: 5051021673004531713
+      type: {class: OwnedCountCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _generatorId: practice_amp
+        _value: 5

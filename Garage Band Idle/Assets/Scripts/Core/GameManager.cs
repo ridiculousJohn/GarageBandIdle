@@ -1,17 +1,17 @@
-using System;
 using System.Collections.Generic;
+using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 using RidiculousGaming.Utilities;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // Bootstrap and tick orchestration. Discovers content through Addressables
-    // by per-type label (see ContentLabels) so new assets are picked up with no
-    // code or registration changes, wires the economy to the tick, and exposes
-    // the player actions the UI calls.
+    // Bootstrap and tick orchestration. All definition content is discovered
+    // through the ContentDatabase (Addressables labels, see ContentLabels) so
+    // new assets are picked up with no code or registration changes; the chapter
+    // names its content by id and everything resolves here. Wires the economy to
+    // the tick and exposes the player actions the UI calls.
     [RequireComponent(typeof(TickSystem))]
     public class GameManager : MonoBehaviour
     {
@@ -24,16 +24,22 @@ namespace RidiculousGaming.GarageBandIdle
         public const string RecordsCurrencyId = "records";
         public const string FansCurrencyId = "fans";
 
-        // the system key in the JSON's unlockSystem payloads doubles as the
-        // progress flag id — play_for_crowd sets "fans", which activates FanSystem
+        // the fans flag doubles as the fan system's activation switch —
+        // play_for_crowd's setFlag payload latches it
         public const string FansUnlockFlagId = "fans";
 
+        public ContentDatabase Database { get; private set; }
         public CurrencyManager Currencies { get; private set; }
         public FlagSystem Flags { get; private set; }
         public ChapterDefinition CurrentChapter { get; private set; }
         public GeneratorSystem Generators { get; private set; }
         public UpgradeSystem Upgrades { get; private set; }
         public FanSystem Fans { get; private set; }
+        public RewardManager Rewards { get; private set; }
+        public ConditionContext Conditions { get; private set; }
+
+        // the current chapter's sections in layout order, resolved from its id list
+        public IReadOnlyList<SectionDefinition> Sections { get; private set; }
 
         private TickSystem _tickSystem;
 
@@ -45,14 +51,12 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             }
 
-            var groups = LoadAll<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup);
-            var currencies = LoadAll<CurrencyDefinition>(ContentLabels.Currency);
-            Currencies = new CurrencyManager(groups, currencies);
-            Flags = new FlagSystem();
+            Database = new ContentDatabase();
+            Currencies = new CurrencyManager(Database.CurrencyGroups.All, Database.Currencies.All);
 
             // the lowest chapter index is the starting chapter; chapter advancement
             // (ChapterManager) is a later slice
-            foreach (var chapter in LoadAll<ChapterDefinition>(ContentLabels.Chapter))
+            foreach (var chapter in Database.Chapters.All)
             {
                 if (CurrentChapter == null || chapter.Index < CurrentChapter.Index)
                     CurrentChapter = chapter;
@@ -61,16 +65,27 @@ namespace RidiculousGaming.GarageBandIdle
             if (CurrentChapter == null)
             {
                 Debug.LogError("GameManager: no ChapterDefinition assets found. Run 'GarageBandIdle → Import Chapter 1 JSON' in the editor menu, then press Play again.");
+                Flags = new FlagSystem();
             }
             else
             {
-                Generators = new GeneratorSystem(CurrentChapter.Generators, Currencies, Flags);
-                Upgrades = new UpgradeSystem(CurrentChapter.Upgrades, Currencies, Generators, Flags);
+                // the chapter's declared flags are the known set; setting or
+                // gating on anything else is reported as a content mistake
+                Flags = new FlagSystem(CurrentChapter.FlagIds);
+                Generators = new GeneratorSystem(Resolve(Database.Generators, CurrentChapter.GeneratorIds, "generator"), Currencies);
+                Upgrades = new UpgradeSystem(Resolve(Database.Upgrades, CurrentChapter.UpgradeIds, "upgrade"), Currencies, Flags);
                 Fans = new FanSystem(CurrentChapter.Fans, FansCurrencyId, FansUnlockFlagId, Currencies, Generators, Flags);
+                Rewards = new RewardManager(Database.Rewards.All);
+                Sections = Resolve(Database.Sections, CurrentChapter.SectionIds, "section");
+
+                Conditions = new ConditionContext(Currencies, Generators, Flags, RecordsCurrencyId, Database);
+
+                // one boot pass covers every content reference — conditions,
+                // payloads, rewards, module addresses — so a mistake gets
+                // reported here, loudly, instead of surfacing mid-run
+                ContentValidator.Validate(Database, Conditions, Rewards);
             }
 
-            // every hardcoded currency reference is validated at load so a content
-            // mistake gets reported here, loudly, instead of surfacing mid-run
             Currencies.ValidateReference(CashCurrencyId, "GameManager (tap)");
             Currencies.ValidateReference(RecordsCurrencyId, "GameManager (income multiplier)");
 
@@ -78,24 +93,21 @@ namespace RidiculousGaming.GarageBandIdle
             _tickSystem.Ticked += OnTicked;
         }
 
-        // Synchronous label load, held for the app's lifetime (definitions are
-        // needed as long as the game runs, so handles are never released).
-        // WaitForCompletion keeps bootstrap simple; this becomes async behind a
-        // loading screen in a later slice.
-        private static IList<T> LoadAll<T>(string label)
+        // maps a chapter's ordered id list to definitions, reporting any id that
+        // fails to resolve (the chapter is authored against the same JSON that
+        // generated the assets, so a miss means a stale import)
+        private static List<T> Resolve<T>(ContentDatabase.Registry<T> registry, IReadOnlyList<string> ids, string kind)
+            where T : ScriptableObject
         {
-            try
+            var definitions = new List<T>(ids.Count);
+            foreach (var id in ids)
             {
-                return Addressables.LoadAssetsAsync<T>(label, null).WaitForCompletion();
+                if (registry.TryGet(id, out var definition))
+                    definitions.Add(definition);
+                else
+                    Debug.LogError($"GameManager: chapter references unknown {kind} id '{id}'. Re-run the chapter import.");
             }
-            catch (Exception exception)
-            {
-                // Addressables throws InvalidKeyException when a label has no
-                // entries yet, i.e. content was never imported/marked
-                Debug.LogError($"GameManager: loading addressable content with label '{label}' failed — " +
-                    $"run 'GarageBandIdle → Import Chapter 1 JSON' (it marks all content addressable), then press Play again. ({exception.Message})");
-                return Array.Empty<T>();
-            }
+            return definitions;
         }
 
         private void OnDestroy()
@@ -114,12 +126,12 @@ namespace RidiculousGaming.GarageBandIdle
             var multiplier = ProductionCalculator.IncomeMultiplier(
                 Currencies.Get(RecordsCurrencyId), CurrentChapter.RecordBuffPerRecord);
             Generators.Tick(seconds, multiplier);
-            Generators.EvaluateUnlocks();
+            Generators.EvaluateUnlocks(Conditions);
 
             // content unlocks before fan accrual so a freshly-set fans flag
             // starts accruing on the same tick; fans never take the income
             // multiplier — fan rate is band size and time only
-            Upgrades.EvaluateContentUnlocks();
+            Upgrades.EvaluateContentUnlocks(Conditions);
             Fans.Tick(seconds);
         }
 
@@ -141,8 +153,8 @@ namespace RidiculousGaming.GarageBandIdle
 
             // a purchase can satisfy another generator's ownedCount unlock — or a
             // content unlock's gate (play_for_crowd: own 1 Drummer) — right now
-            Generators.EvaluateUnlocks();
-            Upgrades.EvaluateContentUnlocks();
+            Generators.EvaluateUnlocks(Conditions);
+            Upgrades.EvaluateContentUnlocks(Conditions);
             return true;
         }
     }

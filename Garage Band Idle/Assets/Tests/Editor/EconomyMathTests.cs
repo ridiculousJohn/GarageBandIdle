@@ -67,7 +67,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var currencies = TestContent.MakeEconomy();
             var definition = TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4);
-            var system = new GeneratorSystem(new[] { definition }, currencies, new FlagSystem());
+            var system = new GeneratorSystem(new[] { definition }, currencies);
             TestContent.BuyTimes(system.Get("amp"), currencies, 1);
             var before = currencies.Get("cash");
 

@@ -4,18 +4,18 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // Runtime home of a chapter's upgrades. This slice implements the general
-    // content-unlock mechanism (design doc sections 2 and 4): a contentUnlock
-    // upgrade whose gate is met applies its payload — unlockSystem sets the
-    // named progress flag, which sections and other gates observe. Buff
-    // upgrades (purchase, tap/output payloads) arrive in the buff slice; their
-    // definitions load and validate but are never auto-applied here.
+    // Runtime home of a chapter's upgrades. Implements the general content-unlock
+    // mechanism (design doc sections 2 and 4): a contentUnlock upgrade whose gate
+    // is met applies its payload — setFlag latches the named flag in the single
+    // reveal registry, which sections and other gates observe. Buff upgrades
+    // (purchase, tap/output payloads) arrive in the buff slice; their definitions
+    // load and validate but are never auto-applied here. Gate conditions are
+    // validated by the boot validation pass (ContentValidator), not here.
     public class UpgradeSystem
     {
         private readonly List<Upgrade> _upgrades = new();
         private readonly Dictionary<string, Upgrade> _byId = new();
         private readonly CurrencyManager _currencies;
-        private readonly GeneratorSystem _generators;
         private readonly FlagSystem _flags;
 
         // fires once per upgrade when its payload is applied
@@ -23,11 +23,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public IReadOnlyList<Upgrade> All => _upgrades;
 
-        public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, CurrencyManager currencies,
-            GeneratorSystem generators, FlagSystem flags)
+        public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, CurrencyManager currencies, FlagSystem flags)
         {
             _currencies = currencies;
-            _generators = generators;
             _flags = flags;
 
             foreach (var definition in definitions)
@@ -50,7 +48,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
                 if (!string.IsNullOrEmpty(definition.CostCurrencyId))
                     _currencies.ValidateReference(definition.CostCurrencyId, $"Upgrade '{definition.Id}' (cost)");
-                GateValidator.Validate(definition.Gate, $"Upgrade '{definition.Id}' (gate)", currencies, generators);
                 ValidatePayload(definition);
 
                 var upgrade = new Upgrade(definition);
@@ -70,15 +67,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // applies any content unlock whose gate now holds; called on tick and
         // after purchases (an ownedCount gate can trip mid-tick)
-        public void EvaluateContentUnlocks()
+        public void EvaluateContentUnlocks(ConditionContext context)
         {
             foreach (var upgrade in _upgrades)
             {
                 if (upgrade.Applied)
                     continue;
-                if (upgrade.Definition.Type != UpgradeDefinition.TypeContentUnlock)
+                if (upgrade.Definition.Type != UpgradeType.ContentUnlock)
                     continue;
-                if (!GateEvaluator.AllMet(upgrade.Definition.Gate, _currencies, _generators, _flags))
+                if (!ConditionEvaluator.IsMet(upgrade.Definition.Gate, context))
                     continue;
 
                 Apply(upgrade);
@@ -90,8 +87,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var payload = upgrade.Definition.Payload;
             switch (payload.Effect)
             {
-                case UpgradePayload.EffectUnlockSystem:
-                    _flags.Set(payload.SystemId);
+                case UpgradePayload.EffectSetFlag:
+                    _flags.Set(payload.FlagId);
                     break;
                 default:
                     // marked applied anyway so a content mistake reports once, not per tick
@@ -105,11 +102,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         private void ValidatePayload(UpgradeDefinition definition)
         {
-            if (definition.Type != UpgradeDefinition.TypeContentUnlock)
+            if (definition.Type != UpgradeType.ContentUnlock)
                 return; // buff payloads validate when their handlers arrive (buff slice)
 
-            if (definition.Payload.Effect == UpgradePayload.EffectUnlockSystem && string.IsNullOrEmpty(definition.Payload.SystemId))
-                Debug.LogError($"UpgradeSystem: content unlock '{definition.Id}' has an unlockSystem payload with an empty system id.");
+            if (definition.Payload.Effect == UpgradePayload.EffectSetFlag && string.IsNullOrEmpty(definition.Payload.FlagId))
+                Debug.LogError($"UpgradeSystem: content unlock '{definition.Id}' has a setFlag payload with an empty flag id.");
 
             // content unlocks auto-apply on gate met; a price needs the purchase
             // flow that arrives with the buff-upgrades slice

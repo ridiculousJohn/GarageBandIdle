@@ -1,24 +1,23 @@
 using System.Collections.Generic;
-using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // Composes the chapter's screen from data: for each ChapterSection,
-    // instantiates its module prefabs (addressable, by address) under the
-    // canvas root and initializes them through IChapterModule. Sections start
-    // hidden until their visibleWhen conditions hold, then latch visible —
-    // the design doc's progressive reveal (section 2), driven by flags and
-    // the shared gate language.
+    // Composes the chapter's screen from data: for each SectionDefinition the
+    // chapter names, instantiates its module prefabs (addressable, by address)
+    // under the canvas root and initializes them through IChapterModule.
+    // Sections start hidden until their visibleWhen condition holds, then latch
+    // visible — the design doc's progressive reveal (section 2), driven by flags
+    // and the shared Condition language.
     public class ChapterScreen : MonoBehaviour
     {
         [SerializeField] private RectTransform _sectionsRoot;
 
         private class SectionInstance
         {
-            public ChapterSection Definition;
+            public SectionDefinition Definition;
             public readonly List<GameObject> Modules = new();
             public bool Revealed;
         }
@@ -38,7 +37,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             _context = new ChapterContext(_game, _game.CurrentChapter, _game.Flags);
 
-            foreach (var section in _game.CurrentChapter.Sections)
+            foreach (var section in _game.Sections)
                 _sections.Add(BuildSection(section));
 
             if (_sections.Count == 0)
@@ -71,7 +70,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             }
         }
 
-        private SectionInstance BuildSection(ChapterSection definition)
+        private SectionInstance BuildSection(SectionDefinition definition)
         {
             var section = new SectionInstance { Definition = definition };
 
@@ -112,7 +111,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             {
                 if (section.Revealed)
                     continue;
-                if (!GateEvaluator.AllMet(section.Definition.VisibleWhen, _game.Currencies, _game.Generators, _game.Flags))
+                if (!ConditionEvaluator.IsMet(section.Definition.VisibleWhen, _game.Conditions))
                     continue;
 
                 section.Revealed = true;

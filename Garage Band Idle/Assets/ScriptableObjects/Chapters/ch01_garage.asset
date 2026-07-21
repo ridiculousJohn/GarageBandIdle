@@ -31,39 +31,27 @@ MonoBehaviour:
   _rehearsal:
     _pointsPerSec: 1
     _pointsPerTap: 2
-  _sections:
-  - _id: garage_floor
-    _displayName: The Garage Floor
-    _moduleAddresses:
-    - module/currency-header
-    - module/tap
-    _visibleWhen: []
-  - _id: the_band
-    _displayName: The Band
-    _moduleAddresses:
-    - module/generator-list
-    _visibleWhen:
-    - _type: currencyEarnedTotal
-      _currencyId: cash
-      _generatorId: 
-      _flagId: 
-      _amount: 100
-  _generators:
-  - {fileID: 11400000, guid: 8d598602cd5ff8840afefc493693dca8, type: 2}
-  - {fileID: 11400000, guid: 14d433f0357bac846ae5965a44e4bb44, type: 2}
-  - {fileID: 11400000, guid: 2b6865bf1f175334b939718cb16a7903, type: 2}
-  - {fileID: 11400000, guid: 009e2e31a438007458c00cb04ca197fe, type: 2}
-  _upgrades:
-  - {fileID: 11400000, guid: 6dfda3c9f5fea7d4497d8a78e2ac8645, type: 2}
-  - {fileID: 11400000, guid: e1571e7fc2db3634e8551a687714abec, type: 2}
-  - {fileID: 11400000, guid: 03f4ec6e88827fa4fa1780d20308bde7, type: 2}
-  - {fileID: 11400000, guid: 5eb497434d44df24f8c91ba2ce505837, type: 2}
-  - {fileID: 11400000, guid: 6042f16ca9c5ada48a421eb3958661b9, type: 2}
-  - {fileID: 11400000, guid: 1ff546827aa28974cbe7999fa6e36b3c, type: 2}
-  - {fileID: 11400000, guid: 24e5002afd7266047bdc30dd8effa674, type: 2}
-  _covers:
-  - {fileID: 11400000, guid: 220a64090d7522f4197adae3e6cba203, type: 2}
-  - {fileID: 11400000, guid: 300f533775e67694ab808a8c555de778, type: 2}
-  - {fileID: 11400000, guid: 44d8f97d56374da4dad122c0bd578fd2, type: 2}
-  _events:
-  - {fileID: 11400000, guid: 22448b83a4dc18d4abc83b27242ed4ed, type: 2}
+  _flagIds:
+  - fans
+  - covers
+  - album
+  _sectionIds:
+  - garage_floor
+  - the_band
+  _generatorIds:
+  - practice_amp
+  - drummer
+  - bassist
+  - guitarist
+  _upgradeIds:
+  - stage_presence
+  - amp_strings
+  - kit_upgrade
+  - tight_set
+  - play_for_crowd
+  - learn_covers
+  - cut_demo
+  _barGroupIds:
+  - learn_covers
+  _eventIds:
+  - garage_jam

@@ -42,5 +42,16 @@ namespace RidiculousGaming.GarageBandIdle
         public string Symbol => _symbol;
         public int MaxDecimals => _maxDecimals;
         public double StartingValue => _startingValue;
+
+#if UNITY_EDITOR
+        // importer-only: currencies a chapter JSON declares (e.g. rehearsal) are
+        // generated like any other content; hand-authored ones are left alone
+        public void EditorInitialize(string id, string displayName, string groupId)
+        {
+            _id = id;
+            _displayName = displayName;
+            _groupId = groupId;
+        }
+#endif
     }
 }

@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Content;
-using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Events
 {
-    // One opt-in event (design doc section 6.1) with its tier ladder. Event
-    // behavior (baseline reset, debuffs, timers) arrives in the events slice;
-    // this slice only stores the data.
+    // One opt-in event (design doc section 6.1) with its tier ladder.
+    // Availability and tier goals are the shared Condition type — the same
+    // evaluator the capstone and sections use. Event behavior (baseline reset,
+    // debuffs, timers) arrives in the events slice; this slice stores the data.
     [CreateAssetMenu(
         fileName = "NewEvent",
         menuName = "GarageBandIdle/Event")]
@@ -25,9 +25,9 @@ namespace RidiculousGaming.GarageBandIdle.Events
         [Tooltip("Event kind from the JSON, e.g. challenge.")]
         private string _type;
 
-        [SerializeField]
-        [Tooltip("All conditions must hold for the event to appear.")]
-        private List<GateCondition> _availableWhen = new();
+        [SerializeReference]
+        [Tooltip("Must hold for the event to appear.")]
+        private Condition _availableWhen;
 
         [SerializeField]
         [Tooltip("On entry the chapter economy resets to a fixed baseline for the event's duration.")]
@@ -39,14 +39,14 @@ namespace RidiculousGaming.GarageBandIdle.Events
         public string Id => _id;
         public string DisplayName => _displayName;
         public string Type => _type;
-        public IReadOnlyList<GateCondition> AvailableWhen => _availableWhen;
+        public Condition AvailableWhen => _availableWhen;
         public bool BaselineReset => _baselineReset;
         public IReadOnlyList<EventTier> Tiers => _tiers;
 
 #if UNITY_EDITOR
         // importer-only: event assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, string type,
-            List<GateCondition> availableWhen, bool baselineReset, List<EventTier> tiers)
+            Condition availableWhen, bool baselineReset, List<EventTier> tiers)
         {
             _id = id;
             _displayName = displayName;
@@ -69,13 +69,9 @@ namespace RidiculousGaming.GarageBandIdle.Events
         [Tooltip("Debuff effect key, e.g. automationDisabled.")]
         private string _debuffEffect;
 
-        [Header("Goal")]
-        [SerializeField]
-        [DefinitionId(typeof(CurrencyDefinition))]
-        private string _goalCurrencyId;
-
-        [SerializeField]
-        private double _goalAmount;
+        [SerializeReference]
+        [Tooltip("Reaching this wins the tier, e.g. a currency condition.")]
+        private Condition _goal;
 
         [SerializeField]
         [Tooltip("Time limit in seconds; timed tiers are the only failable ones.")]
@@ -85,30 +81,29 @@ namespace RidiculousGaming.GarageBandIdle.Events
         private bool _failable;
 
         [SerializeField]
-        [Tooltip("Granted on tier success; a direct reference, so it loads with the chapter.")]
-        private RewardDefinition _reward;
+        [DefinitionId(typeof(RewardDefinition))]
+        [Tooltip("Reward pool id applied on tier success (RewardManager).")]
+        private string _rewardId;
 
         public int Tier => _tier;
         public string DebuffEffect => _debuffEffect;
-        public string GoalCurrencyId => _goalCurrencyId;
-        public double GoalAmount => _goalAmount;
+        public Condition Goal => _goal;
         public double TimerSeconds => _timerSeconds;
         public bool Failable => _failable;
-        public RewardDefinition Reward => _reward;
+        public string RewardId => _rewardId;
 
         public EventTier() { }
 
 #if UNITY_EDITOR
-        public EventTier(int tier, string debuffEffect, string goalCurrencyId, double goalAmount,
-            double timerSeconds, bool failable, RewardDefinition reward)
+        public EventTier(int tier, string debuffEffect, Condition goal,
+            double timerSeconds, bool failable, string rewardId)
         {
             _tier = tier;
             _debuffEffect = debuffEffect;
-            _goalCurrencyId = goalCurrencyId;
-            _goalAmount = goalAmount;
+            _goal = goal;
             _timerSeconds = timerSeconds;
             _failable = failable;
-            _reward = reward;
+            _rewardId = rewardId;
         }
 #endif
     }

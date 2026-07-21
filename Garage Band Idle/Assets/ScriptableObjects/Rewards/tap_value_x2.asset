@@ -15,4 +15,4 @@ MonoBehaviour:
   _id: tap_value_x2
   _displayName: "Tap Value \xD72"
   _value: 2
-  _scope: permanentInChapter
+  _scope: 1

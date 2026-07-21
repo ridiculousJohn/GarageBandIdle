@@ -1,23 +1,20 @@
-using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
-    // Slice 3: the content-unlock mechanism and fan accrual. The load-bearing
-    // claims: a contentUnlock applies exactly when its gate is met, and the fan
-    // rate is a function of band size and time only — provably never Cash.
+    // The content-unlock mechanism and fan accrual. The load-bearing claims: a
+    // contentUnlock applies exactly when its gate is met (latching its flag in
+    // the single reveal registry), and the fan rate is a function of band size
+    // and time only — provably never Cash.
     public class FansAndContentUnlockTests
     {
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
-        private static GateCondition OwnedCount(string generatorId, double amount)
-            => new(GateCondition.TypeOwnedCount, "", generatorId, "", amount);
-
-        private static UpgradePayload UnlockSystem(string systemId)
-            => new(UpgradePayload.EffectUnlockSystem, 0, "", systemId);
+        private static UpgradePayload SetFlag(string flagId)
+            => new(UpgradePayload.EffectSetFlag, 0, "", flagId);
 
         [Test]
         public void ContentUnlock_AppliesWhenGateMet_AndSetsTheFlag()
@@ -26,20 +23,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var flags = new FlagSystem();
             var generators = new GeneratorSystem(
                 new[] { TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true) },
-                currencies, flags);
+                currencies);
             var upgrades = new UpgradeSystem(new[]
             {
-                TestContent.MakeUpgrade("play_for_crowd", UpgradeDefinition.TypeContentUnlock,
-                    UpgradeDefinition.ScopePermanentInChapter,
-                    new List<GateCondition> { OwnedCount("drummer", 1) }, UnlockSystem("fans")),
-            }, currencies, generators, flags);
+                TestContent.MakeUpgrade("play_for_crowd", UpgradeType.ContentUnlock,
+                    ContentScope.PermanentInChapter,
+                    new OwnedCountCondition("drummer", 1), SetFlag("fans")),
+            }, currencies, flags);
+            var context = TestContent.MakeContext(currencies, generators, flags);
 
-            upgrades.EvaluateContentUnlocks();
+            upgrades.EvaluateContentUnlocks(context);
             Assert.IsFalse(flags.IsSet("fans"), "no flag before the gate is met");
             Assert.IsFalse(upgrades.Get("play_for_crowd").Applied);
 
             TestContent.BuyTimes(generators.Get("drummer"), currencies, 1);
-            upgrades.EvaluateContentUnlocks();
+            upgrades.EvaluateContentUnlocks(context);
 
             Assert.IsTrue(flags.IsSet("fans"), "owning 1 drummer sets the fans flag");
             Assert.IsTrue(upgrades.Get("play_for_crowd").Applied);
@@ -52,15 +50,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var flags = new FlagSystem();
             var upgrades = new UpgradeSystem(new[]
             {
-                // empty gate = met from the start
-                TestContent.MakeUpgrade("auto", UpgradeDefinition.TypeContentUnlock,
-                    UpgradeDefinition.ScopePermanentInChapter, null, UnlockSystem("fans")),
-            }, currencies, null, flags);
+                // no gate = met from the start
+                TestContent.MakeUpgrade("auto", UpgradeType.ContentUnlock,
+                    ContentScope.PermanentInChapter, null, SetFlag("fans")),
+            }, currencies, flags);
+            var context = TestContent.MakeContext(currencies, flags: flags);
             var appliedCount = 0;
             upgrades.UpgradeApplied += _ => appliedCount++;
 
-            upgrades.EvaluateContentUnlocks();
-            upgrades.EvaluateContentUnlocks();
+            upgrades.EvaluateContentUnlocks(context);
+            upgrades.EvaluateContentUnlocks(context);
 
             Assert.AreEqual(1, appliedCount, "an applied unlock never re-applies");
         }
@@ -72,13 +71,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var flags = new FlagSystem();
             var upgrades = new UpgradeSystem(new[]
             {
-                // met gate (empty), but buffs wait for the purchase flow (slice 5)
-                TestContent.MakeUpgrade("stage_presence", UpgradeDefinition.TypeBuff,
-                    UpgradeDefinition.ScopeRun, null,
+                // met gate (none), but buffs wait for the purchase flow (buff slice)
+                TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff,
+                    ContentScope.Run, null,
                     new UpgradePayload(UpgradePayload.EffectTapValueAdd, 1, "", "")),
-            }, currencies, null, flags);
+            }, currencies, flags);
+            var context = TestContent.MakeContext(currencies, flags: flags);
 
-            upgrades.EvaluateContentUnlocks();
+            upgrades.EvaluateContentUnlocks(context);
 
             Assert.IsFalse(upgrades.Get("stage_presence").Applied);
         }
@@ -90,7 +90,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var flags = new FlagSystem();
             var generators = new GeneratorSystem(
                 new[] { TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true) },
-                currencies, flags);
+                currencies);
             var fans = new FanSystem(new FansConfig(0.2, 0.02), "fans", "fans", currencies, generators, flags);
 
             fans.Tick(10);
@@ -110,7 +110,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             flags.Set("fans");
-            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, flags);
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
             var fans = new FanSystem(new FansConfig(0.2, 0.02), "fans", "fans", currencies, generators, flags);
             var context = new Content.RewardContext(currencies, flags, fans);
 
@@ -133,6 +133,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
+        public void RewardManager_AppliesByIdFromThePool()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
+            var fans = new FanSystem(new FansConfig(0.2, 0.02), "fans", "fans", currencies, generators, flags);
+            var rewards = new Content.RewardManager(new Content.RewardDefinition[]
+            {
+                TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
+                TestContent.MakeSetFlagReward("open_backroom", "backroom"),
+            });
+            var context = new Content.RewardContext(currencies, flags, fans);
+
+            Assert.IsTrue(rewards.Contains("fan_rate_x1_15"));
+            Assert.IsFalse(rewards.Contains("nope"));
+
+            rewards.Apply("fan_rate_x1_15", context);
+            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9, "pool reward applied by id");
+
+            rewards.Apply("open_backroom", context);
+            Assert.IsTrue(flags.IsSet("backroom"), "setFlag rewards run through the same registry");
+        }
+
+        [Test]
         public void FanRate_ScalesWithBandmates_NeverWithGearOrCash()
         {
             var currencies = TestContent.MakeEconomy();
@@ -143,7 +168,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeGenerator("practice_amp", "cash", 60, 1.15, 0.4), // gear
                 TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true),
                 TestContent.MakeGenerator("bassist", "cash", 4000, 1.15, 20, isBandmate: true),
-            }, currencies, flags);
+            }, currencies);
             var fans = new FanSystem(new FansConfig(0.2, 0.02), "fans", "fans", currencies, generators, flags);
 
             TestContent.BuyTimes(generators.Get("drummer"), currencies, 2);

@@ -8,27 +8,26 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // chapter's definition list, produces into CurrencyManager on tick, and
     // reveals generators as their unlock conditions are met. State is keyed by
     // generator id, so the generator set stays open — new generators are new
-    // assets, not code.
+    // assets, not code. Unlock conditions are validated by the boot validation
+    // pass (ContentValidator), not here.
     public class GeneratorSystem
     {
         private readonly List<Generator> _generators = new();
         private readonly Dictionary<string, Generator> _byId = new();
         private readonly List<string> _producedCurrencyIds = new();
         private readonly CurrencyManager _currencies;
-        private readonly FlagSystem _flags;
 
         // fires once per generator when its unlock conditions are first met
         public event Action<Generator> GeneratorUnlocked;
 
         public IReadOnlyList<Generator> All => _generators;
 
-        // Content errors (duplicate/empty ids, unresolvable currency or generator
-        // references, unlock types no handler exists for) are reported at load so
-        // they surface immediately instead of as silently-never-unlocking rows.
-        public GeneratorSystem(IEnumerable<GeneratorDefinition> definitions, CurrencyManager currencies, FlagSystem flags)
+        // Content errors (duplicate/empty ids, unresolvable produces currencies)
+        // are reported at load so they surface immediately instead of as
+        // silently-never-producing rows.
+        public GeneratorSystem(IEnumerable<GeneratorDefinition> definitions, CurrencyManager currencies)
         {
             _currencies = currencies;
-            _flags = flags;
 
             foreach (var definition in definitions)
             {
@@ -56,12 +55,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 if (!_producedCurrencyIds.Contains(definition.ProducesCurrencyId))
                     _producedCurrencyIds.Add(definition.ProducesCurrencyId);
             }
-
-            // second pass so unlock conditions may reference any generator,
-            // regardless of list order
-            foreach (var generator in _generators)
-                GateValidator.Validate(generator.Definition.Unlock,
-                    $"Generator '{generator.Definition.Id}' (unlock)", _currencies, this);
         }
 
         public Generator Get(string id)
@@ -88,15 +81,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
-        // reveals any still-locked generator whose conditions now hold; called on
+        // reveals any still-locked generator whose condition now holds; called on
         // tick and after purchases (an ownedCount unlock can trip mid-tick)
-        public void EvaluateUnlocks()
+        public void EvaluateUnlocks(ConditionContext context)
         {
             foreach (var generator in _generators)
             {
                 if (generator.Unlocked)
                     continue;
-                if (!GateEvaluator.AllMet(generator.Definition.Unlock, _currencies, this, _flags))
+                if (!ConditionEvaluator.IsMet(generator.Definition.Unlock, context))
                     continue;
 
                 generator.MarkUnlocked();
