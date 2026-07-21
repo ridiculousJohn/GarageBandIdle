@@ -1,11 +1,17 @@
 {
   "_meta": {
     "file": "Chapter 1 — Garage. Buildable content data.",
-    "usage": "Maps to the ScriptableObjects in the design doc (ChapterDefinition, GeneratorDefinition, UpgradeDefinition, EventDefinition, Song/CoverDefinition, AlbumPrestige config). Either hand-author SOs from these values or write a small importer. All numbers are starter values for tuning; the Records capstone gate is the primary pacing knob.",
+    "usage": "Maps to the ScriptableObjects in the design doc (ChapterDefinition, GeneratorDefinition, UpgradeDefinition, EventDefinition, BarDefinition, RewardDefinition, AlbumPrestige config). Either hand-author SOs from these values or write a small importer. ALL ScriptableObjects are discovered at runtime through Addressables (labels per type), not direct references. All numbers are starter values for tuning; the Records capstone gate is the primary pacing knob.",
+    "modelNotes": {
+      "conditions": "Every gate/unlock/visibility/availability rule is a single discriminated Condition shape — always an object with a `type` field — evaluated by ONE ConditionEvaluator. No bare/heterogeneous shapes. Types used in Ch1: `currency` (current balance ≥ amount), `currencyEarnedTotal` (lifetime earned ≥ value), `ownedCount` (generator owned ≥ value), `flagSet` (a flag is set), `barsCompleted` (≥ value bars completed in a group), `recordsCumulative` (cumulative Records ≥ value), `compound` (all/any of nested Conditions).",
+      "flags": "One flag registry drives every progressive reveal. A content-unlock upgrade's payload is `setFlag`; a reward's payload can also be `setFlag`; sections, currencies, bar groups, and any gated content reveal on a `flagSet` Condition. There is no separate `unlockSystem` code path — revealing a system = setting its flag.",
+      "bars": "A 'Learn Covers' cover is a generic fillable BAR. A bar declares `fillCurrency` (a currency id) + `fillRequirement` + `reward`; the fill logic reads `fillCurrency` and never hardcodes covers. Rehearsal is an ordinary run-scoped currency with its own earn config (per-sec tick + per-tap yield). Bars and their fill currency meet only through the `fillCurrency` id — mirrors how generators declare `produces`.",
+      "addressables": "Chapters, Generators, Upgrades, Events, Bars, Currencies, CurrencyGroups, and Rewards are all loaded by Addressables label. Managers build their registries from whatever assets carry the label — no hardcoded lists, no direct scene/asset references."
+    },
     "currencies": {
       "cash": "run-scoped; earned by tap + generators; spent on gear/upgrades",
       "fans": "run-scoped; performance meter; sets the album (demo) Records payout; loosely coupled to Cash by design",
-      "rehearsal": "run-scoped; fills the Learn Covers bars",
+      "rehearsal": "run-scoped; earned by a passive tick + taps; fills bars (Learn Covers) via each bar's fillCurrency",
       "records": "PERMANENT; each Record buffs global income; cumulative Records gate the capstone"
     }
   },
@@ -28,19 +34,26 @@
     "tapBaseValue": 1
   },
 
+  "flags": [
+    { "id": "fans",   "setBy": "upgrade:play_for_crowd", "reveals": "Fans currency + fan meter" },
+    { "id": "covers", "setBy": "upgrade:learn_covers",   "reveals": "Rehearsal currency + Learn Covers bar group" },
+    { "id": "album",  "setBy": "upgrade:cut_demo",       "reveals": "Album/Cut-a-Demo (prestige) button" }
+  ],
+  "flagsNote": "The single reveal registry. Flags are permanent-in-chapter. A content-unlock upgrade (or a reward) sets a flag via a `setFlag` payload; anything that should appear when a system exists gates on `{ \"type\": \"flagSet\", \"flag\": <id> }`.",
+
   "sections": [
     {
       "id": "garage_floor",
       "name": "The Garage Floor",
       "modules": [ "module/currency-header", "module/tap" ],
-      "note": "No visibleWhen: visible from chapter start. Modules are addressable prefab addresses; sections reveal as a group when their conditions hold (progressive reveal, design doc section 2)."
+      "note": "No visibleWhen: visible from chapter start. Module ids are Addressable keys resolved through a string→prefab registry loaded by label; a section reveals as a group when its visibleWhen Condition holds (progressive reveal, design doc §2)."
     },
     {
       "id": "the_band",
       "name": "The Band",
       "modules": [ "module/generator-list" ],
-      "visibleWhen": { "type": "cashEarnedTotal", "value": 100 },
-      "note": "Appears with the Stage-0 goal; the practice_amp row unlocks at the same moment. Later sections gate on flags set by content unlocks, e.g. { \"type\": \"flagSet\", \"flag\": \"fans\" }."
+      "visibleWhen": { "type": "currencyEarnedTotal", "currency": "cash", "value": 100 },
+      "note": "Appears with the Stage-0 goal; the practice_amp row unlocks at the same moment. Later sections gate on flags, e.g. { \"type\": \"flagSet\", \"flag\": \"fans\" }."
     }
   ],
 
@@ -53,7 +66,7 @@
       "baseCost": 60,
       "costGrowth": 1.15,
       "baseOutput": 0.4,
-      "unlock": { "type": "cashEarnedTotal", "value": 100 },
+      "unlock": { "type": "currencyEarnedTotal", "currency": "cash", "value": 100 },
       "note": "First automation. Unlocks the instant the Stage-0 goal (earn 100 Cash by tapping) is met."
     },
     {
@@ -65,7 +78,7 @@
       "costGrowth": 1.15,
       "baseOutput": 3,
       "unlock": { "type": "ownedCount", "generator": "practice_amp", "value": 5 },
-      "note": "First bandmate. Buying the first one triggers the play_for_crowd content unlock (Fans)."
+      "note": "First bandmate. Buying the first one satisfies the play_for_crowd gate, which sets the `fans` flag."
     },
     {
       "id": "bassist",
@@ -96,7 +109,7 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 250 },
-      "gate": { "currency": "cash", "amount": 250 },
+      "gate": { "type": "currency", "currency": "cash", "amount": 250 },
       "payload": { "effect": "tapValueAdd", "value": 1 },
       "note": "+1 Cash per tap."
     },
@@ -106,7 +119,7 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 500 },
-      "gate": { "currency": "cash", "amount": 500 },
+      "gate": { "type": "currency", "currency": "cash", "amount": 500 },
       "payload": { "effect": "generatorOutputMultiplier", "generator": "practice_amp", "value": 2.0 }
     },
     {
@@ -115,7 +128,7 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 5000 },
-      "gate": { "currency": "cash", "amount": 5000 },
+      "gate": { "type": "currency", "currency": "cash", "amount": 5000 },
       "payload": { "effect": "generatorOutputMultiplier", "generator": "drummer", "value": 2.0 }
     },
     {
@@ -124,9 +137,9 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 20000 },
-      "gate": { "currency": "fans", "amount": 30 },
+      "gate": { "type": "currency", "currency": "fans", "amount": 30 },
       "payload": { "effect": "allCashPerSecMultiplier", "value": 1.5 },
-      "note": "Example of an upgrade gated on Fans, not Cash — demonstrates the gating web (§4). You must build a crowd, not just money, to buy it."
+      "note": "Gated on Fans, not Cash — demonstrates the gating web (§4). Same Condition shape as a Cash gate, just a different `currency` id, so no special-casing."
     },
 
     {
@@ -136,8 +149,8 @@
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 0 },
       "gate": { "type": "ownedCount", "generator": "drummer", "value": 1 },
-      "payload": { "effect": "unlockSystem", "system": "fans" },
-      "note": "Stage 2. Recruiting your first Drummer means you can perform — unlocks the Fans meter."
+      "payload": { "effect": "setFlag", "flag": "fans" },
+      "note": "Stage 2. Recruiting your first Drummer sets the `fans` flag — which reveals the Fans currency and meter."
     },
     {
       "id": "learn_covers",
@@ -145,9 +158,9 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 0 },
-      "gate": { "currency": "fans", "amount": 25 },
-      "payload": { "effect": "unlockSystem", "system": "covers" },
-      "note": "Stage 3. Unlocks the three Learn Covers bars and the Rehearsal tick."
+      "gate": { "type": "currency", "currency": "fans", "amount": 25 },
+      "payload": { "effect": "setFlag", "flag": "covers" },
+      "note": "Stage 3. Sets the `covers` flag — reveals the Rehearsal currency and the Learn Covers bar group."
     },
     {
       "id": "cut_demo",
@@ -155,9 +168,15 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 0 },
-      "gate": { "type": "compound", "all": [ { "currency": "fans", "amount": 50 }, { "coversCompleted": 1 } ] },
-      "payload": { "effect": "unlockSystem", "system": "album" },
-      "note": "Stage 4. Unlocks the Release/Cut-a-Demo (prestige) button. This is the core teaching moment."
+      "gate": {
+        "type": "compound",
+        "all": [
+          { "type": "currency", "currency": "fans", "amount": 50 },
+          { "type": "barsCompleted", "group": "learn_covers", "value": 1 }
+        ]
+      },
+      "payload": { "effect": "setFlag", "flag": "album" },
+      "note": "Stage 4. Sets the `album` flag — reveals the Release/Cut-a-Demo (prestige) button. This is the core teaching moment."
     }
   ],
 
@@ -168,51 +187,70 @@
     { "id": "tap_value_x1_50", "name": "Tap Value ×1.50", "type": "tapValueMultiplier", "value": 1.5, "scope": "permanentInChapter" },
     { "id": "tap_value_x2", "name": "Tap Value ×2", "type": "tapValueMultiplier", "value": 2.0, "scope": "permanentInChapter" }
   ],
-  "rewardsNote": "The shared reward pool. Covers and event tiers reference these by id; each type maps to a RewardDefinition subclass asset, so a new reward kind is a new type + entries, and rewards are reusable across content. Available types: fanRateMultiplier, tapValueMultiplier, setFlag (flag: <id> — lets a reward reveal gated content).",
+  "rewardsNote": "The shared reward pool. Bars and event tiers reference these by id; each type maps to a RewardDefinition subclass asset, so a new reward kind is a new type + entries, and rewards are reusable across content. Available types: fanRateMultiplier, tapValueMultiplier, setFlag (payload `flag: <id>` — lets a reward reveal gated content through the same flag registry as content-unlock upgrades).",
 
-  "covers": {
-    "system": "Learn Covers",
+  "rehearsal": {
+    "currency": "rehearsal",
     "scope": "run",
-    "unlockedBy": "learn_covers",
-    "rehearsal": {
-      "pointsPerSec": 1,
-      "pointsPerTap": 2,
-      "note": "Rehearsal points fill cover bars. Passive tick plus taps, so covers advance from engagement, not from Cash."
-    },
-    "bars": [
-      { "id": "cover_1", "name": "Three-Chord Anthem", "fillRequirement": 120, "reward": "fan_rate_x1_15" },
-      { "id": "cover_2", "name": "Parking-Lot Standard", "fillRequirement": 300, "reward": "fan_rate_x1_15" },
-      { "id": "cover_3", "name": "The Crowd-Pleaser", "fillRequirement": 600, "reward": "fan_rate_x1_20" }
+    "revealFlag": "covers",
+    "perSec": 1,
+    "perTap": 2,
+    "note": "Rehearsal is a plain run-scoped currency, revealed by the `covers` flag. It accrues from a passive tick (perSec) plus Jam taps (perTap) — so it advances from engagement, not from Cash. Modelled like `fans`: the currency owns its earn config; consumers (bars) reference it by id."
+  },
+
+  "bars": {
+    "groups": [
+      {
+        "id": "learn_covers",
+        "name": "Learn Covers",
+        "revealFlag": "covers",
+        "fillMode": "perBar",
+        "fillModeNote": "perBar / player-directed: each bar accrues its OWN progress by draining the shared Rehearsal pool; the player chooses which bar to pour Rehearsal into. Bars are independent (not cumulative thresholds on one counter). Totals: 120 + 300 + 600 = 1020 Rehearsal to finish all three.",
+        "bars": [
+          { "id": "cover_1", "name": "Three-Chord Anthem",  "fillCurrency": "rehearsal", "fillRequirement": 120, "reward": "fan_rate_x1_15" },
+          { "id": "cover_2", "name": "Parking-Lot Standard", "fillCurrency": "rehearsal", "fillRequirement": 300, "reward": "fan_rate_x1_15" },
+          { "id": "cover_3", "name": "The Crowd-Pleaser",    "fillCurrency": "rehearsal", "fillRequirement": 600, "reward": "fan_rate_x1_20" }
+        ]
+      }
     ],
-    "note": "Run-scoped: reset each demo but refill faster as the run gets stronger. Cover_1 is on the critical path (gates cut_demo). Cover buffs stack multiplicatively on fan rate."
+    "scope": "run",
+    "note": "A bar is a generic fillable: it declares `fillCurrency` + `fillRequirement` + `reward`. The fill system reads `fillCurrency` and works for any currency — covers are just the Ch1 instance. Run-scoped: bars reset each demo but refill faster as the run gets stronger. cover_1 is on the critical path (its completion satisfies the barsCompleted leg of cut_demo). Bar rewards stack multiplicatively on fan rate."
   },
 
   "fans": {
-    "unlockedBy": "play_for_crowd",
+    "currency": "fans",
+    "revealFlag": "fans",
     "baseFansPerSec": 0.2,
     "perBandmateOwnedBonus": 0.02,
-    "perBandmateNote": "Applies per owned unit of bandmate generators (drummer/bassist/guitarist), not practice_amp. Ties fan rate to band size.",
-    "coverBonusesApply": true,
-    "couplingNote": "fanRate is intentionally NOT a function of Cash or Cash/sec — only band size, covers, and time — so income alone cannot shortcut the demo payout (§11)."
+    "perBandmateNote": "Applies per owned unit of any generator with `isBandmate: true` (behavior-as-data — the fan system reads the flag, it does not name drummer/bassist/guitarist). Ties fan rate to band size.",
+    "barBonusesApply": true,
+    "couplingNote": "fanRate is intentionally NOT a function of Cash or Cash/sec — only band size, bar rewards, and time — so income alone cannot shortcut the demo payout (§11)."
   },
 
   "album": {
     "id": "cut_demo",
     "displayName": "Cut a Demo",
-    "unlock": { "type": "compound", "all": [ { "currency": "fans", "amount": 50 }, { "coversCompleted": 1 } ] },
-    "resets": [ "cash", "generators.owned", "upgrades.buff", "fans", "covers", "rehearsal" ],
-    "keeps": [ "records", "upgrades.contentUnlock", "roadies" ],
+    "revealFlag": "album",
+    "unlock": {
+      "type": "compound",
+      "all": [
+        { "type": "currency", "currency": "fans", "amount": 50 },
+        { "type": "barsCompleted", "group": "learn_covers", "value": 1 }
+      ]
+    },
+    "resets": [ "cash", "generators.owned", "upgrades.buff", "fans", "bars", "rehearsal" ],
+    "keeps": [ "records", "upgrades.contentUnlock", "flags", "roadies" ],
     "recordsFormula": "floor( (fansThisRun / 5) ^ 0.5 )",
     "recordsFormulaExamples": { "50fans": 3, "125fans": 5, "500fans": 10, "2000fans": 20 },
-    "note": "Releasing resets the run and awards Records. Each Record = +2% permanent global income, so the next run is faster."
+    "note": "Releasing resets the run and awards Records. Reset is driven by currency group `resetsOnAlbumRelease` + upgrade/bar `scope`, not a hardcoded name list. Flags are kept (content stays revealed across demos). Each Record = +2% permanent global income, so the next run is faster."
   },
 
   "events": [
     {
       "id": "garage_jam",
       "name": "Garage Jam Challenge",
-      "availableWhen": { "type": "recordsAtLeast", "value": 1 },
-      "availableNote": "Introduced in Stage 6, after the player has released at least one demo, so the prestige loop is understood first.",
+      "availableWhen": { "type": "recordsCumulative", "value": 1 },
+      "availableNote": "Introduced in Stage 6, after the player has released at least one demo, so the prestige loop is understood first. Same `recordsCumulative` Condition type the capstone uses — one evaluator, different threshold.",
       "type": "challenge",
       "baselineReset": true,
       "baselineResetNote": "On entry the chapter economy resets to a fixed baseline for the event's duration, so tiers scale independently of the player's Records.",
@@ -220,7 +258,7 @@
         {
           "tier": 1,
           "debuff": { "effect": "automationDisabled", "note": "Generators paused — tap only." },
-          "goal": { "currency": "cash", "amount": 500 },
+          "goal": { "type": "currency", "currency": "cash", "amount": 500 },
           "timerSeconds": 60,
           "failable": true,
           "reward": "tap_value_x1_25"
@@ -228,7 +266,7 @@
         {
           "tier": 2,
           "debuff": { "effect": "automationDisabled" },
-          "goal": { "currency": "cash", "amount": 2500 },
+          "goal": { "type": "currency", "currency": "cash", "amount": 2500 },
           "timerSeconds": 60,
           "failable": true,
           "reward": "tap_value_x1_50"
@@ -236,7 +274,7 @@
         {
           "tier": 3,
           "debuff": { "effect": "automationDisabled" },
-          "goal": { "currency": "cash", "amount": 10000 },
+          "goal": { "type": "currency", "currency": "cash", "amount": 10000 },
           "timerSeconds": 45,
           "failable": true,
           "reward": "tap_value_x2"
@@ -250,7 +288,7 @@
   "capstone": {
     "id": "backyard_party",
     "name": "Play the Backyard Party",
-    "unlock": { "type": "cumulativeRecordsAtLeast", "value": 30 },
+    "unlock": { "type": "recordsCumulative", "value": 30 },
     "onComplete": {
       "grantRoadies": 1,
       "roadieSystemUIUnlocked": false,
@@ -263,9 +301,9 @@
   "progression": [
     { "stage": 0, "name": "First Notes", "unlocks": "tap only", "gate": "start", "goal": "earn 100 Cash by tapping", "target": "~1-2 min" },
     { "stage": 1, "name": "First Gear", "unlocks": "practice_amp, then drummer/bassist/guitarist by ownership", "gate": "100 Cash earned" },
-    { "stage": 2, "name": "Play for a Crowd", "unlocks": "Fans meter", "gate": "own 1 Drummer" },
-    { "stage": 3, "name": "Learn Covers", "unlocks": "cover bars + rehearsal", "gate": "25 Fans" },
-    { "stage": 4, "name": "Cut a Demo", "unlocks": "album/prestige button", "gate": "50 Fans + 1 cover", "target": "~5 min from install" },
+    { "stage": 2, "name": "Play for a Crowd", "unlocks": "Fans (flag: fans)", "gate": "own 1 Drummer" },
+    { "stage": 3, "name": "Learn Covers", "unlocks": "Rehearsal + cover bars (flag: covers)", "gate": "25 Fans" },
+    { "stage": 4, "name": "Cut a Demo", "unlocks": "album/prestige button (flag: album)", "gate": "50 Fans + 1 cover", "target": "~5 min from install" },
     { "stage": 5, "name": "The Loop", "unlocks": "repeat demos, accumulate Records", "gate": "first demo released" },
     { "stage": 6, "name": "Garage Jam", "unlocks": "garage_jam event", "gate": "1+ Records" },
     { "stage": 7, "name": "Backyard Party", "unlocks": "capstone → Chapter 2 + first Roadie", "gate": "30 cumulative Records" }

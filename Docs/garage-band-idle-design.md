@@ -3,6 +3,18 @@
 An idle game about a band rising from a garage to arenas. Play progresses through eight chapters, each
 a bigger venue with a new mechanic. All numbers below are starting values for tuning.
 
+> **Revision note (data-model consolidation pass).** Changes in this revision, all to keep the doc in
+> sync with the restructured `chapter-01-garage.json` and the build prompts:
+> - **§3** — Rehearsal added as a first-class run-scoped currency; "learn-songs bars" reframed as
+>   generic *fillable bars* fed by a `fillCurrency`.
+> - **§4** — content-unlock reveal is now stated to run through the single flag registry.
+> - **§6** — learn-songs bars note that filling is *player-directed* when several are offered at once.
+> - **§12** — three architecture rules added (unified `Condition` type + evaluator; one flag registry
+>   for all reveal; all content ScriptableObjects discovered via Addressables); `LearnSongBar.cs`
+>   generalized to a bar/bar-group system; `UpgradeDefinition` payload comment updated to `setFlag`.
+> - **Appendix** — a "data model" line added.
+> Edited passages are marked inline with **[rev]**.
+
 ---
 
 ## 1. Core loop
@@ -73,9 +85,17 @@ albums).
 
 **Run-scoped:**
 - **Cash** — earned by tapping and generators; spent on gear and upgrades.
-- **Gear & bandmates** — generators bought with Cash (+Cash/tap, +Cash/sec, +Fan rate).
-- **Learn-songs bars** — EXP bars (learn covers, rehearse) that pace a chapter. Separate from the
-  Catalog (§7).
+- **Gear & bandmates** — generators bought with Cash (+Cash/tap, +Cash/sec, +Fan rate). A generator
+  flagged as a bandmate also raises the Fan rate (§6); bandmate-ness is a data flag, not a hardcoded
+  list. **[rev]**
+- **Rehearsal (and later chapters' equivalent fill currencies)** — a run-scoped currency earned from
+  engagement (a passive tick plus taps), spent to fill learn-songs bars. Rehearsal is Chapter 1's fill
+  currency; a later chapter may define its own. It is an ordinary currency — it owns its earn config,
+  and bars reference it by id. **[rev]**
+- **Learn-songs bars** — generic *fillable bars* that pace a chapter (learn covers, rehearse). Each bar
+  declares a `fillCurrency` (Rehearsal in Ch. 1), a fill requirement, and a reward granted on
+  completion; the fill logic reads `fillCurrency` and is not covers-specific. Fed by a fill currency
+  rather than being their own opaque mechanic. Separate from the Catalog (§7). **[rev]**
 - **Fans** — the run's performance meter; determines the album's Records payout on release.
 - **Catalog (Ch. 6+)** — songs written during the run; a global income multiplier that converts to
   Records on album release (§7).
@@ -104,9 +124,14 @@ currencies as they become affordable.
 
 - **Gating.** An upgrade can be gated on any chapter currency, not only Cash. Which currency unlocks
   which upgrade defines the order in which the player develops each currency, and gives each chapter a
-  distinct shape.
+  distinct shape. A gate is expressed as a single `Condition` (§12), so gating on Fans instead of Cash
+  is the same shape with a different currency id — no special case. **[rev]**
 - **Payloads.** An upgrade can grant a flat bonus, a multiplier, a new generator, a new currency, an
   automation step, a new sub-loop, or a new mechanic.
+- **Reveal.** A content-unlock upgrade reveals its content by **setting a flag** in the single flag
+  registry (§12); the revealed content (a currency, a section, a bar group, a button) gates its own
+  visibility on that flag. Rewards (§6.1) can set flags too. There is one reveal mechanism, not one per
+  content type. **[rev]**
 - **Scope.** *Buff upgrades* are run-scoped: they reset on album release and are re-bought each run
   (faster as Records accumulate). *Content-unlock upgrades* (new generator, currency, or mechanic) are
   permanent within the chapter: the unlock persists across albums; only owned counts reset.
@@ -140,7 +165,12 @@ Moment-to-moment play draws on the systems defined elsewhere:
   chapter. Because runs reset, a chapter's Cash stays in the thousands–millions range; cross-chapter
   growth comes from Records and Roadies.
 - **Upgrades (§4).**
-- **Learn-songs bars** — soft run gates that give early chapters an activity beyond watching a number.
+- **Learn-songs bars** — generic fillable bars (§3) that give early chapters an activity beyond
+  watching a number. A bar fills by spending a fill currency (Rehearsal in Ch. 1, earned from taps plus
+  a passive tick), so progress comes from engagement rather than Cash. When a group offers several bars
+  at once, filling is **player-directed**: the player chooses which bar to pour the fill currency into
+  and each bar tracks its own progress independently — a small prioritization decision rather than an
+  automatic sequence. **[rev]**
 - **Fans** — accrue from performing (tap plus a passive rate that scales with income). Fan rate is
   tuned loosely relative to Cash so that income alone does not determine the album payout.
 - **Capstone gig** — unlocks at the Records gate; grants a Roadie and fires a story beat (§10).
@@ -169,8 +199,9 @@ tuning intends the player to do. Chapter pacing is set with each event's intende
   time. Failing or quitting costs only the time spent, not permanent progress, so entering an event is
   always low-risk.
 - **Reward on success:** a lateral bonus — a permanent-in-chapter buff, a Roadie, a Catalog song, or
-  local currency. Event rewards never include Records or any currency that gates advancement, so an
-  event is never a hard prerequisite; its reward size (above) is what sets how much it matters.
+  local currency, drawn from the shared reward pool (§12). Event rewards never include Records or any
+  currency that gates advancement, so an event is never a hard prerequisite; its reward size (above) is
+  what sets how much it matters. **[rev]**
 - **Tiers:** an event can repeat at higher tiers with a higher starting requirement, a stronger debuff,
   and a larger reward. The rising requirement across tiers is a natural throttle, which makes tiered
   events a repeatable source of Roadies.
@@ -330,7 +361,9 @@ Catalog multipliers) and confirm each chapter still takes meaningful play time.
 
 ## 12. Build notes (Unity)
 
-Content is data-driven via ScriptableObjects so chapters, gear, and songs are data assets.
+Content is data-driven via ScriptableObjects so chapters, gear, and songs are data assets. All
+definition ScriptableObjects are discovered at runtime through **Addressables** (a label per type),
+not direct references or hardcoded lists (see architecture rule 10). **[rev]**
 
 ```
 Assets/Scripts/
@@ -338,15 +371,19 @@ Assets/Scripts/
     GameManager.cs        // bootstrap, save/load + tick orchestration
     TickSystem.cs         // fixed-interval update on real (DateTime) time
     BigNumber.cs          // wraps break_infinity.cs
-    CurrencyManager.cs    // run block (Cash/Fans/gear/catalog) + permanent block (Records/Roadies)
+    CurrencyManager.cs    // run block (Cash/Fans/Rehearsal/gear/catalog) + permanent block (Records/Roadies)   // [rev]
+    ContentDatabase.cs    // [rev] Addressables discovery of all definition SOs by label; id→def registries
+    Condition.cs / ConditionEvaluator.cs   // [rev] one gate/unlock/visibility/availability type + one evaluator
+    FlagManager.cs        // [rev] single reveal registry (permanent-in-chapter flags)
   Loop/
     ChapterDefinition.cs / Chapter.cs   // mechanic, capstone, Records gate, story beat
     ChapterManager.cs     // forward-only advancement + unlocks
     AlbumPrestige.cs      // reset run, compute + award Records
   Economy/
-    GeneratorDefinition.cs / Generator.cs
-    UpgradeDefinition.cs / Upgrade.cs   // payload = buff | unlock generator/currency/mechanic; gate = any currency; scope = run | permanent-in-chapter
-    LearnSongBar.cs
+    GeneratorDefinition.cs / Generator.cs   // isBandmate is a data field the fan system reads   // [rev]
+    UpgradeDefinition.cs / Upgrade.cs   // [rev] payload = buff | setFlag (reveal via flag); gate = any Condition; scope = run | permanent-in-chapter
+    BarDefinition.cs / BarGroupDefinition.cs / BarSystem.cs   // [rev] generic fillable bars (fillCurrency-driven); replaces LearnSongBar
+    RewardDefinition.cs / RewardManager.cs   // [rev] shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
     CostCalculator.cs / ProductionCalculator.cs
   Events/
     EventDefinition.cs / GameEvent.cs   // baseline reset, optional debuff, optional timer, goal, tier, reward
@@ -364,8 +401,9 @@ Assets/Scripts/
     IAPManager.cs         // Backstage Pass (non-consumable) + Roadie bundles (consumable) + Tip Jar
   UI/
     ChapterScreenUI.cs  StoryBeatUI.cs  CollectScreenUI.cs
+    SectionView.cs  ModuleRegistry.cs   // [rev] data-driven layout: sections + module→prefab (Addressables) with visibleWhen Conditions
     RoadieAllocationUI.cs  GeneratorRowUI.cs  NumberFormatter.cs
-ScriptableObjects/  Chapters/  Generators/  Songs/
+ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bars/  Rewards/  Songs/
 ```
 
 **Architecture requirements:**
@@ -374,21 +412,34 @@ ScriptableObjects/  Chapters/  Generators/  Songs/
    calculation is correct.
 3. Drive UI from events; do not poll balances per frame.
 4. Checksum saves and validate on load; cap offline earnings in the client.
-5. Keep content in ScriptableObjects; the regular per-chapter gear curve can be generated by an editor
-   script.
+5. Keep content in ScriptableObjects, discovered via Addressables (rule 10); the regular per-chapter
+   gear curve can be generated by an editor script. **[rev]**
 6. Separate the run block and permanent block in the save schema. An album release clears the run block
    and writes the permanent block.
 7. Store each cleared chapter's replay economy as its own state block (local currency, generators, goal
    `k`), separate from frontier state. The only cross-writes are Roadie allocation in and Roadie award
    out.
+8. **[rev]** Express every gate/unlock/visibility/availability rule as a single `Condition` type
+   evaluated by one `ConditionEvaluator` — no per-currency or per-rule branches. Condition types:
+   `currency`, `currencyEarnedTotal`, `ownedCount`, `flagSet`, `barsCompleted`, `recordsCumulative`,
+   `compound` (all/any).
+9. **[rev]** Drive all progressive reveal through one flag registry: a content-unlock upgrade (or a
+   reward) sets a flag; revealed content gates its visibility on a `flagSet` Condition. No parallel
+   reveal paths (no separate "unlockSystem").
+10. **[rev]** Discover all content ScriptableObjects (chapters, currencies, currency groups, generators,
+    upgrades, events, bars, rewards) via Addressables labels; managers build their id→definition
+    registries from the labelled assets, not from hardcoded lists or direct references. Validate that
+    every referenced id resolves on load.
 
 **Starter prompt for a code assistant:**
 > "In Unity (version X, iOS/Android), scaffold a nested-prestige idle core: a CurrencyManager with a run
-> block (Cash, Fans, gear, catalog) and a permanent block (Records, Roadies) using break_infinity.cs
-> BigDouble; an AlbumPrestige action that clears the run block and awards Records from fans (later fans ×
-> catalog quality); a ChapterManager with forward-only advancement gated by cumulative Records; a
-> TickSystem on DateTime deltas; and a checksummed JSON SaveSystem computing offline earnings at 50%
-> base capped at 4h. Event-driven, no per-frame polling."
+> block (Cash, Fans, Rehearsal, gear, catalog) and a permanent block (Records, Roadies) using
+> break_infinity.cs BigDouble; content discovered via Addressables; a single Condition type + evaluator
+> for all gates/unlocks/visibility; one flag registry for all progressive reveal; an AlbumPrestige
+> action that clears the run block and awards Records from fans (later fans × catalog quality); a
+> ChapterManager with forward-only advancement gated by cumulative Records; a TickSystem on DateTime
+> deltas; and a checksummed JSON SaveSystem computing offline earnings at 50% base capped at 4h.
+> Event-driven, no per-frame polling."
 
 ---
 
@@ -410,6 +461,10 @@ ScriptableObjects/  Chapters/  Generators/  Songs/
 - **Roadies:** permanent multiplier — additive within a venue (+5%/roadie), multiplicative across
   venues. Earned from capstones and from replaying sealed chapter economies; buyable; earned and bought
   Roadies are identical; no purchase cap.
+- **Data model [rev]:** gates/unlocks are a single `Condition` type (one evaluator); all progressive
+  reveal runs through one flag registry (`setFlag` → `flagSet`); learn-songs bars are generic fillables
+  driven by a `fillCurrency` (Rehearsal in Ch. 1); every content ScriptableObject is discovered via
+  Addressables.
 - **Monetization:** opt-in ads only (no forced interstitials); offline 50% with an optional 2×;
   Encore 2× / Overdrive 4×; Backstage Pass (lifetime); Buy Roadies (repeatable); Tip Jar; no
   subscriptions.
