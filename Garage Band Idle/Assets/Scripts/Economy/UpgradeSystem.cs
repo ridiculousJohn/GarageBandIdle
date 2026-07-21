@@ -16,7 +16,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly List<Upgrade> _upgrades = new();
         private readonly Dictionary<string, Upgrade> _byId = new();
         private readonly CurrencyManager _currencies;
-        private readonly FlagSystem _flags;
+        private readonly UpgradePayloadContext _payloadContext;
 
         // fires once per upgrade when its payload is applied
         public event Action<Upgrade> UpgradeApplied;
@@ -26,7 +26,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, CurrencyManager currencies, FlagSystem flags)
         {
             _currencies = currencies;
-            _flags = flags;
+            _payloadContext = new UpgradePayloadContext(flags);
 
             foreach (var definition in definitions)
             {
@@ -85,15 +85,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private void Apply(Upgrade upgrade)
         {
             var payload = upgrade.Definition.Payload;
-            switch (payload.Effect)
+            if (payload == null)
             {
-                case UpgradePayload.EffectSetFlag:
-                    _flags.Set(payload.FlagId);
-                    break;
-                default:
-                    // marked applied anyway so a content mistake reports once, not per tick
-                    Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' payload effect '{payload.Effect}' has no content-unlock handler.");
-                    break;
+                // marked applied anyway so a content mistake reports once, not per tick
+                Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' has no payload. Nothing to apply.");
+            }
+            else
+            {
+                payload.Apply(_payloadContext);
             }
 
             upgrade.MarkApplied();
@@ -103,10 +102,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private void ValidatePayload(UpgradeDefinition definition)
         {
             if (definition.Type != UpgradeType.ContentUnlock)
-                return; // buff payloads validate when their handlers arrive (buff slice)
-
-            if (definition.Payload.Effect == UpgradePayload.EffectSetFlag && string.IsNullOrEmpty(definition.Payload.FlagId))
-                Debug.LogError($"UpgradeSystem: content unlock '{definition.Id}' has a setFlag payload with an empty flag id.");
+                return;
 
             // content unlocks auto-apply on gate met; a price needs the purchase
             // flow that arrives with the buff-upgrades slice

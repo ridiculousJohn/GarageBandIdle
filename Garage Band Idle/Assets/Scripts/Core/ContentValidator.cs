@@ -36,7 +36,10 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var upgrade in database.Upgrades.All)
             {
                 ConditionEvaluator.Validate(upgrade.Gate, context, $"Upgrade '{upgrade.Id}' (gate)");
-                ValidatePayload(upgrade, database, context);
+                if (upgrade.Payload == null)
+                    Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload.");
+                else
+                    upgrade.Payload.Validate(context, $"Upgrade '{upgrade.Id}' (payload)");
             }
 
             foreach (var group in database.BarGroups.All)
@@ -76,21 +79,6 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 if (!registry.Contains(id))
                     Debug.LogError($"ContentValidator: {source} references unknown {typeof(T).Name} id '{id}'.");
-            }
-        }
-
-        private static void ValidatePayload(UpgradeDefinition upgrade, ContentDatabase database, ConditionContext context)
-        {
-            var payload = upgrade.Payload;
-            switch (payload.Effect)
-            {
-                case UpgradePayload.EffectSetFlag:
-                    ValidateFlag(payload.FlagId, context, $"Upgrade '{upgrade.Id}' (payload)");
-                    break;
-                case UpgradePayload.EffectGeneratorOutputMultiplier:
-                    if (!database.Generators.Contains(payload.GeneratorId))
-                        Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' payload targets unknown generator id '{payload.GeneratorId}'.");
-                    break;
             }
         }
 

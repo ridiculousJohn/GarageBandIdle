@@ -13,8 +13,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
-        private static UpgradePayload SetFlag(string flagId)
-            => new(UpgradePayload.EffectSetFlag, 0, "", flagId);
+        private static UpgradePayload SetFlag(string flagId) => new SetFlagPayload(flagId);
 
         [Test]
         public void ContentUnlock_AppliesWhenGateMet_AndSetsTheFlag()
@@ -74,7 +73,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 // met gate (none), but buffs wait for the purchase flow (buff slice)
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff,
                     ContentScope.Run, null,
-                    new UpgradePayload(UpgradePayload.EffectTapValueAdd, 1, "", "")),
+                    new TapValueAddPayload(1)),
             }, currencies, flags);
             var context = TestContent.MakeContext(currencies, flags: flags);
 

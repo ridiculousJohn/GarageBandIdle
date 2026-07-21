@@ -157,8 +157,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     ToUpgradeType(block.type, $"upgrade '{block.id}'"),
                     ToScope(block.scope, $"upgrade '{block.id}'"),
                     block.cost?.currency, block.cost?.amount ?? 0, ToCondition(block.gate),
-                    new UpgradePayload(block.payload?.effect, block.payload?.value ?? 0,
-                        block.payload?.generator, block.payload?.flag));
+                    ToPayload(block.payload, $"upgrade '{block.id}'"));
                 EditorUtility.SetDirty(asset);
                 upgradeIds.Add(block.id);
             }
@@ -191,12 +190,13 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 var tiers = new List<EventTier>();
                 foreach (var tier in block.tiers ?? Array.Empty<TierBlock>())
                 {
-                    tiers.Add(new EventTier(tier.tier, tier.debuff?.effect, ToCondition(tier.goal),
-                        tier.timerSeconds, tier.failable, tier.reward));
+                    tiers.Add(new EventTier(tier.tier,
+                        ToDebuff(tier.debuff, $"event '{block.id}' tier {tier.tier}"),
+                        ToCondition(tier.goal), tier.timerSeconds, tier.failable, tier.reward));
                 }
 
                 var asset = LoadOrCreate<EventDefinition>($"{EventsFolder}/{block.id}.asset");
-                asset.EditorInitialize(block.id, block.name, block.type,
+                asset.EditorInitialize(block.id, block.name,
                     ToCondition(block.availableWhen), block.baselineReset, tiers);
                 EditorUtility.SetDirty(asset);
                 eventIds.Add(block.id);
@@ -418,6 +418,48 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 default:
                     Debug.LogError($"ChapterJsonImporter: {context} has unknown scope '{scope}'. Defaulting to run.");
                     return ContentScope.Run;
+            }
+        }
+
+        // Maps a JSON payload ({ "effect": ... }) onto the UpgradePayload
+        // subclass family. Every upgrade must grant something, so an absent or
+        // unknown effect is a content error.
+        private static UpgradePayload ToPayload(PayloadBlock block, string context)
+        {
+            switch (block?.effect)
+            {
+                case "setFlag":
+                    return new SetFlagPayload(block.flag);
+                case "tapValueAdd":
+                    return new TapValueAddPayload(block.value);
+                case "generatorOutputMultiplier":
+                    return new GeneratorOutputMultiplierPayload(block.generator, block.value);
+                case "allCashPerSecMultiplier":
+                    return new AllCashPerSecMultiplierPayload(block.value);
+                case null:
+                case "":
+                    Debug.LogError($"ChapterJsonImporter: {context} has no payload effect. Importing no payload.");
+                    return null;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} payload effect '{block.effect}' maps to no UpgradePayload subclass. Importing no payload.");
+                    return null;
+            }
+        }
+
+        // A tier with no debuff block is legal content (the plain loop, design
+        // doc section 6.1); an unknown effect is a content error.
+        private static Debuff ToDebuff(DebuffBlock block, string context)
+        {
+            switch (block?.effect)
+            {
+                case "automationDisabled":
+                    return new AutomationDisabledDebuff();
+                case null:
+                case "":
+                    return null;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} debuff effect '{block.effect}' maps to no Debuff subclass. Importing no debuff.");
+                    return null;
             }
         }
 
@@ -671,7 +713,6 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public string id;
             public string name;
-            public string type;
             public ConditionBlock availableWhen;
             public bool baselineReset;
             public TierBlock[] tiers;

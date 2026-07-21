@@ -49,8 +49,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         [Tooltip("Must hold for the upgrade to become available. Gates may reference any currency, not only the cost currency.")]
         private Condition _gate;
 
-        [SerializeField]
-        private UpgradePayload _payload = new();
+        [SerializeReference]
+        private UpgradePayload _payload;
 
         public string Id => _id;
         public string DisplayName => _displayName;
@@ -74,50 +74,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _costAmount = costAmount;
             _gate = gate;
             _payload = payload;
-        }
-#endif
-    }
-
-    // What an upgrade grants. Effect is a string key with one code handler each
-    // (buffs in slice 5); which fields are meaningful depends on the effect.
-    [Serializable]
-    public class UpgradePayload
-    {
-        public const string EffectTapValueAdd = "tapValueAdd";
-        public const string EffectGeneratorOutputMultiplier = "generatorOutputMultiplier";
-        public const string EffectAllCashPerSecMultiplier = "allCashPerSecMultiplier";
-        public const string EffectSetFlag = "setFlag";
-
-        [SerializeField]
-        [Tooltip("One of the Effect* constants.")]
-        private string _effect;
-
-        [SerializeField]
-        private double _value;
-
-        [SerializeField]
-        [DefinitionId(typeof(GeneratorDefinition))]
-        [Tooltip("Target generator id, for generator-scoped effects.")]
-        private string _generatorId;
-
-        [SerializeField]
-        [Tooltip("Flag latched by setFlag — the single reveal registry (FlagSystem), e.g. fans / covers / album.")]
-        private string _flagId;
-
-        public string Effect => _effect;
-        public double Value => _value;
-        public string GeneratorId => _generatorId;
-        public string FlagId => _flagId;
-
-        public UpgradePayload() { }
-
-#if UNITY_EDITOR
-        public UpgradePayload(string effect, double value, string generatorId, string flagId)
-        {
-            _effect = effect;
-            _value = value;
-            _generatorId = generatorId;
-            _flagId = flagId;
         }
 #endif
     }

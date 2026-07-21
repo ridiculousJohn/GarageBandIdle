@@ -62,7 +62,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var definition = Track(ScriptableObject.CreateInstance<UpgradeDefinition>());
             definition.EditorInitialize(id, id, type, scope, costCurrencyId, costAmount,
-                gate, payload ?? new UpgradePayload());
+                gate, payload);
             return definition;
         }
 

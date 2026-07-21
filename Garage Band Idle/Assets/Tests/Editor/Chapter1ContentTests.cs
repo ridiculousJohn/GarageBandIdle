@@ -226,8 +226,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var cutDemo = LoadById<UpgradeDefinition>(UpgradesFolder, "cut_demo");
 
-            Assert.AreEqual(UpgradePayload.EffectSetFlag, cutDemo.Payload.Effect);
-            Assert.AreEqual("album", cutDemo.Payload.FlagId);
+            var payload = cutDemo.Payload as SetFlagPayload;
+            Assert.IsNotNull(payload, "cut_demo payload is a setFlag payload");
+            Assert.AreEqual("album", payload.FlagId);
 
             var gate = cutDemo.Gate as CompoundCondition;
             Assert.IsNotNull(gate, "cut_demo gate is a compound condition — if not, re-run the chapter import");
@@ -305,6 +306,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var goal = tier.Goal as CurrencyBalanceCondition;
             Assert.IsNotNull(goal, "tier goals are currency conditions");
             Assert.AreEqual("cash", goal.CurrencyId);
+
+            Assert.IsInstanceOf<Events.AutomationDisabledDebuff>(tier.Debuff,
+                "every garage_jam tier is tap-only");
         }
 
         [Test]

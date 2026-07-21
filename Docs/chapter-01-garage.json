@@ -251,7 +251,6 @@
       "name": "Garage Jam Challenge",
       "availableWhen": { "type": "recordsCumulative", "value": 1 },
       "availableNote": "Introduced in Stage 6, after the player has released at least one demo, so the prestige loop is understood first. Same `recordsCumulative` Condition type the capstone uses — one evaluator, different threshold.",
-      "type": "challenge",
       "baselineReset": true,
       "baselineResetNote": "On entry the chapter economy resets to a fixed baseline for the event's duration, so tiers scale independently of the player's Records.",
       "tiers": [

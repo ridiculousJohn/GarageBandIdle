@@ -21,10 +21,6 @@ namespace RidiculousGaming.GarageBandIdle.Events
         [SerializeField]
         private string _displayName;
 
-        [SerializeField]
-        [Tooltip("Event kind from the JSON, e.g. challenge.")]
-        private string _type;
-
         [SerializeReference]
         [Tooltip("Must hold for the event to appear.")]
         private Condition _availableWhen;
@@ -38,19 +34,17 @@ namespace RidiculousGaming.GarageBandIdle.Events
 
         public string Id => _id;
         public string DisplayName => _displayName;
-        public string Type => _type;
         public Condition AvailableWhen => _availableWhen;
         public bool BaselineReset => _baselineReset;
         public IReadOnlyList<EventTier> Tiers => _tiers;
 
 #if UNITY_EDITOR
         // importer-only: event assets are generated from chapter JSON
-        public void EditorInitialize(string id, string displayName, string type,
+        public void EditorInitialize(string id, string displayName,
             Condition availableWhen, bool baselineReset, List<EventTier> tiers)
         {
             _id = id;
             _displayName = displayName;
-            _type = type;
             _availableWhen = availableWhen;
             _baselineReset = baselineReset;
             _tiers = tiers;
@@ -65,9 +59,9 @@ namespace RidiculousGaming.GarageBandIdle.Events
         [SerializeField]
         private int _tier;
 
-        [SerializeField]
-        [Tooltip("Debuff effect key, e.g. automationDisabled.")]
-        private string _debuffEffect;
+        [SerializeReference]
+        [Tooltip("How the run is modified for this tier; none = the plain loop.")]
+        private Debuff _debuff;
 
         [SerializeReference]
         [Tooltip("Reaching this wins the tier, e.g. a currency condition.")]
@@ -86,7 +80,7 @@ namespace RidiculousGaming.GarageBandIdle.Events
         private string _rewardId;
 
         public int Tier => _tier;
-        public string DebuffEffect => _debuffEffect;
+        public Debuff Debuff => _debuff;
         public Condition Goal => _goal;
         public double TimerSeconds => _timerSeconds;
         public bool Failable => _failable;
@@ -95,11 +89,11 @@ namespace RidiculousGaming.GarageBandIdle.Events
         public EventTier() { }
 
 #if UNITY_EDITOR
-        public EventTier(int tier, string debuffEffect, Condition goal,
+        public EventTier(int tier, Debuff debuff, Condition goal,
             double timerSeconds, bool failable, string rewardId)
         {
             _tier = tier;
-            _debuffEffect = debuffEffect;
+            _debuff = debuff;
             _goal = goal;
             _timerSeconds = timerSeconds;
             _failable = failable;
