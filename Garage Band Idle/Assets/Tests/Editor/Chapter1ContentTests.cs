@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEditor;
@@ -128,6 +129,89 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(bassist, currencies, 5);
             generators.EvaluateUnlocks();
             Assert.IsTrue(guitarist.Unlocked, "guitarist unlocks at 5 bassists");
+        }
+
+        [Test]
+        public void FansTuning_MatchesJson()
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+
+            Assert.AreEqual(0.2, chapter.Fans.BaseFansPerSec, 1e-9);
+            Assert.AreEqual(0.02, chapter.Fans.PerBandmateOwnedBonus, 1e-9);
+        }
+
+        [TestCase("practice_amp", false)]
+        [TestCase("drummer", true)]
+        [TestCase("bassist", true)]
+        [TestCase("guitarist", true)]
+        public void BandmateFlags_MatchJson(string id, bool isBandmate)
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            GeneratorDefinition generator = null;
+            foreach (var candidate in chapter.Generators)
+            {
+                if (candidate.Id == id)
+                {
+                    generator = candidate;
+                    break;
+                }
+            }
+
+            Assert.IsNotNull(generator, $"generator '{id}' exists");
+            Assert.AreEqual(isBandmate, generator.IsBandmate,
+                $"'{id}' bandmate flag — if this fails, re-run 'GarageBandIdle → Import Chapter 1 JSON' to pick up the isBandmate field");
+        }
+
+        [Test]
+        public void PlayForCrowd_UnlocksFansOnFirstDrummer()
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            var currencies = LoadCurrencyManager();
+            var flags = new FlagSystem();
+            var generators = new GeneratorSystem(chapter.Generators, currencies, flags);
+            var upgrades = new UpgradeSystem(chapter.Upgrades, currencies, generators, flags);
+
+            upgrades.EvaluateContentUnlocks();
+            Assert.IsFalse(flags.IsSet("fans"), "fans locked before the first drummer");
+
+            TestContent.BuyTimes(generators.Get("drummer"), currencies, 1);
+            upgrades.EvaluateContentUnlocks();
+
+            Assert.IsTrue(flags.IsSet("fans"), "recruiting the first drummer reveals fans");
+        }
+
+        [Test]
+        public void CoverRewards_AreTypedAssets_AndShared()
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            Assert.AreEqual(3, chapter.Covers.Count, "Chapter 1 defines three covers");
+
+            foreach (var cover in chapter.Covers)
+            {
+                Assert.IsNotNull(cover.Reward,
+                    $"cover '{cover.Id}' reward — if null, re-run 'GarageBandIdle → Import Chapter 1 JSON' for the reward-pool schema");
+                Assert.IsInstanceOf<FanRateMultiplierReward>(cover.Reward, $"cover '{cover.Id}' reward type");
+            }
+
+            Assert.AreEqual(1.15, ((FanRateMultiplierReward)chapter.Covers[0].Reward).Value, 1e-9);
+            Assert.AreEqual(1.20, ((FanRateMultiplierReward)chapter.Covers[2].Reward).Value, 1e-9);
+            Assert.AreSame(chapter.Covers[0].Reward, chapter.Covers[1].Reward,
+                "cover_1 and cover_2 share the fan_rate_x1_15 asset from the reward pool");
+        }
+
+        [TestCase(0, 1.25)]
+        [TestCase(1, 1.50)]
+        [TestCase(2, 2.0)]
+        public void GarageJamTierRewards_AreTypedAssets(int tierIndex, double value)
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            Assert.AreEqual(1, chapter.Events.Count, "Chapter 1 defines one event");
+            var tier = chapter.Events[0].Tiers[tierIndex];
+
+            Assert.IsNotNull(tier.Reward,
+                $"tier {tier.Tier} reward — if null, re-run 'GarageBandIdle → Import Chapter 1 JSON' for the reward-pool schema");
+            Assert.IsInstanceOf<TapValueMultiplierReward>(tier.Reward);
+            Assert.AreEqual(value, ((TapValueMultiplierReward)tier.Reward).Value, 1e-9);
         }
 
         [Test]

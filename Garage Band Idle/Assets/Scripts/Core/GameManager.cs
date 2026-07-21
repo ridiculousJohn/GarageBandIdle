@@ -22,11 +22,18 @@ namespace RidiculousGaming.GarageBandIdle
         // CurrencyManager) so the currency set remains open
         public const string CashCurrencyId = "cash";
         public const string RecordsCurrencyId = "records";
+        public const string FansCurrencyId = "fans";
+
+        // the system key in the JSON's unlockSystem payloads doubles as the
+        // progress flag id — play_for_crowd sets "fans", which activates FanSystem
+        public const string FansUnlockFlagId = "fans";
 
         public CurrencyManager Currencies { get; private set; }
         public FlagSystem Flags { get; private set; }
         public ChapterDefinition CurrentChapter { get; private set; }
         public GeneratorSystem Generators { get; private set; }
+        public UpgradeSystem Upgrades { get; private set; }
+        public FanSystem Fans { get; private set; }
 
         private TickSystem _tickSystem;
 
@@ -58,6 +65,8 @@ namespace RidiculousGaming.GarageBandIdle
             else
             {
                 Generators = new GeneratorSystem(CurrentChapter.Generators, Currencies, Flags);
+                Upgrades = new UpgradeSystem(CurrentChapter.Upgrades, Currencies, Generators, Flags);
+                Fans = new FanSystem(CurrentChapter.Fans, FansCurrencyId, FansUnlockFlagId, Currencies, Generators, Flags);
             }
 
             // every hardcoded currency reference is validated at load so a content
@@ -106,6 +115,12 @@ namespace RidiculousGaming.GarageBandIdle
                 Currencies.Get(RecordsCurrencyId), CurrentChapter.RecordBuffPerRecord);
             Generators.Tick(seconds, multiplier);
             Generators.EvaluateUnlocks();
+
+            // content unlocks before fan accrual so a freshly-set fans flag
+            // starts accruing on the same tick; fans never take the income
+            // multiplier — fan rate is band size and time only
+            Upgrades.EvaluateContentUnlocks();
+            Fans.Tick(seconds);
         }
 
         // the tap action; tap buffs (stage_presence etc.) arrive in the upgrades slice
@@ -124,8 +139,10 @@ namespace RidiculousGaming.GarageBandIdle
             if (!generator.TryBuy(Currencies))
                 return false;
 
-            // a purchase can satisfy another generator's ownedCount unlock right now
+            // a purchase can satisfy another generator's ownedCount unlock — or a
+            // content unlock's gate (play_for_crowd: own 1 Drummer) — right now
             Generators.EvaluateUnlocks();
+            Upgrades.EvaluateContentUnlocks();
             return true;
         }
     }

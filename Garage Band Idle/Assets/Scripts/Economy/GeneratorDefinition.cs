@@ -23,6 +23,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         [Tooltip("Currency id this generator produces — and is bought with.")]
         private string _producesCurrencyId;
 
+        [SerializeField]
+        [Tooltip("Bandmates (not gear) drive the fan rate: each owned unit adds the chapter's per-bandmate bonus to fans/sec.")]
+        private bool _isBandmate;
+
         [Header("Economy")]
         [SerializeField]
         private double _baseCost;
@@ -42,6 +46,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public string Id => _id;
         public string DisplayName => _displayName;
         public string ProducesCurrencyId => _producesCurrencyId;
+        public bool IsBandmate => _isBandmate;
         public double BaseCost => _baseCost;
         public double CostGrowth => _costGrowth;
         public double BaseOutput => _baseOutput;
@@ -49,12 +54,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
 #if UNITY_EDITOR
         // importer-only: generator assets are generated from chapter JSON
-        public void EditorInitialize(string id, string displayName, string producesCurrencyId,
+        public void EditorInitialize(string id, string displayName, string producesCurrencyId, bool isBandmate,
             double baseCost, double costGrowth, double baseOutput, List<GateCondition> unlock)
         {
             _id = id;
             _displayName = displayName;
             _producesCurrencyId = producesCurrencyId;
+            _isBandmate = isBandmate;
             _baseCost = baseCost;
             _costGrowth = costGrowth;
             _baseOutput = baseOutput;

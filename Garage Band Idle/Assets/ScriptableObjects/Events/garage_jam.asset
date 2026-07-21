@@ -29,24 +29,18 @@ MonoBehaviour:
     _goalAmount: 500
     _timerSeconds: 60
     _failable: 1
-    _rewardEffect: tapValueMultiplier
-    _rewardValue: 1.25
-    _rewardScope: permanentInChapter
+    _reward: {fileID: 11400000, guid: bd172a6a6600e274b8c55a6c64c31d6c, type: 2}
   - _tier: 2
     _debuffEffect: automationDisabled
     _goalCurrencyId: cash
     _goalAmount: 2500
     _timerSeconds: 60
     _failable: 1
-    _rewardEffect: tapValueMultiplier
-    _rewardValue: 1.5
-    _rewardScope: permanentInChapter
+    _reward: {fileID: 11400000, guid: 0a6afb983bb99d442a7cc8f55f40c72d, type: 2}
   - _tier: 3
     _debuffEffect: automationDisabled
     _goalCurrencyId: cash
     _goalAmount: 10000
     _timerSeconds: 45
     _failable: 1
-    _rewardEffect: tapValueMultiplier
-    _rewardValue: 2
-    _rewardScope: permanentInChapter
+    _reward: {fileID: 11400000, guid: 24a5e1d995a65b54e9f5decd91787d12, type: 2}

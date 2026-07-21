@@ -15,5 +15,4 @@ MonoBehaviour:
   _id: cover_3
   _displayName: The Crowd-Pleaser
   _fillRequirement: 600
-  _rewardEffect: fanRateMultiplier
-  _rewardValue: 1.2
+  _reward: {fileID: 11400000, guid: 57e300fe5d2c65949af52f9e5ccb30e2, type: 2}

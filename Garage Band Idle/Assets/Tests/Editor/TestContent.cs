@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEditor;
 using UnityEngine;
@@ -47,19 +48,49 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         public static GeneratorDefinition MakeGenerator(string id, string produces,
-            double baseCost, double costGrowth, double baseOutput, List<GateCondition> unlock = null)
+            double baseCost, double costGrowth, double baseOutput, List<GateCondition> unlock = null,
+            bool isBandmate = false)
         {
             var definition = Track(ScriptableObject.CreateInstance<GeneratorDefinition>());
-            definition.EditorInitialize(id, id, produces, baseCost, costGrowth, baseOutput,
+            definition.EditorInitialize(id, id, produces, isBandmate, baseCost, costGrowth, baseOutput,
                 unlock ?? new List<GateCondition>());
             return definition;
         }
 
-        // the standard two-group, two-currency economy most fixtures need
+        public static UpgradeDefinition MakeUpgrade(string id, string type, string scope,
+            List<GateCondition> gate, UpgradePayload payload,
+            string costCurrencyId = "cash", double costAmount = 0)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<UpgradeDefinition>());
+            definition.EditorInitialize(id, id, type, scope, costCurrencyId, costAmount,
+                gate ?? new List<GateCondition>(), payload ?? new UpgradePayload());
+            return definition;
+        }
+
+        public static FanRateMultiplierReward MakeFanRateReward(string id, double value, string scope = "run")
+        {
+            var definition = Track(ScriptableObject.CreateInstance<FanRateMultiplierReward>());
+            definition.EditorInitialize(id, id, value, scope);
+            return definition;
+        }
+
+        public static SetFlagReward MakeSetFlagReward(string id, string flagId)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<SetFlagReward>());
+            definition.EditorInitialize(id, id, flagId);
+            return definition;
+        }
+
+        // the standard two-group, three-currency economy most fixtures need
         public static CurrencyManager MakeEconomy()
         {
             var groups = new[] { MakeGroup("run", true), MakeGroup("permanent", false) };
-            var currencies = new[] { MakeCurrency("cash", "run"), MakeCurrency("records", "permanent") };
+            var currencies = new[]
+            {
+                MakeCurrency("cash", "run"),
+                MakeCurrency("fans", "run"),
+                MakeCurrency("records", "permanent"),
+            };
             return new CurrencyManager(groups, currencies);
         }
 

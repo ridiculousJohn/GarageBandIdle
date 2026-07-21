@@ -10,8 +10,6 @@ namespace RidiculousGaming.GarageBandIdle.Content
         menuName = "GarageBandIdle/Cover")]
     public class CoverDefinition : ScriptableObject
     {
-        public const string RewardFanRateMultiplier = "fanRateMultiplier";
-
         [SerializeField]
         [Tooltip("Stable string id. Never rename once saves exist.")]
         private string _id;
@@ -23,30 +21,24 @@ namespace RidiculousGaming.GarageBandIdle.Content
         [Tooltip("Rehearsal points required to complete the bar.")]
         private double _fillRequirement;
 
-        [Header("Reward")]
         [SerializeField]
-        [Tooltip("Reward effect key, e.g. fanRateMultiplier.")]
-        private string _rewardEffect;
-
-        [SerializeField]
-        private double _rewardValue;
+        [Tooltip("Applied when the bar completes; a direct reference, so it loads with the chapter.")]
+        private RewardDefinition _reward;
 
         public string Id => _id;
         public string DisplayName => _displayName;
         public double FillRequirement => _fillRequirement;
-        public string RewardEffect => _rewardEffect;
-        public double RewardValue => _rewardValue;
+        public RewardDefinition Reward => _reward;
 
 #if UNITY_EDITOR
         // importer-only: cover assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, double fillRequirement,
-            string rewardEffect, double rewardValue)
+            RewardDefinition reward)
         {
             _id = id;
             _displayName = displayName;
             _fillRequirement = fillRequirement;
-            _rewardEffect = rewardEffect;
-            _rewardValue = rewardValue;
+            _reward = reward;
         }
 #endif
     }

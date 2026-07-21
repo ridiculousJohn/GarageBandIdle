@@ -27,6 +27,18 @@ MonoBehaviour:
     m_SerializedLabels:
     - upgrade
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0a6afb983bb99d442a7cc8f55f40c72d
+    m_Address: reward/tap_value_x1_50
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - reward
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0cfa48117e2261342bf110f6bb21194c
+    m_Address: reward/fan_rate_x1_15
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - reward
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 14d433f0357bac846ae5965a44e4bb44
     m_Address: generator/drummer
     m_ReadOnly: 0
@@ -57,6 +69,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - event
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24a5e1d995a65b54e9f5decd91787d12
+    m_Address: reward/tap_value_x2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - reward
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 24e5002afd7266047bdc30dd8effa674
     m_Address: upgrade/cut_demo
     m_ReadOnly: 0
@@ -80,6 +98,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - cover
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 57e300fe5d2c65949af52f9e5ccb30e2
+    m_Address: reward/fan_rate_x1_20
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - reward
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5d73ec3441964bcb9b7e504af3e46b25
     m_Address: currency/Records
@@ -122,6 +146,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - module
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bd172a6a6600e274b8c55a6c64c31d6c
+    m_Address: reward/tap_value_x1_25
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - reward
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c0817b7a99914dda9e77a6246aa6e70f
     m_Address: currency-group/Permanent

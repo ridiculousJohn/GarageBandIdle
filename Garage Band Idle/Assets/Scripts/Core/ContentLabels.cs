@@ -13,6 +13,7 @@ namespace RidiculousGaming.GarageBandIdle
         public const string Upgrade = "upgrade";
         public const string Cover = "cover";
         public const string Event = "event";
+        public const string Reward = "reward";
         public const string Module = "module";
     }
 }

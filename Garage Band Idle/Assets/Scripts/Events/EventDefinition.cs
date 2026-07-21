@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine;
 
@@ -83,17 +84,9 @@ namespace RidiculousGaming.GarageBandIdle.Events
         [SerializeField]
         private bool _failable;
 
-        [Header("Reward")]
         [SerializeField]
-        [Tooltip("Reward effect key, e.g. tapValueMultiplier.")]
-        private string _rewardEffect;
-
-        [SerializeField]
-        private double _rewardValue;
-
-        [SerializeField]
-        [Tooltip("Reward scope, e.g. permanentInChapter.")]
-        private string _rewardScope;
+        [Tooltip("Granted on tier success; a direct reference, so it loads with the chapter.")]
+        private RewardDefinition _reward;
 
         public int Tier => _tier;
         public string DebuffEffect => _debuffEffect;
@@ -101,15 +94,13 @@ namespace RidiculousGaming.GarageBandIdle.Events
         public double GoalAmount => _goalAmount;
         public double TimerSeconds => _timerSeconds;
         public bool Failable => _failable;
-        public string RewardEffect => _rewardEffect;
-        public double RewardValue => _rewardValue;
-        public string RewardScope => _rewardScope;
+        public RewardDefinition Reward => _reward;
 
         public EventTier() { }
 
 #if UNITY_EDITOR
         public EventTier(int tier, string debuffEffect, string goalCurrencyId, double goalAmount,
-            double timerSeconds, bool failable, string rewardEffect, double rewardValue, string rewardScope)
+            double timerSeconds, bool failable, RewardDefinition reward)
         {
             _tier = tier;
             _debuffEffect = debuffEffect;
@@ -117,9 +108,7 @@ namespace RidiculousGaming.GarageBandIdle.Events
             _goalAmount = goalAmount;
             _timerSeconds = timerSeconds;
             _failable = failable;
-            _rewardEffect = rewardEffect;
-            _rewardValue = rewardValue;
-            _rewardScope = rewardScope;
+            _reward = reward;
         }
 #endif
     }

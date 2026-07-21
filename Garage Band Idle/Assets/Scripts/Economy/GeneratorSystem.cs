@@ -60,7 +60,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // second pass so unlock conditions may reference any generator,
             // regardless of list order
             foreach (var generator in _generators)
-                ValidateUnlockConditions(generator.Definition);
+                GateValidator.Validate(generator.Definition.Unlock,
+                    $"Generator '{generator.Definition.Id}' (unlock)", _currencies, this);
         }
 
         public Generator Get(string id)
@@ -103,29 +104,5 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
-        private void ValidateUnlockConditions(GeneratorDefinition definition)
-        {
-            foreach (var condition in definition.Unlock)
-            {
-                switch (condition.Type)
-                {
-                    case GateCondition.TypeCurrencyBalance:
-                    case GateCondition.TypeCurrencyEarnedTotal:
-                        _currencies.ValidateReference(condition.CurrencyId, $"Generator '{definition.Id}' (unlock)");
-                        break;
-                    case GateCondition.TypeOwnedCount:
-                        if (!_byId.ContainsKey(condition.GeneratorId))
-                            Debug.LogError($"GeneratorSystem: generator '{definition.Id}' unlock references unknown generator id '{condition.GeneratorId}'.");
-                        break;
-                    case GateCondition.TypeFlagSet:
-                        if (string.IsNullOrEmpty(condition.FlagId))
-                            Debug.LogError($"GeneratorSystem: generator '{definition.Id}' unlock has a flagSet condition with an empty flag id.");
-                        break;
-                    default:
-                        Debug.LogError($"GeneratorSystem: generator '{definition.Id}' unlock uses type '{condition.Type}', which has no handler for generator unlocks. It will never unlock.");
-                        break;
-                }
-            }
-        }
     }
 }

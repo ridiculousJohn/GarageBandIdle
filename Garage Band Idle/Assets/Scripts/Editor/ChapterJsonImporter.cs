@@ -31,6 +31,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private const string UpgradesFolder = "Assets/ScriptableObjects/Upgrades";
         private const string CoversFolder = "Assets/ScriptableObjects/Covers";
         private const string EventsFolder = "Assets/ScriptableObjects/Events";
+        private const string RewardsFolder = "Assets/ScriptableObjects/Rewards";
 
         [MenuItem("GarageBandIdle/Import Chapter 1 JSON")]
         public static void ImportChapter1()
@@ -57,11 +58,56 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             EnsureFolders();
 
+            // rewards first: covers and event tiers resolve their reward ids to
+            // these assets, so the pool must exist before anything references it
+            var rewards = new Dictionary<string, RewardDefinition>();
+            foreach (var block in data.rewards ?? Array.Empty<RewardEntryBlock>())
+            {
+                if (rewards.ContainsKey(block.id))
+                {
+                    Debug.LogError($"ChapterJsonImporter: duplicate reward id '{block.id}'. Keeping the first.");
+                    continue;
+                }
+
+                var path = $"{RewardsFolder}/{block.id}.asset";
+                RewardDefinition asset;
+                switch (block.type)
+                {
+                    case "fanRateMultiplier":
+                    {
+                        var reward = LoadOrCreateReward<FanRateMultiplierReward>(path);
+                        reward.EditorInitialize(block.id, block.name, block.value, block.scope);
+                        asset = reward;
+                        break;
+                    }
+                    case "tapValueMultiplier":
+                    {
+                        var reward = LoadOrCreateReward<TapValueMultiplierReward>(path);
+                        reward.EditorInitialize(block.id, block.name, block.value, block.scope);
+                        asset = reward;
+                        break;
+                    }
+                    case "setFlag":
+                    {
+                        var reward = LoadOrCreateReward<SetFlagReward>(path);
+                        reward.EditorInitialize(block.id, block.name, block.flag);
+                        asset = reward;
+                        break;
+                    }
+                    default:
+                        Debug.LogError($"ChapterJsonImporter: reward '{block.id}' has unknown type '{block.type}' — no RewardDefinition subclass maps to it. Skipping it.");
+                        continue;
+                }
+
+                EditorUtility.SetDirty(asset);
+                rewards.Add(block.id, asset);
+            }
+
             var generators = new List<GeneratorDefinition>();
             foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
             {
                 var asset = LoadOrCreate<GeneratorDefinition>($"{GeneratorsFolder}/{block.id}.asset");
-                asset.EditorInitialize(block.id, block.name, block.produces,
+                asset.EditorInitialize(block.id, block.name, block.produces, block.isBandmate,
                     block.baseCost, block.costGrowth, block.baseOutput, ToConditions(block.unlock));
                 EditorUtility.SetDirty(asset);
                 generators.Add(asset);
@@ -84,7 +130,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             {
                 var asset = LoadOrCreate<CoverDefinition>($"{CoversFolder}/{bar.id}.asset");
                 asset.EditorInitialize(bar.id, bar.name, bar.fillRequirement,
-                    bar.reward?.effect, bar.reward?.value ?? 0);
+                    ResolveReward(bar.reward, rewards, $"cover '{bar.id}'"));
                 EditorUtility.SetDirty(asset);
                 covers.Add(asset);
             }
@@ -97,7 +143,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 {
                     tiers.Add(new EventTier(tier.tier, tier.debuff?.effect,
                         tier.goal?.currency, tier.goal?.amount ?? 0, tier.timerSeconds, tier.failable,
-                        tier.reward?.effect, tier.reward?.value ?? 0, tier.reward?.scope));
+                        ResolveReward(tier.reward, rewards, $"event '{block.id}' tier {tier.tier}")));
                 }
 
                 var asset = LoadOrCreate<EventDefinition>($"{EventsFolder}/{block.id}.asset");
@@ -128,7 +174,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             AssetDatabase.SaveAssets();
             var summary = $"Imported '{data.chapter.id}' — {generators.Count} generators, " +
-                $"{upgrades.Count} upgrades, {covers.Count} covers, {events.Count} events. All content marked addressable.";
+                $"{upgrades.Count} upgrades, {covers.Count} covers, {events.Count} events, " +
+                $"{rewards.Count} rewards. All content marked addressable.";
             Debug.Log($"ChapterJsonImporter: {summary}");
             EditorUtility.DisplayDialog("Chapter import", summary, "OK");
         }
@@ -150,6 +197,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             count += MarkType<UpgradeDefinition>(settings, ContentLabels.Upgrade);
             count += MarkType<CoverDefinition>(settings, ContentLabels.Cover);
             count += MarkType<EventDefinition>(settings, ContentLabels.Event);
+            count += MarkType<RewardDefinition>(settings, ContentLabels.Reward);
             count += MarkModulePrefabs(settings);
 
             AssetDatabase.SaveAssets();
@@ -247,9 +295,35 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private static void EnsureFolders()
         {
             var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            foreach (var folder in new[] { ChaptersFolder, GeneratorsFolder, UpgradesFolder, CoversFolder, EventsFolder })
+            foreach (var folder in new[] { ChaptersFolder, GeneratorsFolder, UpgradesFolder, CoversFolder, EventsFolder, RewardsFolder })
                 Directory.CreateDirectory(Path.Combine(projectRoot, folder));
             AssetDatabase.Refresh();
+        }
+
+        private static RewardDefinition ResolveReward(string rewardId, Dictionary<string, RewardDefinition> rewards, string context)
+        {
+            if (string.IsNullOrEmpty(rewardId))
+                return null;
+            if (rewards.TryGetValue(rewardId, out var reward))
+                return reward;
+
+            Debug.LogError($"ChapterJsonImporter: {context} references unknown reward id '{rewardId}'.");
+            return null;
+        }
+
+        // like LoadOrCreate, but a reward id whose type changed in the JSON needs
+        // its asset recreated as the new subclass
+        private static T LoadOrCreateReward<T>(string assetPath) where T : RewardDefinition
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<RewardDefinition>(assetPath);
+            if (existing is T match)
+                return match;
+            if (existing != null)
+                AssetDatabase.DeleteAsset(assetPath);
+
+            var asset = ScriptableObject.CreateInstance<T>();
+            AssetDatabase.CreateAsset(asset, assetPath);
+            return asset;
         }
 
         private static T LoadOrCreate<T>(string assetPath) where T : ScriptableObject
@@ -274,9 +348,22 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public SectionBlock[] sections;
             public GeneratorBlock[] generators;
             public UpgradeBlock[] upgrades;
+            public RewardEntryBlock[] rewards;
             public CoversBlock covers;
             public FansBlock fans;
             public EventBlock[] events;
+        }
+
+        // one entry in the shared reward pool; which fields matter depends on type
+        [Serializable]
+        private class RewardEntryBlock
+        {
+            public string id;
+            public string name;
+            public string type;
+            public double value;
+            public string scope;
+            public string flag;
         }
 
         [Serializable]
@@ -334,6 +421,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string id;
             public string name;
             public string produces;
+            public bool isBandmate;
             public double baseCost;
             public double costGrowth;
             public double baseOutput;
@@ -388,15 +476,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string id;
             public string name;
             public double fillRequirement;
-            public RewardBlock reward;
-        }
-
-        [Serializable]
-        private class RewardBlock
-        {
-            public string effect;
-            public double value;
-            public string scope;
+            public string reward; // reward pool id
         }
 
         [Serializable]
@@ -425,7 +505,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public CostBlock goal;
             public double timerSeconds;
             public bool failable;
-            public RewardBlock reward;
+            public string reward; // reward pool id
         }
 
         [Serializable]

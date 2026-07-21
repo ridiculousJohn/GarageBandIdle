@@ -15,6 +15,7 @@ MonoBehaviour:
   _id: drummer
   _displayName: Drummer
   _producesCurrencyId: cash
+  _isBandmate: 1
   _baseCost: 500
   _costGrowth: 1.15
   _baseOutput: 3

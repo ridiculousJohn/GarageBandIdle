@@ -15,5 +15,4 @@ MonoBehaviour:
   _id: cover_2
   _displayName: Parking-Lot Standard
   _fillRequirement: 300
-  _rewardEffect: fanRateMultiplier
-  _rewardValue: 1.15
+  _reward: {fileID: 11400000, guid: 0cfa48117e2261342bf110f6bb21194c, type: 2}

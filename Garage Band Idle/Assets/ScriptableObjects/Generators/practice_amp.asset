@@ -15,6 +15,7 @@ MonoBehaviour:
   _id: practice_amp
   _displayName: Practice Amp
   _producesCurrencyId: cash
+  _isBandmate: 0
   _baseCost: 60
   _costGrowth: 1.15
   _baseOutput: 0.4

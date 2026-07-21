@@ -15,6 +15,7 @@ MonoBehaviour:
   _id: guitarist
   _displayName: Guitarist
   _producesCurrencyId: cash
+  _isBandmate: 1
   _baseCost: 30000
   _costGrowth: 1.15
   _baseOutput: 130

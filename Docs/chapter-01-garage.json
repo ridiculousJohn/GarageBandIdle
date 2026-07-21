@@ -49,6 +49,7 @@
       "id": "practice_amp",
       "name": "Practice Amp",
       "produces": "cash",
+      "isBandmate": false,
       "baseCost": 60,
       "costGrowth": 1.15,
       "baseOutput": 0.4,
@@ -59,6 +60,7 @@
       "id": "drummer",
       "name": "Drummer",
       "produces": "cash",
+      "isBandmate": true,
       "baseCost": 500,
       "costGrowth": 1.15,
       "baseOutput": 3,
@@ -69,6 +71,7 @@
       "id": "bassist",
       "name": "Bassist",
       "produces": "cash",
+      "isBandmate": true,
       "baseCost": 4000,
       "costGrowth": 1.15,
       "baseOutput": 20,
@@ -78,6 +81,7 @@
       "id": "guitarist",
       "name": "Guitarist",
       "produces": "cash",
+      "isBandmate": true,
       "baseCost": 30000,
       "costGrowth": 1.15,
       "baseOutput": 130,
@@ -157,6 +161,15 @@
     }
   ],
 
+  "rewards": [
+    { "id": "fan_rate_x1_15", "name": "Fan Rate ×1.15", "type": "fanRateMultiplier", "value": 1.15, "scope": "run" },
+    { "id": "fan_rate_x1_20", "name": "Fan Rate ×1.20", "type": "fanRateMultiplier", "value": 1.2, "scope": "run" },
+    { "id": "tap_value_x1_25", "name": "Tap Value ×1.25", "type": "tapValueMultiplier", "value": 1.25, "scope": "permanentInChapter" },
+    { "id": "tap_value_x1_50", "name": "Tap Value ×1.50", "type": "tapValueMultiplier", "value": 1.5, "scope": "permanentInChapter" },
+    { "id": "tap_value_x2", "name": "Tap Value ×2", "type": "tapValueMultiplier", "value": 2.0, "scope": "permanentInChapter" }
+  ],
+  "rewardsNote": "The shared reward pool. Covers and event tiers reference these by id; each type maps to a RewardDefinition subclass asset, so a new reward kind is a new type + entries, and rewards are reusable across content. Available types: fanRateMultiplier, tapValueMultiplier, setFlag (flag: <id> — lets a reward reveal gated content).",
+
   "covers": {
     "system": "Learn Covers",
     "scope": "run",
@@ -167,9 +180,9 @@
       "note": "Rehearsal points fill cover bars. Passive tick plus taps, so covers advance from engagement, not from Cash."
     },
     "bars": [
-      { "id": "cover_1", "name": "Three-Chord Anthem", "fillRequirement": 120, "reward": { "effect": "fanRateMultiplier", "value": 1.15 } },
-      { "id": "cover_2", "name": "Parking-Lot Standard", "fillRequirement": 300, "reward": { "effect": "fanRateMultiplier", "value": 1.15 } },
-      { "id": "cover_3", "name": "The Crowd-Pleaser", "fillRequirement": 600, "reward": { "effect": "fanRateMultiplier", "value": 1.20 } }
+      { "id": "cover_1", "name": "Three-Chord Anthem", "fillRequirement": 120, "reward": "fan_rate_x1_15" },
+      { "id": "cover_2", "name": "Parking-Lot Standard", "fillRequirement": 300, "reward": "fan_rate_x1_15" },
+      { "id": "cover_3", "name": "The Crowd-Pleaser", "fillRequirement": 600, "reward": "fan_rate_x1_20" }
     ],
     "note": "Run-scoped: reset each demo but refill faster as the run gets stronger. Cover_1 is on the critical path (gates cut_demo). Cover buffs stack multiplicatively on fan rate."
   },
@@ -210,7 +223,7 @@
           "goal": { "currency": "cash", "amount": 500 },
           "timerSeconds": 60,
           "failable": true,
-          "reward": { "effect": "tapValueMultiplier", "value": 1.25, "scope": "permanentInChapter" }
+          "reward": "tap_value_x1_25"
         },
         {
           "tier": 2,
@@ -218,7 +231,7 @@
           "goal": { "currency": "cash", "amount": 2500 },
           "timerSeconds": 60,
           "failable": true,
-          "reward": { "effect": "tapValueMultiplier", "value": 1.50, "scope": "permanentInChapter" }
+          "reward": "tap_value_x1_50"
         },
         {
           "tier": 3,
@@ -226,7 +239,7 @@
           "goal": { "currency": "cash", "amount": 10000 },
           "timerSeconds": 45,
           "failable": true,
-          "reward": { "effect": "tapValueMultiplier", "value": 2.0, "scope": "permanentInChapter" }
+          "reward": "tap_value_x2"
         }
       ],
       "failNote": "On a timed fail the event resets; the player can quit anytime. Cost is time only, never permanent progress.",
