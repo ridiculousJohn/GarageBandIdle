@@ -20,11 +20,11 @@ MonoBehaviour:
   _costGrowth: 1.15
   _baseOutput: 3
   _unlock:
-    rid: 5051021673598812161
+    rid: 5051021673832906753
   references:
     version: 2
     RefIds:
-    - rid: 5051021673598812161
+    - rid: 5051021673832906753
       type: {class: OwnedCountCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _generatorId: practice_amp

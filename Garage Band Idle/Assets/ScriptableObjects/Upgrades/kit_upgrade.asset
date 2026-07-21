@@ -19,18 +19,18 @@ MonoBehaviour:
   _costCurrencyId: cash
   _costAmount: 5000
   _gate:
-    rid: 5051021673598812176
+    rid: 5051021673832906768
   _payload:
-    rid: 5051021673598812177
+    rid: 5051021673832906769
   references:
     version: 2
     RefIds:
-    - rid: 5051021673598812176
+    - rid: 5051021673832906768
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
         _amount: 5000
-    - rid: 5051021673598812177
+    - rid: 5051021673832906769
       type: {class: GeneratorOutputMultiplierPayload, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         _generatorId: drummer

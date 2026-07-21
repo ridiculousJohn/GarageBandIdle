@@ -39,6 +39,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private double _baseOutput;
 
         [SerializeReference]
+        [SubclassPicker]
         [Tooltip("Must hold for the generator to reveal; none = visible from start.")]
         private Condition _unlock;
 

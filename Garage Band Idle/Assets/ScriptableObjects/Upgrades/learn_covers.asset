@@ -19,18 +19,18 @@ MonoBehaviour:
   _costCurrencyId: cash
   _costAmount: 0
   _gate:
-    rid: 5051021673598812166
+    rid: 5051021673832906758
   _payload:
-    rid: 5051021673598812167
+    rid: 5051021673832906759
   references:
     version: 2
     RefIds:
-    - rid: 5051021673598812166
+    - rid: 5051021673832906758
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: fans
         _amount: 25
-    - rid: 5051021673598812167
+    - rid: 5051021673832906759
       type: {class: SetFlagPayload, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         _flagId: covers

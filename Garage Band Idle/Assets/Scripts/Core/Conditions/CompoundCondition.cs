@@ -11,9 +11,11 @@ namespace RidiculousGaming.GarageBandIdle
     public class CompoundCondition : Condition
     {
         [SerializeReference]
+        [SubclassPicker]
         private List<Condition> _all = new();
 
         [SerializeReference]
+        [SubclassPicker]
         private List<Condition> _any = new();
 
         public IReadOnlyList<Condition> All => _all;

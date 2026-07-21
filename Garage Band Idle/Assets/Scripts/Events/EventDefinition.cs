@@ -22,6 +22,7 @@ namespace RidiculousGaming.GarageBandIdle.Events
         private string _displayName;
 
         [SerializeReference]
+        [SubclassPicker]
         [Tooltip("Must hold for the event to appear.")]
         private Condition _availableWhen;
 
@@ -60,10 +61,12 @@ namespace RidiculousGaming.GarageBandIdle.Events
         private int _tier;
 
         [SerializeReference]
+        [SubclassPicker]
         [Tooltip("How the run is modified for this tier; none = the plain loop.")]
         private Debuff _debuff;
 
         [SerializeReference]
+        [SubclassPicker]
         [Tooltip("Reaching this wins the tier, e.g. a currency condition.")]
         private Condition _goal;
 

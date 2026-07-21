@@ -51,10 +51,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private double _costAmount;
 
         [SerializeReference]
+        [SubclassPicker]
         [Tooltip("Must hold for the upgrade to become available. Gates may reference any currency, not only the cost currency.")]
         private Condition _gate;
 
         [SerializeReference]
+        [SubclassPicker]
         private UpgradePayload _payload;
 
         public string Id => _id;

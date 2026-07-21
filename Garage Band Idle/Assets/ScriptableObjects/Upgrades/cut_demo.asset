@@ -19,29 +19,29 @@ MonoBehaviour:
   _costCurrencyId: cash
   _costAmount: 0
   _gate:
-    rid: 5051021673598812162
+    rid: 5051021673832906754
   _payload:
-    rid: 5051021673598812163
+    rid: 5051021673832906755
   references:
     version: 2
     RefIds:
-    - rid: 5051021673598812162
+    - rid: 5051021673832906754
       type: {class: CompoundCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _all:
-        - rid: 5051021673598812164
-        - rid: 5051021673598812165
+        - rid: 5051021673832906756
+        - rid: 5051021673832906757
         _any: []
-    - rid: 5051021673598812163
+    - rid: 5051021673832906755
       type: {class: SetFlagPayload, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         _flagId: album
-    - rid: 5051021673598812164
+    - rid: 5051021673832906756
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: fans
         _amount: 50
-    - rid: 5051021673598812165
+    - rid: 5051021673832906757
       type: {class: BarsCompletedCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _groupId: learn_covers

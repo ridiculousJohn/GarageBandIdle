@@ -25,6 +25,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         private List<string> _moduleAddresses = new();
 
         [SerializeReference]
+        [SubclassPicker]
         [Tooltip("Must hold for the section to reveal; none = visible from chapter start. Reveal latches on.")]
         private Condition _visibleWhen;
 
