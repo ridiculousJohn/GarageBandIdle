@@ -11,7 +11,7 @@ Build order and why: each slice depends on the ones before it (offline earnings 
 tick; prestige needs the currency block split; the content-unlock upgrades are what reveal
 fans/covers/album). Building bottom-up keeps a break isolated to the slice you just added.
 
-**Progress marker:** slices 0–3 are already built. Slice **3.5** is a dedicated consolidation pass
+**Progress marker:** slices 0–3.5 are already built. Slice **3.5** is a dedicated consolidation pass
 that establishes the cross-cutting foundations — a single `Condition` type + evaluator, one flag
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
@@ -132,7 +132,7 @@ fan rate reads `isBandmate` instead of naming drummer/bassist/guitarist.)*
 
 ---
 
-## 3.5 — CONSOLIDATION: unified Condition, flag registry, Addressables discovery, rewards, sections  ⬅ next
+## 3.5 — CONSOLIDATION: unified Condition, flag registry, Addressables discovery, rewards, sections  ✅ done
 
 This slice adds no new gameplay. It establishes the cross-cutting foundations the JSON now assumes and
 **retrofits slices 1–3 onto them**, so there is one way to express a gate, one way to reveal content,
@@ -203,7 +203,7 @@ Condition/flags/Addressables. Boot validation passes; a deliberately broken id f
 
 ---
 
-## 4 — Fillable bars + Learn Covers (generic, `fillCurrency`-driven)
+## 4 — Fillable bars + Learn Covers (generic, `fillCurrency`-driven)  ⬅ next
 
 > Implement a **generic fillable-bar system** and use it for Learn Covers. Reference §3, §5, §6 of the
 > design doc and the `rehearsal` + `bars` + `learn_covers` entries in the JSON. Build the system
