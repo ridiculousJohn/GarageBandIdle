@@ -223,7 +223,8 @@ Condition/flags/Addressables. Boot validation passes; a deliberately broken id f
 >   counter (totals 120 / 300 / 600 = 1020 to finish all three). The fill logic reads `fillCurrency`
 >   and works for any currency.
 > - On bar completion, apply its `reward` via `RewardManager` (Ch1 rewards are `fanRateMultiplier`,
->   stacking multiplicatively on fan rate; wire `fans.barBonusesApply`).
+>   stacking multiplicatively on fan rate). The bar's reward reference is the authority for whether
+>   completion grants a fan-rate bonus; there is no second switch in the Fans config.
 > - Implement the `barsCompleted` Condition (count completed bars in a `group`) — `cut_demo` will use
 >   it next slice. `cover_1` completing satisfies `barsCompleted(learn_covers) ≥ 1`.
 > - Bars are run-scoped via the group `scope` (they reset on album release, next slice).

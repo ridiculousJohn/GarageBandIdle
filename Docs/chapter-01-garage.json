@@ -232,7 +232,6 @@
     "baseFansPerSec": 0.2,
     "perBandmateOwnedBonus": 0.02,
     "perBandmateNote": "Applies per owned unit of any generator with `isBandmate: true` (behavior-as-data — the fan system reads the flag, it does not name drummer/bassist/guitarist). Ties fan rate to band size.",
-    "barBonusesApply": true,
     "couplingNote": "fanRate is intentionally NOT a function of Cash or Cash/sec — only band size, bar rewards, and time — so income alone cannot shortcut the demo payout (§11)."
   },
 
