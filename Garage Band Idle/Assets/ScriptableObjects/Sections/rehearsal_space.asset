@@ -17,11 +17,11 @@ MonoBehaviour:
   _moduleAddresses:
   - module/bar-list
   _visibleWhen:
-    rid: 5051021674712399899
+    rid: 5051021696154730524
   references:
     version: 2
     RefIds:
-    - rid: 5051021674712399899
+    - rid: 5051021696154730524
       type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _flagId: covers

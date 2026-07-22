@@ -216,9 +216,11 @@ Condition/flags/Addressables. Boot validation passes; a deliberately broken id f
 > - `learn_covers` (contentUnlock, gate `currency fans ≥ 25`) sets the `covers` flag — which reveals
 >   both the Rehearsal currency and the Learn Covers bar group.
 > - `BarDefinition` (id, name, `fillCurrency`, `fillRequirement`, `reward`) and `BarGroupDefinition`
->   (id, name, `revealFlag`, `fillMode`, `scope`, ordered bar list), discovered by Addressables label.
-> - `BarSystem` with `fillMode: "perBar"` (player-directed): each bar tracks its OWN accumulated
->   progress and the player chooses which bar to pour Rehearsal into; a fill action spends from the
+>   (id, name, `revealFlag`, a polymorphic fill behavior mapped from the JSON's `fillMode` +
+>   `delivery` pair at import, `scope`, ordered bar list), discovered by Addressables label.
+> - The Chapter 1 fill behavior (`fillMode: "perBar"` + `delivery: "continuous"`, player-directed):
+>   each bar tracks its OWN accumulated progress and the player chooses which bar to pour Rehearsal
+>   into; a fill action spends from the
 >   shared Rehearsal pool into the selected bar. Bars are independent, NOT cumulative thresholds on one
 >   counter (totals 120 / 300 / 600 = 1020 to finish all three). The fill logic reads `fillCurrency`
 >   and works for any currency.

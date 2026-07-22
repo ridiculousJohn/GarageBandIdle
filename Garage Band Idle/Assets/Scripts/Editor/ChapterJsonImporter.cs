@@ -178,8 +178,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
                 var groupAsset = LoadOrCreate<BarGroupDefinition>($"{BarGroupsFolder}/{group.id}.asset");
                 groupAsset.EditorInitialize(group.id, group.name, group.revealFlag,
-                    ToFillMode(group.fillMode, $"bar group '{group.id}'"),
-                    ToDelivery(group.delivery, $"bar group '{group.id}'"),
+                    ToFillBehavior(group.fillMode, group.delivery, $"bar group '{group.id}'"),
                     ToScope(data.bars.scope, $"bar group '{group.id}'"), barIds);
                 EditorUtility.SetDirty(groupAsset);
                 barGroupIds.Add(group.id);
@@ -480,28 +479,17 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
         }
 
-        private static BarFillMode ToFillMode(string fillMode, string context)
+        // Maps the JSON (fillMode, delivery) pair onto the BarFillBehavior
+        // subclass family. The pair must name an implemented behavior; anything
+        // else imports no behavior, which boot validation reports - a mode can
+        // never be authored without its handler.
+        private static BarFillBehavior ToFillBehavior(string fillMode, string delivery, string context)
         {
-            switch (fillMode)
-            {
-                case "perBar":
-                    return BarFillMode.PerBar;
-                default:
-                    Debug.LogError($"ChapterJsonImporter: {context} has unknown fillMode '{fillMode}'. Defaulting to perBar.");
-                    return BarFillMode.PerBar;
-            }
-        }
+            if (fillMode == "perBar" && delivery == "continuous")
+                return new PerBarContinuousFill();
 
-        private static BarFillDelivery ToDelivery(string delivery, string context)
-        {
-            switch (delivery)
-            {
-                case "continuous":
-                    return BarFillDelivery.Continuous;
-                default:
-                    Debug.LogError($"ChapterJsonImporter: {context} has unknown delivery '{delivery}'. Defaulting to continuous.");
-                    return BarFillDelivery.Continuous;
-            }
+            Debug.LogError($"ChapterJsonImporter: {context} fillMode '{fillMode}' + delivery '{delivery}' maps to no BarFillBehavior subclass. Importing no fill behavior.");
+            return null;
         }
 
         // "rehearsal" to "Rehearsal" — display names for currencies the JSON

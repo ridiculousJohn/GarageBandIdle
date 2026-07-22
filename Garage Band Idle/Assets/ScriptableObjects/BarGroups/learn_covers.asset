@@ -15,10 +15,16 @@ MonoBehaviour:
   _id: learn_covers
   _displayName: Learn Covers
   _revealFlagId: covers
-  _fillMode: 1
-  _delivery: 1
+  _fillBehavior:
+    rid: 5051021696154730514
   _scope: 1
   _barIds:
   - cover_1
   - cover_2
   - cover_3
+  references:
+    version: 2
+    RefIds:
+    - rid: 5051021696154730514
+      type: {class: PerBarContinuousFill, ns: RidiculousGaming.GarageBandIdle.Content, asm: Assembly-CSharp}
+      data: 

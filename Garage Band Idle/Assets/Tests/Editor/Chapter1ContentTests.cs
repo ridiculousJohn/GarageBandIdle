@@ -278,8 +278,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var group = LoadById<BarGroupDefinition>(BarGroupsFolder, "learn_covers");
             Assert.AreEqual("covers", group.RevealFlagId);
-            Assert.AreEqual(BarFillMode.PerBar, group.FillMode);
-            Assert.AreEqual(BarFillDelivery.Continuous, group.Delivery);
+            // the concrete behavior type is the fill mode; the importer maps
+            // the JSON's (fillMode, delivery) pair onto it
+            Assert.IsInstanceOf<PerBarContinuousFill>(group.FillBehavior);
             Assert.AreEqual(ContentScope.Run, group.Scope);
 
             // the fill currency's earn config rides on the chapter, like fans

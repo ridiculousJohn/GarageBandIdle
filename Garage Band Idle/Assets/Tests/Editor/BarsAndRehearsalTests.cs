@@ -3,6 +3,9 @@ using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
+using UnityEngine;
+using UnityEngine.TestTools;
+using Object = UnityEngine.Object;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -100,7 +103,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // selecting pours the built-up pool in immediately, clamped to the
             // bar's requirement; the excess stays in the pool
-            bars.SetActiveBar("learn_covers", "cover_1");
+            var covers = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
+            covers.SetActiveBar("cover_1");
 
             var cover1 = bars.GetBars("learn_covers")[0];
             Assert.IsTrue(cover1.Completed, "120 requirement filled from a 200 pool");
@@ -116,10 +120,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var bars = MakeCoversSetup(currencies, flags, out _);
 
             // pour 50 into cover_2, then redirect to cover_3 and pour 70
+            var covers = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
             currencies.Add("rehearsal", 50);
-            bars.SetActiveBar("learn_covers", "cover_2");
+            covers.SetActiveBar("cover_2");
             currencies.Add("rehearsal", 70);
-            bars.SetActiveBar("learn_covers", "cover_3");
+            covers.SetActiveBar("cover_3");
 
             var list = bars.GetBars("learn_covers");
             Assert.AreEqual(0.0, list[0].Progress.ToDouble(), 1e-9, "unselected bar untouched");
@@ -138,21 +143,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var completions = 0;
             bars.BarCompleted += _ => completions++;
 
-            bars.SetActiveBar("learn_covers", "cover_1");
+            var covers = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
+            covers.SetActiveBar("cover_1");
             currencies.Add("rehearsal", 120);
             bars.Tick();
 
             Assert.AreEqual(1, completions);
             Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9, "fan-rate reward applied on completion");
-            Assert.IsNull(bars.GetActiveBar("learn_covers"), "completion clears the target");
+            Assert.IsNull(covers.ActiveBar, "completion clears the target");
 
             // further ticks and reselection attempts must not re-apply
             currencies.Add("rehearsal", 500);
             bars.Tick();
-            bars.SetActiveBar("learn_covers", "cover_1");
+            covers.SetActiveBar("cover_1");
             bars.Tick();
             Assert.AreEqual(1, completions, "a completed bar never re-completes");
-            Assert.IsNull(bars.GetActiveBar("learn_covers"), "a completed bar cannot be re-selected");
+            Assert.IsNull(covers.ActiveBar, "a completed bar cannot be re-selected");
             Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
         }
 
@@ -164,9 +170,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var bars = MakeCoversSetup(currencies, flags, out var fans);
 
+            var covers = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
             currencies.Add("rehearsal", 420);
-            bars.SetActiveBar("learn_covers", "cover_1");
-            bars.SetActiveBar("learn_covers", "cover_2");
+            covers.SetActiveBar("cover_1");
+            covers.SetActiveBar("cover_2");
 
             Assert.AreEqual(2, bars.CompletedCount("learn_covers"));
             Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
@@ -184,9 +191,35 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(ConditionEvaluator.IsMet(condition, context));
 
             currencies.Add("rehearsal", 120);
-            bars.SetActiveBar("learn_covers", "cover_1");
+            ((PerBarContinuousRuntime)bars.GetRuntime("learn_covers")).SetActiveBar("cover_1");
 
             Assert.IsTrue(ConditionEvaluator.IsMet(condition, context), "cover_1 satisfies barsCompleted >= 1");
+        }
+
+        // the fill behavior is the mode: a group authored without one (an
+        // unimplemented fillMode/delivery pair imports null) fails loudly at
+        // construction instead of silently running some other mode's rules
+        [Test]
+        public void GroupWithNoFillBehavior_IsSkippedLoudly()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            var rewards = new RewardManager(new RewardDefinition[0]);
+            var bar = TestContent.MakeBar("cover_1", "rehearsal", 120);
+
+            var group = ScriptableObject.CreateInstance<BarGroupDefinition>();
+            group.hideFlags = HideFlags.HideAndDontSave;
+            group.EditorInitialize("broken", "broken", "covers", null,
+                ContentScope.Run, new List<string> { "cover_1" });
+
+            LogAssert.Expect(LogType.Error, "BarSystem: bar group 'broken' has no fill behavior. Skipping it.");
+            var bars = new BarSystem(new[] { group }, new[] { bar }, currencies, rewards,
+                new RewardContext(currencies, flags, null));
+
+            Assert.AreEqual(0, bars.Groups.Count, "a behaviorless group never reaches the runtime");
+            bars.Tick();
+
+            Object.DestroyImmediate(group);
         }
 
         [Test]
@@ -196,11 +229,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var flags = new FlagSystem();
             var bars = MakeCoversSetup(currencies, flags, out _);
 
-            bars.SetActiveBar("learn_covers", "cover_2");
-            Assert.IsNotNull(bars.GetActiveBar("learn_covers"));
+            var covers = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
+            covers.SetActiveBar("cover_2");
+            Assert.IsNotNull(covers.ActiveBar);
 
-            bars.SetActiveBar("learn_covers", null);
-            Assert.IsNull(bars.GetActiveBar("learn_covers"));
+            covers.SetActiveBar(null);
+            Assert.IsNull(covers.ActiveBar);
 
             currencies.Add("rehearsal", 60);
             bars.Tick();

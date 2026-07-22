@@ -6,8 +6,10 @@ using UnityEngine.UI;
 namespace RidiculousGaming.GarageBandIdle.UI
 {
     // One fillable bar in the list. Lives in the BarRow prefab; BarListModule
-    // instantiates one per bar and binds it. Clicking toggles this bar as the
-    // group's active target (player-directed fill, design doc section 6).
+    // instantiates one per bar and binds it against the group's PerBar runtime
+    // (this row IS the per-bar-continuous presentation). Clicking toggles this
+    // bar as the group's active target (player-directed fill, design doc
+    // section 6).
     public class BarRowUI : MonoBehaviour
     {
         [SerializeField] private TextMeshProUGUI _info;
@@ -16,12 +18,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         [SerializeField] private TextMeshProUGUI _selectLabel;
 
         private GameManager _game;
+        private PerBarContinuousRuntime _runtime;
 
-        public BarSystem.BarState Bar { get; private set; }
+        public BarState Bar { get; private set; }
 
-        public void Bind(GameManager game, BarSystem.BarState bar)
+        public void Bind(GameManager game, PerBarContinuousRuntime runtime, BarState bar)
         {
             _game = game;
+            _runtime = runtime;
             Bar = bar;
 
             _selectButton.onClick.AddListener(HandleSelectClicked);
@@ -37,9 +41,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // pool accumulate until the player picks the next bar
         private void HandleSelectClicked()
         {
-            var groupId = Bar.Group.Id;
-            var isActive = _game.Bars.GetActiveBar(groupId) == Bar;
-            _game.Bars.SetActiveBar(groupId, isActive ? null : Bar.Definition.Id);
+            var isActive = _runtime.ActiveBar == Bar;
+            _runtime.SetActiveBar(isActive ? null : Bar.Definition.Id);
         }
 
         public void Refresh()
@@ -62,7 +65,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             else
             {
                 _selectButton.interactable = true;
-                _selectLabel.text = _game.Bars.GetActiveBar(Bar.Group.Id) == Bar ? "Rehearsing..." : "Rehearse";
+                _selectLabel.text = _runtime.ActiveBar == Bar ? "Rehearsing..." : "Rehearse";
             }
         }
     }

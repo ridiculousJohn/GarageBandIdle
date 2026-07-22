@@ -75,12 +75,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         public static BarGroupDefinition MakeBarGroup(string id, string revealFlagId,
-            List<string> barIds, BarFillMode fillMode = BarFillMode.PerBar,
-            BarFillDelivery delivery = BarFillDelivery.Continuous,
+            List<string> barIds, BarFillBehavior fillBehavior = null,
             ContentScope scope = ContentScope.Run)
         {
             var definition = Track(ScriptableObject.CreateInstance<BarGroupDefinition>());
-            definition.EditorInitialize(id, id, revealFlagId, fillMode, delivery, scope, barIds);
+            definition.EditorInitialize(id, id, revealFlagId,
+                fillBehavior ?? new PerBarContinuousFill(), scope, barIds);
             return definition;
         }
 

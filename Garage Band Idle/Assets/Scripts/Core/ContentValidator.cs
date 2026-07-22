@@ -58,10 +58,10 @@ namespace RidiculousGaming.GarageBandIdle
 
             foreach (var group in database.BarGroups.All)
             {
-                if (group.FillMode == BarFillMode.None)
-                    Debug.LogError($"ContentValidator: Bar group '{group.Id}' has fill mode None (uninitialized).");
-                if (group.Delivery == BarFillDelivery.None)
-                    Debug.LogError($"ContentValidator: Bar group '{group.Id}' has delivery None (uninitialized).");
+                if (group.FillBehavior == null)
+                    Debug.LogError($"ContentValidator: Bar group '{group.Id}' has no fill behavior.");
+                else
+                    group.FillBehavior.Validate(context, $"Bar group '{group.Id}' (fillBehavior)");
                 if (group.Scope == ContentScope.None)
                     Debug.LogError($"ContentValidator: Bar group '{group.Id}' has scope None (uninitialized).");
                 ValidateFlag(group.RevealFlagId, context, $"Bar group '{group.Id}' (revealFlag)");

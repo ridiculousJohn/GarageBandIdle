@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Content;
 using TMPro;
@@ -10,6 +11,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // currency readout. Rows of a group stay hidden until its reveal flag sets;
     // in Chapter 1 the hosting section gates on the same flag, but a later
     // chapter can put two groups with different flags in one section.
+    // This module presents PerBarContinuousRuntime groups; the bind-time type
+    // check is content-pairing validation (a group with a different fill
+    // behavior ships its own module prefab), not runtime mode dispatch.
     public class BarListModule : MonoBehaviour, IChapterModule
     {
         [SerializeField] private RectTransform _listRoot;
@@ -19,6 +23,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private ChapterContext _context;
         private readonly List<BarRowUI> _rows = new();
+        private readonly List<(PerBarContinuousRuntime runtime, Action handler)> _selectionHandlers = new();
 
         public void Initialize(ChapterContext context)
         {
@@ -27,13 +32,26 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             foreach (var group in bars.Groups)
             {
-                foreach (var bar in bars.GetBars(group.Id))
+                if (bars.GetRuntime(group.Id) is not PerBarContinuousRuntime runtime)
+                {
+                    Debug.LogError($"BarListModule: bar group '{group.Id}' does not use PerBarContinuousFill; this module cannot present it.");
+                    continue;
+                }
+
+                foreach (var bar in runtime.Bars)
                 {
                     var row = Instantiate(_rowPrefab, _listRoot);
-                    row.Bind(context.Game, bar);
+                    row.Bind(context.Game, runtime, bar);
                     row.gameObject.SetActive(context.Flags.IsSet(group.RevealFlagId));
                     _rows.Add(row);
                 }
+
+                // selection moved: the old and new target both need their labels
+                // redrawn, so the whole group's rows refresh
+                var groupId = group.Id;
+                Action handler = () => RefreshGroupRows(groupId);
+                runtime.ActiveBarChanged += handler;
+                _selectionHandlers.Add((runtime, handler));
             }
 
             // the title names the first group; a multi-group chapter gets
@@ -43,7 +61,6 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             bars.BarProgressChanged += HandleBarChanged;
             bars.BarCompleted += HandleBarChanged;
-            bars.ActiveBarChanged += HandleActiveBarChanged;
             context.Game.Currencies.BalanceChanged += HandleBalanceChanged;
             context.Flags.FlagSet += HandleFlagSet;
 
@@ -57,12 +74,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             _context.Game.Bars.BarProgressChanged -= HandleBarChanged;
             _context.Game.Bars.BarCompleted -= HandleBarChanged;
-            _context.Game.Bars.ActiveBarChanged -= HandleActiveBarChanged;
+            foreach (var (runtime, handler) in _selectionHandlers)
+                runtime.ActiveBarChanged -= handler;
             _context.Game.Currencies.BalanceChanged -= HandleBalanceChanged;
             _context.Flags.FlagSet -= HandleFlagSet;
         }
 
-        private void HandleBarChanged(BarSystem.BarState bar)
+        private void HandleBarChanged(BarState bar)
         {
             foreach (var row in _rows)
             {
@@ -71,8 +89,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             }
         }
 
-        // selection moved: the old and new target both need their labels redrawn
-        private void HandleActiveBarChanged(string groupId)
+        private void RefreshGroupRows(string groupId)
         {
             foreach (var row in _rows)
             {
