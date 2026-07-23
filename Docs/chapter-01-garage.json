@@ -74,8 +74,7 @@
       "name": "Practice Amp",
       "produces": "cash",
       "isBandmate": false,
-      "baseCost": 60,
-      "costGrowth": 1.15,
+      "cost": { "currency": "cash", "amount": 60, "growth": 1.15 },
       "baseOutput": 0.4,
       "unlock": { "type": "currencyEarnedTotal", "currency": "cash", "value": 100 },
       "note": "First automation. Unlocks the instant the Stage-0 goal (earn 100 Cash by tapping) is met."
@@ -85,8 +84,7 @@
       "name": "Drummer",
       "produces": "cash",
       "isBandmate": true,
-      "baseCost": 500,
-      "costGrowth": 1.15,
+      "cost": { "currency": "cash", "amount": 500, "growth": 1.15 },
       "baseOutput": 3,
       "unlock": { "type": "ownedCount", "generator": "practice_amp", "value": 5 },
       "note": "First bandmate. Buying the first one satisfies the play_for_crowd gate, which sets the `fans` flag."
@@ -96,8 +94,7 @@
       "name": "Bassist",
       "produces": "cash",
       "isBandmate": true,
-      "baseCost": 4000,
-      "costGrowth": 1.15,
+      "cost": { "currency": "cash", "amount": 4000, "growth": 1.15 },
       "baseOutput": 20,
       "unlock": { "type": "ownedCount", "generator": "drummer", "value": 5 }
     },
@@ -106,8 +103,7 @@
       "name": "Guitarist",
       "produces": "cash",
       "isBandmate": true,
-      "baseCost": 30000,
-      "costGrowth": 1.15,
+      "cost": { "currency": "cash", "amount": 30000, "growth": 1.15 },
       "baseOutput": 130,
       "unlock": { "type": "ownedCount", "generator": "bassist", "value": 5 }
     }

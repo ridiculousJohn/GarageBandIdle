@@ -167,8 +167,10 @@ An early album cycle takes seconds to minutes; cycles get faster as Records accu
 Moment-to-moment play draws on the systems defined elsewhere:
 - **Tap ("Jam")** — early Cash source; its relevance falls off as gear automates income.
 - **Generators** — exponential cost, `cost = base × growth^owned`, growth ~1.15; a themed set per
-  chapter. Because runs reset, a chapter's Cash stays in the thousands–millions range; cross-chapter
-  growth comes from Records and Roadies.
+  chapter. A generator's cost declares its currency, independent of what it produces (all Chapter 1
+  gear costs Cash) — "buy with Cash, produce Merch" is a data shape, not a special case. Because runs
+  reset, a chapter's Cash stays in the thousands–millions range; cross-chapter growth comes from
+  Records and Roadies.
 - **Upgrades (§4).**
 - **Learn-songs bars** — generic fillable bars (§3) that give early chapters an activity beyond
   watching a number. A bar fills by spending a fill currency (Rehearsal in Ch. 1, earned from taps plus

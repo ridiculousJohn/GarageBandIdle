@@ -27,18 +27,26 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // base production before global multipliers (those apply in ProductionCalculator)
         public BigNumber ProductionPerSecond => (BigNumber)Definition.BaseOutput * Owned;
 
-        // buys one unit if affordable; deducts the cost and bumps Owned
+        // buys one unit if affordable; deducts the declared cost currency —
+        // never the produced currency — and bumps Owned
         public bool TryBuy(CurrencyManager currencies)
         {
             var cost = NextCost;
-            if (currencies.Get(Definition.ProducesCurrencyId) < cost)
+
+            // fail closed on broken content: a non-positive cost is invalid
+            // data (boot validation reports it) and must never behave as an
+            // endless free purchase
+            if (cost <= BigNumber.Zero)
+                return false;
+
+            if (currencies.Get(Definition.CostCurrencyId) < cost)
                 return false;
 
             // Owned settles before the spend: Add fires BalanceChanged
             // synchronously, and no subscriber may ever observe the cost
             // deducted with the purchase not yet counted (state, then notify)
             Owned++;
-            currencies.Add(Definition.ProducesCurrencyId, -cost);
+            currencies.Add(Definition.CostCurrencyId, -cost);
             OwnedChanged?.Invoke();
             return true;
         }

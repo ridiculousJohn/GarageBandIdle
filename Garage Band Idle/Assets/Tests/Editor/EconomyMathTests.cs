@@ -115,6 +115,35 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(40.0, currencies.Get("cash").ToDouble(), 1e-9);
         }
 
+        // fail closed on broken content: a non-positive cost (invalid data —
+        // boot validation reports it) must never be an endless free purchase
+        [Test]
+        public void TryBuy_FailsClosedOnANonPositiveCost()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var generator = new Generator(TestContent.MakeGenerator("broken", "cash", 0, 0, 1));
+            currencies.Add("cash", 100);
+
+            Assert.IsFalse(generator.TryBuy(currencies));
+            Assert.AreEqual(0, generator.Owned);
+            Assert.AreEqual(100.0, currencies.Get("cash").ToDouble(), 1e-9, "nothing charged, nothing granted");
+        }
+
+        // cost and produces are independent declarations: buying charges the
+        // declared cost currency and never touches the produced currency, so a
+        // "buy with Cash, produce Merch" generator is expressible
+        [Test]
+        public void TryBuy_ChargesTheCostCurrency_NeverTheProducedCurrency()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var generator = new Generator(TestContent.MakeGenerator("merch_stand", "fans", 60, 1.15, 1));
+            currencies.Add("cash", 100);
+
+            Assert.IsTrue(generator.TryBuy(currencies));
+            Assert.AreEqual(40.0, currencies.Get("cash").ToDouble(), 1e-9, "the declared cost currency is charged");
+            Assert.AreEqual(0.0, currencies.Get("fans").ToDouble(), 1e-9, "the produced currency is untouched by a purchase");
+        }
+
         // state-then-notify: the spend's BalanceChanged is a synchronous signal
         // that condition evaluators react to, so the purchase must already be
         // counted when it fires — an ownedCount gate may never observe the cost

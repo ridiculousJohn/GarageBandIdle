@@ -49,10 +49,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         public static GeneratorDefinition MakeGenerator(string id, string produces,
             double baseCost, double costGrowth, double baseOutput, Condition unlock = null,
-            bool isBandmate = false)
+            bool isBandmate = false, string costCurrency = "cash")
         {
             var definition = Track(ScriptableObject.CreateInstance<GeneratorDefinition>());
-            definition.EditorInitialize(id, id, produces, isBandmate, baseCost, costGrowth, baseOutput, unlock);
+            definition.EditorInitialize(id, id, produces, isBandmate, costCurrency, baseCost, costGrowth, baseOutput, unlock);
             return definition;
         }
 
@@ -117,12 +117,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             GeneratorSystem generators = null, FlagSystem flags = null)
             => new(currencies, generators, flags);
 
-        // grants exactly enough cash for each purchase so tests control balances
+        // grants exactly enough of the cost currency for each purchase so tests
+        // control balances
         public static void BuyTimes(Generator generator, CurrencyManager currencies, int times)
         {
             for (var i = 0; i < times; i++)
             {
-                currencies.Add(generator.Definition.ProducesCurrencyId, generator.NextCost);
+                currencies.Add(generator.Definition.CostCurrencyId, generator.NextCost);
                 Assert.IsTrue(generator.TryBuy(currencies),
                     $"TryBuy failed for '{generator.Definition.Id}' at owned {generator.Owned}.");
             }

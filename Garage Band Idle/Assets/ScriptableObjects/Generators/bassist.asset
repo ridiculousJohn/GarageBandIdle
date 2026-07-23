@@ -16,15 +16,16 @@ MonoBehaviour:
   _displayName: Bassist
   _producesCurrencyId: cash
   _isBandmate: 1
+  _costCurrencyId: cash
   _baseCost: 4000
   _costGrowth: 1.15
   _baseOutput: 20
   _unlock:
-    rid: 5051021674712399872
+    rid: 1000
   references:
     version: 2
     RefIds:
-    - rid: 5051021674712399872
+    - rid: 1000
       type: {class: OwnedCountCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _generatorId: drummer

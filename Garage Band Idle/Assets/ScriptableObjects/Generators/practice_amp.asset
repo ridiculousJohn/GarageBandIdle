@@ -16,15 +16,16 @@ MonoBehaviour:
   _displayName: Practice Amp
   _producesCurrencyId: cash
   _isBandmate: 0
+  _costCurrencyId: cash
   _baseCost: 60
   _costGrowth: 1.15
   _baseOutput: 0.4
   _unlock:
-    rid: 5051021674712399900
+    rid: 1000
   references:
     version: 2
     RefIds:
-    - rid: 5051021674712399900
+    - rid: 1000
       type: {class: CurrencyEarnedTotalCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash

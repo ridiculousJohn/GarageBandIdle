@@ -43,7 +43,19 @@ namespace RidiculousGaming.GarageBandIdle
             }
 
             foreach (var generator in database.Generators.All)
+            {
+                // a zero/negative cost makes a generator free-and-infinite and a
+                // non-positive growth breaks the cost curve — content mistakes
+                // (including stale assets from before the cost schema) must fail
+                // loudly here, not degrade to wrong gameplay. Growth < 1
+                // (shrinking costs) is legal.
+                context.Currencies.ValidateReference(generator.CostCurrencyId, $"Generator '{generator.Id}' (cost currency)");
+                if (generator.BaseCost <= 0)
+                    Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive base cost ({generator.BaseCost}) — it would be free to buy.");
+                if (generator.CostGrowth <= 0)
+                    Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive cost growth ({generator.CostGrowth}).");
                 ConditionEvaluator.Validate(generator.Unlock, context, $"Generator '{generator.Id}' (unlock)");
+            }
 
             foreach (var upgrade in database.Upgrades.All)
             {

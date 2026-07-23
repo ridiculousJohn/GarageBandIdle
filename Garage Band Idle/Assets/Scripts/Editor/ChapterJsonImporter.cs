@@ -137,10 +137,22 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var generatorIds = new List<string>();
             foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
             {
+                // a missing/invalid cost would import as zeros — never write
+                // that state: the asset is not created/updated and the chapter
+                // does not list the generator. Growth < 1 (shrinking costs) is
+                // legal; growth <= 0 breaks the curve.
+                if (block.cost == null || string.IsNullOrEmpty(block.cost.currency)
+                    || block.cost.amount <= 0 || block.cost.growth <= 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' has a missing or invalid cost block (needs currency, amount > 0, growth > 0). Skipping it — fix the JSON and re-import.");
+                    continue;
+                }
+
                 var asset = LoadOrCreate<GeneratorDefinition>($"{GeneratorsFolder}/{block.id}.asset");
                 var unlock = ToCondition(block.unlock);
                 ApplyIfChanged(asset, generator => generator.EditorInitialize(block.id, block.name, block.produces,
-                    block.isBandmate, block.baseCost, block.costGrowth, block.baseOutput, unlock));
+                    block.isBandmate, block.cost?.currency, block.cost?.amount ?? 0, block.cost?.growth ?? 0,
+                    block.baseOutput, unlock));
                 generatorIds.Add(block.id);
             }
 
@@ -691,10 +703,18 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string name;
             public string produces;
             public bool isBandmate;
-            public double baseCost;
-            public double costGrowth;
+            public GeneratorCostBlock cost;
             public double baseOutput;
             public ConditionBlock unlock;
+        }
+
+        // a generator's cost declares its currency, independent of `produces`
+        [Serializable]
+        private class GeneratorCostBlock
+        {
+            public string currency;
+            public double amount;
+            public double growth;
         }
 
         [Serializable]

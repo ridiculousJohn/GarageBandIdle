@@ -16,15 +16,16 @@ MonoBehaviour:
   _displayName: Drummer
   _producesCurrencyId: cash
   _isBandmate: 1
+  _costCurrencyId: cash
   _baseCost: 500
   _costGrowth: 1.15
   _baseOutput: 3
   _unlock:
-    rid: 5051021674712399873
+    rid: 1000
   references:
     version: 2
     RefIds:
-    - rid: 5051021674712399873
+    - rid: 1000
       type: {class: OwnedCountCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _generatorId: practice_amp

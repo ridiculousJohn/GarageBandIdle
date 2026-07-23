@@ -52,6 +52,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 }
 
                 _currencies.ValidateReference(definition.ProducesCurrencyId, $"Generator '{definition.Id}' (produces)");
+                _currencies.ValidateReference(definition.CostCurrencyId, $"Generator '{definition.Id}' (cost)");
 
                 var generator = new Generator(definition);
                 generator.OwnedChanged += () => GeneratorOwnedChanged?.Invoke(generator);

@@ -111,6 +111,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1.15, generator.CostGrowth, 1e-9);
             Assert.AreEqual(baseOutput, generator.BaseOutput, 1e-9);
             Assert.AreEqual("cash", generator.ProducesCurrencyId);
+            Assert.AreEqual("cash", generator.CostCurrencyId);
         }
 
         [Test]
