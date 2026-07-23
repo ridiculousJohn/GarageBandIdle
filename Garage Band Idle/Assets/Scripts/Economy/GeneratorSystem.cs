@@ -74,16 +74,32 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // silent lookup for gate evaluation, which may probe ids repeatedly
         public bool TryGet(string id, out Generator generator) => _byId.TryGetValue(id, out generator);
 
-        // one economy tick: each produced currency gets its generators' summed
-        // output times the global income multiplier
-        public void Tick(double seconds, BigNumber incomeMultiplier)
+        // One economy tick: each produced currency gets its generators' summed
+        // output. The multiplier applies only to the currencies it declares —
+        // a multiplier is an output effect that names its targets, so
+        // production of anything it doesn't name is untouched.
+        public void Tick(double seconds, BigNumber incomeMultiplier, IReadOnlyList<string> multiplierAffects)
         {
             foreach (var currencyId in _producedCurrencyIds)
             {
-                var perSecond = ProductionCalculator.TotalPerSecond(_generators, currencyId, incomeMultiplier);
+                var multiplier = Affects(multiplierAffects, currencyId) ? incomeMultiplier : BigNumber.One;
+                var perSecond = ProductionCalculator.TotalPerSecond(_generators, currencyId, multiplier);
                 if (perSecond > BigNumber.Zero)
                     _currencies.Add(currencyId, perSecond * seconds);
             }
+        }
+
+        private static bool Affects(IReadOnlyList<string> affectedCurrencyIds, string currencyId)
+        {
+            if (affectedCurrencyIds == null)
+                return false;
+
+            for (var i = 0; i < affectedCurrencyIds.Count; i++)
+            {
+                if (affectedCurrencyIds[i] == currencyId)
+                    return true;
+            }
+            return false;
         }
 
         // reveals any still-locked generator whose condition now holds; called on

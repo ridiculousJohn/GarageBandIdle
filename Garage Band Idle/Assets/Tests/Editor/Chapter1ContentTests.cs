@@ -81,7 +81,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("ch01_garage", chapter.Id);
             Assert.AreEqual(1, chapter.Index);
             Assert.AreEqual(1.0, chapter.TapBaseValue, 1e-9);
-            Assert.AreEqual(0.02, chapter.RecordBuffPerRecord, 1e-9);
+            Assert.AreEqual(0.02, chapter.RecordBuff.PerRecord, 1e-9);
+            CollectionAssert.AreEqual(new[] { "cash" }, chapter.RecordBuff.AffectsCurrencyIds,
+                "the Records buff declares exactly the currencies it affects");
             Assert.AreEqual(30, chapter.CapstoneRecordsGate);
         }
 

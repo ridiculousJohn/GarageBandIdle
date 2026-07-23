@@ -199,6 +199,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
 
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
+            var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
+                new List<string>(data.constants?.recordBuff?.affects ?? Array.Empty<string>()));
             var fans = new FansConfig(data.fans?.currency, data.fans?.revealFlag,
                 data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0);
             var rehearsal = new RehearsalConfig(data.rehearsal?.currency, data.rehearsal?.revealFlag,
@@ -206,7 +208,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
                 data.chapter.name, data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
                 data.chapter.capstoneRecordsGate,
-                data.constants?.tapBaseValue ?? 1, data.constants?.recordBuffPerRecord ?? 0,
+                data.constants?.tapBaseValue ?? 1, recordBuff,
                 fans, rehearsal, flagIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
 
             MarkAllContentAddressable();
@@ -631,8 +633,17 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         [Serializable]
         private class ConstantsBlock
         {
-            public double recordBuffPerRecord;
+            public RecordBuffBlock recordBuff;
             public double tapBaseValue;
+        }
+
+        // a multiplier declares the currencies it affects (plural); production
+        // of anything it doesn't name is untouched
+        [Serializable]
+        private class RecordBuffBlock
+        {
+            public double perRecord;
+            public string[] affects;
         }
 
         [Serializable]

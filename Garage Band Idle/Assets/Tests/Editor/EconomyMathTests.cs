@@ -71,9 +71,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(system.Get("amp"), currencies, 1);
             var before = currencies.Get("cash");
 
-            system.Tick(10.0, BigNumber.One);
+            system.Tick(10.0, BigNumber.One, new[] { "cash" });
 
             Assert.AreEqual(4.0, (currencies.Get("cash") - before).ToDouble(), 1e-9); // 0.4/sec × 10s
+        }
+
+        // a multiplier is an output effect that declares its targets: production
+        // of a currency it doesn't name is untouched, no matter what generators
+        // exist — fans/records producers must never inherit the cash buff
+        [Test]
+        public void Tick_AppliesTheMultiplierOnlyToTheCurrenciesItDeclares()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var cashGen = TestContent.MakeGenerator("cash_gen", "cash", 10, 1.15, 3);
+            var fansGen = TestContent.MakeGenerator("fans_gen", "fans", 10, 1.15, 5);
+            var system = new GeneratorSystem(new[] { cashGen, fansGen }, currencies);
+            TestContent.BuyTimes(system.Get("cash_gen"), currencies, 1);
+            TestContent.BuyTimes(system.Get("fans_gen"), currencies, 1);
+            var cashBefore = currencies.Get("cash");
+            var fansBefore = currencies.Get("fans");
+
+            system.Tick(10.0, 2.0, new[] { "cash" });
+
+            Assert.AreEqual(60.0, (currencies.Get("cash") - cashBefore).ToDouble(), 1e-9); // 3 × 2 × 10s
+            Assert.AreEqual(50.0, (currencies.Get("fans") - fansBefore).ToDouble(), 1e-9,
+                "undeclared currency takes no multiplier"); // 5 × 1 × 10s
         }
 
         [Test]

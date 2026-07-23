@@ -16,6 +16,8 @@ namespace RidiculousGaming.GarageBandIdle
         {
             foreach (var chapter in database.Chapters.All)
             {
+                foreach (var currencyId in chapter.RecordBuff.AffectsCurrencyIds)
+                    context.Currencies.ValidateReference(currencyId, $"Chapter '{chapter.Id}' (recordBuff affects)");
                 context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)");
                 ValidateFlag(chapter.Fans.RevealFlagId, context, $"Chapter '{chapter.Id}' (fans revealFlag)");
 

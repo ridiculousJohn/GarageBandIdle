@@ -24,7 +24,10 @@ MonoBehaviour:
     first roadie."
   _capstoneRecordsGate: 30
   _tapBaseValue: 1
-  _recordBuffPerRecord: 0.02
+  _recordBuff:
+    _perRecord: 0.02
+    _affectsCurrencyIds:
+    - cash
   _fans:
     _currencyId: fans
     _revealFlagId: fans

@@ -115,6 +115,11 @@ income = Σ(generator base × count × buff upgrades)
          × encoreBoost       (temporary 1×/2×/4×, §9)
 ```
 
+A multiplier is an output effect that **declares which currencies it affects** (plural, by id);
+generator production of a currency no multiplier names is untouched. The Records multiplier affects
+Cash in Chapter 1. A currency never opts into a multiplier — the dependency points from the
+multiplier to its targets.
+
 ---
 
 ## 4. Upgrades

@@ -130,9 +130,11 @@ namespace RidiculousGaming.GarageBandIdle
             if (Generators == null)
                 return;
 
+            // the Records buff applies only to the currencies it declares
+            // (cash in Ch1); production of anything it doesn't name is untouched
             var multiplier = ProductionCalculator.IncomeMultiplier(
-                Currencies.Get(RecordsCurrencyId), CurrentChapter.RecordBuffPerRecord);
-            Generators.Tick(seconds, multiplier);
+                Currencies.Get(RecordsCurrencyId), CurrentChapter.RecordBuff.PerRecord);
+            Generators.Tick(seconds, multiplier, CurrentChapter.RecordBuff.AffectsCurrencyIds);
             Generators.EvaluateUnlocks(Conditions);
 
             // content unlocks before fan accrual so a freshly-set fans flag

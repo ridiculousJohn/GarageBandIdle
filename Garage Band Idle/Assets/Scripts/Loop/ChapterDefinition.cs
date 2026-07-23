@@ -51,8 +51,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         private double _tapBaseValue;
 
         [SerializeField]
-        [Tooltip("Permanent global income bonus per Record, e.g. 0.02 for +2% each.")]
-        private double _recordBuffPerRecord;
+        private RecordBuffConfig _recordBuff = new();
 
         [SerializeField]
         private FansConfig _fans = new();
@@ -95,7 +94,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         public string StoryBeatCapstone => _storyBeatCapstone;
         public int CapstoneRecordsGate => _capstoneRecordsGate;
         public double TapBaseValue => _tapBaseValue;
-        public double RecordBuffPerRecord => _recordBuffPerRecord;
+        public RecordBuffConfig RecordBuff => _recordBuff;
         public FansConfig Fans => _fans;
         public RehearsalConfig Rehearsal => _rehearsal;
         public IReadOnlyList<string> FlagIds => _flagIds;
@@ -109,7 +108,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         // importer-only: chapter assets are generated from chapter JSON
         public void EditorInitialize(string id, int index, string displayName, string theme,
             string storyBeatOpen, string storyBeatCapstone, int capstoneRecordsGate,
-            double tapBaseValue, double recordBuffPerRecord, FansConfig fans, RehearsalConfig rehearsal,
+            double tapBaseValue, RecordBuffConfig recordBuff, FansConfig fans, RehearsalConfig rehearsal,
             List<string> flagIds, List<string> sectionIds, List<string> generatorIds,
             List<string> upgradeIds, List<string> barGroupIds, List<string> eventIds)
         {
@@ -121,7 +120,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             _storyBeatCapstone = storyBeatCapstone;
             _capstoneRecordsGate = capstoneRecordsGate;
             _tapBaseValue = tapBaseValue;
-            _recordBuffPerRecord = recordBuffPerRecord;
+            _recordBuff = recordBuff;
             _fans = fans;
             _rehearsal = rehearsal;
             _flagIds = flagIds;
@@ -130,6 +129,36 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             _upgradeIds = upgradeIds;
             _barGroupIds = barGroupIds;
             _eventIds = eventIds;
+        }
+#endif
+    }
+
+    // The Records buff tuning (design doc sections 3 and 5). A multiplier
+    // declares which currencies it affects — it is an output effect, not a
+    // property of the currency being generated — so production of a currency
+    // no multiplier names is untouched. Records affects Cash in Chapter 1.
+    [Serializable]
+    public class RecordBuffConfig
+    {
+        [SerializeField]
+        [Tooltip("Permanent global income bonus per Record, e.g. 0.02 for +2% each.")]
+        private double _perRecord;
+
+        [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
+        [Tooltip("Currency ids whose generator production this multiplier applies to. Anything not listed is untouched.")]
+        private List<string> _affectsCurrencyIds = new();
+
+        public double PerRecord => _perRecord;
+        public IReadOnlyList<string> AffectsCurrencyIds => _affectsCurrencyIds;
+
+        public RecordBuffConfig() { }
+
+#if UNITY_EDITOR
+        public RecordBuffConfig(double perRecord, List<string> affectsCurrencyIds)
+        {
+            _perRecord = perRecord;
+            _affectsCurrencyIds = affectsCurrencyIds;
         }
 #endif
     }

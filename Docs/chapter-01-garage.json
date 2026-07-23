@@ -28,9 +28,13 @@
 
   "constants": {
     "generatorCostGrowth": 1.15,
-    "recordBuffPerRecord": 0.02,
-    "recordBuffMode": "additive",
-    "incomeFormulaNote": "globalIncome = sum(gen.baseOutput * gen.count * genBuffs) * (1 + 0.02 * records) * encoreBoost. Catalog/Roadie multipliers are not present in Ch1.",
+    "recordBuff": {
+      "perRecord": 0.02,
+      "mode": "additive",
+      "affects": [ "cash" ],
+      "note": "A multiplier declares which currencies it affects; generator production of anything it doesn't name is untouched. The Records buff is Ch1's only global multiplier and affects Cash."
+    },
+    "incomeFormulaNote": "cashIncome = sum(gen.baseOutput * gen.count * genBuffs) * (1 + 0.02 * records) * encoreBoost. Catalog/Roadie multipliers are not present in Ch1.",
     "tapBaseValue": 1
   },
 
