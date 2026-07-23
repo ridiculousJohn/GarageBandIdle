@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
@@ -36,6 +37,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private const string EventsFolder = "Assets/ScriptableObjects/Events";
         private const string RewardsFolder = "Assets/ScriptableObjects/Rewards";
 
+        // an explicit null in the JSON behaves exactly like an absent field:
+        // the member keeps its DTO initializer, the single source of "absent"
+        // semantics
+        private static readonly JsonSerializerSettings JsonSettings = new()
+        {
+            NullValueHandling = NullValueHandling.Ignore,
+        };
+
         [MenuItem("GarageBandIdle/Import Chapter 1 JSON")]
         public static void ImportChapter1()
         {
@@ -52,7 +61,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
         private static void Import(string jsonPath)
         {
-            var data = JsonUtility.FromJson<ChapterFile>(File.ReadAllText(jsonPath));
+            var data = JsonConvert.DeserializeObject<ChapterFile>(File.ReadAllText(jsonPath), JsonSettings);
             if (data?.chapter == null || string.IsNullOrEmpty(data.chapter.id))
             {
                 Debug.LogError($"ChapterJsonImporter: '{jsonPath}' has no chapter block with an id. Nothing imported.");
@@ -386,8 +395,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         }
 
         // Maps a JSON condition ({ "type": ... }) onto the Condition subclass
-        // family. An absent gate means no gate: JsonUtility materializes absent
-        // objects as empty instances, so an empty type returns null (always met).
+        // family. An absent gate means no gate: the DTO initializers materialize
+        // absent objects as empty instances, so an empty type returns null
+        // (always met).
         private static Condition ToCondition(ConditionBlock block)
         {
             if (block == null || string.IsNullOrEmpty(block.type))
@@ -409,31 +419,28 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 block.generator, block.flag, block.group, block.value);
         }
 
-        private static List<Condition> ToConditionList(ConditionLeafBlock[] blocks)
+        private static List<Condition> ToConditionList(ConditionBlock[] blocks)
         {
             var conditions = new List<Condition>();
-            foreach (var block in blocks ?? Array.Empty<ConditionLeafBlock>())
+            foreach (var block in blocks ?? Array.Empty<ConditionBlock>())
             {
-                if (string.IsNullOrEmpty(block.type))
+                if (block == null || string.IsNullOrEmpty(block.type))
                 {
                     Debug.LogError("ChapterJsonImporter: compound condition has a child with no type. Skipping it.");
                     continue;
                 }
-                if (block.type == "compound")
-                {
-                    // JsonUtility cannot express recursive DTOs; extend the leaf
-                    // shape if a chapter ever needs deeper nesting
-                    Debug.LogError("ChapterJsonImporter: nested compound conditions are not supported by the importer. Skipping it.");
-                    continue;
-                }
 
-                var condition = ToSimpleCondition(block.type, block.currency, block.amount,
-                    block.generator, block.flag, block.group, block.value);
+                var condition = ToCondition(block);
                 if (condition != null)
                     conditions.Add(condition);
             }
             return conditions;
         }
+
+        // the condition parse path (real DTO shape + conversion), exposed so
+        // EditMode tests can cover nesting depth without an asset-writing import
+        internal static Condition ParseCondition(string json)
+            => ToCondition(JsonConvert.DeserializeObject<ConditionBlock>(json, JsonSettings));
 
         private static Condition ToSimpleCondition(string type, string currency, double amount,
             string generator, string flag, string group, double value)
@@ -635,230 +642,200 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return asset;
         }
 
-        // DTOs mirroring the JSON for JsonUtility; unknown JSON fields (notes,
+        // DTOs mirroring the JSON for Newtonsoft; unknown JSON fields (notes,
         // _meta, capstone, progression, balanceTargets) are simply skipped.
-#pragma warning disable 0649 // fields are assigned by JsonUtility
-        [Serializable]
+        // Field initializers stand in for absent fields (and explicit nulls,
+        // via JsonSettings), so a block or array is never null and an absent
+        // object is an empty instance.
+#pragma warning disable 0649 // fields are assigned by Newtonsoft via reflection
         private class ChapterFile
         {
-            public ChapterBlock chapter;
-            public ConstantsBlock constants;
-            public FlagBlock[] flags;
-            public SectionBlock[] sections;
-            public GeneratorBlock[] generators;
-            public UpgradeBlock[] upgrades;
-            public RewardEntryBlock[] rewards;
-            public RehearsalBlock rehearsal;
-            public BarsBlock bars;
-            public FansBlock fans;
-            public EventBlock[] events;
+            public ChapterBlock chapter = new();
+            public ConstantsBlock constants = new();
+            public FlagBlock[] flags = Array.Empty<FlagBlock>();
+            public SectionBlock[] sections = Array.Empty<SectionBlock>();
+            public GeneratorBlock[] generators = Array.Empty<GeneratorBlock>();
+            public UpgradeBlock[] upgrades = Array.Empty<UpgradeBlock>();
+            public RewardEntryBlock[] rewards = Array.Empty<RewardEntryBlock>();
+            public RehearsalBlock rehearsal = new();
+            public BarsBlock bars = new();
+            public FansBlock fans = new();
+            public EventBlock[] events = Array.Empty<EventBlock>();
         }
 
-        [Serializable]
         private class FlagBlock
         {
-            public string id;
+            public string id = "";
         }
 
         // one entry in the shared reward pool; which fields matter depends on type
-        [Serializable]
         private class RewardEntryBlock
         {
-            public string id;
-            public string name;
-            public string type;
+            public string id = "";
+            public string name = "";
+            public string type = "";
             public double value;
-            public string scope;
-            public string flag;
+            public string scope = "";
+            public string flag = "";
         }
 
-        [Serializable]
         private class ChapterBlock
         {
-            public string id;
+            public string id = "";
             public int index;
-            public string name;
-            public string theme;
-            public string storyBeatOpen;
-            public string storyBeatCapstone;
+            public string name = "";
+            public string theme = "";
+            public string storyBeatOpen = "";
+            public string storyBeatCapstone = "";
             public int capstoneRecordsGate;
         }
 
-        [Serializable]
         private class ConstantsBlock
         {
-            public RecordBuffBlock recordBuff;
+            public RecordBuffBlock recordBuff = new();
             public double tapBaseValue;
         }
 
         // a multiplier declares the currencies it affects (plural); production
         // of anything it doesn't name is untouched
-        [Serializable]
         private class RecordBuffBlock
         {
             public double perRecord;
-            public string[] affects;
+            public string[] affects = Array.Empty<string>();
         }
 
-        [Serializable]
         private class SectionBlock
         {
-            public string id;
-            public string name;
-            public string[] modules;
-            public ConditionBlock visibleWhen;
+            public string id = "";
+            public string name = "";
+            public string[] modules = Array.Empty<string>();
+            public ConditionBlock visibleWhen = new();
         }
 
-        // the discriminated Condition shape; which fields matter depends on type
-        [Serializable]
+        // the discriminated Condition shape; which fields matter depends on
+        // type. all/any children are this same shape, so compounds nest to
+        // any depth — matching the recursive CompoundCondition family.
         private class ConditionBlock
         {
-            public string type;
-            public string currency;
+            public string type = "";
+            public string currency = "";
             public double amount;
-            public string generator;
-            public string flag;
-            public string group;
+            public string generator = "";
+            public string flag = "";
+            public string group = "";
             public double value;
-            public ConditionLeafBlock[] all;
-            public ConditionLeafBlock[] any;
+            public ConditionBlock[] all = Array.Empty<ConditionBlock>();
+            public ConditionBlock[] any = Array.Empty<ConditionBlock>();
         }
 
-        // compound children: the same shape minus nesting (JsonUtility cannot
-        // express recursive DTOs)
-        [Serializable]
-        private class ConditionLeafBlock
-        {
-            public string type;
-            public string currency;
-            public double amount;
-            public string generator;
-            public string flag;
-            public string group;
-            public double value;
-        }
-
-        [Serializable]
         private class GeneratorBlock
         {
-            public string id;
-            public string name;
-            public string produces;
+            public string id = "";
+            public string name = "";
+            public string produces = "";
             public bool isBandmate;
-            public GeneratorCostBlock cost;
+            public GeneratorCostBlock cost = new();
             public double baseOutput;
-            public ConditionBlock unlock;
+            public ConditionBlock unlock = new();
         }
 
         // a generator's cost declares its currency, independent of `produces`
-        [Serializable]
         private class GeneratorCostBlock
         {
-            public string currency;
+            public string currency = "";
             public double amount;
             public double growth;
         }
 
-        [Serializable]
         private class CostBlock
         {
-            public string currency;
+            public string currency = "";
             public double amount;
         }
 
-        [Serializable]
         private class PayloadBlock
         {
-            public string effect;
+            public string effect = "";
             public double value;
-            public string generator;
-            public string flag;
+            public string generator = "";
+            public string flag = "";
         }
 
-        [Serializable]
         private class UpgradeBlock
         {
-            public string id;
-            public string name;
-            public string type;
-            public string scope;
-            public CostBlock cost;
-            public ConditionBlock gate;
-            public PayloadBlock payload;
+            public string id = "";
+            public string name = "";
+            public string type = "";
+            public string scope = "";
+            public CostBlock cost = new();
+            public ConditionBlock gate = new();
+            public PayloadBlock payload = new();
         }
 
-        [Serializable]
         private class RehearsalBlock
         {
-            public string currency;
-            public string group; // CurrencyGroupDefinition id, e.g. "run"
-            public string revealFlag;
+            public string currency = "";
+            public string group = ""; // CurrencyGroupDefinition id, e.g. "run"
+            public string revealFlag = "";
             public double perSec;
             public double perTap;
         }
 
-        [Serializable]
         private class BarsBlock
         {
-            public BarGroupBlock[] groups;
-            public string scope;
+            public BarGroupBlock[] groups = Array.Empty<BarGroupBlock>();
+            public string scope = "";
         }
 
-        [Serializable]
         private class BarGroupBlock
         {
-            public string id;
-            public string name;
-            public string revealFlag;
-            public string fillMode;
-            public string delivery;
-            public BarBlock[] bars;
+            public string id = "";
+            public string name = "";
+            public string revealFlag = "";
+            public string fillMode = "";
+            public string delivery = "";
+            public BarBlock[] bars = Array.Empty<BarBlock>();
         }
 
-        [Serializable]
         private class BarBlock
         {
-            public string id;
-            public string name;
-            public string fillCurrency;
+            public string id = "";
+            public string name = "";
+            public string fillCurrency = "";
             public double fillRequirement;
-            public string reward; // reward pool id
+            public string reward = ""; // reward pool id
         }
 
-        [Serializable]
         private class FansBlock
         {
-            public string currency;
-            public string revealFlag;
+            public string currency = "";
+            public string revealFlag = "";
             public double baseFansPerSec;
             public double perBandmateOwnedBonus;
         }
 
-        [Serializable]
         private class EventBlock
         {
-            public string id;
-            public string name;
-            public ConditionBlock availableWhen;
+            public string id = "";
+            public string name = "";
+            public ConditionBlock availableWhen = new();
             public bool baselineReset;
-            public TierBlock[] tiers;
+            public TierBlock[] tiers = Array.Empty<TierBlock>();
         }
 
-        [Serializable]
         private class TierBlock
         {
             public int tier;
-            public DebuffBlock debuff;
-            public ConditionBlock goal;
+            public DebuffBlock debuff = new();
+            public ConditionBlock goal = new();
             public double timerSeconds;
             public bool failable;
-            public string reward; // reward pool id
+            public string reward = ""; // reward pool id
         }
 
-        [Serializable]
         private class DebuffBlock
         {
-            public string effect;
+            public string effect = "";
         }
 #pragma warning restore 0649
     }
