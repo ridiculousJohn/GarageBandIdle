@@ -161,6 +161,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "the rate is untouched");
         }
 
+        // tap-value rewards route to the tap system and stack per scope,
+        // mirroring fan-rate rewards: the run reset keeps the permanent-in-
+        // chapter stack
+        [Test]
+        public void TapValueRewards_StackPerScope_AndRunResetKeepsPermanent()
+        {
+            var tap = new TapSystem(2);
+            var context = new Content.RewardContext(TestContent.MakeEconomy(), new FlagSystem(), null, tap);
+
+            TestContent.MakeTapValueReward("run_x2", 2.0, ContentScope.Run).Apply(context);
+            TestContent.MakeTapValueReward("perm_x3", 3.0, ContentScope.PermanentInChapter).Apply(context);
+            Assert.AreEqual(12.0, tap.Value.ToDouble(), 1e-9, "base 2 × run 2 × permanent 3");
+
+            tap.ResetRunScopedMultipliers();
+            Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "the run reset keeps the permanent stack");
+        }
+
+        // fail closed on broken content: a non-positive factor (invalid data —
+        // boot validation reports it) must never apply
+        [Test]
+        public void TapValueMultiplier_FailsClosedOnANonPositiveFactor()
+        {
+            var tap = new TapSystem(2);
+
+            LogAssert.Expect(LogType.Error, "TapSystem: MultiplyValue with non-positive factor '0'. Ignoring.");
+            tap.MultiplyValue(0, ContentScope.Run);
+
+            Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "the value is untouched");
+        }
+
         [Test]
         public void SetFlagReward_LatchesTheFlag()
         {

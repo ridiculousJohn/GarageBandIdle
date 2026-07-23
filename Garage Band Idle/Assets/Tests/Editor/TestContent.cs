@@ -118,6 +118,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
+        public static TapValueMultiplierReward MakeTapValueReward(string id, double value, ContentScope scope = ContentScope.Run)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<TapValueMultiplierReward>());
+            definition.EditorInitialize(id, id, value, scope);
+            return definition;
+        }
+
         public static SetFlagReward MakeSetFlagReward(string id, string flagId)
         {
             var definition = Track(ScriptableObject.CreateInstance<SetFlagReward>());

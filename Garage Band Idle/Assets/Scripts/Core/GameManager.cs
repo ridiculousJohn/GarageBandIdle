@@ -37,6 +37,7 @@ namespace RidiculousGaming.GarageBandIdle
         public GeneratorSystem Generators { get; private set; }
         public UpgradeSystem Upgrades { get; private set; }
         public FanSystem Fans { get; private set; }
+        public TapSystem Tap { get; private set; }
         public RehearsalSystem Rehearsal { get; private set; }
         public RewardManager Rewards { get; private set; }
         public BarSystem Bars { get; private set; }
@@ -79,10 +80,11 @@ namespace RidiculousGaming.GarageBandIdle
                 Generators = new GeneratorSystem(Resolve(Database.Generators, CurrentChapter.GeneratorIds, "generator"), Currencies);
                 Upgrades = new UpgradeSystem(Resolve(Database.Upgrades, CurrentChapter.UpgradeIds, "upgrade"), Currencies, Flags);
                 Fans = new FanSystem(CurrentChapter.Fans, Currencies, Generators, Flags);
+                Tap = new TapSystem(CurrentChapter.TapBaseValue);
                 Rehearsal = new RehearsalSystem(CurrentChapter.Rehearsal, Currencies, Flags);
                 Rewards = new RewardManager(Database.Rewards.All);
                 Bars = new BarSystem(Resolve(Database.BarGroups, CurrentChapter.BarGroupIds, "bar group"),
-                    Database.Bars.All, Currencies, Rewards, new RewardContext(Currencies, Flags, Fans));
+                    Database.Bars.All, Currencies, Rewards, new RewardContext(Currencies, Flags, Fans, Tap));
                 Sections = Resolve(Database.Sections, CurrentChapter.SectionIds, "section");
 
                 Conditions = new ConditionContext(Currencies, Generators, Flags, RecordsCurrencyId, Database, Bars);
@@ -149,13 +151,14 @@ namespace RidiculousGaming.GarageBandIdle
             Bars.Tick();
         }
 
-        // the tap action; tap buffs (stage_presence etc.) arrive in the upgrades slice
+        // the tap action; cash per tap = chapter base × tap-reward multipliers
+        // (flat tap buffs like stage_presence arrive with the buff slice)
         public void Jam()
         {
             if (CurrentChapter == null)
                 return;
 
-            Currencies.Add(CashCurrencyId, CurrentChapter.TapBaseValue);
+            Currencies.Add(CashCurrencyId, Tap.Value);
 
             // taps also yield the fill currency; drain immediately so the
             // active bar visibly nudges on the tap, not a tick later

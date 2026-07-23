@@ -9,12 +9,14 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public CurrencyManager Currencies { get; }
         public FlagSystem Flags { get; }
         public FanSystem Fans { get; }
+        public TapSystem Tap { get; }
 
-        public RewardContext(CurrencyManager currencies, FlagSystem flags, FanSystem fans)
+        public RewardContext(CurrencyManager currencies, FlagSystem flags, FanSystem fans, TapSystem tap = null)
         {
             Currencies = currencies;
             Flags = flags;
             Fans = fans;
+            Tap = tap;
         }
     }
 }
