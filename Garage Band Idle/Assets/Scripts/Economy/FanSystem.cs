@@ -1,4 +1,5 @@
 using RidiculousGaming.GarageBandIdle.Loop;
+using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
@@ -27,11 +28,34 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public bool Active => _flags.IsSet(_config.RevealFlagId);
 
-        private BigNumber _rateMultiplier = BigNumber.One;
+        // Fan-rate rewards stack multiplicatively, tracked PER SCOPE so scoped
+        // effects stay resettable: an album release clears the run-scoped stack
+        // and keeps the permanent-in-chapter one. Collapsing scopes into one
+        // number would make "reset run-scoped effects" unimplementable.
+        private BigNumber _runRateMultiplier = BigNumber.One;
+        private BigNumber _permanentRateMultiplier = BigNumber.One;
 
-        // fan-rate rewards (completed covers) stack multiplicatively on the whole
-        // rate; multiplier reset on album release arrives with the prestige slice
-        public void MultiplyRate(double factor) => _rateMultiplier *= factor;
+        public void MultiplyRate(double factor, ContentScope scope)
+        {
+            switch (scope)
+            {
+                case ContentScope.Run:
+                    _runRateMultiplier *= factor;
+                    break;
+                case ContentScope.PermanentInChapter:
+                    _permanentRateMultiplier *= factor;
+                    break;
+                default:
+                    // fail closed on broken content: boot validation reports a
+                    // None scope; an unscoped multiplier must never apply
+                    Debug.LogError($"FanSystem: MultiplyRate with scope '{scope}'. Ignoring.");
+                    break;
+            }
+        }
+
+        // the run reset (album release now, event baseline later) clears only
+        // the run-scoped stack; permanent-in-chapter rewards survive
+        public void ResetRunScopedMultipliers() => _runRateMultiplier = BigNumber.One;
 
         // owned units across bandmate generators (IsBandmate — gear never counts)
         public int BandmateCount
@@ -49,7 +73,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         }
 
         public BigNumber RatePerSecond => Active
-            ? (BigNumber)(_config.BaseFansPerSec + _config.PerBandmateOwnedBonus * BandmateCount) * _rateMultiplier
+            ? (BigNumber)(_config.BaseFansPerSec + _config.PerBandmateOwnedBonus * BandmateCount)
+                * _runRateMultiplier * _permanentRateMultiplier
             : BigNumber.Zero;
 
         public void Tick(double seconds)

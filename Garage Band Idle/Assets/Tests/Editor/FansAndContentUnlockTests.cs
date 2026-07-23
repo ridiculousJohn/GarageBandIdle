@@ -119,6 +119,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
         }
 
+        // multipliers are tracked per scope: the run reset (album release,
+        // event baseline) clears only run-scoped rewards — a permanent-in-
+        // chapter reward must survive it
+        [Test]
+        public void FanRateMultipliers_RunResetKeepsPermanentInChapter()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var context = new Content.RewardContext(currencies, flags, fans);
+
+            TestContent.MakeFanRateReward("run_boost", 1.5, ContentScope.Run).Apply(context);
+            TestContent.MakeFanRateReward("permanent_boost", 2.0, ContentScope.PermanentInChapter).Apply(context);
+            Assert.AreEqual(0.2 * 1.5 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "both scopes stack");
+
+            fans.ResetRunScopedMultipliers();
+
+            Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "run reset keeps the permanent stack");
+        }
+
         [Test]
         public void SetFlagReward_LatchesTheFlag()
         {
