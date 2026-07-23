@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
@@ -77,9 +78,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             if (!string.IsNullOrEmpty(data.rehearsal?.currency))
             {
                 var currencyAsset = LoadOrCreate<CurrencyDefinition>($"{CurrenciesFolder}/{data.rehearsal.currency}.asset");
-                currencyAsset.EditorInitialize(data.rehearsal.currency,
-                    ToDisplayName(data.rehearsal.currency), data.rehearsal.scope);
-                EditorUtility.SetDirty(currencyAsset);
+                ApplyIfChanged(currencyAsset, asset => asset.EditorInitialize(data.rehearsal.currency,
+                    ToDisplayName(data.rehearsal.currency), data.rehearsal.scope));
             }
 
             // rewards first: bars and event tiers reference the pool by id, so
@@ -94,30 +94,26 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 }
 
                 var path = $"{RewardsFolder}/{block.id}.asset";
-                RewardDefinition asset;
                 switch (block.type)
                 {
                     case "fanRateMultiplier":
                     {
                         var reward = LoadOrCreateReward<FanRateMultiplierReward>(path);
-                        reward.EditorInitialize(block.id, block.name, block.value,
-                            ToScope(block.scope, $"reward '{block.id}'"));
-                        asset = reward;
+                        var scope = ToScope(block.scope, $"reward '{block.id}'");
+                        ApplyIfChanged(reward, asset => asset.EditorInitialize(block.id, block.name, block.value, scope));
                         break;
                     }
                     case "tapValueMultiplier":
                     {
                         var reward = LoadOrCreateReward<TapValueMultiplierReward>(path);
-                        reward.EditorInitialize(block.id, block.name, block.value,
-                            ToScope(block.scope, $"reward '{block.id}'"));
-                        asset = reward;
+                        var scope = ToScope(block.scope, $"reward '{block.id}'");
+                        ApplyIfChanged(reward, asset => asset.EditorInitialize(block.id, block.name, block.value, scope));
                         break;
                     }
                     case "setFlag":
                     {
                         var reward = LoadOrCreateReward<SetFlagReward>(path);
-                        reward.EditorInitialize(block.id, block.name, block.flag);
-                        asset = reward;
+                        ApplyIfChanged(reward, asset => asset.EditorInitialize(block.id, block.name, block.flag));
                         break;
                     }
                     default:
@@ -125,7 +121,6 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                         continue;
                 }
 
-                EditorUtility.SetDirty(asset);
                 rewardIds.Add(block.id);
             }
 
@@ -133,9 +128,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             foreach (var block in data.sections ?? Array.Empty<SectionBlock>())
             {
                 var asset = LoadOrCreate<SectionDefinition>($"{SectionsFolder}/{block.id}.asset");
-                asset.EditorInitialize(block.id, block.name,
-                    new List<string>(block.modules ?? Array.Empty<string>()), ToCondition(block.visibleWhen));
-                EditorUtility.SetDirty(asset);
+                var modules = new List<string>(block.modules ?? Array.Empty<string>());
+                var visibleWhen = ToCondition(block.visibleWhen);
+                ApplyIfChanged(asset, section => section.EditorInitialize(block.id, block.name, modules, visibleWhen));
                 sectionIds.Add(block.id);
             }
 
@@ -143,9 +138,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
             {
                 var asset = LoadOrCreate<GeneratorDefinition>($"{GeneratorsFolder}/{block.id}.asset");
-                asset.EditorInitialize(block.id, block.name, block.produces, block.isBandmate,
-                    block.baseCost, block.costGrowth, block.baseOutput, ToCondition(block.unlock));
-                EditorUtility.SetDirty(asset);
+                var unlock = ToCondition(block.unlock);
+                ApplyIfChanged(asset, generator => generator.EditorInitialize(block.id, block.name, block.produces,
+                    block.isBandmate, block.baseCost, block.costGrowth, block.baseOutput, unlock));
                 generatorIds.Add(block.id);
             }
 
@@ -153,12 +148,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             foreach (var block in data.upgrades ?? Array.Empty<UpgradeBlock>())
             {
                 var asset = LoadOrCreate<UpgradeDefinition>($"{UpgradesFolder}/{block.id}.asset");
-                asset.EditorInitialize(block.id, block.name,
-                    ToUpgradeType(block.type, $"upgrade '{block.id}'"),
-                    ToScope(block.scope, $"upgrade '{block.id}'"),
-                    block.cost?.currency, block.cost?.amount ?? 0, ToCondition(block.gate),
-                    ToPayload(block.payload, $"upgrade '{block.id}'"));
-                EditorUtility.SetDirty(asset);
+                var type = ToUpgradeType(block.type, $"upgrade '{block.id}'");
+                var scope = ToScope(block.scope, $"upgrade '{block.id}'");
+                var gate = ToCondition(block.gate);
+                var payload = ToPayload(block.payload, $"upgrade '{block.id}'");
+                ApplyIfChanged(asset, upgrade => upgrade.EditorInitialize(block.id, block.name, type, scope,
+                    block.cost?.currency, block.cost?.amount ?? 0, gate, payload));
                 upgradeIds.Add(block.id);
             }
 
@@ -170,18 +165,18 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 foreach (var bar in group.bars ?? Array.Empty<BarBlock>())
                 {
                     var barAsset = LoadOrCreate<BarDefinition>($"{BarsFolder}/{bar.id}.asset");
-                    barAsset.EditorInitialize(bar.id, bar.name, bar.fillCurrency, bar.fillRequirement, bar.reward);
-                    EditorUtility.SetDirty(barAsset);
+                    ApplyIfChanged(barAsset, asset => asset.EditorInitialize(bar.id, bar.name,
+                        bar.fillCurrency, bar.fillRequirement, bar.reward));
                     barIds.Add(bar.id);
                     barCount++;
                 }
 
                 var groupAsset = LoadOrCreate<BarGroupDefinition>($"{BarGroupsFolder}/{group.id}.asset");
-                groupAsset.EditorInitialize(group.id, group.name, group.revealFlag,
-                    ToFillMode(group.fillMode, $"bar group '{group.id}'"),
-                    ToDelivery(group.delivery, $"bar group '{group.id}'"),
-                    ToScope(data.bars.scope, $"bar group '{group.id}'"), barIds);
-                EditorUtility.SetDirty(groupAsset);
+                var fillMode = ToFillMode(group.fillMode, $"bar group '{group.id}'");
+                var delivery = ToDelivery(group.delivery, $"bar group '{group.id}'");
+                var groupScope = ToScope(data.bars.scope, $"bar group '{group.id}'");
+                ApplyIfChanged(groupAsset, asset => asset.EditorInitialize(group.id, group.name, group.revealFlag,
+                    fillMode, delivery, groupScope, barIds));
                 barGroupIds.Add(group.id);
             }
 
@@ -197,23 +192,22 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 }
 
                 var asset = LoadOrCreate<EventDefinition>($"{EventsFolder}/{block.id}.asset");
-                asset.EditorInitialize(block.id, block.name,
-                    ToCondition(block.availableWhen), block.baselineReset, tiers);
-                EditorUtility.SetDirty(asset);
+                var availableWhen = ToCondition(block.availableWhen);
+                ApplyIfChanged(asset, gameEvent => gameEvent.EditorInitialize(block.id, block.name,
+                    availableWhen, block.baselineReset, tiers));
                 eventIds.Add(block.id);
             }
 
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
-            chapterAsset.EditorInitialize(data.chapter.id, data.chapter.index, data.chapter.name,
-                data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
+            var fans = new FansConfig(data.fans?.currency, data.fans?.revealFlag,
+                data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0);
+            var rehearsal = new RehearsalConfig(data.rehearsal?.currency, data.rehearsal?.revealFlag,
+                data.rehearsal?.perSec ?? 0, data.rehearsal?.perTap ?? 0);
+            ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
+                data.chapter.name, data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
                 data.chapter.capstoneRecordsGate,
                 data.constants?.tapBaseValue ?? 1, data.constants?.recordBuffPerRecord ?? 0,
-                new FansConfig(data.fans?.currency, data.fans?.revealFlag,
-                    data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0),
-                new RehearsalConfig(data.rehearsal?.currency, data.rehearsal?.revealFlag,
-                    data.rehearsal?.perSec ?? 0, data.rehearsal?.perTap ?? 0),
-                flagIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds);
-            EditorUtility.SetDirty(chapterAsset);
+                fans, rehearsal, flagIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
 
             MarkAllContentAddressable();
 
@@ -516,6 +510,47 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 UpgradesFolder, BarsFolder, BarGroupsFolder, EventsFolder, RewardsFolder })
                 Directory.CreateDirectory(Path.Combine(projectRoot, folder));
             AssetDatabase.Refresh();
+        }
+
+        // Initializes an asset only when the result would differ from what is
+        // already saved: the init runs on a scratch instance first and the two
+        // serialized forms are compared. Unity assigns fresh managed-reference
+        // ids (rid) to every new [SerializeReference] instance, so blindly
+        // re-initializing rewrites every gate/payload holder with id churn even
+        // when nothing changed — re-importing an unchanged JSON must leave the
+        // working tree clean.
+        private static void ApplyIfChanged<T>(T asset, Action<T> initialize) where T : ScriptableObject
+        {
+            var candidate = (T)ScriptableObject.CreateInstance(asset.GetType());
+            candidate.name = asset.name;
+            initialize(candidate);
+
+            var changed = NormalizeReferenceIds(EditorJsonUtility.ToJson(asset))
+                != NormalizeReferenceIds(EditorJsonUtility.ToJson(candidate));
+            UnityEngine.Object.DestroyImmediate(candidate);
+            if (!changed)
+                return;
+
+            initialize(asset);
+            EditorUtility.SetDirty(asset);
+        }
+
+        // managed-reference ids are per-instance, so two structurally identical
+        // objects serialize differently; map each distinct rid to its
+        // first-appearance order before comparing
+        private static string NormalizeReferenceIds(string json)
+        {
+            var order = new Dictionary<string, string>();
+            return Regex.Replace(json, "\"rid\":(-?\\d+)", match =>
+            {
+                var rid = match.Groups[1].Value;
+                if (!order.TryGetValue(rid, out var stable))
+                {
+                    stable = order.Count.ToString();
+                    order.Add(rid, stable);
+                }
+                return $"\"rid\":{stable}";
+            });
         }
 
         // like LoadOrCreate, but a reward id whose type changed in the JSON needs
