@@ -21,7 +21,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _baseValue = baseValue;
         }
 
-        public BigNumber Value => (BigNumber)_baseValue * _runMultiplier * _permanentMultiplier;
+        // fails closed on a negative base — invalid data, boot validation
+        // reports it: a tap must never drain cash
+        public BigNumber Value => _baseValue < 0
+            ? BigNumber.Zero
+            : (BigNumber)_baseValue * _runMultiplier * _permanentMultiplier;
 
         public void MultiplyValue(double factor, ContentScope scope)
         {

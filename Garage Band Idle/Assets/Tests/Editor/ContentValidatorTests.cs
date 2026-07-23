@@ -78,6 +78,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
+        // negative tuning drains or dead-ends instead of earning — runtime
+        // fails closed on it, so validation must say why the systems look dead
+        [Test]
+        public void NegativeTapAndRecordBuffTuning_AreReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                tapBaseValue: -1, recordBuffPerRecord: -0.02);
+            var database = new ContentDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' has a negative tapBaseValue (-1) — every Jam would drain cash.");
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' has a negative recordBuff perRecord (-0.02).");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
         // stale/unlisted definitions keep every structural check; only the
         // flag-known checks are skipped — no chapter's declaration list
         // governs an orphan

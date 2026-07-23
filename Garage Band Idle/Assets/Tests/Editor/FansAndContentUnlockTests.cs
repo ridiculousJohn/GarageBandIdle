@@ -178,6 +178,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "the run reset keeps the permanent stack");
         }
 
+        // fail closed on broken content: a negative base (invalid data — boot
+        // validation reports it) must never drain cash on a tap, and no
+        // multiplier can resurrect it
+        [Test]
+        public void TapValue_FailsClosedOnANegativeBase()
+        {
+            var tap = new TapSystem(-5);
+            tap.MultiplyValue(2, ContentScope.Run);
+
+            Assert.AreEqual(0.0, tap.Value.ToDouble(), 1e-9, "never a draining tap");
+        }
+
         // fail closed on broken content: a non-positive factor (invalid data —
         // boot validation reports it) must never apply
         [Test]

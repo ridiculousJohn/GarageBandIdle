@@ -104,11 +104,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             List<string> sectionIds = null, List<string> generatorIds = null,
             List<string> upgradeIds = null, List<string> barGroupIds = null,
             List<string> eventIds = null, List<string> currencyIds = null,
-            string fansRevealFlagId = "fans")
+            string fansRevealFlagId = "fans", double tapBaseValue = 1, double recordBuffPerRecord = 0.02)
         {
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
-            definition.EditorInitialize(id, 1, id, "", "", "", 100, 1,
-                new RecordBuffConfig(0.02, new List<string> { "cash" }),
+            definition.EditorInitialize(id, 1, id, "", "", "", 100, tapBaseValue,
+                new RecordBuffConfig(recordBuffPerRecord, new List<string> { "cash" }),
                 new FansConfig("fans", fansRevealFlagId, 0.2, 0.02),
                 flagIds, currencyIds ?? new List<string>(), sectionIds ?? new List<string>(),
                 generatorIds ?? new List<string>(), upgradeIds ?? new List<string>(),

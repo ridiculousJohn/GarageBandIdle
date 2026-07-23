@@ -63,11 +63,16 @@ namespace RidiculousGaming.GarageBandIdle
             context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)");
             ValidateFlag(chapter.Fans.RevealFlagId, context, $"Chapter '{chapter.Id}' (fans revealFlag)");
 
-            // negative earn config drains instead of earns; the tick guards
-            // fail closed on a net-negative rate, so without this report the
-            // system would just look mysteriously dead
+            // negative tuning drains or dead-ends instead of earning; runtime
+            // fails closed on all of it (guarded ticks, zeroed tap), so
+            // without these reports the systems would just look mysteriously
+            // dead
             if (chapter.Fans.BaseFansPerSec < 0 || chapter.Fans.PerBandmateOwnedBonus < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has negative fan earn values.");
+            if (chapter.TapBaseValue < 0)
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative tapBaseValue ({chapter.TapBaseValue}) — every Jam would drain cash.");
+            if (chapter.RecordBuff.PerRecord < 0)
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative recordBuff perRecord ({chapter.RecordBuff.PerRecord}).");
 
             ValidateIds(chapter.CurrencyIds, database.Currencies, $"Chapter '{chapter.Id}' (currencies)");
             // the chapter's declared currencies: their earn reveal flags are

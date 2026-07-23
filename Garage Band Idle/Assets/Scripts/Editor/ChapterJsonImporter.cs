@@ -279,11 +279,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 eventIds.Add(block.id);
             }
 
-            // negative earn config drains instead of earns; the chapter still
-            // imports (config is not skippable content) — boot validation
-            // reports it too
+            // negative tuning drains or dead-ends instead of earning; the
+            // chapter still imports (config is not skippable content) — boot
+            // validation reports it too
             if ((data.fans?.baseFansPerSec ?? 0) < 0 || (data.fans?.perBandmateOwnedBonus ?? 0) < 0)
                 Debug.LogError("ChapterJsonImporter: fans block has negative earn values. Fix the JSON and re-import.");
+            if ((data.constants?.tapBaseValue ?? 1) < 0)
+                Debug.LogError("ChapterJsonImporter: constants block has a negative tapBaseValue. Fix the JSON and re-import.");
+            if ((data.constants?.recordBuff?.perRecord ?? 0) < 0)
+                Debug.LogError("ChapterJsonImporter: recordBuff block has a negative perRecord. Fix the JSON and re-import.");
 
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
