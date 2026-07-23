@@ -42,6 +42,32 @@ namespace RidiculousGaming.GarageBandIdle
             Rewards = Load<RewardDefinition>(ContentLabels.Reward, d => d.Id);
         }
 
+        // direct-injection alternative to Addressables discovery: tests (and
+        // tooling) hand over an explicit content set instead of loading labels
+        public ContentDatabase(
+            IEnumerable<ChapterDefinition> chapters = null,
+            IEnumerable<SectionDefinition> sections = null,
+            IEnumerable<GeneratorDefinition> generators = null,
+            IEnumerable<UpgradeDefinition> upgrades = null,
+            IEnumerable<BarDefinition> bars = null,
+            IEnumerable<BarGroupDefinition> barGroups = null,
+            IEnumerable<EventDefinition> events = null,
+            IEnumerable<RewardDefinition> rewards = null,
+            IEnumerable<CurrencyDefinition> currencies = null,
+            IEnumerable<CurrencyGroupDefinition> currencyGroups = null)
+        {
+            CurrencyGroups = new Registry<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup, currencyGroups ?? Array.Empty<CurrencyGroupDefinition>(), d => d.Id);
+            Currencies = new Registry<CurrencyDefinition>(ContentLabels.Currency, currencies ?? Array.Empty<CurrencyDefinition>(), d => d.Id);
+            Chapters = new Registry<ChapterDefinition>(ContentLabels.Chapter, chapters ?? Array.Empty<ChapterDefinition>(), d => d.Id);
+            Sections = new Registry<SectionDefinition>(ContentLabels.Section, sections ?? Array.Empty<SectionDefinition>(), d => d.Id);
+            Generators = new Registry<GeneratorDefinition>(ContentLabels.Generator, generators ?? Array.Empty<GeneratorDefinition>(), d => d.Id);
+            Upgrades = new Registry<UpgradeDefinition>(ContentLabels.Upgrade, upgrades ?? Array.Empty<UpgradeDefinition>(), d => d.Id);
+            Bars = new Registry<BarDefinition>(ContentLabels.Bar, bars ?? Array.Empty<BarDefinition>(), d => d.Id);
+            BarGroups = new Registry<BarGroupDefinition>(ContentLabels.BarGroup, barGroups ?? Array.Empty<BarGroupDefinition>(), d => d.Id);
+            Events = new Registry<EventDefinition>(ContentLabels.Event, events ?? Array.Empty<EventDefinition>(), d => d.Id);
+            Rewards = new Registry<RewardDefinition>(ContentLabels.Reward, rewards ?? Array.Empty<RewardDefinition>(), d => d.Id);
+        }
+
         // Synchronous label load, held for the app's lifetime (definitions are
         // needed as long as the game runs, so handles are never released).
         // WaitForCompletion keeps bootstrap simple; this becomes async behind a

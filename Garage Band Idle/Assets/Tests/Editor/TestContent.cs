@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
+using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEditor;
 using UnityEngine;
 
@@ -81,6 +82,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var definition = Track(ScriptableObject.CreateInstance<BarGroupDefinition>());
             definition.EditorInitialize(id, id, revealFlagId, fillMode, delivery, scope, barIds);
+            return definition;
+        }
+
+        public static SectionDefinition MakeSection(string id, Condition visibleWhen = null)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<SectionDefinition>());
+            definition.EditorInitialize(id, id, new List<string>(), visibleWhen);
+            return definition;
+        }
+
+        // a minimal coherent chapter: declared flags plus the id lists that
+        // form its content closure. The fans config uses the standard economy's
+        // currency and must reveal on a declared flag, so include
+        // fansRevealFlagId (default "fans") in flagIds.
+        public static ChapterDefinition MakeChapter(string id, List<string> flagIds,
+            List<string> sectionIds = null, List<string> generatorIds = null,
+            List<string> upgradeIds = null, List<string> barGroupIds = null,
+            List<string> eventIds = null, string fansRevealFlagId = "fans")
+        {
+            var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
+            definition.EditorInitialize(id, 1, id, "", "", "", 100, 1,
+                new RecordBuffConfig(0.02, new List<string> { "cash" }),
+                new FansConfig("fans", fansRevealFlagId, 0.2, 0.02),
+                new RehearsalConfig(null, null, 0, 0),
+                flagIds, sectionIds ?? new List<string>(), generatorIds ?? new List<string>(),
+                upgradeIds ?? new List<string>(), barGroupIds ?? new List<string>(), eventIds ?? new List<string>());
             return definition;
         }
 
