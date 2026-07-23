@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -154,6 +157,95 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(generator.TryBuy(currencies));
             Assert.AreEqual(40.0, currencies.Get("cash").ToDouble(), 1e-9, "the declared cost currency is charged");
             Assert.AreEqual(0.0, currencies.Get("fans").ToDouble(), 1e-9, "the produced currency is untouched by a purchase");
+        }
+
+        // run reset (album release, event baseline; design doc section 7):
+        // gear and bandmates are re-bought each run, so every owned count
+        // zeroes — and no subscriber may ever observe a half-reset fleet
+        // (state, then notify)
+        [Test]
+        public void ResetOwned_ZeroesEveryGenerator_AndNotifiesAfterAllSettle()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var system = new GeneratorSystem(new[]
+            {
+                TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4),
+                TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3),
+            }, currencies);
+            TestContent.BuyTimes(system.Get("amp"), currencies, 2);
+            TestContent.BuyTimes(system.Get("drummer"), currencies, 3);
+
+            var notifications = 0;
+            var observedHalfReset = false;
+            system.GeneratorOwnedChanged += _ =>
+            {
+                notifications++;
+                if (system.Get("amp").Owned != 0 || system.Get("drummer").Owned != 0)
+                    observedHalfReset = true;
+            };
+
+            system.ResetOwned();
+
+            Assert.AreEqual(0, system.Get("amp").Owned);
+            Assert.AreEqual(0, system.Get("drummer").Owned);
+            Assert.AreEqual(2, notifications, "one notification per generator that changed");
+            Assert.IsFalse(observedHalfReset, "every subscriber sees the whole fleet settled");
+            Assert.AreEqual(60.0, system.Get("amp").NextCost.ToDouble(), 1e-9, "the cost curve restarts");
+
+            system.ResetOwned();
+            Assert.AreEqual(2, notifications, "an already-zero fleet notifies nothing");
+        }
+
+        // save/load: the fleet restores as one atomic operation — every count
+        // settles before any notification, so an ownedCount gate never
+        // observes a half-restored fleet; the cost curve resumes at the
+        // restored counts
+        [Test]
+        public void RestoreOwned_EstablishesTheFleetBeforeNotifying()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var system = new GeneratorSystem(new[]
+            {
+                TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4),
+                TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3),
+            }, currencies);
+
+            var notifications = 0;
+            var observedPartialRestore = false;
+            system.GeneratorOwnedChanged += _ =>
+            {
+                notifications++;
+                if (system.Get("amp").Owned != 2 || system.Get("drummer").Owned != 5)
+                    observedPartialRestore = true;
+            };
+
+            system.RestoreOwned(new Dictionary<string, int> { { "amp", 2 }, { "drummer", 5 } });
+
+            Assert.AreEqual(2, system.Get("amp").Owned);
+            Assert.AreEqual(5, system.Get("drummer").Owned);
+            Assert.AreEqual(2, notifications, "one notification per generator that changed");
+            Assert.IsFalse(observedPartialRestore, "every subscriber sees the whole fleet settled");
+            Assert.AreEqual(60 * System.Math.Pow(1.15, 2), system.Get("amp").NextCost.ToDouble(), 1e-6,
+                "the cost curve resumes at the restored count");
+        }
+
+        // corrupt or stale save data fails closed: an unknown id is reported
+        // and skipped, a negative count restores as zero
+        [Test]
+        public void RestoreOwned_FailsClosedOnStaleAndCorruptSaveData()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var system = new GeneratorSystem(new[]
+            {
+                TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4),
+            }, currencies);
+
+            LogAssert.Expect(LogType.Error, "GeneratorSystem: RestoreOwned with unknown generator id 'ghost'. Skipping it.");
+            system.RestoreOwned(new Dictionary<string, int> { { "ghost", 3 } });
+
+            LogAssert.Expect(LogType.Error, "Generator: RestoreOwned with negative count '-1' for 'amp'. Restoring zero.");
+            system.RestoreOwned(new Dictionary<string, int> { { "amp", -1 } });
+            Assert.AreEqual(0, system.Get("amp").Owned);
         }
 
         // state-then-notify: the spend's BalanceChanged is a synchronous signal

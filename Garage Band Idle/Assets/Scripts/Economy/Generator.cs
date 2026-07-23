@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
@@ -57,5 +58,39 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         }
 
         internal void MarkUnlocked() => Unlocked = true;
+
+        // run reset: state-only, no notification — GeneratorSystem fires
+        // OwnedChanged after EVERY generator has settled, so a subscriber
+        // never observes a half-reset fleet. Returns whether anything changed.
+        internal bool ResetOwned()
+        {
+            if (Owned == 0)
+                return false;
+
+            Owned = 0;
+            return true;
+        }
+
+        internal void NotifyOwnedChanged() => OwnedChanged?.Invoke();
+
+        // save/load: state-only re-establishment — GeneratorSystem restores
+        // the whole fleet and notifies after every count settles. A negative
+        // count is corrupt save data and fails closed to zero (a negative
+        // Owned would corrupt the cost curve and production). Returns whether
+        // anything changed.
+        internal bool RestoreOwned(int owned)
+        {
+            if (owned < 0)
+            {
+                Debug.LogError($"Generator: RestoreOwned with negative count '{owned}' for '{Definition.Id}'. Restoring zero.");
+                owned = 0;
+            }
+
+            if (Owned == owned)
+                return false;
+
+            Owned = owned;
+            return true;
+        }
     }
 }

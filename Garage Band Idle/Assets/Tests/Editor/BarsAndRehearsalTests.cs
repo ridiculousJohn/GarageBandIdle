@@ -54,6 +54,34 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new RewardContext(currencies, flags, fans));
         }
 
+        // MakeCoversSetup plus a permanent-in-chapter group, for the run-reset
+        // scope split
+        private static BarSystem MakeTwoScopeSetup(CurrencyManager currencies, FlagSystem flags,
+            out FanSystem fans)
+        {
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
+            fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var rewards = new RewardManager(new RewardDefinition[]
+            {
+                TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
+                TestContent.MakeFanRateReward("fan_rate_x1_20", 1.2),
+            });
+
+            var bars = new[]
+            {
+                TestContent.MakeBar("cover_1", "rehearsal", 120, "fan_rate_x1_15"),
+                TestContent.MakeBar("cover_2", "rehearsal", 300),
+                TestContent.MakeBar("song_1", "rehearsal", 100, "fan_rate_x1_20"),
+            };
+            var run = TestContent.MakeBarGroup("learn_covers", "covers",
+                new List<string> { "cover_1", "cover_2" });
+            var permanent = TestContent.MakeBarGroup("setlist", "covers",
+                new List<string> { "song_1" }, scope: ContentScope.PermanentInChapter);
+
+            return new BarSystem(new[] { run, permanent }, bars, currencies, rewards,
+                new RewardContext(currencies, flags, fans));
+        }
+
         [Test]
         public void RehearsalAccrual_IsDormantUntilTheFlag()
         {
@@ -242,6 +270,185 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bars.SetActiveBar("learn_covers", "cover_1");
 
             Assert.AreEqual(1, completedDuringSpend);
+        }
+
+        // the run reset (album release, event baseline) honors each group's
+        // declared scope: run groups forget everything, permanent-in-chapter
+        // groups keep it, and no reward ever re-applies
+        [Test]
+        public void ResetRunScopedGroups_ClearsRunGroups_KeepsPermanentInChapter()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var bars = MakeTwoScopeSetup(currencies, flags, out var fans);
+
+            currencies.Add("rehearsal", 120);
+            bars.SetActiveBar("learn_covers", "cover_1"); // completes, applies ×1.15
+            currencies.Add("rehearsal", 50);
+            bars.SetActiveBar("learn_covers", "cover_2"); // partial, stays selected
+            currencies.Add("rehearsal", 100);
+            bars.SetActiveBar("setlist", "song_1");       // completes, applies ×1.2
+            Assert.AreEqual(1, bars.CompletedCount("learn_covers"));
+            Assert.AreEqual(1, bars.CompletedCount("setlist"));
+            Assert.IsNotNull(bars.GetActiveBar("learn_covers"));
+
+            bars.ResetRunScopedGroups();
+
+            var covers = bars.GetBars("learn_covers");
+            Assert.AreEqual(0.0, covers[0].Progress.ToDouble(), 1e-9);
+            Assert.IsFalse(covers[0].Completed);
+            Assert.AreEqual(0.0, covers[1].Progress.ToDouble(), 1e-9);
+            Assert.AreEqual(0, bars.CompletedCount("learn_covers"), "the run group forgets its completions");
+            Assert.IsNull(bars.GetActiveBar("learn_covers"), "the run reset clears the selection");
+
+            Assert.IsTrue(bars.GetBars("setlist")[0].Completed, "permanent-in-chapter survives the run reset");
+            Assert.AreEqual(1, bars.CompletedCount("setlist"));
+            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9, "the reset re-applies no rewards");
+        }
+
+        // state-then-notify: by the time any BarProgressChanged subscriber
+        // runs, the whole run-scoped reset has settled — no half-reset group
+        // is ever observable, and nothing completes
+        [Test]
+        public void ResetRunScopedGroups_StateSettlesBeforeNotifications()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            var bars = MakeTwoScopeSetup(currencies, flags, out _);
+            currencies.Add("rehearsal", 50);
+            bars.SetActiveBar("learn_covers", "cover_1");
+            bars.SetActiveBar("learn_covers", "cover_2");
+            currencies.Add("rehearsal", 30);
+            bars.Tick();
+
+            var list = bars.GetBars("learn_covers");
+            var notifications = 0;
+            var observedPartialReset = false;
+            bars.BarProgressChanged += _ =>
+            {
+                notifications++;
+                if (list[0].Progress.ToDouble() != 0.0 || list[1].Progress.ToDouble() != 0.0
+                    || bars.GetActiveBar("learn_covers") != null)
+                    observedPartialReset = true;
+            };
+            var completions = 0;
+            bars.BarCompleted += _ => completions++;
+
+            bars.ResetRunScopedGroups();
+
+            Assert.AreEqual(2, notifications, "one progress notification per changed bar");
+            Assert.IsFalse(observedPartialReset, "every subscriber sees fully settled state");
+            Assert.AreEqual(0, completions, "a reset never completes anything");
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, BigNumber>> Snapshot(
+            string groupId, Dictionary<string, BigNumber> progressByBarId)
+            => new Dictionary<string, IReadOnlyDictionary<string, BigNumber>> { [groupId] = progressByBarId };
+
+        // save/load: the snapshot re-establishes progress through the same
+        // clamp-and-derive rule as accrual — a restored completion is
+        // recorded fact (no reward, no BarCompleted), and the derivation
+        // holds in both directions
+        [Test]
+        public void RestoreProgress_DerivesCompletion_WithoutRewardOrCompletionEvent()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var bars = MakeCoversSetup(currencies, flags, out var fans);
+            var completions = 0;
+            bars.BarCompleted += _ => completions++;
+            var list = bars.GetBars("learn_covers");
+
+            bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber>
+            {
+                ["cover_1"] = 120, // exactly the requirement
+                ["cover_2"] = 50,  // partial
+                ["cover_3"] = 900, // over the 600 requirement
+            }));
+
+            Assert.IsTrue(list[0].Completed, "restored-full derives completed");
+            Assert.AreEqual(50.0, list[1].Progress.ToDouble(), 1e-9);
+            Assert.IsFalse(list[1].Completed);
+            Assert.AreEqual(600.0, list[2].Progress.ToDouble(), 1e-9, "restore clamps to the requirement");
+            Assert.IsTrue(list[2].Completed);
+            Assert.AreEqual(2, bars.CompletedCount("learn_covers"));
+            Assert.AreEqual(0, completions, "a restored completion is fact, not an occurrence");
+            Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "restore grants no rewards");
+
+            // authoritative in both directions: below the requirement un-completes
+            bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber> { ["cover_1"] = 10 }));
+            Assert.IsFalse(list[0].Completed);
+            Assert.AreEqual(1, bars.CompletedCount("learn_covers"));
+
+            // corrupt save data fails closed to an empty bar
+            LogAssert.Expect(LogType.Error,
+                "BarSystem: RestoreProgress with negative progress for bar 'cover_2'. Restoring an empty bar.");
+            bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber> { ["cover_2"] = -5 }));
+            Assert.AreEqual(0.0, list[1].Progress.ToDouble(), 1e-9);
+        }
+
+        // the snapshot is atomic: by the time any subscriber runs, every
+        // saved bar holds its final value and a selection left on a
+        // now-completed bar is already cleared — Drain must never sit on a
+        // completed target, and no subscriber may observe a half-restored
+        // system
+        [Test]
+        public void RestoreProgress_SettlesTheWholeSnapshotBeforeNotifying()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            var bars = MakeCoversSetup(currencies, flags, out _);
+            bars.SetActiveBar("learn_covers", "cover_2");
+            var list = bars.GetBars("learn_covers");
+
+            var notifications = 0;
+            var observedPartialRestore = false;
+            bars.BarProgressChanged += _ =>
+            {
+                notifications++;
+                if (list[0].Progress.ToDouble() != 120.0 || list[1].Progress.ToDouble() != 300.0
+                    || bars.GetActiveBar("learn_covers") != null)
+                    observedPartialRestore = true;
+            };
+            var activeChanges = 0;
+            bars.ActiveBarChanged += _ => activeChanges++;
+
+            bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber>
+            {
+                ["cover_1"] = 120,
+                ["cover_2"] = 300, // the selected bar restores to complete
+            }));
+
+            Assert.AreEqual(2, notifications, "one progress notification per restored bar");
+            Assert.IsFalse(observedPartialRestore, "every subscriber sees the whole snapshot settled");
+            Assert.IsNull(bars.GetActiveBar("learn_covers"), "a completed bar can never stay the drain target");
+            Assert.AreEqual(1, activeChanges, "the cleared selection notifies");
+        }
+
+        // stale save data fails closed: unknown group and bar ids are
+        // reported and skipped, and nothing else in the snapshot is lost
+        [Test]
+        public void RestoreProgress_SkipsUnknownIdsLoudly()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            var bars = MakeCoversSetup(currencies, flags, out _);
+
+            LogAssert.Expect(LogType.Error,
+                "BarSystem: RestoreProgress with unknown bar group id 'ghost_group'. Skipping it.");
+            bars.RestoreProgress(Snapshot("ghost_group", new Dictionary<string, BigNumber> { ["cover_1"] = 50 }));
+
+            LogAssert.Expect(LogType.Error,
+                "BarSystem: RestoreProgress with unknown bar id 'ghost' in group 'learn_covers'. Skipping it.");
+            bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber>
+            {
+                ["ghost"] = 50,
+                ["cover_1"] = 70, // the valid entry still restores
+            }));
+
+            Assert.AreEqual(70.0, bars.GetBars("learn_covers")[0].Progress.ToDouble(), 1e-9);
         }
 
         [Test]

@@ -11,9 +11,9 @@ namespace RidiculousGaming.GarageBandIdle.Content
     // player chooses the target (a standing prioritization decision). With
     // Continuous delivery the pool streams into the group's active bar every
     // tick; the pool only holds a balance while nothing is selected. Completion
-    // is derived from progress inside BarState.AddProgress — the only mutation
-    // a bar's state has — so progress and completion can never diverge no
-    // matter which path establishes state (drain now, save-restore later).
+    // is derived from progress inside BarState's own transitions (accrue,
+    // run-reset, restore), so progress and completion can never diverge no
+    // matter which path establishes state.
     // Completion applies the bar's reward through the shared pool and feeds
     // barsCompleted conditions via IBarCompletionSource.
     public class BarSystem : IBarCompletionSource
@@ -54,6 +54,35 @@ namespace RidiculousGaming.GarageBandIdle.Content
 
                 Completed = true;
                 return true;
+            }
+
+            // run reset: back to an empty bar. State-only, no notification —
+            // BarSystem notifies after every run-scoped bar has settled.
+            // Returns whether anything changed.
+            internal bool ResetForRun()
+            {
+                if (Progress <= BigNumber.Zero && !Completed)
+                    return false;
+
+                Progress = BigNumber.Zero;
+                Completed = false;
+                return true;
+            }
+
+            // save/load: re-establishes saved progress through the same
+            // clamp-and-derive rule as accrual, so completion can never
+            // diverge from progress on this path either. Negative progress is
+            // corrupt save data and fails closed to an empty bar.
+            internal void RestoreProgress(BigNumber progress)
+            {
+                if (progress < BigNumber.Zero)
+                {
+                    Debug.LogError($"BarSystem: RestoreProgress with negative progress for bar '{Definition.Id}'. Restoring an empty bar.");
+                    progress = BigNumber.Zero;
+                }
+
+                Progress = BigNumber.Min(progress, Definition.FillRequirement);
+                Completed = Remaining <= BigNumber.Zero;
             }
         }
 
@@ -206,6 +235,103 @@ namespace RidiculousGaming.GarageBandIdle.Content
                 _rewards.Apply(bar.Definition.RewardId, _rewardContext);
 
             BarCompleted?.Invoke(bar);
+        }
+
+        // Run reset (album release, event baseline): every group whose
+        // declared scope is Run returns to empty — no progress, nothing
+        // completed, no selection — and permanent-in-chapter groups are
+        // untouched. Nothing completes here, so no reward applies and
+        // BarCompleted never fires. All state settles before any
+        // notification (state, then notify).
+        public void ResetRunScopedGroups()
+        {
+            var changedBars = new List<BarState>();
+            var clearedGroups = new List<string>();
+
+            foreach (var definition in _groupOrder)
+            {
+                if (definition.Scope != ContentScope.Run)
+                    continue;
+
+                var group = _groups[definition.Id];
+                foreach (var bar in group.Bars)
+                {
+                    if (bar.ResetForRun())
+                        changedBars.Add(bar);
+                }
+                if (group.ActiveBar != null)
+                {
+                    group.ActiveBar = null;
+                    clearedGroups.Add(definition.Id);
+                }
+            }
+
+            foreach (var bar in changedBars)
+                BarProgressChanged?.Invoke(bar);
+            foreach (var groupId in clearedGroups)
+                ActiveBarChanged?.Invoke(groupId);
+        }
+
+        // Save/load: re-establishes saved progress as one atomic operation,
+        // keyed by group then bar id. A restored completion is recorded fact,
+        // not a new occurrence — no reward applies and BarCompleted does not
+        // fire; the reward's own effects are restored by their owning
+        // systems. A selection left on a now-completed bar clears, exactly
+        // as completing it by drain would. The complete snapshot settles —
+        // including selection cleanup — before any notification fires
+        // (state, then notify), so a subscriber never observes a partially
+        // restored system. Unknown ids are stale save data: reported and
+        // skipped.
+        public void RestoreProgress(IReadOnlyDictionary<string, IReadOnlyDictionary<string, BigNumber>> progressByGroupAndBarId)
+        {
+            if (progressByGroupAndBarId == null)
+            {
+                Debug.LogError("BarSystem: RestoreProgress with no saved progress.");
+                return;
+            }
+
+            var restoredBars = new List<BarState>();
+            var clearedGroups = new List<string>();
+
+            foreach (var groupEntry in progressByGroupAndBarId)
+            {
+                if (!_groups.TryGetValue(groupEntry.Key ?? "", out var group))
+                {
+                    Debug.LogError($"BarSystem: RestoreProgress with unknown bar group id '{groupEntry.Key}'. Skipping it.");
+                    continue;
+                }
+                if (groupEntry.Value == null)
+                {
+                    Debug.LogError($"BarSystem: RestoreProgress with no saved bars for group '{groupEntry.Key}'. Skipping it.");
+                    continue;
+                }
+
+                foreach (var barEntry in groupEntry.Value)
+                {
+                    var bar = group.Bars.Find(b => b.Definition.Id == barEntry.Key);
+                    if (bar == null)
+                    {
+                        Debug.LogError($"BarSystem: RestoreProgress with unknown bar id '{barEntry.Key}' in group '{groupEntry.Key}'. Skipping it.");
+                        continue;
+                    }
+
+                    bar.RestoreProgress(barEntry.Value);
+                    restoredBars.Add(bar);
+                }
+
+                // after the whole group settles: the selection can never sit
+                // on a completed bar
+                if (group.ActiveBar != null && group.ActiveBar.Completed)
+                {
+                    group.ActiveBar = null;
+                    clearedGroups.Add(group.Definition.Id);
+                }
+            }
+
+            foreach (var bar in restoredBars)
+                BarProgressChanged?.Invoke(bar);
+            foreach (var groupId in clearedGroups)
+                ActiveBarChanged?.Invoke(groupId);
         }
 
         // completed bars in the group this run, for barsCompleted conditions
