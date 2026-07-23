@@ -43,11 +43,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (_sections.Count == 0)
                 Debug.LogError($"ChapterScreen: chapter '{_game.CurrentChapter.Id}' has no sections — nothing to show. Re-run the chapter import.");
 
-            // sections can gate on flags or on any currency condition; balance
-            // changes also cover earned-total and owned-count movement (buying
-            // moves a balance), so these two signals are sufficient
+            // one subscription per condition input: balances/earned totals/
+            // records → BalanceChanged, flags → FlagSet, ownedCount →
+            // GeneratorOwnedChanged, barsCompleted → BarCompleted. Every signal
+            // fires after its state settles, so evaluation never reads mid-
+            // mutation state and never depends on a proxy signal arriving later
             _game.Flags.FlagSet += HandleFlagSet;
             _game.Currencies.BalanceChanged += HandleBalanceChanged;
+            _game.Generators.GeneratorOwnedChanged += HandleGeneratorOwnedChanged;
+            _game.Bars.BarCompleted += HandleBarCompleted;
 
             EvaluateSections();
         }
@@ -59,6 +63,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             _game.Flags.FlagSet -= HandleFlagSet;
             _game.Currencies.BalanceChanged -= HandleBalanceChanged;
+            if (_game.Generators != null)
+                _game.Generators.GeneratorOwnedChanged -= HandleGeneratorOwnedChanged;
+            if (_game.Bars != null)
+                _game.Bars.BarCompleted -= HandleBarCompleted;
 
             foreach (var section in _sections)
             {
@@ -104,6 +112,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void HandleFlagSet(string flagId) => EvaluateSections();
 
         private void HandleBalanceChanged(string currencyId, BigNumber balance) => EvaluateSections();
+
+        private void HandleGeneratorOwnedChanged(Economy.Generator generator) => EvaluateSections();
+
+        private void HandleBarCompleted(Content.BarSystem.BarState bar) => EvaluateSections();
 
         private void EvaluateSections()
         {

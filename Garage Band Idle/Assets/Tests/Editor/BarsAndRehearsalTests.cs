@@ -189,6 +189,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(ConditionEvaluator.IsMet(condition, context), "cover_1 satisfies barsCompleted >= 1");
         }
 
+        // state-then-notify: the drain's BalanceChanged is a synchronous signal
+        // that condition evaluators react to, so the completion must already be
+        // latched when it fires — a barsCompleted gate may never observe the
+        // pool drained with the bar not yet counted as done
+        [Test]
+        public void Completion_IsLatchedBeforeTheSpendNotifies()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            var bars = MakeCoversSetup(currencies, flags, out _);
+            currencies.Add("rehearsal", 120);
+
+            var completedDuringSpend = -1;
+            currencies.BalanceChanged += (id, _) =>
+            {
+                if (id == "rehearsal")
+                    completedDuringSpend = bars.CompletedCount("learn_covers");
+            };
+
+            bars.SetActiveBar("learn_covers", "cover_1");
+
+            Assert.AreEqual(1, completedDuringSpend);
+        }
+
         [Test]
         public void TogglingTheActiveBar_Deselects()
         {

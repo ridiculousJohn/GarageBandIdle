@@ -147,25 +147,29 @@ namespace RidiculousGaming.GarageBandIdle.Content
             if (transfer <= BigNumber.Zero)
                 return;
 
-            _currencies.Add(bar.Definition.FillCurrencyId, -transfer);
+            // all bar state settles before the spend: Add fires BalanceChanged
+            // synchronously, and no subscriber may ever observe the pool
+            // drained with the progress or completion not yet recorded
+            // (state, then notify)
             bar.Progress += transfer;
+            var completed = bar.Remaining <= BigNumber.Zero;
+            if (completed)
+            {
+                bar.Completed = true;
+
+                // completion clears the selection rather than auto-advancing:
+                // which bar to work next is the player's call (design doc
+                // section 6)
+                group.ActiveBar = null;
+            }
+
+            _currencies.Add(bar.Definition.FillCurrencyId, -transfer);
             BarProgressChanged?.Invoke(bar);
 
-            if (bar.Remaining <= BigNumber.Zero)
-                Complete(group, bar);
-        }
+            if (!completed)
+                return;
 
-        private void Complete(GroupState group, BarState bar)
-        {
-            bar.Completed = true;
-
-            // completion clears the selection rather than auto-advancing: which
-            // bar to work next is the player's call (design doc section 6)
-            if (group.ActiveBar == bar)
-            {
-                group.ActiveBar = null;
-                ActiveBarChanged?.Invoke(group.Definition.Id);
-            }
+            ActiveBarChanged?.Invoke(group.Definition.Id);
 
             if (!string.IsNullOrEmpty(bar.Definition.RewardId))
                 _rewards.Apply(bar.Definition.RewardId, _rewardContext);

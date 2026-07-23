@@ -20,6 +20,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // fires once per generator when its unlock conditions are first met
         public event Action<Generator> GeneratorUnlocked;
 
+        // fires whenever any generator's owned count changes (purchases now,
+        // run resets later) — the signal behind ownedCount conditions
+        public event Action<Generator> GeneratorOwnedChanged;
+
         public IReadOnlyList<Generator> All => _generators;
 
         // Content errors (duplicate/empty ids, unresolvable produces currencies)
@@ -50,6 +54,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 _currencies.ValidateReference(definition.ProducesCurrencyId, $"Generator '{definition.Id}' (produces)");
 
                 var generator = new Generator(definition);
+                generator.OwnedChanged += () => GeneratorOwnedChanged?.Invoke(generator);
                 _generators.Add(generator);
                 _byId.Add(definition.Id, generator);
                 if (!_producedCurrencyIds.Contains(definition.ProducesCurrencyId))

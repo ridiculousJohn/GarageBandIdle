@@ -34,8 +34,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             if (currencies.Get(Definition.ProducesCurrencyId) < cost)
                 return false;
 
-            currencies.Add(Definition.ProducesCurrencyId, -cost);
+            // Owned settles before the spend: Add fires BalanceChanged
+            // synchronously, and no subscriber may ever observe the cost
+            // deducted with the purchase not yet counted (state, then notify)
             Owned++;
+            currencies.Add(Definition.ProducesCurrencyId, -cost);
             OwnedChanged?.Invoke();
             return true;
         }

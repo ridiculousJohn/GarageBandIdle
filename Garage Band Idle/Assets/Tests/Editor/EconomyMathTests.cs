@@ -92,5 +92,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, generator.Owned);
             Assert.AreEqual(40.0, currencies.Get("cash").ToDouble(), 1e-9);
         }
+
+        // state-then-notify: the spend's BalanceChanged is a synchronous signal
+        // that condition evaluators react to, so the purchase must already be
+        // counted when it fires — an ownedCount gate may never observe the cost
+        // deducted with Owned still stale
+        [Test]
+        public void TryBuy_OwnedIsCountedBeforeTheSpendNotifies()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var generator = new Generator(TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4));
+            currencies.Add("cash", 60);
+
+            var ownedDuringSpend = -1;
+            currencies.BalanceChanged += (id, _) =>
+            {
+                if (id == "cash")
+                    ownedDuringSpend = generator.Owned;
+            };
+
+            Assert.IsTrue(generator.TryBuy(currencies));
+            Assert.AreEqual(1, ownedDuringSpend);
+        }
     }
 }
