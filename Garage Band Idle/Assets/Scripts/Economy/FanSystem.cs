@@ -37,6 +37,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public void MultiplyRate(double factor, ContentScope scope)
         {
+            // fail closed on broken content: a non-positive factor would zero
+            // or negate the whole multiplicative stack for the rest of the run
+            // (boot validation reports it)
+            if (factor <= 0)
+            {
+                Debug.LogError($"FanSystem: MultiplyRate with non-positive factor '{factor}'. Ignoring.");
+                return;
+            }
+
             switch (scope)
             {
                 case ContentScope.Run:

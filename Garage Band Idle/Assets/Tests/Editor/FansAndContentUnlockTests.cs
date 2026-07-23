@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -139,6 +141,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fans.ResetRunScopedMultipliers();
 
             Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "run reset keeps the permanent stack");
+        }
+
+        // fail closed on broken content: a non-positive factor (invalid data —
+        // boot validation reports it) would zero or negate the whole stack for
+        // the rest of the run and must never apply
+        [Test]
+        public void FanRateMultiplier_FailsClosedOnANonPositiveFactor()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+
+            LogAssert.Expect(LogType.Error, "FanSystem: MultiplyRate with non-positive factor '0'. Ignoring.");
+            fans.MultiplyRate(0, ContentScope.Run);
+
+            Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "the rate is untouched");
         }
 
         [Test]

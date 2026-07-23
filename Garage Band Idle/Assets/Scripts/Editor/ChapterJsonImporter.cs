@@ -93,6 +93,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
+                // a non-positive multiplier would zero or negate its stack —
+                // never write that state; content referencing the skipped id
+                // fails validation loudly
+                if ((block.type == "fanRateMultiplier" || block.type == "tapValueMultiplier") && block.value <= 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: reward '{block.id}' has a non-positive multiplier ({block.value}). Skipping it — fix the JSON and re-import.");
+                    continue;
+                }
+
                 var path = $"{RewardsFolder}/{block.id}.asset";
                 switch (block.type)
                 {
@@ -148,6 +157,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
+                // production must never drain; zero output stays legal (a pure
+                // fan-rate bandmate is coherent)
+                if (block.baseOutput < 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' has a negative baseOutput ({block.baseOutput}). Skipping it — fix the JSON and re-import.");
+                    continue;
+                }
+
                 var asset = LoadOrCreate<GeneratorDefinition>($"{GeneratorsFolder}/{block.id}.asset");
                 var unlock = ToCondition(block.unlock);
                 ApplyIfChanged(asset, generator => generator.EditorInitialize(block.id, block.name, block.produces,
@@ -159,6 +176,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var upgradeIds = new List<string>();
             foreach (var block in data.upgrades ?? Array.Empty<UpgradeBlock>())
             {
+                // a negative cost would GRANT currency when the buff purchase
+                // flow lands — never write that state
+                if ((block.cost?.amount ?? 0) < 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: upgrade '{block.id}' has a negative cost amount ({block.cost.amount}). Skipping it — fix the JSON and re-import.");
+                    continue;
+                }
+
                 var asset = LoadOrCreate<UpgradeDefinition>($"{UpgradesFolder}/{block.id}.asset");
                 var type = ToUpgradeType(block.type, $"upgrade '{block.id}'");
                 var scope = ToScope(block.scope, $"upgrade '{block.id}'");
@@ -218,6 +243,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     availableWhen, block.baselineReset, tiers));
                 eventIds.Add(block.id);
             }
+
+            // negative earn config drains instead of earns; the chapter still
+            // imports (config is not skippable content) — boot validation
+            // reports it too
+            if ((data.fans?.baseFansPerSec ?? 0) < 0 || (data.fans?.perBandmateOwnedBonus ?? 0) < 0)
+                Debug.LogError("ChapterJsonImporter: fans block has negative earn values. Fix the JSON and re-import.");
+            if ((data.rehearsal?.perSec ?? 0) < 0 || (data.rehearsal?.perTap ?? 0) < 0)
+                Debug.LogError("ChapterJsonImporter: rehearsal block has negative earn values. Fix the JSON and re-import.");
 
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,

@@ -115,6 +115,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(40.0, currencies.Get("cash").ToDouble(), 1e-9);
         }
 
+        // fail closed on broken content: a negative base output (invalid data —
+        // boot validation reports it) must never drain a currency
+        [Test]
+        public void ProductionPerSecond_FailsClosedOnANegativeBaseOutput()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var generator = new Generator(TestContent.MakeGenerator("leak", "cash", 10, 1.15, -5));
+            TestContent.BuyTimes(generator, currencies, 1);
+
+            Assert.AreEqual(0.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "never negative production");
+        }
+
         // fail closed on broken content: a non-positive cost (invalid data —
         // boot validation reports it) must never be an endless free purchase
         [Test]

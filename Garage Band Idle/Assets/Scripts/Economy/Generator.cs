@@ -24,8 +24,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public BigNumber NextCost => CostCalculator.Cost(Definition, Owned);
 
-        // base production before global multipliers (those apply in ProductionCalculator)
-        public BigNumber ProductionPerSecond => (BigNumber)Definition.BaseOutput * Owned;
+        // Base production before global multipliers (those apply in
+        // ProductionCalculator). Fails closed on a negative base output —
+        // invalid data, boot validation reports it: production must never
+        // drain a currency.
+        public BigNumber ProductionPerSecond => Definition.BaseOutput < 0
+            ? BigNumber.Zero
+            : (BigNumber)Definition.BaseOutput * Owned;
 
         // buys one unit if affordable; deducts the declared cost currency —
         // never the produced currency — and bumps Owned

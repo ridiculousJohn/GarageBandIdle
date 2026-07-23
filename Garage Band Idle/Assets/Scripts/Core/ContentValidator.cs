@@ -28,6 +28,14 @@ namespace RidiculousGaming.GarageBandIdle
                     context.Currencies.ValidateReference(chapter.Rehearsal.CurrencyId, $"Chapter '{chapter.Id}' (rehearsal currency)");
                     ValidateFlag(chapter.Rehearsal.RevealFlagId, context, $"Chapter '{chapter.Id}' (rehearsal revealFlag)");
                 }
+                // negative earn config drains instead of earns; the tick guards
+                // fail closed on a net-negative rate, so without this report the
+                // system would just look mysteriously dead
+                if (chapter.Fans.BaseFansPerSec < 0 || chapter.Fans.PerBandmateOwnedBonus < 0)
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has negative fan earn values.");
+                if (chapter.Rehearsal.PointsPerSec < 0 || chapter.Rehearsal.PointsPerTap < 0)
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has negative rehearsal earn values.");
+
                 ValidateIds(chapter.SectionIds, database.Sections, $"Chapter '{chapter.Id}' (sections)");
                 ValidateIds(chapter.GeneratorIds, database.Generators, $"Chapter '{chapter.Id}' (generators)");
                 ValidateIds(chapter.UpgradeIds, database.Upgrades, $"Chapter '{chapter.Id}' (upgrades)");
@@ -54,6 +62,10 @@ namespace RidiculousGaming.GarageBandIdle
                     Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive base cost ({generator.BaseCost}) — it would be free to buy.");
                 if (generator.CostGrowth <= 0)
                     Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive cost growth ({generator.CostGrowth}).");
+                // production must never drain (runtime fails closed on it);
+                // zero output stays legal — a pure fan-rate bandmate is coherent
+                if (generator.BaseOutput < 0)
+                    Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a negative base output ({generator.BaseOutput}).");
                 ConditionEvaluator.Validate(generator.Unlock, context, $"Generator '{generator.Id}' (unlock)");
             }
 
@@ -63,6 +75,10 @@ namespace RidiculousGaming.GarageBandIdle
                     Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has type None (uninitialized).");
                 if (upgrade.Scope == ContentScope.None)
                     Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has scope None (uninitialized).");
+                // a negative cost would GRANT currency when the buff purchase
+                // flow lands; close it before that flow exists
+                if (upgrade.CostAmount < 0)
+                    Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has a negative cost amount ({upgrade.CostAmount}).");
                 ConditionEvaluator.Validate(upgrade.Gate, context, $"Upgrade '{upgrade.Id}' (gate)");
                 if (upgrade.Payload == null)
                     Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload.");
@@ -117,6 +133,17 @@ namespace RidiculousGaming.GarageBandIdle
                 };
                 if (scope == ContentScope.None)
                     Debug.LogError($"ContentValidator: Reward '{reward.Id}' has scope None (uninitialized).");
+
+                // a non-positive multiplier would zero or negate its whole
+                // multiplicative stack (runtime fails closed on it)
+                var multiplier = reward switch
+                {
+                    FanRateMultiplierReward fanRate => (double?)fanRate.Value,
+                    TapValueMultiplierReward tapValue => tapValue.Value,
+                    _ => null,
+                };
+                if (multiplier <= 0)
+                    Debug.LogError($"ContentValidator: Reward '{reward.Id}' has a non-positive multiplier ({multiplier}).");
             }
         }
 
