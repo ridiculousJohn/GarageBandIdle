@@ -198,11 +198,11 @@
 
   "rehearsal": {
     "currency": "rehearsal",
-    "scope": "run",
+    "group": "run",
     "revealFlag": "covers",
     "perSec": 1,
     "perTap": 2,
-    "note": "Rehearsal is a plain run-scoped currency, revealed by the `covers` flag. It accrues from a passive tick (perSec) plus Jam taps (perTap) — so it advances from engagement, not from Cash. Modelled like `fans`: the currency owns its earn config; consumers (bars) reference it by id."
+    "note": "Rehearsal is a plain run-scoped currency, revealed by the `covers` flag. It accrues from a passive tick (perSec) plus Jam taps (perTap) — so it advances from engagement, not from Cash. Modelled like `fans`: the currency owns its earn config; consumers (bars) reference it by id. `group` is the CurrencyGroupDefinition id the currency belongs to (reset behavior comes from the group's flags, like every currency)."
   },
 
   "bars": {

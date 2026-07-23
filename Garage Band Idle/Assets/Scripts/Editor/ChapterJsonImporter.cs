@@ -79,7 +79,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             {
                 var currencyAsset = LoadOrCreate<CurrencyDefinition>($"{CurrenciesFolder}/{data.rehearsal.currency}.asset");
                 ApplyIfChanged(currencyAsset, asset => asset.EditorInitialize(data.rehearsal.currency,
-                    ToDisplayName(data.rehearsal.currency), data.rehearsal.scope));
+                    ToDisplayName(data.rehearsal.currency), data.rehearsal.group));
             }
 
             // rewards first: bars and event tiers reference the pool by id, so
@@ -718,7 +718,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private class RehearsalBlock
         {
             public string currency;
-            public string scope;
+            public string group; // CurrencyGroupDefinition id, e.g. "run"
             public string revealFlag;
             public double perSec;
             public double perTap;
