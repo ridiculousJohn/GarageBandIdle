@@ -36,7 +36,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
-        public static CurrencyDefinition MakeCurrency(string id, string groupId, double startingValue = 0)
+        public static CurrencyDefinition MakeCurrency(string id, string groupId, double startingValue = 0,
+            string earnRevealFlag = null, double earnPerSec = 0, double earnPerTap = 0)
         {
             var definition = Track(ScriptableObject.CreateInstance<CurrencyDefinition>());
             var serialized = new SerializedObject(definition);
@@ -44,6 +45,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             serialized.FindProperty("_displayName").stringValue = id;
             serialized.FindProperty("_groupId").stringValue = groupId;
             serialized.FindProperty("_startingValue").doubleValue = startingValue;
+            serialized.FindProperty("_earn._revealFlagId").stringValue = earnRevealFlag ?? "";
+            serialized.FindProperty("_earn._perSec").doubleValue = earnPerSec;
+            serialized.FindProperty("_earn._perTap").doubleValue = earnPerTap;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return definition;
         }
@@ -99,15 +103,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public static ChapterDefinition MakeChapter(string id, List<string> flagIds,
             List<string> sectionIds = null, List<string> generatorIds = null,
             List<string> upgradeIds = null, List<string> barGroupIds = null,
-            List<string> eventIds = null, string fansRevealFlagId = "fans")
+            List<string> eventIds = null, List<string> currencyIds = null,
+            string fansRevealFlagId = "fans")
         {
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
             definition.EditorInitialize(id, 1, id, "", "", "", 100, 1,
                 new RecordBuffConfig(0.02, new List<string> { "cash" }),
                 new FansConfig("fans", fansRevealFlagId, 0.2, 0.02),
-                new RehearsalConfig(null, null, 0, 0),
-                flagIds, sectionIds ?? new List<string>(), generatorIds ?? new List<string>(),
-                upgradeIds ?? new List<string>(), barGroupIds ?? new List<string>(), eventIds ?? new List<string>());
+                flagIds, currencyIds ?? new List<string>(), sectionIds ?? new List<string>(),
+                generatorIds ?? new List<string>(), upgradeIds ?? new List<string>(),
+                barGroupIds ?? new List<string>(), eventIds ?? new List<string>());
             return definition;
         }
 

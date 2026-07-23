@@ -82,13 +82,39 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     flagIds.Add(flag.id);
             }
 
-            // a chapter can declare a fill currency (rehearsal); generate it like
-            // any other content so bars' fillCurrency ids resolve on load
-            if (!string.IsNullOrEmpty(data.rehearsal?.currency))
+            // currencies the chapter JSON declares (fill currencies): the
+            // currency OWNS its earn config (design doc section 3) — generate
+            // it like any other content so bars' fillCurrency ids resolve on
+            // load, and list it on the chapter so engagement earn runs only
+            // for the owning chapter (flag ids may repeat across chapters).
+            // Hand-authored currencies (cash, fans, records) are not in this
+            // array and are left alone.
+            var currencyIds = new List<string>();
+            foreach (var block in data.currencies ?? Array.Empty<CurrencyEntryBlock>())
             {
-                var currencyAsset = LoadOrCreate<CurrencyDefinition>($"{CurrenciesFolder}/{data.rehearsal.currency}.asset");
-                ApplyIfChanged(currencyAsset, asset => asset.EditorInitialize(data.rehearsal.currency,
-                    ToDisplayName(data.rehearsal.currency), data.rehearsal.group));
+                if (string.IsNullOrEmpty(block.id))
+                {
+                    Debug.LogError("ChapterJsonImporter: currencies array contains an entry with an empty id. Skipping it.");
+                    continue;
+                }
+                // negative earn drains instead of earns, and earn values with
+                // no reveal flag can never activate — never write those states
+                if (block.earn.perSec < 0 || block.earn.perTap < 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: currency '{block.id}' has negative earn values. Skipping it — fix the JSON and re-import.");
+                    continue;
+                }
+                if ((block.earn.perSec > 0 || block.earn.perTap > 0) && string.IsNullOrEmpty(block.earn.revealFlag))
+                {
+                    Debug.LogError($"ChapterJsonImporter: currency '{block.id}' has earn values but no revealFlag — the earn could never activate. Skipping it — fix the JSON and re-import.");
+                    continue;
+                }
+
+                var currencyAsset = LoadOrCreate<CurrencyDefinition>($"{CurrenciesFolder}/{block.id}.asset");
+                var earn = new EngagementEarnConfig(block.earn.revealFlag, block.earn.perSec, block.earn.perTap);
+                ApplyIfChanged(currencyAsset, asset => asset.EditorInitialize(block.id,
+                    ToDisplayName(block.id), block.group, earn));
+                currencyIds.Add(block.id);
             }
 
             // rewards first: bars and event tiers reference the pool by id, so
@@ -258,21 +284,17 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             // reports it too
             if ((data.fans?.baseFansPerSec ?? 0) < 0 || (data.fans?.perBandmateOwnedBonus ?? 0) < 0)
                 Debug.LogError("ChapterJsonImporter: fans block has negative earn values. Fix the JSON and re-import.");
-            if ((data.rehearsal?.perSec ?? 0) < 0 || (data.rehearsal?.perTap ?? 0) < 0)
-                Debug.LogError("ChapterJsonImporter: rehearsal block has negative earn values. Fix the JSON and re-import.");
 
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
                 new List<string>(data.constants?.recordBuff?.affects ?? Array.Empty<string>()));
             var fans = new FansConfig(data.fans?.currency, data.fans?.revealFlag,
                 data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0);
-            var rehearsal = new RehearsalConfig(data.rehearsal?.currency, data.rehearsal?.revealFlag,
-                data.rehearsal?.perSec ?? 0, data.rehearsal?.perTap ?? 0);
             ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
                 data.chapter.name, data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
                 data.chapter.capstoneRecordsGate,
                 data.constants?.tapBaseValue ?? 1, recordBuff,
-                fans, rehearsal, flagIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
+                fans, flagIds, currencyIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
 
             MarkAllContentAddressable();
 
@@ -657,7 +679,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public GeneratorBlock[] generators = Array.Empty<GeneratorBlock>();
             public UpgradeBlock[] upgrades = Array.Empty<UpgradeBlock>();
             public RewardEntryBlock[] rewards = Array.Empty<RewardEntryBlock>();
-            public RehearsalBlock rehearsal = new();
+            public CurrencyEntryBlock[] currencies = Array.Empty<CurrencyEntryBlock>();
             public BarsBlock bars = new();
             public FansBlock fans = new();
             public EventBlock[] events = Array.Empty<EventBlock>();
@@ -772,10 +794,17 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public PayloadBlock payload = new();
         }
 
-        private class RehearsalBlock
+        // one chapter-declared currency; the currency owns its earn config
+        private class CurrencyEntryBlock
         {
-            public string currency = "";
+            public string id = "";
             public string group = ""; // CurrencyGroupDefinition id, e.g. "run"
+            public EarnBlock earn = new();
+        }
+
+        // engagement earn: passive tick + Jam taps, gated by a reveal flag
+        private class EarnBlock
+        {
             public string revealFlag = "";
             public double perSec;
             public double perTap;

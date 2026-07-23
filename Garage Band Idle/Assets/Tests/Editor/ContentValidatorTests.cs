@@ -59,6 +59,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
+        // a chapter-listed currency's earn flag validates against the OWNING
+        // chapter — another chapter declaring the same flag id must not make
+        // it pass, because flag ids are chapter-local and may repeat
+        [Test]
+        public void CurrencyEarnFlag_ValidatesAgainstTheOwningChapter()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var poached = TestContent.MakeCurrency("stagecraft", "run", earnRevealFlag: "two", earnPerSec: 1);
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "one" },
+                currencyIds: new List<string> { "stagecraft" });
+            var ch2 = TestContent.MakeChapter("ch2", new List<string> { "fans", "two" });
+            var database = new ContentDatabase(chapters: new[] { ch1, ch2 }, currencies: new[] { poached });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Currency 'stagecraft' (earn revealFlag) references flag 'two', which the chapter does not declare.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
         // stale/unlisted definitions keep every structural check; only the
         // flag-known checks are skipped — no chapter's declaration list
         // governs an orphan

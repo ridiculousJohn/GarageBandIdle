@@ -196,14 +196,14 @@
   ],
   "rewardsNote": "The shared reward pool. Bars and event tiers reference these by id; each type maps to a RewardDefinition subclass asset, so a new reward kind is a new type + entries, and rewards are reusable across content. Available types: fanRateMultiplier, tapValueMultiplier, setFlag (payload `flag: <id>` — lets a reward reveal gated content through the same flag registry as content-unlock upgrades).",
 
-  "rehearsal": {
-    "currency": "rehearsal",
-    "group": "run",
-    "revealFlag": "covers",
-    "perSec": 1,
-    "perTap": 2,
-    "note": "Rehearsal is a plain run-scoped currency, revealed by the `covers` flag. It accrues from a passive tick (perSec) plus Jam taps (perTap) — so it advances from engagement, not from Cash. Modelled like `fans`: the currency owns its earn config; consumers (bars) reference it by id. `group` is the CurrencyGroupDefinition id the currency belongs to (reset behavior comes from the group's flags, like every currency)."
-  },
+  "currencies": [
+    {
+      "id": "rehearsal",
+      "group": "run",
+      "earn": { "revealFlag": "covers", "perSec": 1, "perTap": 2 },
+      "note": "Rehearsal is a plain run-scoped currency, revealed by the `covers` flag. The currency OWNS its earn config: a passive tick (perSec) plus Jam taps (perTap) — engagement, not Cash — and consumers (bars) reference it by id. `group` is the CurrencyGroupDefinition id the currency belongs to (reset behavior comes from the group's flags, like every currency). A chapter can declare any number of fill currencies here, each with its own earn config and reveal flag."
+    }
+  ],
 
   "bars": {
     "groups": [

@@ -56,13 +56,15 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         [SerializeField]
         private FansConfig _fans = new();
 
-        [SerializeField]
-        private RehearsalConfig _rehearsal = new();
-
         [Header("Content")]
         [SerializeField]
         [Tooltip("Progress flags this chapter's content may set — the single reveal registry. Anything not listed here is a typo.")]
         private List<string> _flagIds = new();
+
+        [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
+        [Tooltip("Currencies this chapter declares (fill currencies with earn configs). Engagement earn runs only for the CURRENT chapter's list — flag ids may repeat across chapters, so flags alone cannot scope it.")]
+        private List<string> _currencyIds = new();
 
         [SerializeField]
         [DefinitionId(typeof(SectionDefinition))]
@@ -96,8 +98,8 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         public double TapBaseValue => _tapBaseValue;
         public RecordBuffConfig RecordBuff => _recordBuff;
         public FansConfig Fans => _fans;
-        public RehearsalConfig Rehearsal => _rehearsal;
         public IReadOnlyList<string> FlagIds => _flagIds;
+        public IReadOnlyList<string> CurrencyIds => _currencyIds;
         public IReadOnlyList<string> SectionIds => _sectionIds;
         public IReadOnlyList<string> GeneratorIds => _generatorIds;
         public IReadOnlyList<string> UpgradeIds => _upgradeIds;
@@ -108,9 +110,10 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         // importer-only: chapter assets are generated from chapter JSON
         public void EditorInitialize(string id, int index, string displayName, string theme,
             string storyBeatOpen, string storyBeatCapstone, int capstoneRecordsGate,
-            double tapBaseValue, RecordBuffConfig recordBuff, FansConfig fans, RehearsalConfig rehearsal,
-            List<string> flagIds, List<string> sectionIds, List<string> generatorIds,
-            List<string> upgradeIds, List<string> barGroupIds, List<string> eventIds)
+            double tapBaseValue, RecordBuffConfig recordBuff, FansConfig fans,
+            List<string> flagIds, List<string> currencyIds, List<string> sectionIds,
+            List<string> generatorIds, List<string> upgradeIds, List<string> barGroupIds,
+            List<string> eventIds)
         {
             _id = id;
             _index = index;
@@ -122,8 +125,8 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             _tapBaseValue = tapBaseValue;
             _recordBuff = recordBuff;
             _fans = fans;
-            _rehearsal = rehearsal;
             _flagIds = flagIds;
+            _currencyIds = currencyIds;
             _sectionIds = sectionIds;
             _generatorIds = generatorIds;
             _upgradeIds = upgradeIds;
@@ -203,44 +206,4 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 #endif
     }
 
-    // Rehearsal earn config (design doc section 3): the fill currency accrues
-    // from a passive tick plus Jam taps (engagement, never Cash). Modelled like
-    // FansConfig - the currency accrued into and the flag that activates accrual
-    // are chapter data, not code bindings. A chapter with no fill currency
-    // leaves the currency id empty and the system stays dormant.
-    [Serializable]
-    public class RehearsalConfig
-    {
-        [SerializeField]
-        [DefinitionId(typeof(CurrencyDefinition))]
-        [Tooltip("Currency id the rehearsal earn accrues into. Empty = no fill currency this chapter.")]
-        private string _currencyId;
-
-        [SerializeField]
-        [Tooltip("Flag that activates rehearsal accrual (the single reveal registry).")]
-        private string _revealFlagId;
-
-        [SerializeField]
-        private double _pointsPerSec;
-
-        [SerializeField]
-        private double _pointsPerTap;
-
-        public string CurrencyId => _currencyId;
-        public string RevealFlagId => _revealFlagId;
-        public double PointsPerSec => _pointsPerSec;
-        public double PointsPerTap => _pointsPerTap;
-
-        public RehearsalConfig() { }
-
-#if UNITY_EDITOR
-        public RehearsalConfig(string currencyId, string revealFlagId, double pointsPerSec, double pointsPerTap)
-        {
-            _currencyId = currencyId;
-            _revealFlagId = revealFlagId;
-            _pointsPerSec = pointsPerSec;
-            _pointsPerTap = pointsPerTap;
-        }
-#endif
-    }
 }

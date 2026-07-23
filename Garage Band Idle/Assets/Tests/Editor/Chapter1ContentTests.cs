@@ -189,11 +189,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void RehearsalTuning_MatchesJson()
         {
+            // the currency OWNS its earn config (design doc section 3), so the
+            // tuning lives on the currency asset; the chapter lists the
+            // currency so engagement earn is chapter-owned, not global
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            CollectionAssert.AreEqual(new[] { "rehearsal" }, chapter.CurrencyIds);
+            var rehearsal = LoadById<CurrencyDefinition>(CurrenciesFolder, "rehearsal");
 
-            Assert.AreEqual(1.0, chapter.Rehearsal.PointsPerSec, 1e-9,
-                "rehearsal perSec — if this fails, re-run 'GarageBandIdle → Import Chapter 1 JSON' for the restructured JSON");
-            Assert.AreEqual(2.0, chapter.Rehearsal.PointsPerTap, 1e-9);
+            Assert.AreEqual("covers", rehearsal.Earn.RevealFlagId,
+                "earn revealFlag — if this fails, re-run 'GarageBandIdle → Import Chapter 1 JSON' for the restructured JSON");
+            Assert.AreEqual(1.0, rehearsal.Earn.PerSec, 1e-9);
+            Assert.AreEqual(2.0, rehearsal.Earn.PerTap, 1e-9);
         }
 
         [TestCase("practice_amp", false)]
@@ -285,12 +291,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(BarFillDelivery.Continuous, group.Delivery);
             Assert.AreEqual(ContentScope.Run, group.Scope);
 
-            // the fill currency's earn config rides on the chapter, like fans
-            var chapterRehearsal = LoadRequired<ChapterDefinition>(ChapterPath).Rehearsal;
-            Assert.AreEqual("rehearsal", chapterRehearsal.CurrencyId);
-            Assert.AreEqual("covers", chapterRehearsal.RevealFlagId);
-            Assert.AreEqual(1, chapterRehearsal.PointsPerSec, 1e-9);
-            Assert.AreEqual(2, chapterRehearsal.PointsPerTap, 1e-9);
+            // the fill currency OWNS its earn config; bars reference it by id
+            var rehearsal = LoadById<CurrencyDefinition>(CurrenciesFolder, "rehearsal");
+            Assert.AreEqual("run", rehearsal.GroupId);
+            Assert.AreEqual("covers", rehearsal.Earn.RevealFlagId);
+            Assert.AreEqual(1, rehearsal.Earn.PerSec, 1e-9);
+            Assert.AreEqual(2, rehearsal.Earn.PerTap, 1e-9);
             CollectionAssert.AreEqual(new[] { "cover_1", "cover_2", "cover_3" }, group.BarIds);
 
             foreach (var (barId, requirement, rewardId) in new[]

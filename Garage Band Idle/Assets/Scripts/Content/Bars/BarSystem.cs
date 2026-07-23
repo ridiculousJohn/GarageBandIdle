@@ -191,7 +191,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
 
         // continuous delivery: each tick, whatever sits in the fill currency
         // pool moves into the active bar. Accrual itself happens elsewhere
-        // (RehearsalSystem), so ordering only affects latency by one tick.
+        // (EngagementEarnSystem), so ordering only affects latency by one tick.
         public void Tick()
         {
             foreach (var group in _groups.Values)

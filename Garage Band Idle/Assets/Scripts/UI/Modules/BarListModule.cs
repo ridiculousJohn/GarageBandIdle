@@ -134,12 +134,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         // the fill currency readout lives here rather than the currency header;
         // the playable pass (slice 10) makes the header data-driven. One line
-        // per revealed fill currency; the rehearsal system is the accrual
-        // source for its own currency, so only that line carries earn rates.
+        // per revealed fill currency; any earn-configured currency carries its
+        // earn rates (the currency owns its earn config).
         private void RefreshPool()
         {
             var lines = new List<string>(_pools.Count);
-            var rehearsal = _context.Game.Rehearsal;
+            var earn = _context.Game.EngagementEarn;
             foreach (var pool in _pools)
             {
                 if (!IsRevealed(pool))
@@ -152,8 +152,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     continue;
 
                 var line = $"{definition.DisplayName}: {NumberFormatter.Format(_context.Game.Currencies.Get(pool.CurrencyId))}";
-                if (rehearsal.Configured && pool.CurrencyId == rehearsal.CurrencyId)
-                    line += $" (+{NumberFormatter.Format(rehearsal.RatePerSecond)}/sec, +{NumberFormatter.Format(_context.Chapter.Rehearsal.PointsPerTap)}/tap)";
+                if (earn.HasEarn(pool.CurrencyId))
+                    line += $" (+{NumberFormatter.Format(earn.RatePerSecond(pool.CurrencyId))}/sec, +{NumberFormatter.Format(earn.PerTap(pool.CurrencyId))}/tap)";
                 lines.Add(line);
             }
             _poolLabel.text = string.Join("\n", lines);

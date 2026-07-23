@@ -38,7 +38,7 @@ namespace RidiculousGaming.GarageBandIdle
         public UpgradeSystem Upgrades { get; private set; }
         public FanSystem Fans { get; private set; }
         public TapSystem Tap { get; private set; }
-        public RehearsalSystem Rehearsal { get; private set; }
+        public EngagementEarnSystem EngagementEarn { get; private set; }
         public RewardManager Rewards { get; private set; }
         public BarSystem Bars { get; private set; }
         public ConditionContext Conditions { get; private set; }
@@ -81,7 +81,11 @@ namespace RidiculousGaming.GarageBandIdle
                 Upgrades = new UpgradeSystem(Resolve(Database.Upgrades, CurrentChapter.UpgradeIds, "upgrade"), Currencies, Flags);
                 Fans = new FanSystem(CurrentChapter.Fans, Currencies, Generators, Flags);
                 Tap = new TapSystem(CurrentChapter.TapBaseValue);
-                Rehearsal = new RehearsalSystem(CurrentChapter.Rehearsal, Currencies, Flags);
+                // only the CURRENT chapter's declared currencies earn: flag
+                // ids may legitimately repeat across chapters, so ownership
+                // comes from the chapter's currency list, never from flags
+                EngagementEarn = new EngagementEarnSystem(
+                    Resolve(Database.Currencies, CurrentChapter.CurrencyIds, "currency"), Currencies, Flags);
                 Rewards = new RewardManager(Database.Rewards.All);
                 Bars = new BarSystem(Resolve(Database.BarGroups, CurrentChapter.BarGroupIds, "bar group"),
                     Database.Bars.All, Currencies, Rewards, new RewardContext(Currencies, Flags, Fans, Tap));
@@ -145,9 +149,9 @@ namespace RidiculousGaming.GarageBandIdle
             Upgrades.EvaluateContentUnlocks(Conditions);
             Fans.Tick(seconds);
 
-            // rehearsal accrues, then bars drain the pool into the active bar
-            // in the same tick, so a selected bar advances with no pool lag
-            Rehearsal.Tick(seconds);
+            // fill currencies accrue, then bars drain the pool into the active
+            // bar in the same tick, so a selected bar advances with no pool lag
+            EngagementEarn.Tick(seconds);
             Bars.Tick();
         }
 
@@ -160,9 +164,9 @@ namespace RidiculousGaming.GarageBandIdle
 
             Currencies.Add(CashCurrencyId, Tap.Value);
 
-            // taps also yield the fill currency; drain immediately so the
+            // taps also yield the fill currencies; drain immediately so the
             // active bar visibly nudges on the tap, not a tick later
-            Rehearsal.OnJamTap();
+            EngagementEarn.OnJamTap();
             Bars.Tick();
         }
 

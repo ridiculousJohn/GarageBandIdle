@@ -29,6 +29,9 @@ namespace RidiculousGaming.GarageBandIdle
                 ValidateChapter(chapter, database, ChapterScoped(context, database, chapter), rewards, visited);
 
             var orphan = ChapterScoped(context, database, null);
+            foreach (var currency in database.Currencies.All)
+                if (!visited.Currencies.Contains(currency.Id))
+                    ValidateCurrencyEarn(currency, orphan);
             foreach (var section in database.Sections.All)
                 if (!visited.Sections.Contains(section.Id))
                     ValidateSection(section, orphan);
@@ -60,20 +63,24 @@ namespace RidiculousGaming.GarageBandIdle
             context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)");
             ValidateFlag(chapter.Fans.RevealFlagId, context, $"Chapter '{chapter.Id}' (fans revealFlag)");
 
-            // a chapter without a fill currency is legal; one that declares it
-            // must resolve both the currency and its activation flag
-            if (!string.IsNullOrEmpty(chapter.Rehearsal.CurrencyId))
-            {
-                context.Currencies.ValidateReference(chapter.Rehearsal.CurrencyId, $"Chapter '{chapter.Id}' (rehearsal currency)");
-                ValidateFlag(chapter.Rehearsal.RevealFlagId, context, $"Chapter '{chapter.Id}' (rehearsal revealFlag)");
-            }
             // negative earn config drains instead of earns; the tick guards
             // fail closed on a net-negative rate, so without this report the
             // system would just look mysteriously dead
             if (chapter.Fans.BaseFansPerSec < 0 || chapter.Fans.PerBandmateOwnedBonus < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has negative fan earn values.");
-            if (chapter.Rehearsal.PointsPerSec < 0 || chapter.Rehearsal.PointsPerTap < 0)
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has negative rehearsal earn values.");
+
+            ValidateIds(chapter.CurrencyIds, database.Currencies, $"Chapter '{chapter.Id}' (currencies)");
+            // the chapter's declared currencies: their earn reveal flags are
+            // chapter-scoped like every other flag reference — flag ids may
+            // repeat across chapters, so the owning chapter's list is the
+            // only one that counts
+            foreach (var id in chapter.CurrencyIds)
+            {
+                if (!database.Currencies.TryGet(id, out var currency))
+                    continue;
+                visited.Currencies.Add(id);
+                ValidateCurrencyEarn(currency, context);
+            }
 
             ValidateIds(chapter.SectionIds, database.Sections, $"Chapter '{chapter.Id}' (sections)");
             ValidateIds(chapter.GeneratorIds, database.Generators, $"Chapter '{chapter.Id}' (generators)");
@@ -148,6 +155,22 @@ namespace RidiculousGaming.GarageBandIdle
                 visited.Rewards.Add(rewardId);
                 ValidateRewardDefinition(reward, context);
             }
+        }
+
+        // negative earn drains instead of earns, and earn values with no
+        // reveal flag can never activate (the importer refuses both; this
+        // catches stale assets)
+        private static void ValidateCurrencyEarn(CurrencyDefinition currency, ConditionContext context)
+        {
+            if (!currency.Earn.Configured)
+                return;
+
+            if (currency.Earn.PerSec < 0 || currency.Earn.PerTap < 0)
+                Debug.LogError($"ContentValidator: Currency '{currency.Id}' has negative earn values.");
+            if (string.IsNullOrEmpty(currency.Earn.RevealFlagId))
+                Debug.LogError($"ContentValidator: Currency '{currency.Id}' has earn values but no reveal flag — the earn can never activate.");
+            else
+                ValidateFlag(currency.Earn.RevealFlagId, context, $"Currency '{currency.Id}' (earn revealFlag)");
         }
 
         private static void ValidateSection(SectionDefinition section, ConditionContext context)
@@ -266,6 +289,7 @@ namespace RidiculousGaming.GarageBandIdle
         // pass covers exactly the rest
         private class Visited
         {
+            public readonly HashSet<string> Currencies = new();
             public readonly HashSet<string> Sections = new();
             public readonly HashSet<string> Generators = new();
             public readonly HashSet<string> Upgrades = new();
