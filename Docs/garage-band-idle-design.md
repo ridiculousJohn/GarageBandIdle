@@ -181,8 +181,9 @@ Moment-to-moment play draws on the systems defined elsewhere:
   data, separate from that bookkeeping: Chapter 1 uses `continuous` (accrued currency streams into the
   active bar; selecting a bar IS the interaction), and future chapters can add tap-a-chunk or
   dump-the-pool variants as new delivery values rather than new systems. **[rev]**
-- **Fans** — accrue from performing (tap plus a passive rate that scales with income). Fan rate is
-  tuned loosely relative to Cash so that income alone does not determine the album payout.
+- **Fans** — accrue passively once revealed: a base rate plus a per-bandmate bonus, a function of
+  band size and time only — never Cash or income. Fan rate is tuned loosely relative to Cash so that
+  income alone does not determine the album payout.
 - **Capstone gig** — unlocks at the Records gate; grants a Roadie and fires a story beat (§10).
 
 ### 6.1 Events
