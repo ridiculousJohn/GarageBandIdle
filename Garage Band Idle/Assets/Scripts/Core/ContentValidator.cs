@@ -86,6 +86,12 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 context.Currencies.ValidateReference(bar.FillCurrencyId, $"Bar '{bar.Id}' (fillCurrency)");
                 ValidateReward(bar.RewardId, rewards, $"Bar '{bar.Id}'");
+
+                // a non-positive requirement can never be legitimately filled;
+                // BarSystem rejects such bars — report the content error here
+                // (catches stale assets from before this rule)
+                if (bar.FillRequirement <= 0)
+                    Debug.LogError($"ContentValidator: Bar '{bar.Id}' has a non-positive fill requirement ({bar.FillRequirement}).");
             }
 
             foreach (var gameEvent in database.Events.All)

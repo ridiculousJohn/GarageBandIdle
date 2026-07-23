@@ -3,6 +3,8 @@ using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -187,6 +189,35 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bars.SetActiveBar("learn_covers", "cover_1");
 
             Assert.IsTrue(ConditionEvaluator.IsMet(condition, context), "cover_1 satisfies barsCompleted >= 1");
+        }
+
+        // fail closed on broken content: a non-positive fill requirement can
+        // never be legitimately filled — the bar is rejected at construction,
+        // so a content typo can never satisfy a barsCompleted gate or grant
+        // its reward at boot (the importer and boot validation report it)
+        [Test]
+        public void NonPositiveRequirementBar_IsRejected_AndGrantsNothing()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var rewards = new RewardManager(new RewardDefinition[]
+            {
+                TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
+            });
+            var bars = new[] { TestContent.MakeBar("broken_cover", "rehearsal", 0, "fan_rate_x1_15") };
+            var group = TestContent.MakeBarGroup("learn_covers", "covers", new List<string> { "broken_cover" });
+
+            LogAssert.Expect(LogType.Error,
+                "BarSystem: bar 'broken_cover' has a non-positive fill requirement (0). Skipping it.");
+            var system = new BarSystem(new[] { group }, bars, currencies, rewards,
+                new RewardContext(currencies, flags, fans));
+
+            Assert.AreEqual(0, system.GetBars("learn_covers").Count, "the rejected bar has no state");
+            Assert.AreEqual(0, system.CompletedCount("learn_covers"), "it never satisfies a barsCompleted gate");
+            Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "no reward granted");
         }
 
         // state-then-notify: the drain's BalanceChanged is a synchronous signal

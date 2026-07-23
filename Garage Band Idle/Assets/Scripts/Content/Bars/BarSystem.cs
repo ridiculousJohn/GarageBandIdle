@@ -11,7 +11,10 @@ namespace RidiculousGaming.GarageBandIdle.Content
     // player chooses the target (a standing prioritization decision). With
     // Continuous delivery the pool streams into the group's active bar every
     // tick; the pool only holds a balance while nothing is selected. Completion
-    // latches, applies the bar's reward through the shared pool, and feeds
+    // is derived from progress inside BarState.AddProgress — the only mutation
+    // a bar's state has — so progress and completion can never diverge no
+    // matter which path establishes state (drain now, save-restore later).
+    // Completion applies the bar's reward through the shared pool and feeds
     // barsCompleted conditions via IBarCompletionSource.
     public class BarSystem : IBarCompletionSource
     {
@@ -21,16 +24,36 @@ namespace RidiculousGaming.GarageBandIdle.Content
         {
             public BarDefinition Definition { get; }
             public BarGroupDefinition Group { get; }
-            public BigNumber Progress { get; internal set; }
-            public bool Completed { get; internal set; }
+            public BigNumber Progress { get; private set; }
+            public bool Completed { get; private set; }
 
             public BigNumber Remaining => (BigNumber)Definition.FillRequirement - Progress;
 
+            // requirement > 0 is enforced where bars are accepted (BarSystem
+            // rejects non-positive requirements), so a new bar is never
+            // already complete
             public BarState(BarDefinition definition, BarGroupDefinition group)
             {
                 Definition = definition;
                 Group = group;
                 Progress = BigNumber.Zero;
+            }
+
+            // The ONLY mutation a bar's state has: progress moves and
+            // completion derives from it in one operation, so the two can
+            // never diverge regardless of the caller. Clamps to the
+            // requirement. Returns true when this call completed the bar.
+            internal bool AddProgress(BigNumber amount)
+            {
+                if (Completed || amount <= BigNumber.Zero)
+                    return false;
+
+                Progress = BigNumber.Min(Progress + amount, Definition.FillRequirement);
+                if (Remaining > BigNumber.Zero)
+                    return false;
+
+                Completed = true;
+                return true;
             }
         }
 
@@ -71,10 +94,23 @@ namespace RidiculousGaming.GarageBandIdle.Content
                 var state = new GroupState { Definition = group };
                 foreach (var barId in group.BarIds)
                 {
-                    if (barsById.TryGetValue(barId, out var bar))
-                        state.Bars.Add(new BarState(bar, group));
-                    else
+                    if (!barsById.TryGetValue(barId, out var bar))
+                    {
                         Debug.LogError($"BarSystem: bar group '{group.Id}' references unknown bar id '{barId}'.");
+                        continue;
+                    }
+
+                    // fail closed on broken content: a non-positive requirement
+                    // can never be legitimately filled — rejecting the bar means
+                    // it can never satisfy a barsCompleted gate or grant its
+                    // reward (the importer and boot validation report it)
+                    if (bar.FillRequirement <= 0)
+                    {
+                        Debug.LogError($"BarSystem: bar '{bar.Id}' has a non-positive fill requirement ({bar.FillRequirement}). Skipping it.");
+                        continue;
+                    }
+
+                    state.Bars.Add(new BarState(bar, group));
                 }
 
                 if (_groups.TryAdd(group.Id, state))
@@ -151,17 +187,12 @@ namespace RidiculousGaming.GarageBandIdle.Content
             // synchronously, and no subscriber may ever observe the pool
             // drained with the progress or completion not yet recorded
             // (state, then notify)
-            bar.Progress += transfer;
-            var completed = bar.Remaining <= BigNumber.Zero;
-            if (completed)
-            {
-                bar.Completed = true;
+            var completed = bar.AddProgress(transfer);
 
-                // completion clears the selection rather than auto-advancing:
-                // which bar to work next is the player's call (design doc
-                // section 6)
+            // completion clears the selection rather than auto-advancing: which
+            // bar to work next is the player's call (design doc section 6)
+            if (completed)
                 group.ActiveBar = null;
-            }
 
             _currencies.Add(bar.Definition.FillCurrencyId, -transfer);
             BarProgressChanged?.Invoke(bar);

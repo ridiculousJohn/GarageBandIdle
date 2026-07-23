@@ -176,6 +176,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 var barIds = new List<string>();
                 foreach (var bar in group.bars ?? Array.Empty<BarBlock>())
                 {
+                    // a non-positive requirement can never be legitimately
+                    // filled — never write that state: the asset is not
+                    // created/updated and the group does not list the bar
+                    if (bar.fillRequirement <= 0)
+                    {
+                        Debug.LogError($"ChapterJsonImporter: bar '{bar.id}' has a non-positive fillRequirement ({bar.fillRequirement}). Skipping it — fix the JSON and re-import.");
+                        continue;
+                    }
+
                     var barAsset = LoadOrCreate<BarDefinition>($"{BarsFolder}/{bar.id}.asset");
                     ApplyIfChanged(barAsset, asset => asset.EditorInitialize(bar.id, bar.name,
                         bar.fillCurrency, bar.fillRequirement, bar.reward));
