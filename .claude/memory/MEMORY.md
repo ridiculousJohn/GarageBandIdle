@@ -4,3 +4,4 @@
 - [Closed sets are enums](closed-sets-are-enums.md) — code-defined vocabularies are C# enums, never strings; strings only for open designer ids
 - [No AI attribution in commits](no-ai-attribution-in-commits.md) — never add Co-Authored-By/Generated-with trailers; disabled in settings 2026-07-21
 - [Unity headless verify loop](unity-headless-verify-loop.md) — batchmode import+tests when editor closed (check UnityLockfile first); reimport required after schema changes
+- [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) — merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
