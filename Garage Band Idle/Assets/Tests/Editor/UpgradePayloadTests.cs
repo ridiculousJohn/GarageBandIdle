@@ -137,6 +137,133 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the definition's permanent-in-chapter scope reached the grant");
         }
 
+        // buying charges the declared cost currency and grants the payload, and
+        // the effect settles before the spend notifies - no subscriber may
+        // observe the money gone with the buff not yet applied
+        [Test]
+        public void TryBuy_ChargesTheCostCurrency_AndGrantsBeforeTheSpendNotifies()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
+            var tap = new TapSystem(1, modifiers);
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
+                    new CurrencyBalanceCondition("cash", 250), new TapValueAddPayload(1), costAmount: 250),
+            }, currencies, flags, modifiers);
+            var context = TestContent.MakeContext(currencies, flags: flags);
+            var stagePresence = upgrades.Get("stage_presence");
+
+            Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "the gate is unmet at zero cash");
+            Assert.IsFalse(stagePresence.Applied);
+
+            currencies.Add("cash", 249);
+            Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "still short of the gate");
+
+            var tapDuringSpend = 0.0;
+            currencies.BalanceChanged += (id, _) =>
+            {
+                if (id == "cash")
+                    tapDuringSpend = tap.Value.ToDouble();
+            };
+            currencies.Add("cash", 1);
+
+            Assert.IsTrue(upgrades.TryBuy(stagePresence, context), "gate met and affordable");
+            Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "the declared currency is charged");
+            Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "base 1 + the granted add");
+            Assert.AreEqual(2.0, tapDuringSpend, 1e-9, "the buff was already granted when the spend fired");
+
+            Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "an applied buff is never bought twice");
+        }
+
+        [Test]
+        public void TryBuy_FiresUpgradeAppliedOncePerPurchase()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("amp_strings", UpgradeType.Buff, ContentScope.Run,
+                    null, new GeneratorOutputMultiplierPayload("practice_amp", 2), costAmount: 500),
+            }, currencies, new FlagSystem(), modifiers);
+            var context = TestContent.MakeContext(currencies);
+            var applied = 0;
+            upgrades.UpgradeApplied += _ => applied++;
+            currencies.Add("cash", 500);
+
+            Assert.IsTrue(upgrades.TryBuy(upgrades.Get("amp_strings"), context));
+            Assert.IsFalse(upgrades.TryBuy(upgrades.Get("amp_strings"), context));
+
+            Assert.AreEqual(1, applied, "one notification for the one purchase");
+            Assert.AreEqual(2.0,
+                modifiers.For(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "practice_amp")).Multiply.ToDouble(),
+                1e-9);
+        }
+
+        // the shared evaluator means a non-Cash gate is the same shape with a
+        // different currency id - tight_set is the Ch1 proof
+        [Test]
+        public void TryBuy_GatesOnAnyCurrency_NotJustTheOneItCharges()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("tight_set", UpgradeType.Buff, ContentScope.Run,
+                    new CurrencyBalanceCondition("fans", 30),
+                    new CurrencyPerSecMultiplierPayload(new List<string> { "cash" }, 1.5), costAmount: 20000),
+            }, currencies, new FlagSystem(), modifiers);
+            var context = TestContent.MakeContext(currencies);
+            var tightSet = upgrades.Get("tight_set");
+            currencies.Add("cash", 20000);
+
+            Assert.IsFalse(upgrades.IsAvailable(tightSet, context), "the Fans gate is unmet");
+            Assert.IsTrue(upgrades.CanAfford(tightSet), "affordability is a separate question");
+            Assert.IsFalse(upgrades.TryBuy(tightSet, context));
+
+            currencies.Add("fans", 30);
+
+            Assert.IsTrue(upgrades.IsAvailable(tightSet, context), "the same evaluator, a different currency id");
+            Assert.IsTrue(upgrades.TryBuy(tightSet, context));
+            Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "cash paid");
+            Assert.AreEqual(30.0, currencies.Get("fans").ToDouble(), 1e-9, "the gated currency is never charged");
+        }
+
+        // fail closed: never charge for a purchase that could grant nothing, and
+        // never let missing tuning become an endless free purchase
+        [Test]
+        public void TryBuy_RefusesBrokenContent_WithoutCharging()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("no_payload", UpgradeType.Buff, ContentScope.Run, null, null, costAmount: 100),
+                TestContent.MakeUpgrade("free_buff", UpgradeType.Buff, ContentScope.Run,
+                    null, new TapValueAddPayload(1)),
+                TestContent.MakeUpgrade("no_currency", UpgradeType.Buff, ContentScope.Run,
+                    null, new TapValueAddPayload(1), costCurrencyId: "", costAmount: 100),
+                TestContent.MakeUpgrade("reveal", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
+                    null, new SetFlagPayload("fans")),
+            }, currencies, new FlagSystem(), modifiers);
+            var context = TestContent.MakeContext(currencies);
+            currencies.Add("cash", 1000);
+
+            LogAssert.Expect(LogType.Error,
+                "UpgradeSystem: upgrade 'no_payload' has no payload. Refusing the purchase rather than charging for nothing.");
+            Assert.IsFalse(upgrades.TryBuy(upgrades.Get("no_payload"), context));
+
+            Assert.IsFalse(upgrades.TryBuy(upgrades.Get("free_buff"), context), "a zero cost is not a free buff");
+            Assert.IsFalse(upgrades.TryBuy(upgrades.Get("no_currency"), context), "nothing to charge");
+
+            LogAssert.Expect(LogType.Error,
+                "UpgradeSystem: TryBuy on 'reveal', which is a ContentUnlock - only buffs are bought.");
+            Assert.IsFalse(upgrades.TryBuy(upgrades.Get("reveal"), context));
+
+            Assert.AreEqual(1000.0, currencies.Get("cash").ToDouble(), 1e-9, "not a coin spent");
+        }
+
         // tuning that the registry refuses at runtime is reported against the
         // asset too, so a content mistake surfaces at boot instead of as an
         // effect that silently never applied

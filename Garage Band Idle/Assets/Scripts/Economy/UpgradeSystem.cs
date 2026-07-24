@@ -7,10 +7,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // Runtime home of a chapter's upgrades. Implements the general content-unlock
     // mechanism (design doc sections 2 and 4): a contentUnlock upgrade whose gate
     // is met applies its payload - setFlag latches the named flag in the single
-    // reveal registry, which sections and other gates observe. Buff upgrades
-    // (purchase, tap/output payloads) arrive in the buff slice; their definitions
-    // load and validate but are never auto-applied here. Gate conditions are
-    // validated by the boot validation pass (ContentValidator), not here.
+    // reveal registry, which sections and other gates observe. Buffs are never
+    // auto-applied: they are bought through TryBuy, which charges the declared
+    // cost currency and grants the payload. Gate conditions are validated by the
+    // boot validation pass (ContentValidator), not here.
     public class UpgradeSystem
     {
         private readonly List<Upgrade> _upgrades = new();
@@ -83,6 +83,72 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
+        // Whether the UI should offer this buff: its gate holds and it has not
+        // been bought yet. Affordability is deliberately separate so a row can
+        // show a priced, disabled button rather than vanishing.
+        public bool IsAvailable(Upgrade upgrade, ConditionContext context)
+            => upgrade != null
+               && upgrade.Definition.Type == UpgradeType.Buff
+               && !upgrade.Applied
+               && ConditionEvaluator.IsMet(upgrade.Definition.Gate, context);
+
+        public bool CanAfford(Upgrade upgrade)
+            => upgrade != null
+               && upgrade.Definition.CostAmount > 0
+               && !string.IsNullOrEmpty(upgrade.Definition.CostCurrencyId)
+               && _currencies.Get(upgrade.Definition.CostCurrencyId) >= (BigNumber)upgrade.Definition.CostAmount;
+
+        // Buys one buff: charges the declared cost currency and grants the
+        // payload. Every refusal is silent except the ones that mean broken
+        // content, because the UI calls this on a button press.
+        public bool TryBuy(Upgrade upgrade, ConditionContext context)
+        {
+            if (upgrade == null)
+                return false;
+
+            // content unlocks are free and apply on their gate; buying one is a
+            // caller mistake, not a rejected purchase
+            if (upgrade.Definition.Type != UpgradeType.Buff)
+            {
+                Debug.LogError($"UpgradeSystem: TryBuy on '{upgrade.Definition.Id}', which is a {upgrade.Definition.Type} - only buffs are bought.");
+                return false;
+            }
+
+            if (upgrade.Applied)
+                return false;
+            if (!ConditionEvaluator.IsMet(upgrade.Definition.Gate, context))
+                return false;
+
+            // fail closed on broken content (boot validation reports all three):
+            // never charge for a payload that would grant nothing, and never let
+            // a missing price or currency become an endless free purchase
+            var payload = upgrade.Definition.Payload;
+            if (payload == null)
+            {
+                Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' has no payload. Refusing the purchase rather than charging for nothing.");
+                return false;
+            }
+
+            var cost = (BigNumber)upgrade.Definition.CostAmount;
+            if (cost <= BigNumber.Zero)
+                return false;
+
+            var currencyId = upgrade.Definition.CostCurrencyId;
+            if (string.IsNullOrEmpty(currencyId))
+                return false;
+            if (_currencies.Get(currencyId) < cost)
+                return false;
+
+            // state, then notify: the latch and the effect settle before the
+            // spend fires BalanceChanged, so no condition evaluator or UI
+            // subscriber observes the money gone with the buff not yet granted
+            upgrade.MarkApplied();
+            payload.Apply(_payloadContext, upgrade.Definition.Scope);
+            _currencies.Add(currencyId, -cost);
+            UpgradeApplied?.Invoke(upgrade);
+            return true;
+        }
+
         private void Apply(Upgrade upgrade)
         {
             var payload = upgrade.Definition.Payload;
@@ -107,10 +173,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             if (definition.Type != UpgradeType.ContentUnlock)
                 return;
 
-            // content unlocks auto-apply on gate met; a price needs the purchase
-            // flow that arrives with the buff-upgrades slice
+            // content unlocks apply on their gate and are never bought, so a
+            // price on one would never be charged - only buffs go through TryBuy
             if (definition.CostAmount > 0)
-                Debug.LogError($"UpgradeSystem: content unlock '{definition.Id}' has a non-zero cost, but content unlocks are applied automatically in this slice. Its cost will be ignored.");
+                Debug.LogError($"UpgradeSystem: content unlock '{definition.Id}' has a non-zero cost, but content unlocks are applied automatically. Its cost will be ignored.");
         }
     }
 }

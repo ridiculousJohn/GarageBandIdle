@@ -60,6 +60,13 @@
       "note": "Appears with the Stage-0 goal; the practice_amp row unlocks at the same moment. Later sections gate on flags, e.g. { \"type\": \"flagSet\", \"flag\": \"fans\" }."
     },
     {
+      "id": "the_gear",
+      "name": "The Gear",
+      "modules": [ "module/upgrade-list" ],
+      "visibleWhen": { "type": "currency", "currency": "cash", "amount": 250 },
+      "note": "The buff list. Gated to the first buff's own gate (stage_presence at 250 Cash) so the region never shows empty - a section reveal latches, while each row appears and disappears on its own gate and purchase state, which is what brings rows back after an album release."
+    },
+    {
       "id": "rehearsal_space",
       "name": "The Rehearsal Space",
       "modules": [ "module/bar-list" ],

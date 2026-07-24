@@ -63,6 +63,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - upgrade
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2018d01baa90feb4489548a760c0d9c8
+    m_Address: section/the_gear
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - section
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 22448b83a4dc18d4abc83b27242ed4ed
     m_Address: event/garage_jam
     m_ReadOnly: 0
@@ -134,6 +140,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - upgrade
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6a9e3c18b5d74f02a7c4e9b16d0f8a23
+    m_Address: module/upgrade-list
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - module
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6dfda3c9f5fea7d4497d8a78e2ac8645
     m_Address: upgrade/stage_presence

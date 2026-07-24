@@ -183,6 +183,19 @@ namespace RidiculousGaming.GarageBandIdle
             Bars.Tick();
         }
 
+        public bool BuyUpgrade(Upgrade upgrade)
+        {
+            if (CurrentChapter == null || Upgrades == null)
+                return false;
+            if (!Upgrades.TryBuy(upgrade, Conditions))
+                return false;
+
+            // the spend moves a balance, which can satisfy a content unlock's
+            // gate right now (the same reason BuyGenerator re-evaluates)
+            Upgrades.EvaluateContentUnlocks(Conditions);
+            return true;
+        }
+
         public bool BuyGenerator(Generator generator)
         {
             if (generator == null || !generator.Unlocked)

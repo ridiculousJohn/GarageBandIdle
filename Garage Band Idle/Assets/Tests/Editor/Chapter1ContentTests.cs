@@ -283,7 +283,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Sections_MatchJson()
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
-            CollectionAssert.AreEqual(new[] { "garage_floor", "the_band", "rehearsal_space" }, chapter.SectionIds);
+            CollectionAssert.AreEqual(new[] { "garage_floor", "the_band", "the_gear", "rehearsal_space" },
+                chapter.SectionIds);
 
             var garageFloor = LoadById<SectionDefinition>(SectionsFolder, "garage_floor");
             Assert.IsNull(garageFloor.VisibleWhen, "garage_floor is visible from chapter start");
@@ -294,6 +295,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNotNull(visibleWhen, "the_band reveals on an earned-total condition");
             Assert.AreEqual("cash", visibleWhen.CurrencyId);
             Assert.AreEqual(100, visibleWhen.Value, 1e-9);
+
+            // the buff list reveals on the first buff's own gate, so the region
+            // never shows before it has a row to show
+            var theGear = LoadById<SectionDefinition>(SectionsFolder, "the_gear");
+            var gearGate = theGear.VisibleWhen as CurrencyBalanceCondition;
+            Assert.IsNotNull(gearGate, "the_gear reveals on a currency balance condition");
+            Assert.AreEqual("cash", gearGate.CurrencyId);
+            Assert.AreEqual(250, gearGate.Amount, 1e-9, "stage_presence's own gate");
+            CollectionAssert.AreEqual(new[] { "module/upgrade-list" }, theGear.ModuleAddresses);
 
             var rehearsalSpace = LoadById<SectionDefinition>(SectionsFolder, "rehearsal_space");
             var coversGate = rehearsalSpace.VisibleWhen as FlagSetCondition;
