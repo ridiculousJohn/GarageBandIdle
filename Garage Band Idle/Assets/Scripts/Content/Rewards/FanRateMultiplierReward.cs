@@ -21,9 +21,11 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public double Value => _value;
         public ContentScope Scope => _scope;
 
-        // the reward's scope travels with the effect, so the fan system can
-        // reset run-scoped multipliers without touching permanent ones
-        public override void Apply(RewardContext context) => context.Fans.MultiplyRate(_value, _scope);
+        // the reward's scope travels with the effect, so the run reset clears
+        // run-scoped multipliers without touching permanent-in-chapter ones
+        public override void Apply(RewardContext context)
+            => context.Modifiers.Grant(ModifierTargetKey.Global(ModifierTarget.FanRate),
+                ModifierOperation.Multiply, _scope, _value);
 
 #if UNITY_EDITOR
         public void EditorInitialize(string id, string displayName, double value, ContentScope scope)

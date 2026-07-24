@@ -37,7 +37,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var currencies = TestContent.MakeEconomy();
             var definition = TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4);
-            var generators = new GeneratorSystem(new[] { definition }, currencies);
+            var generators = new GeneratorSystem(new[] { definition }, currencies, new ModifierSystem());
             var context = TestContent.MakeContext(currencies, generators);
             var condition = new OwnedCountCondition("amp", 2);
 

@@ -23,10 +23,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public IReadOnlyList<Upgrade> All => _upgrades;
 
-        public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, CurrencyManager currencies, FlagSystem flags)
+        public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, CurrencyManager currencies,
+            FlagSystem flags, ModifierSystem modifiers)
         {
             _currencies = currencies;
-            _payloadContext = new UpgradePayloadContext(flags);
+            _payloadContext = new UpgradePayloadContext(flags, modifiers);
 
             foreach (var definition in definitions)
             {

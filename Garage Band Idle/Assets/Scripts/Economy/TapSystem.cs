@@ -1,74 +1,45 @@
 using System;
-using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // Jam tap value (design doc section 3): cash per tap is the chapter's
-    // base times the tap-reward multiplier stacks. Multipliers are tracked
-    // PER SCOPE, mirroring FanSystem: the run reset (album release, event
-    // baseline) clears the run-scoped stack and keeps the permanent-in-
-    // chapter one - collapsing scopes into one number would make "reset
-    // run-scoped effects" unimplementable. Flat tap-value adds
-    // (TapValueAddPayload) arrive with the buff slice and will feed in here.
+    // Jam tap value (design doc section 3): the chapter's base composed with
+    // every modifier targeting TapValue. The stacks live in ModifierSystem, not
+    // here - flat adds (stage_presence) and multipliers (event-tier rewards)
+    // compose by the one rule, per scope, and the run reset that clears the
+    // run-scoped ones is that system's single entry point.
     public class TapSystem
     {
+        private static readonly ModifierTargetKey Target = ModifierTargetKey.Global(ModifierTarget.TapValue);
+
         private readonly double _baseValue;
+        private readonly ModifierSystem _modifiers;
 
-        private BigNumber _runMultiplier = BigNumber.One;
-        private BigNumber _permanentMultiplier = BigNumber.One;
-
-        public TapSystem(double baseValue)
+        public TapSystem(double baseValue, ModifierSystem modifiers)
         {
             _baseValue = baseValue;
+            _modifiers = modifiers;
+            _modifiers.Changed += HandleModifierChanged;
         }
 
-        // UI listens here, nothing polls; fires only when Value actually moved
+        // UI listens here, nothing polls; fires when the composed value moves
         public event Action ValueChanged;
 
-        // fails closed on a negative base - invalid data, boot validation
-        // reports it: a tap must never drain cash
-        public BigNumber Value => _baseValue < 0
-            ? BigNumber.Zero
-            : (BigNumber)_baseValue * _runMultiplier * _permanentMultiplier;
-
-        public void MultiplyValue(double factor, ContentScope scope)
+        // Fails closed on tuning that would make a tap drain cash: a negative
+        // base (invalid data - boot validation reports it) or any composition
+        // landing below zero yields nothing, and no multiplier resurrects it.
+        public BigNumber Value
         {
-            // fail closed on broken content: a non-positive factor would zero
-            // or negate the whole multiplicative stack for the rest of the run
-            // (boot validation reports it)
-            if (factor <= 0)
+            get
             {
-                Debug.LogError($"TapSystem: MultiplyValue with non-positive factor '{factor}'. Ignoring.");
-                return;
-            }
-
-            switch (scope)
-            {
-                case ContentScope.Run:
-                    _runMultiplier *= factor;
-                    ValueChanged?.Invoke();
-                    break;
-                case ContentScope.PermanentInChapter:
-                    _permanentMultiplier *= factor;
-                    ValueChanged?.Invoke();
-                    break;
-                default:
-                    // fail closed on broken content: boot validation reports a
-                    // None scope; an unscoped multiplier must never apply
-                    Debug.LogError($"TapSystem: MultiplyValue with scope '{scope}'. Ignoring.");
-                    break;
+                var value = _modifiers.For(Target).ApplyTo(_baseValue);
+                return value < BigNumber.Zero ? BigNumber.Zero : value;
             }
         }
 
-        // the run reset (album release, event baseline) clears only the
-        // run-scoped stack; permanent-in-chapter rewards survive
-        public void ResetRunScopedMultipliers()
+        private void HandleModifierChanged(ModifierTargetKey target)
         {
-            if (_runMultiplier == BigNumber.One)
-                return;
-
-            _runMultiplier = BigNumber.One;
-            ValueChanged?.Invoke();
+            if (target.Equals(Target))
+                ValueChanged?.Invoke();
         }
     }
 }

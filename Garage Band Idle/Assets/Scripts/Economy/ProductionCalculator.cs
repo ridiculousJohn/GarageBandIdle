@@ -2,17 +2,20 @@ using System.Collections.Generic;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // Income math per the design doc section 3: sum of generator output, then
-    // the global multipliers. Only the Records multiplier exists in Chapter 1;
-    // catalog/roadie/encore multiply into IncomeMultiplier in later slices.
+    // Income math per the design doc section 3. This is formula only: the
+    // modifiers that scale production are composed by ModifierSystem, so
+    // catalog/roadie/encore arrive as more derived modifiers rather than more
+    // parameters here.
     public static class ProductionCalculator
     {
-        // permanent global buff: 1 + buffPerRecord x records (additive per Record)
+        // permanent global buff: 1 + buffPerRecord x records (additive per
+        // Record), the value RecordsIncomeModifier reports
         public static BigNumber IncomeMultiplier(BigNumber records, double buffPerRecord)
             => BigNumber.One + records * buffPerRecord;
 
-        // sum(gen.baseOutput x count) for one produced currency, times the multiplier
-        public static BigNumber TotalPerSecond(IReadOnlyList<Generator> generators, string currencyId, BigNumber incomeMultiplier)
+        // sum of one produced currency's generator output, each generator
+        // already composed with the modifiers targeting it
+        public static BigNumber TotalPerSecond(IReadOnlyList<Generator> generators, string currencyId)
         {
             var sum = BigNumber.Zero;
             foreach (var generator in generators)
@@ -20,7 +23,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 if (generator.Definition.ProducesCurrencyId == currencyId)
                     sum += generator.ProductionPerSecond;
             }
-            return sum * incomeMultiplier;
+            return sum;
         }
     }
 }

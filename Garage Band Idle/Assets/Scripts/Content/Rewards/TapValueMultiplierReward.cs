@@ -1,3 +1,4 @@
+using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Content
@@ -20,7 +21,8 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public ContentScope Scope => _scope;
 
         public override void Apply(RewardContext context)
-            => context.Tap.MultiplyValue(_value, _scope);
+            => context.Modifiers.Grant(ModifierTargetKey.Global(ModifierTarget.TapValue),
+                ModifierOperation.Multiply, _scope, _value);
 
 #if UNITY_EDITOR
         public void EditorInitialize(string id, string displayName, double value, ContentScope scope)

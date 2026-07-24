@@ -40,29 +40,54 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TotalPerSecond_SumsOnlyTheRequestedCurrency()
         {
             var currencies = TestContent.MakeEconomy();
-            var cashGen = new Generator(TestContent.MakeGenerator("cash_gen", "cash", 10, 1.15, 3));
-            var recordsGen = new Generator(TestContent.MakeGenerator("records_gen", "records", 10, 1.15, 50));
+            var modifiers = new ModifierSystem();
+            var cashGen = new Generator(TestContent.MakeGenerator("cash_gen", "cash", 10, 1.15, 3), modifiers);
+            var recordsGen = new Generator(TestContent.MakeGenerator("records_gen", "records", 10, 1.15, 50), modifiers);
             TestContent.BuyTimes(cashGen, currencies, 4);
             TestContent.BuyTimes(recordsGen, currencies, 2);
             var generators = new[] { cashGen, recordsGen };
 
-            var cashPerSecond = ProductionCalculator.TotalPerSecond(generators, "cash", BigNumber.One);
-            var recordsPerSecond = ProductionCalculator.TotalPerSecond(generators, "records", BigNumber.One);
+            var cashPerSecond = ProductionCalculator.TotalPerSecond(generators, "cash");
+            var recordsPerSecond = ProductionCalculator.TotalPerSecond(generators, "records");
 
             Assert.AreEqual(12.0, cashPerSecond.ToDouble(), 1e-9);   // 3 x 4 owned
             Assert.AreEqual(100.0, recordsPerSecond.ToDouble(), 1e-9); // 50 x 2 owned
         }
 
+        // a generator's own output modifier composes into its rate, so the row
+        // readout and the tick both pick it up with no second code path
         [Test]
-        public void TotalPerSecond_AppliesIncomeMultiplier()
+        public void ProductionPerSecond_ComposesTheGeneratorsOwnOutputModifier()
         {
             var currencies = TestContent.MakeEconomy();
-            var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 5));
+            var modifiers = new ModifierSystem();
+            var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 5), modifiers);
             TestContent.BuyTimes(generator, currencies, 2);
+            Assert.AreEqual(10.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "5 output x 2 owned");
 
-            var perSecond = ProductionCalculator.TotalPerSecond(new[] { generator }, "cash", 1.5);
+            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "gen"),
+                ModifierOperation.Multiply, ContentScope.Run, 1.5);
 
-            Assert.AreEqual(15.0, perSecond.ToDouble(), 1e-9); // 5 x 2 x 1.5
+            Assert.AreEqual(15.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "5 x 2 x 1.5");
+
+            // a modifier naming another generator never reaches this one
+            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "someone_else"),
+                ModifierOperation.Multiply, ContentScope.Run, 10);
+            Assert.AreEqual(15.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "another generator's buff is not ours");
+        }
+
+        // an unowned generator produces nothing whatever targets it: a flat add
+        // must never pay out for gear the player never bought
+        [Test]
+        public void ProductionPerSecond_IsZeroWhileUnowned_EvenWithAnAddModifier()
+        {
+            var modifiers = new ModifierSystem();
+            var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 5), modifiers);
+
+            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "gen"),
+                ModifierOperation.Add, ContentScope.Run, 100);
+
+            Assert.AreEqual(0.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "nothing owned, nothing produced");
         }
 
         [Test]
@@ -70,42 +95,78 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var currencies = TestContent.MakeEconomy();
             var definition = TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4);
-            var system = new GeneratorSystem(new[] { definition }, currencies);
+            var system = new GeneratorSystem(new[] { definition }, currencies, new ModifierSystem());
             TestContent.BuyTimes(system.Get("amp"), currencies, 1);
             var before = currencies.Get("cash");
 
-            system.Tick(10.0, BigNumber.One, new[] { "cash" });
+            system.Tick(10.0);
 
             Assert.AreEqual(4.0, (currencies.Get("cash") - before).ToDouble(), 1e-9); // 0.4/sec x 10s
         }
 
-        // a multiplier is an output effect that declares its targets: production
-        // of a currency it doesn't name is untouched, no matter what generators
-        // exist - fans/records producers must never inherit the cash buff
+        // a multiplier is granted against the currency production it names:
+        // production of a currency nothing targets is untouched, no matter what
+        // generators exist - fans/records producers never inherit the cash buff
         [Test]
-        public void Tick_AppliesTheMultiplierOnlyToTheCurrenciesItDeclares()
+        public void Tick_AppliesAMultiplierOnlyToTheCurrencyItTargets()
         {
             var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
             var cashGen = TestContent.MakeGenerator("cash_gen", "cash", 10, 1.15, 3);
             var fansGen = TestContent.MakeGenerator("fans_gen", "fans", 10, 1.15, 5);
-            var system = new GeneratorSystem(new[] { cashGen, fansGen }, currencies);
+            var system = new GeneratorSystem(new[] { cashGen, fansGen }, currencies, modifiers);
             TestContent.BuyTimes(system.Get("cash_gen"), currencies, 1);
             TestContent.BuyTimes(system.Get("fans_gen"), currencies, 1);
             var cashBefore = currencies.Get("cash");
             var fansBefore = currencies.Get("fans");
 
-            system.Tick(10.0, 2.0, new[] { "cash" });
+            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash"),
+                ModifierOperation.Multiply, ContentScope.Run, 2.0);
+            system.Tick(10.0);
 
             Assert.AreEqual(60.0, (currencies.Get("cash") - cashBefore).ToDouble(), 1e-9); // 3 x 2 x 10s
             Assert.AreEqual(50.0, (currencies.Get("fans") - fansBefore).ToDouble(), 1e-9,
-                "undeclared currency takes no multiplier"); // 5 x 1 x 10s
+                "an untargeted currency takes no multiplier"); // 5 x 1 x 10s
+        }
+
+        // the Records buff is a derived modifier: always on, tracking the
+        // balance, and confined to the currencies the chapter declares
+        [Test]
+        public void RecordsIncomeModifier_TracksTheBalance_AndOnlyItsOwnCurrency()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
+            var cashGen = TestContent.MakeGenerator("cash_gen", "cash", 10, 1.15, 3);
+            var fansGen = TestContent.MakeGenerator("fans_gen", "fans", 10, 1.15, 5);
+            var system = new GeneratorSystem(new[] { cashGen, fansGen }, currencies, modifiers);
+            TestContent.BuyTimes(system.Get("cash_gen"), currencies, 1);
+            TestContent.BuyTimes(system.Get("fans_gen"), currencies, 1);
+            modifiers.AddDerived(new RecordsIncomeModifier(currencies, "records", 0.02, "cash"));
+
+            var cashTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash");
+            var fansTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "fans");
+            Assert.AreEqual(1.0, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "no records, no bonus");
+
+            currencies.Add("records", 10);
+
+            Assert.AreEqual(1.2, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9,
+                "the value follows the balance with nothing re-applying it");
+            Assert.AreEqual(1.0, modifiers.For(fansTarget).Multiply.ToDouble(), 1e-9,
+                "an undeclared currency never inherits the Records buff");
+
+            // a run reset drops granted modifiers and leaves derived ones: the
+            // Records balance is what governs this buff's lifetime
+            modifiers.Grant(cashTarget, ModifierOperation.Multiply, ContentScope.Run, 3.0);
+            Assert.AreEqual(3.6, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "granted x derived");
+            modifiers.ResetRunScoped();
+            Assert.AreEqual(1.2, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "the derived buff survives");
         }
 
         [Test]
         public void TryBuy_DeductsCostAndFailsWhenUnaffordable()
         {
             var currencies = TestContent.MakeEconomy();
-            var generator = new Generator(TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4));
+            var generator = new Generator(TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4), new ModifierSystem());
 
             currencies.Add("cash", 100);
             Assert.IsTrue(generator.TryBuy(currencies));
@@ -124,7 +185,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ProductionPerSecond_FailsClosedOnANegativeBaseOutput()
         {
             var currencies = TestContent.MakeEconomy();
-            var generator = new Generator(TestContent.MakeGenerator("leak", "cash", 10, 1.15, -5));
+            var generator = new Generator(TestContent.MakeGenerator("leak", "cash", 10, 1.15, -5), new ModifierSystem());
             TestContent.BuyTimes(generator, currencies, 1);
 
             Assert.AreEqual(0.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "never negative production");
@@ -136,7 +197,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TryBuy_FailsClosedOnANonPositiveCost()
         {
             var currencies = TestContent.MakeEconomy();
-            var generator = new Generator(TestContent.MakeGenerator("broken", "cash", 0, 0, 1));
+            var generator = new Generator(TestContent.MakeGenerator("broken", "cash", 0, 0, 1), new ModifierSystem());
             currencies.Add("cash", 100);
 
             Assert.IsFalse(generator.TryBuy(currencies));
@@ -151,7 +212,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TryBuy_ChargesTheCostCurrency_NeverTheProducedCurrency()
         {
             var currencies = TestContent.MakeEconomy();
-            var generator = new Generator(TestContent.MakeGenerator("merch_stand", "fans", 60, 1.15, 1));
+            var generator = new Generator(TestContent.MakeGenerator("merch_stand", "fans", 60, 1.15, 1), new ModifierSystem());
             currencies.Add("cash", 100);
 
             Assert.IsTrue(generator.TryBuy(currencies));
@@ -171,7 +232,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4),
                 TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3),
-            }, currencies);
+            }, currencies, new ModifierSystem());
             TestContent.BuyTimes(system.Get("amp"), currencies, 2);
             TestContent.BuyTimes(system.Get("drummer"), currencies, 3);
 
@@ -208,7 +269,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4),
                 TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3),
-            }, currencies);
+            }, currencies, new ModifierSystem());
 
             var notifications = 0;
             var observedPartialRestore = false;
@@ -238,7 +299,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var system = new GeneratorSystem(new[]
             {
                 TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4),
-            }, currencies);
+            }, currencies, new ModifierSystem());
 
             LogAssert.Expect(LogType.Error, "GeneratorSystem: RestoreOwned with unknown generator id 'ghost'. Skipping it.");
             system.RestoreOwned(new Dictionary<string, int> { { "ghost", 3 } });
@@ -256,7 +317,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TryBuy_OwnedIsCountedBeforeTheSpendNotifies()
         {
             var currencies = TestContent.MakeEconomy();
-            var generator = new Generator(TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4));
+            var generator = new Generator(TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4), new ModifierSystem());
             currencies.Add("cash", 60);
 
             var ownedDuringSpend = -1;

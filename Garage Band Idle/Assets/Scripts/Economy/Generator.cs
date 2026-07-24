@@ -18,20 +18,27 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // fires after a successful purchase changes Owned; code-only subscribers
         public event Action OwnedChanged;
 
-        public Generator(GeneratorDefinition definition)
+        private readonly ModifierSystem _modifiers;
+        private readonly ModifierTargetKey _outputTarget;
+
+        public Generator(GeneratorDefinition definition, ModifierSystem modifiers)
         {
             Definition = definition;
+            _modifiers = modifiers;
+            _outputTarget = ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, definition.Id);
         }
 
         public BigNumber NextCost => CostCalculator.Cost(Definition, Owned);
 
-        // Base production before global multipliers (those apply in
-        // ProductionCalculator). Fails closed on a negative base output -
-        // invalid data, boot validation reports it: production must never
-        // drain a currency.
-        public BigNumber ProductionPerSecond => Definition.BaseOutput < 0
+        // This generator's output, composed with the modifiers targeting it
+        // (amp_strings, kit_upgrade). Currency-wide multipliers compose over the
+        // summed fleet in GeneratorSystem, not here. Fails closed twice: a
+        // negative base output must never drain a currency (invalid data, boot
+        // validation reports it), and an unowned generator produces nothing
+        // whatever targets it - a flat add must not pay out gear you never bought.
+        public BigNumber ProductionPerSecond => Owned == 0 || Definition.BaseOutput < 0
             ? BigNumber.Zero
-            : (BigNumber)Definition.BaseOutput * Owned;
+            : _modifiers.For(_outputTarget).ApplyTo((BigNumber)Definition.BaseOutput * Owned);
 
         // buys one unit if affordable; deducts the declared cost currency -
         // never the produced currency - and bumps Owned

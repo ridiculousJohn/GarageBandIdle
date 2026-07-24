@@ -35,8 +35,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static BarSystem MakeCoversSetup(CurrencyManager currencies, FlagSystem flags,
             out FanSystem fans)
         {
-            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
+            fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -53,7 +54,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new List<string> { "cover_1", "cover_2", "cover_3" });
 
             return new BarSystem(new[] { group }, bars, currencies, rewards,
-                new RewardContext(currencies, flags, fans));
+                new RewardContext(currencies, flags, modifiers));
         }
 
         // MakeCoversSetup plus a permanent-in-chapter group, for the run-reset
@@ -61,8 +62,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static BarSystem MakeTwoScopeSetup(CurrencyManager currencies, FlagSystem flags,
             out FanSystem fans)
         {
-            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
+            fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -81,7 +83,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new List<string> { "song_1" }, scope: ContentScope.PermanentInChapter);
 
             return new BarSystem(new[] { run, permanent }, bars, currencies, rewards,
-                new RewardContext(currencies, flags, fans));
+                new RewardContext(currencies, flags, modifiers));
         }
 
         [Test]
@@ -263,7 +265,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Error, "BarSystem: bar group 'broken' has no fill behavior. Skipping it.");
             var bars = new BarSystem(new[] { group }, new[] { bar }, currencies, rewards,
-                new RewardContext(currencies, flags, null));
+                new RewardContext(currencies, flags, new ModifierSystem()));
 
             Assert.AreEqual(0, bars.Groups.Count, "a behaviorless group never reaches the runtime");
             bars.Tick();
@@ -281,8 +283,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = MakeEconomyWithRehearsal();
             var flags = new FlagSystem();
             flags.Set("fans");
-            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -293,7 +296,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Error,
                 "BarSystem: bar 'broken_cover' has a non-positive fill requirement (0). Skipping it.");
             var system = new BarSystem(new[] { group }, bars, currencies, rewards,
-                new RewardContext(currencies, flags, fans));
+                new RewardContext(currencies, flags, modifiers));
 
             Assert.AreEqual(0, system.GetBars("learn_covers").Count, "the rejected bar has no state");
             Assert.AreEqual(0, system.CompletedCount("learn_covers"), "it never satisfies a barsCompleted gate");

@@ -33,6 +33,7 @@ namespace RidiculousGaming.GarageBandIdle
         public ContentDatabase Database { get; private set; }
         public CurrencyManager Currencies { get; private set; }
         public FlagSystem Flags { get; private set; }
+        public ModifierSystem Modifiers { get; private set; }
         public ChapterDefinition CurrentChapter { get; private set; }
         public GeneratorSystem Generators { get; private set; }
         public UpgradeSystem Upgrades { get; private set; }
@@ -59,6 +60,10 @@ namespace RidiculousGaming.GarageBandIdle
             Database = new ContentDatabase();
             Currencies = new CurrencyManager(Database.CurrencyGroups.All, Database.Currencies.All);
 
+            // built before the systems that read it: every stat effect in the
+            // game composes through here, so no system holds its own stack
+            Modifiers = new ModifierSystem();
+
             // the lowest chapter index is the starting chapter; chapter advancement
             // (ChapterManager) is a later slice
             foreach (var chapter in Database.Chapters.All)
@@ -77,10 +82,20 @@ namespace RidiculousGaming.GarageBandIdle
                 // the chapter's declared flags are the known set; setting or
                 // gating on anything else is reported as a content mistake
                 Flags = new FlagSystem(CurrentChapter.FlagIds);
-                Generators = new GeneratorSystem(Resolve(Database.Generators, CurrentChapter.GeneratorIds, "generator"), Currencies);
-                Upgrades = new UpgradeSystem(Resolve(Database.Upgrades, CurrentChapter.UpgradeIds, "upgrade"), Currencies, Flags);
-                Fans = new FanSystem(CurrentChapter.Fans, Currencies, Generators, Flags);
-                Tap = new TapSystem(CurrentChapter.TapBaseValue);
+                Generators = new GeneratorSystem(Resolve(Database.Generators, CurrentChapter.GeneratorIds, "generator"), Currencies, Modifiers);
+                Upgrades = new UpgradeSystem(Resolve(Database.Upgrades, CurrentChapter.UpgradeIds, "upgrade"), Currencies, Flags, Modifiers);
+                Fans = new FanSystem(CurrentChapter.Fans, Currencies, Generators, Flags, Modifiers);
+                Tap = new TapSystem(CurrentChapter.TapBaseValue, Modifiers);
+
+                // the Records buff is derived, not granted: one modifier per
+                // currency the chapter's recordBuff declares, each reading the
+                // Records balance, so production of anything undeclared is
+                // untouched and nothing has to remember to re-apply it
+                foreach (var currencyId in CurrentChapter.RecordBuff.AffectsCurrencyIds)
+                {
+                    Modifiers.AddDerived(new RecordsIncomeModifier(
+                        Currencies, RecordsCurrencyId, CurrentChapter.RecordBuff.PerRecord, currencyId));
+                }
                 // only the CURRENT chapter's declared currencies earn: flag
                 // ids may legitimately repeat across chapters, so ownership
                 // comes from the chapter's currency list, never from flags
@@ -88,7 +103,7 @@ namespace RidiculousGaming.GarageBandIdle
                     Resolve(Database.Currencies, CurrentChapter.CurrencyIds, "currency"), Currencies, Flags);
                 Rewards = new RewardManager(Database.Rewards.All);
                 Bars = new BarSystem(Resolve(Database.BarGroups, CurrentChapter.BarGroupIds, "bar group"),
-                    Database.Bars.All, Currencies, Rewards, new RewardContext(Currencies, Flags, Fans, Tap));
+                    Database.Bars.All, Currencies, Rewards, new RewardContext(Currencies, Flags, Modifiers));
                 Sections = Resolve(Database.Sections, CurrentChapter.SectionIds, "section");
 
                 Conditions = new ConditionContext(Currencies, Generators, Flags, RecordsCurrencyId, Database, Bars);
@@ -136,11 +151,9 @@ namespace RidiculousGaming.GarageBandIdle
             if (Generators == null)
                 return;
 
-            // the Records buff applies only to the currencies it declares
-            // (cash in Ch1); production of anything it doesn't name is untouched
-            var multiplier = ProductionCalculator.IncomeMultiplier(
-                Currencies.Get(RecordsCurrencyId), CurrentChapter.RecordBuff.PerRecord);
-            Generators.Tick(seconds, multiplier, CurrentChapter.RecordBuff.AffectsCurrencyIds);
+            // production composes its own modifiers per currency (the Records
+            // buff among them), so the tick passes no multipliers
+            Generators.Tick(seconds);
             Generators.EvaluateUnlocks(Conditions);
 
             // content unlocks before fan accrual so a freshly-set fans flag

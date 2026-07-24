@@ -17,20 +17,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static UpgradePayload SetFlag(string flagId) => new SetFlagPayload(flagId);
 
+        private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Global(ModifierTarget.FanRate);
+        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
+
         [Test]
         public void ContentUnlock_AppliesWhenGateMet_AndSetsTheFlag()
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(
                 new[] { TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true) },
-                currencies);
+                currencies, modifiers);
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("play_for_crowd", UpgradeType.ContentUnlock,
                     ContentScope.PermanentInChapter,
                     new OwnedCountCondition("drummer", 1), SetFlag("fans")),
-            }, currencies, flags);
+            }, currencies, flags, modifiers);
             var context = TestContent.MakeContext(currencies, generators, flags);
 
             upgrades.EvaluateContentUnlocks(context);
@@ -54,7 +58,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 // no gate = met from the start
                 TestContent.MakeUpgrade("auto", UpgradeType.ContentUnlock,
                     ContentScope.PermanentInChapter, null, SetFlag("fans")),
-            }, currencies, flags);
+            }, currencies, flags, new ModifierSystem());
             var context = TestContent.MakeContext(currencies, flags: flags);
             var appliedCount = 0;
             upgrades.UpgradeApplied += _ => appliedCount++;
@@ -76,7 +80,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff,
                     ContentScope.Run, null,
                     new TapValueAddPayload(1)),
-            }, currencies, flags);
+            }, currencies, flags, new ModifierSystem());
             var context = TestContent.MakeContext(currencies, flags: flags);
 
             upgrades.EvaluateContentUnlocks(context);
@@ -89,10 +93,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(
                 new[] { TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true) },
-                currencies);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+                currencies, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
 
             fans.Tick(10);
             Assert.AreEqual(0.0, currencies.Get("fans").ToDouble(), 1e-9, "no accrual before the flag");
@@ -111,9 +116,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             flags.Set("fans");
-            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
-            var context = new Content.RewardContext(currencies, flags, fans);
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
+            var context = new Content.RewardContext(currencies, flags, modifiers);
 
             TestContent.MakeFanRateReward("boost_a", 1.15).Apply(context);
             TestContent.MakeFanRateReward("boost_b", 1.15).Apply(context);
@@ -121,60 +127,63 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
         }
 
-        // multipliers are tracked per scope: the run reset (album release,
-        // event baseline) clears only run-scoped rewards - a permanent-in-
-        // chapter reward must survive it
+        // modifiers carry their scope: the run reset (album release, event
+        // baseline) drops only run-scoped rewards - a permanent-in-chapter
+        // reward must survive it
         [Test]
         public void FanRateMultipliers_RunResetKeepsPermanentInChapter()
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             flags.Set("fans");
-            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
-            var context = new Content.RewardContext(currencies, flags, fans);
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
+            var context = new Content.RewardContext(currencies, flags, modifiers);
 
             TestContent.MakeFanRateReward("run_boost", 1.5, ContentScope.Run).Apply(context);
             TestContent.MakeFanRateReward("permanent_boost", 2.0, ContentScope.PermanentInChapter).Apply(context);
             Assert.AreEqual(0.2 * 1.5 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "both scopes stack");
 
-            fans.ResetRunScopedMultipliers();
+            modifiers.ResetRunScoped();
 
             Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "run reset keeps the permanent stack");
         }
 
         // fail closed on broken content: a non-positive factor (invalid data -
-        // boot validation reports it) would zero or negate the whole stack for
-        // the rest of the run and must never apply
+        // boot validation reports it) would zero or negate the whole product
+        // for the rest of the run and must never apply
         [Test]
         public void FanRateMultiplier_FailsClosedOnANonPositiveFactor()
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             flags.Set("fans");
-            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
 
-            LogAssert.Expect(LogType.Error, "FanSystem: MultiplyRate with non-positive factor '0'. Ignoring.");
-            fans.MultiplyRate(0, ContentScope.Run);
+            LogAssert.Expect(LogType.Error,
+                "ModifierSystem: Grant on 'FanRate' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
+            modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 0);
 
             Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "the rate is untouched");
         }
 
-        // tap-value rewards route to the tap system and stack per scope,
-        // mirroring fan-rate rewards: the run reset keeps the permanent-in-
-        // chapter stack
+        // tap-value rewards target TapValue and stack per scope, mirroring
+        // fan-rate rewards: the run reset keeps the permanent-in-chapter stack
         [Test]
         public void TapValueRewards_StackPerScope_AndRunResetKeepsPermanent()
         {
-            var tap = new TapSystem(2);
-            var context = new Content.RewardContext(TestContent.MakeEconomy(), new FlagSystem(), null, tap);
+            var modifiers = new ModifierSystem();
+            var tap = new TapSystem(2, modifiers);
+            var context = new Content.RewardContext(TestContent.MakeEconomy(), new FlagSystem(), modifiers);
 
             TestContent.MakeTapValueReward("run_x2", 2.0, ContentScope.Run).Apply(context);
             TestContent.MakeTapValueReward("perm_x3", 3.0, ContentScope.PermanentInChapter).Apply(context);
             Assert.AreEqual(12.0, tap.Value.ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
 
-            tap.ResetRunScopedMultipliers();
+            modifiers.ResetRunScoped();
             Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "the run reset keeps the permanent stack");
         }
 
@@ -184,8 +193,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void TapValue_FailsClosedOnANegativeBase()
         {
-            var tap = new TapSystem(-5);
-            tap.MultiplyValue(2, ContentScope.Run);
+            var modifiers = new ModifierSystem();
+            var tap = new TapSystem(-5, modifiers);
+            modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
 
             Assert.AreEqual(0.0, tap.Value.ToDouble(), 1e-9, "never a draining tap");
         }
@@ -195,39 +205,61 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void TapValueMultiplier_FailsClosedOnANonPositiveFactor()
         {
-            var tap = new TapSystem(2);
+            var modifiers = new ModifierSystem();
+            var tap = new TapSystem(2, modifiers);
 
-            LogAssert.Expect(LogType.Error, "TapSystem: MultiplyValue with non-positive factor '0'. Ignoring.");
-            tap.MultiplyValue(0, ContentScope.Run);
+            LogAssert.Expect(LogType.Error,
+                "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
+            modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 0);
 
             Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "the value is untouched");
         }
 
-        // the UI advertises Tap.Value, so it needs a signal for every change
-        // to the value - applied multipliers and a run reset that cleared
-        // something - and no signal when nothing moved (rejected factor,
-        // no-op reset)
+        // the UI advertises Tap.Value, so it needs a signal for every change to
+        // the value - applied modifiers and a run reset that cleared something -
+        // and no signal when nothing moved (rejected value, no-op reset, or a
+        // modifier on somebody else's target)
         [Test]
         public void TapValueChanged_FiresOnlyWhenTheValueMoves()
         {
-            var tap = new TapSystem(2);
+            var modifiers = new ModifierSystem();
+            var tap = new TapSystem(2, modifiers);
             var changes = 0;
             tap.ValueChanged += () => changes++;
 
-            tap.ResetRunScopedMultipliers();
+            modifiers.ResetRunScoped();
             Assert.AreEqual(0, changes, "a no-op reset is silent");
 
-            tap.MultiplyValue(2, ContentScope.Run);
-            tap.MultiplyValue(3, ContentScope.PermanentInChapter);
-            Assert.AreEqual(2, changes, "each applied multiplier notifies");
+            modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
+            modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.PermanentInChapter, 3);
+            Assert.AreEqual(2, changes, "each applied modifier notifies");
 
-            LogAssert.Expect(LogType.Error, "TapSystem: MultiplyValue with non-positive factor '0'. Ignoring.");
-            tap.MultiplyValue(0, ContentScope.Run);
-            Assert.AreEqual(2, changes, "a rejected factor is silent");
+            LogAssert.Expect(LogType.Error,
+                "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
+            modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 0);
+            Assert.AreEqual(2, changes, "a rejected value is silent");
 
-            tap.ResetRunScopedMultipliers();
+            modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 5);
+            Assert.AreEqual(2, changes, "another target's modifier is not ours");
+
+            modifiers.ResetRunScoped();
             Assert.AreEqual(3, changes, "clearing the run stack notifies");
             Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "base 2 x permanent 3 after the reset");
+        }
+
+        // flat adds land before the multipliers, so a tap add is worth more once
+        // a multiplier is in play - one composition rule, stated once
+        [Test]
+        public void TapValue_AddsComposeBeforeMultipliers()
+        {
+            var modifiers = new ModifierSystem();
+            var tap = new TapSystem(2, modifiers);
+
+            modifiers.Grant(TapValue, ModifierOperation.Add, ContentScope.Run, 1);
+            Assert.AreEqual(3.0, tap.Value.ToDouble(), 1e-9, "base 2 + 1");
+
+            modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
+            Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "(2 + 1) x 2, never 2 + (1 x 2)");
         }
 
         [Test]
@@ -235,7 +267,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
-            var context = new Content.RewardContext(currencies, flags, null);
+            var context = new Content.RewardContext(currencies, flags, new ModifierSystem());
 
             TestContent.MakeSetFlagReward("open_backroom", "backroom").Apply(context);
 
@@ -248,14 +280,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             flags.Set("fans");
-            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
             var rewards = new Content.RewardManager(new Content.RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
                 TestContent.MakeSetFlagReward("open_backroom", "backroom"),
             });
-            var context = new Content.RewardContext(currencies, flags, fans);
+            var context = new Content.RewardContext(currencies, flags, modifiers);
 
             Assert.IsTrue(rewards.Contains("fan_rate_x1_15"));
             Assert.IsFalse(rewards.Contains("nope"));
@@ -273,13 +306,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             flags.Set("fans");
+            var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new[]
             {
                 TestContent.MakeGenerator("practice_amp", "cash", 60, 1.15, 0.4), // gear
                 TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true),
                 TestContent.MakeGenerator("bassist", "cash", 4000, 1.15, 20, isBandmate: true),
-            }, currencies);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            }, currencies, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
 
             TestContent.BuyTimes(generators.Get("drummer"), currencies, 2);
             TestContent.BuyTimes(generators.Get("bassist"), currencies, 1);

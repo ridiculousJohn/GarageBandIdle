@@ -138,7 +138,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
             var currencies = LoadCurrencyManager();
-            var generators = new GeneratorSystem(LoadChapterGenerators(chapter), currencies);
+            var generators = new GeneratorSystem(LoadChapterGenerators(chapter), currencies, new ModifierSystem());
             var context = TestContent.MakeContext(currencies, generators, new FlagSystem());
 
             var amp = generators.Get("practice_amp");
@@ -219,8 +219,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
             var currencies = LoadCurrencyManager();
             var flags = new FlagSystem(chapter.FlagIds);
-            var generators = new GeneratorSystem(LoadChapterGenerators(chapter), currencies);
-            var upgrades = new UpgradeSystem(LoadChapterUpgrades(chapter), currencies, flags);
+            var generators = new GeneratorSystem(LoadChapterGenerators(chapter), currencies, new ModifierSystem());
+            var upgrades = new UpgradeSystem(LoadChapterUpgrades(chapter), currencies, flags, new ModifierSystem());
             var context = TestContent.MakeContext(currencies, generators, flags);
 
             upgrades.EvaluateContentUnlocks(context);
@@ -375,7 +375,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
             var currencies = LoadCurrencyManager();
-            var generators = new GeneratorSystem(LoadChapterGenerators(chapter), currencies);
+            var generators = new GeneratorSystem(LoadChapterGenerators(chapter), currencies, new ModifierSystem());
             var amp = generators.Get("practice_amp");
 
             TestContent.BuyTimes(amp, currencies, 1);

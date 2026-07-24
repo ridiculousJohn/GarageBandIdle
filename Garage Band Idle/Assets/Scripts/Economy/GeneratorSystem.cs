@@ -16,6 +16,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly Dictionary<string, Generator> _byId = new();
         private readonly List<string> _producedCurrencyIds = new();
         private readonly CurrencyManager _currencies;
+        private readonly ModifierSystem _modifiers;
 
         // fires once per generator when its unlock conditions are first met
         public event Action<Generator> GeneratorUnlocked;
@@ -29,9 +30,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // Content errors (duplicate/empty ids, unresolvable produces currencies)
         // are reported at load so they surface immediately instead of as
         // silently-never-producing rows.
-        public GeneratorSystem(IEnumerable<GeneratorDefinition> definitions, CurrencyManager currencies)
+        public GeneratorSystem(IEnumerable<GeneratorDefinition> definitions, CurrencyManager currencies,
+            ModifierSystem modifiers)
         {
             _currencies = currencies;
+            _modifiers = modifiers;
 
             foreach (var definition in definitions)
             {
@@ -54,7 +57,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 _currencies.ValidateReference(definition.ProducesCurrencyId, $"Generator '{definition.Id}' (produces)");
                 _currencies.ValidateReference(definition.CostCurrencyId, $"Generator '{definition.Id}' (cost)");
 
-                var generator = new Generator(definition);
+                var generator = new Generator(definition, _modifiers);
                 generator.OwnedChanged += () => GeneratorOwnedChanged?.Invoke(generator);
                 _generators.Add(generator);
                 _byId.Add(definition.Id, generator);
@@ -76,31 +79,20 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public bool TryGet(string id, out Generator generator) => _byId.TryGetValue(id, out generator);
 
         // One economy tick: each produced currency gets its generators' summed
-        // output. The multiplier applies only to the currencies it declares -
-        // a multiplier is an output effect that names its targets, so
-        // production of anything it doesn't name is untouched.
-        public void Tick(double seconds, BigNumber incomeMultiplier, IReadOnlyList<string> multiplierAffects)
+        // output, composed with the modifiers targeting that currency's
+        // production. A currency nothing targets composes to identity, so a
+        // multiplier only ever reaches the currencies it was granted against -
+        // a fans or merch producer never inherits a cash buff.
+        public void Tick(double seconds)
         {
             foreach (var currencyId in _producedCurrencyIds)
             {
-                var multiplier = Affects(multiplierAffects, currencyId) ? incomeMultiplier : BigNumber.One;
-                var perSecond = ProductionCalculator.TotalPerSecond(_generators, currencyId, multiplier);
+                var composition = _modifiers.For(
+                    ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, currencyId));
+                var perSecond = composition.ApplyTo(ProductionCalculator.TotalPerSecond(_generators, currencyId));
                 if (perSecond > BigNumber.Zero)
                     _currencies.Add(currencyId, perSecond * seconds);
             }
-        }
-
-        private static bool Affects(IReadOnlyList<string> affectedCurrencyIds, string currencyId)
-        {
-            if (affectedCurrencyIds == null)
-                return false;
-
-            for (var i = 0; i < affectedCurrencyIds.Count; i++)
-            {
-                if (affectedCurrencyIds[i] == currencyId)
-                    return true;
-            }
-            return false;
         }
 
         // Run reset (album release, event baseline; design doc section 7):
