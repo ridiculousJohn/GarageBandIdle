@@ -278,6 +278,11 @@ taps/time; fan rate jumps on completion via RewardManager; `barsCompleted` repor
 >   has `resetsOnAlbumRelease = true` (Cash, Fans, Rehearsal), every generator's owned count, every
 >   upgrade/bar whose `scope == run` (buff upgrades, cover bars). KEEP the permanent block — Records,
 >   `contentUnlock` upgrade effects, **flags** (content stays revealed across demos), Roadies.
+>   The **effects** half of that reset is one `ResetRunScoped()` call on the modifier registry (§12
+>   rule 11), not a per-system enumeration — every run-scoped multiplier and bonus lives there, so
+>   fan rate, tap value, generator output and global income all clear in one operation and a system
+>   added later cannot be forgotten. What the release still walks per-system is *state*: currency
+>   balances, owned counts, bar progress, and the buff-upgrade purchase latches.
 > - Award Records = `floor((fansThisRun / 5) ^ 0.5)`. Each Record adds +2% to the permanent global
 >   income multiplier (`1 + 0.02 × records`).
 >
@@ -314,7 +319,13 @@ banked; advance flag set.
 >
 > - `EventManager` runs a self-contained challenge on a sandboxed economy snapshot: on entry, reset
 >   the chapter economy to a fixed baseline for the event's duration (independent of the player's
->   Records).
+>   Records). **The baseline is a filtered view of the modifier registry, not a reset.** The Records
+>   buff is a *derived* modifier (§12 rule 11) and carries no scope, so `ResetRunScoped()` deliberately
+>   leaves it in place — calling it here would run the challenge with the player's Records bonus still
+>   applied, which looks like it works and quietly voids the fixed baseline. Have the event read the
+>   registry through a lens that excludes derived contributors for its duration and mutates nothing:
+>   the player's Records balance must survive the event untouched, so the source cannot be the lever.
+>   Nothing to unwind then makes failure and quit free.
 > - Availability is a `recordsCumulative ≥ 1` Condition (available after the first demo). Each tier's
 >   `goal` is a `currency` Condition evaluated by the shared evaluator.
 > - garage_jam: debuff `automationDisabled` (generators paused, tap-only); timed and failable. Three
@@ -338,8 +349,16 @@ reward applies from the pool.
 > - `SaveSystem`: serialize to JSON with a checksum; validate on load and reject/repair tampered
 >   saves. Model the run block and permanent block as separate sections in the schema. The run block
 >   holds Cash/Fans/Rehearsal balances, generator owned counts, buff-upgrade state, and bar progress;
->   the permanent block holds Records, `contentUnlock` effects, **flags**, and Roadies. An album
->   release clears the run block and writes the permanent block.
+>   the permanent block holds Records, `contentUnlock` effects, **flags**, Roadies, and the
+>   permanent-in-chapter granted modifiers (§12 rule 11) — the cleared event tiers' tap buffs are the
+>   Ch1 case. An album release clears the run block and writes the permanent block.
+> - **Derived modifiers are never serialized.** They compute from a source on every read, so the
+>   Records buff comes back from the restored Records balance with nothing to save or migrate; writing
+>   one would create a second answer that can disagree with its source. Granted modifiers are the only
+>   ones with state, and there is a choice to make: serialize them as a list, or save only the facts
+>   that produced them (which buffs are bought, which bars completed, which tiers cleared) and re-grant
+>   on load. Prefer the second if the save already records those facts — one source of truth beats two
+>   that can drift — but decide it explicitly rather than by accident.
 > - `OfflineEarnings`: on load, compute `productionPerSecond × min(secondsAway, cap) × rate` using
 >   `DateTime` deltas, rate = 0.5, cap = 4 hours. Show a collect screen with the amount and a
 >   placeholder "Double it" button (wire the actual ad later).

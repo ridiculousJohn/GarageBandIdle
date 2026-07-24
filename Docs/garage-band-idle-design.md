@@ -15,6 +15,14 @@ a bigger venue with a new mechanic. All numbers below are starting values for tu
 > - **Appendix** — a "data model" line added.
 > Edited passages are marked inline with **[rev]**.
 
+> **Revision note (modifier consolidation pass).** Changes in this revision, all following the move of
+> every stat modifier out of the individual systems and into one registry:
+> - **§12** — architecture rule 11 added (one modifier registry: systems compose on read rather than
+>   holding stacks, granted modifiers carry a scope and derived ones do not, one call resets the
+>   run-scoped ones); `ProductionCalculator` noted as formula-only, and `Modifiers/` added to the file
+>   tree.
+> Edited passages are marked inline with **[rev]**, as above.
+
 ---
 
 ## 1. Core loop
@@ -397,7 +405,8 @@ Assets/Scripts/
     UpgradeDefinition.cs / Upgrade.cs   // [rev] payload = buff | setFlag (reveal via flag); gate = any Condition; scope = run | permanent-in-chapter
     BarDefinition.cs / BarGroupDefinition.cs / BarSystem.cs   // [rev] generic fillable bars (fillCurrency-driven); replaces LearnSongBar
     RewardDefinition.cs / RewardManager.cs   // [rev] shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
-    CostCalculator.cs / ProductionCalculator.cs
+    CostCalculator.cs / ProductionCalculator.cs   // [rev] formula only; the modifiers that scale production live in the registry
+    Modifiers/ModifierSystem.cs   // [rev] one registry for every stat modifier: granted (carries scope) + derived (computed from a source); the composition rule lives here
   Events/
     EventDefinition.cs / GameEvent.cs   // baseline reset, optional debuff, optional timer, goal, tier, reward
     EventManager.cs       // enter/quit/fail/succeed, tiers, sandboxed economy snapshot
@@ -443,6 +452,18 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     upgrades, events, bars, rewards) via Addressables labels; managers build their id→definition
     registries from the labelled assets, not from hardcoded lists or direct references. Validate that
     every referenced id resolves on load.
+11. **[rev]** Compose every stat modifier through one registry — no system keeps its own multiplier or
+    bonus stack. Each asks for the composition on its target and applies it, where a target is a closed
+    kind (tap value, fan rate, a generator's output, a currency's production) plus, for the kinds that
+    act on one thing, the designer id they name. The rule is `(base + adds) × multipliers`, expressed in
+    exactly one place, so two systems cannot disagree about the order their modifiers apply in. A
+    **granted** modifier is a fact established at a moment (a bought buff, a completed bar, a cleared
+    event tier) and carries a `scope`; a **derived** modifier computes from a source on every read and
+    carries no scope, because its lifetime is its source's and two answers to "does this survive a
+    release" could disagree. Keep grants individually rather than accumulating them into one number:
+    that is what makes a run reset exact, and it makes the reset a single call instead of a per-system
+    enumeration that silently misses whichever system was added last. A modifier reaches only the target
+    it names, which is what keeps an income buff off a fans or merch producer.
 
 **Starter prompt for a code assistant:**
 > "In Unity (version X, iOS/Android), scaffold a nested-prestige idle core: a CurrencyManager with a run
