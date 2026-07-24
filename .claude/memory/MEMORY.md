@@ -5,3 +5,5 @@
 - [No AI attribution in commits](no-ai-attribution-in-commits.md) — never add Co-Authored-By/Generated-with trailers; disabled in settings 2026-07-21
 - [Unity headless verify loop](unity-headless-verify-loop.md) — batchmode import+tests when editor closed (check UnityLockfile first); reimport required after schema changes
 - [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) — merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
+- [Bug reports are verify-only](bug-reports-are-verify-only.md) — a finding means verdict + evidence, never edits or reverts; freeze after a denied tool call
+- [Quote directive before editing](quote-directive-before-editing.md) — standing protocol: first edit of a task is preceded by Acting on: "<John's words>"; nothing quotable = no edit
