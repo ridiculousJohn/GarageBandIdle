@@ -18,13 +18,13 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
     // corresponding definition assets, so the JSON stays the source of truth.
     // Re-running updates existing assets in place (stable paths keyed by id).
     // Every definition asset in the project is then marked addressable
-    // (address "<label>/<id>", one label per type) — runtime discovery loads
+    // (address "<label>/<id>", one label per type) - runtime discovery loads
     // by label, so no asset lives in Resources and no chapter holds a direct
     // asset reference: content links by string id, resolved at load.
     //
     // Every gate/unlock/visibility/availability rule in the JSON is one
     // discriminated Condition shape ({ "type": ... }), mapped 1:1 onto the
-    // Condition subclass family — no bespoke gate shapes survive import.
+    // Condition subclass family - no bespoke gate shapes survive import.
     public static class ChapterJsonImporter
     {
         private const string ChaptersFolder = "Assets/ScriptableObjects/Chapters";
@@ -83,7 +83,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
 
             // currencies the chapter JSON declares (fill currencies): the
-            // currency OWNS its earn config (design doc section 3) — generate
+            // currency OWNS its earn config (design doc section 3) - generate
             // it like any other content so bars' fillCurrency ids resolve on
             // load, and list it on the chapter so engagement earn runs only
             // for the owning chapter (flag ids may repeat across chapters).
@@ -98,15 +98,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
                 // negative earn drains instead of earns, and earn values with
-                // no reveal flag can never activate — never write those states
+                // no reveal flag can never activate - never write those states
                 if (block.earn.perSec < 0 || block.earn.perTap < 0)
                 {
-                    Debug.LogError($"ChapterJsonImporter: currency '{block.id}' has negative earn values. Skipping it — fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: currency '{block.id}' has negative earn values. Skipping it - fix the JSON and re-import.");
                     continue;
                 }
                 if ((block.earn.perSec > 0 || block.earn.perTap > 0) && string.IsNullOrEmpty(block.earn.revealFlag))
                 {
-                    Debug.LogError($"ChapterJsonImporter: currency '{block.id}' has earn values but no revealFlag — the earn could never activate. Skipping it — fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: currency '{block.id}' has earn values but no revealFlag - the earn could never activate. Skipping it - fix the JSON and re-import.");
                     continue;
                 }
 
@@ -128,12 +128,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
-                // a non-positive multiplier would zero or negate its stack —
+                // a non-positive multiplier would zero or negate its stack -
                 // never write that state; content referencing the skipped id
                 // fails validation loudly
                 if ((block.type == "fanRateMultiplier" || block.type == "tapValueMultiplier") && block.value <= 0)
                 {
-                    Debug.LogError($"ChapterJsonImporter: reward '{block.id}' has a non-positive multiplier ({block.value}). Skipping it — fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: reward '{block.id}' has a non-positive multiplier ({block.value}). Skipping it - fix the JSON and re-import.");
                     continue;
                 }
 
@@ -161,7 +161,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                         break;
                     }
                     default:
-                        Debug.LogError($"ChapterJsonImporter: reward '{block.id}' has unknown type '{block.type}' — no RewardDefinition subclass maps to it. Skipping it.");
+                        Debug.LogError($"ChapterJsonImporter: reward '{block.id}' has unknown type '{block.type}' - no RewardDefinition subclass maps to it. Skipping it.");
                         continue;
                 }
 
@@ -181,14 +181,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var generatorIds = new List<string>();
             foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
             {
-                // a missing/invalid cost would import as zeros — never write
+                // a missing/invalid cost would import as zeros - never write
                 // that state: the asset is not created/updated and the chapter
                 // does not list the generator. Growth < 1 (shrinking costs) is
                 // legal; growth <= 0 breaks the curve.
                 if (block.cost == null || string.IsNullOrEmpty(block.cost.currency)
                     || block.cost.amount <= 0 || block.cost.growth <= 0)
                 {
-                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' has a missing or invalid cost block (needs currency, amount > 0, growth > 0). Skipping it — fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' has a missing or invalid cost block (needs currency, amount > 0, growth > 0). Skipping it - fix the JSON and re-import.");
                     continue;
                 }
 
@@ -196,7 +196,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 // fan-rate bandmate is coherent)
                 if (block.baseOutput < 0)
                 {
-                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' has a negative baseOutput ({block.baseOutput}). Skipping it — fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' has a negative baseOutput ({block.baseOutput}). Skipping it - fix the JSON and re-import.");
                     continue;
                 }
 
@@ -212,10 +212,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             foreach (var block in data.upgrades ?? Array.Empty<UpgradeBlock>())
             {
                 // a negative cost would GRANT currency when the buff purchase
-                // flow lands — never write that state
+                // flow lands - never write that state
                 if ((block.cost?.amount ?? 0) < 0)
                 {
-                    Debug.LogError($"ChapterJsonImporter: upgrade '{block.id}' has a negative cost amount ({block.cost.amount}). Skipping it — fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: upgrade '{block.id}' has a negative cost amount ({block.cost.amount}). Skipping it - fix the JSON and re-import.");
                     continue;
                 }
 
@@ -237,11 +237,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 foreach (var bar in group.bars ?? Array.Empty<BarBlock>())
                 {
                     // a non-positive requirement can never be legitimately
-                    // filled — never write that state: the asset is not
+                    // filled - never write that state: the asset is not
                     // created/updated and the group does not list the bar
                     if (bar.fillRequirement <= 0)
                     {
-                        Debug.LogError($"ChapterJsonImporter: bar '{bar.id}' has a non-positive fillRequirement ({bar.fillRequirement}). Skipping it — fix the JSON and re-import.");
+                        Debug.LogError($"ChapterJsonImporter: bar '{bar.id}' has a non-positive fillRequirement ({bar.fillRequirement}). Skipping it - fix the JSON and re-import.");
                         continue;
                     }
 
@@ -279,7 +279,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
 
             // negative tuning drains or dead-ends instead of earning; the
-            // chapter still imports (config is not skippable content) — boot
+            // chapter still imports (config is not skippable content) - boot
             // validation reports it too
             if ((data.fans?.baseFansPerSec ?? 0) < 0 || (data.fans?.perBandmateOwnedBonus ?? 0) < 0)
                 Debug.LogError("ChapterJsonImporter: fans block has negative earn values. Fix the JSON and re-import.");
@@ -302,7 +302,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             MarkAllContentAddressable();
 
             AssetDatabase.SaveAssets();
-            var summary = $"Imported '{data.chapter.id}' — {flagIds.Count} flags, {sectionIds.Count} sections, " +
+            var summary = $"Imported '{data.chapter.id}' - {flagIds.Count} flags, {sectionIds.Count} sections, " +
                 $"{generatorIds.Count} generators, {upgradeIds.Count} upgrades, {barGroupIds.Count} bar groups " +
                 $"({barCount} bars), {eventIds.Count} events, {rewardIds.Count} rewards. All content marked addressable.";
             Debug.Log($"ChapterJsonImporter: {summary}");
@@ -575,7 +575,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return null;
         }
 
-        // "rehearsal" to "Rehearsal" — display names for currencies the JSON
+        // "rehearsal" to "Rehearsal" - display names for currencies the JSON
         // declares by id only
         private static string ToDisplayName(string id)
             => string.IsNullOrEmpty(id) ? id : char.ToUpperInvariant(id[0]) + id.Substring(1);
@@ -594,7 +594,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // serialized forms are compared. Unity assigns fresh managed-reference
         // ids (rid) to every new [SerializeReference] instance, so blindly
         // re-initializing rewrites every gate/payload holder with id churn even
-        // when nothing changed — re-importing an unchanged JSON must leave the
+        // when nothing changed - re-importing an unchanged JSON must leave the
         // working tree clean.
         private static void ApplyIfChanged<T>(T asset, Action<T> initialize) where T : ScriptableObject
         {
@@ -728,7 +728,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
         // the discriminated Condition shape; which fields matter depends on
         // type. all/any children are this same shape, so compounds nest to
-        // any depth — matching the recursive CompoundCondition family.
+        // any depth - matching the recursive CompoundCondition family.
         private class ConditionBlock
         {
             public string type = "";

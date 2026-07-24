@@ -4,7 +4,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
 {
     // One generic fillable bar (design doc section 3): declares the currency
     // that fills it, a fill requirement, and a reward granted on completion.
-    // The fill logic reads FillCurrencyId and works for any currency — Learn
+    // The fill logic reads FillCurrencyId and works for any currency - Learn
     // Covers is just the Chapter 1 instance, nothing here is covers-specific.
     // Fill/reward behavior arrives with the bars slice; this stores the data.
     [CreateAssetMenu(

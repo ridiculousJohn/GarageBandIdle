@@ -9,7 +9,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // The content-unlock mechanism and fan accrual. The load-bearing claims: a
     // contentUnlock applies exactly when its gate is met (latching its flag in
     // the single reveal registry), and the fan rate is a function of band size
-    // and time only — provably never Cash.
+    // and time only - provably never Cash.
     public class FansAndContentUnlockTests
     {
         [OneTimeTearDown]
@@ -102,7 +102,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "base rate once active");
             fans.Tick(10);
-            Assert.AreEqual(2.0, currencies.Get("fans").ToDouble(), 1e-9, "rate × seconds");
+            Assert.AreEqual(2.0, currencies.Get("fans").ToDouble(), 1e-9, "rate x seconds");
         }
 
         [Test]
@@ -122,7 +122,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // multipliers are tracked per scope: the run reset (album release,
-        // event baseline) clears only run-scoped rewards — a permanent-in-
+        // event baseline) clears only run-scoped rewards - a permanent-in-
         // chapter reward must survive it
         [Test]
         public void FanRateMultipliers_RunResetKeepsPermanentInChapter()
@@ -143,7 +143,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "run reset keeps the permanent stack");
         }
 
-        // fail closed on broken content: a non-positive factor (invalid data —
+        // fail closed on broken content: a non-positive factor (invalid data -
         // boot validation reports it) would zero or negate the whole stack for
         // the rest of the run and must never apply
         [Test]
@@ -172,13 +172,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             TestContent.MakeTapValueReward("run_x2", 2.0, ContentScope.Run).Apply(context);
             TestContent.MakeTapValueReward("perm_x3", 3.0, ContentScope.PermanentInChapter).Apply(context);
-            Assert.AreEqual(12.0, tap.Value.ToDouble(), 1e-9, "base 2 × run 2 × permanent 3");
+            Assert.AreEqual(12.0, tap.Value.ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
 
             tap.ResetRunScopedMultipliers();
             Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "the run reset keeps the permanent stack");
         }
 
-        // fail closed on broken content: a negative base (invalid data — boot
+        // fail closed on broken content: a negative base (invalid data - boot
         // validation reports it) must never drain cash on a tap, and no
         // multiplier can resurrect it
         [Test]
@@ -190,7 +190,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.0, tap.Value.ToDouble(), 1e-9, "never a draining tap");
         }
 
-        // fail closed on broken content: a non-positive factor (invalid data —
+        // fail closed on broken content: a non-positive factor (invalid data -
         // boot validation reports it) must never apply
         [Test]
         public void TapValueMultiplier_FailsClosedOnANonPositiveFactor()
@@ -257,13 +257,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(generators.Get("drummer"), currencies, 2);
             TestContent.BuyTimes(generators.Get("bassist"), currencies, 1);
             Assert.AreEqual(3, fans.BandmateCount);
-            Assert.AreEqual(0.26, fans.RatePerSecond.ToDouble(), 1e-9, "0.2 + 0.02 × 3 bandmates");
+            Assert.AreEqual(0.26, fans.RatePerSecond.ToDouble(), 1e-9, "0.2 + 0.02 x 3 bandmates");
 
             // gear must not move the rate
             TestContent.BuyTimes(generators.Get("practice_amp"), currencies, 5);
             Assert.AreEqual(0.26, fans.RatePerSecond.ToDouble(), 1e-9, "amps never change fan rate");
 
-            // neither must Cash itself — fan rate is band size and time only
+            // neither must Cash itself - fan rate is band size and time only
             currencies.Add("cash", 1e9);
             Assert.AreEqual(0.26, fans.RatePerSecond.ToDouble(), 1e-9, "cash never changes fan rate");
         }

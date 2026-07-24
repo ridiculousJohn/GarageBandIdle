@@ -4,7 +4,7 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // JSON effect "setFlag": latches a progress flag in the single reveal
-    // registry — the content-unlock payload. Everything that appears when a
+    // registry - the content-unlock payload. Everything that appears when a
     // system exists gates on the flag (FlagSetCondition).
     [Serializable]
     public class SetFlagPayload : UpgradePayload

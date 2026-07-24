@@ -14,7 +14,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // cumulative thresholds on one counter), the continuous drain is clamped
     // and player-directed, completion applies the pool reward exactly once,
     // barsCompleted conditions read live counts, and each fill currency owns
-    // its earn config — accruing from tick + taps only after its own flag.
+    // its earn config - accruing from tick + taps only after its own flag.
     public class BarsAndRehearsalTests
     {
         [OneTimeTearDown]
@@ -101,12 +101,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("covers");
 
             earn.Tick(10);
-            Assert.AreEqual(10.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "perSec × seconds");
+            Assert.AreEqual(10.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "perSec x seconds");
             earn.OnJamTap();
             Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "+perTap on a Jam tap");
         }
 
-        // a chapter can hold several independently earned fill currencies —
+        // a chapter can hold several independently earned fill currencies -
         // each currency OWNS its earn config (design doc section 3) and is
         // gated by its own flag, and a currency with no earn config never
         // accrues from engagement
@@ -134,7 +134,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             flags.Set("openmic");
             earn.Tick(10);
-            Assert.AreEqual(30.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "perSec × seconds once revealed");
+            Assert.AreEqual(30.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "perSec x seconds once revealed");
             Assert.AreEqual(22.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "both earn once both are revealed");
         }
 

@@ -29,14 +29,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         [Header("Economy")]
         [SerializeField]
         [DefinitionId(typeof(CurrencyDefinition))]
-        [Tooltip("Currency id the purchase deducts from — declared independently of what the generator produces.")]
+        [Tooltip("Currency id the purchase deducts from - declared independently of what the generator produces.")]
         private string _costCurrencyId;
 
         [SerializeField]
         private double _baseCost;
 
         [SerializeField]
-        [Tooltip("Cost multiplier per owned unit: cost = baseCost × growth^owned.")]
+        [Tooltip("Cost multiplier per owned unit: cost = baseCost x growth^owned.")]
         private double _costGrowth;
 
         [SerializeField]

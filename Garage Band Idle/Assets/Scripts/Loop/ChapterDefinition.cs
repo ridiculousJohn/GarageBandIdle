@@ -58,12 +58,12 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 
         [Header("Content")]
         [SerializeField]
-        [Tooltip("Progress flags this chapter's content may set — the single reveal registry. Anything not listed here is a typo.")]
+        [Tooltip("Progress flags this chapter's content may set - the single reveal registry. Anything not listed here is a typo.")]
         private List<string> _flagIds = new();
 
         [SerializeField]
         [DefinitionId(typeof(CurrencyDefinition))]
-        [Tooltip("Currencies this chapter declares (fill currencies with earn configs). Engagement earn runs only for the CURRENT chapter's list — flag ids may repeat across chapters, so flags alone cannot scope it.")]
+        [Tooltip("Currencies this chapter declares (fill currencies with earn configs). Engagement earn runs only for the CURRENT chapter's list - flag ids may repeat across chapters, so flags alone cannot scope it.")]
         private List<string> _currencyIds = new();
 
         [SerializeField]
@@ -137,8 +137,8 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     }
 
     // The Records buff tuning (design doc sections 3 and 5). A multiplier
-    // declares which currencies it affects — it is an output effect, not a
-    // property of the currency being generated — so production of a currency
+    // declares which currencies it affects - it is an output effect, not a
+    // property of the currency being generated - so production of a currency
     // no multiplier names is untouched. Records affects Cash in Chapter 1.
     [Serializable]
     public class RecordBuffConfig

@@ -49,8 +49,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var cashPerSecond = ProductionCalculator.TotalPerSecond(generators, "cash", BigNumber.One);
             var recordsPerSecond = ProductionCalculator.TotalPerSecond(generators, "records", BigNumber.One);
 
-            Assert.AreEqual(12.0, cashPerSecond.ToDouble(), 1e-9);   // 3 × 4 owned
-            Assert.AreEqual(100.0, recordsPerSecond.ToDouble(), 1e-9); // 50 × 2 owned
+            Assert.AreEqual(12.0, cashPerSecond.ToDouble(), 1e-9);   // 3 x 4 owned
+            Assert.AreEqual(100.0, recordsPerSecond.ToDouble(), 1e-9); // 50 x 2 owned
         }
 
         [Test]
@@ -62,7 +62,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var perSecond = ProductionCalculator.TotalPerSecond(new[] { generator }, "cash", 1.5);
 
-            Assert.AreEqual(15.0, perSecond.ToDouble(), 1e-9); // 5 × 2 × 1.5
+            Assert.AreEqual(15.0, perSecond.ToDouble(), 1e-9); // 5 x 2 x 1.5
         }
 
         [Test]
@@ -76,12 +76,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             system.Tick(10.0, BigNumber.One, new[] { "cash" });
 
-            Assert.AreEqual(4.0, (currencies.Get("cash") - before).ToDouble(), 1e-9); // 0.4/sec × 10s
+            Assert.AreEqual(4.0, (currencies.Get("cash") - before).ToDouble(), 1e-9); // 0.4/sec x 10s
         }
 
         // a multiplier is an output effect that declares its targets: production
         // of a currency it doesn't name is untouched, no matter what generators
-        // exist — fans/records producers must never inherit the cash buff
+        // exist - fans/records producers must never inherit the cash buff
         [Test]
         public void Tick_AppliesTheMultiplierOnlyToTheCurrenciesItDeclares()
         {
@@ -96,9 +96,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             system.Tick(10.0, 2.0, new[] { "cash" });
 
-            Assert.AreEqual(60.0, (currencies.Get("cash") - cashBefore).ToDouble(), 1e-9); // 3 × 2 × 10s
+            Assert.AreEqual(60.0, (currencies.Get("cash") - cashBefore).ToDouble(), 1e-9); // 3 x 2 x 10s
             Assert.AreEqual(50.0, (currencies.Get("fans") - fansBefore).ToDouble(), 1e-9,
-                "undeclared currency takes no multiplier"); // 5 × 1 × 10s
+                "undeclared currency takes no multiplier"); // 5 x 1 x 10s
         }
 
         [Test]
@@ -118,7 +118,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(40.0, currencies.Get("cash").ToDouble(), 1e-9);
         }
 
-        // fail closed on broken content: a negative base output (invalid data —
+        // fail closed on broken content: a negative base output (invalid data -
         // boot validation reports it) must never drain a currency
         [Test]
         public void ProductionPerSecond_FailsClosedOnANegativeBaseOutput()
@@ -130,7 +130,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "never negative production");
         }
 
-        // fail closed on broken content: a non-positive cost (invalid data —
+        // fail closed on broken content: a non-positive cost (invalid data -
         // boot validation reports it) must never be an endless free purchase
         [Test]
         public void TryBuy_FailsClosedOnANonPositiveCost()
@@ -161,7 +161,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // run reset (album release, event baseline; design doc section 7):
         // gear and bandmates are re-bought each run, so every owned count
-        // zeroes — and no subscriber may ever observe a half-reset fleet
+        // zeroes - and no subscriber may ever observe a half-reset fleet
         // (state, then notify)
         [Test]
         public void ResetOwned_ZeroesEveryGenerator_AndNotifiesAfterAllSettle()
@@ -196,7 +196,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2, notifications, "an already-zero fleet notifies nothing");
         }
 
-        // save/load: the fleet restores as one atomic operation — every count
+        // save/load: the fleet restores as one atomic operation - every count
         // settles before any notification, so an ownedCount gate never
         // observes a half-restored fleet; the cost curve resumes at the
         // restored counts
@@ -250,7 +250,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // state-then-notify: the spend's BalanceChanged is a synchronous signal
         // that condition evaluators react to, so the purchase must already be
-        // counted when it fires — an ownedCount gate may never observe the cost
+        // counted when it fires - an ownedCount gate may never observe the cost
         // deducted with Owned still stale
         [Test]
         public void TryBuy_OwnedIsCountedBeforeTheSpendNotifies()

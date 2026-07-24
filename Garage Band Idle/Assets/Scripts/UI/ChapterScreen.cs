@@ -9,7 +9,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // chapter names, instantiates its module prefabs (addressable, by address)
     // under the canvas root and initializes them through IChapterModule.
     // Sections start hidden until their visibleWhen condition holds, then latch
-    // visible — the design doc's progressive reveal (section 2), driven by flags
+    // visible - the design doc's progressive reveal (section 2), driven by flags
     // and the shared Condition language.
     public class ChapterScreen : MonoBehaviour
     {
@@ -41,11 +41,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 _sections.Add(BuildSection(section));
 
             if (_sections.Count == 0)
-                Debug.LogError($"ChapterScreen: chapter '{_game.CurrentChapter.Id}' has no sections — nothing to show. Re-run the chapter import.");
+                Debug.LogError($"ChapterScreen: chapter '{_game.CurrentChapter.Id}' has no sections - nothing to show. Re-run the chapter import.");
 
             // one subscription per condition input: balances/earned totals/
-            // records → BalanceChanged, flags → FlagSet, ownedCount →
-            // GeneratorOwnedChanged, barsCompleted → BarCompleted. Every signal
+            // records > BalanceChanged, flags > FlagSet, ownedCount >
+            // GeneratorOwnedChanged, barsCompleted > BarCompleted. Every signal
             // fires after its state settles, so evaluation never reads mid-
             // mutation state and never depends on a proxy signal arriving later
             _game.Flags.FlagSet += HandleFlagSet;
@@ -91,7 +91,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 }
                 catch (System.Exception exception)
                 {
-                    Debug.LogError($"ChapterScreen: section '{definition.Id}' failed to instantiate module '{address}' — is the prefab marked addressable with that address? ({exception.Message})");
+                    Debug.LogError($"ChapterScreen: section '{definition.Id}' failed to instantiate module '{address}' - is the prefab marked addressable with that address? ({exception.Message})");
                     continue;
                 }
 

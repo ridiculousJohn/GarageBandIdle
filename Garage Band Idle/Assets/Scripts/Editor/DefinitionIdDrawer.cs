@@ -6,7 +6,7 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.EditorTools
 {
     // Draws a [DefinitionId(typeof(X))] string field as a dropdown of the ids
-    // found on X assets in the project. Authoring UX only — the serialized
+    // found on X assets in the project. Authoring UX only - the serialized
     // value stays a plain string. A value that matches no asset is kept and
     // shown as a "missing" entry rather than silently rewritten.
     [CustomPropertyDrawer(typeof(DefinitionIdAttribute))]

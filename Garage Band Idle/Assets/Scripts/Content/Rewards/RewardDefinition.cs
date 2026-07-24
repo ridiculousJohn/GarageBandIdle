@@ -4,7 +4,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
 {
     // One reward (design doc section 6.1): the payoff of an event tier or a
     // completed cover bar, and reusable anywhere content grants something.
-    // Rewards are a ScriptableObject family — each subclass declares exactly
+    // Rewards are a ScriptableObject family - each subclass declares exactly
     // the fields its kind needs and implements Apply, so a reward type can
     // never exist without its handler. A new reward kind is a new subclass
     // plus assets; referencing content points at reward assets directly.

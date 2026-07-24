@@ -6,7 +6,7 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.Events
 {
     // One opt-in event (design doc section 6.1) with its tier ladder.
-    // Availability and tier goals are the shared Condition type — the same
+    // Availability and tier goals are the shared Condition type - the same
     // evaluator the capstone and sections use. Event behavior (baseline reset,
     // debuffs, timers) arrives in the events slice; this slice stores the data.
     [CreateAssetMenu(

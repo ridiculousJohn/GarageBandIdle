@@ -7,11 +7,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // catalog/roadie/encore multiply into IncomeMultiplier in later slices.
     public static class ProductionCalculator
     {
-        // permanent global buff: 1 + buffPerRecord × records (additive per Record)
+        // permanent global buff: 1 + buffPerRecord x records (additive per Record)
         public static BigNumber IncomeMultiplier(BigNumber records, double buffPerRecord)
             => BigNumber.One + records * buffPerRecord;
 
-        // Σ(gen.baseOutput × count) for one produced currency, times the multiplier
+        // sum(gen.baseOutput x count) for one produced currency, times the multiplier
         public static BigNumber TotalPerSecond(IReadOnlyList<Generator> generators, string currencyId, BigNumber incomeMultiplier)
         {
             var sum = BigNumber.Zero;

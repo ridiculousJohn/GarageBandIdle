@@ -4,10 +4,10 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // Progress flags: string ids set once and observed anywhere — the single
+    // Progress flags: string ids set once and observed anywhere - the single
     // reveal registry (design doc section 12, rule 9). Content-unlock upgrades
     // and setFlag rewards set them; sections, currencies, and gates observe them
-    // through FlagSetCondition. Flags only ever latch on — scoping/reset rules
+    // through FlagSetCondition. Flags only ever latch on - scoping/reset rules
     // arrive with the save/prestige slices.
     public class FlagSystem
     {

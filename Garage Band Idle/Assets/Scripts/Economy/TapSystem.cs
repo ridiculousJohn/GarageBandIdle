@@ -6,7 +6,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // base times the tap-reward multiplier stacks. Multipliers are tracked
     // PER SCOPE, mirroring FanSystem: the run reset (album release, event
     // baseline) clears the run-scoped stack and keeps the permanent-in-
-    // chapter one — collapsing scopes into one number would make "reset
+    // chapter one - collapsing scopes into one number would make "reset
     // run-scoped effects" unimplementable. Flat tap-value adds
     // (TapValueAddPayload) arrive with the buff slice and will feed in here.
     public class TapSystem
@@ -21,7 +21,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _baseValue = baseValue;
         }
 
-        // fails closed on a negative base — invalid data, boot validation
+        // fails closed on a negative base - invalid data, boot validation
         // reports it: a tap must never drain cash
         public BigNumber Value => _baseValue < 0
             ? BigNumber.Zero

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // What kind of upgrade this is — a closed, code-defined set (ContentScope
+    // What kind of upgrade this is - a closed, code-defined set (ContentScope
     // has the rationale). The chapter JSON spells these "buff" / "contentUnlock".
     // Explicit values: the numbers are the serialization contract, and zero is
     // reserved for the uninitialized state (see ContentScope). Append with new
@@ -20,7 +20,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     }
 
     // One upgrade (design doc section 4). Gates are the shared Condition type;
-    // a content unlock's payload is setFlag — the single reveal registry.
+    // a content unlock's payload is setFlag - the single reveal registry.
     // Buff purchase and payload application arrive in the buff slice.
     [CreateAssetMenu(
         fileName = "NewUpgrade",

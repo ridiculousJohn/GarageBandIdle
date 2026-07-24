@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Content
 {
-    // Sets a progress flag — the reward kind that opens content, since sections,
+    // Sets a progress flag - the reward kind that opens content, since sections,
     // generator unlocks, and gates all observe flags (FlagSetCondition).
     // Lets any reward source (an event, a bar, a special song) reveal new
     // content with no new plumbing.

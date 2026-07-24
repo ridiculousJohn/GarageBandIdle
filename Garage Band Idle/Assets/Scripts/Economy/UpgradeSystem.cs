@@ -6,7 +6,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // Runtime home of a chapter's upgrades. Implements the general content-unlock
     // mechanism (design doc sections 2 and 4): a contentUnlock upgrade whose gate
-    // is met applies its payload — setFlag latches the named flag in the single
+    // is met applies its payload - setFlag latches the named flag in the single
     // reveal registry, which sections and other gates observe. Buff upgrades
     // (purchase, tap/output payloads) arrive in the buff slice; their definitions
     // load and validate but are never auto-applied here. Gate conditions are

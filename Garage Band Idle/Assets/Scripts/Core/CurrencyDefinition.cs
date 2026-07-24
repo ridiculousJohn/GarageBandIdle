@@ -65,9 +65,9 @@ namespace RidiculousGaming.GarageBandIdle
     }
 
     // Engagement earn (design doc section 3): a fill currency owns its earn
-    // config — a passive tick plus Jam taps, gated by a reveal flag, never
+    // config - a passive tick plus Jam taps, gated by a reveal flag, never
     // Cash. Unset means the currency has no engagement earn (cash, fans,
-    // records). Earn values without a reveal flag can never activate — the
+    // records). Earn values without a reveal flag can never activate - the
     // importer refuses that state and boot validation reports it.
     [Serializable]
     public class EngagementEarnConfig

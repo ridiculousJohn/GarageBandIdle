@@ -2,7 +2,7 @@ namespace RidiculousGaming.GarageBandIdle
 {
     // The single entry point for every gate/unlock/visibility/availability check
     // (design doc section 12, rule 8). Dispatch is the Condition subclass's
-    // Evaluate override — no per-currency or per-rule branches live anywhere else.
+    // Evaluate override - no per-currency or per-rule branches live anywhere else.
     public static class ConditionEvaluator
     {
         // a null condition means the content declared no gate: always met

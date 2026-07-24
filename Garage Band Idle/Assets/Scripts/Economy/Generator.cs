@@ -26,15 +26,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public BigNumber NextCost => CostCalculator.Cost(Definition, Owned);
 
         // Base production before global multipliers (those apply in
-        // ProductionCalculator). Fails closed on a negative base output —
+        // ProductionCalculator). Fails closed on a negative base output -
         // invalid data, boot validation reports it: production must never
         // drain a currency.
         public BigNumber ProductionPerSecond => Definition.BaseOutput < 0
             ? BigNumber.Zero
             : (BigNumber)Definition.BaseOutput * Owned;
 
-        // buys one unit if affordable; deducts the declared cost currency —
-        // never the produced currency — and bumps Owned
+        // buys one unit if affordable; deducts the declared cost currency -
+        // never the produced currency - and bumps Owned
         public bool TryBuy(CurrencyManager currencies)
         {
             var cost = NextCost;
@@ -59,7 +59,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         internal void MarkUnlocked() => Unlocked = true;
 
-        // run reset: state-only, no notification — GeneratorSystem fires
+        // run reset: state-only, no notification - GeneratorSystem fires
         // OwnedChanged after EVERY generator has settled, so a subscriber
         // never observes a half-reset fleet. Returns whether anything changed.
         internal bool ResetOwned()
@@ -73,7 +73,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         internal void NotifyOwnedChanged() => OwnedChanged?.Invoke();
 
-        // save/load: state-only re-establishment — GeneratorSystem restores
+        // save/load: state-only re-establishment - GeneratorSystem restores
         // the whole fleet and notifies after every count settles. A negative
         // count is corrupt save data and fails closed to zero (a negative
         // Owned would corrupt the cost curve and production). Returns whether

@@ -11,11 +11,11 @@ namespace RidiculousGaming.GarageBandIdle
     // Boot-time content validation (design doc section 12, rule 10): every id
     // referenced by a condition, payload, reward, module, or chapter list must
     // resolve to a loaded asset or a declared flag. Reports loudly and never
-    // throws — a broken reference is a content bug to fix, not a crash.
+    // throws - a broken reference is a content bug to fix, not a crash.
     //
     // Content validates in its OWNING chapter's context: flags are declared
     // per chapter, so a flag reference is only meaningful against the
-    // declaring chapter's list — never against whichever chapter happens to
+    // declaring chapter's list - never against whichever chapter happens to
     // be active. Rewards enter a chapter's closure through its bars and event
     // tiers. Definitions no chapter lists (stale imports, unreferenced pool
     // entries) still get every structural check; only the flag-known checks
@@ -70,13 +70,13 @@ namespace RidiculousGaming.GarageBandIdle
             if (chapter.Fans.BaseFansPerSec < 0 || chapter.Fans.PerBandmateOwnedBonus < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has negative fan earn values.");
             if (chapter.TapBaseValue < 0)
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative tapBaseValue ({chapter.TapBaseValue}) — every Jam would drain cash.");
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative tapBaseValue ({chapter.TapBaseValue}) - every Jam would drain cash.");
             if (chapter.RecordBuff.PerRecord < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative recordBuff perRecord ({chapter.RecordBuff.PerRecord}).");
 
             ValidateIds(chapter.CurrencyIds, database.Currencies, $"Chapter '{chapter.Id}' (currencies)");
             // the chapter's declared currencies: their earn reveal flags are
-            // chapter-scoped like every other flag reference — flag ids may
+            // chapter-scoped like every other flag reference - flag ids may
             // repeat across chapters, so the owning chapter's list is the
             // only one that counts
             foreach (var id in chapter.CurrencyIds)
@@ -173,7 +173,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (currency.Earn.PerSec < 0 || currency.Earn.PerTap < 0)
                 Debug.LogError($"ContentValidator: Currency '{currency.Id}' has negative earn values.");
             if (string.IsNullOrEmpty(currency.Earn.RevealFlagId))
-                Debug.LogError($"ContentValidator: Currency '{currency.Id}' has earn values but no reveal flag — the earn can never activate.");
+                Debug.LogError($"ContentValidator: Currency '{currency.Id}' has earn values but no reveal flag - the earn can never activate.");
             else
                 ValidateFlag(currency.Earn.RevealFlagId, context, $"Currency '{currency.Id}' (earn revealFlag)");
         }
@@ -188,17 +188,17 @@ namespace RidiculousGaming.GarageBandIdle
         private static void ValidateGenerator(GeneratorDefinition generator, ConditionContext context)
         {
             // a zero/negative cost makes a generator free-and-infinite and a
-            // non-positive growth breaks the cost curve — content mistakes
+            // non-positive growth breaks the cost curve - content mistakes
             // (including stale assets from before the cost schema) must fail
             // loudly here, not degrade to wrong gameplay. Growth < 1
             // (shrinking costs) is legal.
             context.Currencies.ValidateReference(generator.CostCurrencyId, $"Generator '{generator.Id}' (cost currency)");
             if (generator.BaseCost <= 0)
-                Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive base cost ({generator.BaseCost}) — it would be free to buy.");
+                Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive base cost ({generator.BaseCost}) - it would be free to buy.");
             if (generator.CostGrowth <= 0)
                 Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive cost growth ({generator.CostGrowth}).");
             // production must never drain (runtime fails closed on it);
-            // zero output stays legal — a pure fan-rate bandmate is coherent
+            // zero output stays legal - a pure fan-rate bandmate is coherent
             if (generator.BaseOutput < 0)
                 Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a negative base output ({generator.BaseOutput}).");
             ConditionEvaluator.Validate(generator.Unlock, context, $"Generator '{generator.Id}' (unlock)");
@@ -239,7 +239,7 @@ namespace RidiculousGaming.GarageBandIdle
             ValidateRewardReference(bar.RewardId, rewards, $"Bar '{bar.Id}'");
 
             // a non-positive requirement can never be legitimately filled;
-            // BarSystem rejects such bars — report the content error here
+            // BarSystem rejects such bars - report the content error here
             // (catches stale assets from before this rule)
             if (bar.FillRequirement <= 0)
                 Debug.LogError($"ContentValidator: Bar '{bar.Id}' has a non-positive fill requirement ({bar.FillRequirement}).");

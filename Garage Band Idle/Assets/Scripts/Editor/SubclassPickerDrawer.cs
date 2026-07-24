@@ -7,7 +7,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 {
     // Draws a [SubclassPicker] [SerializeReference] field as a concrete-type
     // popup plus the chosen instance's fields, so polymorphic families
-    // (Condition, UpgradePayload, Debuff, ...) can be authored in the inspector —
+    // (Condition, UpgradePayload, Debuff, ...) can be authored in the inspector -
     // Unity's default inspector can edit an existing instance but offers no way
     // to create one. The family comes from the field's declared base type and
     // its subclasses from TypeCache, so this drawer is family-agnostic: new
@@ -106,7 +106,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         }
 
         // the field's declared base type, e.g. Condition for a [SerializeReference]
-        // Condition field — the popup offers that family's concrete subclasses.
+        // Condition field - the popup offers that family's concrete subclasses.
         // Read from the property (not fieldInfo) so list elements resolve too.
         private static Type GetDeclaredBaseType(SerializedProperty property)
         {

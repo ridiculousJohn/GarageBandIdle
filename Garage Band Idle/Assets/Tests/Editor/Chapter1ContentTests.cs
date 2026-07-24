@@ -11,8 +11,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // Validates the IMPORTED Chapter 1 assets against docs/chapter-01-garage.json
     // and simulates the generator unlock chain end-to-end. The chapter references
     // its content by id, so these tests resolve ids against the asset folders the
-    // importer writes — the editor-test stand-in for the Addressables registries.
-    // Requires 'GarageBandIdle → Import Chapter 1 JSON' to have been run.
+    // importer writes - the editor-test stand-in for the Addressables registries.
+    // Requires 'GarageBandIdle > Import Chapter 1 JSON' to have been run.
     public class Chapter1ContentTests
     {
         private const string ChapterPath = "Assets/ScriptableObjects/Chapters/ch01_garage.asset";
@@ -30,7 +30,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var asset = AssetDatabase.LoadAssetAtPath<T>(path);
             Assert.IsNotNull(asset,
-                $"Missing asset at '{path}'. Run 'GarageBandIdle → Import Chapter 1 JSON' first.");
+                $"Missing asset at '{path}'. Run 'GarageBandIdle > Import Chapter 1 JSON' first.");
             return asset;
         }
 
@@ -44,7 +44,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // the importer writes one asset per id, so id resolution in tests is a
-        // folder path — the runtime equivalent is the ContentDatabase registry
+        // folder path - the runtime equivalent is the ContentDatabase registry
         private static T LoadById<T>(string folder, string id) where T : Object
             => LoadRequired<T>($"{folder}/{id}.asset");
 
@@ -146,7 +146,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var bassist = generators.Get("bassist");
             var guitarist = generators.Get("guitarist");
 
-            // stage 0: tap only — nothing revealed below the 100-earned threshold
+            // stage 0: tap only - nothing revealed below the 100-earned threshold
             currencies.Add("cash", 99);
             generators.EvaluateUnlocks(context);
             Assert.IsFalse(amp.Unlocked, "amp stays locked at 99 lifetime cash");
@@ -197,7 +197,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var rehearsal = LoadById<CurrencyDefinition>(CurrenciesFolder, "rehearsal");
 
             Assert.AreEqual("covers", rehearsal.Earn.RevealFlagId,
-                "earn revealFlag — if this fails, re-run 'GarageBandIdle → Import Chapter 1 JSON' for the restructured JSON");
+                "earn revealFlag - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
             Assert.AreEqual(1.0, rehearsal.Earn.PerSec, 1e-9);
             Assert.AreEqual(2.0, rehearsal.Earn.PerTap, 1e-9);
         }
@@ -242,7 +242,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("album", payload.FlagId);
 
             var gate = cutDemo.Gate as CompoundCondition;
-            Assert.IsNotNull(gate, "cut_demo gate is a compound condition — if not, re-run the chapter import");
+            Assert.IsNotNull(gate, "cut_demo gate is a compound condition - if not, re-run the chapter import");
             Assert.AreEqual(2, gate.All.Count);
 
             var fans = gate.All[0] as CurrencyBalanceCondition;

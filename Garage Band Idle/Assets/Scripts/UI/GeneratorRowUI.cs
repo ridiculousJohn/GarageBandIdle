@@ -70,7 +70,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void RefreshAffordability()
         {
             // mirrors TryBuy exactly, including its fail-closed refusal of a
-            // non-positive cost — the button is never enabled for a buy that
+            // non-positive cost - the button is never enabled for a buy that
             // would be refused
             _buyButton.interactable = Generator.NextCost > BigNumber.Zero
                 && _game.Currencies.Get(Generator.Definition.CostCurrencyId) >= Generator.NextCost;

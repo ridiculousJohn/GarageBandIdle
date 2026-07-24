@@ -11,7 +11,7 @@ namespace RidiculousGaming.GarageBandIdle
 {
     // Runtime discovery of every definition ScriptableObject (design doc section
     // 12, rule 10): each type loads by its Addressables label into an id-keyed
-    // registry, so the content set stays open — new assets are picked up with no
+    // registry, so the content set stays open - new assets are picked up with no
     // code or registration changes and nothing holds a direct asset reference.
     // Label load order is arbitrary; display/processing order comes from the
     // chapter's id lists, never from a registry.
@@ -83,8 +83,8 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 // Addressables throws InvalidKeyException when a label has no
                 // entries yet, i.e. content was never imported/marked
-                Debug.LogError($"ContentDatabase: loading addressable content with label '{label}' failed — " +
-                    $"run 'GarageBandIdle → Import Chapter 1 JSON' (it marks all content addressable), then press Play again. ({exception.Message})");
+                Debug.LogError($"ContentDatabase: loading addressable content with label '{label}' failed - " +
+                    $"run 'GarageBandIdle > Import Chapter 1 JSON' (it marks all content addressable), then press Play again. ({exception.Message})");
                 assets = Array.Empty<T>();
             }
 

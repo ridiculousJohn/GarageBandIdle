@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // Fill-currency engagement earn (design doc section 3): a fill currency
-    // OWNS its earn config — a passive tick plus Jam taps, never Cash, so bar
+    // OWNS its earn config - a passive tick plus Jam taps, never Cash, so bar
     // progress comes from playing, not income. The caller hands over the
     // OWNING chapter's currencies only (flag ids may repeat across chapters,
     // so flags cannot scope this); each earner is then dormant until its own
@@ -29,7 +29,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public bool HasEarn(string currencyId) => Find(currencyId) != null;
 
-        // zero while dormant; a negative rate never earns (fail closed — the
+        // zero while dormant; a negative rate never earns (fail closed - the
         // importer refuses it and boot validation reports stale assets)
         public BigNumber RatePerSecond(string currencyId)
         {

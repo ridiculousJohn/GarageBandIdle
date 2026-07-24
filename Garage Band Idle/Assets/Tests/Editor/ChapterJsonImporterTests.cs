@@ -7,7 +7,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 {
     // The importer's condition parse path (real DTO shape + conversion, no
     // asset writes). The load-bearing claim: compound conditions map onto the
-    // recursive CompoundCondition family at any nesting depth — the Condition
+    // recursive CompoundCondition family at any nesting depth - the Condition
     // contract declares all/any as arrays of nested Condition.
     public class ChapterJsonImporterTests
     {
@@ -20,7 +20,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             var context = TestContent.MakeContext(currencies, flags: flags);
-            // all[fans, any[covers, all[album, cash ≥ 100]]] — three levels
+            // all[fans, any[covers, all[album, cash >= 100]]] - three levels
             var condition = ChapterJsonImporter.ParseCondition(@"{
                 ""type"": ""compound"",
                 ""all"": [
@@ -63,7 +63,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(condition.Evaluate(context), "the surviving child governs the gate");
         }
 
-        // absent and explicit-null gates both mean "no gate" — the Newtonsoft
+        // absent and explicit-null gates both mean "no gate" - the Newtonsoft
         // swap must keep JsonUtility's absent-field semantics
         [Test]
         public void Condition_AbsentOrNullGate_ImportsNoGate()

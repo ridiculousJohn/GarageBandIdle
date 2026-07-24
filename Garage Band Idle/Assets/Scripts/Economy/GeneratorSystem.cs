@@ -7,7 +7,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // Runtime home of a chapter's generators: builds Generator state from the
     // chapter's definition list, produces into CurrencyManager on tick, and
     // reveals generators as their unlock conditions are met. State is keyed by
-    // generator id, so the generator set stays open — new generators are new
+    // generator id, so the generator set stays open - new generators are new
     // assets, not code. Unlock conditions are validated by the boot validation
     // pass (ContentValidator), not here.
     public class GeneratorSystem
@@ -21,7 +21,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public event Action<Generator> GeneratorUnlocked;
 
         // fires whenever any generator's owned count changes (purchases, run
-        // resets, restores) — the signal behind ownedCount conditions
+        // resets, restores) - the signal behind ownedCount conditions
         public event Action<Generator> GeneratorOwnedChanged;
 
         public IReadOnlyList<Generator> All => _generators;
@@ -76,7 +76,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public bool TryGet(string id, out Generator generator) => _byId.TryGetValue(id, out generator);
 
         // One economy tick: each produced currency gets its generators' summed
-        // output. The multiplier applies only to the currencies it declares —
+        // output. The multiplier applies only to the currencies it declares -
         // a multiplier is an output effect that names its targets, so
         // production of anything it doesn't name is untouched.
         public void Tick(double seconds, BigNumber incomeMultiplier, IReadOnlyList<string> multiplierAffects)
@@ -105,7 +105,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // Run reset (album release, event baseline; design doc section 7):
         // gear and bandmates are re-bought each run, so every owned count
-        // returns to zero. All state settles before any notification fires —
+        // returns to zero. All state settles before any notification fires -
         // a subscriber may never observe one generator reset while another
         // still holds its old count (state, then notify).
         public void ResetOwned()
@@ -120,7 +120,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 generator.NotifyOwnedChanged();
         }
 
-        // Save/load: re-establishes saved counts as one atomic operation —
+        // Save/load: re-establishes saved counts as one atomic operation -
         // every count settles before any notification fires, so a subscriber
         // never observes a half-restored fleet (state, then notify). An
         // unknown id is stale save data: reported and skipped.

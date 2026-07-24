@@ -4,7 +4,7 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle
 {
     // JSON type "flagSet": a progress flag has latched on (FlagSystem). The
-    // observing half of the single reveal registry — content-unlock upgrades and
+    // observing half of the single reveal registry - content-unlock upgrades and
     // setFlag rewards set flags, and anything that appears when a system exists
     // gates on one of these.
     [Serializable]

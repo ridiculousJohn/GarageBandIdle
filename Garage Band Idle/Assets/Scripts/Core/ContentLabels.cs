@@ -2,7 +2,7 @@ namespace RidiculousGaming.GarageBandIdle
 {
     // Addressables labels, one per definition type. The importer stamps these
     // onto content assets; runtime discovery loads by label, so the content set
-    // stays open — new assets are picked up with no code or registration changes.
+    // stays open - new assets are picked up with no code or registration changes.
     // Addresses follow "<label>/<asset id>".
     public static class ContentLabels
     {

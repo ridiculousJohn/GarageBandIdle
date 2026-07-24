@@ -4,7 +4,7 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // Fan accrual (design doc sections 3 and 6): fans are a function of band
-    // size and time ONLY — never Cash or Cash/sec — so income alone cannot
+    // size and time ONLY - never Cash or Cash/sec - so income alone cannot
     // shortcut the album payout (section 11). Dormant until the activation flag
     // (set by the chapter's play_for_crowd-style content unlock) latches on.
     public class FanSystem
@@ -66,7 +66,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // the run-scoped stack; permanent-in-chapter rewards survive
         public void ResetRunScopedMultipliers() => _runRateMultiplier = BigNumber.One;
 
-        // owned units across bandmate generators (IsBandmate — gear never counts)
+        // owned units across bandmate generators (IsBandmate - gear never counts)
         public int BandmateCount
         {
             get

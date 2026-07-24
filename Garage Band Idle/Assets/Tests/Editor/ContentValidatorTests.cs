@@ -35,7 +35,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // ch1 plays the active chapter (its flags are the live context);
             // ch2's content must still validate against ch2's own declarations
-            // — the pass reports nothing at all
+            // - the pass reports nothing at all
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
             ContentValidator.Validate(database, context, NoRewards);
         }
@@ -52,7 +52,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // "two" exists somewhere (ch2 declares it), but ch1 owns the
-            // section — a flag another chapter declares can never be set while
+            // section - a flag another chapter declares can never be set while
             // ch1's FlagSystem is live, so this is a content error
             LogAssert.Expect(LogType.Error,
                 "Condition: Section 'poached' (visibleWhen) references flag 'two', which the chapter does not declare.");
@@ -60,7 +60,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // a chapter-listed currency's earn flag validates against the OWNING
-        // chapter — another chapter declaring the same flag id must not make
+        // chapter - another chapter declaring the same flag id must not make
         // it pass, because flag ids are chapter-local and may repeat
         [Test]
         public void CurrencyEarnFlag_ValidatesAgainstTheOwningChapter()
@@ -78,7 +78,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
-        // negative tuning drains or dead-ends instead of earning — runtime
+        // negative tuning drains or dead-ends instead of earning - runtime
         // fails closed on it, so validation must say why the systems look dead
         [Test]
         public void NegativeTapAndRecordBuffTuning_AreReported()
@@ -90,14 +90,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' has a negative tapBaseValue (-1) — every Jam would drain cash.");
+                "ContentValidator: Chapter 'ch1' has a negative tapBaseValue (-1) - every Jam would drain cash.");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' has a negative recordBuff perRecord (-0.02).");
             ContentValidator.Validate(database, context, NoRewards);
         }
 
         // stale/unlisted definitions keep every structural check; only the
-        // flag-known checks are skipped — no chapter's declaration list
+        // flag-known checks are skipped - no chapter's declaration list
         // governs an orphan
         [Test]
         public void OrphanedContent_KeepsStructuralChecks_WithoutFlagFalsePositives()
@@ -110,7 +110,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // the broken cost is reported; the undeclared 'ghost' flag is not
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Generator 'stale' has a non-positive base cost (-5) — it would be free to buy.");
+                "ContentValidator: Generator 'stale' has a non-positive base cost (-5) - it would be free to buy.");
             ContentValidator.Validate(database, context, NoRewards);
         }
     }

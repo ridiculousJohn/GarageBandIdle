@@ -69,7 +69,7 @@ namespace RidiculousGaming.GarageBandIdle
 
             if (CurrentChapter == null)
             {
-                Debug.LogError("GameManager: no ChapterDefinition assets found. Run 'GarageBandIdle → Import Chapter 1 JSON' in the editor menu, then press Play again.");
+                Debug.LogError("GameManager: no ChapterDefinition assets found. Run 'GarageBandIdle > Import Chapter 1 JSON' in the editor menu, then press Play again.");
                 Flags = new FlagSystem();
             }
             else
@@ -93,8 +93,8 @@ namespace RidiculousGaming.GarageBandIdle
 
                 Conditions = new ConditionContext(Currencies, Generators, Flags, RecordsCurrencyId, Database, Bars);
 
-                // one boot pass covers every content reference — conditions,
-                // payloads, rewards, module addresses — so a mistake gets
+                // one boot pass covers every content reference - conditions,
+                // payloads, rewards, module addresses - so a mistake gets
                 // reported here, loudly, instead of surfacing mid-run
                 ContentValidator.Validate(Database, Conditions, Rewards);
             }
@@ -145,7 +145,7 @@ namespace RidiculousGaming.GarageBandIdle
 
             // content unlocks before fan accrual so a freshly-set fans flag
             // starts accruing on the same tick; fans never take the income
-            // multiplier — fan rate is band size and time only
+            // multiplier - fan rate is band size and time only
             Upgrades.EvaluateContentUnlocks(Conditions);
             Fans.Tick(seconds);
 
@@ -155,7 +155,7 @@ namespace RidiculousGaming.GarageBandIdle
             Bars.Tick();
         }
 
-        // the tap action; cash per tap = chapter base × tap-reward multipliers
+        // the tap action; cash per tap = chapter base x tap-reward multipliers
         // (flat tap buffs like stage_presence arrive with the buff slice)
         public void Jam()
         {
@@ -177,8 +177,8 @@ namespace RidiculousGaming.GarageBandIdle
             if (!generator.TryBuy(Currencies))
                 return false;
 
-            // a purchase can satisfy another generator's ownedCount unlock — or a
-            // content unlock's gate (play_for_crowd: own 1 Drummer) — right now
+            // a purchase can satisfy another generator's ownedCount unlock - or a
+            // content unlock's gate (play_for_crowd: own 1 Drummer) - right now
             Generators.EvaluateUnlocks(Conditions);
             Upgrades.EvaluateContentUnlocks(Conditions);
             return true;

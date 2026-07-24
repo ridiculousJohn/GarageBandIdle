@@ -6,7 +6,7 @@ namespace RidiculousGaming.GarageBandIdle
     // JSON type "recordsCumulative": cumulative Records earned is at least Value.
     // Reads the records currency's lifetime-earned total (Records are never
     // spent, so cumulative equals earned). The capstone gate and event
-    // availability both use this — one type, different thresholds.
+    // availability both use this - one type, different thresholds.
     [Serializable]
     public class RecordsCumulativeCondition : Condition
     {
