@@ -37,7 +37,8 @@ namespace RidiculousGaming.GarageBandIdle
         public GeneratorSystem Generators { get; private set; }
         public UpgradeSystem Upgrades { get; private set; }
         public FanSystem Fans { get; private set; }
-        public RehearsalSystem Rehearsal { get; private set; }
+        public TapSystem Tap { get; private set; }
+        public EngagementEarnSystem EngagementEarn { get; private set; }
         public RewardManager Rewards { get; private set; }
         public BarSystem Bars { get; private set; }
         public ConditionContext Conditions { get; private set; }
@@ -79,10 +80,15 @@ namespace RidiculousGaming.GarageBandIdle
                 Generators = new GeneratorSystem(Resolve(Database.Generators, CurrentChapter.GeneratorIds, "generator"), Currencies);
                 Upgrades = new UpgradeSystem(Resolve(Database.Upgrades, CurrentChapter.UpgradeIds, "upgrade"), Currencies, Flags);
                 Fans = new FanSystem(CurrentChapter.Fans, Currencies, Generators, Flags);
-                Rehearsal = new RehearsalSystem(CurrentChapter.Rehearsal, Currencies, Flags);
+                Tap = new TapSystem(CurrentChapter.TapBaseValue);
+                // only the CURRENT chapter's declared currencies earn: flag
+                // ids may legitimately repeat across chapters, so ownership
+                // comes from the chapter's currency list, never from flags
+                EngagementEarn = new EngagementEarnSystem(
+                    Resolve(Database.Currencies, CurrentChapter.CurrencyIds, "currency"), Currencies, Flags);
                 Rewards = new RewardManager(Database.Rewards.All);
                 Bars = new BarSystem(Resolve(Database.BarGroups, CurrentChapter.BarGroupIds, "bar group"),
-                    Database.Bars.All, Currencies, Rewards, new RewardContext(Currencies, Flags, Fans));
+                    Database.Bars.All, Currencies, Rewards, new RewardContext(Currencies, Flags, Fans, Tap));
                 Sections = Resolve(Database.Sections, CurrentChapter.SectionIds, "section");
 
                 Conditions = new ConditionContext(Currencies, Generators, Flags, RecordsCurrencyId, Database, Bars);
@@ -130,9 +136,11 @@ namespace RidiculousGaming.GarageBandIdle
             if (Generators == null)
                 return;
 
+            // the Records buff applies only to the currencies it declares
+            // (cash in Ch1); production of anything it doesn't name is untouched
             var multiplier = ProductionCalculator.IncomeMultiplier(
-                Currencies.Get(RecordsCurrencyId), CurrentChapter.RecordBuffPerRecord);
-            Generators.Tick(seconds, multiplier);
+                Currencies.Get(RecordsCurrencyId), CurrentChapter.RecordBuff.PerRecord);
+            Generators.Tick(seconds, multiplier, CurrentChapter.RecordBuff.AffectsCurrencyIds);
             Generators.EvaluateUnlocks(Conditions);
 
             // content unlocks before fan accrual so a freshly-set fans flag
@@ -141,23 +149,24 @@ namespace RidiculousGaming.GarageBandIdle
             Upgrades.EvaluateContentUnlocks(Conditions);
             Fans.Tick(seconds);
 
-            // rehearsal accrues, then bars drain the pool into the active bar
-            // in the same tick, so a selected bar advances with no pool lag
-            Rehearsal.Tick(seconds);
+            // fill currencies accrue, then bars drain the pool into the active
+            // bar in the same tick, so a selected bar advances with no pool lag
+            EngagementEarn.Tick(seconds);
             Bars.Tick();
         }
 
-        // the tap action; tap buffs (stage_presence etc.) arrive in the upgrades slice
+        // the tap action; cash per tap = chapter base × tap-reward multipliers
+        // (flat tap buffs like stage_presence arrive with the buff slice)
         public void Jam()
         {
             if (CurrentChapter == null)
                 return;
 
-            Currencies.Add(CashCurrencyId, CurrentChapter.TapBaseValue);
+            Currencies.Add(CashCurrencyId, Tap.Value);
 
-            // taps also yield the fill currency; drain immediately so the
+            // taps also yield the fill currencies; drain immediately so the
             // active bar visibly nudges on the tap, not a tick later
-            Rehearsal.OnJamTap();
+            EngagementEarn.OnJamTap();
             Bars.Tick();
         }
 

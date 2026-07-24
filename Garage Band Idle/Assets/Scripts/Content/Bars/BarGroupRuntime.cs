@@ -46,30 +46,35 @@ namespace RidiculousGaming.GarageBandIdle.Content
             return count;
         }
 
-        protected BarState FindBar(string barId)
+        protected internal BarState FindBar(string barId)
             => _bars.Find(bar => bar.Definition.Id == barId);
 
         protected void RaiseProgressChanged(BarState bar)
             => ProgressChanged?.Invoke(bar);
 
-        // latches the bar, applies its pool reward exactly once, and notifies.
-        // OnBarCompleted runs between the latch and the notifications so the
-        // mode can settle its own state (e.g. clear a selection) before
-        // listeners observe the completion.
-        protected void Complete(BarState bar)
+        // the occurrence side of a completion: after the mode latched it
+        // through BarState.AddProgress and settled its own state, applies the
+        // bar's pool reward exactly once and notifies. Only live accrual takes
+        // this path - a restored completion is recorded fact, not an
+        // occurrence, so BarSystem.RestoreProgress never calls it.
+        protected void NotifyCompleted(BarState bar)
         {
-            if (bar.Completed)
-                return;
-
-            bar.Completed = true;
-            OnBarCompleted(bar);
-
             if (!string.IsNullOrEmpty(bar.Definition.RewardId))
                 _rewards.Apply(bar.Definition.RewardId, _rewardContext);
 
             Completed?.Invoke(bar);
         }
 
-        protected virtual void OnBarCompleted(BarState bar) { }
+        // Mode-state reconciliation hooks for the host's atomic transitions
+        // (BarSystem.ResetRunScopedGroups, BarSystem.RestoreProgress). The
+        // host re-establishes every bar's state first, then the mode settles
+        // whatever it holds on top (e.g. a selection); each returns whether
+        // mode state changed. Notification is deferred - the host calls
+        // NotifyModeStateChanged only after ALL groups have settled (state,
+        // then notify), so no subscriber ever observes a half-applied
+        // transition.
+        internal virtual bool ReconcileAfterRunReset() => false;
+        internal virtual bool ReconcileAfterRestore() => false;
+        internal virtual void NotifyModeStateChanged() { }
     }
 }

@@ -70,5 +70,7 @@ crashlytics-build.properties
 **/[Aa]ssets/[Ss]treamingAssets/aa.meta
 **/[Aa]ssets/[Ss]treamingAssets/aa/*
 
-# Claude Code local (per-machine) settings
+# Claude Code local (per-machine) settings, including the transient temp
+# files the tooling writes beside it
 .claude/settings.local.json
+.claude/settings.local.json.tmp.*

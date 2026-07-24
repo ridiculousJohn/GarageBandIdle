@@ -16,6 +16,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private GameManager _game;
         private CurrencyDefinition _producesDefinition;
+        private CurrencyDefinition _costDefinition;
 
         public Generator Generator { get; private set; }
 
@@ -24,6 +25,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             _game = game;
             Generator = generator;
             _producesDefinition = game.Currencies.GetDefinition(generator.Definition.ProducesCurrencyId);
+            _costDefinition = game.Currencies.GetDefinition(generator.Definition.CostCurrencyId);
 
             _buyButton.onClick.AddListener(HandleBuyClicked);
             Generator.OwnedChanged += Refresh;
@@ -50,10 +52,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Refresh();
         }
 
-        // affordability moves whenever the purchase currency's balance moves
+        // affordability moves whenever the cost currency's balance moves
         public void HandleBalanceChanged(string currencyId)
         {
-            if (gameObject.activeSelf && Generator.Definition.ProducesCurrencyId == currencyId)
+            if (gameObject.activeSelf && Generator.Definition.CostCurrencyId == currencyId)
                 RefreshAffordability();
         }
 
@@ -61,13 +63,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             _info.text = $"{Generator.Definition.DisplayName} x{Generator.Owned}\n" +
                 $"+{NumberFormatter.Format(Generator.ProductionPerSecond)} {_producesDefinition.DisplayName}/sec ({NumberFormatter.Format(Generator.Definition.BaseOutput)} each)";
-            _buyLabel.text = $"Buy {NumberFormatter.Format(Generator.NextCost, _producesDefinition)}";
+            _buyLabel.text = $"Buy {NumberFormatter.Format(Generator.NextCost, _costDefinition)}";
             RefreshAffordability();
         }
 
         private void RefreshAffordability()
         {
-            _buyButton.interactable = _game.Currencies.Get(Generator.Definition.ProducesCurrencyId) >= Generator.NextCost;
+            // mirrors TryBuy exactly, including its fail-closed refusal of a
+            // non-positive cost — the button is never enabled for a buy that
+            // would be refused
+            _buyButton.interactable = Generator.NextCost > BigNumber.Zero
+                && _game.Currencies.Get(Generator.Definition.CostCurrencyId) >= Generator.NextCost;
         }
     }
 }

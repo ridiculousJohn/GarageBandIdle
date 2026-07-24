@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -117,6 +119,88 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.MakeFanRateReward("boost_b", 1.15).Apply(context);
 
             Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
+        }
+
+        // multipliers are tracked per scope: the run reset (album release,
+        // event baseline) clears only run-scoped rewards — a permanent-in-
+        // chapter reward must survive it
+        [Test]
+        public void FanRateMultipliers_RunResetKeepsPermanentInChapter()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+            var context = new Content.RewardContext(currencies, flags, fans);
+
+            TestContent.MakeFanRateReward("run_boost", 1.5, ContentScope.Run).Apply(context);
+            TestContent.MakeFanRateReward("permanent_boost", 2.0, ContentScope.PermanentInChapter).Apply(context);
+            Assert.AreEqual(0.2 * 1.5 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "both scopes stack");
+
+            fans.ResetRunScopedMultipliers();
+
+            Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "run reset keeps the permanent stack");
+        }
+
+        // fail closed on broken content: a non-positive factor (invalid data —
+        // boot validation reports it) would zero or negate the whole stack for
+        // the rest of the run and must never apply
+        [Test]
+        public void FanRateMultiplier_FailsClosedOnANonPositiveFactor()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags);
+
+            LogAssert.Expect(LogType.Error, "FanSystem: MultiplyRate with non-positive factor '0'. Ignoring.");
+            fans.MultiplyRate(0, ContentScope.Run);
+
+            Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "the rate is untouched");
+        }
+
+        // tap-value rewards route to the tap system and stack per scope,
+        // mirroring fan-rate rewards: the run reset keeps the permanent-in-
+        // chapter stack
+        [Test]
+        public void TapValueRewards_StackPerScope_AndRunResetKeepsPermanent()
+        {
+            var tap = new TapSystem(2);
+            var context = new Content.RewardContext(TestContent.MakeEconomy(), new FlagSystem(), null, tap);
+
+            TestContent.MakeTapValueReward("run_x2", 2.0, ContentScope.Run).Apply(context);
+            TestContent.MakeTapValueReward("perm_x3", 3.0, ContentScope.PermanentInChapter).Apply(context);
+            Assert.AreEqual(12.0, tap.Value.ToDouble(), 1e-9, "base 2 × run 2 × permanent 3");
+
+            tap.ResetRunScopedMultipliers();
+            Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "the run reset keeps the permanent stack");
+        }
+
+        // fail closed on broken content: a negative base (invalid data — boot
+        // validation reports it) must never drain cash on a tap, and no
+        // multiplier can resurrect it
+        [Test]
+        public void TapValue_FailsClosedOnANegativeBase()
+        {
+            var tap = new TapSystem(-5);
+            tap.MultiplyValue(2, ContentScope.Run);
+
+            Assert.AreEqual(0.0, tap.Value.ToDouble(), 1e-9, "never a draining tap");
+        }
+
+        // fail closed on broken content: a non-positive factor (invalid data —
+        // boot validation reports it) must never apply
+        [Test]
+        public void TapValueMultiplier_FailsClosedOnANonPositiveFactor()
+        {
+            var tap = new TapSystem(2);
+
+            LogAssert.Expect(LogType.Error, "TapSystem: MultiplyValue with non-positive factor '0'. Ignoring.");
+            tap.MultiplyValue(0, ContentScope.Run);
+
+            Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "the value is untouched");
         }
 
         [Test]

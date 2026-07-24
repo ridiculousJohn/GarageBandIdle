@@ -30,7 +30,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (string.IsNullOrEmpty(_flagId))
                 Debug.LogError($"Condition: {source} has a flagSet condition with an empty flag id.");
             else if (context.Flags != null && !context.Flags.IsKnown(_flagId))
-                Debug.LogError($"Condition: {source} references flag '{_flagId}', which no chapter declares.");
+                Debug.LogError($"Condition: {source} references flag '{_flagId}', which the chapter does not declare.");
         }
     }
 }

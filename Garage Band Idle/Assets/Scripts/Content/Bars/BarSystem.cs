@@ -11,7 +11,10 @@ namespace RidiculousGaming.GarageBandIdle.Content
     // its state, and this host only resolves content, routes ticks, aggregates
     // change notifications, and feeds barsCompleted conditions via
     // IBarCompletionSource. Nothing here inspects a fill mode; mode-specific
-    // callers (UI) take the concrete runtime from GetRuntime.
+    // callers (UI) take the concrete runtime from GetRuntime. The mode-agnostic
+    // state transitions - run reset and save restore - live here, because bar
+    // progress is shared state: both settle every group completely before any
+    // notification fires (state, then notify).
     public class BarSystem : IBarCompletionSource
     {
         private readonly Dictionary<string, BarGroupRuntime> _groups = new();
@@ -42,10 +45,23 @@ namespace RidiculousGaming.GarageBandIdle.Content
                 var states = new List<BarState>();
                 foreach (var barId in group.BarIds)
                 {
-                    if (barsById.TryGetValue(barId, out var bar))
-                        states.Add(new BarState(bar, group));
-                    else
+                    if (!barsById.TryGetValue(barId, out var bar))
+                    {
                         Debug.LogError($"BarSystem: bar group '{group.Id}' references unknown bar id '{barId}'.");
+                        continue;
+                    }
+
+                    // fail closed on broken content: a non-positive requirement
+                    // can never be legitimately filled - rejecting the bar means
+                    // it can never satisfy a barsCompleted gate or grant its
+                    // reward (the importer and boot validation report it)
+                    if (bar.FillRequirement <= 0)
+                    {
+                        Debug.LogError($"BarSystem: bar '{bar.Id}' has a non-positive fill requirement ({bar.FillRequirement}). Skipping it.");
+                        continue;
+                    }
+
+                    states.Add(new BarState(bar, group));
                 }
 
                 var runtime = group.FillBehavior.CreateRuntime(group, states, currencies, rewards, rewardContext);
@@ -77,6 +93,95 @@ namespace RidiculousGaming.GarageBandIdle.Content
         {
             foreach (var runtime in _groups.Values)
                 runtime.Tick();
+        }
+
+        // Run reset (album release, event baseline): every group whose
+        // declared scope is Run returns to empty - no progress, nothing
+        // completed, no mode state (selection etc.) - and
+        // permanent-in-chapter groups are untouched. Nothing completes here,
+        // so no reward applies and BarCompleted never fires. All state
+        // settles before any notification (state, then notify).
+        public void ResetRunScopedGroups()
+        {
+            var changedBars = new List<BarState>();
+            var changedModes = new List<BarGroupRuntime>();
+
+            foreach (var definition in _groupOrder)
+            {
+                if (definition.Scope != ContentScope.Run)
+                    continue;
+
+                var runtime = _groups[definition.Id];
+                foreach (var bar in runtime.Bars)
+                {
+                    if (bar.ResetForRun())
+                        changedBars.Add(bar);
+                }
+                if (runtime.ReconcileAfterRunReset())
+                    changedModes.Add(runtime);
+            }
+
+            foreach (var bar in changedBars)
+                BarProgressChanged?.Invoke(bar);
+            foreach (var runtime in changedModes)
+                runtime.NotifyModeStateChanged();
+        }
+
+        // Save/load: re-establishes saved progress as one atomic operation,
+        // keyed by group then bar id. A restored completion is recorded fact,
+        // not a new occurrence - no reward applies and BarCompleted does not
+        // fire; the reward's own effects are restored by their owning
+        // systems. Each mode reconciles its own state on top (a selection
+        // left on a now-completed bar clears, exactly as completing it by
+        // drain would). The complete snapshot settles - including that
+        // reconciliation - before any notification fires (state, then
+        // notify), so a subscriber never observes a partially restored
+        // system. Unknown ids are stale save data: reported and skipped.
+        public void RestoreProgress(IReadOnlyDictionary<string, IReadOnlyDictionary<string, BigNumber>> progressByGroupAndBarId)
+        {
+            if (progressByGroupAndBarId == null)
+            {
+                Debug.LogError("BarSystem: RestoreProgress with no saved progress.");
+                return;
+            }
+
+            var restoredBars = new List<BarState>();
+            var changedModes = new List<BarGroupRuntime>();
+
+            foreach (var groupEntry in progressByGroupAndBarId)
+            {
+                if (!_groups.TryGetValue(groupEntry.Key ?? "", out var runtime))
+                {
+                    Debug.LogError($"BarSystem: RestoreProgress with unknown bar group id '{groupEntry.Key}'. Skipping it.");
+                    continue;
+                }
+                if (groupEntry.Value == null)
+                {
+                    Debug.LogError($"BarSystem: RestoreProgress with no saved bars for group '{groupEntry.Key}'. Skipping it.");
+                    continue;
+                }
+
+                foreach (var barEntry in groupEntry.Value)
+                {
+                    var bar = runtime.FindBar(barEntry.Key);
+                    if (bar == null)
+                    {
+                        Debug.LogError($"BarSystem: RestoreProgress with unknown bar id '{barEntry.Key}' in group '{groupEntry.Key}'. Skipping it.");
+                        continue;
+                    }
+
+                    bar.RestoreProgress(barEntry.Value);
+                    restoredBars.Add(bar);
+                }
+
+                if (runtime.ReconcileAfterRestore())
+                    changedModes.Add(runtime);
+            }
+
+            foreach (var bar in restoredBars)
+                BarProgressChanged?.Invoke(bar);
+            foreach (var runtime in changedModes)
+                runtime.NotifyModeStateChanged();
         }
 
         // completed bars in the group this run, for barsCompleted conditions

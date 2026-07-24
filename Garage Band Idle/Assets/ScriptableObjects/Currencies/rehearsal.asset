@@ -18,3 +18,7 @@ MonoBehaviour:
   _symbol: 
   _maxDecimals: 0
   _startingValue: 0
+  _earn:
+    _revealFlagId: covers
+    _perSec: 1
+    _perTap: 2

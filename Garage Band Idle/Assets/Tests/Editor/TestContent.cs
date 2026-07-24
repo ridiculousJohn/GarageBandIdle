@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
+using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEditor;
 using UnityEngine;
 
@@ -35,7 +36,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
-        public static CurrencyDefinition MakeCurrency(string id, string groupId, double startingValue = 0)
+        public static CurrencyDefinition MakeCurrency(string id, string groupId, double startingValue = 0,
+            string earnRevealFlag = null, double earnPerSec = 0, double earnPerTap = 0)
         {
             var definition = Track(ScriptableObject.CreateInstance<CurrencyDefinition>());
             var serialized = new SerializedObject(definition);
@@ -43,16 +45,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             serialized.FindProperty("_displayName").stringValue = id;
             serialized.FindProperty("_groupId").stringValue = groupId;
             serialized.FindProperty("_startingValue").doubleValue = startingValue;
+            serialized.FindProperty("_earn._revealFlagId").stringValue = earnRevealFlag ?? "";
+            serialized.FindProperty("_earn._perSec").doubleValue = earnPerSec;
+            serialized.FindProperty("_earn._perTap").doubleValue = earnPerTap;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return definition;
         }
 
         public static GeneratorDefinition MakeGenerator(string id, string produces,
             double baseCost, double costGrowth, double baseOutput, Condition unlock = null,
-            bool isBandmate = false)
+            bool isBandmate = false, string costCurrency = "cash")
         {
             var definition = Track(ScriptableObject.CreateInstance<GeneratorDefinition>());
-            definition.EditorInitialize(id, id, produces, isBandmate, baseCost, costGrowth, baseOutput, unlock);
+            definition.EditorInitialize(id, id, produces, isBandmate, costCurrency, baseCost, costGrowth, baseOutput, unlock);
             return definition;
         }
 
@@ -84,9 +89,43 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
+        public static SectionDefinition MakeSection(string id, Condition visibleWhen = null)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<SectionDefinition>());
+            definition.EditorInitialize(id, id, new List<string>(), visibleWhen);
+            return definition;
+        }
+
+        // a minimal coherent chapter: declared flags plus the id lists that
+        // form its content closure. The fans config uses the standard economy's
+        // currency and must reveal on a declared flag, so include
+        // fansRevealFlagId (default "fans") in flagIds.
+        public static ChapterDefinition MakeChapter(string id, List<string> flagIds,
+            List<string> sectionIds = null, List<string> generatorIds = null,
+            List<string> upgradeIds = null, List<string> barGroupIds = null,
+            List<string> eventIds = null, List<string> currencyIds = null,
+            string fansRevealFlagId = "fans", double tapBaseValue = 1, double recordBuffPerRecord = 0.02)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
+            definition.EditorInitialize(id, 1, id, "", "", "", 100, tapBaseValue,
+                new RecordBuffConfig(recordBuffPerRecord, new List<string> { "cash" }),
+                new FansConfig("fans", fansRevealFlagId, 0.2, 0.02),
+                flagIds, currencyIds ?? new List<string>(), sectionIds ?? new List<string>(),
+                generatorIds ?? new List<string>(), upgradeIds ?? new List<string>(),
+                barGroupIds ?? new List<string>(), eventIds ?? new List<string>());
+            return definition;
+        }
+
         public static FanRateMultiplierReward MakeFanRateReward(string id, double value, ContentScope scope = ContentScope.Run)
         {
             var definition = Track(ScriptableObject.CreateInstance<FanRateMultiplierReward>());
+            definition.EditorInitialize(id, id, value, scope);
+            return definition;
+        }
+
+        public static TapValueMultiplierReward MakeTapValueReward(string id, double value, ContentScope scope = ContentScope.Run)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<TapValueMultiplierReward>());
             definition.EditorInitialize(id, id, value, scope);
             return definition;
         }
@@ -117,12 +156,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             GeneratorSystem generators = null, FlagSystem flags = null)
             => new(currencies, generators, flags);
 
-        // grants exactly enough cash for each purchase so tests control balances
+        // grants exactly enough of the cost currency for each purchase so tests
+        // control balances
         public static void BuyTimes(Generator generator, CurrencyManager currencies, int times)
         {
             for (var i = 0; i < times; i++)
             {
-                currencies.Add(generator.Definition.ProducesCurrencyId, generator.NextCost);
+                currencies.Add(generator.Definition.CostCurrencyId, generator.NextCost);
                 Assert.IsTrue(generator.TryBuy(currencies),
                     $"TryBuy failed for '{generator.Definition.Id}' at owned {generator.Owned}.");
             }

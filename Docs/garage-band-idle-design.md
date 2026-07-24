@@ -115,6 +115,11 @@ income = Σ(generator base × count × buff upgrades)
          × encoreBoost       (temporary 1×/2×/4×, §9)
 ```
 
+A multiplier is an output effect that **declares which currencies it affects** (plural, by id);
+generator production of a currency no multiplier names is untouched. The Records multiplier affects
+Cash in Chapter 1. A currency never opts into a multiplier — the dependency points from the
+multiplier to its targets.
+
 ---
 
 ## 4. Upgrades
@@ -162,8 +167,10 @@ An early album cycle takes seconds to minutes; cycles get faster as Records accu
 Moment-to-moment play draws on the systems defined elsewhere:
 - **Tap ("Jam")** — early Cash source; its relevance falls off as gear automates income.
 - **Generators** — exponential cost, `cost = base × growth^owned`, growth ~1.15; a themed set per
-  chapter. Because runs reset, a chapter's Cash stays in the thousands–millions range; cross-chapter
-  growth comes from Records and Roadies.
+  chapter. A generator's cost declares its currency, independent of what it produces (all Chapter 1
+  gear costs Cash) — "buy with Cash, produce Merch" is a data shape, not a special case. Because runs
+  reset, a chapter's Cash stays in the thousands–millions range; cross-chapter growth comes from
+  Records and Roadies.
 - **Upgrades (§4).**
 - **Learn-songs bars** — generic fillable bars (§3) that give early chapters an activity beyond
   watching a number. A bar fills by spending a fill currency (Rehearsal in Ch. 1, earned from taps plus
@@ -176,8 +183,9 @@ Moment-to-moment play draws on the systems defined elsewhere:
   (accrued currency streams into the active bar; selecting a bar IS the interaction); tap-a-chunk or
   dump-the-pool variants are sibling behavior classes, and their JSON vocabulary exists only once the
   class does. **[rev]**
-- **Fans** — accrue from performing (tap plus a passive rate that scales with income). Fan rate is
-  tuned loosely relative to Cash so that income alone does not determine the album payout.
+- **Fans** — accrue passively once revealed: a base rate plus a per-bandmate bonus, a function of
+  band size and time only — never Cash or income. Fan rate is tuned loosely relative to Cash so that
+  income alone does not determine the album payout.
 - **Capstone gig** — unlocks at the Records gate; grants a Roadie and fires a story beat (§10).
 
 ### 6.1 Events

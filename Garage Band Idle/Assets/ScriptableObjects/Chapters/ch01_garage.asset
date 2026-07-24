@@ -24,21 +24,21 @@ MonoBehaviour:
     first roadie."
   _capstoneRecordsGate: 30
   _tapBaseValue: 1
-  _recordBuffPerRecord: 0.02
+  _recordBuff:
+    _perRecord: 0.02
+    _affectsCurrencyIds:
+    - cash
   _fans:
     _currencyId: fans
     _revealFlagId: fans
     _baseFansPerSec: 0.2
     _perBandmateOwnedBonus: 0.02
-  _rehearsal:
-    _currencyId: rehearsal
-    _revealFlagId: covers
-    _pointsPerSec: 1
-    _pointsPerTap: 2
   _flagIds:
   - fans
   - covers
   - album
+  _currencyIds:
+  - rehearsal
   _sectionIds:
   - garage_floor
   - the_band

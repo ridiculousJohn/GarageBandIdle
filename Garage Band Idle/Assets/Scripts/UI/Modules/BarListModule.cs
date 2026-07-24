@@ -25,6 +25,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly List<BarRowUI> _rows = new();
         private readonly List<(PerBarContinuousRuntime runtime, Action handler)> _selectionHandlers = new();
 
+        // the pool readout derives from the bars on display: each distinct
+        // fill currency, in bar order, tagged with the reveal flags of the
+        // groups that fill from it. A currency renders only while at least
+        // one owning group is revealed, so a hidden group can't leak its
+        // pool ahead of its flag.
+        private class PoolEntry
+        {
+            public string CurrencyId;
+            public readonly List<string> RevealFlagIds = new();
+        }
+
+        private readonly List<PoolEntry> _pools = new();
+
         public void Initialize(ChapterContext context)
         {
             _context = context;
@@ -44,6 +57,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     row.Bind(context.Game, runtime, bar);
                     row.gameObject.SetActive(context.Flags.IsSet(group.RevealFlagId));
                     _rows.Add(row);
+
+                    var pool = _pools.Find(p => p.CurrencyId == bar.Definition.FillCurrencyId);
+                    if (pool == null)
+                        _pools.Add(pool = new PoolEntry { CurrencyId = bar.Definition.FillCurrencyId });
+                    if (!pool.RevealFlagIds.Contains(group.RevealFlagId))
+                        pool.RevealFlagIds.Add(group.RevealFlagId);
                 }
 
                 // selection moved: the old and new target both need their labels
@@ -100,8 +119,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void HandleBalanceChanged(string currencyId, BigNumber balance)
         {
-            if (currencyId == _context.Game.Rehearsal.CurrencyId)
-                RefreshPool();
+            foreach (var pool in _pools)
+            {
+                if (pool.CurrencyId == currencyId && IsRevealed(pool))
+                {
+                    RefreshPool();
+                    return;
+                }
+            }
         }
 
         private void HandleFlagSet(string flagId)
@@ -114,20 +139,41 @@ namespace RidiculousGaming.GarageBandIdle.UI
             RefreshPool();
         }
 
+        private bool IsRevealed(PoolEntry pool)
+        {
+            foreach (var flagId in pool.RevealFlagIds)
+            {
+                if (_context.Flags.IsSet(flagId))
+                    return true;
+            }
+            return false;
+        }
+
         // the fill currency readout lives here rather than the currency header;
-        // the playable pass (slice 10) makes the header data-driven
+        // the playable pass (slice 10) makes the header data-driven. One line
+        // per revealed fill currency; any earn-configured currency carries its
+        // earn rates (the currency owns its earn config).
         private void RefreshPool()
         {
-            var rehearsal = _context.Game.Rehearsal;
-            if (!rehearsal.Configured)
+            var lines = new List<string>(_pools.Count);
+            var earn = _context.Game.EngagementEarn;
+            foreach (var pool in _pools)
             {
-                _poolLabel.text = "";
-                return;
-            }
+                if (!IsRevealed(pool))
+                    continue;
 
-            var definition = _context.Game.Currencies.GetDefinition(rehearsal.CurrencyId);
-            _poolLabel.text = $"{definition.DisplayName}: {NumberFormatter.Format(_context.Game.Currencies.Get(rehearsal.CurrencyId))}" +
-                $" (+{NumberFormatter.Format(rehearsal.RatePerSecond)}/sec, +{NumberFormatter.Format(_context.Chapter.Rehearsal.PointsPerTap)}/tap)";
+                // an unresolvable id is a content error GetDefinition already
+                // reported; the readout skips it rather than dying
+                var definition = _context.Game.Currencies.GetDefinition(pool.CurrencyId);
+                if (definition == null)
+                    continue;
+
+                var line = $"{definition.DisplayName}: {NumberFormatter.Format(_context.Game.Currencies.Get(pool.CurrencyId))}";
+                if (earn.HasEarn(pool.CurrencyId))
+                    line += $" (+{NumberFormatter.Format(earn.RatePerSecond(pool.CurrencyId))}/sec, +{NumberFormatter.Format(earn.PerTap(pool.CurrencyId))}/tap)";
+                lines.Add(line);
+            }
+            _poolLabel.text = string.Join("\n", lines);
         }
     }
 }

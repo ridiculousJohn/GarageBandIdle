@@ -20,11 +20,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public ContentScope Scope => _scope;
 
         public override void Apply(RewardContext context)
-        {
-            // nothing can grant this yet: events (the only tap-reward source)
-            // arrive with the events slice, which adds the tap-buff stack
-            Debug.LogError($"TapValueMultiplierReward '{Id}': tap-value application arrives with the events slice.");
-        }
+            => context.Tap.MultiplyValue(_value, _scope);
 
 #if UNITY_EDITOR
         public void EditorInitialize(string id, string displayName, double value, ContentScope scope)

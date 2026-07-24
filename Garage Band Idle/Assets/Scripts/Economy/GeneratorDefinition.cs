@@ -19,7 +19,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         [SerializeField]
         [DefinitionId(typeof(CurrencyDefinition))]
-        [Tooltip("Currency id this generator produces — and is bought with.")]
+        [Tooltip("Currency id this generator produces.")]
         private string _producesCurrencyId;
 
         [SerializeField]
@@ -27,6 +27,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private bool _isBandmate;
 
         [Header("Economy")]
+        [SerializeField]
+        [DefinitionId(typeof(CurrencyDefinition))]
+        [Tooltip("Currency id the purchase deducts from — declared independently of what the generator produces.")]
+        private string _costCurrencyId;
+
         [SerializeField]
         private double _baseCost;
 
@@ -47,6 +52,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public string DisplayName => _displayName;
         public string ProducesCurrencyId => _producesCurrencyId;
         public bool IsBandmate => _isBandmate;
+        public string CostCurrencyId => _costCurrencyId;
         public double BaseCost => _baseCost;
         public double CostGrowth => _costGrowth;
         public double BaseOutput => _baseOutput;
@@ -55,12 +61,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 #if UNITY_EDITOR
         // importer-only: generator assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, string producesCurrencyId, bool isBandmate,
-            double baseCost, double costGrowth, double baseOutput, Condition unlock)
+            string costCurrencyId, double baseCost, double costGrowth, double baseOutput, Condition unlock)
         {
             _id = id;
             _displayName = displayName;
             _producesCurrencyId = producesCurrencyId;
             _isBandmate = isBandmate;
+            _costCurrencyId = costCurrencyId;
             _baseCost = baseCost;
             _costGrowth = costGrowth;
             _baseOutput = baseOutput;

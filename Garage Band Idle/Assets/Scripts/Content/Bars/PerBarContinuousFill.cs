@@ -67,7 +67,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
 
         // continuous delivery: each tick, whatever sits in the fill currency
         // pool moves into the active bar. Accrual itself happens elsewhere
-        // (RehearsalSystem), so ordering only affects latency by one tick.
+        // (EngagementEarnSystem), so ordering only affects latency by one tick.
         public override void Tick() => Drain();
 
         private void Drain()
@@ -81,21 +81,50 @@ namespace RidiculousGaming.GarageBandIdle.Content
             if (transfer <= BigNumber.Zero)
                 return;
 
+            // all bar state settles before the spend: Add fires BalanceChanged
+            // synchronously, and no subscriber may ever observe the pool
+            // drained with the progress or completion not yet recorded
+            // (state, then notify)
+            var completed = bar.AddProgress(transfer);
+
+            // completion clears the selection rather than auto-advancing: which
+            // bar to work next is the player's call (design doc section 6)
+            if (completed)
+                _activeBar = null;
+
             Currencies.Add(bar.Definition.FillCurrencyId, -transfer);
-            bar.Progress += transfer;
             RaiseProgressChanged(bar);
 
-            if (bar.Remaining <= BigNumber.Zero)
-                Complete(bar);
-        }
-
-        protected override void OnBarCompleted(BarState bar)
-        {
-            if (_activeBar != bar)
+            if (!completed)
                 return;
 
-            _activeBar = null;
             ActiveBarChanged?.Invoke();
+            NotifyCompleted(bar);
         }
+
+        // run reset empties every bar, so a standing selection is a stale
+        // prioritization decision - it clears unconditionally
+        internal override bool ReconcileAfterRunReset()
+        {
+            if (_activeBar == null)
+                return false;
+
+            _activeBar = null;
+            return true;
+        }
+
+        // after a restore the selection can never sit on a completed bar -
+        // Drain must never hold a completed target, exactly as completing it
+        // by drain would have cleared it
+        internal override bool ReconcileAfterRestore()
+        {
+            if (_activeBar == null || !_activeBar.Completed)
+                return false;
+
+            _activeBar = null;
+            return true;
+        }
+
+        internal override void NotifyModeStateChanged() => ActiveBarChanged?.Invoke();
     }
 }
