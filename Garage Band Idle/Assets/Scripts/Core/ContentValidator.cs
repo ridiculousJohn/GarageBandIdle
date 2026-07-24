@@ -219,6 +219,15 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has a negative cost amount ({upgrade.CostAmount}).");
             else if (upgrade.Type == UpgradeType.Buff && upgrade.CostAmount == 0)
                 Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' is a buff with no cost - it would be free to buy.");
+
+            // an amount with no currency to charge is free in practice, which is
+            // the same hole from the other side; a currency it does name resolves
+            // through the check every other currency id goes through. A content
+            // unlock charges nothing, so it needs no currency at all.
+            if (upgrade.CostAmount > 0 && string.IsNullOrEmpty(upgrade.CostCurrencyId))
+                Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' costs {upgrade.CostAmount} but names no cost currency - the purchase would charge nothing.");
+            else if (!string.IsNullOrEmpty(upgrade.CostCurrencyId))
+                context.Currencies.ValidateReference(upgrade.CostCurrencyId, $"Upgrade '{upgrade.Id}' (cost currency)");
             ConditionEvaluator.Validate(upgrade.Gate, context, $"Upgrade '{upgrade.Id}' (gate)");
             if (upgrade.Payload == null)
                 Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload.");

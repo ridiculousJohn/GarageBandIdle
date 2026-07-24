@@ -160,6 +160,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
+        // a buff must be payable, which takes two checks: an amount with no
+        // currency to charge is free in practice, and a currency it does name
+        // has to resolve. A content unlock charges nothing and needs neither.
+        [Test]
+        public void UpgradeCostCurrency_MustBeNamedAndResolve_WhenTheUpgradeCostsAnything()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var unnamed = TestContent.MakeUpgrade("unnamed_currency", UpgradeType.Buff, ContentScope.Run,
+                null, new TapValueAddPayload(1), costCurrencyId: "", costAmount: 250);
+            var ghost = TestContent.MakeUpgrade("ghost_cost_currency", UpgradeType.Buff, ContentScope.Run,
+                null, new TapValueAddPayload(1), costCurrencyId: "merch", costAmount: 250);
+            var free = TestContent.MakeUpgrade("free_reveal", UpgradeType.ContentUnlock,
+                ContentScope.PermanentInChapter, null, new SetFlagPayload("fans"), costCurrencyId: "");
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                upgradeIds: new List<string> { "unnamed_currency", "ghost_cost_currency", "free_reveal" });
+            var database = new ContentDatabase(chapters: new[] { ch1 }, upgrades: new[] { unnamed, ghost, free });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Upgrade 'unnamed_currency' costs 250 but names no cost currency - the purchase would charge nothing.");
+            LogAssert.Expect(LogType.Error,
+                "CurrencyManager: Upgrade 'ghost_cost_currency' (cost currency) references currency id 'merch', which resolves to no CurrencyDefinition asset.");
+            // the free content unlock reports nothing - an unexpected third
+            // error would fail here
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
         // a declared currency that resolves to no asset would silently multiply
         // nothing; it reports through the same reference check every other
         // currency id goes through

@@ -231,6 +231,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
+                // an amount with no currency to charge is the same free purchase
+                // from the other side - never write it. Whether a named currency
+                // resolves is a database question, so boot validation owns that.
+                if ((block.cost?.amount ?? 0) > 0 && string.IsNullOrEmpty(block.cost?.currency))
+                {
+                    Debug.LogError($"ChapterJsonImporter: upgrade '{block.id}' has a cost amount ({block.cost.amount}) but names no cost currency. Skipping it - fix the JSON and re-import.");
+                    continue;
+                }
+
                 var asset = LoadOrCreate<UpgradeDefinition>($"{UpgradesFolder}/{block.id}.asset");
                 var scope = ToScope(block.scope, $"upgrade '{block.id}'");
                 var gate = ToCondition(block.gate);
