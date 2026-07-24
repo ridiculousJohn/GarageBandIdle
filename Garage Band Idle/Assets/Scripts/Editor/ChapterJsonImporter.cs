@@ -467,6 +467,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         internal static Condition ParseCondition(string json)
             => ToCondition(JsonConvert.DeserializeObject<ConditionBlock>(json, JsonSettings));
 
+        // the payload parse path, exposed for the same reason as ParseCondition:
+        // tests cover which values the importer refuses to write without one
+        internal static UpgradePayload ParsePayload(string json, string context)
+            => ToPayload(JsonConvert.DeserializeObject<PayloadBlock>(json, JsonSettings), context);
+
         private static Condition ToSimpleCondition(string type, string currency, double amount,
             string generator, string flag, string group, double value)
         {
@@ -519,8 +524,24 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     return new TapValueAddPayload(block.value);
                 case "generatorOutputMultiplier":
                     return new GeneratorOutputMultiplierPayload(block.generator, block.value);
-                case "allCashPerSecMultiplier":
-                    return new AllCashPerSecMultiplierPayload(block.value);
+                case "currencyPerSecMultiplier":
+                {
+                    // never write a multiplier that would zero or negate the
+                    // production stack it lands in, or one that names nothing
+                    // to affect and so could never apply; the upgrade imports
+                    // with no payload and boot validation reports that
+                    if (block.value <= 0)
+                    {
+                        Debug.LogError($"ChapterJsonImporter: {context} has a non-positive currencyPerSecMultiplier ({block.value}). Importing no payload - fix the JSON and re-import.");
+                        return null;
+                    }
+                    if (block.affects == null || block.affects.Length == 0)
+                    {
+                        Debug.LogError($"ChapterJsonImporter: {context} currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Importing no payload - fix the JSON and re-import.");
+                        return null;
+                    }
+                    return new CurrencyPerSecMultiplierPayload(new List<string>(block.affects), block.value);
+                }
                 case null:
                 case "":
                     Debug.LogError($"ChapterJsonImporter: {context} has no payload effect. Importing no payload.");
@@ -773,6 +794,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public double value;
             public string generator = "";
             public string flag = "";
+            public string[] affects = Array.Empty<string>();
         }
 
         private class UpgradeBlock

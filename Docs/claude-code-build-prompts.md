@@ -249,8 +249,10 @@ taps/time; fan rate jumps on completion via RewardManager; `barsCompleted` repor
 >   `Condition` evaluated by the shared `ConditionEvaluator` — no per-currency branches. Its `cost` is
 >   `{ currency, amount }` charged through `CurrencyManager`.
 > - Implement payloads: `tapValueAdd`, `generatorOutputMultiplier` (target generator by `id`),
->   `allCashPerSecMultiplier`. Payload targets are referenced by `id`; adding a payload type later is
->   one handler, not a rewrite. Validate gate/target ids on load.
+>   `currencyPerSecMultiplier` (multiplies production of the currencies its `affects` list names, the
+>   same rule `constants.recordBuff.affects` follows — nothing unlisted is touched). Payload targets are
+>   referenced by `id`; adding a payload type later is one handler, not a rewrite. Validate gate/target
+>   ids on load.
 > - Ch1 buffs: `stage_presence` (+1 tap, Cash-gated), `amp_strings` (×2 amp, Cash-gated),
 >   `kit_upgrade` (×2 drummer, Cash-gated), `tight_set` (×1.5 all Cash/sec, **Fans-gated at 30**).
 >   `tight_set` proves non-Cash gating falls out of the unified Condition for free — same shape,

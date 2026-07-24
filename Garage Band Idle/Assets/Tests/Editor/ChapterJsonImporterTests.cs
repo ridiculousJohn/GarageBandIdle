@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.EditorTools;
+using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -70,6 +71,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             Assert.IsNull(ChapterJsonImporter.ParseCondition("{}"), "an empty block is no gate");
             Assert.IsNull(ChapterJsonImporter.ParseCondition("null"), "an explicit null is no gate");
+        }
+
+        // a per-sec multiplier carries the currencies it affects as data, so the
+        // payload can name any number of them without a code change - the same
+        // contract constants.recordBuff.affects follows
+        [Test]
+        public void Payload_CurrencyPerSecMultiplier_CarriesItsAffectedCurrencies()
+        {
+            var payload = ChapterJsonImporter.ParsePayload(
+                @"{ ""effect"": ""currencyPerSecMultiplier"", ""affects"": [""cash"", ""merch""], ""value"": 1.5 }",
+                "upgrade 'tight_set'") as CurrencyPerSecMultiplierPayload;
+
+            Assert.IsNotNull(payload, "the effect maps onto the currency-declaring payload");
+            Assert.AreEqual(1.5, payload.Value, 1e-9);
+            CollectionAssert.AreEqual(new[] { "cash", "merch" }, payload.AffectsCurrencyIds);
+        }
+
+        // a multiplier naming nothing could never apply, and a non-positive one
+        // would zero or negate the production stack it lands in - neither is
+        // written, and the upgrade's absent payload is what boot validation
+        // then reports
+        [TestCase(@"{ ""effect"": ""currencyPerSecMultiplier"", ""value"": 1.5 }",
+            "ChapterJsonImporter: upgrade 'x' currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Importing no payload - fix the JSON and re-import.")]
+        [TestCase(@"{ ""effect"": ""currencyPerSecMultiplier"", ""affects"": [""cash""], ""value"": 0 }",
+            "ChapterJsonImporter: upgrade 'x' has a non-positive currencyPerSecMultiplier (0). Importing no payload - fix the JSON and re-import.")]
+        public void Payload_CurrencyPerSecMultiplier_RefusesWhatCouldNeverApply(string json, string expectedError)
+        {
+            LogAssert.Expect(LogType.Error, expectedError);
+
+            Assert.IsNull(ChapterJsonImporter.ParsePayload(json, "upgrade 'x'"));
         }
     }
 }

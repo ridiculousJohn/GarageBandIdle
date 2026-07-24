@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Content;
+using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -111,6 +112,48 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // the broken cost is reported; the undeclared 'ghost' flag is not
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Generator 'stale' has a non-positive base cost (-5) - it would be free to buy.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // the importer refuses to write either of these, so reaching them means
+        // a stale asset from before the payload declared its currencies - the
+        // same belt-and-braces the reward and generator value checks get
+        [Test]
+        public void PerSecMultiplierPayload_UnappliableTuning_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var empty = TestContent.MakeUpgrade("empty_affects", UpgradeType.Buff, ContentScope.Run,
+                null, new CurrencyPerSecMultiplierPayload(new List<string>(), 1.5), costAmount: 100);
+            var zeroed = TestContent.MakeUpgrade("zeroed", UpgradeType.Buff, ContentScope.Run,
+                null, new CurrencyPerSecMultiplierPayload(new List<string> { "cash" }, 0), costAmount: 100);
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                upgradeIds: new List<string> { "empty_affects", "zeroed" });
+            var database = new ContentDatabase(chapters: new[] { ch1 }, upgrades: new[] { empty, zeroed });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "UpgradePayload: Upgrade 'empty_affects' (payload) names no affected currencies - the multiplier could never apply.");
+            LogAssert.Expect(LogType.Error,
+                "UpgradePayload: Upgrade 'zeroed' (payload) has a non-positive multiplier (0).");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // a declared currency that resolves to no asset would silently multiply
+        // nothing; it reports through the same reference check every other
+        // currency id goes through
+        [Test]
+        public void PerSecMultiplierPayload_UnknownAffectedCurrency_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var upgrade = TestContent.MakeUpgrade("ghost_currency", UpgradeType.Buff, ContentScope.Run,
+                null, new CurrencyPerSecMultiplierPayload(new List<string> { "cash", "merch" }, 1.5), costAmount: 100);
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                upgradeIds: new List<string> { "ghost_currency" });
+            var database = new ContentDatabase(chapters: new[] { ch1 }, upgrades: new[] { upgrade });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "CurrencyManager: Upgrade 'ghost_currency' (payload) references currency id 'merch', which resolves to no CurrencyDefinition asset.");
             ContentValidator.Validate(database, context, NoRewards);
         }
     }

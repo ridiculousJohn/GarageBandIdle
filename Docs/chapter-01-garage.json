@@ -145,8 +145,8 @@
       "scope": "run",
       "cost": { "currency": "cash", "amount": 20000 },
       "gate": { "type": "currency", "currency": "fans", "amount": 30 },
-      "payload": { "effect": "allCashPerSecMultiplier", "value": 1.5 },
-      "note": "Gated on Fans, not Cash — demonstrates the gating web (§4). Same Condition shape as a Cash gate, just a different `currency` id, so no special-casing."
+      "payload": { "effect": "currencyPerSecMultiplier", "affects": ["cash"], "value": 1.5 },
+      "note": "Gated on Fans, not Cash — demonstrates the gating web (§4). Same Condition shape as a Cash gate, just a different `currency` id, so no special-casing. The payload names the currencies it multiplies rather than implying Cash from the effect name, matching `constants.recordBuff.affects` — production of anything unlisted is untouched."
     },
 
     {

@@ -256,6 +256,29 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, covers.Value, 1e-9);
         }
 
+        // the Ch1 income buff declares what it multiplies instead of implying
+        // cash from its effect name, so a chapter whose generators produce
+        // something else needs no code change to keep them out of it
+        [Test]
+        public void TightSetBuff_DeclaresTheCurrenciesItMultiplies()
+        {
+            var tightSet = LoadById<UpgradeDefinition>(UpgradesFolder, "tight_set");
+
+            var payload = tightSet.Payload as CurrencyPerSecMultiplierPayload;
+            Assert.IsNotNull(payload,
+                "tight_set payload is a currency-declaring per-sec multiplier - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON'");
+            Assert.AreEqual(1.5, payload.Value, 1e-9);
+            CollectionAssert.AreEqual(new[] { "cash" }, payload.AffectsCurrencyIds,
+                "the buff multiplies only the currencies the JSON names");
+
+            // the gate is this upgrade's whole point in Ch1: the same Condition
+            // shape as the Cash-gated buffs, just a different currency id
+            var gate = tightSet.Gate as CurrencyBalanceCondition;
+            Assert.IsNotNull(gate, "tight_set gates on a currency balance");
+            Assert.AreEqual("fans", gate.CurrencyId);
+            Assert.AreEqual(30, gate.Amount, 1e-9);
+        }
+
         [Test]
         public void Sections_MatchJson()
         {
