@@ -19,8 +19,8 @@ a bigger venue with a new mechanic. All numbers below are starting values for tu
 > every stat modifier out of the individual systems and into one registry:
 > - **§12** — architecture rule 11 added (one modifier registry: systems compose on read rather than
 >   holding stacks, granted modifiers carry a scope and derived ones do not, one call resets the
->   run-scoped ones); `ProductionCalculator` noted as formula-only, and `Modifiers/` added to the file
->   tree.
+>   run-scoped ones); `ProductionCalculator` noted as formula-only, `Modifiers/` added to the file
+>   tree, and the starter prompt names the registry beside the Condition and flag rules.
 > Edited passages are marked inline with **[rev]**, as above.
 
 ---
@@ -469,7 +469,8 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 > "In Unity (version X, iOS/Android), scaffold a nested-prestige idle core: a CurrencyManager with a run
 > block (Cash, Fans, Rehearsal, gear, catalog) and a permanent block (Records, Roadies) using
 > break_infinity.cs BigDouble; content discovered via Addressables; a single Condition type + evaluator
-> for all gates/unlocks/visibility; one flag registry for all progressive reveal; an AlbumPrestige
+> for all gates/unlocks/visibility; one flag registry for all progressive reveal; one modifier registry
+> every stat effect composes through, with no per-system multiplier stacks; an AlbumPrestige
 > action that clears the run block and awards Records from fans (later fans × catalog quality); a
 > ChapterManager with forward-only advancement gated by cumulative Records; a TickSystem on DateTime
 > deltas; and a checksummed JSON SaveSystem computing offline earnings at 50% base capped at 4h.
