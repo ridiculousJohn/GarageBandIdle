@@ -203,6 +203,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "the value is untouched");
         }
 
+        // the UI advertises Tap.Value, so it needs a signal for every change
+        // to the value - applied multipliers and a run reset that cleared
+        // something - and no signal when nothing moved (rejected factor,
+        // no-op reset)
+        [Test]
+        public void TapValueChanged_FiresOnlyWhenTheValueMoves()
+        {
+            var tap = new TapSystem(2);
+            var changes = 0;
+            tap.ValueChanged += () => changes++;
+
+            tap.ResetRunScopedMultipliers();
+            Assert.AreEqual(0, changes, "a no-op reset is silent");
+
+            tap.MultiplyValue(2, ContentScope.Run);
+            tap.MultiplyValue(3, ContentScope.PermanentInChapter);
+            Assert.AreEqual(2, changes, "each applied multiplier notifies");
+
+            LogAssert.Expect(LogType.Error, "TapSystem: MultiplyValue with non-positive factor '0'. Ignoring.");
+            tap.MultiplyValue(0, ContentScope.Run);
+            Assert.AreEqual(2, changes, "a rejected factor is silent");
+
+            tap.ResetRunScopedMultipliers();
+            Assert.AreEqual(3, changes, "clearing the run stack notifies");
+            Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "base 2 x permanent 3 after the reset");
+        }
+
         [Test]
         public void SetFlagReward_LatchesTheFlag()
         {

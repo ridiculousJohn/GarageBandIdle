@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
@@ -21,6 +22,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _baseValue = baseValue;
         }
 
+        // UI listens here, nothing polls; fires only when Value actually moved
+        public event Action ValueChanged;
+
         // fails closed on a negative base - invalid data, boot validation
         // reports it: a tap must never drain cash
         public BigNumber Value => _baseValue < 0
@@ -42,9 +46,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             {
                 case ContentScope.Run:
                     _runMultiplier *= factor;
+                    ValueChanged?.Invoke();
                     break;
                 case ContentScope.PermanentInChapter:
                     _permanentMultiplier *= factor;
+                    ValueChanged?.Invoke();
                     break;
                 default:
                     // fail closed on broken content: boot validation reports a
@@ -56,6 +62,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // the run reset (album release, event baseline) clears only the
         // run-scoped stack; permanent-in-chapter rewards survive
-        public void ResetRunScopedMultipliers() => _runMultiplier = BigNumber.One;
+        public void ResetRunScopedMultipliers()
+        {
+            if (_runMultiplier == BigNumber.One)
+                return;
+
+            _runMultiplier = BigNumber.One;
+            ValueChanged?.Invoke();
+        }
     }
 }
