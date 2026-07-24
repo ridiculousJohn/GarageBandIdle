@@ -138,6 +138,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
+        // a buff is bought, so it must cost something; a content unlock is
+        // applied when its gate holds, so costing nothing is right for it - the
+        // check reads the upgrade's type, never its id
+        [Test]
+        public void BuffWithNoCost_IsReported_AndAFreeContentUnlockIsNot()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var free = TestContent.MakeUpgrade("free_buff", UpgradeType.Buff, ContentScope.Run,
+                null, new TapValueAddPayload(1));
+            var reveal = TestContent.MakeUpgrade("reveal", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
+                null, new SetFlagPayload("fans"));
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                upgradeIds: new List<string> { "free_buff", "reveal" });
+            var database = new ContentDatabase(chapters: new[] { ch1 }, upgrades: new[] { free, reveal });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            // only the buff reports - an unexpected second error would fail here
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Upgrade 'free_buff' is a buff with no cost - it would be free to buy.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
         // a declared currency that resolves to no asset would silently multiply
         // nothing; it reports through the same reference check every other
         // currency id goes through

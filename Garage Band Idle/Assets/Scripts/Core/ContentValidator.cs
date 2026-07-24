@@ -210,10 +210,15 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has type None (uninitialized).");
             if (upgrade.Scope == ContentScope.None)
                 Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has scope None (uninitialized).");
-            // a negative cost would GRANT currency when the buff purchase
-            // flow lands; close it before that flow exists
+            // a negative cost would GRANT currency when the buff purchase flow
+            // lands, and a buff costing nothing would be an endless free
+            // purchase - the same failure class as a non-positive generator
+            // cost. A content unlock legitimately costs nothing: its gate is
+            // the price. Both close before that flow exists.
             if (upgrade.CostAmount < 0)
                 Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has a negative cost amount ({upgrade.CostAmount}).");
+            else if (upgrade.Type == UpgradeType.Buff && upgrade.CostAmount == 0)
+                Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' is a buff with no cost - it would be free to buy.");
             ConditionEvaluator.Validate(upgrade.Gate, context, $"Upgrade '{upgrade.Id}' (gate)");
             if (upgrade.Payload == null)
                 Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload.");

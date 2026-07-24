@@ -211,6 +211,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var upgradeIds = new List<string>();
             foreach (var block in data.upgrades ?? Array.Empty<UpgradeBlock>())
             {
+                var type = ToUpgradeType(block.type, $"upgrade '{block.id}'");
+
                 // a negative cost would GRANT currency when the buff purchase
                 // flow lands - never write that state
                 if ((block.cost?.amount ?? 0) < 0)
@@ -219,8 +221,17 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
+                // a buff is bought, so it must cost something: a zero cost is
+                // an endless free purchase, the same failure a non-positive
+                // generator cost would be. Content unlocks legitimately cost
+                // nothing - their gate is the price.
+                if (type == UpgradeType.Buff && (block.cost?.amount ?? 0) == 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: upgrade '{block.id}' is a buff with no cost - it would be free to buy. Skipping it - fix the JSON and re-import.");
+                    continue;
+                }
+
                 var asset = LoadOrCreate<UpgradeDefinition>($"{UpgradesFolder}/{block.id}.asset");
-                var type = ToUpgradeType(block.type, $"upgrade '{block.id}'");
                 var scope = ToScope(block.scope, $"upgrade '{block.id}'");
                 var gate = ToCondition(block.gate);
                 var payload = ToPayload(block.payload, $"upgrade '{block.id}'");
