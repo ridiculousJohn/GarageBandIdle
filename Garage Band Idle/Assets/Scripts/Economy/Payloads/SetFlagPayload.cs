@@ -23,7 +23,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _flagId = flagId;
         }
 
-        public override void Apply(UpgradePayloadContext context) => context.Flags.Set(_flagId);
+        // the scope is unused: a flag is permanent within its chapter by
+        // definition, so it latches through the reveal registry rather than
+        // being granted as a scoped modifier
+        public override void Apply(UpgradePayloadContext context, ContentScope scope) => context.Flags.Set(_flagId);
 
         public override void Validate(ConditionContext context, string source)
         {

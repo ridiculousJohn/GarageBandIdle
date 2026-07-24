@@ -21,13 +21,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _value = value;
         }
 
-        public override void Apply(UpgradePayloadContext context)
-        {
-            // nothing can grant this yet: buff purchase (the only path here)
-            // arrives with the buff slice, which adds the tap-value stack
-            Debug.LogError("TapValueAddPayload: tap-value application arrives with the buff slice.");
-        }
+        // an Add lands before every multiplier (ModifierComposition), so a flat
+        // tap bonus is worth more the more tap multipliers are already in play
+        public override void Apply(UpgradePayloadContext context, ContentScope scope)
+            => context.Modifiers.Grant(ModifierTargetKey.Global(ModifierTarget.TapValue),
+                ModifierOperation.Add, scope, _value);
 
-        public override void Validate(ConditionContext context, string source) { }
+        public override void Validate(ConditionContext context, string source)
+        {
+            // a negative add subtracts from the tap and nothing else restores
+            // it; the registry refuses it at runtime, this catches the asset
+            if (_value < 0)
+                Debug.LogError($"UpgradePayload: {source} adds a negative amount ({_value}) to the tap value.");
+        }
     }
 }

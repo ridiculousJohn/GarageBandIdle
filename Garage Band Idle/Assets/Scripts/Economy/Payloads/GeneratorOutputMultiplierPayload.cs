@@ -28,13 +28,19 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _value = value;
         }
 
-        public override void Apply(UpgradePayloadContext context)
-        {
-            Debug.LogError("GeneratorOutputMultiplierPayload: generator buff application arrives with the buff slice.");
-        }
+        // the target names one generator, so the buff can never reach another's
+        // output however many generators produce the same currency
+        public override void Apply(UpgradePayloadContext context, ContentScope scope)
+            => context.Modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, _generatorId),
+                ModifierOperation.Multiply, scope, _value);
 
         public override void Validate(ConditionContext context, string source)
         {
+            // a non-positive multiplier would zero or negate the generator's
+            // whole output product (the registry refuses it at runtime)
+            if (_value <= 0)
+                Debug.LogError($"UpgradePayload: {source} has a non-positive multiplier ({_value}).");
+
             // prefer the content registry (covers ids outside the running chapter);
             // unit tests have no database and validate against the live system
             var resolves = context.Database != null

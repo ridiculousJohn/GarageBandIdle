@@ -10,8 +10,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [Serializable]
     public abstract class UpgradePayload
     {
-        // grants the payload to the running game
-        public abstract void Apply(UpgradePayloadContext context);
+        // Grants the payload to the running game. The scope is the owning
+        // upgrade's and travels with the grant rather than living on the payload,
+        // so an upgrade's declared lifetime and its effect's lifetime cannot
+        // disagree (UpgradeDefinition.Scope is the one declaration).
+        public abstract void Apply(UpgradePayloadContext context, ContentScope scope);
 
         // load-time check that every id the payload references resolves;
         // failures are reported loudly with the owning upgrade named in source

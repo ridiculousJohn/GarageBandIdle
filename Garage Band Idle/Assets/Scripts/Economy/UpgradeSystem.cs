@@ -93,7 +93,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
             else
             {
-                payload.Apply(_payloadContext);
+                // the upgrade's declared scope travels with the grant, so the
+                // effect's lifetime is never a second declaration
+                payload.Apply(_payloadContext, upgrade.Definition.Scope);
             }
 
             upgrade.MarkApplied();

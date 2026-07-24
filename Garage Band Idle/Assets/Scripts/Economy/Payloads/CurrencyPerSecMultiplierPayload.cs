@@ -33,9 +33,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _value = value;
         }
 
-        public override void Apply(UpgradePayloadContext context)
+        // one grant per declared currency, each targeting that currency's
+        // production, so the effect reaches exactly what the payload names
+        public override void Apply(UpgradePayloadContext context, ContentScope scope)
         {
-            Debug.LogError("CurrencyPerSecMultiplierPayload: income buff application arrives with the buff slice.");
+            foreach (var currencyId in _affectsCurrencyIds)
+            {
+                context.Modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, currencyId),
+                    ModifierOperation.Multiply, scope, _value);
+            }
         }
 
         public override void Validate(ConditionContext context, string source)
