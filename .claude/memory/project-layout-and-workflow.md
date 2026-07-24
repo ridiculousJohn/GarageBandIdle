@@ -5,9 +5,10 @@ metadata:
   node_type: memory
   type: project
   originSessionId: a3758315-7030-4a24-98c6-20cdec0e772e
+  modified: 2026-07-24T18:30:46.380Z
 ---
 
-Garage Band Idle is John's personal Unity 6000.5.4f1 idle game. The Unity project is nested at `Garage Band Idle/Garage Band Idle/` (repo root holds `Docs/` beside it).
+Garage Band Idle is John's personal Unity 6000.5.4f1 idle game. The Unity project (Assets/, Packages/, ProjectSettings/) sits one level down at `<repo>/Garage Band Idle/`, with `Docs/` beside it at the repo root. There is a stray empty `Garage Band Idle/Garage Band Idle/Logs/` directory - it is not the project.
 
 **Why:** Docs/garage-band-idle-design.md is the design source of truth; Docs/claude-code-build-prompts.md is a 10-slice ordered build plan being fed one slice at a time, each slice tested in-editor and committed before the next.
 
