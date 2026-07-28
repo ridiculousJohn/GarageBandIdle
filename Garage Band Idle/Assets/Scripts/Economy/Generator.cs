@@ -30,6 +30,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public BigNumber NextCost => CostCalculator.Cost(Definition, Owned);
 
+        // The address modifiers reach this generator's output at. Exposed so a
+        // display can ask whether a composition change is one of its own
+        // instead of rebuilding the key and risking a different answer.
+        public ModifierTargetKey OutputTarget => _outputTarget;
+
         // This generator's output, composed with the modifiers targeting it
         // (amp_strings, kit_upgrade). Currency-wide multipliers compose over the
         // summed fleet in GeneratorSystem, not here. Fails closed twice: a
@@ -39,6 +44,26 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public BigNumber ProductionPerSecond => Owned == 0 || Definition.BaseOutput < 0
             ? BigNumber.Zero
             : _modifiers.For(_outputTarget).ApplyTo((BigNumber)Definition.BaseOutput * Owned);
+
+        // What one unit currently contributes, buffs included. Derived from the
+        // same composition as ProductionPerSecond rather than from BaseOutput,
+        // so Owned x PerUnitProduction == ProductionPerSecond and a display
+        // showing both cannot contradict itself. An Add on this target is a
+        // fleet-level lump, so dividing spreads it evenly across the units -
+        // the only split that keeps that identity true. An unowned generator
+        // previews its first unit, which is what a row advertises before you
+        // own one; a negative base output fails closed as it does above.
+        public BigNumber PerUnitProduction
+        {
+            get
+            {
+                if (Definition.BaseOutput < 0)
+                    return BigNumber.Zero;
+
+                var units = Owned == 0 ? 1 : Owned;
+                return _modifiers.For(_outputTarget).ApplyTo((BigNumber)Definition.BaseOutput * units) / units;
+            }
+        }
 
         // buys one unit if affordable; deducts the declared cost currency -
         // never the produced currency - and bumps Owned

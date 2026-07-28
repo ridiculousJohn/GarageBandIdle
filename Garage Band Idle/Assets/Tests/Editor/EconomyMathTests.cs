@@ -76,6 +76,60 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(15.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "another generator's buff is not ours");
         }
 
+        // the per-unit figure a row shows beside the total is derived from the
+        // same composition, so the two can never contradict each other - an
+        // unbuffed "each" next to a buffed total reads as a bug
+        [Test]
+        public void PerUnitProduction_TracksTheBuff_AndAlwaysDividesTheTotal()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
+            var target = ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "gen");
+            var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 0.4), modifiers);
+
+            Assert.AreEqual(0.4, generator.PerUnitProduction.ToDouble(), 1e-9,
+                "unowned, the row previews what the first unit would produce");
+
+            TestContent.BuyTimes(generator, currencies, 5);
+            Assert.AreEqual(0.4, generator.PerUnitProduction.ToDouble(), 1e-9);
+
+            modifiers.Grant(target, ModifierOperation.Multiply, ContentScope.Run, 2);
+
+            Assert.AreEqual(0.8, generator.PerUnitProduction.ToDouble(), 1e-9, "0.4 x 2, the buff reaches the per-unit");
+            Assert.AreEqual(4.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "0.4 x 5 x 2");
+            Assert.AreEqual(generator.ProductionPerSecond.ToDouble(),
+                (generator.PerUnitProduction * generator.Owned).ToDouble(), 1e-9,
+                "owned x each == the total the row shows beside it");
+        }
+
+        // an Add on the target is a fleet-level lump, so the per-unit spreads it
+        // across the units rather than paying it once per unit - the identity
+        // holds for the operation that could most easily break it
+        [Test]
+        public void PerUnitProduction_SpreadsAnAddAcrossTheFleet()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
+            var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 5), modifiers);
+            TestContent.BuyTimes(generator, currencies, 4);
+
+            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "gen"),
+                ModifierOperation.Add, ContentScope.Run, 20);
+
+            Assert.AreEqual(40.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "(5 x 4) + 20");
+            Assert.AreEqual(10.0, generator.PerUnitProduction.ToDouble(), 1e-9, "40 / 4, not 5 + 20");
+            Assert.AreEqual(generator.ProductionPerSecond.ToDouble(),
+                (generator.PerUnitProduction * generator.Owned).ToDouble(), 1e-9);
+        }
+
+        [Test]
+        public void PerUnitProduction_FailsClosedOnANegativeBaseOutput()
+        {
+            var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, -5), new ModifierSystem());
+
+            Assert.AreEqual(0.0, generator.PerUnitProduction.ToDouble(), 1e-9, "never advertises negative output");
+        }
+
         // an unowned generator produces nothing whatever targets it: a flat add
         // must never pay out for gear the player never bought
         [Test]

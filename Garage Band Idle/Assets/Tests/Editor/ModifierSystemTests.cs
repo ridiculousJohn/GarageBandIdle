@@ -108,6 +108,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(observedHalfReset, "every subscriber sees all targets settled");
         }
 
+        // What a display filters on. The notification names the target that
+        // changed, so a generator row can tell its own output modifier from
+        // another generator's, and the grant has settled by the time it fires -
+        // a row repainting inside the handler reads the new rate, never the one
+        // it was about to replace.
+        [Test]
+        public void Grant_NotifiesWithTheTargetItNames_AfterTheGrantSettles()
+        {
+            var modifiers = new ModifierSystem();
+            var amp = ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "practice_amp");
+            var drummer = ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "drummer");
+
+            var notifications = 0;
+            var observed = default(ModifierTargetKey);
+            var multiplyWhenNotified = 0.0;
+            modifiers.Changed += target =>
+            {
+                notifications++;
+                observed = target;
+                multiplyWhenNotified = modifiers.For(target).Multiply.ToDouble();
+            };
+
+            modifiers.Grant(amp, ModifierOperation.Multiply, ContentScope.Run, 2);
+
+            Assert.AreEqual(1, notifications, "one notification for the one grant");
+            Assert.AreEqual(amp, observed, "named the generator it targets");
+            Assert.AreNotEqual(drummer, observed, "another generator's row can tell this is not its own");
+            Assert.AreEqual(2.0, multiplyWhenNotified, 1e-9, "the grant was already stored when the signal fired");
+        }
+
         // a target that addresses nothing is a caller mistake, not tuning: it
         // would modify a value no system reads
         [Test]

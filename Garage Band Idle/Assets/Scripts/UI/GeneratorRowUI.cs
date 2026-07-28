@@ -59,10 +59,25 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 RefreshAffordability();
         }
 
+        // A modifier on this generator changes the rate the row advertises, and
+        // nothing else would repaint it: Refresh is otherwise driven by
+        // OwnedChanged alone, so a bought buff (amp_strings, kit_upgrade) left
+        // the old "+X/sec" standing until the next purchase - the same
+        // staleness TapSystem.ValueChanged cures for the Jam label. A run reset
+        // clearing those grants arrives through here too.
+        public void HandleModifierChanged(ModifierTargetKey target)
+        {
+            if (gameObject.activeSelf && target.Equals(Generator.OutputTarget))
+                Refresh();
+        }
+
         private void Refresh()
         {
+            // both figures come from the composed output, never the raw
+            // BaseOutput: a buffed total beside an unbuffed "each" reads as a
+            // bug even when each number is defensible on its own
             _info.text = $"{Generator.Definition.DisplayName} x{Generator.Owned}\n" +
-                $"+{NumberFormatter.Format(Generator.ProductionPerSecond)} {_producesDefinition.DisplayName}/sec ({NumberFormatter.Format(Generator.Definition.BaseOutput)} each)";
+                $"+{NumberFormatter.Format(Generator.ProductionPerSecond)} {_producesDefinition.DisplayName}/sec ({NumberFormatter.Format(Generator.PerUnitProduction)} each)";
             _buyLabel.text = $"Buy {NumberFormatter.Format(Generator.NextCost, _costDefinition)}";
             RefreshAffordability();
         }

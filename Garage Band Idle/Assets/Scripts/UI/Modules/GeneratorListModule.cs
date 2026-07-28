@@ -28,6 +28,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             context.Game.Currencies.BalanceChanged += HandleBalanceChanged;
             context.Game.Generators.GeneratorUnlocked += HandleGeneratorUnlocked;
+
+            // the third system signal a row's display reads: output modifiers.
+            // Subscribed here rather than per row because Changed is a system
+            // event carrying its target, the same shape as BalanceChanged -
+            // each row decides whether the target is its own.
+            context.Game.Modifiers.Changed += HandleModifierChanged;
         }
 
         private void OnDestroy()
@@ -37,12 +43,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             _context.Game.Currencies.BalanceChanged -= HandleBalanceChanged;
             _context.Game.Generators.GeneratorUnlocked -= HandleGeneratorUnlocked;
+            _context.Game.Modifiers.Changed -= HandleModifierChanged;
         }
 
         private void HandleBalanceChanged(string currencyId, BigNumber balance)
         {
             foreach (var row in _rows)
                 row.HandleBalanceChanged(currencyId);
+        }
+
+        private void HandleModifierChanged(ModifierTargetKey target)
+        {
+            foreach (var row in _rows)
+                row.HandleModifierChanged(target);
         }
 
         private void HandleGeneratorUnlocked(Generator generator)
