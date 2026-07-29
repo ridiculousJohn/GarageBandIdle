@@ -20,8 +20,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     }
 
     // One upgrade (design doc section 4). Gates are the shared Condition type;
-    // a content unlock's payload is setFlag - the single reveal registry.
-    // Buff purchase and payload application arrive in the buff slice.
+    // a content unlock's payload is setFlag - the single reveal registry. A buff
+    // is bought through UpgradeSystem.TryBuy, a content unlock applies when its
+    // gate holds, and both grant the payload with this asset's Scope.
     [CreateAssetMenu(
         fileName = "NewUpgrade",
         menuName = "GarageBandIdle/Upgrade")]

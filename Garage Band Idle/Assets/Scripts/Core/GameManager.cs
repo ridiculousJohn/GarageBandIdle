@@ -168,8 +168,9 @@ namespace RidiculousGaming.GarageBandIdle
             Bars.Tick();
         }
 
-        // the tap action; cash per tap = chapter base x tap-reward multipliers
-        // (flat tap buffs like stage_presence arrive with the buff slice)
+        // the tap action; cash per tap is the chapter base composed with every
+        // modifier targeting tap value - flat adds (stage_presence) and event-tier
+        // multipliers alike, all of it inside TapSystem.Value
         public void Jam()
         {
             if (CurrentChapter == null)

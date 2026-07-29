@@ -1,8 +1,8 @@
 namespace RidiculousGaming.GarageBandIdle
 {
-    // Completed-bar counts consumed by BarsCompletedCondition. Implemented by
-    // the bar system (bars slice); until one is wired into the ConditionContext,
-    // every barsCompleted condition evaluates as unmet.
+    // Completed-bar counts consumed by BarsCompletedCondition, implemented by
+    // BarSystem. Where the ConditionContext carries none, every barsCompleted
+    // condition evaluates as unmet.
     public interface IBarCompletionSource
     {
         // completed bars in the given bar group this run

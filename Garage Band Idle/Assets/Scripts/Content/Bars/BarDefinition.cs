@@ -6,7 +6,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
     // that fills it, a fill requirement, and a reward granted on completion.
     // The fill logic reads FillCurrencyId and works for any currency - Learn
     // Covers is just the Chapter 1 instance, nothing here is covers-specific.
-    // Fill/reward behavior arrives with the bars slice; this stores the data.
+    // How a bar fills is its group's BarFillBehavior; this is the authored data.
     [CreateAssetMenu(
         fileName = "NewBar",
         menuName = "GarageBandIdle/Bar")]

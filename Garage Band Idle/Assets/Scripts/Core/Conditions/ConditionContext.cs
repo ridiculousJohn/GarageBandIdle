@@ -20,8 +20,9 @@ namespace RidiculousGaming.GarageBandIdle
         // null in unit tests, which validate against the live systems instead
         public ContentDatabase Database { get; }
 
-        // completed-bar counts for barsCompleted; null until the bars slice,
-        // which makes every barsCompleted condition evaluate as unmet
+        // completed-bar counts for barsCompleted (BarSystem in the running game);
+        // null in fixtures that stand up no bars, which makes every barsCompleted
+        // condition evaluate as unmet
         public IBarCompletionSource Bars { get; }
 
         public ConditionContext(CurrencyManager currencies, GeneratorSystem generators, FlagSystem flags,

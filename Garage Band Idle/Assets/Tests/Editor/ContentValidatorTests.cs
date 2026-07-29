@@ -212,6 +212,81 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
+        // The mirror of the Records check, and the reason both exist: Fans are the
+        // run's performance meter feeding the Records payout, so they MUST reset
+        // where Records must not. Kept across a release, fans compound and every
+        // fans gate stays satisfied after the first demo - still playable, which is
+        // what makes it worth reporting.
+        [Test]
+        public void FansSurvivingARelease_IsReported()
+        {
+            var groups = new[] { TestContent.MakeGroup("permanent", false) };
+            var currencies = new CurrencyManager(groups, new[]
+            {
+                TestContent.MakeCurrency("cash", "permanent"),
+                TestContent.MakeCurrency("fans", "permanent"),
+                TestContent.MakeCurrency("records", "permanent"),
+            });
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
+            var database = new ContentDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' fans currency 'fans' is in a currency group that survives an album release - fans would compound across runs and inflate the Records payout.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // an unresolvable fans currency reports once, as a bad reference - the group
+        // question is only asked of a currency that exists
+        [Test]
+        public void UnknownFansCurrency_ReportsOnlyTheBadReference()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" }, fansCurrencyId: "ghost");
+            var database = new ContentDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "CurrencyManager: Chapter 'ch1' (fans currency) references currency id 'ghost', which resolves to no CurrencyDefinition asset.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // an earn-less currency used to get no checks at all; a negative starting
+        // value puts it in debt at boot and again after every release, which resets
+        // balances back to it
+        [Test]
+        public void NegativeStartingValue_IsReported_EvenWithoutAnEarnConfig()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var indebted = TestContent.MakeCurrency("merch", "run", startingValue: -5);
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                currencyIds: new List<string> { "merch" });
+            var database = new ContentDatabase(chapters: new[] { ch1 }, currencies: new[] { indebted });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Currency 'merch' has a negative starting value (-5) - it would start in debt at boot and after every album release.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // the module list is instantiated in order with no de-duplication, so a
+        // repeat is two of the same module wired to the same systems
+        [Test]
+        public void SectionListingAModuleTwice_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var doubled = TestContent.MakeSection("doubled", null,
+                new List<string> { "module/tap", "module/tap" });
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                sectionIds: new List<string> { "doubled" });
+            var database = new ContentDatabase(chapters: new[] { ch1 }, sections: new[] { doubled });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Section 'doubled' lists module 'module/tap' more than once - it would be instantiated twice.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
         // the starting chapter is the lowest index, so an index is an ordinal:
         // sharing one makes which chapter starts arbitrary
         [Test]

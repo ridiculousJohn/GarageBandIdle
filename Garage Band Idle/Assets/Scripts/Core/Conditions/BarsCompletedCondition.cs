@@ -4,8 +4,8 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle
 {
     // JSON type "barsCompleted": at least Value bars completed in a bar group
-    // this run. Unmet until a bar system is wired into the ConditionContext
-    // (bars slice), which is the staged-content behavior the chapter data wants.
+    // this run, counted by the IBarCompletionSource the context carries. Unmet
+    // when there is none, so a fixture without a bar system fails closed.
     [Serializable]
     public class BarsCompletedCondition : Condition
     {

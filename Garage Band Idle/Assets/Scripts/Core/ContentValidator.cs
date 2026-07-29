@@ -34,7 +34,7 @@ namespace RidiculousGaming.GarageBandIdle
             var orphan = ChapterScoped(context, database, null);
             foreach (var currency in database.Currencies.All)
                 if (!visited.Currencies.Contains(currency.Id))
-                    ValidateCurrencyEarn(currency, orphan);
+                    ValidateCurrency(currency, orphan);
             foreach (var section in database.Sections.All)
                 if (!visited.Sections.Contains(section.Id))
                     ValidateSection(section, orphan);
@@ -93,7 +93,15 @@ namespace RidiculousGaming.GarageBandIdle
         {
             foreach (var currencyId in chapter.RecordBuff.AffectsCurrencyIds)
                 context.Currencies.ValidateReference(currencyId, $"Chapter '{chapter.Id}' (recordBuff affects)");
-            context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)");
+            // Fans are the run's performance meter and the Records payout reads
+            // fansThisRun, so they have to return to zero on release. Filed in a
+            // group that keeps them, fans compound across runs: the payout inflates
+            // and every fans gate stays satisfied after the first release, which
+            // still plays, just far too easily. Only asked when the id resolves, so
+            // a bad reference reports once rather than twice.
+            if (context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)")
+                && !context.Currencies.ResetsOnAlbumRelease(chapter.Fans.CurrencyId))
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' fans currency '{chapter.Fans.CurrencyId}' is in a currency group that survives an album release - fans would compound across runs and inflate the Records payout.");
             ValidateFlag(chapter.Fans.RevealFlagId, context, $"Chapter '{chapter.Id}' (fans revealFlag)");
 
             // negative tuning drains or dead-ends instead of earning; runtime
@@ -123,7 +131,7 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!database.Currencies.TryGet(id, out var currency))
                     continue;
                 visited.Currencies.Add(id);
-                ValidateCurrencyEarn(currency, context);
+                ValidateCurrency(currency, context);
             }
 
             ValidateIds(chapter.SectionIds, database.Sections, $"Chapter '{chapter.Id}' (sections)");
@@ -217,11 +225,18 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // negative earn drains instead of earns, and earn values with no
-        // reveal flag can never activate (the importer refuses both; this
-        // catches stale assets)
-        private static void ValidateCurrencyEarn(CurrencyDefinition currency, ConditionContext context)
+        // Every currency gets the checks that do not depend on an earn config; an
+        // earn-less currency (Cash, Fans, Records) previously got none at all.
+        private static void ValidateCurrency(CurrencyDefinition currency, ConditionContext context)
         {
+            // a negative starting value puts the currency in debt at boot and again
+            // after every album release, which resets balances back to it
+            if (currency.StartingValue < 0)
+                Debug.LogError($"ContentValidator: Currency '{currency.Id}' has a negative starting value ({currency.StartingValue}) - it would start in debt at boot and after every album release.");
+
+            // negative earn drains instead of earns, and earn values with no
+            // reveal flag can never activate (the importer refuses both; this
+            // catches stale assets)
             if (!currency.Earn.Configured)
                 return;
 
@@ -242,8 +257,17 @@ namespace RidiculousGaming.GarageBandIdle
             // loaded content - freshly imported or hand-edited alike.
             if (section.ModuleAddresses.Count == 0)
                 Debug.LogError($"ContentValidator: Section '{section.Id}' has no modules - its reveal would show an empty region.");
+
+            // the list is instantiated in order with no de-duplication, so a repeat
+            // puts two of the same module in the region, each wired to the same
+            // systems - a doubled readout rather than an error anyone would trace
+            var seen = new HashSet<string>();
             foreach (var address in section.ModuleAddresses)
+            {
+                if (!seen.Add(address))
+                    Debug.LogError($"ContentValidator: Section '{section.Id}' lists module '{address}' more than once - it would be instantiated twice.");
                 ValidateModuleAddress(address, $"Section '{section.Id}'");
+            }
         }
 
         private static void ValidateGenerator(GeneratorDefinition generator, ConditionContext context)
