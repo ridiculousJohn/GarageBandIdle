@@ -156,7 +156,7 @@ and one way to discover content. Do it as one slice, then confirm slices 1–3 s
 >
 > **2. One `Condition` type + one `ConditionEvaluator`.** Define a serializable, polymorphic
 > `Condition` discriminated by a `type` string, covering every shape in the JSON:
-> `currency` (current balance ≥ `amount`), `currencyEarnedTotal` (lifetime earned ≥ `value`),
+> `currency` (current balance ≥ `value`), `currencyEarnedTotal` (lifetime earned ≥ `value`),
 > `ownedCount` (generator owned ≥ `value`), `flagSet` (`flag` is set), `barsCompleted`
 > (≥ `value` bars completed in `group`), `recordsCumulative` (cumulative Records ≥ `value`), and
 > `compound` (`all` / `any` arrays of nested `Condition`). Implement `ConditionEvaluator.Evaluate(

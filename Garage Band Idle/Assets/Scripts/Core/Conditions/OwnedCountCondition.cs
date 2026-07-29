@@ -29,7 +29,7 @@ namespace RidiculousGaming.GarageBandIdle
         public override bool Evaluate(ConditionContext context)
             => context.Generators != null
                 && context.Generators.TryGet(_generatorId, out var generator)
-                && generator.Owned >= _value;
+                && ThresholdIsMet(_value, generator.Owned);
 
         public override void Validate(ConditionContext context, string source)
         {
@@ -40,6 +40,7 @@ namespace RidiculousGaming.GarageBandIdle
                 : context.Generators != null && context.Generators.TryGet(_generatorId, out _);
             if (!resolves)
                 Debug.LogError($"Condition: {source} references unknown generator id '{_generatorId}'.");
+            ValidateThreshold(_value, source);
         }
     }
 }

@@ -248,7 +248,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fans = gate.All[0] as CurrencyBalanceCondition;
             Assert.IsNotNull(fans);
             Assert.AreEqual("fans", fans.CurrencyId);
-            Assert.AreEqual(50, fans.Amount, 1e-9);
+            Assert.AreEqual(50, fans.Value, 1e-9);
 
             var covers = gate.All[1] as BarsCompletedCondition;
             Assert.IsNotNull(covers);
@@ -276,7 +276,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var gate = tightSet.Gate as CurrencyBalanceCondition;
             Assert.IsNotNull(gate, "tight_set gates on a currency balance");
             Assert.AreEqual("fans", gate.CurrencyId);
-            Assert.AreEqual(30, gate.Amount, 1e-9);
+            Assert.AreEqual(30, gate.Value, 1e-9);
         }
 
         [Test]
@@ -302,7 +302,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var gearGate = theGear.VisibleWhen as CurrencyBalanceCondition;
             Assert.IsNotNull(gearGate, "the_gear reveals on a currency balance condition");
             Assert.AreEqual("cash", gearGate.CurrencyId);
-            Assert.AreEqual(250, gearGate.Amount, 1e-9, "stage_presence's own gate");
+            Assert.AreEqual(250, gearGate.Value, 1e-9, "stage_presence's own gate");
             CollectionAssert.AreEqual(new[] { "module/upgrade-list" }, theGear.ModuleAddresses);
 
             var rehearsalSpace = LoadById<SectionDefinition>(SectionsFolder, "rehearsal_space");

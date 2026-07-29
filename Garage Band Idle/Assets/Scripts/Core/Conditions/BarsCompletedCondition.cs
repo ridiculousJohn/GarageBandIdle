@@ -27,7 +27,7 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         public override bool Evaluate(ConditionContext context)
-            => context.Bars != null && context.Bars.CompletedCount(_groupId) >= _value;
+            => context.Bars != null && ThresholdIsMet(_value, context.Bars.CompletedCount(_groupId));
 
         public override void Validate(ConditionContext context, string source)
         {
@@ -35,6 +35,7 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"Condition: {source} has a barsCompleted condition with an empty group id.");
             else if (context.Database != null && !context.Database.BarGroups.Contains(_groupId))
                 Debug.LogError($"Condition: {source} references unknown bar group id '{_groupId}'.");
+            ValidateThreshold(_value, source);
         }
     }
 }

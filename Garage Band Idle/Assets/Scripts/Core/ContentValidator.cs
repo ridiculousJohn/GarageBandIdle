@@ -24,6 +24,9 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public static void Validate(ContentDatabase database, ConditionContext context, RewardManager rewards)
         {
+            ValidateRecordsSurviveRelease(context);
+            ValidateChapterIndices(database);
+
             var visited = new Visited();
             foreach (var chapter in database.Chapters.All)
                 ValidateChapter(chapter, database, ChapterScoped(context, database, chapter), rewards, visited);
@@ -55,6 +58,36 @@ namespace RidiculousGaming.GarageBandIdle
                     ValidateRewardDefinition(reward, orphan);
         }
 
+        // Records are the one permanent progression currency: the income buff and
+        // every capstone gate read their cumulative total, and the balance is what
+        // the player sees as permanent progress. Filing Records in a group that
+        // resets on release makes those two disagree - the readout returns to zero
+        // every album while the progression it stands for carries on. The whole
+        // "derived modifiers carry no scope" argument (rule 11) rests on this group
+        // flag, and nothing else checks that the asset was filed correctly.
+        private static void ValidateRecordsSurviveRelease(ConditionContext context)
+        {
+            if (context.Currencies.ResetsOnAlbumRelease(context.RecordsCurrencyId))
+                Debug.LogError($"ContentValidator: Records currency '{context.RecordsCurrencyId}' is in a currency group that resets on album release - permanent progress would return to zero every release.");
+        }
+
+        // The starting chapter is the lowest index (GameManager) and advancement
+        // walks them in order, so an index is an ordinal, not a label: two chapters
+        // sharing one make which of them starts arbitrary.
+        private static void ValidateChapterIndices(ContentDatabase database)
+        {
+            var byIndex = new Dictionary<int, string>();
+            foreach (var chapter in database.Chapters.All)
+            {
+                if (chapter.Index <= 0)
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a non-positive index ({chapter.Index}) - chapter order is 1-based.");
+                else if (byIndex.TryGetValue(chapter.Index, out var existing))
+                    Debug.LogError($"ContentValidator: Chapters '{existing}' and '{chapter.Id}' share index {chapter.Index} - which one starts would be arbitrary.");
+                else
+                    byIndex.Add(chapter.Index, chapter.Id);
+            }
+        }
+
         private static void ValidateChapter(ChapterDefinition chapter, ContentDatabase database,
             ConditionContext context, RewardManager rewards, Visited visited)
         {
@@ -73,7 +106,13 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative tapBaseValue ({chapter.TapBaseValue}) - every Jam would drain cash.");
             if (chapter.RecordBuff.PerRecord < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative recordBuff perRecord ({chapter.RecordBuff.PerRecord}).");
+            // the primary pacing knob (design doc section 11): at zero the
+            // capstone is reachable before the player has released anything, so
+            // the chapter has no length at all
+            if (chapter.CapstoneRecordsGate <= 0)
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a non-positive capstoneRecordsGate ({chapter.CapstoneRecordsGate}) - the capstone would unlock before play starts.");
 
+            ValidateFlagDeclarations(chapter);
             ValidateIds(chapter.CurrencyIds, database.Currencies, $"Chapter '{chapter.Id}' (currencies)");
             // the chapter's declared currencies: their earn reveal flags are
             // chapter-scoped like every other flag reference - flag ids may
@@ -162,6 +201,22 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
+        // The declared flag list is the chapter's whole reveal vocabulary - every
+        // flag check anywhere is measured against it - so a blank entry declares
+        // nothing and a repeat says the same thing twice, both of which read as
+        // an authoring slip in the JSON flags array.
+        private static void ValidateFlagDeclarations(ChapterDefinition chapter)
+        {
+            var declared = new HashSet<string>();
+            foreach (var flagId in chapter.FlagIds)
+            {
+                if (string.IsNullOrEmpty(flagId))
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' declares an empty flag id.");
+                else if (!declared.Add(flagId))
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' declares flag '{flagId}' more than once.");
+            }
+        }
+
         // negative earn drains instead of earns, and earn values with no
         // reveal flag can never activate (the importer refuses both; this
         // catches stale assets)
@@ -181,6 +236,12 @@ namespace RidiculousGaming.GarageBandIdle
         private static void ValidateSection(SectionDefinition section, ConditionContext context)
         {
             ConditionEvaluator.Validate(section.VisibleWhen, context, $"Section '{section.Id}' (visibleWhen)");
+            // a section IS its modules: with none, its reveal shows an empty region.
+            // The importer reports it too but writes the asset anyway (an empty
+            // region is inert, not wrong), so this is the check that sees it in
+            // loaded content - freshly imported or hand-edited alike.
+            if (section.ModuleAddresses.Count == 0)
+                Debug.LogError($"ContentValidator: Section '{section.Id}' has no modules - its reveal would show an empty region.");
             foreach (var address in section.ModuleAddresses)
                 ValidateModuleAddress(address, $"Section '{section.Id}'");
         }
@@ -244,6 +305,10 @@ namespace RidiculousGaming.GarageBandIdle
             if (group.Scope == ContentScope.None)
                 Debug.LogError($"ContentValidator: Bar group '{group.Id}' has scope None (uninitialized).");
             ValidateFlag(group.RevealFlagId, context, $"Bar group '{group.Id}' (revealFlag)");
+            // a group with no bars reveals an empty region and can never satisfy
+            // a barsCompleted gate, so anything waiting on it waits forever
+            if (group.BarIds.Count == 0)
+                Debug.LogError($"ContentValidator: Bar group '{group.Id}' has no bars - it can never complete one.");
             ValidateIds(group.BarIds, database.Bars, $"Bar group '{group.Id}' (bars)");
         }
 
@@ -259,13 +324,50 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ContentValidator: Bar '{bar.Id}' has a non-positive fill requirement ({bar.FillRequirement}).");
         }
 
+        // An event's tier ladder is where the design's rules about events live as
+        // data (design doc section 6.1), and slice 8's runtime will trust every
+        // field here: a tier that cannot be failed, cannot be won, or pays nothing
+        // is a content mistake that reads as working content.
         private static void ValidateEvent(EventDefinition gameEvent, ConditionContext context, RewardManager rewards)
         {
             ConditionEvaluator.Validate(gameEvent.AvailableWhen, context, $"Event '{gameEvent.Id}' (availableWhen)");
+
+            if (gameEvent.Tiers.Count == 0)
+                Debug.LogError($"ContentValidator: Event '{gameEvent.Id}' has no tiers - there would be nothing to enter.");
+
+            // tier numbers are the ladder, so they ascend with list order and
+            // start at 1; a repeat or a step backwards makes one number name two
+            // rungs, which no save or reward record could tell apart
+            var previous = 0;
             foreach (var tier in gameEvent.Tiers)
             {
-                ConditionEvaluator.Validate(tier.Goal, context, $"Event '{gameEvent.Id}' tier {tier.Tier} (goal)");
-                ValidateRewardReference(tier.RewardId, rewards, $"Event '{gameEvent.Id}' tier {tier.Tier}");
+                var source = $"Event '{gameEvent.Id}' tier {tier.Tier}";
+                ConditionEvaluator.Validate(tier.Goal, context, $"{source} (goal)");
+                ValidateRewardReference(tier.RewardId, rewards, source);
+
+                // a null Condition means "no gate", which for a goal means the
+                // tier is won the moment it is entered
+                if (tier.Goal == null)
+                    Debug.LogError($"ContentValidator: {source} has no goal - the tier would be won on entry.");
+
+                // an event's reward magnitude is the dial that sets how essential
+                // it is; no reward sets that dial to nothing, which is never what
+                // authoring a challenge means (a bar may legitimately have none)
+                if (string.IsNullOrEmpty(tier.RewardId))
+                    Debug.LogError($"ContentValidator: {source} has no reward - clearing it would grant nothing.");
+
+                // only timed tiers can fail, which cuts both ways: a failable tier
+                // with no timer has no way to fail, and a timer on a tier that
+                // cannot fail runs a clock with nothing riding on it
+                if (tier.Failable && tier.TimerSeconds <= 0)
+                    Debug.LogError($"ContentValidator: {source} is failable but has no timer ({tier.TimerSeconds}s) - only timed tiers can fail.");
+                else if (!tier.Failable && tier.TimerSeconds > 0)
+                    Debug.LogError($"ContentValidator: {source} has a {tier.TimerSeconds}s timer but is not failable - the timer could never end the tier.");
+
+                if (tier.Tier <= previous)
+                    Debug.LogError($"ContentValidator: Event '{gameEvent.Id}' has tier number {tier.Tier} following {previous} - tier numbers ascend with list order, starting at 1.");
+                else
+                    previous = tier.Tier;
             }
         }
 

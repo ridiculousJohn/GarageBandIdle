@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
@@ -173,7 +174,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             {
                 var asset = LoadOrCreate<SectionDefinition>($"{SectionsFolder}/{block.id}.asset");
                 var modules = new List<string>(block.modules ?? Array.Empty<string>());
-                var visibleWhen = ToCondition(block.visibleWhen);
+                // a section IS its modules: one with none reveals an empty region
+                // when its visibleWhen holds. Written anyway (an empty region is
+                // inert, not wrong) so the rest of the chapter still imports.
+                if (modules.Count == 0)
+                    Debug.LogError($"ChapterJsonImporter: section '{block.id}' names no modules - it would reveal an empty region.");
+                var visibleWhen = ToCondition(block.visibleWhen, $"section '{block.id}' (visibleWhen)");
                 ApplyIfChanged(asset, section => section.EditorInitialize(block.id, block.name, modules, visibleWhen));
                 sectionIds.Add(block.id);
             }
@@ -201,7 +207,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 }
 
                 var asset = LoadOrCreate<GeneratorDefinition>($"{GeneratorsFolder}/{block.id}.asset");
-                var unlock = ToCondition(block.unlock);
+                var unlock = ToCondition(block.unlock, $"generator '{block.id}' (unlock)");
                 ApplyIfChanged(asset, generator => generator.EditorInitialize(block.id, block.name, block.produces,
                     block.isBandmate, block.cost?.currency, block.cost?.amount ?? 0, block.cost?.growth ?? 0,
                     block.baseOutput, unlock));
@@ -242,7 +248,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
                 var asset = LoadOrCreate<UpgradeDefinition>($"{UpgradesFolder}/{block.id}.asset");
                 var scope = ToScope(block.scope, $"upgrade '{block.id}'");
-                var gate = ToCondition(block.gate);
+                var gate = ToCondition(block.gate, $"upgrade '{block.id}' (gate)");
                 var payload = ToPayload(block.payload, $"upgrade '{block.id}'");
                 ApplyIfChanged(asset, upgrade => upgrade.EditorInitialize(block.id, block.name, type, scope,
                     block.cost?.currency, block.cost?.amount ?? 0, gate, payload));
@@ -288,11 +294,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 {
                     tiers.Add(new EventTier(tier.tier,
                         ToDebuff(tier.debuff, $"event '{block.id}' tier {tier.tier}"),
-                        ToCondition(tier.goal), tier.timerSeconds, tier.failable, tier.reward));
+                        ToCondition(tier.goal, $"event '{block.id}' tier {tier.tier} (goal)"),
+                        tier.timerSeconds, tier.failable, tier.reward));
                 }
 
                 var asset = LoadOrCreate<EventDefinition>($"{EventsFolder}/{block.id}.asset");
-                var availableWhen = ToCondition(block.availableWhen);
+                var availableWhen = ToCondition(block.availableWhen, $"event '{block.id}' (availableWhen)");
                 ApplyIfChanged(asset, gameEvent => gameEvent.EditorInitialize(block.id, block.name,
                     availableWhen, block.baselineReset, tiers));
                 eventIds.Add(block.id);
@@ -443,15 +450,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // family. An absent gate means no gate: the DTO initializers materialize
         // absent objects as empty instances, so an empty type returns null
         // (always met).
-        private static Condition ToCondition(ConditionBlock block)
+        private static Condition ToCondition(ConditionBlock block, string context)
         {
             if (block == null || string.IsNullOrEmpty(block.type))
                 return null;
 
             if (block.type == "compound")
             {
-                var all = ToConditionList(block.all);
-                var any = ToConditionList(block.any);
+                var all = ToConditionList(block.all, $"{context} all");
+                var any = ToConditionList(block.any, $"{context} any");
                 if (all.Count == 0 && any.Count == 0)
                 {
                     Debug.LogError("ChapterJsonImporter: compound condition has no children. Importing no gate.");
@@ -460,45 +467,80 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 return new CompoundCondition(all, any);
             }
 
-            return ToSimpleCondition(block.type, block.currency, block.amount,
+            ValidateThreshold(block, context);
+            return ToSimpleCondition(block.type, block.currency,
                 block.generator, block.flag, block.group, block.value);
         }
 
-        private static List<Condition> ToConditionList(ConditionBlock[] blocks)
+        private static List<Condition> ToConditionList(ConditionBlock[] blocks, string context)
         {
             var conditions = new List<Condition>();
-            foreach (var block in blocks ?? Array.Empty<ConditionBlock>())
+            var children = blocks ?? Array.Empty<ConditionBlock>();
+            for (var i = 0; i < children.Length; i++)
             {
+                var block = children[i];
                 if (block == null || string.IsNullOrEmpty(block.type))
                 {
                     Debug.LogError("ChapterJsonImporter: compound condition has a child with no type. Skipping it.");
                     continue;
                 }
 
-                var condition = ToCondition(block);
+                var condition = ToCondition(block, $"{context}[{i}]");
                 if (condition != null)
                     conditions.Add(condition);
             }
             return conditions;
         }
 
+        // Every condition states its threshold as `value`, because a condition
+        // compares against one; `amount` is a cost block's key, where the number is
+        // a price. A key the DTO does not define is the importer's to catch: only
+        // it sees the raw JSON, since the asset keeps just the keys that were read.
+        //
+        // The condition is still written when the threshold is bad. Dropping it
+        // would mean "no gate", which is the very always-open failure being
+        // reported, so the faithful asset plus Condition's fail-closed evaluation
+        // is the safe pair.
+        private static void ValidateThreshold(ConditionBlock block, string context)
+        {
+            if (block.unrecognized != null)
+            {
+                foreach (var key in block.unrecognized.Keys)
+                    Debug.LogError($"ChapterJsonImporter: {context} carries unrecognized key '{key}' - a condition's threshold is 'value' ('amount' is a cost block's price). Fix the JSON and re-import.");
+            }
+
+            // flagSet compares against nothing, and an unknown type is reported by
+            // the subclass mapping itself
+            if (!IsThresholdType(block.type))
+                return;
+            if (block.value > 0)
+                return;
+
+            Debug.LogError($"ChapterJsonImporter: {context} has a non-positive value ({block.value}) - the gate would be met before play starts. Fix the JSON and re-import.");
+        }
+
+        // flagSet carries no threshold; every other non-compound type does
+        private static bool IsThresholdType(string type)
+            => type is "currency" or "currencyEarnedTotal" or "ownedCount"
+                or "barsCompleted" or "recordsCumulative";
+
         // the condition parse path (real DTO shape + conversion), exposed so
         // EditMode tests can cover nesting depth without an asset-writing import
-        internal static Condition ParseCondition(string json)
-            => ToCondition(JsonConvert.DeserializeObject<ConditionBlock>(json, JsonSettings));
+        internal static Condition ParseCondition(string json, string context = "condition")
+            => ToCondition(JsonConvert.DeserializeObject<ConditionBlock>(json, JsonSettings), context);
 
         // the payload parse path, exposed for the same reason as ParseCondition:
         // tests cover which values the importer refuses to write without one
         internal static UpgradePayload ParsePayload(string json, string context)
             => ToPayload(JsonConvert.DeserializeObject<PayloadBlock>(json, JsonSettings), context);
 
-        private static Condition ToSimpleCondition(string type, string currency, double amount,
+        private static Condition ToSimpleCondition(string type, string currency,
             string generator, string flag, string group, double value)
         {
             switch (type)
             {
                 case "currency":
-                    return new CurrencyBalanceCondition(currency, amount);
+                    return new CurrencyBalanceCondition(currency, value);
                 case "currencyEarnedTotal":
                     return new CurrencyEarnedTotalCondition(currency, value);
                 case "ownedCount":
@@ -774,11 +816,19 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public string type = "";
             public string currency = "";
-            public double amount;
             public string generator = "";
             public string flag = "";
             public string group = "";
             public double value;
+
+            // Any key that matches no field above lands here instead of being
+            // dropped. A condition object carries nothing but its own keys (notes
+            // sit on the content around it), so anything collected here is a
+            // misspelling - `amount` copied from the cost block beside it, say -
+            // and a misspelled threshold would otherwise import as zero: a gate
+            // met before play starts.
+            [JsonExtensionData]
+            public IDictionary<string, JToken> unrecognized;
             public ConditionBlock[] all = Array.Empty<ConditionBlock>();
             public ConditionBlock[] any = Array.Empty<ConditionBlock>();
         }

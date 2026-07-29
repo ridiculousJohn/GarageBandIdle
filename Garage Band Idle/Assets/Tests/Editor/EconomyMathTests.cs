@@ -184,9 +184,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // the Records buff is a derived modifier: always on, tracking the
-        // balance, and confined to the currencies the chapter declares
+        // cumulative total, and confined to the currencies the chapter declares
         [Test]
-        public void RecordsIncomeModifier_TracksTheBalance_AndOnlyItsOwnCurrency()
+        public void RecordsIncomeModifier_TracksTheCumulativeTotal_AndOnlyItsOwnCurrency()
         {
             var currencies = TestContent.MakeEconomy();
             var modifiers = new ModifierSystem();
@@ -204,16 +204,42 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             currencies.Add("records", 10);
 
             Assert.AreEqual(1.2, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9,
-                "the value follows the balance with nothing re-applying it");
+                "the value follows the total with nothing re-applying it");
             Assert.AreEqual(1.0, modifiers.For(fansTarget).Multiply.ToDouble(), 1e-9,
                 "an undeclared currency never inherits the Records buff");
 
             // a run reset drops granted modifiers and leaves derived ones: the
-            // Records balance is what governs this buff's lifetime
+            // Records total is what governs this buff's lifetime
             modifiers.Grant(cashTarget, ModifierOperation.Multiply, ContentScope.Run, 3.0);
             Assert.AreEqual(3.6, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "granted x derived");
             modifiers.ResetRunScoped();
             Assert.AreEqual(1.2, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "the derived buff survives");
+        }
+
+        // "Cumulative Records" has one reading, shared by the permanent income
+        // buff and the capstone gate, so the two can never drift apart. Records
+        // are accumulated and never spent, which makes this invisible today -
+        // spending is the only way to tell the readings apart, and it proves
+        // which one is in force rather than relying on the rule holding forever.
+        [Test]
+        public void RecordsIncomeModifier_AndTheCapstoneGate_ReadTheSameTotal()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
+            modifiers.AddDerived(new RecordsIncomeModifier(currencies, "records", 0.02, "cash"));
+            var cashTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash");
+            var gate = new RecordsCumulativeCondition(10);
+            var context = TestContent.MakeContext(currencies);
+
+            currencies.Add("records", 10);
+            Assert.AreEqual(1.2, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9);
+            Assert.IsTrue(gate.Evaluate(context));
+
+            currencies.Add("records", -10);
+
+            Assert.AreEqual(1.2, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9,
+                "a permanent buff cannot shrink");
+            Assert.IsTrue(gate.Evaluate(context), "and a chapter gate cannot un-gate");
         }
 
         [Test]

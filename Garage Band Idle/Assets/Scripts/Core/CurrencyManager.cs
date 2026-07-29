@@ -152,6 +152,17 @@ namespace RidiculousGaming.GarageBandIdle
             return false;
         }
 
+        // Whether a currency's group opts into the album-release reset. A system
+        // whose correctness depends on a currency surviving a release can assert
+        // on the group flag instead of trusting the asset to be filed correctly.
+        // An unresolvable group answers false - that broken reference is already
+        // reported at load, and it is not this question's job to repeat it.
+        public bool ResetsOnAlbumRelease(string currencyId)
+            => !string.IsNullOrEmpty(currencyId)
+               && _definitions.TryGetValue(currencyId, out var definition)
+               && _groups.TryGetValue(definition.GroupId, out var group)
+               && group.ResetsOnAlbumRelease;
+
         // Album release (prestige) reset: every currency whose group opts in returns
         // to its starting value. Driven purely by the group flag, so new currencies
         // and new groups participate with no code changes.

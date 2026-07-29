@@ -89,8 +89,8 @@ namespace RidiculousGaming.GarageBandIdle
 
                 // the Records buff is derived, not granted: one modifier per
                 // currency the chapter's recordBuff declares, each reading the
-                // Records balance, so production of anything undeclared is
-                // untouched and nothing has to remember to re-apply it
+                // cumulative Records total, so production of anything undeclared
+                // is untouched and nothing has to remember to re-apply it
                 foreach (var currencyId in CurrentChapter.RecordBuff.AffectsCurrencyIds)
                 {
                     Modifiers.AddDerived(new RecordsIncomeModifier(

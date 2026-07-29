@@ -15,61 +15,61 @@ MonoBehaviour:
   _id: garage_jam
   _displayName: Garage Jam Challenge
   _availableWhen:
-    rid: 5051021696154730515
+    rid: 1000
   _baselineReset: 1
   _tiers:
   - _tier: 1
     _debuff:
-      rid: 5051021696154730516
+      rid: 1001
     _goal:
-      rid: 5051021696154730517
+      rid: 1002
     _timerSeconds: 60
     _failable: 1
     _rewardId: tap_value_x1_25
   - _tier: 2
     _debuff:
-      rid: 5051021696154730518
+      rid: 1003
     _goal:
-      rid: 5051021696154730519
+      rid: 1004
     _timerSeconds: 60
     _failable: 1
     _rewardId: tap_value_x1_50
   - _tier: 3
     _debuff:
-      rid: 5051021696154730520
+      rid: 1005
     _goal:
-      rid: 5051021696154730521
+      rid: 1006
     _timerSeconds: 45
     _failable: 1
     _rewardId: tap_value_x2
   references:
     version: 2
     RefIds:
-    - rid: 5051021696154730515
+    - rid: 1000
       type: {class: RecordsCumulativeCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _value: 1
-    - rid: 5051021696154730516
+    - rid: 1001
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
       data: 
-    - rid: 5051021696154730517
+    - rid: 1002
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
-        _amount: 500
-    - rid: 5051021696154730518
+        _value: 500
+    - rid: 1003
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
       data: 
-    - rid: 5051021696154730519
+    - rid: 1004
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
-        _amount: 2500
-    - rid: 5051021696154730520
+        _value: 2500
+    - rid: 1005
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
       data: 
-    - rid: 5051021696154730521
+    - rid: 1006
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
-        _amount: 10000
+        _value: 10000

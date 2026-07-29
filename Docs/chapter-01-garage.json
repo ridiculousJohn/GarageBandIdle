@@ -3,7 +3,8 @@
     "file": "Chapter 1 — Garage. Buildable content data.",
     "usage": "Maps to the ScriptableObjects in the design doc (ChapterDefinition, GeneratorDefinition, UpgradeDefinition, EventDefinition, BarDefinition, RewardDefinition, AlbumPrestige config). Either hand-author SOs from these values or write a small importer. ALL ScriptableObjects are discovered at runtime through Addressables (labels per type), not direct references. All numbers are starter values for tuning; the Records capstone gate is the primary pacing knob.",
     "modelNotes": {
-      "conditions": "Every gate/unlock/visibility/availability rule is a single discriminated Condition shape — always an object with a `type` field — evaluated by ONE ConditionEvaluator. No bare/heterogeneous shapes. Types used in Ch1: `currency` (current balance ≥ amount), `currencyEarnedTotal` (lifetime earned ≥ value), `ownedCount` (generator owned ≥ value), `flagSet` (a flag is set), `barsCompleted` (≥ value bars completed in a group), `recordsCumulative` (cumulative Records ≥ value), `compound` (all/any of nested Conditions).",
+      "conditions": "Every gate/unlock/visibility/availability rule is a single discriminated Condition shape — always an object with a `type` field — evaluated by ONE ConditionEvaluator. No bare/heterogeneous shapes. Types used in Ch1: `currency` (current balance ≥ value), `currencyEarnedTotal` (lifetime earned ≥ value), `ownedCount` (generator owned ≥ value), `flagSet` (a flag is set), `barsCompleted` (≥ value bars completed in a group), `recordsCumulative` (cumulative Records ≥ value), `compound` (all/any of nested Conditions).",
+      "conditionThresholds": "A condition states its threshold as `value`, always — a condition compares against one. `amount` is a cost block's key, where the number is a price, not a threshold: `cost: { currency, amount }`. A condition object carries no other keys, so the importer reports any key it does not recognize (`amount` copied from the cost block beside a gate, or a plain misspelling) instead of dropping it and leaving the threshold at zero. A threshold must also be positive — the importer reports a non-positive one, boot validation reports it on existing assets, and the condition evaluates as unmet, so a broken gate blocks content rather than standing open.",
       "flags": "One flag registry drives every progressive reveal. A content-unlock upgrade's payload is `setFlag`; a reward's payload can also be `setFlag`; sections, currencies, bar groups, and any gated content reveal on a `flagSet` Condition. There is no separate `unlockSystem` code path — revealing a system = setting its flag.",
       "bars": "A 'Learn Covers' cover is a generic fillable BAR. A bar declares `fillCurrency` (a currency id) + `fillRequirement` + `reward`; the fill logic reads `fillCurrency` and never hardcodes covers. Rehearsal is an ordinary run-scoped currency with its own earn config (per-sec tick + per-tap yield). Bars and their fill currency meet only through the `fillCurrency` id — mirrors how generators declare `produces`. A group's `fillMode` + `delivery` pair maps onto a concrete BarFillBehavior class at import (polymorphic, like Condition) — Ch1's pair is perBar + continuous. A new pair requires its behavior class to exist first, so authored data can never outrun implemented code.",
       "addressables": "Chapters, Generators, Upgrades, Events, Bars, Currencies, CurrencyGroups, and Rewards are all loaded by Addressables label. Managers build their registries from whatever assets carry the label — no hardcoded lists, no direct scene/asset references."
@@ -63,7 +64,7 @@
       "id": "the_gear",
       "name": "The Gear",
       "modules": [ "module/upgrade-list" ],
-      "visibleWhen": { "type": "currency", "currency": "cash", "amount": 250 },
+      "visibleWhen": { "type": "currency", "currency": "cash", "value": 250 },
       "note": "The buff list. Gated to the first buff's own gate (stage_presence at 250 Cash) so the region never shows empty - a section reveal latches, while each row appears and disappears on its own gate and purchase state, which is what brings rows back after an album release."
     },
     {
@@ -123,7 +124,7 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 250 },
-      "gate": { "type": "currency", "currency": "cash", "amount": 250 },
+      "gate": { "type": "currency", "currency": "cash", "value": 250 },
       "payload": { "effect": "tapValueAdd", "value": 1 },
       "note": "+1 Cash per tap."
     },
@@ -133,7 +134,7 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 500 },
-      "gate": { "type": "currency", "currency": "cash", "amount": 500 },
+      "gate": { "type": "currency", "currency": "cash", "value": 500 },
       "payload": { "effect": "generatorOutputMultiplier", "generator": "practice_amp", "value": 2.0 }
     },
     {
@@ -142,7 +143,7 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 5000 },
-      "gate": { "type": "currency", "currency": "cash", "amount": 5000 },
+      "gate": { "type": "currency", "currency": "cash", "value": 5000 },
       "payload": { "effect": "generatorOutputMultiplier", "generator": "drummer", "value": 2.0 }
     },
     {
@@ -151,7 +152,7 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 20000 },
-      "gate": { "type": "currency", "currency": "fans", "amount": 30 },
+      "gate": { "type": "currency", "currency": "fans", "value": 30 },
       "payload": { "effect": "currencyPerSecMultiplier", "affects": ["cash"], "value": 1.5 },
       "note": "Gated on Fans, not Cash — demonstrates the gating web (§4). Same Condition shape as a Cash gate, just a different `currency` id, so no special-casing. The payload names the currencies it multiplies rather than implying Cash from the effect name, matching `constants.recordBuff.affects` — production of anything unlisted is untouched."
     },
@@ -172,7 +173,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 0 },
-      "gate": { "type": "currency", "currency": "fans", "amount": 25 },
+      "gate": { "type": "currency", "currency": "fans", "value": 25 },
       "payload": { "effect": "setFlag", "flag": "covers" },
       "note": "Stage 3. Sets the `covers` flag — reveals the Rehearsal currency and the Learn Covers bar group."
     },
@@ -185,7 +186,7 @@
       "gate": {
         "type": "compound",
         "all": [
-          { "type": "currency", "currency": "fans", "amount": 50 },
+          { "type": "currency", "currency": "fans", "value": 50 },
           { "type": "barsCompleted", "group": "learn_covers", "value": 1 }
         ]
       },
@@ -249,7 +250,7 @@
     "unlock": {
       "type": "compound",
       "all": [
-        { "type": "currency", "currency": "fans", "amount": 50 },
+        { "type": "currency", "currency": "fans", "value": 50 },
         { "type": "barsCompleted", "group": "learn_covers", "value": 1 }
       ]
     },
@@ -272,7 +273,7 @@
         {
           "tier": 1,
           "debuff": { "effect": "automationDisabled", "note": "Generators paused — tap only." },
-          "goal": { "type": "currency", "currency": "cash", "amount": 500 },
+          "goal": { "type": "currency", "currency": "cash", "value": 500 },
           "timerSeconds": 60,
           "failable": true,
           "reward": "tap_value_x1_25"
@@ -280,7 +281,7 @@
         {
           "tier": 2,
           "debuff": { "effect": "automationDisabled" },
-          "goal": { "type": "currency", "currency": "cash", "amount": 2500 },
+          "goal": { "type": "currency", "currency": "cash", "value": 2500 },
           "timerSeconds": 60,
           "failable": true,
           "reward": "tap_value_x1_50"
@@ -288,7 +289,7 @@
         {
           "tier": 3,
           "debuff": { "effect": "automationDisabled" },
-          "goal": { "type": "currency", "currency": "cash", "amount": 10000 },
+          "goal": { "type": "currency", "currency": "cash", "value": 10000 },
           "timerSeconds": 45,
           "failable": true,
           "reward": "tap_value_x2"

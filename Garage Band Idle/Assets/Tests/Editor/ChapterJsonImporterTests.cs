@@ -30,7 +30,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                         { ""type"": ""flagSet"", ""flag"": ""covers"" },
                         { ""type"": ""compound"", ""all"": [
                             { ""type"": ""flagSet"", ""flag"": ""album"" },
-                            { ""type"": ""currency"", ""currency"": ""cash"", ""amount"": 100 }
+                            { ""type"": ""currency"", ""currency"": ""cash"", ""value"": 100 }
                         ] }
                     ] }
                 ]
@@ -71,6 +71,67 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             Assert.IsNull(ChapterJsonImporter.ParseCondition("{}"), "an empty block is no gate");
             Assert.IsNull(ChapterJsonImporter.ParseCondition("null"), "an explicit null is no gate");
+        }
+
+        // A key the DTO does not define would otherwise be dropped, leaving the
+        // threshold at zero - a gate met before play starts. `amount` copied from
+        // the cost block beside the gate is the likely one, but the check is on the
+        // key not matching rather than on any particular spelling, so a plain typo
+        // reports the same way. Only the importer sees this: the asset keeps just
+        // the keys that were read.
+        [Test]
+        public void Condition_UnrecognizedKey_IsReportedRatherThanDropped()
+        {
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: upgrade 'x' (gate) carries unrecognized key 'amount' - a condition's threshold is 'value' ('amount' is a cost block's price). Fix the JSON and re-import.");
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: upgrade 'x' (gate) has a non-positive value (0) - the gate would be met before play starts. Fix the JSON and re-import.");
+            ChapterJsonImporter.ParseCondition(
+                @"{ ""type"": ""currency"", ""currency"": ""cash"", ""amount"": 250 }", "upgrade 'x' (gate)");
+
+            // any misspelling, not one hand-picked wrong key
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: generator 'g' (unlock) carries unrecognized key 'valeu' - a condition's threshold is 'value' ('amount' is a cost block's price). Fix the JSON and re-import.");
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: generator 'g' (unlock) has a non-positive value (0) - the gate would be met before play starts. Fix the JSON and re-import.");
+            ChapterJsonImporter.ParseCondition(
+                @"{ ""type"": ""currencyEarnedTotal"", ""currency"": ""cash"", ""valeu"": 100 }", "generator 'g' (unlock)");
+        }
+
+        // a genuinely zero threshold reports plainly, and the condition is still
+        // written: dropping it would mean "no gate", which is the same always-open
+        // failure the report is about
+        [Test]
+        public void Condition_NonPositiveThreshold_IsReportedAndStillWritten()
+        {
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: upgrade 'x' (gate) has a non-positive value (0) - the gate would be met before play starts. Fix the JSON and re-import.");
+
+            Assert.IsInstanceOf<CurrencyBalanceCondition>(ChapterJsonImporter.ParseCondition(
+                @"{ ""type"": ""currency"", ""currency"": ""cash"" }", "upgrade 'x' (gate)"));
+        }
+
+        // the unified key is what the importer reads: a currency gate's threshold
+        // arrives under `value`, the same key every other condition uses
+        [Test]
+        public void Condition_CurrencyGate_ReadsItsThresholdFromValue()
+        {
+            var condition = ChapterJsonImporter.ParseCondition(
+                @"{ ""type"": ""currency"", ""currency"": ""cash"", ""value"": 250 }",
+                "upgrade 'x' (gate)") as CurrencyBalanceCondition;
+
+            Assert.IsNotNull(condition);
+            Assert.AreEqual("cash", condition.CurrencyId);
+            Assert.AreEqual(250, condition.Value, 1e-9);
+        }
+
+        // flagSet reads neither numeric key, so a stray one must not be read as a
+        // missing threshold
+        [Test]
+        public void Condition_FlagSet_CarriesNoThresholdToReport()
+        {
+            Assert.IsInstanceOf<FlagSetCondition>(ChapterJsonImporter.ParseCondition(
+                @"{ ""type"": ""flagSet"", ""flag"": ""fans"" }", "section 's' (visibleWhen)"));
         }
 
         // a per-sec multiplier carries the currencies it affects as data, so the

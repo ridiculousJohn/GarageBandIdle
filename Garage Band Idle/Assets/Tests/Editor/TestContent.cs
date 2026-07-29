@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
+using RidiculousGaming.GarageBandIdle.Events;
 using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEditor;
 using UnityEngine;
@@ -89,10 +90,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
-        public static SectionDefinition MakeSection(string id, Condition visibleWhen = null)
+        // Defaults to one real module address: a section with none is a reported
+        // content error, so a fixture that only cares about visibility still has to
+        // be a coherent section. The address has to resolve through Addressables
+        // like the running game's would.
+        public static SectionDefinition MakeSection(string id, Condition visibleWhen = null,
+            List<string> moduleAddresses = null)
         {
             var definition = Track(ScriptableObject.CreateInstance<SectionDefinition>());
-            definition.EditorInitialize(id, id, new List<string>(), visibleWhen);
+            definition.EditorInitialize(id, id,
+                moduleAddresses ?? new List<string> { "module/tap" }, visibleWhen);
             return definition;
         }
 
@@ -104,10 +111,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             List<string> sectionIds = null, List<string> generatorIds = null,
             List<string> upgradeIds = null, List<string> barGroupIds = null,
             List<string> eventIds = null, List<string> currencyIds = null,
-            string fansRevealFlagId = "fans", double tapBaseValue = 1, double recordBuffPerRecord = 0.02)
+            string fansRevealFlagId = "fans", double tapBaseValue = 1, double recordBuffPerRecord = 0.02,
+            int index = 1, int capstoneRecordsGate = 30)
         {
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
-            definition.EditorInitialize(id, 1, id, "", "", "", 100, tapBaseValue,
+            definition.EditorInitialize(id, index, id, "", "", "", capstoneRecordsGate, tapBaseValue,
                 new RecordBuffConfig(recordBuffPerRecord, new List<string> { "cash" }),
                 new FansConfig("fans", fansRevealFlagId, 0.2, 0.02),
                 flagIds, currencyIds ?? new List<string>(), sectionIds ?? new List<string>(),
@@ -115,6 +123,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 barGroupIds ?? new List<string>(), eventIds ?? new List<string>());
             return definition;
         }
+
+        public static EventDefinition MakeEvent(string id, List<EventTier> tiers,
+            Condition availableWhen = null, bool baselineReset = true)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<EventDefinition>());
+            definition.EditorInitialize(id, id, availableWhen, baselineReset, tiers);
+            return definition;
+        }
+
+        // One tier, defaulting to the coherent shape: timed and failable together,
+        // paying a reward. Goal is required rather than defaulted, because "no
+        // goal" is one of the states a tier fixture needs to be able to express.
+        public static EventTier MakeTier(int tier, string rewardId, Condition goal,
+            double timerSeconds = 60, bool failable = true)
+            => new(tier, new AutomationDisabledDebuff(), goal, timerSeconds, failable, rewardId);
 
         public static FanRateMultiplierReward MakeFanRateReward(string id, double value, ContentScope scope = ContentScope.Run)
         {

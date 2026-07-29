@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -153,6 +155,73 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, null);
 
             Assert.IsFalse(condition.Evaluate(context), "a null child must never pass");
+        }
+
+        // A threshold of zero or less is satisfied by an empty balance, an unowned
+        // generator and an untouched bar group, so an always-open gate is exactly
+        // what a mistyped or defaulted threshold produces. Every threshold type
+        // fails closed on it instead, the same rule a null compound child follows.
+        [Test]
+        public void NonPositiveThreshold_FailsClosed_ForEveryThresholdType()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var definition = TestContent.MakeGenerator("amp", "cash", 60, 1.15, 0.4);
+            var generators = new GeneratorSystem(new[] { definition }, currencies, new ModifierSystem());
+            var bars = new StubBarCompletion(3);
+            var context = new ConditionContext(currencies, generators, new FlagSystem(), bars: bars);
+
+            // every actual value here is comfortably above zero, so only the
+            // threshold rule can be what refuses these
+            currencies.Add("cash", 500);
+            currencies.Add("records", 40);
+            TestContent.BuyTimes(generators.Get("amp"), currencies, 2);
+
+            Assert.IsFalse(new CurrencyBalanceCondition("cash", 0).Evaluate(context), "currency");
+            Assert.IsFalse(new CurrencyEarnedTotalCondition("cash", 0).Evaluate(context), "currencyEarnedTotal");
+            Assert.IsFalse(new OwnedCountCondition("amp", 0).Evaluate(context), "ownedCount");
+            Assert.IsFalse(new BarsCompletedCondition("learn_covers", 0).Evaluate(context), "barsCompleted");
+            Assert.IsFalse(new RecordsCumulativeCondition(-1).Evaluate(context), "recordsCumulative");
+        }
+
+        // the report names the JSON key to fix, since the mistake is in the chapter
+        // data rather than in the field it deserialized into - and every condition
+        // spells its threshold `value`, including the one whose C# field is still
+        // called _amount
+        [Test]
+        public void NonPositiveThreshold_IsReported_NamingTheJsonKey()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var context = TestContent.MakeContext(currencies, flags: new FlagSystem());
+
+            LogAssert.Expect(LogType.Error,
+                "Condition: Upgrade 'x' (gate) has a non-positive value (0) - the gate would be met before play starts.");
+            new CurrencyBalanceCondition("cash", 0).Validate(context, "Upgrade 'x' (gate)");
+
+            LogAssert.Expect(LogType.Error,
+                "Condition: Section 'y' (visibleWhen) has a non-positive value (0) - the gate would be met before play starts.");
+            new CurrencyEarnedTotalCondition("cash", 0).Validate(context, "Section 'y' (visibleWhen)");
+        }
+
+        // a positive threshold is silent - the check must not report every gate
+        [Test]
+        public void PositiveThreshold_IsNotReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var context = TestContent.MakeContext(currencies, flags: new FlagSystem());
+
+            new CurrencyBalanceCondition("cash", 250).Validate(context, "Upgrade 'x' (gate)");
+            new RecordsCumulativeCondition(30).Validate(context, "Chapter 'ch1' (capstone)");
+        }
+
+        // completed-bar counts without a BarSystem, so a threshold test does not
+        // have to stand up bar groups to have something above zero to compare
+        private class StubBarCompletion : IBarCompletionSource
+        {
+            private readonly int _completed;
+
+            public StubBarCompletion(int completed) => _completed = completed;
+
+            public int CompletedCount(string groupId) => _completed;
         }
 
         [Test]
