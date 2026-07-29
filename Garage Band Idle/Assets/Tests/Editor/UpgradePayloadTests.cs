@@ -264,6 +264,95 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1000.0, currencies.Get("cash").ToDouble(), 1e-9, "not a coin spent");
         }
 
+        // The run reset acts on declared scope: a run-scoped buff is re-bought each
+        // run so its latch clears, while a content unlock is permanent within the
+        // chapter and keeps its latch - which is what leaves flags set and content
+        // revealed across demos. The latch is all this clears; the effects the
+        // purchases granted are ModifierSystem's to reset.
+        [Test]
+        public void ResetRunScoped_ClearsRunBuffLatches_AndKeepsContentUnlocks()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
+                    null, new TapValueAddPayload(1), costAmount: 250),
+                TestContent.MakeUpgrade("play_for_crowd", UpgradeType.ContentUnlock,
+                    ContentScope.PermanentInChapter, null, new SetFlagPayload("fans")),
+            }, currencies, flags, modifiers);
+            var context = TestContent.MakeContext(currencies, flags: flags);
+            var buff = upgrades.Get("stage_presence");
+            var reveal = upgrades.Get("play_for_crowd");
+
+            currencies.Add("cash", 250);
+            Assert.IsTrue(upgrades.TryBuy(buff, context));
+            upgrades.EvaluateContentUnlocks(context);
+            Assert.IsTrue(reveal.Applied, "the unlock applied on its gate");
+
+            Assert.IsTrue(upgrades.ResetRunScoped(), "something was cleared");
+
+            Assert.IsFalse(buff.Applied, "the run-scoped buff is re-bought each run");
+            Assert.IsTrue(reveal.Applied, "the content unlock is permanent within the chapter");
+            Assert.IsTrue(flags.IsSet("fans"), "and the content it revealed stays revealed");
+
+            currencies.Add("cash", 250);
+            Assert.IsTrue(upgrades.TryBuy(buff, context), "the buff is on offer again");
+        }
+
+        // state, then notify: no subscriber may see one buff on offer again while
+        // another still reads as bought
+        [Test]
+        public void ResetRunScoped_SettlesEveryLatchBeforeNotifying()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var modifiers = new ModifierSystem();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("first", UpgradeType.Buff, ContentScope.Run,
+                    null, new TapValueAddPayload(1), costAmount: 100),
+                TestContent.MakeUpgrade("second", UpgradeType.Buff, ContentScope.Run,
+                    null, new TapValueAddPayload(1), costAmount: 100),
+            }, currencies, new FlagSystem(), modifiers);
+            var context = TestContent.MakeContext(currencies);
+            currencies.Add("cash", 200);
+            Assert.IsTrue(upgrades.TryBuy(upgrades.Get("first"), context));
+            Assert.IsTrue(upgrades.TryBuy(upgrades.Get("second"), context));
+
+            var anyStillApplied = false;
+            var notifications = 0;
+            upgrades.UpgradeCleared += _ =>
+            {
+                notifications++;
+                foreach (var upgrade in upgrades.All)
+                    anyStillApplied |= upgrade.Applied;
+            };
+
+            upgrades.ResetRunScoped();
+
+            Assert.IsFalse(anyStillApplied, "every latch had settled before the first notification");
+            Assert.AreEqual(2, notifications, "one per cleared upgrade");
+        }
+
+        // a reset with nothing bought is a no-op, so it stays silent rather than
+        // waking every row for nothing
+        [Test]
+        public void ResetRunScoped_IsSilentAndFalseWhenNothingWasBought()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
+                    null, new TapValueAddPayload(1), costAmount: 250),
+            }, currencies, new FlagSystem(), new ModifierSystem());
+            var notified = false;
+            upgrades.UpgradeCleared += _ => notified = true;
+
+            Assert.IsFalse(upgrades.ResetRunScoped(), "nothing to clear");
+            Assert.IsFalse(notified);
+        }
+
         // tuning that the registry refuses at runtime is reported against the
         // asset too, so a content mistake surfaces at boot instead of as an
         // effect that silently never applied

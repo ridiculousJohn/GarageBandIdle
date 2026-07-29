@@ -21,6 +21,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // fires once per upgrade when its payload is applied
         public event Action<Upgrade> UpgradeApplied;
 
+        // fires once per upgrade when a run reset clears its purchase latch, the
+        // counterpart to UpgradeApplied: a row that hid itself when bought offers
+        // the buff again. Kept separate because "acquired" and "available to buy
+        // again" are different facts, and a subscriber may care about only one.
+        public event Action<Upgrade> UpgradeCleared;
+
         public IReadOnlyList<Upgrade> All => _upgrades;
 
         public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, CurrencyManager currencies,
@@ -146,6 +152,43 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             payload.Apply(_payloadContext, upgrade.Definition.Scope);
             _currencies.Add(currencyId, -cost);
             UpgradeApplied?.Invoke(upgrade);
+            return true;
+        }
+
+        // Run reset (album release, design doc section 5): a run-scoped buff is
+        // re-bought each run, so its purchase latch clears; a content unlock is
+        // permanent within the chapter and keeps its latch, which is what leaves
+        // flags set and content revealed across demos. Scope decides, never the
+        // type and never a name list, so an upgrade added later resets according
+        // to what it declares.
+        //
+        // This clears the LATCH only. The effects the purchases granted live in
+        // ModifierSystem and clear through its own ResetRunScoped, which is what
+        // keeps the release from having to know what any payload did.
+        //
+        // Every latch settles before any notification fires, so no subscriber sees
+        // one buff on offer again while another still reads as bought (state, then
+        // notify). Returns whether anything changed, so a no-op reset stays silent.
+        public bool ResetRunScoped()
+        {
+            List<Upgrade> cleared = null;
+
+            foreach (var upgrade in _upgrades)
+            {
+                if (upgrade.Definition.Scope != ContentScope.Run)
+                    continue;
+                if (!upgrade.ClearApplied())
+                    continue;
+
+                cleared ??= new List<Upgrade>();
+                cleared.Add(upgrade);
+            }
+
+            if (cleared == null)
+                return false;
+
+            foreach (var upgrade in cleared)
+                UpgradeCleared?.Invoke(upgrade);
             return true;
         }
 

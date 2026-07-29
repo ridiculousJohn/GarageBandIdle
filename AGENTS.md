@@ -9,3 +9,11 @@ All existing and newly appearing changes are user-owned. Codex never owns worksp
 If a command, test, editor, importer, formatter, or other tool creates unexpected changes, leave every change untouched, report exactly what appeared, and wait for explicit direction. Do not clean up, undo, or restore those changes on your own.
 
 This rule overrides cleanup preferences, test-artifact cleanup, assumptions about generated content, and all inferred authorization. If there is any uncertainty, do nothing destructive and ask John.
+
+# Unity Test Rule
+
+Never run Unity tests or request approval to run Unity tests unless John explicitly instructs Codex to run them in the current task.
+
+# Remember Rule
+
+When John says to "remember" an instruction, persist it in this `AGENTS.md` file during the same response. Acknowledging or promising to follow it only in the current conversation does not satisfy the request.

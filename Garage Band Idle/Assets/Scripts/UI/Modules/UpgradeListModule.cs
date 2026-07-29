@@ -32,13 +32,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // one subscription per condition input a gate can read, mirroring
             // ChapterScreen: a buff gate is any Condition, so balances/earned
             // totals, flags, owned counts and completed bars all move
-            // availability. UpgradeApplied covers the row hiding itself once
-            // bought (and reappearing after a run reset re-clears it).
+            // availability. UpgradeApplied hides a row once bought and
+            // UpgradeCleared brings it back when the album release drops the latch.
             context.Game.Currencies.BalanceChanged += HandleBalanceChanged;
             context.Game.Flags.FlagSet += HandleFlagSet;
             context.Game.Generators.GeneratorOwnedChanged += HandleGeneratorOwnedChanged;
             context.Game.Bars.BarCompleted += HandleBarCompleted;
             context.Game.Upgrades.UpgradeApplied += HandleUpgradeApplied;
+            context.Game.Upgrades.UpgradeCleared += HandleUpgradeCleared;
         }
 
         private void OnDestroy()
@@ -53,7 +54,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (_context.Game.Bars != null)
                 _context.Game.Bars.BarCompleted -= HandleBarCompleted;
             if (_context.Game.Upgrades != null)
+            {
                 _context.Game.Upgrades.UpgradeApplied -= HandleUpgradeApplied;
+                _context.Game.Upgrades.UpgradeCleared -= HandleUpgradeCleared;
+            }
         }
 
         private void HandleBalanceChanged(string currencyId, BigNumber balance) => RefreshRows();
@@ -65,6 +69,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void HandleBarCompleted(Content.BarState bar) => RefreshRows();
 
         private void HandleUpgradeApplied(Upgrade upgrade) => RefreshRows();
+
+        private void HandleUpgradeCleared(Upgrade upgrade) => RefreshRows();
 
         private void RefreshRows()
         {

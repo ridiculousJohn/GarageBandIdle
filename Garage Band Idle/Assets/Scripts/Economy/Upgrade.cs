@@ -20,5 +20,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         }
 
         internal void MarkApplied() => Applied = true;
+
+        // The album release drops a run-scoped buff's latch so the player re-buys
+        // it (design doc section 5); whether this upgrade is one of those is the
+        // caller's question, since Definition.Scope is where that is declared.
+        // Returns whether anything changed, so an untouched upgrade stays silent.
+        internal bool ClearApplied()
+        {
+            if (!Applied)
+                return false;
+
+            Applied = false;
+            return true;
+        }
     }
 }
