@@ -58,6 +58,19 @@ a bigger venue with a new mechanic. All numbers below are starting values for tu
 > as Records before advancing), **§2** (decision settled), **§6** (capstone bullet), **§12** rule 12
 > (the unique-id policy now names each chapter's run currencies). Marked **[rev]** inline, as above.
 
+> **Revision note (production-config pass).** A currency no longer declares how it is earned: the
+> engagement earn config moves off the currency definition, and every flat-rate currency source
+> becomes a **production config** — `{currency, amount, trigger: tick | tap, gate: Condition}` —
+> held by its producer, pointing at the currency it creates (the same dependency direction
+> multipliers already use). Two holder kinds today: **generators** (their `produces`/`baseOutput` is
+> a tick-triggered config, scaled by owned count and wrapped in purchase mechanics) and **modules**
+> (the Jam button holds its per-tap yields — Cash, and Rehearsal once revealed — plus Rehearsal's
+> passive trickle). Currencies become pure state: a balance, a group, formatting. Idle eligibility
+> falls out by construction: generators are the only idle-eligible holder (§9), so module-held
+> production never idle-pays and no per-config idle flag exists. Edits: **§3** (Rehearsal bullet),
+> **§6** (tap bullet), **§9** (idle boundary restated as the holder), **§12** (rule 13 added; file
+> tree). Marked **[rev]** inline, as above.
+
 ---
 
 ## 1. Core loop
@@ -151,8 +164,9 @@ different events.
   list. **[rev]**
 - **Rehearsal (and later chapters' equivalent fill currencies)** — a run-scoped currency earned from
   engagement (a passive tick plus taps), spent to fill learn-songs bars. Rehearsal is Chapter 1's fill
-  currency; a later chapter may define its own. It is an ordinary currency — it owns its earn config,
-  and bars reference it by id. **[rev]**
+  currency; a later chapter may define its own. It is an ordinary currency — pure state like any
+  other; its accrual comes from production configs held by the chapter's Jam module (a per-tap yield
+  plus a passive trickle, §12 rule 13) and bars reference it by id. **[rev]**
 - **Learn-songs bars** — generic *fillable bars* that pace a chapter (learn covers, rehearse). Each bar
   declares a `fillCurrency` (Rehearsal in Ch. 1), a fill requirement, and a reward granted on
   completion; the fill logic reads `fillCurrency` and is not covers-specific. Fed by a fill currency
@@ -226,7 +240,10 @@ An early album cycle takes seconds to minutes; cycles get faster as Records accu
 ## 6. Within-a-chapter play & events
 
 Moment-to-moment play draws on the systems defined elsewhere:
-- **Tap ("Jam")** — early Cash source; its relevance falls off as gear automates income.
+- **Tap ("Jam")** — early Cash source; its relevance falls off as gear automates income. **[rev]**
+  The button is an authored module that holds its tap-triggered production configs (§12 rule 13) —
+  Cash always, Rehearsal once revealed — plus Rehearsal's passive trickle, so what engagement yields
+  is producer data, never currency data or code.
 - **Generators** — exponential cost, `cost = base × growth^owned`, growth ~1.15; a themed set per
   chapter. A generator's cost declares its currency, independent of what it produces (all Chapter 1
   gear costs Cash) — "buy with Cash, produce Merch" is a data shape, not a special case. Because runs
@@ -386,7 +403,11 @@ state where every economy is unfocused; launching is an ordinary focus-gain on t
 return to — so in-game chapter switching (Ch. 2+) and time away are one mechanic, not two.
 **Generator production only:** fans, rehearsal, and bar progress pause while unfocused — engagement
 currencies never earn while the player is not engaging, and idle fan accrual would let time away
-shortcut the Records payout (§11). The base rate is set at 50% so that the doubled value is a full
+shortcut the Records payout (§11). **[rev]** With production configs (§12 rule 13) this boundary is
+the holder, by construction: idle pays only configs held by generators. Module-held configs never
+idle-pay — a tap-triggered config cannot fire while nobody taps, and Rehearsal's passive trickle
+lives on the Jam module, not on a generator — so there is no per-config idle flag to author or get
+wrong. The base rate is set at 50% so that the doubled value is a full
 100%. Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
 **[rev]** Doubling is a **timed buff**, not a per-collect choice: the "Double it" ad grants a fact
@@ -486,6 +507,7 @@ Assets/Scripts/
     BarDefinition.cs / BarGroupDefinition.cs / BarSystem.cs   // [rev] generic fillable bars (fillCurrency-driven); replaces LearnSongBar
     RewardDefinition.cs / RewardManager.cs   // [rev] shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
     CostCalculator.cs / ProductionCalculator.cs   // [rev] formula only; the modifiers that scale production live in the registry
+    ProductionConfig.cs / ProductionSystem.cs   // [rev] rule 13: {currency, amount, trigger, gate} held by producers; the system fires module-held configs (tap + tick); replaces EngagementEarnSystem/TapSystem
     Modifiers/ModifierSystem.cs   // [rev] one registry for every stat modifier: granted (carries scope) + derived (computed from a source); the composition rule lives here
   Events/
     EventDefinition.cs / GameEvent.cs   // baseline reset, optional debuff, optional timer, goal, tier, reward
@@ -555,8 +577,8 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     allocation, an entitlement, a clear count) — there is no global grant store and no grant ever
     migrates across a chapter boundary. Wanting a granted global effect is the smell that its
     underlying fact has not been named yet.
-12. **[rev]** Bundle the per-economy systems (currency pool, generators, upgrades, bars, fans, tap,
-    engagement earn, modifiers, flags, condition context) into one **economy context**, constructed
+12. **[rev]** Bundle the per-economy systems (currency pool, generators, upgrades, bars, fans,
+    production (rule 13), modifiers, flags, condition context) into one **economy context**, constructed
     from a recipe and instantiated per economy: one startup pool holds the global currencies, and each
     frontier chapter, event sandbox, and replay economy is its own context. A context's recipe declares
     which fact classes it projects into modifiers at construction:
@@ -578,6 +600,21 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     impossible by construction. Each context's last-interaction timestamp lives in its state block
     (rule 7). The suspended run during an event is simply unfocused, and an app launch is an ordinary
     focus-gain.
+13. **[rev]** Every flat-rate currency source is a **production config** — `{currency id, amount,
+    trigger: tick | tap, gate: Condition}` — held by its producer, never by the currency: a currency
+    is pure state (a balance, a group, formatting), and the dependency points from producer to
+    currency, the same direction a multiplier points at its targets (§3). Two holder kinds exist
+    today: a **generator** holds one tick-triggered config (its `produces` + `baseOutput`), scaled by
+    owned count and wrapped in purchase mechanics; a **module** (the Jam button) holds its per-tap
+    yields and Rehearsal's passive trickle. A config's gate is an ordinary rule-8 Condition — this
+    replaces the bespoke reveal-flag string the old earn config carried. Idle eligibility (§9) is a
+    property of the holder kind: generators are the only idle-eligible holder, so module-held
+    production never idle-pays — by construction, not by flag; a producer whose output must idle-pay
+    is a generator, full stop. The modifier vocabulary (rule 11) is unchanged by this: each holder
+    composes exactly the targets it composes today (a generator's output; tap value is the Jam
+    module's Cash config), so the pass moves where base values live, not how they scale. Sources
+    with formula-driven rates stay their own systems — the fan rate is a function of band size (§6),
+    not a flat amount — and rewards/grants are rule-11 facts, not production.
 
 **Starter prompt for a code assistant:**
 > "In Unity (version X, iOS/Android), scaffold a nested-prestige idle core: a CurrencyManager with a run
@@ -614,7 +651,9 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   reveal runs through one flag registry (`setFlag` → `flagSet`); learn-songs bars are generic fillables
   driven by a `fillCurrency` (Rehearsal in Ch. 1); every content ScriptableObject is discovered via
   Addressables; currency definitions are global while balances live in per-context pools (the group
-  declares placement); saves store facts, never grants, and each economy context re-projects its
+  declares placement); every flat-rate currency source is a production config held by its producer
+  (generators and the Jam module — a currency never declares its own earn, and only generator-held
+  production idle-pays); saves store facts, never grants, and each economy context re-projects its
   modifiers from those facts at construction.
 - **Monetization:** opt-in ads only (no forced interstitials); idle earnings are per-economy (50% of
   generator production, paid on focus-gain) with a timed 2× double-idle buff from the "Double it" ad;

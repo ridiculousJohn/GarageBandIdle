@@ -16,9 +16,11 @@ that establishes the cross-cutting foundations — a single `Condition` type + e
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
 foundations that touch code already written, so they are introduced explicitly here rather than
-pretended to be forward-only. Slices 4–10 assume 3.5 is in place and build on it. Slice **5.5** is
-the second such pass: it establishes the economy-context boundary from the design's multi-economy
-revision (§12 rule 12) and retrofits slices 1–5 onto it; slices 6–9 assume it.
+pretended to be forward-only. Slices 4–10 assume 3.5 is in place and build on it. Slice **5.4**
+establishes the production-config shape (§12 rule 13: every flat-rate currency source lives on its
+producer — generators and the Jam module — never on the currency) and retrofits slices 1–5 onto it.
+Slice **5.5** establishes the economy-context boundary from the design's multi-economy revision
+(§12 rule 12), assumes 5.4, and retrofits slices 1–5 onto it; slices 6–9 assume both.
 
 ---
 
@@ -269,6 +271,58 @@ taps/time; fan rate jumps on completion via RewardManager; `barsCompleted` repor
 
 ---
 
+## 5.4 — CONSOLIDATION: production configs (sources own production; currencies are pure state)
+
+This slice adds no new gameplay. It moves "how a currency is earned" off `CurrencyDefinition` and
+onto the producers, per the design's production-config revision pass (§12 rule 13), and **retrofits
+slices 1–5 onto it** — before 5.5 bundles the earn machinery into the economy context in the old
+shape. Do it as one slice, then confirm slices 1–5 still play identically.
+
+> Read `/docs/garage-band-idle-design.md` — §3, §6, §9, and §12 rule 13 (the production-config
+> revision pass). This is a refactor/foundation pass; **do not change observable gameplay.** Build
+> these foundations and retrofit slices 1–5 onto them:
+>
+> **1. `ProductionConfig`.** `{currencyId, amount, trigger: tick | tap, gate: Condition}`. The gate
+> is an ordinary Condition evaluated by the shared evaluator (none = always on) — the bespoke
+> `revealFlag` string dies with the earn config. A negative amount is refused at import and reported
+> at boot, the same fail-closed rule the earn config had.
+>
+> **2. The Jam module owns the tap.** Extend the chapter JSON and importer: a `producers` array
+> authors the Jam producer — its module address (`module/tap`) plus its production list: cash
+> 1/tap (retiring `constants.tapBaseValue`), rehearsal 2/tap and rehearsal 1/sec both gated on
+> `flagSet covers` (retiring the `earn` block on the rehearsal currency entry). Producer definitions
+> are generated assets discovered by an Addressables label like every other content kind. Currency
+> entries in `currencies` become `{id, group}` only; delete `EngagementEarnConfig`, and the importer
+> **refuses** an `earn` block (stale JSON) rather than silently ignoring it.
+>
+> **3. Generators expose the same shape.** `GeneratorDefinition.produces`/`baseOutput` reads as a
+> tick-triggered production config scaled by owned count; the generator JSON is unchanged. Generators
+> are the only idle-eligible holder (§9): slice 9 reads generator production per second only, so
+> module-held configs never idle-pay by construction — do not add an idle flag to the config.
+>
+> **4. `ProductionSystem` replaces `EngagementEarnSystem` and `TapSystem`.** On tick, fire the
+> tick-triggered module-held configs whose gates hold; on Jam, fire the tap-triggered ones. It keeps
+> what the UI reads today: the composed tap value and its change event, and the per-second/per-tap
+> rate displays. The modifier vocabulary is unchanged: the Jam cash config composes the existing
+> `TapValue` target (stage_presence and event-tier buffs land exactly as before); the rehearsal
+> configs compose nothing new.
+>
+> **5. Retrofit.** GameManager wires `ProductionSystem` in place of the two it replaces, and `Jam()`
+> becomes "fire the tap trigger" instead of `Currencies.Add(CashCurrencyId, ...)`. Bars are untouched
+> (they drain a currency by id, whoever produced it), and the fan system is untouched — its rate is a
+> formula over band size, not a flat amount, so it is NOT a production config (§12 rule 13). Extend
+> the boot validation pass (config currency ids resolve, gates validate, amounts non-negative) and
+> update the editor tests.
+>
+> Goal: slices 1–5 play exactly as before, but what a tap or a tick yields is authored on the
+> producer — the Jam module and generators — and a currency definition is pure state. Stop here.
+
+✅ **Test & commit:** Chapter 1 plays identically end-to-end (tap pays 1 Cash; the `covers` flag
+starts Rehearsal at 1/sec + 2/tap; stage_presence and tap buffs still apply); the importer refuses a
+currency `earn` block; the test suite is green.
+
+---
+
 ## 5.5 — CONSOLIDATION: the economy context (permanent pool, context factory, focus lifecycle)
 
 This slice adds no new gameplay. It establishes the economy-context boundary from the design's
@@ -291,13 +345,15 @@ still play identically.
 >
 > **2. The chapter's currency roster is authored.** Extend the chapter JSON and importer so a chapter
 > declares its full local currency list — `cash` and `fans` join `rehearsal` in the `currencies`
-> array, with the earn config staying optional per entry — and `ChapterDefinition.CurrencyIds` carries
+> array, as the bare `{id, group}` entries 5.4 left them (production lives on producers, never on a
+> currency entry) — and `ChapterDefinition.CurrencyIds` carries
 > the roster. A context builds its pool from that roster, never from `Database.Currencies.All`.
 > Validate at construction: every roster id resolves, no roster id belongs to a global group, and no
 > id exists in both the pool and the permanent pool — shadowing is an error, never a fall-through.
 >
 > **3. `EconomyContext` + factory/recipe.** Bundle the per-economy systems — currency pool,
-> generators, upgrades, bars, fans, tap, engagement earn, flags, modifiers, condition context — into
+> generators, upgrades, bars, fans, production (5.4's tap + trickle system), flags, modifiers,
+> condition context — into
 > an `EconomyContext` built by a factory from (chapter definition, ContentDatabase, permanent pool,
 > recipe). The recipe declares which global derivations register (§12 rule 12): the frontier recipe
 > registers the Records income modifiers (reading the permanent pool through the chapter's
