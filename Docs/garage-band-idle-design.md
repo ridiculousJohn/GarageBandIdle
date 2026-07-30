@@ -23,6 +23,41 @@ a bigger venue with a new mechanic. All numbers below are starting values for tu
 >   tree, and the starter prompt names the registry beside the Condition and flag rules.
 > Edited passages are marked inline with **[rev]**, as above.
 
+> **Revision note (economy-context pass).** Changes in this revision, all following the decision to
+> run every simultaneous economy (the frontier chapter, an event sandbox, a replay economy) as an
+> instance of one machinery rather than as filtered views of a single economy:
+> - **§2** — open decision flagged: whether frontier run currencies carry across a capstone
+>   advancement or each chapter's are distinct ids; settle before Chapter 2 content.
+> - **§3** — currency *definitions* stay global; *balances* live in per-context pools, and a
+>   currency's **group** declares its pool (placement joins reset behavior as group data).
+> - **§6.1** — the event baseline restated as a freshly constructed context, not a filtered view.
+> - **§8.1** — replay isolation restated as construction (own context, own currency ids, no
+>   chapter-permanent inheritance), not exemption.
+> - **§12** — rule 6 sharpened (saves store facts, never grants); rule 7 (a replay economy is its own
+>   pool and context instance); rule 11 extended (an effect's durability is its source fact's
+>   durability); rule 12 added (the economy context and its per-context projection recipes);
+>   `CurrencyManager` and the file tree updated to match.
+> Edited passages are marked inline with **[rev]**, as above.
+
+> **Revision note (idle-accrual pass).** Changes in this revision, all following the decision that
+> there is no app-level "offline" — idle earnings are per-economy, based on how long that specific
+> economy has been unfocused:
+> - **§6.1** — timed events disable idle payouts while running; the timer pauses while the event is
+>   unfocused *(provisional — pause behavior to be verified against Ctrl C)*.
+> - **§9** — offline earnings restated as per-economy idle accrual on focus-gain (generator
+>   production only; fans/rehearsal/bars pause while unfocused); the "Double it" ad grants a timed
+>   double-idle buff (an expiry fact, the same shape as Encore) rather than doubling one collect.
+> - **§12** — rule 7 gains the per-economy last-interaction timestamp; rule 12 gains the context
+>   lifecycle (constructed → focused ⇄ unfocused → discarded, exactly one focused).
+> - **File tree / appendix** — `OfflineEarnings.cs` renamed `IdleEarnings.cs`; summary lines updated.
+> Edited passages are marked inline with **[rev]**, as above.
+
+> **Revision note (per-chapter frontier pass).** The §2 open decision is settled: run currencies are
+> per-chapter ids and advancement opens the next chapter's economy fresh; the capstone implicitly
+> cuts an album so no run value is stranded at the boundary. Edits: **§1** (the capstone banks Fans
+> as Records before advancing), **§2** (decision settled), **§6** (capstone bullet), **§12** rule 12
+> (the unique-id policy now names each chapter's run currencies). Marked **[rev]** inline, as above.
+
 ---
 
 ## 1. Core loop
@@ -34,10 +69,12 @@ bandmates, grows Fans, and then releases an album. Releasing an album resets the
 Fans, and the working Catalog — and awards **Records**. Each Record permanently increases global
 income, so the next run is faster. The player repeats this loop several times within a chapter.
 
-**The chapter loop (outer).** Cumulative Records unlock the current chapter's capstone gig. Playing the
-capstone advances the player to the next chapter and does not reset chapter progress — the climb is
-forward only. After advancing, releasing an album resets the run back to the start of the *current*
-chapter, not the garage.
+**The chapter loop (outer).** Cumulative Records unlock the current chapter's capstone gig.
+**[rev]** Playing the capstone **implicitly cuts an album** — the run's Fans bank as Records as part
+of the show — and then advances the player to the next chapter, whose economy opens fresh (run
+currencies are per-chapter, §2/§3). Chapter progress — Records, flags, unlocks — is never reset: the
+climb is forward only. After advancing, releasing an album resets the run back to the start of the
+*current* chapter, not the garage.
 
 Records are the link between the loops: they raise income and gate chapter advancement. Chapter
 advancement therefore depends on releasing albums over time, not on a single large Cash total.
@@ -76,6 +113,14 @@ mechanic, and a higher Records gate.
 chapter-specific currency); generators; an upgrade tree (§4); a set of opt-in events (§6); and a
 capstone gig gated by Records.
 
+**[rev] Settled:** each chapter's run currencies are distinct ids, and advancement starts the new
+chapter's economy fresh (the Ctrl-C-compatible reading). To keep un-released value from being
+stranded — and to remove the release-before-capstone ritual stranding would create — the capstone
+implicitly cuts an album (§1, §6): the run's Fans convert to Records as part of the show, then the
+next chapter opens fresh. Every frontier context is therefore just the current chapter's context,
+with the same lifecycle as an event sandbox or replay economy (§12 rule 12), and §6's promise that a
+chapter's Cash stays in the thousands–millions range is structural rather than tuned.
+
 **Progressive reveal.** A chapter does not present all its mechanics at once. Content-unlock upgrades
 (§4) introduce new generators, currencies, and mechanics as the player buys them, so the chapter opens
 up in stages. Each such upgrade should introduce a change in play — a new mechanic, sub-loop, or
@@ -90,6 +135,14 @@ Once a chapter is cleared it remains available as a replay economy (§8.1).
 
 Currencies are either **run-scoped** (reset on album release) or **permanent** (persist across
 albums).
+
+**[rev]** A currency *definition* is global — one registry of everything assignable — but *balances*
+live in per-context pools (§12 rule 12): one permanent pool created at startup, plus one pool per
+economy context (the frontier chapter, an event sandbox, a replay economy). Which pool holds a
+currency's balance is declared by its **group**, so placement is group data beside
+`resetsOnAlbumRelease`; a run-scoped global currency is incoherent and fails validation. An album
+release resets balances *within* the living chapter pool — instance death and run reset are
+different events.
 
 **Run-scoped:**
 - **Cash** — earned by tapping and generators; spent on gear and upgrades.
@@ -195,6 +248,8 @@ Moment-to-moment play draws on the systems defined elsewhere:
   band size and time only — never Cash or income. Fan rate is tuned loosely relative to Cash so that
   income alone does not determine the album payout.
 - **Capstone gig** — unlocks at the Records gate; grants a Roadie and fires a story beat (§10).
+  **[rev]** Playing it implicitly cuts an album (§5) — the run's Fans bank as Records — before
+  advancing, so no run value is stranded at the chapter boundary.
 
 ### 6.1 Events
 
@@ -209,13 +264,19 @@ beneficial to chapter pace that a reasonable player will do it, and skipping it 
 grind. The chapter is always completable without any given event, but only quickly with the events its
 tuning intends the player to do. Chapter pacing is set with each event's intended engagement in mind.
 
-- **On start,** the chapter's economy resets to a baseline for the duration of the event, so the
-  challenge runs at a fixed scale independent of the player's accumulated power. This is what lets a
+- **On start,** the event constructs a fresh economy context at a fixed baseline (§12 rule 12): its
+  recipe projects the chapter's permanent-in-chapter facts only — earlier tiers' rewards apply, but
+  no run facts carry in and no global derivation (Records) is registered — so the challenge runs at
+  a fixed scale independent of the player's accumulated power, and the suspended run is never
+  touched. Quitting or failing discards the context; there is nothing to unwind. This is what lets a
   debuff be meaningful — the player is working from a known floor rather than an arbitrary fortune.
+  **[rev]**
 - **Goal:** reach a target amount of a currency.
 - **Debuff (optional):** the run is modified — generation halved, automation disabled, tap-only, a
   currency locked. Debuffs change how the loop is played, which is where an event's variety comes from.
 - **Timer (optional):** adds a time limit. Timed events are the only events that can be failed.
+  **[rev]** While a timed event is running, idle payouts (§9) are disabled; the timer pauses while
+  the event is unfocused *(provisional — verify the pause against Ctrl C)*.
 - **Failure:** a failed timed event resets that event's progress; the player can quit an event at any
   time. Failing or quitting costs only the time spent, not permanent progress, so entering an event is
   always low-risk.
@@ -273,6 +334,11 @@ generators, and completion goal. This replay economy is isolated: the player's g
 progress do not apply inside it, so it runs at its own scale regardless of how far the player has
 advanced overall. The isolation is what keeps an early chapter worth replaying late — it cannot be
 cleared instantly by the player's accumulated power, because that power does not reach inside it.
+**[rev]** Isolation is achieved by construction, not exemption (§12 rule 12): a replay economy is
+its own context with its own currency ids, projecting only the facts its recipe names — Roadie
+allocation and its own replay-local facts. It does not inherit the chapter's permanent-in-chapter
+facts (event-tier buffs earned at the frontier do not apply inside a replay); after the capstone,
+those facts are archival.
 
 Replaying a chapter means building its local economy up to the current goal and clearing it, which
 awards a Roadie. Each clear raises that chapter's next goal:
@@ -311,16 +377,29 @@ larger venues reward more crew. Values to be set during tuning.
 All ads are opt-in and return a concrete reward; there are no forced interstitials. Everything
 purchasable is also earnable in-game.
 
-**Offline earnings.** `offline = productionPerSecond × min(secondsAway, cap) × rate`, with **rate =
-50%** and **cap = 4 hours** (raisable via the Backstage Pass). The base rate is set at 50% so that the
-doubled value is a full 100%, i.e. the ad or the Pass grants full offline earnings rather than a bonus
-on top. Offline income is themed as streaming/radio royalties and is largest at the Radio chapter.
+**Idle earnings (per economy). [rev]** There is no app-level "offline": each economy context (§12
+rule 12) tracks when it was last interacted with, and an unfocused economy accrues nothing live —
+instead it pays `generatorProduction × min(idleSeconds, cap) × rate` at the moment it gains focus,
+with **rate = 50%**, **cap = 4 hours** per economy (raisable via the Backstage Pass), and no payout
+below a minimum idle threshold (a too-quick refocus earns nothing). Closing the app is just the
+state where every economy is unfocused; launching is an ordinary focus-gain on the chapter you
+return to — so in-game chapter switching (Ch. 2+) and time away are one mechanic, not two.
+**Generator production only:** fans, rehearsal, and bar progress pause while unfocused — engagement
+currencies never earn while the player is not engaging, and idle fan accrual would let time away
+shortcut the Records payout (§11). The base rate is set at 50% so that the doubled value is a full
+100%. Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
-| Player | Offline payout | How |
+**[rev]** Doubling is a **timed buff**, not a per-collect choice: the "Double it" ad grants a fact
+with an expiry — every idle payout collected while it is active is doubled — rather than doubling
+one collect screen (doubling on every switch, as Ctrl C allows, over-serves frequent switchers).
+Structurally it is the same shape as Encore: a timed multiplier fact that modifiers derive from
+(§12 rule 11). The Backstage Pass is that fact permanently on.
+
+| Player | Idle payout | How |
 |---|---|---|
-| Free, no action | 50% | Auto-collected |
-| Free, watches ad | 100% (2×) | "Double it" ad on the collect screen |
-| Backstage Pass owner | 100% (2×) | Automatic, no ad |
+| Free, no action | 50% | Auto-collected on focus-gain |
+| Free, watches ad | 100% (2×) while the buff lasts | "Double it" ad grants a timed double-idle buff |
+| Backstage Pass owner | 100% (2×) always | The double-idle fact is permanently on |
 
 **Encore (active boost).** The player activates a 2× income boost for a set duration. Rewarded ads
 extend the duration (~+2h per ad) up to a cap (~8h). Sustained use escalates it to 4× ("Overdrive" /
@@ -392,7 +471,8 @@ Assets/Scripts/
     GameManager.cs        // bootstrap, save/load + tick orchestration
     TickSystem.cs         // fixed-interval update on real (DateTime) time
     BigNumber.cs          // wraps break_infinity.cs
-    CurrencyManager.cs    // run block (Cash/Fans/Rehearsal/gear/catalog) + permanent block (Records/Roadies)   // [rev]
+    CurrencyManager.cs    // [rev] one class, one instance per pool: a startup pool (Records/Roadies) + one per economy context (run currencies)
+    EconomyContext.cs     // [rev] rule 12: the per-economy bundle (currency pool + systems + modifiers + flags), built from a projection recipe
     ContentDatabase.cs    // [rev] Addressables discovery of all definition SOs by label; id→def registries
     Condition.cs / ConditionEvaluator.cs   // [rev] one gate/unlock/visibility/availability type + one evaluator
     FlagManager.cs        // [rev] single reveal registry (permanent-in-chapter flags)
@@ -417,7 +497,7 @@ Assets/Scripts/
     SongDefinition.cs / Song.cs         // Catalog (run) + Discography (permanent)
   Save/
     SaveData.cs / SaveSystem.cs         // JSON + checksum
-    OfflineEarnings.cs    // DateTime delta on load, 50% base
+    IdleEarnings.cs       // [rev] per-economy idle accrual on focus-gain (time since that economy's last interaction), 50% base
   Monetization/
     AdManager.cs          // rewarded only (Encore top-up + offline Double it)
     IAPManager.cs         // Backstage Pass (non-consumable) + Roadie bundles (consumable) + Tip Jar
@@ -436,11 +516,15 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 4. Checksum saves and validate on load; cap offline earnings in the client.
 5. Keep content in ScriptableObjects, discovered via Addressables (rule 10); the regular per-chapter
    gear curve can be generated by an editor script. **[rev]**
-6. Separate the run block and permanent block in the save schema. An album release clears the run block
-   and writes the permanent block.
-7. Store each cleared chapter's replay economy as its own state block (local currency, generators, goal
-   `k`), separate from frontier state. The only cross-writes are Roadie allocation in and Roadie award
-   out.
+6. **[rev]** Separate the run block and permanent block in the save schema. An album release clears
+   the run block and writes the permanent block. Saves store **facts** (balances, purchase latches,
+   completed bars, cleared tiers, clear counts) and never modifier grants; derived modifiers are
+   never serialized. On load, each economy context re-projects its modifiers from the restored facts
+   at construction (rule 12), so an effect can never disagree with the fact that produced it.
+7. **[rev]** Store each cleared chapter's replay economy as its own state block (local currency,
+   generators, goal `k`, last-interaction timestamp), separate from frontier state — in code, its own
+   currency pool and context instance (rule 12), not scope tags inside shared managers. The only
+   cross-writes are Roadie allocation in and Roadie award out.
 8. **[rev]** Express every gate/unlock/visibility/availability rule as a single `Condition` type
    evaluated by one `ConditionEvaluator` — no per-currency or per-rule branches. Condition types:
    `currency`, `currencyEarnedTotal`, `ownedCount`, `flagSet`, `barsCompleted`, `recordsCumulative`,
@@ -464,6 +548,36 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     that is what makes a run reset exact, and it makes the reset a single call instead of a per-system
     enumeration that silently misses whichever system was added last. A modifier reaches only the target
     it names, which is what keeps an income buff off a fans or merch producer.
+    **[rev]** The scope a grant carries is a working copy of its originating fact's declared scope (the
+    upgrade or reward definition), which is the single authoritative lifetime: **an effect's durability
+    is exactly the durability of the fact it projects from.** Anything that must survive a reset
+    boundary is therefore derived from a fact that owns that lifetime (the Records total, the Roadie
+    allocation, an entitlement, a clear count) — there is no global grant store and no grant ever
+    migrates across a chapter boundary. Wanting a granted global effect is the smell that its
+    underlying fact has not been named yet.
+12. **[rev]** Bundle the per-economy systems (currency pool, generators, upgrades, bars, fans, tap,
+    engagement earn, modifiers, flags, condition context) into one **economy context**, constructed
+    from a recipe and instantiated per economy: one startup pool holds the global currencies, and each
+    frontier chapter, event sandbox, and replay economy is its own context. A context's recipe declares
+    which fact classes it projects into modifiers at construction:
+
+    | Context | Projects |
+    |---|---|
+    | Frontier chapter | global facts + its chapter-permanent facts + run facts |
+    | Event sandbox | chapter-permanent facts only |
+    | Replay economy | Roadie allocation + replay-local facts |
+
+    Currency ids are unique wherever two balances are genuinely different things — **[rev]** each
+    chapter's run currencies (settled in §2) and a replay economy's local currency — so an id names
+    one balance and resolution is a construction-time ownership check, never a runtime fall-through. Orchestration (album release, event entry, capstone)
+    is written against the context, not against a global manager, so a second economy is an
+    instantiation rather than a rewrite.
+    **[rev]** A context has a lifecycle — constructed → focused ⇄ unfocused → discarded — with exactly
+    one focused context at a time. Only the focused context is ticked; unfocused economies accrue
+    nothing live and are paid idle earnings on focus-gain (§9), which is what makes double-counting
+    impossible by construction. Each context's last-interaction timestamp lives in its state block
+    (rule 7). The suspended run during an event is simply unfocused, and an app launch is an ordinary
+    focus-gain.
 
 **Starter prompt for a code assistant:**
 > "In Unity (version X, iOS/Android), scaffold a nested-prestige idle core: a CurrencyManager with a run
@@ -499,8 +613,11 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 - **Data model [rev]:** gates/unlocks are a single `Condition` type (one evaluator); all progressive
   reveal runs through one flag registry (`setFlag` → `flagSet`); learn-songs bars are generic fillables
   driven by a `fillCurrency` (Rehearsal in Ch. 1); every content ScriptableObject is discovered via
-  Addressables.
-- **Monetization:** opt-in ads only (no forced interstitials); offline 50% with an optional 2×;
+  Addressables; currency definitions are global while balances live in per-context pools (the group
+  declares placement); saves store facts, never grants, and each economy context re-projects its
+  modifiers from those facts at construction.
+- **Monetization:** opt-in ads only (no forced interstitials); idle earnings are per-economy (50% of
+  generator production, paid on focus-gain) with a timed 2× double-idle buff from the "Double it" ad;
   Encore 2× / Overdrive 4×; Backstage Pass (lifetime); Buy Roadies (repeatable); Tip Jar; no
   subscriptions.
 - **Engine:** Unity.

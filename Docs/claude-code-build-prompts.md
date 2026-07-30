@@ -283,6 +283,10 @@ taps/time; fan rate jumps on completion via RewardManager; `barsCompleted` repor
 >   fan rate, tap value, generator output and global income all clear in one operation and a system
 >   added later cannot be forgotten. What the release still walks per-system is *state*: currency
 >   balances, owned counts, bar progress, and the buff-upgrade purchase latches.
+> - Write the release as an operation on the bundled economy context (design §12 rule 12), not as
+>   GameManager code reaching at its own properties: the Records award writes the permanent pool, the
+>   resets walk the chapter context's systems, and the same orchestration must later run unchanged
+>   against other context instances (the event sandbox, replay economies).
 > - Award Records = `floor((fansThisRun / 5) ^ 0.5)`. Each Record adds +2% to the permanent global
 >   income multiplier (`1 + 0.02 × records`).
 >
@@ -301,15 +305,18 @@ faster; Records formula matches the examples in the JSON.
 > - `RecordsManager` tracks cumulative Records and exposes the permanent income multiplier.
 > - The capstone `unlock` is a `recordsCumulative ≥ 30` Condition (same evaluator, same type the event
 >   availability uses). When it holds, unlock "Play the Backyard Party."
-> - On capstone completion: grant 1 Roadie to a permanent pool but keep the Roadie allocation/replay
->   UI LOCKED (`roadieSystemUIUnlocked: false` — deferred to Chapter 2); fire the `storyBeatCapstone`
->   text; set an "advance to Chapter 2" flag (Chapter 2 content doesn't exist yet — just mark it).
+> - On capstone completion: first perform the standard album release (slice 6's path — the run's
+>   Fans bank as Records; design §1–§2: the capstone implicitly cuts an album, so no run value is
+>   stranded at the chapter boundary); then grant 1 Roadie to a permanent pool but keep the Roadie
+>   allocation/replay UI LOCKED (`roadieSystemUIUnlocked: false` — deferred to Chapter 2); fire the
+>   `storyBeatCapstone` text; set an "advance to Chapter 2" flag (Chapter 2 content doesn't exist
+>   yet — just mark it).
 >
 > Goal: reaching 30 cumulative Records unlocks the capstone; playing it shows the story beat, banks
 > the first Roadie (no allocation UI), and flags chapter advancement. Stop here.
 
-✅ **Test & commit:** capstone unlocks at 30 Records via `recordsCumulative`; story beat fires; Roadie
-banked; advance flag set.
+✅ **Test & commit:** capstone unlocks at 30 Records via `recordsCumulative`; the implicit release
+banks Fans as Records; story beat fires; Roadie banked; advance flag set.
 
 ---
 
@@ -317,15 +324,15 @@ banked; advance flag set.
 
 > Implement the event system per §6.1 and the `events` array (garage_jam).
 >
-> - `EventManager` runs a self-contained challenge on a sandboxed economy snapshot: on entry, reset
->   the chapter economy to a fixed baseline for the event's duration (independent of the player's
->   Records). **The baseline is a filtered view of the modifier registry, not a reset.** The Records
->   buff is a *derived* modifier (§12 rule 11) and carries no scope, so `ResetRunScoped()` deliberately
->   leaves it in place — calling it here would run the challenge with the player's Records bonus still
->   applied, which looks like it works and quietly voids the fixed baseline. Have the event read the
->   registry through a lens that excludes derived contributors for its duration and mutates nothing:
->   the player's Records balance must survive the event untouched, so the source cannot be the lever.
->   Nothing to unwind then makes failure and quit free.
+> - `EventManager` runs a self-contained challenge in a **freshly constructed economy context**
+>   (design §12 rule 12), never in the player's run: on entry, build an event context whose recipe
+>   projects the chapter's permanent-in-chapter facts only — earlier tiers' rewards apply, no run
+>   facts carry in, and the Records buff (a *derived* modifier, §12 rule 11) is never registered
+>   because the recipe names no global facts. That absence IS the fixed baseline: nothing is filtered,
+>   nothing is reset, and the suspended run — balances, lifetime-earned totals, modifiers, the Records
+>   balance itself — is never touched. On quit, fail, or success the context is discarded; nothing to
+>   unwind makes failure and quit free, and the sandbox's earnings die with it instead of polluting
+>   the run's earned-total gates.
 > - Availability is a `recordsCumulative ≥ 1` Condition (available after the first demo). Each tier's
 >   `goal` is a `currency` Condition evaluated by the shared evaluator.
 > - garage_jam: debuff `automationDisabled` (generators paused, tap-only); timed and failable. Three
@@ -350,24 +357,31 @@ reward applies from the pool.
 >   saves. Model the run block and permanent block as separate sections in the schema. The run block
 >   holds Cash/Fans/Rehearsal balances, generator owned counts, buff-upgrade state, and bar progress;
 >   the permanent block holds Records, `contentUnlock` effects, **flags**, Roadies, and the
->   permanent-in-chapter granted modifiers (§12 rule 11) — the cleared event tiers' tap buffs are the
->   Ch1 case. An album release clears the run block and writes the permanent block.
-> - **Derived modifiers are never serialized.** They compute from a source on every read, so the
+>   permanent-in-chapter **facts** (the cleared event tiers are the Ch1 case; their tap buffs
+>   re-project on load). An album release clears the run block and writes the permanent block.
+> - **No modifier is ever serialized.** Derived modifiers compute from a source on every read, so the
 >   Records buff comes back from the restored Records balance with nothing to save or migrate; writing
->   one would create a second answer that can disagree with its source. Granted modifiers are the only
->   ones with state, and there is a choice to make: serialize them as a list, or save only the facts
->   that produced them (which buffs are bought, which bars completed, which tiers cleared) and re-grant
->   on load. Prefer the second if the save already records those facts — one source of truth beats two
->   that can drift — but decide it explicitly rather than by accident.
-> - `OfflineEarnings`: on load, compute `productionPerSecond × min(secondsAway, cap) × rate` using
->   `DateTime` deltas, rate = 0.5, cap = 4 hours. Show a collect screen with the amount and a
->   placeholder "Double it" button (wire the actual ad later).
+>   one would create a second answer that can disagree with its source. Grants are the same decision,
+>   already made (design §12 rules 11–12): the save records only the facts that produced them — which
+>   buffs are bought, which bars completed, which tiers cleared — and each economy context re-projects
+>   its grants from those facts at construction. One source of truth: an effect can never disagree
+>   with the fact that produced it.
+> - `IdleEarnings` (design §9, per-economy): each economy context stores a last-interaction
+>   timestamp in its state block. On focus-gain — an app launch is just a focus-gain on the one Ch1
+>   context — pay `generatorProductionPerSecond × min(idleSeconds, cap) × rate` using `DateTime`
+>   deltas, rate = 0.5, cap = 4 hours, and nothing below a minimum idle threshold. Generator
+>   production only: fans, rehearsal, and bars pause while unfocused. Show a collect screen with the
+>   amount and a placeholder "Double it" button — a timed double-idle buff (an expiry fact modifiers
+>   derive from, §12 rule 11), not a per-collect double; wire the actual ad later. With one chapter
+>   this behaves exactly like classic offline earnings, but written against the context, chapter
+>   switching (Ch2+) needs nothing new.
 >
 > Goal: closing and reopening restores state (including flags and bar progress); time away grants
-> offline Cash at 50% capped at 4h; a tampered save is rejected. Stop here.
+> idle Cash at 50% capped at 4h, and a below-threshold absence pays nothing; a tampered save is
+> rejected. Stop here.
 
-✅ **Test & commit:** state persists across restart; flags/bars restore; offline payout correct and
-capped; checksum rejects edits.
+✅ **Test & commit:** state persists across restart; flags/bars restore; idle payout correct, capped,
+and zero below the threshold; checksum rejects edits.
 
 ---
 
