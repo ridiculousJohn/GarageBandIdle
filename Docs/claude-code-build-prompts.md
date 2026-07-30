@@ -16,7 +16,9 @@ that establishes the cross-cutting foundations — a single `Condition` type + e
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
 foundations that touch code already written, so they are introduced explicitly here rather than
-pretended to be forward-only. Slices 4–10 assume 3.5 is in place and build on it.
+pretended to be forward-only. Slices 4–10 assume 3.5 is in place and build on it. Slice **5.5** is
+the second such pass: it establishes the economy-context boundary from the design's multi-economy
+revision (§12 rule 12) and retrofits slices 1–5 onto it; slices 6–9 assume it.
 
 ---
 
@@ -264,6 +266,66 @@ taps/time; fan rate jumps on completion via RewardManager; `barsCompleted` repor
 > gates on Fans via the same evaluator as the Cash buffs. Stop here.
 
 ✅ **Test & commit:** each buff applies; `tight_set` gates on Fans; effects stack correctly.
+
+---
+
+## 5.5 — CONSOLIDATION: the economy context (permanent pool, context factory, focus lifecycle)
+
+This slice adds no new gameplay. It establishes the economy-context boundary from the design's
+multi-economy revision passes and **retrofits slices 1–5 onto it**, so that slice 6's release is an
+operation on a context, slice 8's event sandbox is a second instantiation of the same machinery, and
+Chapter 2+ replay economies need no new architecture. Do it as one slice, then confirm slices 1–5
+still play identically.
+
+> Read `/docs/garage-band-idle-design.md` — §3, §9, and §12 rules 6, 7, 11, 12 (the economy-context,
+> idle-accrual, and per-chapter frontier revision passes). This is a refactor/foundation pass; **do
+> not change observable gameplay.** Build these five foundations and retrofit slices 1–5 onto them:
+>
+> **1. Group-declared placement + the permanent pool.** `CurrencyManager` stays ONE class with no
+> scope concept inside it; lifetime comes from who creates an instance. Add a placement flag to
+> `CurrencyGroupDefinition` (global vs chapter) beside `resetsOnAlbumRelease`. At boot, build a
+> startup instance holding every currency whose group is global — Records today, Roadies later —
+> created once, never reset by any run operation, and destined to be the permanent save block
+> (slice 9). A group that is both run-scoped and global is incoherent ("resets on whose release?"):
+> the importer refuses it and boot validation reports it on existing assets.
+>
+> **2. The chapter's currency roster is authored.** Extend the chapter JSON and importer so a chapter
+> declares its full local currency list — `cash` and `fans` join `rehearsal` in the `currencies`
+> array, with the earn config staying optional per entry — and `ChapterDefinition.CurrencyIds` carries
+> the roster. A context builds its pool from that roster, never from `Database.Currencies.All`.
+> Validate at construction: every roster id resolves, no roster id belongs to a global group, and no
+> id exists in both the pool and the permanent pool — shadowing is an error, never a fall-through.
+>
+> **3. `EconomyContext` + factory/recipe.** Bundle the per-economy systems — currency pool,
+> generators, upgrades, bars, fans, tap, engagement earn, flags, modifiers, condition context — into
+> an `EconomyContext` built by a factory from (chapter definition, ContentDatabase, permanent pool,
+> recipe). The recipe declares which global derivations register (§12 rule 12): the frontier recipe
+> registers the Records income modifiers (reading the permanent pool through the chapter's
+> `recordBuff`); a later event recipe will not — that absence IS slice 8's fixed baseline, so the
+> factory takes the recipe now even though only the frontier recipe exists yet. Inside the context,
+> currency resolution is a construction-time ownership map over (pool + permanent pool): consumers
+> keep one lookup and one aggregated balance-changed subscription.
+>
+> **4. Focus lifecycle skeleton.** A context is constructed → focused ⇄ unfocused → discarded, with
+> exactly one focused context at a time; only the focused context receives the tick (GameManager
+> routes it). Record a last-interaction timestamp on focus loss — the value idle earnings (slice 9)
+> will read. No idle payout logic yet.
+>
+> **5. Retrofit.** Move the slice 1–5 runtime construction out of `GameManager.Awake` into the
+> factory. GameManager keeps the database, tick routing, focus switching, and the single frontier
+> context; the UI's `ChapterContext` points at the context rather than at GameManager's properties.
+> The hardcoded UI display ids (`CashCurrencyId` etc.) remain as declared slice-10 debt — leave them.
+>
+> Finally, extend the boot **validation pass** to the new shape (roster and placement checks above)
+> and update the editor test fixtures to construct contexts through the factory.
+>
+> Goal: slices 1–5 play exactly as before, but the runtime is one permanent pool plus one frontier
+> `EconomyContext` built from a recipe — the shape every later slice instantiates instead of
+> rewrites. Stop here.
+
+✅ **Test & commit:** Chapter 1 plays identically end-to-end; boot validation catches a misplaced
+currency (a run-scoped global group, a roster id in a global group, a shadowed id); the test suite
+is green with context-based fixtures.
 
 ---
 
