@@ -11,7 +11,7 @@ Build order and why: each slice depends on the ones before it (offline earnings 
 tick; prestige needs the currency block split; the content-unlock upgrades are what reveal
 fans/covers/album). Building bottom-up keeps a break isolated to the slice you just added.
 
-**Progress marker:** slices 0–4 are already built. Slice **3.5** is a dedicated consolidation pass
+**Progress marker:** slices 0–5 are already built and tested. Slice **3.5** is a dedicated consolidation pass
 that establishes the cross-cutting foundations — a single `Condition` type + evaluator, one flag
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
@@ -242,7 +242,7 @@ taps/time; fan rate jumps on completion via RewardManager; `barsCompleted` repor
 
 ---
 
-## 5 — Buff upgrades (any-currency gating via Condition)
+## 5 — Buff upgrades (any-currency gating via Condition)  ✅ done
 
 > Implement the run-scoped buff upgrades per §4 and the `type: buff` entries in the `upgrades` array.
 > Gating and discovery already exist from 3.5 — this slice adds the buff payloads and run scope.
