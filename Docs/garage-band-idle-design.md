@@ -612,7 +612,11 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     production never idle-pays — by construction, not by flag; a producer whose output must idle-pay
     is a generator, full stop. The modifier vocabulary (rule 11) is unchanged by this: each holder
     composes exactly the targets it composes today (a generator's output; tap value is the Jam
-    module's Cash config), so the pass moves where base values live, not how they scale. Sources
+    module's Cash config), so the pass moves where base values live, not how they scale. Which
+    config takes a composition is itself a declaration on the config — the Jam Cash entry declares
+    `composes: tapValue`, an undeclared config pays its raw amount — never an inference from a
+    currency name or list position; `tapValue` is the only module-legal value today, and anything
+    else is refused at import and reported at boot. Sources
     with formula-driven rates stay their own systems — the fan rate is a function of band size (§6),
     not a flat amount — and rewards/grants are rule-11 facts, not production.
 

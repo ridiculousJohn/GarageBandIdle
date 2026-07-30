@@ -18,6 +18,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private const string ChapterPath = "Assets/ScriptableObjects/Chapters/ch01_garage.asset";
         private const string SectionsFolder = "Assets/ScriptableObjects/Sections";
         private const string CurrenciesFolder = "Assets/ScriptableObjects/Currencies";
+        private const string ProducersFolder = "Assets/ScriptableObjects/Producers";
         private const string GroupsFolder = "Assets/ScriptableObjects/CurrencyGroups";
         private const string GeneratorsFolder = "Assets/ScriptableObjects/Generators";
         private const string UpgradesFolder = "Assets/ScriptableObjects/Upgrades";
@@ -80,7 +81,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual("ch01_garage", chapter.Id);
             Assert.AreEqual(1, chapter.Index);
-            Assert.AreEqual(1.0, chapter.TapBaseValue, 1e-9);
             Assert.AreEqual(0.02, chapter.RecordBuff.PerRecord, 1e-9);
             CollectionAssert.AreEqual(new[] { "cash" }, chapter.RecordBuff.AffectsCurrencyIds,
                 "the Records buff declares exactly the currencies it affects");
@@ -186,20 +186,45 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.02, chapter.Fans.PerBandmateOwnedBonus, 1e-9);
         }
 
+        // production lives on the producer (design doc section 12, rule 13):
+        // the jam producer authors what a tap yields and Rehearsal's trickle,
+        // and the chapter lists the producer so production is chapter-owned
         [Test]
-        public void RehearsalTuning_MatchesJson()
+        public void JamProducer_MatchesJson()
         {
-            // the currency OWNS its earn config (design doc section 3), so the
-            // tuning lives on the currency asset; the chapter lists the
-            // currency so engagement earn is chapter-owned, not global
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
             CollectionAssert.AreEqual(new[] { "rehearsal" }, chapter.CurrencyIds);
-            var rehearsal = LoadById<CurrencyDefinition>(CurrenciesFolder, "rehearsal");
+            CollectionAssert.AreEqual(new[] { "jam" }, chapter.ProducerIds,
+                "the jam producer - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
 
-            Assert.AreEqual("covers", rehearsal.Earn.RevealFlagId,
-                "earn revealFlag - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
-            Assert.AreEqual(1.0, rehearsal.Earn.PerSec, 1e-9);
-            Assert.AreEqual(2.0, rehearsal.Earn.PerTap, 1e-9);
+            var jam = LoadById<ProducerDefinition>(ProducersFolder, "jam");
+            Assert.AreEqual("module/tap", jam.ModuleAddress);
+            Assert.AreEqual(3, jam.Production.Count);
+
+            var cash = jam.Production[0];
+            Assert.AreEqual("cash", cash.CurrencyId);
+            Assert.AreEqual(1.0, cash.Amount, 1e-9, "replaces the old constants.tapBaseValue");
+            Assert.AreEqual(ProductionTrigger.Tap, cash.Trigger);
+            Assert.AreEqual(ModifierTarget.TapValue, cash.Composes, "tap buffs land on the cash yield");
+            Assert.IsNull(cash.Gate, "cash per tap is ungated");
+
+            var rehearsalTap = jam.Production[1];
+            Assert.AreEqual("rehearsal", rehearsalTap.CurrencyId);
+            Assert.AreEqual(2.0, rehearsalTap.Amount, 1e-9);
+            Assert.AreEqual(ProductionTrigger.Tap, rehearsalTap.Trigger);
+            Assert.AreEqual(ModifierTarget.None, rehearsalTap.Composes, "tap buffs never inflate rehearsal");
+            var tapGate = rehearsalTap.Gate as FlagSetCondition;
+            Assert.IsNotNull(tapGate, "the rehearsal yield gates on an ordinary Condition");
+            Assert.AreEqual("covers", tapGate.FlagId);
+
+            var trickle = jam.Production[2];
+            Assert.AreEqual("rehearsal", trickle.CurrencyId);
+            Assert.AreEqual(1.0, trickle.Amount, 1e-9);
+            Assert.AreEqual(ProductionTrigger.Tick, trickle.Trigger,
+                "the passive trickle is module-held, never an innate generator (it must not idle-pay)");
+            var trickleGate = trickle.Gate as FlagSetCondition;
+            Assert.IsNotNull(trickleGate);
+            Assert.AreEqual("covers", trickleGate.FlagId);
         }
 
         [TestCase("practice_amp", false)]
@@ -325,12 +350,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsInstanceOf<PerBarContinuousFill>(group.FillBehavior);
             Assert.AreEqual(ContentScope.Run, group.Scope);
 
-            // the fill currency OWNS its earn config; bars reference it by id
+            // the fill currency is pure state (its accrual lives on the jam
+            // producer); bars reference it by id
             var rehearsal = LoadById<CurrencyDefinition>(CurrenciesFolder, "rehearsal");
             Assert.AreEqual("run", rehearsal.GroupId);
-            Assert.AreEqual("covers", rehearsal.Earn.RevealFlagId);
-            Assert.AreEqual(1, rehearsal.Earn.PerSec, 1e-9);
-            Assert.AreEqual(2, rehearsal.Earn.PerTap, 1e-9);
             CollectionAssert.AreEqual(new[] { "cover_1", "cover_2", "cover_3" }, group.BarIds);
 
             foreach (var (barId, requirement, rewardId) in new[]

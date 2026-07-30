@@ -35,6 +35,9 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var currency in database.Currencies.All)
                 if (!visited.Currencies.Contains(currency.Id))
                     ValidateCurrency(currency, orphan);
+            foreach (var producer in database.Producers.All)
+                if (!visited.Producers.Contains(producer.Id))
+                    ValidateProducer(producer, orphan);
             foreach (var section in database.Sections.All)
                 if (!visited.Sections.Contains(section.Id))
                     ValidateSection(section, orphan);
@@ -110,8 +113,6 @@ namespace RidiculousGaming.GarageBandIdle
             // dead
             if (chapter.Fans.BaseFansPerSec < 0 || chapter.Fans.PerBandmateOwnedBonus < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has negative fan earn values.");
-            if (chapter.TapBaseValue < 0)
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative tapBaseValue ({chapter.TapBaseValue}) - every Jam would drain cash.");
             if (chapter.RecordBuff.PerRecord < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative recordBuff perRecord ({chapter.RecordBuff.PerRecord}).");
             // the primary pacing knob (design doc section 11): at zero the
@@ -122,16 +123,24 @@ namespace RidiculousGaming.GarageBandIdle
 
             ValidateFlagDeclarations(chapter);
             ValidateIds(chapter.CurrencyIds, database.Currencies, $"Chapter '{chapter.Id}' (currencies)");
-            // the chapter's declared currencies: their earn reveal flags are
-            // chapter-scoped like every other flag reference - flag ids may
-            // repeat across chapters, so the owning chapter's list is the
-            // only one that counts
             foreach (var id in chapter.CurrencyIds)
             {
                 if (!database.Currencies.TryGet(id, out var currency))
                     continue;
                 visited.Currencies.Add(id);
                 ValidateCurrency(currency, context);
+            }
+
+            // the chapter's producers: their gates are chapter-scoped like every
+            // other flag reference - flag ids may repeat across chapters, so the
+            // owning chapter's list is the only one that counts
+            ValidateIds(chapter.ProducerIds, database.Producers, $"Chapter '{chapter.Id}' (producers)");
+            foreach (var id in chapter.ProducerIds)
+            {
+                if (!database.Producers.TryGet(id, out var producer))
+                    continue;
+                visited.Producers.Add(id);
+                ValidateProducer(producer, context);
             }
 
             ValidateIds(chapter.SectionIds, database.Sections, $"Chapter '{chapter.Id}' (sections)");
@@ -225,27 +234,42 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // Every currency gets the checks that do not depend on an earn config; an
-        // earn-less currency (Cash, Fans, Records) previously got none at all.
         private static void ValidateCurrency(CurrencyDefinition currency, ConditionContext context)
         {
             // a negative starting value puts the currency in debt at boot and again
             // after every album release, which resets balances back to it
             if (currency.StartingValue < 0)
                 Debug.LogError($"ContentValidator: Currency '{currency.Id}' has a negative starting value ({currency.StartingValue}) - it would start in debt at boot and after every album release.");
+        }
 
-            // negative earn drains instead of earns, and earn values with no
-            // reveal flag can never activate (the importer refuses both; this
-            // catches stale assets)
-            if (!currency.Earn.Configured)
-                return;
+        // A producer IS its production configs (design doc section 12, rule 13):
+        // every field here is trusted per firing, so broken tuning must report
+        // at boot rather than degrade to wrong gameplay - runtime fails closed
+        // on all of it (skipped configs, zeroed compositions), which without
+        // these reports would just look mysteriously dead.
+        private static void ValidateProducer(ProducerDefinition producer, ConditionContext context)
+        {
+            ValidateModuleAddress(producer.ModuleAddress, $"Producer '{producer.Id}'");
 
-            if (currency.Earn.PerSec < 0 || currency.Earn.PerTap < 0)
-                Debug.LogError($"ContentValidator: Currency '{currency.Id}' has negative earn values.");
-            if (string.IsNullOrEmpty(currency.Earn.RevealFlagId))
-                Debug.LogError($"ContentValidator: Currency '{currency.Id}' has earn values but no reveal flag - the earn can never activate.");
-            else
-                ValidateFlag(currency.Earn.RevealFlagId, context, $"Currency '{currency.Id}' (earn revealFlag)");
+            if (producer.Production.Count == 0)
+                Debug.LogError($"ContentValidator: Producer '{producer.Id}' has no production configs - it would produce nothing.");
+
+            foreach (var config in producer.Production)
+            {
+                var source = $"Producer '{producer.Id}' (config for '{config.CurrencyId}')";
+                context.Currencies.ValidateReference(config.CurrencyId, source);
+                // production must never drain (runtime fails closed on it)
+                if (config.Amount < 0)
+                    Debug.LogError($"ContentValidator: {source} has a negative amount ({config.Amount}).");
+                if (config.Trigger == ProductionTrigger.None)
+                    Debug.LogError($"ContentValidator: {source} has trigger None (uninitialized) - it would never fire.");
+                // module-held configs compose TapValue or nothing; a config
+                // declaring any other kind would scale by a composition no
+                // module fires, so the runtime ignores it
+                if (config.Composes != ModifierTarget.None && config.Composes != ModifierTarget.TapValue)
+                    Debug.LogError($"ContentValidator: {source} declares composition '{config.Composes}', which no module-held config composes.");
+                ConditionEvaluator.Validate(config.Gate, context, $"{source} (gate)");
+            }
         }
 
         private static void ValidateSection(SectionDefinition section, ConditionContext context)
@@ -435,6 +459,7 @@ namespace RidiculousGaming.GarageBandIdle
         private class Visited
         {
             public readonly HashSet<string> Currencies = new();
+            public readonly HashSet<string> Producers = new();
             public readonly HashSet<string> Sections = new();
             public readonly HashSet<string> Generators = new();
             public readonly HashSet<string> Upgrades = new();

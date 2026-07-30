@@ -23,7 +23,6 @@ MonoBehaviour:
     one is \u2014 and a guy named Dave offers to haul your gear. You've got your
     first roadie."
   _capstoneRecordsGate: 30
-  _tapBaseValue: 1
   _recordBuff:
     _perRecord: 0.02
     _affectsCurrencyIds:
@@ -39,6 +38,8 @@ MonoBehaviour:
   - album
   _currencyIds:
   - rehearsal
+  _producerIds:
+  - jam
   _sectionIds:
   - garage_floor
   - the_band

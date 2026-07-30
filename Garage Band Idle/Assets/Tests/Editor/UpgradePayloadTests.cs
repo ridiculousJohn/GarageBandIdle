@@ -26,14 +26,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TapValueAdd_GrantsAnAddOnTapValue()
         {
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(1, modifiers);
+            var tap = TestContent.MakeTapProduction(1, modifiers);
 
             new TapValueAddPayload(1).Apply(Context(modifiers), ContentScope.Run);
 
-            Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "base 1 + 1");
+            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9, "base 1 + 1");
 
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 3);
-            Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "(1 + 1) x 3");
+            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "(1 + 1) x 3");
         }
 
         [Test]
@@ -102,14 +102,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void PayloadScope_DecidesWhatARunResetKeeps(ContentScope scope, double afterReset)
         {
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(1, modifiers);
+            var tap = TestContent.MakeTapProduction(1, modifiers);
 
             new TapValueAddPayload(1).Apply(Context(modifiers), scope);
-            Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9);
+            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9);
 
             modifiers.ResetRunScoped();
 
-            Assert.AreEqual(afterReset, tap.Value.ToDouble(), 1e-9);
+            Assert.AreEqual(afterReset, tap.TapValue.ToDouble(), 1e-9);
         }
 
         // UpgradeSystem hands the owning definition's scope to the payload. The
@@ -121,7 +121,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(1, modifiers);
+            var tap = TestContent.MakeTapProduction(1, modifiers, currencies, flags);
             var upgrades = new UpgradeSystem(new[]
             {
                 // no gate = met from the start, so it applies on the first pass
@@ -130,10 +130,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(5.0, tap.Value.ToDouble(), 1e-9, "base 1 + 4");
+            Assert.AreEqual(5.0, tap.TapValue.ToDouble(), 1e-9, "base 1 + 4");
 
             modifiers.ResetRunScoped();
-            Assert.AreEqual(5.0, tap.Value.ToDouble(), 1e-9,
+            Assert.AreEqual(5.0, tap.TapValue.ToDouble(), 1e-9,
                 "the definition's permanent-in-chapter scope reached the grant");
         }
 
@@ -146,7 +146,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(1, modifiers);
+            var tap = TestContent.MakeTapProduction(1, modifiers, currencies, flags);
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
@@ -165,13 +165,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             currencies.BalanceChanged += (id, _) =>
             {
                 if (id == "cash")
-                    tapDuringSpend = tap.Value.ToDouble();
+                    tapDuringSpend = tap.TapValue.ToDouble();
             };
             currencies.Add("cash", 1);
 
             Assert.IsTrue(upgrades.TryBuy(stagePresence, context), "gate met and affordable");
             Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "the declared currency is charged");
-            Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "base 1 + the granted add");
+            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9, "base 1 + the granted add");
             Assert.AreEqual(2.0, tapDuringSpend, 1e-9, "the buff was already granted when the spend fired");
 
             Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "an applied buff is never bought twice");

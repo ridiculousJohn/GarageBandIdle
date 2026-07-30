@@ -32,8 +32,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly Dictionary<ModifierTargetKey, List<DerivedModifier>> _derived = new();
 
         // fires after a target's composition changes. Systems that advertise a
-        // composed value re-broadcast it (TapSystem drives the Jam label this
-        // way, so the button can never show a stale amount).
+        // composed value re-broadcast it (ProductionSystem drives the Jam label
+        // this way, so the button can never show a stale amount).
         public event Action<ModifierTargetKey> Changed;
 
         public void Grant(ModifierTargetKey target, ModifierOperation operation, ContentScope scope, BigNumber value)

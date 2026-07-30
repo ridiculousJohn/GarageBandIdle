@@ -9,12 +9,13 @@ using Object = UnityEngine.Object;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
-    // The fillable-bar system and fill-currency engagement earn. The
-    // load-bearing claims: bars are independent per-bar progress (never
-    // cumulative thresholds on one counter), the continuous drain is clamped
-    // and player-directed, completion applies the pool reward exactly once,
-    // barsCompleted conditions read live counts, and each fill currency owns
-    // its earn config - accruing from tick + taps only after its own flag.
+    // The fillable-bar system and fill-currency production. The load-bearing
+    // claims: bars are independent per-bar progress (never cumulative
+    // thresholds on one counter), the continuous drain is clamped and
+    // player-directed, completion applies the pool reward exactly once,
+    // barsCompleted conditions read live counts, and fill-currency accrual is
+    // producer-held production configs (design doc section 12, rule 13) -
+    // firing from tick + taps only while each config's own gate holds.
     public class BarsAndRehearsalTests
     {
         [OneTimeTearDown]
@@ -87,57 +88,67 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void EngagementEarn_IsDormantUntilTheCurrencysFlag()
+        public void Production_IsDormantUntilTheConfigsGate()
         {
-            var rehearsal = TestContent.MakeCurrency("rehearsal", "run",
-                earnRevealFlag: "covers", earnPerSec: 1, earnPerTap: 2);
+            var rehearsal = TestContent.MakeCurrency("rehearsal", "run");
             var currencies = new CurrencyManager(new[] { TestContent.MakeGroup("run", true) }, new[] { rehearsal });
             var flags = new FlagSystem();
-            var earn = new EngagementEarnSystem(new[] { rehearsal }, currencies, flags);
+            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
+            {
+                new("rehearsal", 1, ProductionTrigger.Tick, new FlagSetCondition("covers"), ModifierTarget.None),
+                new("rehearsal", 2, ProductionTrigger.Tap, new FlagSetCondition("covers"), ModifierTarget.None),
+            });
+            var production = new ProductionSystem(new[] { producer }, currencies, new ModifierSystem(),
+                TestContent.MakeContext(currencies, flags: flags));
 
-            earn.Tick(10);
-            earn.OnJamTap();
-            Assert.AreEqual(0.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "no accrual before the flag");
-            Assert.AreEqual(0.0, earn.RatePerSecond("rehearsal").ToDouble(), 1e-9);
+            production.Tick(10);
+            production.FireTap();
+            Assert.AreEqual(0.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "no accrual before the gate");
+            Assert.AreEqual(0.0, production.RatePerSecond("rehearsal").ToDouble(), 1e-9);
 
             flags.Set("covers");
 
-            earn.Tick(10);
-            Assert.AreEqual(10.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "perSec x seconds");
-            earn.OnJamTap();
-            Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "+perTap on a Jam tap");
+            production.Tick(10);
+            Assert.AreEqual(10.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "per-sec amount x seconds");
+            production.FireTap();
+            Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "+per-tap amount on a Jam tap");
         }
 
-        // a chapter can hold several independently earned fill currencies -
-        // each currency OWNS its earn config (design doc section 3) and is
-        // gated by its own flag, and a currency with no earn config never
-        // accrues from engagement
+        // a chapter can hold several independently produced fill currencies -
+        // each config carries its own gate (an ordinary Condition, design doc
+        // section 12 rule 13), and a currency no config names never accrues
+        // from engagement
         [Test]
-        public void FillCurrencies_EarnIndependently_EachGatedByItsOwnFlag()
+        public void FillCurrencies_ProduceIndependently_EachGatedByItsOwnCondition()
         {
-            var rehearsal = TestContent.MakeCurrency("rehearsal", "run",
-                earnRevealFlag: "covers", earnPerSec: 1, earnPerTap: 2);
-            var stagecraft = TestContent.MakeCurrency("stagecraft", "run",
-                earnRevealFlag: "openmic", earnPerSec: 3);
+            var rehearsal = TestContent.MakeCurrency("rehearsal", "run");
+            var stagecraft = TestContent.MakeCurrency("stagecraft", "run");
             var cash = TestContent.MakeCurrency("cash", "run");
             var currencies = new CurrencyManager(new[] { TestContent.MakeGroup("run", true) },
                 new[] { rehearsal, stagecraft, cash });
             var flags = new FlagSystem();
-            var earn = new EngagementEarnSystem(new[] { rehearsal, stagecraft, cash }, currencies, flags);
+            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
+            {
+                new("rehearsal", 1, ProductionTrigger.Tick, new FlagSetCondition("covers"), ModifierTarget.None),
+                new("rehearsal", 2, ProductionTrigger.Tap, new FlagSetCondition("covers"), ModifierTarget.None),
+                new("stagecraft", 3, ProductionTrigger.Tick, new FlagSetCondition("openmic"), ModifierTarget.None),
+            });
+            var production = new ProductionSystem(new[] { producer }, currencies, new ModifierSystem(),
+                TestContent.MakeContext(currencies, flags: flags));
 
             flags.Set("covers");
-            earn.Tick(10);
-            earn.OnJamTap();
+            production.Tick(10);
+            production.FireTap();
 
-            Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the revealed currency earns tick + tap");
-            Assert.AreEqual(0.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "its own flag gates it, not another's");
-            Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "no earn config = no engagement earn");
-            Assert.IsFalse(earn.HasEarn("cash"));
+            Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the gated-open currency earns tick + tap");
+            Assert.AreEqual(0.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "its own gate governs it, not another's");
+            Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "no config = no engagement production");
+            Assert.IsFalse(production.HasProduction("cash"));
 
             flags.Set("openmic");
-            earn.Tick(10);
-            Assert.AreEqual(30.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "perSec x seconds once revealed");
-            Assert.AreEqual(22.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "both earn once both are revealed");
+            production.Tick(10);
+            Assert.AreEqual(30.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "amount x seconds once its gate holds");
+            Assert.AreEqual(22.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "both produce once both gates hold");
         }
 
         [Test]

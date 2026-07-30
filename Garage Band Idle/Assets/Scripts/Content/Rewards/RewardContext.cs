@@ -4,7 +4,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
 {
     // Everything a reward may touch when applied. Stat effects go through
     // Modifiers rather than through the system they affect, so a reward needs no
-    // reference to FanSystem or TapSystem to change a rate or a tap value.
+    // reference to FanSystem or ProductionSystem to change a rate or a tap value.
     // Grows as reward kinds need more of the game (roadie pool, catalog, ...).
     public class RewardContext
     {

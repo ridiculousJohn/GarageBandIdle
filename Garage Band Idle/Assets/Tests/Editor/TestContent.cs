@@ -37,8 +37,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
-        public static CurrencyDefinition MakeCurrency(string id, string groupId, double startingValue = 0,
-            string earnRevealFlag = null, double earnPerSec = 0, double earnPerTap = 0)
+        public static CurrencyDefinition MakeCurrency(string id, string groupId, double startingValue = 0)
         {
             var definition = Track(ScriptableObject.CreateInstance<CurrencyDefinition>());
             var serialized = new SerializedObject(definition);
@@ -46,11 +45,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             serialized.FindProperty("_displayName").stringValue = id;
             serialized.FindProperty("_groupId").stringValue = groupId;
             serialized.FindProperty("_startingValue").doubleValue = startingValue;
-            serialized.FindProperty("_earn._revealFlagId").stringValue = earnRevealFlag ?? "";
-            serialized.FindProperty("_earn._perSec").doubleValue = earnPerSec;
-            serialized.FindProperty("_earn._perTap").doubleValue = earnPerTap;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return definition;
+        }
+
+        public static ProducerDefinition MakeProducer(string id, List<ProductionConfig> production,
+            string moduleAddress = "module/tap")
+        {
+            var definition = Track(ScriptableObject.CreateInstance<ProducerDefinition>());
+            definition.EditorInitialize(id, moduleAddress, production);
+            return definition;
+        }
+
+        // a jam producer whose single tap config composes TapValue - the probe
+        // for the tap-value modifier stack (the shape TapSystem was)
+        public static ProductionSystem MakeTapProduction(double baseAmount, ModifierSystem modifiers,
+            CurrencyManager currencies = null, FlagSystem flags = null)
+        {
+            currencies ??= MakeEconomy();
+            var producer = MakeProducer("jam", new List<ProductionConfig>
+            {
+                new("cash", baseAmount, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+            });
+            return new ProductionSystem(new[] { producer }, currencies, modifiers,
+                MakeContext(currencies, flags: flags));
         }
 
         public static GeneratorDefinition MakeGenerator(string id, string produces,
@@ -111,16 +129,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             List<string> sectionIds = null, List<string> generatorIds = null,
             List<string> upgradeIds = null, List<string> barGroupIds = null,
             List<string> eventIds = null, List<string> currencyIds = null,
-            string fansRevealFlagId = "fans", double tapBaseValue = 1, double recordBuffPerRecord = 0.02,
+            List<string> producerIds = null,
+            string fansRevealFlagId = "fans", double recordBuffPerRecord = 0.02,
             int index = 1, int capstoneRecordsGate = 30, string fansCurrencyId = "fans")
         {
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
-            definition.EditorInitialize(id, index, id, "", "", "", capstoneRecordsGate, tapBaseValue,
+            definition.EditorInitialize(id, index, id, "", "", "", capstoneRecordsGate,
                 new RecordBuffConfig(recordBuffPerRecord, new List<string> { "cash" }),
                 new FansConfig(fansCurrencyId, fansRevealFlagId, 0.2, 0.02),
-                flagIds, currencyIds ?? new List<string>(), sectionIds ?? new List<string>(),
-                generatorIds ?? new List<string>(), upgradeIds ?? new List<string>(),
-                barGroupIds ?? new List<string>(), eventIds ?? new List<string>());
+                flagIds, currencyIds ?? new List<string>(), producerIds ?? new List<string>(),
+                sectionIds ?? new List<string>(), generatorIds ?? new List<string>(),
+                upgradeIds ?? new List<string>(), barGroupIds ?? new List<string>(),
+                eventIds ?? new List<string>());
             return definition;
         }
 

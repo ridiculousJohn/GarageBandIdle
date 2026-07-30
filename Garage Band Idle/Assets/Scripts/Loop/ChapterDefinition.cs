@@ -47,10 +47,6 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         private int _capstoneRecordsGate;
 
         [SerializeField]
-        [Tooltip("Cash granted per Jam tap before tap buffs.")]
-        private double _tapBaseValue;
-
-        [SerializeField]
         private RecordBuffConfig _recordBuff = new();
 
         [SerializeField]
@@ -63,8 +59,13 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 
         [SerializeField]
         [DefinitionId(typeof(CurrencyDefinition))]
-        [Tooltip("Currencies this chapter declares (fill currencies with earn configs). Engagement earn runs only for the CURRENT chapter's list - flag ids may repeat across chapters, so flags alone cannot scope it.")]
+        [Tooltip("Currencies this chapter declares (fill currencies like rehearsal). How they are earned lives on producers, never here.")]
         private List<string> _currencyIds = new();
+
+        [SerializeField]
+        [DefinitionId(typeof(ProducerDefinition))]
+        [Tooltip("Module-held production sources (the Jam button). Only the CURRENT chapter's producers fire.")]
+        private List<string> _producerIds = new();
 
         [SerializeField]
         [DefinitionId(typeof(SectionDefinition))]
@@ -95,11 +96,11 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         public string StoryBeatOpen => _storyBeatOpen;
         public string StoryBeatCapstone => _storyBeatCapstone;
         public int CapstoneRecordsGate => _capstoneRecordsGate;
-        public double TapBaseValue => _tapBaseValue;
         public RecordBuffConfig RecordBuff => _recordBuff;
         public FansConfig Fans => _fans;
         public IReadOnlyList<string> FlagIds => _flagIds;
         public IReadOnlyList<string> CurrencyIds => _currencyIds;
+        public IReadOnlyList<string> ProducerIds => _producerIds;
         public IReadOnlyList<string> SectionIds => _sectionIds;
         public IReadOnlyList<string> GeneratorIds => _generatorIds;
         public IReadOnlyList<string> UpgradeIds => _upgradeIds;
@@ -110,10 +111,10 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         // importer-only: chapter assets are generated from chapter JSON
         public void EditorInitialize(string id, int index, string displayName, string theme,
             string storyBeatOpen, string storyBeatCapstone, int capstoneRecordsGate,
-            double tapBaseValue, RecordBuffConfig recordBuff, FansConfig fans,
-            List<string> flagIds, List<string> currencyIds, List<string> sectionIds,
-            List<string> generatorIds, List<string> upgradeIds, List<string> barGroupIds,
-            List<string> eventIds)
+            RecordBuffConfig recordBuff, FansConfig fans,
+            List<string> flagIds, List<string> currencyIds, List<string> producerIds,
+            List<string> sectionIds, List<string> generatorIds, List<string> upgradeIds,
+            List<string> barGroupIds, List<string> eventIds)
         {
             _id = id;
             _index = index;
@@ -122,11 +123,11 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             _storyBeatOpen = storyBeatOpen;
             _storyBeatCapstone = storyBeatCapstone;
             _capstoneRecordsGate = capstoneRecordsGate;
-            _tapBaseValue = tapBaseValue;
             _recordBuff = recordBuff;
             _fans = fans;
             _flagIds = flagIds;
             _currencyIds = currencyIds;
+            _producerIds = producerIds;
             _sectionIds = sectionIds;
             _generatorIds = generatorIds;
             _upgradeIds = upgradeIds;

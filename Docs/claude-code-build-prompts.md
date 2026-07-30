@@ -11,7 +11,7 @@ Build order and why: each slice depends on the ones before it (offline earnings 
 tick; prestige needs the currency block split; the content-unlock upgrades are what reveal
 fans/covers/album). Building bottom-up keeps a break isolated to the slice you just added.
 
-**Progress marker:** slices 0–5 are already built and tested. Slice **3.5** is a dedicated consolidation pass
+**Progress marker:** slices 0–5 and **5.4** are already built and tested. Slice **3.5** is a dedicated consolidation pass
 that establishes the cross-cutting foundations — a single `Condition` type + evaluator, one flag
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
@@ -271,7 +271,7 @@ taps/time; fan rate jumps on completion via RewardManager; `barsCompleted` repor
 
 ---
 
-## 5.4 — CONSOLIDATION: production configs (sources own production; currencies are pure state)
+## 5.4 — CONSOLIDATION: production configs (sources own production; currencies are pure state)  ✅ done
 
 This slice adds no new gameplay. It moves "how a currency is earned" off `CurrencyDefinition` and
 onto the producers, per the design's production-config revision pass (§12 rule 13), and **retrofits
@@ -282,10 +282,13 @@ shape. Do it as one slice, then confirm slices 1–5 still play identically.
 > revision pass). This is a refactor/foundation pass; **do not change observable gameplay.** Build
 > these foundations and retrofit slices 1–5 onto them:
 >
-> **1. `ProductionConfig`.** `{currencyId, amount, trigger: tick | tap, gate: Condition}`. The gate
-> is an ordinary Condition evaluated by the shared evaluator (none = always on) — the bespoke
-> `revealFlag` string dies with the earn config. A negative amount is refused at import and reported
-> at boot, the same fail-closed rule the earn config had.
+> **1. `ProductionConfig`.** `{currencyId, amount, trigger: tick | tap, gate: Condition, composes}`.
+> The gate is an ordinary Condition evaluated by the shared evaluator (none = always on) — the
+> bespoke `revealFlag` string dies with the earn config. `composes` declares which rule-11 target
+> scales the config's output (`tapValue` on the Jam cash entry; absent = the raw amount) — a
+> declaration, never an inference from a currency name. A negative amount, an unknown trigger, or an
+> unknown composes is refused at import and reported at boot, the same fail-closed rule the earn
+> config had.
 >
 > **2. The Jam module owns the tap.** Extend the chapter JSON and importer: a `producers` array
 > authors the Jam producer — its module address (`module/tap`) plus its production list: cash

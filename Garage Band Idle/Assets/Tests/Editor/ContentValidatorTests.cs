@@ -61,40 +61,75 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
-        // a chapter-listed currency's earn flag validates against the OWNING
+        // a chapter-listed producer's config gate validates against the OWNING
         // chapter - another chapter declaring the same flag id must not make
         // it pass, because flag ids are chapter-local and may repeat
         [Test]
-        public void CurrencyEarnFlag_ValidatesAgainstTheOwningChapter()
+        public void ProducerGateFlag_ValidatesAgainstTheOwningChapter()
         {
             var currencies = TestContent.MakeEconomy();
-            var poached = TestContent.MakeCurrency("stagecraft", "run", earnRevealFlag: "two", earnPerSec: 1);
+            var poached = TestContent.MakeProducer("busk", new List<ProductionConfig>
+            {
+                new("cash", 1, ProductionTrigger.Tap, new FlagSetCondition("two"), ModifierTarget.None),
+            });
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "one" },
-                currencyIds: new List<string> { "stagecraft" });
+                producerIds: new List<string> { "busk" });
             var ch2 = TestContent.MakeChapter("ch2", new List<string> { "fans", "two" }, index: 2);
-            var database = new ContentDatabase(chapters: new[] { ch1, ch2 }, currencies: new[] { poached });
+            var database = new ContentDatabase(chapters: new[] { ch1, ch2 }, producers: new[] { poached });
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Currency 'stagecraft' (earn revealFlag) references flag 'two', which the chapter does not declare.");
+                "Condition: Producer 'busk' (config for 'cash') (gate) references flag 'two', which the chapter does not declare.");
             ContentValidator.Validate(database, context, NoRewards);
         }
 
         // negative tuning drains or dead-ends instead of earning - runtime
         // fails closed on it, so validation must say why the systems look dead
         [Test]
-        public void NegativeTapAndRecordBuffTuning_AreReported()
+        public void NegativeRecordBuffTuning_IsReported()
         {
             var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
-                tapBaseValue: -1, recordBuffPerRecord: -0.02);
+                recordBuffPerRecord: -0.02);
             var database = new ContentDatabase(chapters: new[] { ch1 });
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' has a negative tapBaseValue (-1) - every Jam would drain cash.");
-            LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' has a negative recordBuff perRecord (-0.02).");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // A producer IS its production configs, and every field is trusted per
+        // firing: broken tuning must say why the runtime (which fails closed -
+        // skipped configs, zeroed compositions) looks mysteriously dead. The
+        // importer refuses to write any of these, so reaching them means a
+        // stale or hand-built asset.
+        [Test]
+        public void BrokenProducerConfigs_AreReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var broken = TestContent.MakeProducer("broken", new List<ProductionConfig>
+            {
+                new("cash", -1, ProductionTrigger.Tap, null, ModifierTarget.None),
+                new("merch", 1, ProductionTrigger.None, null, ModifierTarget.None),
+                new("cash", 1, ProductionTrigger.Tick, null, ModifierTarget.FanRate),
+            });
+            var hollow = TestContent.MakeProducer("hollow", new List<ProductionConfig>());
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                producerIds: new List<string> { "broken", "hollow" });
+            var database = new ContentDatabase(chapters: new[] { ch1 }, producers: new[] { broken, hollow });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Producer 'broken' (config for 'cash') has a negative amount (-1).");
+            LogAssert.Expect(LogType.Error,
+                "CurrencyManager: Producer 'broken' (config for 'merch') references currency id 'merch', which resolves to no CurrencyDefinition asset.");
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Producer 'broken' (config for 'merch') has trigger None (uninitialized) - it would never fire.");
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Producer 'broken' (config for 'cash') declares composition 'FanRate', which no module-held config composes.");
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Producer 'hollow' has no production configs - it would produce nothing.");
             ContentValidator.Validate(database, context, NoRewards);
         }
 
@@ -251,11 +286,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
-        // an earn-less currency used to get no checks at all; a negative starting
-        // value puts it in debt at boot and again after every release, which resets
-        // balances back to it
+        // a negative starting value puts the currency in debt at boot and again
+        // after every release, which resets balances back to it
         [Test]
-        public void NegativeStartingValue_IsReported_EvenWithoutAnEarnConfig()
+        public void NegativeStartingValue_IsReported()
         {
             var currencies = TestContent.MakeEconomy();
             var indebted = TestContent.MakeCurrency("merch", "run", startingValue: -5);

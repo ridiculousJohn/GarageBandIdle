@@ -134,6 +134,71 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 @"{ ""type"": ""flagSet"", ""flag"": ""fans"" }", "section 's' (visibleWhen)"));
         }
 
+        // the producer parse path (design doc section 12, rule 13): trigger and
+        // composes vocabularies map onto their closed enums, the gate onto the
+        // Condition family, and an absent gate means always-on
+        [Test]
+        public void Producer_ProductionEntries_MapOntoConfigs()
+        {
+            var configs = ChapterJsonImporter.ParseProducerProduction(@"{
+                ""id"": ""jam"", ""module"": ""module/tap"",
+                ""production"": [
+                    { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""tapValue"" },
+                    { ""currency"": ""rehearsal"", ""amount"": 2, ""trigger"": ""tap"", ""gate"": { ""type"": ""flagSet"", ""flag"": ""covers"" } },
+                    { ""currency"": ""rehearsal"", ""amount"": 1, ""trigger"": ""tick"", ""gate"": { ""type"": ""flagSet"", ""flag"": ""covers"" } }
+                ]
+            }");
+
+            Assert.AreEqual(3, configs.Count);
+
+            Assert.AreEqual("cash", configs[0].CurrencyId);
+            Assert.AreEqual(1.0, configs[0].Amount, 1e-9);
+            Assert.AreEqual(ProductionTrigger.Tap, configs[0].Trigger);
+            Assert.AreEqual(ModifierTarget.TapValue, configs[0].Composes);
+            Assert.IsNull(configs[0].Gate, "no gate = always on");
+
+            Assert.AreEqual(ModifierTarget.None, configs[1].Composes, "absent composes = the raw amount");
+            var gate = configs[1].Gate as FlagSetCondition;
+            Assert.IsNotNull(gate, "the gate is an ordinary Condition");
+            Assert.AreEqual("covers", gate.FlagId);
+
+            Assert.AreEqual(ProductionTrigger.Tick, configs[2].Trigger);
+        }
+
+        // an invalid entry skips the whole producer - a producer missing one of
+        // its yields is not the authored producer - and each refusal says why
+        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""hold"" } ] }",
+            "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown trigger 'hold' - a production config fires on 'tick' or 'tap'. Skipping the producer - fix the JSON and re-import.")]
+        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""fanRate"" } ] }",
+            "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown composes 'fanRate' - a module-held config composes 'tapValue' or nothing. Skipping the producer - fix the JSON and re-import.")]
+        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": -1, ""trigger"": ""tap"" } ] }",
+            "ChapterJsonImporter: producer 'jam' production for 'cash' has a negative amount (-1). Skipping the producer - fix the JSON and re-import.")]
+        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""amount"": 1, ""trigger"": ""tap"" } ] }",
+            "ChapterJsonImporter: producer 'jam' has a production entry with no currency. Skipping the producer - fix the JSON and re-import.")]
+        [TestCase(@"{ ""id"": ""jam"", ""production"": [] }",
+            "ChapterJsonImporter: producer 'jam' has no production entries - it would produce nothing. Skipping it - fix the JSON and re-import.")]
+        public void Producer_RefusesWhatCouldNeverFireAsAuthored(string json, string expectedError)
+        {
+            LogAssert.Expect(LogType.Error, expectedError);
+
+            Assert.IsNull(ChapterJsonImporter.ParseProducerProduction(json));
+        }
+
+        // the pre-5.4 schema put engagement earn on the currency; an earn block
+        // is stale JSON that used to mean something, so it refuses rather than
+        // silently dropping it (a bare {id, group} entry imports fine)
+        [Test]
+        public void CurrencyEntry_WithAnEarnBlock_IsRefused()
+        {
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: currency 'rehearsal' carries an 'earn' block - currencies are pure state, production lives on producers (design doc section 12, rule 13). Skipping it - fix the JSON and re-import.");
+            Assert.IsFalse(ChapterJsonImporter.ParseCurrencyEntryIsImportable(
+                @"{ ""id"": ""rehearsal"", ""group"": ""run"", ""earn"": { ""revealFlag"": ""covers"", ""perSec"": 1, ""perTap"": 2 } }"));
+
+            Assert.IsTrue(ChapterJsonImporter.ParseCurrencyEntryIsImportable(
+                @"{ ""id"": ""rehearsal"", ""group"": ""run"" }"));
+        }
+
         // a per-sec multiplier carries the currencies it affects as data, so the
         // payload can name any number of them without a code change - the same
         // contract constants.recordBuff.affects follows
