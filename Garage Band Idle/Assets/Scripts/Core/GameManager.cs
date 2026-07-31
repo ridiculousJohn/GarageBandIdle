@@ -167,6 +167,12 @@ namespace RidiculousGaming.GarageBandIdle
             // bar in the same tick, so a selected bar advances with no pool lag
             Production.Tick(seconds);
             Bars.Tick();
+
+            // the tick has fully settled - production, drains, completions,
+            // whatever modifiers or flags they granted - so the tap value is
+            // final: publish it only now (a bar completing mid-tick could set
+            // a flag some config's gate reads, so no earlier point is safe)
+            Production.RefreshTapValue();
         }
 
         // the tap action: every tap-triggered production config fires - the
@@ -183,6 +189,10 @@ namespace RidiculousGaming.GarageBandIdle
             // drain immediately so the active bar visibly nudges on the tap,
             // not a tick later
             Bars.Tick();
+
+            // the whole tap has settled (yields paid, bars drained, anything
+            // a completion granted): publish the tap value only now
+            Production.RefreshTapValue();
         }
 
         public bool BuyUpgrade(Upgrade upgrade)
@@ -195,6 +205,11 @@ namespace RidiculousGaming.GarageBandIdle
             // the spend moves a balance, which can satisfy a content unlock's
             // gate right now (the same reason BuyGenerator re-evaluates)
             Upgrades.EvaluateContentUnlocks(Conditions);
+
+            // the purchase has settled (buff granted, unlocks evaluated):
+            // publish the tap value only now, never from a modifier callback
+            // midway through the operation
+            Production.RefreshTapValue();
             return true;
         }
 
@@ -209,6 +224,10 @@ namespace RidiculousGaming.GarageBandIdle
             // content unlock's gate (play_for_crowd: own 1 Drummer) - right now
             Generators.EvaluateUnlocks(Conditions);
             Upgrades.EvaluateContentUnlocks(Conditions);
+
+            // settled, then publish (an unlock just evaluated can have granted
+            // a tap buff or set a flag a config's gate reads)
+            Production.RefreshTapValue();
             return true;
         }
     }

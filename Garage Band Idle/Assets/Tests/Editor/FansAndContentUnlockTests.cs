@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
@@ -215,36 +216,79 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9, "the value is untouched");
         }
 
-        // the UI advertises the composed tap value, so it needs a signal for
-        // every change to it - applied modifiers and a run reset that cleared
-        // something - and no signal when nothing moved (rejected value, no-op
-        // reset, or a modifier on somebody else's target)
+        // Publishing is post-mutation: nothing notifies the UI from inside an
+        // operation - modifier grants and gate flips stay silent until the
+        // orchestrator's RefreshTapValue says the whole mutation has settled -
+        // and the refresh publishes only an actual move (one notification for
+        // the operation, none for a no-op, a rejected value, or somebody
+        // else's target).
         [Test]
-        public void TapValueChanged_FiresOnlyWhenTheValueMoves()
+        public void TapValueChanged_FiresOnRefresh_OnlyWhenTheValueMoved()
         {
             var modifiers = new ModifierSystem();
             var tap = TestContent.MakeTapProduction(2, modifiers);
             var changes = 0;
             tap.TapValueChanged += () => changes++;
 
-            modifiers.ResetRunScoped();
-            Assert.AreEqual(0, changes, "a no-op reset is silent");
+            tap.RefreshTapValue();
+            Assert.AreEqual(0, changes, "nothing moved, nothing published");
 
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.PermanentInChapter, 3);
-            Assert.AreEqual(2, changes, "each applied modifier notifies");
+            Assert.AreEqual(0, changes, "mid-mutation grants never notify the UI directly");
+
+            tap.RefreshTapValue();
+            Assert.AreEqual(1, changes, "one settled operation, one notification");
+            Assert.AreEqual(12.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x 2 x 3");
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 0);
-            Assert.AreEqual(2, changes, "a rejected value is silent");
-
             modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 5);
-            Assert.AreEqual(2, changes, "another target's modifier is not ours");
+            tap.RefreshTapValue();
+            Assert.AreEqual(1, changes, "a rejected value and another target's modifier move nothing");
 
             modifiers.ResetRunScoped();
-            Assert.AreEqual(3, changes, "clearing the run stack notifies");
+            tap.RefreshTapValue();
+            Assert.AreEqual(2, changes, "clearing the run stack moved the value");
             Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x permanent 3 after the reset");
+        }
+
+        // A composing config may carry any gate the data model supports (rule
+        // 13 forbids nothing): the tap pays it only while its gate holds, the
+        // evaluated value follows the gate immediately, and the post-mutation
+        // refresh is what tells the UI - so payout and display can never
+        // diverge across a gate transition.
+        [Test]
+        public void GatedComposingConfig_PaysAndPublishesOnItsGateTransition()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
+            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
+            {
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+                new("cash", 4, ProductionTrigger.Tap, new FlagSetCondition("amped"), ModifierTarget.TapValue),
+            });
+            var production = new ProductionSystem(new[] { producer }, currencies, modifiers,
+                TestContent.MakeContext(currencies, flags: flags));
+            var changes = 0;
+            production.TapValueChanged += () => changes++;
+
+            Assert.AreEqual(1.0, production.TapValue.ToDouble(), 1e-9, "the gated yield is dormant");
+            production.FireTap();
+            Assert.AreEqual(1.0, currencies.Get("cash").ToDouble(), 1e-9, "a tap pays only the open config");
+
+            flags.Set("amped");
+            Assert.AreEqual(5.0, production.TapValue.ToDouble(), 1e-9, "the evaluated value follows the gate");
+            Assert.AreEqual(0, changes, "no notification until the mutation settles");
+
+            production.RefreshTapValue();
+            Assert.AreEqual(1, changes, "the settled refresh publishes the gate transition");
+
+            production.FireTap();
+            Assert.AreEqual(6.0, currencies.Get("cash").ToDouble(), 1e-9,
+                "payout matches the advertised value: 1 + (1 + 4)");
         }
 
         // flat adds land before the multipliers, so a tap add is worth more once

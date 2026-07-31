@@ -13,6 +13,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // they did before; an undeclared config pays its raw amount. Generators
     // keep their own production path and are the only idle-eligible holder
     // (section 9). No producers leaves the system inert.
+    //
+    // TapValue can move for two reasons - a modifier changed, or a config's
+    // gate transitioned (any Condition input: a flag, a balance, an owned
+    // count) - and neither may notify the UI mid-mutation: a tick's
+    // production has bars still to drain, a purchase has unlocks still to
+    // evaluate. So nothing here pushes. GameManager calls RefreshTapValue
+    // after each complete operation settles (tick, Jam, purchase - the same
+    // boundary every unlock evaluation uses), and the event fires only when
+    // the evaluated value actually moved.
     public class ProductionSystem
     {
         private static readonly ModifierTargetKey TapValueTarget = ModifierTargetKey.Global(ModifierTarget.TapValue);
@@ -22,9 +31,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly CurrencyManager _currencies;
         private readonly ModifierSystem _modifiers;
         private readonly ConditionContext _conditions;
+        private BigNumber _lastTapValue;
 
-        // fires when the composed tap value moves (reward applied, run reset);
-        // UI listens here, nothing polls
+        // fires from RefreshTapValue when the composed tap value moved (buff
+        // bought, run reset, a config's gate transitioned); UI listens here,
+        // nothing polls
         public event Action TapValueChanged;
 
         public ProductionSystem(IEnumerable<ProducerDefinition> producers, CurrencyManager currencies,
@@ -33,7 +44,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _currencies = currencies;
             _modifiers = modifiers;
             _conditions = conditions;
-            _modifiers.Changed += HandleModifierChanged;
 
             foreach (var producer in producers)
             {
@@ -65,6 +75,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     }
                 }
             }
+
+            _lastTapValue = TapValue;
         }
 
         // The composed Jam yield the button advertises: every tap config that
@@ -140,6 +152,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
+        // The post-mutation refresh: re-evaluates the tap value and publishes
+        // only an actual move. Called by GameManager after each complete
+        // operation settles (end of tick, end of Jam, a successful purchase,
+        // a future reset/restore) - never from inside a system, so no
+        // subscriber can observe a half-settled mutation (state, then notify).
+        public void RefreshTapValue()
+        {
+            var value = TapValue;
+            if (value == _lastTapValue)
+                return;
+
+            _lastTapValue = value;
+            TapValueChanged?.Invoke();
+        }
+
         // A config composes exactly the target it declares. Anything landing
         // below zero yields nothing and no multiplier resurrects it - the same
         // fail-closed rule TapSystem had, so a tap can never drain cash.
@@ -159,12 +186,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     return config;
             }
             return null;
-        }
-
-        private void HandleModifierChanged(ModifierTargetKey target)
-        {
-            if (target.Equals(TapValueTarget))
-                TapValueChanged?.Invoke();
         }
     }
 }
