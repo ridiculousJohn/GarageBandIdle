@@ -142,11 +142,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var payload = ChapterJsonImporter.ParsePayload(
                 @"{ ""effect"": ""currencyPerSecMultiplier"", ""affects"": [""cash"", ""merch""], ""value"": 1.5 }",
-                "upgrade 'tight_set'") as CurrencyPerSecMultiplierPayload;
+                "upgrade 'tight_set'") as GrantModifierEffect;
 
-            Assert.IsNotNull(payload, "the effect maps onto the currency-declaring payload");
+            Assert.IsNotNull(payload, "the effect maps onto a currency-production modifier");
+            Assert.AreEqual(ModifierTarget.CurrencyProduction, payload.Target);
+            Assert.AreEqual(ModifierOperation.Multiply, payload.Operation);
             Assert.AreEqual(1.5, payload.Value, 1e-9);
-            CollectionAssert.AreEqual(new[] { "cash", "merch" }, payload.AffectsCurrencyIds);
+            CollectionAssert.AreEqual(new[] { "cash", "merch" }, payload.Qualifiers);
         }
 
         // a multiplier naming nothing could never apply, and a non-positive one
@@ -156,7 +158,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [TestCase(@"{ ""effect"": ""currencyPerSecMultiplier"", ""value"": 1.5 }",
             "ChapterJsonImporter: upgrade 'x' currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Importing no payload - fix the JSON and re-import.")]
         [TestCase(@"{ ""effect"": ""currencyPerSecMultiplier"", ""affects"": [""cash""], ""value"": 0 }",
-            "ChapterJsonImporter: upgrade 'x' has a non-positive currencyPerSecMultiplier (0). Importing no payload - fix the JSON and re-import.")]
+            "ChapterJsonImporter: upgrade 'x' has a non-positive currencyPerSecMultiplier (0). Refusing it - fix the JSON and re-import.")]
         public void Payload_CurrencyPerSecMultiplier_RefusesWhatCouldNeverApply(string json, string expectedError)
         {
             LogAssert.Expect(LogType.Error, expectedError);

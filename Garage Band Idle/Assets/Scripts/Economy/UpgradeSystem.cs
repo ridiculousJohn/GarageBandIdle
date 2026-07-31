@@ -16,7 +16,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly List<Upgrade> _upgrades = new();
         private readonly Dictionary<string, Upgrade> _byId = new();
         private readonly CurrencyManager _currencies;
-        private readonly UpgradePayloadContext _payloadContext;
+        private readonly EffectContext _effectContext;
 
         // fires once per upgrade when its payload is applied
         public event Action<Upgrade> UpgradeApplied;
@@ -33,7 +33,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             FlagSystem flags, ModifierSystem modifiers)
         {
             _currencies = currencies;
-            _payloadContext = new UpgradePayloadContext(flags, modifiers);
+            _effectContext = new EffectContext(currencies, flags, modifiers);
 
             foreach (var definition in definitions)
             {
@@ -149,7 +149,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // spend fires BalanceChanged, so no condition evaluator or UI
             // subscriber observes the money gone with the buff not yet granted
             upgrade.MarkApplied();
-            payload.Apply(_payloadContext, upgrade.Definition.Scope);
+            payload.Apply(_effectContext, upgrade.Definition.Scope);
             _currencies.Add(currencyId, -cost);
             UpgradeApplied?.Invoke(upgrade);
             return true;
@@ -194,20 +194,25 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         private void Apply(Upgrade upgrade)
         {
+            // State, then notify - the same order TryBuy uses, and for a sharper
+            // reason here: a setFlag payload fires FlagSet from inside Apply, so
+            // anything that re-evaluates content unlocks on that signal would
+            // otherwise observe this upgrade as unapplied and grant it twice.
+            upgrade.MarkApplied();
+
             var payload = upgrade.Definition.Payload;
             if (payload == null)
             {
-                // marked applied anyway so a content mistake reports once, not per tick
+                // already latched, so a content mistake reports once, not per tick
                 Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' has no payload. Nothing to apply.");
             }
             else
             {
                 // the upgrade's declared scope travels with the grant, so the
                 // effect's lifetime is never a second declaration
-                payload.Apply(_payloadContext, upgrade.Definition.Scope);
+                payload.Apply(_effectContext, upgrade.Definition.Scope);
             }
 
-            upgrade.MarkApplied();
             UpgradeApplied?.Invoke(upgrade);
         }
 

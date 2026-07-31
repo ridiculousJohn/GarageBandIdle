@@ -35,7 +35,10 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public RewardDefinition Get(string id)
             => !string.IsNullOrEmpty(id) && _byId.TryGetValue(id, out var reward) ? reward : null;
 
-        public void Apply(string rewardId, RewardContext context)
+        // the scope belongs to the content applying the reward (a bar group, an
+        // event tier), not to the reward asset - which is what keeps one reward
+        // reusable across sources whose lifetimes differ
+        public void Apply(string rewardId, EffectContext context, ContentScope scope)
         {
             if (!_byId.TryGetValue(rewardId ?? "", out var reward))
             {
@@ -43,7 +46,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
                 return;
             }
 
-            reward.Apply(context);
+            reward.Apply(context, scope);
         }
     }
 }

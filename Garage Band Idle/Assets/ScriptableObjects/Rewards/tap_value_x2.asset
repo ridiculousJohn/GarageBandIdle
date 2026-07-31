@@ -9,10 +9,20 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a9d4050739bcd514ba9a3f7509ece108, type: 3}
+  m_Script: {fileID: 11500000, guid: b2c86993ddbbfa34e92fefb512a756af, type: 3}
   m_Name: tap_value_x2
-  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.TapValueMultiplierReward
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.RewardDefinition
   _id: tap_value_x2
   _displayName: "Tap Value \xD72"
-  _value: 2
-  _scope: 2
+  _effect:
+    rid: 1000
+  references:
+    version: 2
+    RefIds:
+    - rid: 1000
+      type: {class: GrantModifierEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _target: 1
+        _qualifiers: []
+        _operation: 2
+        _value: 2

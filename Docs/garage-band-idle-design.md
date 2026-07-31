@@ -548,12 +548,17 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     that is what makes a run reset exact, and it makes the reset a single call instead of a per-system
     enumeration that silently misses whichever system was added last. A modifier reaches only the target
     it names, which is what keeps an income buff off a fans or merch producer.
-    **[rev]** The scope a grant carries is a working copy of its originating fact's declared scope (the
-    upgrade or reward definition), which is the single authoritative lifetime: **an effect's durability
-    is exactly the durability of the fact it projects from.** Anything that must survive a reset
-    boundary is therefore derived from a fact that owns that lifetime (the Records total, the Roadie
-    allocation, an entitlement, a clear count) — there is no global grant store and no grant ever
-    migrates across a chapter boundary. Wanting a granted global effect is the smell that its
+    **[rev]** The scope a grant carries is a working copy of its originating fact's declared scope, which
+    is the single authoritative lifetime: **an effect's durability is exactly the durability of the fact
+    it projects from.** Each fact declares that lifetime where the fact itself lives - the upgrade
+    definition for a bought buff, the bar group for a completed bar, the event tier for a cleared tier -
+    and never on the effect, nor on a reward definition, which is a reusable projection rather than a
+    fact and so has no lifetime of its own to declare. A scope on a shared reward could disagree with the
+    content applying it, and the disagreement is invisible: a run-scoped source granting a
+    permanent-in-chapter effect re-grants it every run and compounds without limit. Anything that must
+    survive a reset boundary is therefore derived from a fact that owns that lifetime (the Records total,
+    the Roadie allocation, an entitlement, a clear count) — there is no global grant store and no grant
+    ever migrates across a chapter boundary. Wanting a granted global effect is the smell that its
     underlying fact has not been named yet.
 12. **[rev]** Bundle the per-economy systems (currency pool, generators, upgrades, bars, fans, tap,
     engagement earn, modifiers, flags, condition context) into one **economy context**, constructed

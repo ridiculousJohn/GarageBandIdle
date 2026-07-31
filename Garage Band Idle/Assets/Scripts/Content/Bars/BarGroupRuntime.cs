@@ -12,7 +12,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
     {
         private readonly List<BarState> _bars;
         private readonly RewardManager _rewards;
-        private readonly RewardContext _rewardContext;
+        private readonly EffectContext _effectContext;
 
         protected readonly CurrencyManager Currencies;
 
@@ -23,13 +23,13 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public event Action<BarState> Completed;
 
         protected BarGroupRuntime(BarGroupDefinition group, List<BarState> bars,
-            CurrencyManager currencies, RewardManager rewards, RewardContext rewardContext)
+            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext)
         {
             Group = group;
             _bars = bars;
             Currencies = currencies;
             _rewards = rewards;
-            _rewardContext = rewardContext;
+            _effectContext = effectContext;
         }
 
         public abstract void Tick();
@@ -59,8 +59,12 @@ namespace RidiculousGaming.GarageBandIdle.Content
         // occurrence, so BarSystem.RestoreProgress never calls it.
         protected void NotifyCompleted(BarState bar)
         {
+            // the group's scope is the reward's lifetime: run-scoped bars reset each
+            // demo, so what they granted must clear with them. One declaration, so a
+            // reward asset and the content that pays it can never disagree about how
+            // long the effect lives.
             if (!string.IsNullOrEmpty(bar.Definition.RewardId))
-                _rewards.Apply(bar.Definition.RewardId, _rewardContext);
+                _rewards.Apply(bar.Definition.RewardId, _effectContext, Group.Scope);
 
             Completed?.Invoke(bar);
         }

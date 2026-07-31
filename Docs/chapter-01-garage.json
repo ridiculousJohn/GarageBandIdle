@@ -196,13 +196,14 @@
   ],
 
   "rewards": [
-    { "id": "fan_rate_x1_15", "name": "Fan Rate ×1.15", "type": "fanRateMultiplier", "value": 1.15, "scope": "run" },
-    { "id": "fan_rate_x1_20", "name": "Fan Rate ×1.20", "type": "fanRateMultiplier", "value": 1.2, "scope": "run" },
-    { "id": "tap_value_x1_25", "name": "Tap Value ×1.25", "type": "tapValueMultiplier", "value": 1.25, "scope": "permanentInChapter" },
-    { "id": "tap_value_x1_50", "name": "Tap Value ×1.50", "type": "tapValueMultiplier", "value": 1.5, "scope": "permanentInChapter" },
-    { "id": "tap_value_x2", "name": "Tap Value ×2", "type": "tapValueMultiplier", "value": 2.0, "scope": "permanentInChapter" }
+    { "id": "fan_rate_x1_15", "name": "Fan Rate ×1.15", "type": "fanRateMultiplier", "value": 1.15 },
+    { "id": "fan_rate_x1_20", "name": "Fan Rate ×1.20", "type": "fanRateMultiplier", "value": 1.2 },
+    { "id": "tap_value_x1_25", "name": "Tap Value ×1.25", "type": "tapValueMultiplier", "value": 1.25 },
+    { "id": "tap_value_x1_50", "name": "Tap Value ×1.50", "type": "tapValueMultiplier", "value": 1.5 },
+    { "id": "tap_value_x2", "name": "Tap Value ×2", "type": "tapValueMultiplier", "value": 2.0 }
   ],
-  "rewardsNote": "The shared reward pool. Bars and event tiers reference these by id; each type maps to a RewardDefinition subclass asset, so a new reward kind is a new type + entries, and rewards are reusable across content. Available types: fanRateMultiplier, tapValueMultiplier, setFlag (payload `flag: <id>` — lets a reward reveal gated content through the same flag registry as content-unlock upgrades).",
+  "rewardsNote": "The shared reward pool. Bars and event tiers reference these by id; each `type` is friendly vocabulary the importer maps onto a GameEffect - the same effect family an upgrade's `payload` builds - so a reward and a buff granting the same thing share one handler and one validator. Available types: fanRateMultiplier, tapValueMultiplier, setFlag (with `flag: <id>` — lets a reward reveal gated content through the same flag registry as content-unlock upgrades).",
+  "rewardsScopeNote": "A reward entry declares NO scope. The lifetime belongs to whatever applies it: a cover bar's reward lives as long as its bar group's `bars.scope`, an event tier's lives as long as the tier's own `scope`. That is one declaration per fact: a scope on the shared asset could disagree with the content paying it (a run-scoped bar granting a permanent multiplier would re-grant and compound every run), and it is what lets the same reward be a run payoff in one place and permanent in another.",
 
   "currencies": [
     {
@@ -276,7 +277,9 @@
           "goal": { "type": "currency", "currency": "cash", "value": 500 },
           "timerSeconds": 60,
           "failable": true,
-          "reward": "tap_value_x1_25"
+          "reward": "tap_value_x1_25",
+          "scope": "permanentInChapter",
+          "scopeNote": "How long a cleared tier stays cleared - the tier's OWN state, which slice 8 needs regardless of what the tier pays. permanentInChapter: you do not re-climb the Garage Jam ladder after every demo. What the reward granted projects from that clear and inherits its durability (design doc rule 11), which is why the reward declares no scope; a cover bar's fan-rate reward is run-scoped for the same reason in reverse, because bar completion is a run fact."
         },
         {
           "tier": 2,
@@ -284,7 +287,8 @@
           "goal": { "type": "currency", "currency": "cash", "value": 2500 },
           "timerSeconds": 60,
           "failable": true,
-          "reward": "tap_value_x1_50"
+          "reward": "tap_value_x1_50",
+          "scope": "permanentInChapter"
         },
         {
           "tier": 3,
@@ -292,7 +296,8 @@
           "goal": { "type": "currency", "currency": "cash", "value": 10000 },
           "timerSeconds": 45,
           "failable": true,
-          "reward": "tap_value_x2"
+          "reward": "tap_value_x2",
+          "scope": "permanentInChapter"
         }
       ],
       "failNote": "On a timed fail the event resets; the player can quit anytime. Cost is time only, never permanent progress.",

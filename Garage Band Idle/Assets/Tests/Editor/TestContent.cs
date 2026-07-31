@@ -63,7 +63,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         public static UpgradeDefinition MakeUpgrade(string id, UpgradeType type, ContentScope scope,
-            Condition gate, UpgradePayload payload,
+            Condition gate, GameEffect payload,
             string costCurrencyId = "cash", double costAmount = 0)
         {
             var definition = Track(ScriptableObject.CreateInstance<UpgradeDefinition>());
@@ -136,27 +136,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // paying a reward. Goal is required rather than defaulted, because "no
         // goal" is one of the states a tier fixture needs to be able to express.
         public static EventTier MakeTier(int tier, string rewardId, Condition goal,
-            double timerSeconds = 60, bool failable = true)
-            => new(tier, new AutomationDisabledDebuff(), goal, timerSeconds, failable, rewardId);
+            double timerSeconds = 60, bool failable = true,
+            ContentScope scope = ContentScope.PermanentInChapter)
+            => new(tier, new AutomationDisabledDebuff(), goal, timerSeconds, failable, rewardId, scope);
 
-        public static FanRateMultiplierReward MakeFanRateReward(string id, double value, ContentScope scope = ContentScope.Run)
-        {
-            var definition = Track(ScriptableObject.CreateInstance<FanRateMultiplierReward>());
-            definition.EditorInitialize(id, id, value, scope);
-            return definition;
-        }
+        // Reward fixtures carry no scope: the content applying one declares the
+        // lifetime, so a bar group's Scope or a tier's Scope supplies it at Apply.
+        // The named helpers are just the friendly effect vocabulary, same as the
+        // importer's - one reward type underneath.
+        public static RewardDefinition MakeFanRateReward(string id, double value)
+            => MakeReward(id, new GrantModifierEffect(ModifierTarget.FanRate, ModifierOperation.Multiply, value));
 
-        public static TapValueMultiplierReward MakeTapValueReward(string id, double value, ContentScope scope = ContentScope.Run)
-        {
-            var definition = Track(ScriptableObject.CreateInstance<TapValueMultiplierReward>());
-            definition.EditorInitialize(id, id, value, scope);
-            return definition;
-        }
+        public static RewardDefinition MakeTapValueReward(string id, double value)
+            => MakeReward(id, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Multiply, value));
 
-        public static SetFlagReward MakeSetFlagReward(string id, string flagId)
+        public static RewardDefinition MakeSetFlagReward(string id, string flagId)
+            => MakeReward(id, new SetFlagEffect(flagId));
+
+        public static RewardDefinition MakeReward(string id, GameEffect effect)
         {
-            var definition = Track(ScriptableObject.CreateInstance<SetFlagReward>());
-            definition.EditorInitialize(id, id, flagId);
+            var definition = Track(ScriptableObject.CreateInstance<RewardDefinition>());
+            definition.EditorInitialize(id, id, effect);
             return definition;
         }
 

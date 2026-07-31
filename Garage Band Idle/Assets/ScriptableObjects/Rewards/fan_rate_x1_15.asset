@@ -9,10 +9,20 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cd99e3c5177a4034ea258bc00c0dc027, type: 3}
+  m_Script: {fileID: 11500000, guid: b2c86993ddbbfa34e92fefb512a756af, type: 3}
   m_Name: fan_rate_x1_15
-  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.FanRateMultiplierReward
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.RewardDefinition
   _id: fan_rate_x1_15
   _displayName: "Fan Rate \xD71.15"
-  _value: 1.15
-  _scope: 1
+  _effect:
+    rid: 1000
+  references:
+    version: 2
+    RefIds:
+    - rid: 1000
+      type: {class: GrantModifierEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _target: 2
+        _qualifiers: []
+        _operation: 2
+        _value: 1.15

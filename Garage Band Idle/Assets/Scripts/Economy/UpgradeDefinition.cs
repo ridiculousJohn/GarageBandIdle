@@ -58,7 +58,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         [SerializeReference]
         [SubclassPicker]
-        private UpgradePayload _payload;
+        [Tooltip("What the upgrade grants. Its lifetime is this asset's Scope, never a second declaration on the effect.")]
+        private GameEffect _payload;
 
         public string Id => _id;
         public string DisplayName => _displayName;
@@ -67,12 +68,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public string CostCurrencyId => _costCurrencyId;
         public double CostAmount => _costAmount;
         public Condition Gate => _gate;
-        public UpgradePayload Payload => _payload;
+        public GameEffect Payload => _payload;
 
 #if UNITY_EDITOR
         // importer-only: upgrade assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, UpgradeType type, ContentScope scope,
-            string costCurrencyId, double costAmount, Condition gate, UpgradePayload payload)
+            string costCurrencyId, double costAmount, Condition gate, GameEffect payload)
         {
             _id = id;
             _displayName = displayName;

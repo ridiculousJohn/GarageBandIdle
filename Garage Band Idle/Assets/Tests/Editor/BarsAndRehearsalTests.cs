@@ -54,15 +54,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new List<string> { "cover_1", "cover_2", "cover_3" });
 
             return new BarSystem(new[] { group }, bars, currencies, rewards,
-                new RewardContext(currencies, flags, modifiers));
+                new EffectContext(currencies, flags, modifiers));
         }
 
         // MakeCoversSetup plus a permanent-in-chapter group, for the run-reset
         // scope split
         private static BarSystem MakeTwoScopeSetup(CurrencyManager currencies, FlagSystem flags,
-            out FanSystem fans)
+            out FanSystem fans, out ModifierSystem modifiers)
         {
-            var modifiers = new ModifierSystem();
+            modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
             fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
             var rewards = new RewardManager(new RewardDefinition[]
@@ -83,7 +83,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new List<string> { "song_1" }, scope: ContentScope.PermanentInChapter);
 
             return new BarSystem(new[] { run, permanent }, bars, currencies, rewards,
-                new RewardContext(currencies, flags, modifiers));
+                new EffectContext(currencies, flags, modifiers));
         }
 
         [Test]
@@ -265,7 +265,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Error, "BarSystem: bar group 'broken' has no fill behavior. Skipping it.");
             var bars = new BarSystem(new[] { group }, new[] { bar }, currencies, rewards,
-                new RewardContext(currencies, flags, new ModifierSystem()));
+                new EffectContext(currencies, flags, new ModifierSystem()));
 
             Assert.AreEqual(0, bars.Groups.Count, "a behaviorless group never reaches the runtime");
             bars.Tick();
@@ -296,7 +296,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Error,
                 "BarSystem: bar 'broken_cover' has a non-positive fill requirement (0). Skipping it.");
             var system = new BarSystem(new[] { group }, bars, currencies, rewards,
-                new RewardContext(currencies, flags, modifiers));
+                new EffectContext(currencies, flags, modifiers));
 
             Assert.AreEqual(0, system.GetBars("learn_covers").Count, "the rejected bar has no state");
             Assert.AreEqual(0, system.CompletedCount("learn_covers"), "it never satisfies a barsCompleted gate");
@@ -336,7 +336,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = MakeEconomyWithRehearsal();
             var flags = new FlagSystem();
             flags.Set("fans");
-            var bars = MakeTwoScopeSetup(currencies, flags, out var fans);
+            var bars = MakeTwoScopeSetup(currencies, flags, out var fans, out _);
             var coversRuntime = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
             var setlistRuntime = (PerBarContinuousRuntime)bars.GetRuntime("setlist");
 
@@ -364,6 +364,40 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9, "the reset re-applies no rewards");
         }
 
+        // The group's scope is how long bar completion lasts, and the reward's grant
+        // projects from that completion, so it inherits the same durability (design
+        // doc rule 11) rather than declaring one. Both groups here pay the same kind
+        // of reward and differ only in their own scope, so the effects half of a
+        // release (ModifierSystem.ResetRunScoped) has to split them: a cover's boost
+        // goes with the bars it came from, a setlist song's stays.
+        //
+        // While the scope lived on the shared reward asset it could disagree with the
+        // group paying it, and the disagreement was invisible: a run-scoped group
+        // whose reward claimed permanence re-granted that multiplier every run and
+        // compounded without limit.
+        [Test]
+        public void BarRewards_TakeTheirGroupsScope_SoARunResetSplitsThem()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var bars = MakeTwoScopeSetup(currencies, flags, out var fans, out var modifiers);
+            var coversRuntime = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
+            var setlistRuntime = (PerBarContinuousRuntime)bars.GetRuntime("setlist");
+
+            currencies.Add("rehearsal", 120);
+            coversRuntime.SetActiveBar("cover_1"); // run group, grants x1.15
+            currencies.Add("rehearsal", 100);
+            setlistRuntime.SetActiveBar("song_1"); // permanent-in-chapter group, grants x1.2
+            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9,
+                "both grants stack while the run lives");
+
+            modifiers.ResetRunScoped();
+
+            Assert.AreEqual(0.2 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9,
+                "the run group's grant cleared and the permanent group's survived");
+        }
+
         // state-then-notify: by the time any BarProgressChanged subscriber
         // runs, the whole run-scoped reset has settled - no half-reset group
         // is ever observable, and nothing completes
@@ -372,7 +406,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var currencies = MakeEconomyWithRehearsal();
             var flags = new FlagSystem();
-            var bars = MakeTwoScopeSetup(currencies, flags, out _);
+            var bars = MakeTwoScopeSetup(currencies, flags, out _, out _);
             var coversRuntime = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
             currencies.Add("rehearsal", 50);
             coversRuntime.SetActiveBar("cover_1");

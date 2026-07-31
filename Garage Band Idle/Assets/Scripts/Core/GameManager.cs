@@ -103,7 +103,7 @@ namespace RidiculousGaming.GarageBandIdle
                     Resolve(Database.Currencies, CurrentChapter.CurrencyIds, "currency"), Currencies, Flags);
                 Rewards = new RewardManager(Database.Rewards.All);
                 Bars = new BarSystem(Resolve(Database.BarGroups, CurrentChapter.BarGroupIds, "bar group"),
-                    Database.Bars.All, Currencies, Rewards, new RewardContext(Currencies, Flags, Modifiers));
+                    Database.Bars.All, Currencies, Rewards, new EffectContext(Currencies, Flags, Modifiers));
                 Sections = Resolve(Database.Sections, CurrentChapter.SectionIds, "section");
 
                 Conditions = new ConditionContext(Currencies, Generators, Flags, RecordsCurrencyId, Database, Bars);

@@ -15,60 +15,63 @@ MonoBehaviour:
   _id: garage_jam
   _displayName: Garage Jam Challenge
   _availableWhen:
-    rid: 1000
+    rid: 1007
   _baselineReset: 1
   _tiers:
   - _tier: 1
     _debuff:
-      rid: 1001
+      rid: 1008
     _goal:
-      rid: 1002
+      rid: 1009
     _timerSeconds: 60
     _failable: 1
     _rewardId: tap_value_x1_25
+    _scope: 2
   - _tier: 2
     _debuff:
-      rid: 1003
+      rid: 1010
     _goal:
-      rid: 1004
+      rid: 1011
     _timerSeconds: 60
     _failable: 1
     _rewardId: tap_value_x1_50
+    _scope: 2
   - _tier: 3
     _debuff:
-      rid: 1005
+      rid: 1012
     _goal:
-      rid: 1006
+      rid: 1013
     _timerSeconds: 45
     _failable: 1
     _rewardId: tap_value_x2
+    _scope: 2
   references:
     version: 2
     RefIds:
-    - rid: 1000
+    - rid: 1007
       type: {class: RecordsCumulativeCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _value: 1
-    - rid: 1001
+    - rid: 1008
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
       data: 
-    - rid: 1002
+    - rid: 1009
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
         _value: 500
-    - rid: 1003
+    - rid: 1010
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
       data: 
-    - rid: 1004
+    - rid: 1011
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
         _value: 2500
-    - rid: 1005
+    - rid: 1012
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
       data: 
-    - rid: 1006
+    - rid: 1013
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash

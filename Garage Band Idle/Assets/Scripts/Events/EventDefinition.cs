@@ -82,18 +82,23 @@ namespace RidiculousGaming.GarageBandIdle.Events
         [Tooltip("Reward pool id applied on tier success (RewardManager).")]
         private string _rewardId;
 
+        [SerializeField]
+        [Tooltip("How long a cleared tier stays cleared. An event ladder is not re-climbed after an album release, so a tier clear is permanent within its chapter. What the reward granted inherits this rather than declaring its own.")]
+        private ContentScope _scope;
+
         public int Tier => _tier;
         public Debuff Debuff => _debuff;
         public Condition Goal => _goal;
         public double TimerSeconds => _timerSeconds;
         public bool Failable => _failable;
         public string RewardId => _rewardId;
+        public ContentScope Scope => _scope;
 
         public EventTier() { }
 
 #if UNITY_EDITOR
         public EventTier(int tier, Debuff debuff, Condition goal,
-            double timerSeconds, bool failable, string rewardId)
+            double timerSeconds, bool failable, string rewardId, ContentScope scope)
         {
             _tier = tier;
             _debuff = debuff;
@@ -101,6 +106,7 @@ namespace RidiculousGaming.GarageBandIdle.Events
             _timerSeconds = timerSeconds;
             _failable = failable;
             _rewardId = rewardId;
+            _scope = scope;
         }
 #endif
     }

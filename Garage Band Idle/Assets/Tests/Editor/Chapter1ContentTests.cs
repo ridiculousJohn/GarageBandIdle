@@ -237,8 +237,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var cutDemo = LoadById<UpgradeDefinition>(UpgradesFolder, "cut_demo");
 
-            var payload = cutDemo.Payload as SetFlagPayload;
-            Assert.IsNotNull(payload, "cut_demo payload is a setFlag payload");
+            var payload = cutDemo.Payload as SetFlagEffect;
+            Assert.IsNotNull(payload, "cut_demo payload is a setFlag effect");
             Assert.AreEqual("album", payload.FlagId);
 
             var gate = cutDemo.Gate as CompoundCondition;
@@ -264,11 +264,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tightSet = LoadById<UpgradeDefinition>(UpgradesFolder, "tight_set");
 
-            var payload = tightSet.Payload as CurrencyPerSecMultiplierPayload;
+            var payload = tightSet.Payload as GrantModifierEffect;
             Assert.IsNotNull(payload,
-                "tight_set payload is a currency-declaring per-sec multiplier - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON'");
+                "tight_set payload grants a modifier - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON'");
+            Assert.AreEqual(ModifierTarget.CurrencyProduction, payload.Target,
+                "the friendly currencyPerSecMultiplier maps onto currency production");
+            Assert.AreEqual(ModifierOperation.Multiply, payload.Operation);
             Assert.AreEqual(1.5, payload.Value, 1e-9);
-            CollectionAssert.AreEqual(new[] { "cash" }, payload.AffectsCurrencyIds,
+            CollectionAssert.AreEqual(new[] { "cash" }, payload.Qualifiers,
                 "the buff multiplies only the currencies the JSON names");
 
             // the gate is this upgrade's whole point in Ch1: the same Condition
@@ -342,7 +345,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.AreEqual(rewardId, bar.RewardId, $"bar '{barId}' names its reward from the shared pool");
 
                 var reward = LoadById<RewardDefinition>(RewardsFolder, rewardId);
-                Assert.IsInstanceOf<FanRateMultiplierReward>(reward);
+                // the reward asset declares no lifetime at all - the group's Scope
+                // asserted above is the one declaration, so a cover's boost clears
+                // with the bars it came from
+                var effect = reward.Effect as GrantModifierEffect;
+                Assert.IsNotNull(effect, $"reward '{rewardId}' grants a modifier");
+                Assert.AreEqual(ModifierTarget.FanRate, effect.Target);
             }
         }
 
@@ -359,8 +367,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(rewardId, tier.RewardId);
             var reward = LoadById<RewardDefinition>(RewardsFolder, rewardId);
-            Assert.IsInstanceOf<TapValueMultiplierReward>(reward);
-            Assert.AreEqual(value, ((TapValueMultiplierReward)reward).Value, 1e-9);
+            var effect = reward.Effect as GrantModifierEffect;
+            Assert.IsNotNull(effect, $"reward '{rewardId}' grants a modifier");
+            Assert.AreEqual(ModifierTarget.TapValue, effect.Target);
+            Assert.AreEqual(value, effect.Value, 1e-9);
+
+            // the tier's own clear state is what carries a lifetime; the grant
+            // projects from it and inherits one, so the shared reward needs none
+            Assert.AreEqual(ContentScope.PermanentInChapter, tier.Scope,
+                "an event ladder is not re-climbed after an album release");
 
             var goal = tier.Goal as CurrencyBalanceCondition;
             Assert.IsNotNull(goal, "tier goals are currency conditions");

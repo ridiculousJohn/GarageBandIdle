@@ -15,7 +15,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
-        private static UpgradePayload SetFlag(string flagId) => new SetFlagPayload(flagId);
+        private static GameEffect SetFlag(string flagId) => new SetFlagEffect(flagId);
 
         private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Global(ModifierTarget.FanRate);
         private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
@@ -79,7 +79,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 // met gate (none), but buffs wait for the purchase flow (buff slice)
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff,
                     ContentScope.Run, null,
-                    new TapValueAddPayload(1)),
+                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1)),
             }, currencies, flags, new ModifierSystem());
             var context = TestContent.MakeContext(currencies, flags: flags);
 
@@ -119,17 +119,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
             var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
-            var context = new Content.RewardContext(currencies, flags, modifiers);
+            var context = new EffectContext(currencies, flags, modifiers);
 
-            TestContent.MakeFanRateReward("boost_a", 1.15).Apply(context);
-            TestContent.MakeFanRateReward("boost_b", 1.15).Apply(context);
+            TestContent.MakeFanRateReward("boost_a", 1.15).Apply(context, ContentScope.Run);
+            TestContent.MakeFanRateReward("boost_b", 1.15).Apply(context, ContentScope.Run);
 
             Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
         }
 
-        // modifiers carry their scope: the run reset (album release, event
-        // baseline) drops only run-scoped rewards - a permanent-in-chapter
-        // reward must survive it
+        // Modifiers carry their scope, and the scope comes from whoever APPLIES the
+        // reward, not from the reward: the run reset (album release, event baseline)
+        // drops only the run-scoped grant. Both calls here use the same kind of
+        // reward and differ only in the lifetime the applying content declared,
+        // which is the whole point of keeping scope off the shared asset.
         [Test]
         public void FanRateMultipliers_RunResetKeepsPermanentInChapter()
         {
@@ -139,10 +141,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
             var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
-            var context = new Content.RewardContext(currencies, flags, modifiers);
+            var context = new EffectContext(currencies, flags, modifiers);
 
-            TestContent.MakeFanRateReward("run_boost", 1.5, ContentScope.Run).Apply(context);
-            TestContent.MakeFanRateReward("permanent_boost", 2.0, ContentScope.PermanentInChapter).Apply(context);
+            TestContent.MakeFanRateReward("run_boost", 1.5).Apply(context, ContentScope.Run);
+            TestContent.MakeFanRateReward("permanent_boost", 2.0).Apply(context, ContentScope.PermanentInChapter);
             Assert.AreEqual(0.2 * 1.5 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "both scopes stack");
 
             modifiers.ResetRunScoped();
@@ -177,10 +179,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var modifiers = new ModifierSystem();
             var tap = new TapSystem(2, modifiers);
-            var context = new Content.RewardContext(TestContent.MakeEconomy(), new FlagSystem(), modifiers);
+            var context = new EffectContext(TestContent.MakeEconomy(), new FlagSystem(), modifiers);
 
-            TestContent.MakeTapValueReward("run_x2", 2.0, ContentScope.Run).Apply(context);
-            TestContent.MakeTapValueReward("perm_x3", 3.0, ContentScope.PermanentInChapter).Apply(context);
+            TestContent.MakeTapValueReward("run_x2", 2.0).Apply(context, ContentScope.Run);
+            TestContent.MakeTapValueReward("perm_x3", 3.0).Apply(context, ContentScope.PermanentInChapter);
             Assert.AreEqual(12.0, tap.Value.ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
 
             modifiers.ResetRunScoped();
@@ -267,9 +269,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
-            var context = new Content.RewardContext(currencies, flags, new ModifierSystem());
+            var context = new EffectContext(currencies, flags, new ModifierSystem());
 
-            TestContent.MakeSetFlagReward("open_backroom", "backroom").Apply(context);
+            // a flag is permanent within its chapter by definition, so the scope the
+            // applier passes is not consulted - the latch is not a scoped modifier
+            TestContent.MakeSetFlagReward("open_backroom", "backroom").Apply(context, ContentScope.Run);
 
             Assert.IsTrue(flags.IsSet("backroom"));
         }
@@ -288,15 +292,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
                 TestContent.MakeSetFlagReward("open_backroom", "backroom"),
             });
-            var context = new Content.RewardContext(currencies, flags, modifiers);
+            var context = new EffectContext(currencies, flags, modifiers);
 
             Assert.IsTrue(rewards.Contains("fan_rate_x1_15"));
             Assert.IsFalse(rewards.Contains("nope"));
 
-            rewards.Apply("fan_rate_x1_15", context);
+            rewards.Apply("fan_rate_x1_15", context, ContentScope.Run);
             Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9, "pool reward applied by id");
 
-            rewards.Apply("open_backroom", context);
+            rewards.Apply("open_backroom", context, ContentScope.Run);
             Assert.IsTrue(flags.IsSet("backroom"), "setFlag rewards run through the same registry");
         }
 

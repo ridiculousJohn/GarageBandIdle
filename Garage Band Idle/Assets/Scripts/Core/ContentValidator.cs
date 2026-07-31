@@ -380,6 +380,13 @@ namespace RidiculousGaming.GarageBandIdle
                 if (string.IsNullOrEmpty(tier.RewardId))
                     Debug.LogError($"ContentValidator: {source} has no reward - clearing it would grant nothing.");
 
+                // the tier's scope is how long its own clear state lasts; whatever it
+                // pays projects from that clear and inherits the durability (design
+                // doc rule 11), and an unscoped grant has no reset path at all, so
+                // ModifierSystem would refuse it at runtime
+                if (tier.Scope == ContentScope.None)
+                    Debug.LogError($"ContentValidator: {source} has scope None (uninitialized) - a tier clear needs a declared lifetime for anything to project from.");
+
                 // only timed tiers can fail, which cuts both ways: a failable tier
                 // with no timer has no way to fail, and a timer on a tier that
                 // cannot fail runs a clock with nothing riding on it
@@ -395,30 +402,20 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // rewards can reveal content too; their flags run through the same registry
+        // A reward's effect validates itself - the same call an upgrade's payload
+        // gets, so a new effect kind is one class and never an edit here. This used
+        // to be a downcast chain over reward subclasses, which meant a kind nobody
+        // added a case for was silently unvalidated.
+        //
+        // No scope check: a reward carries no lifetime of its own. Whatever applies
+        // it declares one (a bar group, an event tier), and those are checked where
+        // they are declared.
         private static void ValidateRewardDefinition(RewardDefinition reward, ConditionContext context)
         {
-            if (reward is SetFlagReward setFlag)
-                ValidateFlag(setFlag.FlagId, context, $"Reward '{reward.Id}' (setFlag)");
-            var scope = reward switch
-            {
-                FanRateMultiplierReward fanRate => fanRate.Scope,
-                TapValueMultiplierReward tapValue => tapValue.Scope,
-                _ => (ContentScope?)null,
-            };
-            if (scope == ContentScope.None)
-                Debug.LogError($"ContentValidator: Reward '{reward.Id}' has scope None (uninitialized).");
-
-            // a non-positive multiplier would zero or negate its whole
-            // multiplicative stack (runtime fails closed on it)
-            var multiplier = reward switch
-            {
-                FanRateMultiplierReward fanRate => (double?)fanRate.Value,
-                TapValueMultiplierReward tapValue => tapValue.Value,
-                _ => null,
-            };
-            if (multiplier <= 0)
-                Debug.LogError($"ContentValidator: Reward '{reward.Id}' has a non-positive multiplier ({multiplier}).");
+            if (reward.Effect == null)
+                Debug.LogError($"ContentValidator: Reward '{reward.Id}' has no effect - applying it would grant nothing.");
+            else
+                reward.Effect.Validate(context, $"Reward '{reward.Id}' (effect)");
         }
 
         // conditions and payloads resolve content ids through the database and

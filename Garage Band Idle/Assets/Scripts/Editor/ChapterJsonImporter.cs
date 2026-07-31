@@ -129,43 +129,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
-                // a non-positive multiplier would zero or negate its stack -
-                // never write that state; content referencing the skipped id
-                // fails validation loudly
-                if ((block.type == "fanRateMultiplier" || block.type == "tapValueMultiplier") && block.value <= 0)
-                {
-                    Debug.LogError($"ChapterJsonImporter: reward '{block.id}' has a non-positive multiplier ({block.value}). Skipping it - fix the JSON and re-import.");
+                // a reward carries no scope: whatever applies it declares the
+                // lifetime (a bar group, an event tier), so the same asset can be a
+                // run payoff in one place and a permanent one in another
+                var effect = ToRewardEffect(block, $"reward '{block.id}'");
+                if (effect == null)
                     continue;
-                }
 
-                var path = $"{RewardsFolder}/{block.id}.asset";
-                switch (block.type)
-                {
-                    case "fanRateMultiplier":
-                    {
-                        var reward = LoadOrCreateReward<FanRateMultiplierReward>(path);
-                        var scope = ToScope(block.scope, $"reward '{block.id}'");
-                        ApplyIfChanged(reward, asset => asset.EditorInitialize(block.id, block.name, block.value, scope));
-                        break;
-                    }
-                    case "tapValueMultiplier":
-                    {
-                        var reward = LoadOrCreateReward<TapValueMultiplierReward>(path);
-                        var scope = ToScope(block.scope, $"reward '{block.id}'");
-                        ApplyIfChanged(reward, asset => asset.EditorInitialize(block.id, block.name, block.value, scope));
-                        break;
-                    }
-                    case "setFlag":
-                    {
-                        var reward = LoadOrCreateReward<SetFlagReward>(path);
-                        ApplyIfChanged(reward, asset => asset.EditorInitialize(block.id, block.name, block.flag));
-                        break;
-                    }
-                    default:
-                        Debug.LogError($"ChapterJsonImporter: reward '{block.id}' has unknown type '{block.type}' - no RewardDefinition subclass maps to it. Skipping it.");
-                        continue;
-                }
-
+                var reward = LoadOrCreateReward($"{RewardsFolder}/{block.id}.asset");
+                ApplyIfChanged(reward, asset => asset.EditorInitialize(block.id, block.name, effect));
                 rewardIds.Add(block.id);
             }
 
@@ -295,7 +267,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     tiers.Add(new EventTier(tier.tier,
                         ToDebuff(tier.debuff, $"event '{block.id}' tier {tier.tier}"),
                         ToCondition(tier.goal, $"event '{block.id}' tier {tier.tier} (goal)"),
-                        tier.timerSeconds, tier.failable, tier.reward));
+                        tier.timerSeconds, tier.failable, tier.reward,
+                        ToScope(tier.scope, $"event '{block.id}' tier {tier.tier}")));
                 }
 
                 var asset = LoadOrCreate<EventDefinition>($"{EventsFolder}/{block.id}.asset");
@@ -531,7 +504,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
         // the payload parse path, exposed for the same reason as ParseCondition:
         // tests cover which values the importer refuses to write without one
-        internal static UpgradePayload ParsePayload(string json, string context)
+        internal static GameEffect ParsePayload(string json, string context)
             => ToPayload(JsonConvert.DeserializeObject<PayloadBlock>(json, JsonSettings), context);
 
         private static Condition ToSimpleCondition(string type, string currency,
@@ -576,33 +549,68 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // Maps a JSON payload ({ "effect": ... }) onto the UpgradePayload
         // subclass family. Every upgrade must grant something, so an absent or
         // unknown effect is a content error.
-        private static UpgradePayload ToPayload(PayloadBlock block, string context)
+        // The JSON keeps friendly effect names rather than spelling out a modifier
+        // target and operation: the importer is where authored vocabulary maps onto
+        // classes, the same way fillMode + delivery maps onto a BarFillBehavior.
+        // Both authoring sites - an upgrade's payload and a reward entry - build the
+        // same GameEffect family, so an effect reachable from either grants
+        // identically and is validated by one handler.
+        private static GameEffect ToRewardEffect(RewardEntryBlock block, string context)
+        {
+            switch (block.type)
+            {
+                case "setFlag":
+                    return new SetFlagEffect(block.flag);
+                case "fanRateMultiplier":
+                    return ToMultiplier(ModifierTarget.FanRate, block.value, context, block.type);
+                case "tapValueMultiplier":
+                    return ToMultiplier(ModifierTarget.TapValue, block.value, context, block.type);
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown type '{block.type}' - no effect maps to it. Skipping it.");
+                    return null;
+            }
+        }
+
+        // never write a multiplier that would zero or negate the product it lands
+        // in: the effect is refused here and the content naming it reports loudly,
+        // rather than importing a value the registry refuses at runtime anyway
+        private static GameEffect ToMultiplier(ModifierTarget target, double value, string context,
+            string effectName, List<string> qualifiers = null)
+        {
+            if (value <= 0)
+            {
+                Debug.LogError($"ChapterJsonImporter: {context} has a non-positive {effectName} ({value}). Refusing it - fix the JSON and re-import.");
+                return null;
+            }
+
+            return new GrantModifierEffect(target, ModifierOperation.Multiply, value, qualifiers);
+        }
+
+        private static GameEffect ToPayload(PayloadBlock block, string context)
         {
             switch (block?.effect)
             {
                 case "setFlag":
-                    return new SetFlagPayload(block.flag);
+                    return new SetFlagEffect(block.flag);
                 case "tapValueAdd":
-                    return new TapValueAddPayload(block.value);
+                    // a negative add is left to boot validation: unlike a multiplier
+                    // it cannot poison a whole stack, so the asset is worth keeping
+                    // around to be reported by name
+                    return new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, block.value);
                 case "generatorOutputMultiplier":
-                    return new GeneratorOutputMultiplierPayload(block.generator, block.value);
+                    return ToMultiplier(ModifierTarget.GeneratorOutput, block.value, context, block.effect,
+                        new List<string> { block.generator });
                 case "currencyPerSecMultiplier":
                 {
-                    // never write a multiplier that would zero or negate the
-                    // production stack it lands in, or one that names nothing
-                    // to affect and so could never apply; the upgrade imports
+                    // an empty affects list could never apply; the upgrade imports
                     // with no payload and boot validation reports that
-                    if (block.value <= 0)
-                    {
-                        Debug.LogError($"ChapterJsonImporter: {context} has a non-positive currencyPerSecMultiplier ({block.value}). Importing no payload - fix the JSON and re-import.");
-                        return null;
-                    }
                     if (block.affects == null || block.affects.Length == 0)
                     {
                         Debug.LogError($"ChapterJsonImporter: {context} currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Importing no payload - fix the JSON and re-import.");
                         return null;
                     }
-                    return new CurrencyPerSecMultiplierPayload(new List<string>(block.affects), block.value);
+                    return ToMultiplier(ModifierTarget.CurrencyProduction, block.value, context, block.effect,
+                        new List<string>(block.affects));
                 }
                 case null:
                 case "":
@@ -713,17 +721,17 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             });
         }
 
-        // like LoadOrCreate, but a reward id whose type changed in the JSON needs
-        // its asset recreated as the new subclass
-        private static T LoadOrCreateReward<T>(string assetPath) where T : RewardDefinition
+        // like LoadOrCreate, but an asset written by an older schema - back when a
+        // reward kind was its own RewardDefinition subclass - no longer loads as a
+        // RewardDefinition at all, so the file is replaced rather than collided with
+        private static RewardDefinition LoadOrCreateReward(string assetPath)
         {
             var existing = AssetDatabase.LoadAssetAtPath<RewardDefinition>(assetPath);
-            if (existing is T match)
-                return match;
             if (existing != null)
-                AssetDatabase.DeleteAsset(assetPath);
+                return existing;
 
-            var asset = ScriptableObject.CreateInstance<T>();
+            AssetDatabase.DeleteAsset(assetPath);
+            var asset = ScriptableObject.CreateInstance<RewardDefinition>();
             AssetDatabase.CreateAsset(asset, assetPath);
             return asset;
         }
@@ -772,7 +780,6 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string name = "";
             public string type = "";
             public double value;
-            public string scope = "";
             public string flag = "";
         }
 
@@ -944,6 +951,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public double timerSeconds;
             public bool failable;
             public string reward = ""; // reward pool id
+            public string scope = ""; // how long a cleared tier stays cleared
         }
 
         private class DebuffBlock

@@ -25,7 +25,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public event Action<BarState> BarCompleted;
 
         public BarSystem(IReadOnlyList<BarGroupDefinition> groups, IEnumerable<BarDefinition> bars,
-            CurrencyManager currencies, RewardManager rewards, RewardContext rewardContext)
+            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext)
         {
             var barsById = new Dictionary<string, BarDefinition>();
             foreach (var bar in bars)
@@ -64,7 +64,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
                     states.Add(new BarState(bar, group));
                 }
 
-                var runtime = group.FillBehavior.CreateRuntime(group, states, currencies, rewards, rewardContext);
+                var runtime = group.FillBehavior.CreateRuntime(group, states, currencies, rewards, effectContext);
                 if (_groups.TryAdd(group.Id, runtime))
                 {
                     _groupOrder.Add(group);

@@ -17,8 +17,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
 
-        private static UpgradePayloadContext Context(ModifierSystem modifiers)
-            => new(new FlagSystem(), modifiers);
+        private static EffectContext Context(ModifierSystem modifiers)
+            => new(TestContent.MakeEconomy(), new FlagSystem(), modifiers);
 
         // a flat tap add lands before the multipliers, which is what makes
         // stage_presence worth more later in a run than at the start
@@ -28,7 +28,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var tap = new TapSystem(1, modifiers);
 
-            new TapValueAddPayload(1).Apply(Context(modifiers), ContentScope.Run);
+            new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1).Apply(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "base 1 + 1");
 
@@ -49,7 +49,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(system.Get("practice_amp"), currencies, 1);
             TestContent.BuyTimes(system.Get("drummer"), currencies, 1);
 
-            new GeneratorOutputMultiplierPayload("practice_amp", 2).Apply(Context(modifiers), ContentScope.Run);
+            new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 2, new List<string> { "practice_amp" }).Apply(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(0.8, system.Get("practice_amp").ProductionPerSecond.ToDouble(), 1e-9, "0.4 x 2");
             Assert.AreEqual(3.0, system.Get("drummer").ProductionPerSecond.ToDouble(), 1e-9,
@@ -71,7 +71,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var cashBefore = currencies.Get("cash");
             var fansBefore = currencies.Get("fans");
 
-            new CurrencyPerSecMultiplierPayload(new List<string> { "cash" }, 1.5)
+            new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 1.5, new List<string> { "cash" })
                 .Apply(Context(modifiers), ContentScope.Run);
             system.Tick(10);
 
@@ -85,7 +85,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var modifiers = new ModifierSystem();
 
-            new CurrencyPerSecMultiplierPayload(new List<string> { "cash", "fans" }, 2)
+            new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 2, new List<string> { "cash", "fans" })
                 .Apply(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(2.0,
@@ -104,7 +104,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var tap = new TapSystem(1, modifiers);
 
-            new TapValueAddPayload(1).Apply(Context(modifiers), scope);
+            new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1).Apply(Context(modifiers), scope);
             Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9);
 
             modifiers.ResetRunScoped();
@@ -126,7 +126,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 // no gate = met from the start, so it applies on the first pass
                 TestContent.MakeUpgrade("permanent_tap", UpgradeType.ContentUnlock,
-                    ContentScope.PermanentInChapter, null, new TapValueAddPayload(4)),
+                    ContentScope.PermanentInChapter, null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4)),
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
@@ -150,7 +150,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
-                    new CurrencyBalanceCondition("cash", 250), new TapValueAddPayload(1), costAmount: 250),
+                    new CurrencyBalanceCondition("cash", 250), new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costAmount: 250),
             }, currencies, flags, modifiers);
             var context = TestContent.MakeContext(currencies, flags: flags);
             var stagePresence = upgrades.Get("stage_presence");
@@ -185,7 +185,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("amp_strings", UpgradeType.Buff, ContentScope.Run,
-                    null, new GeneratorOutputMultiplierPayload("practice_amp", 2), costAmount: 500),
+                    null, new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 2, new List<string> { "practice_amp" }), costAmount: 500),
             }, currencies, new FlagSystem(), modifiers);
             var context = TestContent.MakeContext(currencies);
             var applied = 0;
@@ -212,7 +212,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeUpgrade("tight_set", UpgradeType.Buff, ContentScope.Run,
                     new CurrencyBalanceCondition("fans", 30),
-                    new CurrencyPerSecMultiplierPayload(new List<string> { "cash" }, 1.5), costAmount: 20000),
+                    new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 1.5, new List<string> { "cash" }), costAmount: 20000),
             }, currencies, new FlagSystem(), modifiers);
             var context = TestContent.MakeContext(currencies);
             var tightSet = upgrades.Get("tight_set");
@@ -241,11 +241,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeUpgrade("no_payload", UpgradeType.Buff, ContentScope.Run, null, null, costAmount: 100),
                 TestContent.MakeUpgrade("free_buff", UpgradeType.Buff, ContentScope.Run,
-                    null, new TapValueAddPayload(1)),
+                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1)),
                 TestContent.MakeUpgrade("no_currency", UpgradeType.Buff, ContentScope.Run,
-                    null, new TapValueAddPayload(1), costCurrencyId: "", costAmount: 100),
+                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costCurrencyId: "", costAmount: 100),
                 TestContent.MakeUpgrade("reveal", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
-                    null, new SetFlagPayload("fans")),
+                    null, new SetFlagEffect("fans")),
             }, currencies, new FlagSystem(), modifiers);
             var context = TestContent.MakeContext(currencies);
             currencies.Add("cash", 1000);
@@ -278,9 +278,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
-                    null, new TapValueAddPayload(1), costAmount: 250),
+                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costAmount: 250),
                 TestContent.MakeUpgrade("play_for_crowd", UpgradeType.ContentUnlock,
-                    ContentScope.PermanentInChapter, null, new SetFlagPayload("fans")),
+                    ContentScope.PermanentInChapter, null, new SetFlagEffect("fans")),
             }, currencies, flags, modifiers);
             var context = TestContent.MakeContext(currencies, flags: flags);
             var buff = upgrades.Get("stage_presence");
@@ -311,9 +311,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("first", UpgradeType.Buff, ContentScope.Run,
-                    null, new TapValueAddPayload(1), costAmount: 100),
+                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costAmount: 100),
                 TestContent.MakeUpgrade("second", UpgradeType.Buff, ContentScope.Run,
-                    null, new TapValueAddPayload(1), costAmount: 100),
+                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costAmount: 100),
             }, currencies, new FlagSystem(), modifiers);
             var context = TestContent.MakeContext(currencies);
             currencies.Add("cash", 200);
@@ -335,6 +335,44 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2, notifications, "one per cleared upgrade");
         }
 
+        // The same rule on the apply side, where it bites harder: a setFlag payload
+        // fires FlagSet from inside Apply, so an evaluator re-entering on that
+        // signal has to find the latch already set. Otherwise it re-applies the
+        // unlock and grants its payload a second time - invisible for a flag, which
+        // latches idempotently, and a real double grant for anything else.
+        [Test]
+        public void EvaluateContentUnlocks_LatchesBeforeThePayloadNotifies()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("play_for_crowd", UpgradeType.ContentUnlock,
+                    ContentScope.PermanentInChapter, null, new SetFlagEffect("fans")),
+            }, currencies, flags, new ModifierSystem());
+            var context = TestContent.MakeContext(currencies, flags: flags);
+            var reveal = upgrades.Get("play_for_crowd");
+
+            var applications = 0;
+            upgrades.UpgradeApplied += _ => applications++;
+
+            var appliedWhenFlagFired = false;
+            flags.FlagSet += _ =>
+            {
+                appliedWhenFlagFired = reveal.Applied;
+
+                // re-entrant evaluation, the shape a condition-invalidation signal
+                // gives this call: it must find nothing left to apply
+                upgrades.EvaluateContentUnlocks(context);
+            };
+
+            upgrades.EvaluateContentUnlocks(context);
+
+            Assert.IsTrue(appliedWhenFlagFired, "the latch settled before the payload's flag fired");
+            Assert.AreEqual(1, applications, "re-entrant evaluation granted nothing a second time");
+            Assert.IsTrue(flags.IsSet("fans"));
+        }
+
         // a reset with nothing bought is a no-op, so it stays silent rather than
         // waking every row for nothing
         [Test]
@@ -344,7 +382,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
-                    null, new TapValueAddPayload(1), costAmount: 250),
+                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costAmount: 250),
             }, currencies, new FlagSystem(), new ModifierSystem());
             var notified = false;
             upgrades.UpgradeCleared += _ => notified = true;
@@ -362,14 +400,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var context = TestContent.MakeContext(TestContent.MakeEconomy());
 
             LogAssert.Expect(LogType.Error,
-                "UpgradePayload: Upgrade 'drain_tap' (payload) adds a negative amount (-1) to the tap value.");
-            new TapValueAddPayload(-1).Validate(context, "Upgrade 'drain_tap' (payload)");
+                "GameEffect: Upgrade 'drain_tap' (payload) adds a negative amount (-1) to TapValue.");
+            new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, -1).Validate(context, "Upgrade 'drain_tap' (payload)");
 
             LogAssert.Expect(LogType.Error,
-                "UpgradePayload: Upgrade 'zero_amp' (payload) has a non-positive multiplier (0).");
+                "GameEffect: Upgrade 'zero_amp' (payload) has a non-positive multiplier (0).");
             LogAssert.Expect(LogType.Error,
-                "UpgradePayload: Upgrade 'zero_amp' (payload) targets unknown generator id 'practice_amp'.");
-            new GeneratorOutputMultiplierPayload("practice_amp", 0).Validate(context, "Upgrade 'zero_amp' (payload)");
+                "GameEffect: Upgrade 'zero_amp' (payload) targets unknown generator id 'practice_amp'.");
+            new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 0, new List<string> { "practice_amp" }).Validate(context, "Upgrade 'zero_amp' (payload)");
         }
     }
 }

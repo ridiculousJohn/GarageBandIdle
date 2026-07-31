@@ -14,8 +14,8 @@ namespace RidiculousGaming.GarageBandIdle.Content
     public class PerBarContinuousFill : BarFillBehavior
     {
         public override BarGroupRuntime CreateRuntime(BarGroupDefinition group, List<BarState> bars,
-            CurrencyManager currencies, RewardManager rewards, RewardContext rewardContext)
-            => new PerBarContinuousRuntime(group, bars, currencies, rewards, rewardContext);
+            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext)
+            => new PerBarContinuousRuntime(group, bars, currencies, rewards, effectContext);
 
         // no authored fields, so nothing to resolve
         public override void Validate(ConditionContext context, string source) { }
@@ -34,8 +34,8 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public event Action ActiveBarChanged;
 
         public PerBarContinuousRuntime(BarGroupDefinition group, List<BarState> bars,
-            CurrencyManager currencies, RewardManager rewards, RewardContext rewardContext)
-            : base(group, bars, currencies, rewards, rewardContext) { }
+            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext)
+            : base(group, bars, currencies, rewards, effectContext) { }
 
         // player-directed targeting: null bar id clears the selection and lets
         // the pool accumulate. Completed bars cannot be selected.
