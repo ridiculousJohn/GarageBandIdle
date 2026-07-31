@@ -8,3 +8,4 @@
 - [Bug reports are verify-only](bug-reports-are-verify-only.md) — a finding means verdict + evidence, never edits or reverts; freeze after a denied tool call
 - [Quote directive before editing](quote-directive-before-editing.md) — standing protocol: first edit of a task is preceded by Acting on: "<John's words>"; nothing quotable = no edit
 - [No inaction epilogues](no-inaction-epilogues.md) — never close a response with what you didn't do ("nothing edited"); repo state is a fact, restraint is not news
+- [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) — never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
