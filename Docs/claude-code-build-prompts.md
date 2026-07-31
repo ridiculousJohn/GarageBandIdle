@@ -358,7 +358,11 @@ still play identically.
 > generators, upgrades, bars, fans, production (5.4's tap + trickle system), flags, modifiers,
 > condition context — into
 > an `EconomyContext` built by a factory from (chapter definition, ContentDatabase, permanent pool,
-> recipe). The recipe declares which global derivations register (§12 rule 12): the frontier recipe
+> recipe). The context ends every top-level operation (tick, tap, purchase, and later release,
+> restore, focus-gain) with a **post-mutation evaluation step** — the seam GameManager's
+> `RefreshTapValue` call sites currently are, folded into one place — so condition-dependent
+> published values (the tap value today; anything gate-driven later) re-evaluate exactly once, after
+> the whole mutation settles, and a new operation cannot forget to. The recipe declares which global derivations register (§12 rule 12): the frontier recipe
 > registers the Records income modifiers (reading the permanent pool through the chapter's
 > `recordBuff`); a later event recipe will not — that absence IS slice 8's fixed baseline, so the
 > factory takes the recipe now even though only the frontier recipe exists yet. Inside the context,
