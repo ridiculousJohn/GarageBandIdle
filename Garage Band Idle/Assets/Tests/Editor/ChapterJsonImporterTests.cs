@@ -151,12 +151,47 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             CollectionAssert.AreEqual(new[] { "cash", "merch" }, payload.Qualifiers);
         }
 
+        // One vocabulary, two JSON keys. A reward's `type` and an upgrade's
+        // `payload.effect` route through the same translator, so an effect name
+        // authored either way builds the same object - including the names the old
+        // two-family split happened to keep on one side. A reward paying a flat tap
+        // bonus is coherent content, and nothing should have refused it but the
+        // accident of which class family used to own the handler.
+        [TestCase(@"{ ""type"": ""tapValueAdd"", ""value"": 3 }",
+            @"{ ""effect"": ""tapValueAdd"", ""value"": 3 }")]
+        [TestCase(@"{ ""type"": ""generatorOutputMultiplier"", ""generator"": ""practice_amp"", ""value"": 2 }",
+            @"{ ""effect"": ""generatorOutputMultiplier"", ""generator"": ""practice_amp"", ""value"": 2 }")]
+        [TestCase(@"{ ""type"": ""fanRateMultiplier"", ""value"": 1.15 }",
+            @"{ ""effect"": ""fanRateMultiplier"", ""value"": 1.15 }")]
+        public void RewardAndPayload_AuthorTheSameEffectVocabulary(string rewardJson, string payloadJson)
+        {
+            var asReward = (GrantModifierEffect)ChapterJsonImporter.ParseRewardEffect(rewardJson, "reward 'r'");
+            var asPayload = (GrantModifierEffect)ChapterJsonImporter.ParsePayload(payloadJson, "upgrade 'u'");
+
+            Assert.IsNotNull(asReward, "the reward site accepts the name");
+            Assert.AreEqual(asPayload.Target, asReward.Target);
+            Assert.AreEqual(asPayload.Operation, asReward.Operation);
+            Assert.AreEqual(asPayload.Value, asReward.Value, 1e-9);
+            CollectionAssert.AreEqual(asPayload.Qualifiers, asReward.Qualifiers);
+        }
+
+        // a name the family does not know is the one check either site still makes
+        [Test]
+        public void RewardEffect_WithAnUnknownName_IsRefused()
+        {
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: reward 'r' names unknown effect 'teleport' - no GameEffect maps to it.");
+
+            Assert.IsNull(ChapterJsonImporter.ParseRewardEffect(
+                @"{ ""type"": ""teleport"", ""value"": 1 }", "reward 'r'"));
+        }
+
         // a multiplier naming nothing could never apply, and a non-positive one
         // would zero or negate the production stack it lands in - neither is
         // written, and the upgrade's absent payload is what boot validation
         // then reports
         [TestCase(@"{ ""effect"": ""currencyPerSecMultiplier"", ""value"": 1.5 }",
-            "ChapterJsonImporter: upgrade 'x' currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Importing no payload - fix the JSON and re-import.")]
+            "ChapterJsonImporter: upgrade 'x' currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Refusing it - fix the JSON and re-import.")]
         [TestCase(@"{ ""effect"": ""currencyPerSecMultiplier"", ""affects"": [""cash""], ""value"": 0 }",
             "ChapterJsonImporter: upgrade 'x' has a non-positive currencyPerSecMultiplier (0). Refusing it - fix the JSON and re-import.")]
         public void Payload_CurrencyPerSecMultiplier_RefusesWhatCouldNeverApply(string json, string expectedError)

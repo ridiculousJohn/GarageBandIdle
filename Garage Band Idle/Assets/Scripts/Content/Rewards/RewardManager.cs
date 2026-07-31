@@ -3,10 +3,11 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Content
 {
-    // The shared reward pool (design doc section 6.1): bars and event tiers name
-    // a reward by id, and Apply dispatches to the RewardDefinition asset's own
-    // handler. One pool, so a reward is reusable across content and a new reward
-    // kind is a new subclass plus assets.
+    // The shared reward pool (design doc section 6.1): bars and event tiers name a
+    // reward by id, and Apply forwards to that asset's GameEffect carrying the scope
+    // of whatever applied it. One pool, so a reward is reusable across content, and a
+    // new reward kind is a new GameEffect subclass plus assets - RewardDefinition is
+    // concrete, because a reward is the named wrapper and the effect is the behavior.
     public class RewardManager
     {
         private readonly Dictionary<string, RewardDefinition> _byId = new();

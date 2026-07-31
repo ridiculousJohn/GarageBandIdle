@@ -507,6 +507,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         internal static GameEffect ParsePayload(string json, string context)
             => ToPayload(JsonConvert.DeserializeObject<PayloadBlock>(json, JsonSettings), context);
 
+        // the reward entry's parse path, exposed so tests can prove the two
+        // authoring sites really are one vocabulary rather than two that happen to
+        // overlap - the same effect name authored either way builds the same effect
+        internal static GameEffect ParseRewardEffect(string json, string context)
+            => ToRewardEffect(JsonConvert.DeserializeObject<RewardEntryBlock>(json, JsonSettings), context);
+
         private static Condition ToSimpleCondition(string type, string currency,
             string generator, string flag, string group, double value)
         {
@@ -546,30 +552,67 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
         }
 
-        // Maps a JSON payload ({ "effect": ... }) onto the GameEffect
-        // subclass family. Every upgrade must grant something, so an absent or
-        // unknown effect is a content error.
-        // The JSON keeps friendly effect names rather than spelling out a modifier
-        // target and operation: the importer is where authored vocabulary maps onto
-        // classes, the same way fillMode + delivery maps onto a BarFillBehavior.
-        // Both authoring sites - an upgrade's payload and a reward entry - build the
-        // same GameEffect family, so an effect reachable from either grants
-        // identically and is validated by one handler.
-        private static GameEffect ToRewardEffect(RewardEntryBlock block, string context)
+        // Every authored effect name, mapped in one place onto the GameEffect
+        // family. The JSON keeps friendly names rather than spelling out a modifier
+        // target and operation, because the importer is where authored vocabulary
+        // meets classes - the same way fillMode + delivery maps onto a
+        // BarFillBehavior.
+        //
+        // Both authoring sites feed this: an upgrade's `payload.effect` and a reward
+        // entry's `type` are two JSON keys over ONE vocabulary. Neither restricts
+        // which names it accepts, and that is deliberate - the old split
+        // (multipliers for rewards, flat adds and per-generator targets for payloads)
+        // was a fossil of the two class families rather than a rule. A reward paying
+        // a flat tap bonus and a buff raising fan rate are both coherent content, so
+        // the check worth keeping is whether the family knows the name at all.
+        //
+        // Returns null on refusal, having reported why; what a refusal MEANS belongs
+        // to the caller - a reward entry is skipped, while an upgrade imports with no
+        // payload and boot validation reports the gap.
+        private static GameEffect ToEffect(string kind, double value, string flag, string generator,
+            string[] affects, string context)
         {
-            switch (block.type)
+            switch (kind)
             {
                 case "setFlag":
-                    return new SetFlagEffect(block.flag);
-                case "fanRateMultiplier":
-                    return ToMultiplier(ModifierTarget.FanRate, block.value, context, block.type);
+                    return new SetFlagEffect(flag);
+                case "tapValueAdd":
+                    // a negative add is left to boot validation: unlike a multiplier
+                    // it cannot poison a whole stack, so the asset is worth keeping
+                    // around to be reported by name
+                    return new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, value);
                 case "tapValueMultiplier":
-                    return ToMultiplier(ModifierTarget.TapValue, block.value, context, block.type);
+                    return ToMultiplier(ModifierTarget.TapValue, value, context, kind);
+                case "fanRateMultiplier":
+                    return ToMultiplier(ModifierTarget.FanRate, value, context, kind);
+                case "generatorOutputMultiplier":
+                    return ToMultiplier(ModifierTarget.GeneratorOutput, value, context, kind,
+                        new List<string> { generator });
+                case "currencyPerSecMultiplier":
+                {
+                    // an empty affects list could never apply, so the effect is never
+                    // written and the content naming it reports instead
+                    if (affects == null || affects.Length == 0)
+                    {
+                        Debug.LogError($"ChapterJsonImporter: {context} currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Refusing it - fix the JSON and re-import.");
+                        return null;
+                    }
+                    return ToMultiplier(ModifierTarget.CurrencyProduction, value, context, kind,
+                        new List<string>(affects));
+                }
+                case null:
+                case "":
+                    Debug.LogError($"ChapterJsonImporter: {context} names no effect.");
+                    return null;
                 default:
-                    Debug.LogError($"ChapterJsonImporter: {context} has unknown type '{block.type}' - no effect maps to it. Skipping it.");
+                    Debug.LogError($"ChapterJsonImporter: {context} names unknown effect '{kind}' - no GameEffect maps to it.");
                     return null;
             }
         }
+
+        // a reward entry authors its effect name under `type`
+        private static GameEffect ToRewardEffect(RewardEntryBlock block, string context)
+            => ToEffect(block.type, block.value, block.flag, block.generator, block.affects, context);
 
         // never write a multiplier that would zero or negate the product it lands
         // in: the effect is refused here and the content naming it reports loudly,
@@ -586,41 +629,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return new GrantModifierEffect(target, ModifierOperation.Multiply, value, qualifiers);
         }
 
+        // an upgrade authors its effect name under `payload.effect`; every upgrade
+        // must grant something, so an absent payload is a content error the boot
+        // validation pass reports against the upgrade
         private static GameEffect ToPayload(PayloadBlock block, string context)
-        {
-            switch (block?.effect)
-            {
-                case "setFlag":
-                    return new SetFlagEffect(block.flag);
-                case "tapValueAdd":
-                    // a negative add is left to boot validation: unlike a multiplier
-                    // it cannot poison a whole stack, so the asset is worth keeping
-                    // around to be reported by name
-                    return new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, block.value);
-                case "generatorOutputMultiplier":
-                    return ToMultiplier(ModifierTarget.GeneratorOutput, block.value, context, block.effect,
-                        new List<string> { block.generator });
-                case "currencyPerSecMultiplier":
-                {
-                    // an empty affects list could never apply; the upgrade imports
-                    // with no payload and boot validation reports that
-                    if (block.affects == null || block.affects.Length == 0)
-                    {
-                        Debug.LogError($"ChapterJsonImporter: {context} currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Importing no payload - fix the JSON and re-import.");
-                        return null;
-                    }
-                    return ToMultiplier(ModifierTarget.CurrencyProduction, block.value, context, block.effect,
-                        new List<string>(block.affects));
-                }
-                case null:
-                case "":
-                    Debug.LogError($"ChapterJsonImporter: {context} has no payload effect. Importing no payload.");
-                    return null;
-                default:
-                    Debug.LogError($"ChapterJsonImporter: {context} payload effect '{block.effect}' maps to no GameEffect. Importing no payload.");
-                    return null;
-            }
-        }
+            => ToEffect(block?.effect, block?.value ?? 0, block?.flag, block?.generator,
+                block?.affects, context);
 
         // A tier with no debuff block is legal content (the plain loop, design
         // doc section 6.1); an unknown effect is a content error.
@@ -781,6 +795,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string type = "";
             public double value;
             public string flag = "";
+
+            // a reward authors from the same effect vocabulary an upgrade payload
+            // does, so it carries the same parameter fields; which ones matter
+            // depends on the effect named by `type`
+            public string generator = "";
+            public string[] affects = Array.Empty<string>();
         }
 
         private class ChapterBlock
