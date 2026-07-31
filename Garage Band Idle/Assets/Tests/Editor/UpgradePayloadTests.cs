@@ -409,5 +409,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "GameEffect: Upgrade 'zero_amp' (payload) targets unknown generator id 'practice_amp'.");
             new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 0, new List<string> { "practice_amp" }).Validate(context, "Upgrade 'zero_amp' (payload)");
         }
+
+        // Now that one class carries the target and the operation as serialized
+        // enums, an asset can hold an int no member defines - a state the specialized
+        // payload classes could not represent, because each hardcoded both. Reported
+        // as undefined rather than as the uninitialized zero, which is a different
+        // mistake with a different cause.
+        [TestCase(99, 2, "GameEffect: Upgrade 'x' (payload) has modifier target 99, which no ModifierTarget defines.")]
+        [TestCase(1, 99, "GameEffect: Upgrade 'x' (payload) has modifier operation 99, which no ModifierOperation defines.")]
+        public void Validate_ReportsAnEnumValueNoMemberDefines(int target, int operation, string expected)
+        {
+            var context = TestContent.MakeContext(TestContent.MakeEconomy());
+
+            LogAssert.Expect(LogType.Error, expected);
+            new GrantModifierEffect((ModifierTarget)target, (ModifierOperation)operation, 1)
+                .Validate(context, "Upgrade 'x' (payload)");
+        }
     }
 }

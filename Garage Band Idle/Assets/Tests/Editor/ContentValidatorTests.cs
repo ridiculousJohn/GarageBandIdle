@@ -395,6 +395,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, rewards);
         }
 
+        // A tier's scope is how long its clear lasts, and whatever it pays projects
+        // from that clear - so an unscoped tier leaves the grant with no lifetime and
+        // no reset path, which ModifierSystem would then refuse at runtime. Zero is
+        // the uninitialized state a hand-built or un-migrated asset lands on.
+        [Test]
+        public void EventTierWithNoScope_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var rewards = new RewardManager(new[] { TestContent.MakeTapValueReward("tap_x2", 2) });
+            var unscoped = TestContent.MakeEvent("unscoped", new List<EventTier>
+            {
+                TestContent.MakeTier(1, "tap_x2", new CurrencyBalanceCondition("cash", 500),
+                    scope: ContentScope.None),
+            });
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                eventIds: new List<string> { "unscoped" });
+            var database = new ContentDatabase(chapters: new[] { ch1 }, events: new[] { unscoped });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Event 'unscoped' tier 1 has scope None (uninitialized) - a tier clear needs a declared lifetime for anything to project from.");
+            ContentValidator.Validate(database, context, rewards);
+        }
+
         // an event with no tiers has nothing to enter at all
         [Test]
         public void EventWithNoTiers_IsReported()

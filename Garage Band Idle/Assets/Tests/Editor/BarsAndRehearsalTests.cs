@@ -364,6 +364,46 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9, "the reset re-applies no rewards");
         }
 
+        // One reward ASSET, two lifetimes - the property a scope field on the reward
+        // could not express at all, rather than merely stated twice. The same id is
+        // paid by a run-scoped group and a permanent one, each grant takes the
+        // durability of the completion it projects from, and the run reset keeps
+        // exactly one of the two.
+        [Test]
+        public void OneRewardAsset_TakesADifferentLifetimeFromEachSourceApplyingIt()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
+            var rewards = new RewardManager(new[] { TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15) });
+
+            var bars = new[]
+            {
+                TestContent.MakeBar("cover_1", "rehearsal", 100, "fan_rate_x1_15"),
+                TestContent.MakeBar("song_1", "rehearsal", 100, "fan_rate_x1_15"),
+            };
+            var run = TestContent.MakeBarGroup("learn_covers", "covers", new List<string> { "cover_1" });
+            var permanent = TestContent.MakeBarGroup("setlist", "covers", new List<string> { "song_1" },
+                scope: ContentScope.PermanentInChapter);
+            var system = new BarSystem(new[] { run, permanent }, bars, currencies, rewards,
+                new EffectContext(currencies, flags, modifiers));
+
+            currencies.Add("rehearsal", 100);
+            ((PerBarContinuousRuntime)system.GetRuntime("learn_covers")).SetActiveBar("cover_1");
+            currencies.Add("rehearsal", 100);
+            ((PerBarContinuousRuntime)system.GetRuntime("setlist")).SetActiveBar("song_1");
+            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9,
+                "the one asset granted once per completion");
+
+            modifiers.ResetRunScoped();
+
+            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9,
+                "the run group's grant cleared, the permanent group's grant of the same asset stayed");
+        }
+
         // The group's scope is how long bar completion lasts, and the reward's grant
         // projects from that completion, so it inherits the same durability (design
         // doc rule 11) rather than declaring one. Both groups here pay the same kind

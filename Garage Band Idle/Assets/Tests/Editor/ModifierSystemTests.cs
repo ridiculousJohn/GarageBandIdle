@@ -18,6 +18,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
         private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Global(ModifierTarget.FanRate);
 
+        // A serialized enum is an int, so an asset can carry a value no member
+        // defines. Both writers come through IsAddressable, which is what keeps such
+        // a value out of the store. The operation case is the one that bites: the
+        // value guards test for Multiply and Add by name, so an undefined operation
+        // would slip past every one of them and then compose as a multiply - a zero
+        // there wipes the whole product for the rest of the run.
+        [Test]
+        public void Grant_RefusesAnEnumValueNoMemberDefines()
+        {
+            var modifiers = new ModifierSystem();
+
+            LogAssert.Expect(LogType.Error,
+                "ModifierSystem: Grant with target kind 99, which no ModifierTarget defines. Ignoring.");
+            modifiers.Grant(ModifierTargetKey.Global((ModifierTarget)99),
+                ModifierOperation.Multiply, ContentScope.Run, 2);
+
+            LogAssert.Expect(LogType.Error,
+                "ModifierSystem: Grant on 'TapValue' with operation 99, which no ModifierOperation defines. Ignoring.");
+            modifiers.Grant(TapValue, (ModifierOperation)99, ContentScope.Run, 0);
+
+            Assert.AreEqual(1.0, modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+                "the zero never reached the product it would have wiped");
+            Assert.AreEqual(0.0, modifiers.For(TapValue).Add.ToDouble(), 1e-9);
+        }
+
         [Test]
         public void UntargetedTarget_ComposesToIdentity()
         {

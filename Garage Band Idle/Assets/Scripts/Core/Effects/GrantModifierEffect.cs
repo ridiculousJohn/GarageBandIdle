@@ -24,6 +24,7 @@ namespace RidiculousGaming.GarageBandIdle
         private ModifierTarget _target;
 
         [SerializeField]
+        [ModifierQualifierId(nameof(_target))]
         [Tooltip("Generator or currency ids the modifier applies to, for the kinds that name one. Anything not listed is untouched.")]
         private List<string> _qualifiers = new();
 
@@ -66,9 +67,19 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Validate(ConditionContext context, string source)
         {
-            if (_target == ModifierTarget.None)
+            // A serialized enum is an int, so a hand-edited or un-migrated asset can
+            // hold a value no member defines. The specialized payload classes this
+            // replaced could not express that - each hardcoded its target and
+            // operation - so generalizing made two new broken states representable
+            // and they have to be named here rather than only failing closed later.
+            if (!Enum.IsDefined(typeof(ModifierTarget), _target))
+                Debug.LogError($"GameEffect: {source} has modifier target {(int)_target}, which no ModifierTarget defines.");
+            else if (_target == ModifierTarget.None)
                 Debug.LogError($"GameEffect: {source} names no modifier target (uninitialized).");
-            if (_operation == ModifierOperation.None)
+
+            if (!Enum.IsDefined(typeof(ModifierOperation), _operation))
+                Debug.LogError($"GameEffect: {source} has modifier operation {(int)_operation}, which no ModifierOperation defines.");
+            else if (_operation == ModifierOperation.None)
                 Debug.LogError($"GameEffect: {source} names no modifier operation (uninitialized).");
 
             // an Add of a negative amount subtracts with nothing to restore it, and
@@ -100,9 +111,12 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             }
 
+            // which registry resolves a qualifier follows from the target's declared
+            // definition family, the same mapping the inspector's dropdown reads
+            var family = ModifierTargetKey.QualifierDefinitionType(_target);
             foreach (var qualifier in _qualifiers)
             {
-                if (_target == ModifierTarget.CurrencyProduction)
+                if (family == typeof(CurrencyDefinition))
                 {
                     context.Currencies.ValidateReference(qualifier, source);
                     continue;

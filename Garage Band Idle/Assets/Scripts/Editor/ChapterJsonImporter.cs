@@ -546,7 +546,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
         }
 
-        // Maps a JSON payload ({ "effect": ... }) onto the UpgradePayload
+        // Maps a JSON payload ({ "effect": ... }) onto the GameEffect
         // subclass family. Every upgrade must grant something, so an absent or
         // unknown effect is a content error.
         // The JSON keeps friendly effect names rather than spelling out a modifier
@@ -617,7 +617,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     Debug.LogError($"ChapterJsonImporter: {context} has no payload effect. Importing no payload.");
                     return null;
                 default:
-                    Debug.LogError($"ChapterJsonImporter: {context} payload effect '{block.effect}' maps to no UpgradePayload subclass. Importing no payload.");
+                    Debug.LogError($"ChapterJsonImporter: {context} payload effect '{block.effect}' maps to no GameEffect. Importing no payload.");
                     return null;
             }
         }

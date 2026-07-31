@@ -31,7 +31,17 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 return;
             }
 
-            var definitionType = ((DefinitionIdAttribute)attribute).DefinitionType;
+            DrawIdPopup(position, property, label, ((DefinitionIdAttribute)attribute).DefinitionType);
+        }
+
+        // The popup itself, shared with ModifierQualifierIdDrawer so a qualifier
+        // whose family is resolved at draw time gets identical behavior - same
+        // ordering, same "(none)", same "<missing>" entry for a value that matches
+        // no asset. Two drawers exist only because they resolve the family
+        // differently, never because they present it differently.
+        internal static void DrawIdPopup(Rect position, SerializedProperty property, GUIContent label,
+            Type definitionType)
+        {
             var ids = GetIds(definitionType);
 
             var options = new List<string> { NoneLabel };

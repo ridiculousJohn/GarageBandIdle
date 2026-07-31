@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace RidiculousGaming.GarageBandIdle.Content
 {
     // How a bar group fills (design doc section 6). A polymorphic family
-    // serialized via [SerializeReference], like Condition and UpgradePayload:
+    // serialized via [SerializeReference], like Condition and GameEffect:
     // the concrete type IS the fill mode, so a mode can never be authored
     // without its handler. The chapter JSON's (fillMode, delivery) strings map
     // onto a subclass at import; runtime code never inspects a mode value.

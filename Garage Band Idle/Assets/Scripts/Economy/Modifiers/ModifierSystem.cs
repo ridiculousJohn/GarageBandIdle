@@ -148,9 +148,25 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // for, would silently modify a value nobody reads
         private static bool IsAddressable(ModifierTargetKey target, ModifierOperation operation, string source)
         {
+            // A serialized enum is an int, so an asset can hold a value no member
+            // defines. Both writers (Grant, AddDerived) come through here, which is
+            // what keeps such a value out of the store entirely: an undefined target
+            // would be filed as global and read by nobody, and an undefined
+            // operation is worse - IsApplicable's value guards test for Multiply and
+            // Add by name, so it would skip them all and then compose as a multiply.
+            if (!Enum.IsDefined(typeof(ModifierTarget), target.Kind))
+            {
+                Debug.LogError($"ModifierSystem: {source} with target kind {(int)target.Kind}, which no ModifierTarget defines. Ignoring.");
+                return false;
+            }
             if (target.Kind == ModifierTarget.None)
             {
                 Debug.LogError($"ModifierSystem: {source} with target kind None (uninitialized). Ignoring.");
+                return false;
+            }
+            if (!Enum.IsDefined(typeof(ModifierOperation), operation))
+            {
+                Debug.LogError($"ModifierSystem: {source} on '{target}' with operation {(int)operation}, which no ModifierOperation defines. Ignoring.");
                 return false;
             }
             if (operation == ModifierOperation.None)
