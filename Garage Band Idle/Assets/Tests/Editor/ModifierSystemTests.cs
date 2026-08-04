@@ -6,9 +6,11 @@ using UnityEngine.TestTools;
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
     // The modifier registry's own contracts. The load-bearing claims: one
-    // composition rule for every system, a run reset that is exact rather than
-    // reconstructive (which is why grants are kept individually instead of
-    // accumulated), and a target that addresses nothing is refused rather than
+    // composition rule for every system, a store that is REBUILT rather than
+    // filtered (which is why grants are kept individually instead of
+    // accumulated - a rebuild has to compose the same factors in the same
+    // order), a derived modifier untouched by that rebuild because its lifetime
+    // is its source's, and a target that addresses nothing refused rather than
     // silently stored.
     public class ModifierSystemTests
     {
@@ -17,6 +19,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
         private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Global(ModifierTarget.FanRate);
+
+        // a derived modifier with a fixed value: enough to assert that a store
+        // rebuild leaves derived modifiers standing, without dragging in the
+        // currency pool RecordsIncomeModifier reads
+        private class FixedDerived : DerivedModifier
+        {
+            private readonly ModifierTargetKey _target;
+            private readonly ModifierOperation _operation;
+            private readonly BigNumber _value;
+
+            public FixedDerived(ModifierTargetKey target, ModifierOperation operation, double value)
+            {
+                _target = target;
+                _operation = operation;
+                _value = value;
+            }
+
+            public override ModifierTargetKey Target => _target;
+            public override ModifierOperation Operation => _operation;
+            public override BigNumber Value => _value;
+        }
 
         // A serialized enum is an int, so an asset can carry a value no member
         // defines. Both writers come through IsAddressable, which is what keeps such
@@ -73,11 +96,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(48.0, composition.ApplyTo(5).ToDouble(), 1e-9, "(5 + 3) x 6");
         }
 
-        // grants are kept individually, so the reset removes exactly the
-        // run-scoped factors. A collapsed product could not do this: dividing
-        // 1.5 x 3 out of one number needs the history this keeps.
+        // The store is rebuilt, never filtered (design doc section 12, rule 6):
+        // ResetGranted empties it whatever the scopes were, and the permanent
+        // effects come back because the FACTS behind them come back. Asserting
+        // that a permanent grant is cleared here is not a gap - it is the
+        // property. A method that dropped run-scoped grants and left permanent
+        // ones would be a second mechanism for arriving at a modifier set,
+        // beside the projection, able to disagree with it silently.
+        //
+        // Grants are still kept individually rather than accumulated: what that
+        // buys after this change is that a rebuild composes the same factors in
+        // the same order, which a collapsed product could not reproduce.
         [Test]
-        public void ResetRunScoped_RemovesExactlyTheRunScopedGrants()
+        public void ResetGranted_ClearsEveryGrantWhateverItsScope()
         {
             var modifiers = new ModifierSystem();
 
@@ -87,35 +118,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             modifiers.Grant(TapValue, ModifierOperation.Add, ContentScope.Run, 10);
             modifiers.Grant(TapValue, ModifierOperation.Add, ContentScope.PermanentInChapter, 4);
 
-            Assert.IsTrue(modifiers.ResetRunScoped());
+            Assert.IsTrue(modifiers.ResetGranted());
 
             var composition = modifiers.For(TapValue);
-            Assert.AreEqual(4.0, composition.Add.ToDouble(), 1e-9, "only the permanent add survives");
-            Assert.AreEqual(2.0, composition.Multiply.ToDouble(), 1e-9, "only the permanent multiplier survives");
+            Assert.AreEqual(0.0, composition.Add.ToDouble(), 1e-9, "no grant survives a rebuild, permanent included");
+            Assert.AreEqual(1.0, composition.Multiply.ToDouble(), 1e-9, "the store composes to identity until the projection re-runs");
         }
 
         [Test]
-        public void ResetRunScoped_IsSilentAndFalseWhenNothingIsRunScoped()
+        public void ResetGranted_IsSilentAndFalseWhenThereIsNothingToClear()
         {
             var modifiers = new ModifierSystem();
-            modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.PermanentInChapter, 2);
+            modifiers.AddDerived(new FixedDerived(TapValue, ModifierOperation.Multiply, 2));
             var changes = 0;
             modifiers.Changed += _ => changes++;
 
-            Assert.IsFalse(modifiers.ResetRunScoped(), "nothing to clear");
+            Assert.IsFalse(modifiers.ResetGranted(), "nothing granted to clear");
             Assert.AreEqual(0, changes, "and nothing notified");
-            Assert.AreEqual(2.0, modifiers.For(TapValue).Multiply.ToDouble(), 1e-9);
+            Assert.AreEqual(2.0, modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+                "a derived modifier is untouched: its lifetime is its source's, so there is nothing to rebuild");
         }
 
         // state, then notify: every target settles before the first
         // notification, so no subscriber observes one target cleared while
-        // another still holds its run grants
+        // another still holds its grants
         [Test]
-        public void ResetRunScoped_SettlesEveryTargetBeforeNotifying()
+        public void ResetGranted_SettlesEveryTargetBeforeNotifying()
         {
             var modifiers = new ModifierSystem();
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
-            modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 3);
+            modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.PermanentInChapter, 3);
 
             var notifications = 0;
             var observedHalfReset = false;
@@ -127,7 +159,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     observedHalfReset = true;
             };
 
-            modifiers.ResetRunScoped();
+            modifiers.ResetGranted();
 
             Assert.AreEqual(2, notifications, "one notification per target that changed");
             Assert.IsFalse(observedHalfReset, "every subscriber sees all targets settled");

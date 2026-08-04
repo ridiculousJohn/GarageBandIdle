@@ -21,7 +21,7 @@ namespace RidiculousGaming.GarageBandIdle
     // structural: a signal that fires mid-mutation cannot reach an evaluator.
     public class ConditionContext : IDisposable
     {
-        public CurrencyManager Currencies { get; }
+        public ICurrencies Currencies { get; }
         public GeneratorSystem Generators { get; }
         public FlagSystem Flags { get; }
 
@@ -48,7 +48,7 @@ namespace RidiculousGaming.GarageBandIdle
         // the initial pass
         private bool _dirty = true;
 
-        public ConditionContext(CurrencyManager currencies, GeneratorSystem generators, FlagSystem flags,
+        public ConditionContext(ICurrencies currencies, GeneratorSystem generators, FlagSystem flags,
             string recordsCurrencyId = "records", ContentDatabase database = null, IBarCompletionSource bars = null)
         {
             Currencies = currencies;

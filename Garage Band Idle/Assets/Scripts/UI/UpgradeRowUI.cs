@@ -15,16 +15,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
         [SerializeField] private Button _buyButton;
         [SerializeField] private TextMeshProUGUI _buyLabel;
 
-        private GameManager _game;
+        private ChapterContext _context;
         private CurrencyDefinition _costDefinition;
 
         public Upgrade Upgrade { get; private set; }
 
-        public void Bind(GameManager game, Upgrade upgrade)
+        public void Bind(ChapterContext context, Upgrade upgrade)
         {
-            _game = game;
+            _context = context;
             Upgrade = upgrade;
-            _costDefinition = game.Currencies.GetDefinition(upgrade.Definition.CostCurrencyId);
+            _costDefinition = context.Economy.Currencies.GetDefinition(upgrade.Definition.CostCurrencyId);
 
             _buyButton.onClick.AddListener(HandleBuyClicked);
 
@@ -46,7 +46,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             // BuyUpgrade re-evaluates content unlocks; the module refreshes every
             // row off UpgradeApplied, so this row hides itself through Refresh
-            _game.BuyUpgrade(Upgrade);
+            _context.Game.BuyUpgrade(Upgrade);
         }
 
         // Availability and affordability are separate questions: an ungated or
@@ -54,14 +54,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // shows its price with the button disabled.
         public void Refresh()
         {
-            var available = _game.Upgrades.IsAvailable(Upgrade, _game.Conditions);
+            var available = _context.Economy.Upgrades.IsAvailable(Upgrade, _context.Economy.Conditions);
             gameObject.SetActive(available);
             if (!available)
                 return;
 
             // mirrors TryBuy's refusals, so the button is never enabled for a
             // purchase that would be refused
-            _buyButton.interactable = _game.Upgrades.CanAfford(Upgrade);
+            _buyButton.interactable = _context.Economy.Upgrades.CanAfford(Upgrade);
         }
     }
 }

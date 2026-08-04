@@ -14,7 +14,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
     public class PerBarContinuousFill : BarFillBehavior
     {
         public override BarGroupRuntime CreateRuntime(BarGroupDefinition group, List<BarState> bars,
-            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext)
+            ICurrencies currencies, RewardManager rewards, EffectContext effectContext)
             => new PerBarContinuousRuntime(group, bars, currencies, rewards, effectContext);
 
         // no authored fields, so nothing to resolve
@@ -34,7 +34,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public event Action ActiveBarChanged;
 
         public PerBarContinuousRuntime(BarGroupDefinition group, List<BarState> bars,
-            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext)
+            ICurrencies currencies, RewardManager rewards, EffectContext effectContext)
             : base(group, bars, currencies, rewards, effectContext) { }
 
         // player-directed targeting: null bar id clears the selection and lets

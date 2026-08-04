@@ -409,18 +409,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9,
                 "the one asset granted once per completion");
 
-            modifiers.ResetRunScoped();
+            TestContent.RunReset(modifiers, bars: system);
 
             Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9,
-                "the run group's grant cleared, the permanent group's grant of the same asset stayed");
+                "the run group's completion is gone so its grant did not come back; the permanent group's completion survived and re-granted the same asset");
         }
 
         // The group's scope is how long bar completion lasts, and the reward's grant
         // projects from that completion, so it inherits the same durability (design
         // doc rule 11) rather than declaring one. Both groups here pay the same kind
         // of reward and differ only in their own scope, so the effects half of a
-        // release (ModifierSystem.ResetRunScoped) has to split them: a cover's boost
-        // goes with the bars it came from, a setlist song's stays.
+        // release has to split them: a cover's boost
+        // goes with the bars it came from, a setlist song's stays. The release does
+        // that by resetting the run group's completions and re-projecting, so the
+        // cover's boost is absent because its FACT is absent.
         //
         // While the scope lived on the shared reward asset it could disagree with the
         // group paying it, and the disagreement was invisible: a run-scoped group
@@ -443,10 +445,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9,
                 "both grants stack while the run lives");
 
-            modifiers.ResetRunScoped();
+            TestContent.RunReset(modifiers, bars: bars);
 
             Assert.AreEqual(0.2 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9,
-                "the run group's grant cleared and the permanent group's survived");
+                "the run group's completion reset so its grant is not re-projected; the permanent group's survived and is");
         }
 
         // state-then-notify: by the time any BarProgressChanged subscriber

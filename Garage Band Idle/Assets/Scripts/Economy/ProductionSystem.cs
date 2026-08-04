@@ -28,7 +28,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         private readonly List<ProductionConfig> _tick = new();
         private readonly List<ProductionConfig> _tap = new();
-        private readonly CurrencyManager _currencies;
+        private readonly ICurrencies _currencies;
         private readonly ModifierSystem _modifiers;
         private readonly ConditionContext _conditions;
         private BigNumber _lastTapValue;
@@ -38,7 +38,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // nothing polls
         public event Action TapValueChanged;
 
-        public ProductionSystem(IEnumerable<ProducerDefinition> producers, CurrencyManager currencies,
+        public ProductionSystem(IEnumerable<ProducerDefinition> producers, ICurrencies currencies,
             ModifierSystem modifiers, ConditionContext conditions)
         {
             _currencies = currencies;

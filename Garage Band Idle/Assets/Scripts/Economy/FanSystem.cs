@@ -12,14 +12,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private static readonly ModifierTargetKey RateTarget = ModifierTargetKey.Global(ModifierTarget.FanRate);
 
         private readonly FansConfig _config;
-        private readonly CurrencyManager _currencies;
+        private readonly ICurrencies _currencies;
         private readonly GeneratorSystem _generators;
         private readonly FlagSystem _flags;
         private readonly ModifierSystem _modifiers;
 
         // the accrual currency and activation flag come from the chapter's fans
         // config (JSON), not from code
-        public FanSystem(FansConfig config, CurrencyManager currencies, GeneratorSystem generators,
+        public FanSystem(FansConfig config, ICurrencies currencies, GeneratorSystem generators,
             FlagSystem flags, ModifierSystem modifiers)
         {
             _config = config;

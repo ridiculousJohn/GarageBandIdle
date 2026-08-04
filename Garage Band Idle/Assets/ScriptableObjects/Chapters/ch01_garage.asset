@@ -37,6 +37,8 @@ MonoBehaviour:
   - covers
   - album
   _currencyIds:
+  - cash
+  - fans
   - rehearsal
   _producerIds:
   - jam

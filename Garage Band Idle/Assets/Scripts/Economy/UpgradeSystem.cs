@@ -11,11 +11,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // auto-applied: they are bought through TryBuy, which charges the declared
     // cost currency and grants the payload. Gate conditions are validated by the
     // boot validation pass (ContentValidator), not here.
-    public class UpgradeSystem
+    public class UpgradeSystem : IModifierFactSource
     {
         private readonly List<Upgrade> _upgrades = new();
         private readonly Dictionary<string, Upgrade> _byId = new();
-        private readonly CurrencyManager _currencies;
+        private readonly ICurrencies _currencies;
         private readonly EffectContext _effectContext;
 
         // fires once per upgrade when its payload is applied
@@ -29,7 +29,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public IReadOnlyList<Upgrade> All => _upgrades;
 
-        public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, CurrencyManager currencies,
+        public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, ICurrencies currencies,
             FlagSystem flags, ModifierSystem modifiers)
         {
             _currencies = currencies;
@@ -162,9 +162,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // type and never a name list, so an upgrade added later resets according
         // to what it declares.
         //
-        // This clears the LATCH only. The effects the purchases granted live in
-        // ModifierSystem and clear through its own ResetRunScoped, which is what
-        // keeps the release from having to know what any payload did.
+        // This clears the LATCH only, and the latch is the fact. The effects
+        // those purchases granted are rebuilt by re-projecting from the latches
+        // that survive (EconomyContext.ProjectModifiers), never edited in place,
+        // so the release still does not have to know what any payload did - it
+        // resets facts and asks for the projection again.
         //
         // Every latch settles before any notification fires, so no subscriber sees
         // one buff on offer again while another still reads as bought (state, then
@@ -190,6 +192,28 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             foreach (var upgrade in cleared)
                 UpgradeCleared?.Invoke(upgrade);
             return true;
+        }
+
+        public string FactSourceName => "upgrade purchase latches";
+
+        // The projection (design doc section 12, rule 6): every latched upgrade
+        // re-applies its payload, so the modifier store is rebuilt from the
+        // latches rather than from a memory of what was granted. Notifications
+        // are deliberately NOT re-fired - UpgradeApplied means "just acquired",
+        // and a projection is not an acquisition; a row that hid itself when
+        // bought is already hidden. Nothing latches or unlatches here, which is
+        // what makes this safe to run at any boundary.
+        public void ProjectModifiers()
+        {
+            foreach (var upgrade in _upgrades)
+            {
+                if (!upgrade.Applied)
+                    continue;
+
+                // a missing payload was already reported when the latch was set;
+                // a projection repeating it every boundary would be noise
+                upgrade.Definition.Payload?.Apply(_effectContext, upgrade.Definition.Scope);
+            }
         }
 
         private void Apply(Upgrade upgrade)

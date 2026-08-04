@@ -15,7 +15,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
     {
         // creates the runtime handler that owns this group's fill state
         public abstract BarGroupRuntime CreateRuntime(BarGroupDefinition group, List<BarState> bars,
-            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext);
+            ICurrencies currencies, RewardManager rewards, EffectContext effectContext);
 
         // load-time check that every id the behavior references resolves;
         // failures are reported loudly with the owning group named in source

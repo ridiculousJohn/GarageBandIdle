@@ -22,6 +22,47 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static RewardManager NoRewards => new(Array.Empty<RewardDefinition>());
 
+        // Currency group placement (design doc section 12, rule 12) is checked
+        // here and nowhere else: group assets are hand-authored, never generated
+        // from the chapter JSON, so there is no importer to refuse a bad
+        // combination at. Both cases describe an asset that already exists.
+        [Test]
+        public void GlobalGroupThatAlsoResetsOnRelease_IsReported()
+        {
+            var chapter = TestContent.MakeChapter("ch1", new List<string> { "fans" });
+            var incoherent = TestContent.MakeGroup("permanent", true, CurrencyPlacement.Global);
+            var database = new ContentDatabase(chapters: new[] { chapter },
+                currencyGroups: new[] { incoherent });
+            var context = new ConditionContext(TestContent.MakeEconomy(), null,
+                new FlagSystem(chapter.FlagIds), database: database);
+
+            // "resets on whose release?" has no answer - a global currency is
+            // held by a pool no release touches, so one of the two declarations
+            // is a mistake and nothing can tell which
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: currency group 'permanent' is placed Global and also resets on album release - a global currency is held by a pool no release touches, so the two cannot both be true.");
+
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        [Test]
+        public void GroupWithNoPlacement_IsReported()
+        {
+            var chapter = TestContent.MakeChapter("ch1", new List<string> { "fans" });
+            var unmigrated = TestContent.MakeGroup("run", true, CurrencyPlacement.None);
+            var database = new ContentDatabase(chapters: new[] { chapter },
+                currencyGroups: new[] { unmigrated });
+            var context = new ConditionContext(TestContent.MakeEconomy(), null,
+                new FlagSystem(chapter.FlagIds), database: database);
+
+            // the un-migrated field: its currencies land in no pool at all, so
+            // every balance in the group silently reads zero
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: currency group 'run' has no placement set (None) - its currencies would land in no pool and every balance would read zero. Set it to Chapter or Global.");
+
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
         [Test]
         public void Flags_ValidateAgainstTheOwningChapter_NotTheActiveOne()
         {

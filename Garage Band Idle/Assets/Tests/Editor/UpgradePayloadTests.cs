@@ -94,20 +94,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "fans")).Multiply.ToDouble(), 1e-9);
         }
 
-        // the scope travels with the grant, so a run-scoped buff clears on the
-        // album release and a permanent-in-chapter one survives it - the
-        // upgrade's declaration is the only place that lifetime is stated
+        // The upgrade's declaration is the only place a payload's lifetime is
+        // stated, and the release reads it off the FACT rather than off the store
+        // (design doc section 12, rule 6): a run-scoped latch clears, so
+        // re-projecting does not re-grant its add; a permanent-in-chapter latch
+        // survives, so re-projecting does.
         [TestCase(ContentScope.Run, 1.0)]
         [TestCase(ContentScope.PermanentInChapter, 2.0)]
         public void PayloadScope_DecidesWhatARunResetKeeps(ContentScope scope, double afterReset)
         {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(1, modifiers);
+            var tap = TestContent.MakeTapProduction(1, modifiers, currencies, flags);
+            var upgrades = new UpgradeSystem(new[]
+            {
+                // no gate = met from the start, so it latches on the first pass
+                TestContent.MakeUpgrade("tap_add", UpgradeType.ContentUnlock, scope, null,
+                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1)),
+            }, currencies, flags, modifiers);
 
-            new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1).Apply(Context(modifiers), scope);
+            upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
             Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9);
 
-            modifiers.ResetRunScoped();
+            TestContent.RunReset(modifiers, upgrades);
 
             Assert.AreEqual(afterReset, tap.TapValue.ToDouble(), 1e-9);
         }
@@ -132,9 +142,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
             Assert.AreEqual(5.0, tap.TapValue.ToDouble(), 1e-9, "base 1 + 4");
 
-            modifiers.ResetRunScoped();
+            TestContent.RunReset(modifiers, upgrades);
             Assert.AreEqual(5.0, tap.TapValue.ToDouble(), 1e-9,
-                "the definition's permanent-in-chapter scope reached the grant");
+                "the definition's permanent-in-chapter scope kept the latch, and the projection rebuilt the grant from it");
         }
 
         // buying charges the declared cost currency and grants the payload, and

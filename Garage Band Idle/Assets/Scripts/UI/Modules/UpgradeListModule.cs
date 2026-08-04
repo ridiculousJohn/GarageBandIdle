@@ -19,13 +19,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             _context = context;
 
-            foreach (var upgrade in context.Game.Upgrades.All)
+            foreach (var upgrade in context.Economy.Upgrades.All)
             {
                 if (upgrade.Definition.Type != UpgradeType.Buff)
                     continue;
 
                 var row = Instantiate(_rowPrefab, _listRoot);
-                row.Bind(context.Game, upgrade);
+                row.Bind(context, upgrade);
                 _rows.Add(row);
             }
 
@@ -35,9 +35,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // UpgradeApplied and UpgradeCleared stay separate because they are row
             // lifecycle rather than a gate: a row hides once bought and comes back
             // when the album release drops the latch.
-            context.Game.Conditions.Settled += HandleConditionsSettled;
-            context.Game.Upgrades.UpgradeApplied += HandleUpgradeApplied;
-            context.Game.Upgrades.UpgradeCleared += HandleUpgradeCleared;
+            context.Economy.Conditions.Settled += HandleConditionsSettled;
+            context.Economy.Upgrades.UpgradeApplied += HandleUpgradeApplied;
+            context.Economy.Upgrades.UpgradeCleared += HandleUpgradeCleared;
         }
 
         private void OnDestroy()
@@ -45,12 +45,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (_context == null)
                 return;
 
-            if (_context.Game.Conditions != null)
-                _context.Game.Conditions.Settled -= HandleConditionsSettled;
-            if (_context.Game.Upgrades != null)
+            if (_context.Economy.Conditions != null)
+                _context.Economy.Conditions.Settled -= HandleConditionsSettled;
+            if (_context.Economy.Upgrades != null)
             {
-                _context.Game.Upgrades.UpgradeApplied -= HandleUpgradeApplied;
-                _context.Game.Upgrades.UpgradeCleared -= HandleUpgradeCleared;
+                _context.Economy.Upgrades.UpgradeApplied -= HandleUpgradeApplied;
+                _context.Economy.Upgrades.UpgradeCleared -= HandleUpgradeCleared;
             }
         }
 

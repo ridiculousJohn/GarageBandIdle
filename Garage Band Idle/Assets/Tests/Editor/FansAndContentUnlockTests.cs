@@ -129,10 +129,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // Modifiers carry their scope, and the scope comes from whoever APPLIES the
-        // reward, not from the reward: the run reset (album release, event baseline)
-        // drops only the run-scoped grant. Both calls here use the same kind of
-        // reward and differ only in the lifetime the applying content declared,
+        // reward, not from the reward: both upgrades here carry the same kind of
+        // payload and differ only in the lifetime the applying content declared,
         // which is the whole point of keeping scope off the shared asset.
+        //
+        // The release is not a filter over the store (design doc section 12, rule
+        // 6). It resets the FACTS - here the purchase latches - and re-projects,
+        // so the run-scoped multiplier is absent because the latch that produced
+        // it is absent, and the permanent one is present because its latch is.
         [Test]
         public void FanRateMultipliers_RunResetKeepsPermanentInChapter()
         {
@@ -142,15 +146,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
             var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
-            var context = new EffectContext(currencies, flags, modifiers);
+            var upgrades = new UpgradeSystem(new[]
+            {
+                // no gate = met from the start, so both apply on the first pass
+                TestContent.MakeUpgrade("run_boost", UpgradeType.ContentUnlock, ContentScope.Run, null,
+                    new GrantModifierEffect(ModifierTarget.FanRate, ModifierOperation.Multiply, 1.5)),
+                TestContent.MakeUpgrade("permanent_boost", UpgradeType.ContentUnlock,
+                    ContentScope.PermanentInChapter, null,
+                    new GrantModifierEffect(ModifierTarget.FanRate, ModifierOperation.Multiply, 2.0)),
+            }, currencies, flags, modifiers);
 
-            TestContent.MakeFanRateReward("run_boost", 1.5).Apply(context, ContentScope.Run);
-            TestContent.MakeFanRateReward("permanent_boost", 2.0).Apply(context, ContentScope.PermanentInChapter);
+            upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
             Assert.AreEqual(0.2 * 1.5 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "both scopes stack");
 
-            modifiers.ResetRunScoped();
+            TestContent.RunReset(modifiers, upgrades);
 
-            Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "run reset keeps the permanent stack");
+            Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9,
+                "the run latch cleared so its multiplier was not re-projected; the permanent latch survived and was");
         }
 
         // fail closed on broken content: a non-positive factor (invalid data -
@@ -173,21 +185,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "the rate is untouched");
         }
 
-        // tap-value rewards target TapValue and stack per scope, mirroring
-        // fan-rate rewards: the run reset keeps the permanent-in-chapter stack
+        // tap-value payloads target TapValue and stack per scope, mirroring
+        // fan-rate ones: after the release resets the run latch and re-projects,
+        // only the permanent stack is rebuilt
         [Test]
         public void TapValueRewards_StackPerScope_AndRunResetKeepsPermanent()
         {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(2, modifiers);
-            var context = new EffectContext(TestContent.MakeEconomy(), new FlagSystem(), modifiers);
+            var tap = TestContent.MakeTapProduction(2, modifiers, currencies, flags);
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("run_x2", UpgradeType.ContentUnlock, ContentScope.Run, null,
+                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Multiply, 2.0)),
+                TestContent.MakeUpgrade("perm_x3", UpgradeType.ContentUnlock,
+                    ContentScope.PermanentInChapter, null,
+                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Multiply, 3.0)),
+            }, currencies, flags, modifiers);
 
-            TestContent.MakeTapValueReward("run_x2", 2.0).Apply(context, ContentScope.Run);
-            TestContent.MakeTapValueReward("perm_x3", 3.0).Apply(context, ContentScope.PermanentInChapter);
+            upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
             Assert.AreEqual(12.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
 
-            modifiers.ResetRunScoped();
-            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "the run reset keeps the permanent stack");
+            TestContent.RunReset(modifiers, upgrades);
+            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9,
+                "only the permanent latch was left to re-project");
         }
 
         // fail closed on broken content: a negative amount (invalid data - boot
@@ -250,10 +272,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tap.RefreshTapValue();
             Assert.AreEqual(1, changes, "a rejected value and another target's modifier move nothing");
 
-            modifiers.ResetRunScoped();
+            modifiers.ResetGranted();
             tap.RefreshTapValue();
-            Assert.AreEqual(2, changes, "clearing the run stack moved the value");
-            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x permanent 3 after the reset");
+            Assert.AreEqual(2, changes, "rebuilding the store moved the value");
+            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9,
+                "base 2: an emptied store composes to identity until the projection re-runs");
         }
 
         // A composing config may carry any gate the data model supports (rule

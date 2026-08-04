@@ -20,12 +20,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // split them rather than a silent divergence.
     public class RecordsIncomeModifier : DerivedModifier
     {
-        private readonly CurrencyManager _currencies;
+        private readonly ICurrencies _currencies;
         private readonly string _recordsCurrencyId;
         private readonly double _perRecord;
         private readonly ModifierTargetKey _target;
 
-        public RecordsIncomeModifier(CurrencyManager currencies, string recordsCurrencyId,
+        public RecordsIncomeModifier(ICurrencies currencies, string recordsCurrencyId,
             double perRecord, string affectedCurrencyId)
         {
             _currencies = currencies;

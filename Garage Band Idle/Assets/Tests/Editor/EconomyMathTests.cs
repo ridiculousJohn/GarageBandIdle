@@ -208,11 +208,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1.0, modifiers.For(fansTarget).Multiply.ToDouble(), 1e-9,
                 "an undeclared currency never inherits the Records buff");
 
-            // a run reset drops granted modifiers and leaves derived ones: the
-            // Records total is what governs this buff's lifetime
+            // rebuilding the grant store leaves derived modifiers standing: the
+            // Records total is what governs this buff's lifetime, and a total in
+            // a pool no release touches needs nothing re-applied
             modifiers.Grant(cashTarget, ModifierOperation.Multiply, ContentScope.Run, 3.0);
             Assert.AreEqual(3.6, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "granted x derived");
-            modifiers.ResetRunScoped();
+            modifiers.ResetGranted();
             Assert.AreEqual(1.2, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "the derived buff survives");
         }
 

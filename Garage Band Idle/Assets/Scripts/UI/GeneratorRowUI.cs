@@ -14,18 +14,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
         [SerializeField] private Button _buyButton;
         [SerializeField] private TextMeshProUGUI _buyLabel;
 
-        private GameManager _game;
+        private ChapterContext _context;
         private CurrencyDefinition _producesDefinition;
         private CurrencyDefinition _costDefinition;
 
         public Generator Generator { get; private set; }
 
-        public void Bind(GameManager game, Generator generator)
+        public void Bind(ChapterContext context, Generator generator)
         {
-            _game = game;
+            _context = context;
             Generator = generator;
-            _producesDefinition = game.Currencies.GetDefinition(generator.Definition.ProducesCurrencyId);
-            _costDefinition = game.Currencies.GetDefinition(generator.Definition.CostCurrencyId);
+            _producesDefinition = context.Economy.Currencies.GetDefinition(generator.Definition.ProducesCurrencyId);
+            _costDefinition = context.Economy.Currencies.GetDefinition(generator.Definition.CostCurrencyId);
 
             _buyButton.onClick.AddListener(HandleBuyClicked);
             Generator.OwnedChanged += Refresh;
@@ -43,7 +43,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void HandleBuyClicked()
         {
-            _game.BuyGenerator(Generator);
+            _context.Game.BuyGenerator(Generator);
         }
 
         public void Show()
@@ -88,7 +88,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // non-positive cost - the button is never enabled for a buy that
             // would be refused
             _buyButton.interactable = Generator.NextCost > BigNumber.Zero
-                && _game.Currencies.Get(Generator.Definition.CostCurrencyId) >= Generator.NextCost;
+                && _context.Economy.Currencies.Get(Generator.Definition.CostCurrencyId) >= Generator.NextCost;
         }
     }
 }

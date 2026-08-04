@@ -17,14 +17,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         [SerializeField] private Button _selectButton;
         [SerializeField] private TextMeshProUGUI _selectLabel;
 
-        private GameManager _game;
+        private ChapterContext _context;
         private PerBarContinuousRuntime _runtime;
 
         public BarState Bar { get; private set; }
 
-        public void Bind(GameManager game, PerBarContinuousRuntime runtime, BarState bar)
+        public void Bind(ChapterContext context, PerBarContinuousRuntime runtime, BarState bar)
         {
-            _game = game;
+            _context = context;
             _runtime = runtime;
             Bar = bar;
 
@@ -48,7 +48,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Refresh()
         {
             var definition = Bar.Definition;
-            var reward = _game.Rewards.Get(definition.RewardId);
+            var reward = _context.Economy.Rewards.Get(definition.RewardId);
             var rewardText = reward != null ? $" | {reward.DisplayName}" : "";
             _info.text = $"{definition.DisplayName}\n" +
                 $"{NumberFormatter.Format(Bar.Progress)} / {NumberFormatter.Format(definition.FillRequirement)}{rewardText}";

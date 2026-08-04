@@ -41,7 +41,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Initialize(ChapterContext context)
         {
             _context = context;
-            var bars = context.Game.Bars;
+            var bars = context.Economy.Bars;
 
             foreach (var group in bars.Groups)
             {
@@ -54,7 +54,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 foreach (var bar in runtime.Bars)
                 {
                     var row = Instantiate(_rowPrefab, _listRoot);
-                    row.Bind(context.Game, runtime, bar);
+                    row.Bind(context, runtime, bar);
                     row.gameObject.SetActive(context.Flags.IsSet(group.RevealFlagId));
                     _rows.Add(row);
 
@@ -80,7 +80,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             bars.BarProgressChanged += HandleBarChanged;
             bars.BarCompleted += HandleBarChanged;
-            context.Game.Currencies.BalanceChanged += HandleBalanceChanged;
+            context.Economy.Currencies.BalanceChanged += HandleBalanceChanged;
             context.Flags.FlagSet += HandleFlagSet;
 
             RefreshPool();
@@ -91,11 +91,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (_context == null)
                 return;
 
-            _context.Game.Bars.BarProgressChanged -= HandleBarChanged;
-            _context.Game.Bars.BarCompleted -= HandleBarChanged;
+            _context.Economy.Bars.BarProgressChanged -= HandleBarChanged;
+            _context.Economy.Bars.BarCompleted -= HandleBarChanged;
             foreach (var (runtime, handler) in _selectionHandlers)
                 runtime.ActiveBarChanged -= handler;
-            _context.Game.Currencies.BalanceChanged -= HandleBalanceChanged;
+            _context.Economy.Currencies.BalanceChanged -= HandleBalanceChanged;
             _context.Flags.FlagSet -= HandleFlagSet;
         }
 
@@ -157,7 +157,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void RefreshPool()
         {
             var lines = new List<string>(_pools.Count);
-            var production = _context.Game.Production;
+            var production = _context.Economy.Production;
             foreach (var pool in _pools)
             {
                 if (!IsRevealed(pool))
@@ -165,11 +165,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
                 // an unresolvable id is a content error GetDefinition already
                 // reported; the readout skips it rather than dying
-                var definition = _context.Game.Currencies.GetDefinition(pool.CurrencyId);
+                var definition = _context.Economy.Currencies.GetDefinition(pool.CurrencyId);
                 if (definition == null)
                     continue;
 
-                var line = $"{definition.DisplayName}: {NumberFormatter.Format(_context.Game.Currencies.Get(pool.CurrencyId))}";
+                var line = $"{definition.DisplayName}: {NumberFormatter.Format(_context.Economy.Currencies.Get(pool.CurrencyId))}";
                 if (production.HasProduction(pool.CurrencyId))
                     line += $" (+{NumberFormatter.Format(production.RatePerSecond(pool.CurrencyId))}/sec, +{NumberFormatter.Format(production.PerTap(pool.CurrencyId))}/tap)";
                 lines.Add(line);

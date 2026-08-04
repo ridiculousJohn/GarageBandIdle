@@ -4,10 +4,18 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // Holds balances for whatever CurrencyDefinition assets exist, keyed by
-    // currency id. Knows nothing about specific currencies or groups; behavior
-    // is driven by group flags, never by named ids.
-    public class CurrencyManager
+    // Holds balances for whatever CurrencyDefinition definitions it is given,
+    // keyed by currency id. Knows nothing about specific currencies or groups;
+    // behavior is driven by group flags, never by named ids.
+    //
+    // ONE pool, with no scope concept inside it (design doc section 12, rule
+    // 12): a currency's lifetime comes from who created the instance holding
+    // it, never from a flag read here. The startup pool and each economy
+    // context's pool are the same class with different owners - which is what
+    // makes an event sandbox or a replay economy a second instantiation rather
+    // than a second code path. Consumers reach one or several pools through
+    // ICurrencies (see CurrencyRouter) and cannot tell which.
+    public class CurrencyManager : ICurrencies
     {
         private readonly Dictionary<string, CurrencyDefinition> _definitions = new();
         private readonly Dictionary<string, CurrencyGroupDefinition> _groups = new();
@@ -63,6 +71,23 @@ namespace RidiculousGaming.GarageBandIdle
                 _lifetimeEarned.Add(definition.Id, BigNumber.Zero);
             }
         }
+
+        // Whether this pool holds the currency. Silent, unlike GetDefinition:
+        // the caller asking is deciding WHICH pool owns an id (CurrencyRouter's
+        // ownership map, boot's shadowing check), so a miss is the expected
+        // answer for every id another pool owns.
+        public bool Contains(string id) => !string.IsNullOrEmpty(id) && _definitions.ContainsKey(id);
+
+        // The group a currency is filed in, or null if the currency or its
+        // group reference does not resolve (both already reported at load).
+        // Placement and reset behavior are read from here, so validation asks
+        // one question of the asset rather than re-deriving the lookup.
+        public CurrencyGroupDefinition GetGroup(string currencyId)
+            => !string.IsNullOrEmpty(currencyId)
+               && _definitions.TryGetValue(currencyId, out var definition)
+               && _groups.TryGetValue(definition.GroupId ?? "", out var group)
+                ? group
+                : null;
 
         public CurrencyDefinition GetDefinition(string id)
         {

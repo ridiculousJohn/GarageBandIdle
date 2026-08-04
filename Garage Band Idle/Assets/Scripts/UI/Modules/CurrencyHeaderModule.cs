@@ -18,10 +18,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Initialize(ChapterContext context)
         {
             _context = context;
-            _cashDefinition = context.Game.Currencies.GetDefinition(GameManager.CashCurrencyId);
-            _fansDefinition = context.Game.Currencies.GetDefinition(GameManager.FansCurrencyId);
+            _cashDefinition = context.Economy.Currencies.GetDefinition(GameManager.CashCurrencyId);
+            _fansDefinition = context.Economy.Currencies.GetDefinition(GameManager.FansCurrencyId);
 
-            context.Game.Currencies.BalanceChanged += HandleBalanceChanged;
+            context.Economy.Currencies.BalanceChanged += HandleBalanceChanged;
             context.Flags.FlagSet += HandleFlagSet;
 
             _fansLabel.gameObject.SetActive(context.Flags.IsSet(GameManager.FansUnlockFlagId));
@@ -34,7 +34,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (_context == null)
                 return;
 
-            _context.Game.Currencies.BalanceChanged -= HandleBalanceChanged;
+            _context.Economy.Currencies.BalanceChanged -= HandleBalanceChanged;
             _context.Flags.FlagSet -= HandleFlagSet;
         }
 
@@ -57,7 +57,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void RefreshCash()
         {
-            var cash = _context.Game.Currencies.Get(GameManager.CashCurrencyId);
+            var cash = _context.Economy.Currencies.Get(GameManager.CashCurrencyId);
             _cashLabel.text = $"{_cashDefinition.DisplayName}: {NumberFormatter.Format(cash, _cashDefinition)}";
         }
 
@@ -68,9 +68,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (!_fansLabel.gameObject.activeSelf)
                 return;
 
-            var fans = _context.Game.Currencies.Get(GameManager.FansCurrencyId);
+            var fans = _context.Economy.Currencies.Get(GameManager.FansCurrencyId);
             _fansLabel.text = $"{_fansDefinition.DisplayName}: {NumberFormatter.Format(fans, _fansDefinition)}" +
-                $"  (+{NumberFormatter.Format(_context.Game.Fans.RatePerSecond)}/s)";
+                $"  (+{NumberFormatter.Format(_context.Economy.Fans.RatePerSecond)}/s)";
         }
     }
 }

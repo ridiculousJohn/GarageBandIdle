@@ -15,3 +15,4 @@ MonoBehaviour:
   _id: permanent
   _displayName: Permanent
   _resetsOnAlbumRelease: 0
+  _placement: 2

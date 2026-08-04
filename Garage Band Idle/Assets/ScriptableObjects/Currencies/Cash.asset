@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 99356da217644a6a9208906ccea68a6b, type: 3}
   m_Name: Cash
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   _id: cash
   _displayName: Cash
   _groupId: run

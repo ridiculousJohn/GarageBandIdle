@@ -15,7 +15,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
     // state transitions - run reset and save restore - live here, because bar
     // progress is shared state: both settle every group completely before any
     // notification fires (state, then notify).
-    public class BarSystem : IBarCompletionSource
+    public class BarSystem : IBarCompletionSource, Economy.IModifierFactSource
     {
         private readonly Dictionary<string, BarGroupRuntime> _groups = new();
         private readonly List<BarGroupDefinition> _groupOrder = new();
@@ -25,7 +25,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public event Action<BarState> BarCompleted;
 
         public BarSystem(IReadOnlyList<BarGroupDefinition> groups, IEnumerable<BarDefinition> bars,
-            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext)
+            ICurrencies currencies, RewardManager rewards, EffectContext effectContext)
         {
             var barsById = new Dictionary<string, BarDefinition>();
             foreach (var bar in bars)
@@ -182,6 +182,20 @@ namespace RidiculousGaming.GarageBandIdle.Content
                 BarProgressChanged?.Invoke(bar);
             foreach (var runtime in changedModes)
                 runtime.NotifyModeStateChanged();
+        }
+
+        public string FactSourceName => "completed bars";
+
+        // The projection (design doc section 12, rule 6): every group re-applies
+        // the rewards of the bars it currently records as completed. Group order
+        // is the chapter's declaration order rather than dictionary order, so a
+        // rebuild composes its grants in the same sequence every time - which
+        // matters the moment two rewards target one stat with a mix of adds and
+        // multiplies.
+        public void ProjectModifiers()
+        {
+            foreach (var definition in _groupOrder)
+                _groups[definition.Id].ProjectCompletedRewards();
         }
 
         // completed bars in the group this run, for barsCompleted conditions

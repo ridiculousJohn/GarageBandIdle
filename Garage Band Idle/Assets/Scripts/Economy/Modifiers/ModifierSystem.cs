@@ -117,21 +117,39 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return new ModifierComposition(add, multiply);
         }
 
-        // The run reset (album release, event baseline): drops every run-scoped
-        // grant and keeps permanent-in-chapter ones. Derived modifiers are
-        // untouched by design. Every target settles before any notification
-        // fires, so no subscriber observes one target cleared while another
-        // still holds its run grants (state, then notify). Returns whether
-        // anything changed, so a no-op reset stays silent.
-        public bool ResetRunScoped()
+        // Empties the grant store so a projection can rebuild it (design doc
+        // section 12, rule 6). Derived modifiers are untouched: they carry no
+        // scope because their lifetime is their source's, so there is nothing
+        // here to rebuild for them.
+        //
+        // This is deliberately total rather than selective. The method it
+        // replaced dropped run-scoped grants and left permanent ones sitting in
+        // place, which made a release and a load two different mechanisms for
+        // arriving at one modifier set - written by different slices, exercised
+        // on different days, and able to disagree without anything noticing.
+        // Re-projection is now the only door a modifier enters through, so a
+        // boundary clears everything and re-runs the projection over the facts
+        // that survived it; a store that gets rebuilt cannot hold a stale or
+        // double-counted effect. Nothing may call this without projecting
+        // afterwards - EconomyContext.ProjectModifiers is the only caller, and
+        // it does both halves.
+        //
+        // Every target settles before any notification fires, so no subscriber
+        // observes one target cleared while another still holds its grants
+        // (state, then notify). Returns whether anything changed, so a no-op
+        // stays silent.
+        public bool ResetGranted()
         {
-            List<ModifierTargetKey> cleared = null;
+            if (_granted.Count == 0)
+                return false;
 
+            List<ModifierTargetKey> cleared = null;
             foreach (var entry in _granted)
             {
-                if (entry.Value.RemoveAll(granted => granted.Scope == ContentScope.Run) == 0)
+                if (entry.Value.Count == 0)
                     continue;
 
+                entry.Value.Clear();
                 cleared ??= new List<ModifierTargetKey>();
                 cleared.Add(entry.Key);
             }

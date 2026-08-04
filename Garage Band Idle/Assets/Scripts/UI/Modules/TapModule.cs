@@ -19,22 +19,22 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Initialize(ChapterContext context)
         {
             _context = context;
-            _cashDefinition = context.Game.Currencies.GetDefinition(GameManager.CashCurrencyId);
+            _cashDefinition = context.Economy.Currencies.GetDefinition(GameManager.CashCurrencyId);
             RefreshLabel();
-            context.Game.Production.TapValueChanged += RefreshLabel;
+            context.Economy.Production.TapValueChanged += RefreshLabel;
             _jamButton.onClick.AddListener(HandleJamClicked);
         }
 
         private void OnDestroy()
         {
             if (_context != null)
-                _context.Game.Production.TapValueChanged -= RefreshLabel;
+                _context.Economy.Production.TapValueChanged -= RefreshLabel;
             _jamButton.onClick.RemoveListener(HandleJamClicked);
         }
 
         private void RefreshLabel()
         {
-            _jamLabel.text = $"JAM\n<size=44>+{NumberFormatter.Format(_context.Game.Production.TapValue, _cashDefinition)} per tap</size>";
+            _jamLabel.text = $"JAM\n<size=44>+{NumberFormatter.Format(_context.Economy.Production.TapValue, _cashDefinition)} per tap</size>";
         }
 
         private void HandleJamClicked()

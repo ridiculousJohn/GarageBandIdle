@@ -10,11 +10,11 @@ namespace RidiculousGaming.GarageBandIdle
     // Grows as effect kinds need more of the game (roadie pool, catalog, ...).
     public class EffectContext
     {
-        public CurrencyManager Currencies { get; }
+        public ICurrencies Currencies { get; }
         public FlagSystem Flags { get; }
         public ModifierSystem Modifiers { get; }
 
-        public EffectContext(CurrencyManager currencies, FlagSystem flags, ModifierSystem modifiers)
+        public EffectContext(ICurrencies currencies, FlagSystem flags, ModifierSystem modifiers)
         {
             Currencies = currencies;
             Flags = flags;

@@ -26,6 +26,7 @@ namespace RidiculousGaming.GarageBandIdle
         {
             ValidateRecordsSurviveRelease(context);
             ValidateChapterIndices(database);
+            ValidateCurrencyPlacement(database);
 
             var visited = new Visited();
             foreach (var chapter in database.Chapters.All)
@@ -72,6 +73,35 @@ namespace RidiculousGaming.GarageBandIdle
         {
             if (context.Currencies.ResetsOnAlbumRelease(context.RecordsCurrencyId))
                 Debug.LogError($"ContentValidator: Records currency '{context.RecordsCurrencyId}' is in a currency group that resets on album release - permanent progress would return to zero every release.");
+        }
+
+        // Placement decides which pool holds a group's balances (design doc
+        // section 12, rule 12), and this is the ONLY enforcement point for it:
+        // currency group assets are hand-authored, never generated from the
+        // chapter JSON, so there is no import step to refuse a bad combination
+        // at. Both checks below describe assets that already exist rather than
+        // JSON someone is about to write.
+        //
+        // None is the un-migrated field: a group added before placement existed,
+        // or created by hand and left at the default. Its currencies would land
+        // in no pool at all - not in the chapter's roster, since a global check
+        // would not match, and not in the startup pool either - so every balance
+        // in the group silently reads zero.
+        //
+        // Global + resetsOnAlbumRelease has no coherent reading: "resets on whose
+        // release?" A global currency is held by a pool no release touches, so
+        // one of the two declarations is a mistake and there is no way to tell
+        // which. Reported rather than resolved by precedence, because guessing
+        // would either wipe permanent progress or silently keep a run currency.
+        private static void ValidateCurrencyPlacement(ContentDatabase database)
+        {
+            foreach (var group in database.CurrencyGroups.All)
+            {
+                if (group.Placement == CurrencyPlacement.None)
+                    Debug.LogError($"ContentValidator: currency group '{group.Id}' has no placement set (None) - its currencies would land in no pool and every balance would read zero. Set it to Chapter or Global.");
+                else if (group.Placement == CurrencyPlacement.Global && group.ResetsOnAlbumRelease)
+                    Debug.LogError($"ContentValidator: currency group '{group.Id}' is placed Global and also resets on album release - a global currency is held by a pool no release touches, so the two cannot both be true.");
+            }
         }
 
         // The starting chapter is the lowest index (GameManager) and advancement

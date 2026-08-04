@@ -14,7 +14,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         private readonly RewardManager _rewards;
         private readonly EffectContext _effectContext;
 
-        protected readonly CurrencyManager Currencies;
+        protected readonly ICurrencies Currencies;
 
         public BarGroupDefinition Group { get; }
         public IReadOnlyList<BarState> Bars => _bars;
@@ -23,7 +23,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public event Action<BarState> Completed;
 
         protected BarGroupRuntime(BarGroupDefinition group, List<BarState> bars,
-            CurrencyManager currencies, RewardManager rewards, EffectContext effectContext)
+            ICurrencies currencies, RewardManager rewards, EffectContext effectContext)
         {
             Group = group;
             _bars = bars;
@@ -67,6 +67,26 @@ namespace RidiculousGaming.GarageBandIdle.Content
                 _rewards.Apply(bar.Definition.RewardId, _effectContext, Group.Scope);
 
             Completed?.Invoke(bar);
+        }
+
+        // The projection side of a completion (design doc section 12, rule 6):
+        // re-applies the reward of every bar currently recorded as completed,
+        // with the group's scope as that reward's lifetime - the same single
+        // declaration NotifyCompleted uses, so a live completion and a projected
+        // one can never grant different strengths.
+        //
+        // Deliberately silent: Completed is the occurrence signal and a
+        // projection is not an occurrence. That is also what makes this the
+        // mechanism rule 6 wants for a restored completion, which RestoreProgress
+        // records as fact without firing anything - the fact is in the bar state,
+        // and the effect follows from re-reading it.
+        internal void ProjectCompletedRewards()
+        {
+            foreach (var bar in _bars)
+            {
+                if (bar.Completed && !string.IsNullOrEmpty(bar.Definition.RewardId))
+                    _rewards.Apply(bar.Definition.RewardId, _effectContext, Group.Scope);
+            }
         }
 
         // Mode-state reconciliation hooks for the host's atomic transitions

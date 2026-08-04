@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -23,25 +24,31 @@ namespace RidiculousGaming.GarageBandIdle.UI
         }
 
         private GameManager _game;
+        private EconomyContext _economy;
         private ChapterContext _context;
         private readonly List<SectionInstance> _sections = new();
 
         private void Start()
         {
             _game = GameManager.Instance;
-            if (_game == null || _game.CurrentChapter == null)
+
+            // the screen shows the chapter being played forward, so it binds the
+            // frontier economy specifically rather than "whatever has focus" -
+            // an event sandbox taking focus (slice 8) does not repaint this
+            _economy = _game?.Frontier;
+            if (_economy == null)
             {
                 // GameManager already logged the missing-content error
                 return;
             }
 
-            _context = new ChapterContext(_game, _game.CurrentChapter, _game.Flags);
+            _context = new ChapterContext(_game, _economy);
 
-            foreach (var section in _game.Sections)
+            foreach (var section in _economy.Sections)
                 _sections.Add(BuildSection(section));
 
             if (_sections.Count == 0)
-                Debug.LogError($"ChapterScreen: chapter '{_game.CurrentChapter.Id}' has no sections - nothing to show. Re-run the chapter import.");
+                Debug.LogError($"ChapterScreen: chapter '{_economy.Chapter.Id}' has no sections - nothing to show. Re-run the chapter import.");
 
             // One subscription for every condition input there is: the context
             // holds the individual signals (balances, flags, owned counts,
@@ -49,7 +56,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // a visibleWhen gate is never asked about half-applied state and this
             // screen has no list of inputs to keep in step with the Condition
             // vocabulary.
-            _game.Conditions.Settled += HandleConditionsSettled;
+            _economy.Conditions.Settled += HandleConditionsSettled;
 
             // no drain has run yet, so the opening reveal is asked for directly
             EvaluateSections();
@@ -57,11 +64,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void OnDestroy()
         {
-            if (_game == null)
-                return;
-
-            if (_game.Conditions != null)
-                _game.Conditions.Settled -= HandleConditionsSettled;
+            if (_economy?.Conditions != null)
+                _economy.Conditions.Settled -= HandleConditionsSettled;
 
             foreach (var section in _sections)
             {
@@ -112,7 +116,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             {
                 if (section.Revealed)
                     continue;
-                if (!ConditionEvaluator.IsMet(section.Definition.VisibleWhen, _game.Conditions))
+                if (!ConditionEvaluator.IsMet(section.Definition.VisibleWhen, _economy.Conditions))
                     continue;
 
                 section.Revealed = true;

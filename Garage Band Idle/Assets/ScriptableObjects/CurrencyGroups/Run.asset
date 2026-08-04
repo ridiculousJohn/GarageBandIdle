@@ -15,3 +15,4 @@ MonoBehaviour:
   _id: run
   _displayName: Run
   _resetsOnAlbumRelease: 1
+  _placement: 1

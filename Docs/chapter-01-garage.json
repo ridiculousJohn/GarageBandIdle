@@ -206,6 +206,15 @@
 
   "currencies": [
     {
+      "id": "cash",
+      "group": "run",
+      "note": "The chapter's full local currency roster (design doc §12 rule 12): the economy context builds its pool from THIS list, never from every imported currency, so a currency belongs to exactly one economy. Chapter-placed groups only - a global currency (records) is held by the startup pool and naming it here is refused."
+    },
+    {
+      "id": "fans",
+      "group": "run"
+    },
+    {
       "id": "rehearsal",
       "group": "run",
       "note": "Rehearsal is a plain run-scoped currency: pure state — a balance, a group, formatting (design doc §12 rule 13). How it is earned lives on the jam producer below, never here, and consumers (bars) reference it by id. `group` is the CurrencyGroupDefinition id the currency belongs to (reset behavior comes from the group's flags, like every currency)."

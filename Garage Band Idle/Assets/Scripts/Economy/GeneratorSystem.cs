@@ -15,7 +15,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly List<Generator> _generators = new();
         private readonly Dictionary<string, Generator> _byId = new();
         private readonly List<string> _producedCurrencyIds = new();
-        private readonly CurrencyManager _currencies;
+        private readonly ICurrencies _currencies;
         private readonly ModifierSystem _modifiers;
 
         // fires once per generator when its unlock conditions are first met
@@ -30,7 +30,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // Content errors (duplicate/empty ids, unresolvable produces currencies)
         // are reported at load so they surface immediately instead of as
         // silently-never-producing rows.
-        public GeneratorSystem(IEnumerable<GeneratorDefinition> definitions, CurrencyManager currencies,
+        public GeneratorSystem(IEnumerable<GeneratorDefinition> definitions, ICurrencies currencies,
             ModifierSystem modifiers)
         {
             _currencies = currencies;

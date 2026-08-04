@@ -120,8 +120,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var manager = LoadCurrencyManager();
             var groups = LoadAllIn<CurrencyGroupDefinition>(GroupsFolder);
 
-            foreach (var (currencyId, resets) in new[]
-                { ("cash", true), ("fans", true), ("rehearsal", true), ("records", false) })
+            // Placement is what decides which POOL holds the balance (design doc
+            // section 12, rule 12), and it is asserted here because nothing else
+            // can: the group assets are hand-authored, so a placement left at
+            // None or filed wrong is not a JSON mistake anyone re-imports away.
+            // Records placed Chapter would put permanent progress in the run pool
+            // and lose it on the first release.
+            foreach (var (currencyId, resets, placement) in new[]
+            {
+                ("cash", true, CurrencyPlacement.Chapter),
+                ("fans", true, CurrencyPlacement.Chapter),
+                ("rehearsal", true, CurrencyPlacement.Chapter),
+                ("records", false, CurrencyPlacement.Global),
+            })
             {
                 var definition = manager.GetDefinition(currencyId);
                 Assert.IsNotNull(definition, $"currency '{currencyId}' exists");
@@ -130,6 +141,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsNotNull(group, $"currency '{currencyId}' resolves its group '{definition.GroupId}'");
                 Assert.AreEqual(resets, group.ResetsOnAlbumRelease,
                     $"currency '{currencyId}' album-release reset behavior");
+                Assert.AreEqual(placement, group.Placement,
+                    $"currency '{currencyId}' pool placement");
             }
         }
 
@@ -193,7 +206,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void JamProducer_MatchesJson()
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
-            CollectionAssert.AreEqual(new[] { "rehearsal" }, chapter.CurrencyIds);
+
+            // the chapter's full local roster (design doc section 12, rule 12) -
+            // the economy context builds its pool from exactly this list, so a
+            // currency missing here has no balance at runtime. Records is absent
+            // on purpose: it is placed Global and lives in the startup pool.
+            CollectionAssert.AreEqual(new[] { "cash", "fans", "rehearsal" }, chapter.CurrencyIds,
+                "if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the roster");
             CollectionAssert.AreEqual(new[] { "jam" }, chapter.ProducerIds,
                 "the jam producer - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
 

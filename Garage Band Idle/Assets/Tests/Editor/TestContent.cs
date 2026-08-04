@@ -26,13 +26,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Created.Clear();
         }
 
-        public static CurrencyGroupDefinition MakeGroup(string id, bool resetsOnAlbumRelease)
+        // Placement defaults to Chapter because that is what almost every
+        // fixture wants: one flat pool standing in for a chapter's economy.
+        // A fixture testing placement itself passes it explicitly.
+        public static CurrencyGroupDefinition MakeGroup(string id, bool resetsOnAlbumRelease,
+            CurrencyPlacement placement = CurrencyPlacement.Chapter)
         {
             var definition = Track(ScriptableObject.CreateInstance<CurrencyGroupDefinition>());
             var serialized = new SerializedObject(definition);
             serialized.FindProperty("_id").stringValue = id;
             serialized.FindProperty("_displayName").stringValue = id;
             serialized.FindProperty("_resetsOnAlbumRelease").boolValue = resetsOnAlbumRelease;
+            // intValue, not enumValueIndex: the serialized form is the enum's
+            // VALUE (a save contract, explicitly numbered), and index-vs-value
+            // only coincide while no value is skipped
+            serialized.FindProperty("_placement").intValue = (int)placement;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return definition;
         }
@@ -195,9 +203,34 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // evaluation context over live test systems; no ContentDatabase, which
         // makes Validate fall back to the systems themselves
-        public static ConditionContext MakeContext(CurrencyManager currencies,
+        public static ConditionContext MakeContext(ICurrencies currencies,
             GeneratorSystem generators = null, FlagSystem flags = null)
             => new(currencies, generators, flags);
+
+        // The run reset exactly as slice 6's release will perform it (design doc
+        // section 12, rule 6): reset the FACTS that declare a run lifetime, then
+        // rebuild the modifier store by re-projecting from whatever facts
+        // survived. Nothing filters the store - a run-scoped effect disappears
+        // because the fact behind it is gone, not because anything went looking
+        // for grants to remove.
+        //
+        // This is the shape every test asserting "what a release keeps" now
+        // uses, so the tests exercise the mechanism the release will use rather
+        // than a reset call that only existed for them.
+        public static void RunReset(ModifierSystem modifiers, UpgradeSystem upgrades = null,
+            BarSystem bars = null, GeneratorSystem generators = null)
+        {
+            // facts first, all of them, before the store is touched: a
+            // projection that ran against half-reset facts would rebuild
+            // effects the release is in the middle of removing
+            upgrades?.ResetRunScoped();
+            bars?.ResetRunScopedGroups();
+            generators?.ResetOwned();
+
+            modifiers.ResetGranted();
+            upgrades?.ProjectModifiers();
+            bars?.ProjectModifiers();
+        }
 
         // grants exactly enough of the cost currency for each purchase so tests
         // control balances

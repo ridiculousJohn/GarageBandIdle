@@ -67,7 +67,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // buys one unit if affordable; deducts the declared cost currency -
         // never the produced currency - and bumps Owned
-        public bool TryBuy(CurrencyManager currencies)
+        public bool TryBuy(ICurrencies currencies)
         {
             var cost = NextCost;
 
