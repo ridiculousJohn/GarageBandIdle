@@ -31,6 +31,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private const string ChaptersFolder = "Assets/ScriptableObjects/Chapters";
         private const string SectionsFolder = "Assets/ScriptableObjects/Sections";
         private const string CurrenciesFolder = "Assets/ScriptableObjects/Currencies";
+        private const string ProducersFolder = "Assets/ScriptableObjects/Producers";
         private const string GeneratorsFolder = "Assets/ScriptableObjects/Generators";
         private const string UpgradesFolder = "Assets/ScriptableObjects/Upgrades";
         private const string BarsFolder = "Assets/ScriptableObjects/Bars";
@@ -83,39 +84,55 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     flagIds.Add(flag.id);
             }
 
-            // currencies the chapter JSON declares (fill currencies): the
-            // currency OWNS its earn config (design doc section 3) - generate
-            // it like any other content so bars' fillCurrency ids resolve on
-            // load, and list it on the chapter so engagement earn runs only
-            // for the owning chapter (flag ids may repeat across chapters).
+            // currencies the chapter JSON declares (fill currencies): pure
+            // state ({id, group}) - generate them like any other content so
+            // bars' fillCurrency ids resolve on load. How a currency is earned
+            // lives on producers (design doc section 12, rule 13), never here.
             // Hand-authored currencies (cash, fans, records) are not in this
             // array and are left alone.
             var currencyIds = new List<string>();
             foreach (var block in data.currencies ?? Array.Empty<CurrencyEntryBlock>())
             {
+                if (!IsImportableCurrencyEntry(block))
+                    continue;
+
+                var currencyAsset = LoadOrCreate<CurrencyDefinition>($"{CurrenciesFolder}/{block.id}.asset");
+                ApplyIfChanged(currencyAsset, asset => asset.EditorInitialize(block.id,
+                    ToDisplayName(block.id), block.group));
+                currencyIds.Add(block.id);
+            }
+
+            // producers: the module-held production sources (design doc
+            // section 12, rule 13) - what the Jam button yields per tap, plus
+            // Rehearsal's passive trickle. Config gates are ordinary
+            // Conditions; an invalid entry skips the whole producer, because a
+            // producer missing one of its yields is not the authored producer.
+            var producerIds = new List<string>();
+            foreach (var block in data.producers ?? Array.Empty<ProducerBlock>())
+            {
                 if (string.IsNullOrEmpty(block.id))
                 {
-                    Debug.LogError("ChapterJsonImporter: currencies array contains an entry with an empty id. Skipping it.");
+                    Debug.LogError("ChapterJsonImporter: producers array contains an entry with an empty id. Skipping it.");
                     continue;
                 }
-                // negative earn drains instead of earns, and earn values with
-                // no reveal flag can never activate - never write those states
-                if (block.earn.perSec < 0 || block.earn.perTap < 0)
+                if (producerIds.Contains(block.id))
                 {
-                    Debug.LogError($"ChapterJsonImporter: currency '{block.id}' has negative earn values. Skipping it - fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: duplicate producer id '{block.id}'. Keeping the first.");
                     continue;
                 }
-                if ((block.earn.perSec > 0 || block.earn.perTap > 0) && string.IsNullOrEmpty(block.earn.revealFlag))
+                if (string.IsNullOrEmpty(block.module))
                 {
-                    Debug.LogError($"ChapterJsonImporter: currency '{block.id}' has earn values but no revealFlag - the earn could never activate. Skipping it - fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: producer '{block.id}' names no module. Skipping it - fix the JSON and re-import.");
                     continue;
                 }
 
-                var currencyAsset = LoadOrCreate<CurrencyDefinition>($"{CurrenciesFolder}/{block.id}.asset");
-                var earn = new EngagementEarnConfig(block.earn.revealFlag, block.earn.perSec, block.earn.perTap);
-                ApplyIfChanged(currencyAsset, asset => asset.EditorInitialize(block.id,
-                    ToDisplayName(block.id), block.group, earn));
-                currencyIds.Add(block.id);
+                var configs = ToProductionConfigs(block);
+                if (configs == null)
+                    continue;
+
+                var producerAsset = LoadOrCreate<ProducerDefinition>($"{ProducersFolder}/{block.id}.asset");
+                ApplyIfChanged(producerAsset, asset => asset.EditorInitialize(block.id, block.module, configs));
+                producerIds.Add(block.id);
             }
 
             // rewards first: bars and event tiers reference the pool by id, so
@@ -283,8 +300,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             // validation reports it too
             if ((data.fans?.baseFansPerSec ?? 0) < 0 || (data.fans?.perBandmateOwnedBonus ?? 0) < 0)
                 Debug.LogError("ChapterJsonImporter: fans block has negative earn values. Fix the JSON and re-import.");
-            if ((data.constants?.tapBaseValue ?? 1) < 0)
-                Debug.LogError("ChapterJsonImporter: constants block has a negative tapBaseValue. Fix the JSON and re-import.");
+            // the pre-5.4 schema put the Jam yield in constants; a leftover
+            // tapBaseValue would silently disagree with the jam producer's
+            // cash config, so its presence is refused rather than dropped
+            if (data.constants?.tapBaseValue != null)
+                Debug.LogError("ChapterJsonImporter: constants block still carries tapBaseValue - the Jam yield lives on the jam producer's cash config (design doc section 12, rule 13). Fix the JSON and re-import.");
             if ((data.constants?.recordBuff?.perRecord ?? 0) < 0)
                 Debug.LogError("ChapterJsonImporter: recordBuff block has a negative perRecord. Fix the JSON and re-import.");
 
@@ -295,16 +315,16 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0);
             ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
                 data.chapter.name, data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
-                data.chapter.capstoneRecordsGate,
-                data.constants?.tapBaseValue ?? 1, recordBuff,
-                fans, flagIds, currencyIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
+                data.chapter.capstoneRecordsGate, recordBuff,
+                fans, flagIds, currencyIds, producerIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
 
             MarkAllContentAddressable();
 
             AssetDatabase.SaveAssets();
-            var summary = $"Imported '{data.chapter.id}' - {flagIds.Count} flags, {sectionIds.Count} sections, " +
-                $"{generatorIds.Count} generators, {upgradeIds.Count} upgrades, {barGroupIds.Count} bar groups " +
-                $"({barCount} bars), {eventIds.Count} events, {rewardIds.Count} rewards. All content marked addressable.";
+            var summary = $"Imported '{data.chapter.id}' - {flagIds.Count} flags, {producerIds.Count} producers, " +
+                $"{sectionIds.Count} sections, {generatorIds.Count} generators, {upgradeIds.Count} upgrades, " +
+                $"{barGroupIds.Count} bar groups ({barCount} bars), {eventIds.Count} events, {rewardIds.Count} rewards. " +
+                "All content marked addressable.";
             Debug.Log($"ChapterJsonImporter: {summary}");
             if (!Application.isBatchMode)
                 EditorUtility.DisplayDialog("Chapter import", summary, "OK");
@@ -325,6 +345,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             int count = 0;
             count += MarkType<CurrencyDefinition>(settings, ContentLabels.Currency);
             count += MarkType<CurrencyGroupDefinition>(settings, ContentLabels.CurrencyGroup);
+            count += MarkType<ProducerDefinition>(settings, ContentLabels.Producer);
             count += MarkType<ChapterDefinition>(settings, ContentLabels.Chapter);
             count += MarkType<SectionDefinition>(settings, ContentLabels.Section);
             count += MarkType<GeneratorDefinition>(settings, ContentLabels.Generator);
@@ -363,10 +384,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             var knownLabels = new HashSet<string>
             {
-                ContentLabels.Currency, ContentLabels.CurrencyGroup, ContentLabels.Chapter,
-                ContentLabels.Section, ContentLabels.Generator, ContentLabels.Upgrade,
-                ContentLabels.Bar, ContentLabels.BarGroup, ContentLabels.Event,
-                ContentLabels.Reward, ContentLabels.Module,
+                ContentLabels.Currency, ContentLabels.CurrencyGroup, ContentLabels.Producer,
+                ContentLabels.Chapter, ContentLabels.Section, ContentLabels.Generator,
+                ContentLabels.Upgrade, ContentLabels.Bar, ContentLabels.BarGroup,
+                ContentLabels.Event, ContentLabels.Reward, ContentLabels.Module,
             };
             var usedLabels = new HashSet<string>();
             foreach (var group in settings.groups)
@@ -497,10 +518,78 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             => type is "currency" or "currencyEarnedTotal" or "ownedCount"
                 or "barsCompleted" or "recordsCumulative";
 
+        // one currency entry's import decision: pure state ({id, group}) only -
+        // the pre-5.4 schema put engagement earn on the currency, and an earn
+        // block is stale JSON that used to mean something, so it is refused
+        // loudly rather than silently dropped
+        private static bool IsImportableCurrencyEntry(CurrencyEntryBlock block)
+        {
+            if (string.IsNullOrEmpty(block.id))
+            {
+                Debug.LogError("ChapterJsonImporter: currencies array contains an entry with an empty id. Skipping it.");
+                return false;
+            }
+            if (block.earn != null)
+            {
+                Debug.LogError($"ChapterJsonImporter: currency '{block.id}' carries an 'earn' block - currencies are pure state, production lives on producers (design doc section 12, rule 13). Skipping it - fix the JSON and re-import.");
+                return false;
+            }
+            return true;
+        }
+
+        // Converts a producer's production entries, or null when any entry is
+        // invalid - a producer missing one of its yields is not the authored
+        // producer, so the whole block is skipped rather than half-written.
+        private static List<ProductionConfig> ToProductionConfigs(ProducerBlock block)
+        {
+            if (block.production.Length == 0)
+            {
+                Debug.LogError($"ChapterJsonImporter: producer '{block.id}' has no production entries - it would produce nothing. Skipping it - fix the JSON and re-import.");
+                return null;
+            }
+
+            var configs = new List<ProductionConfig>();
+            foreach (var entry in block.production)
+            {
+                var context = $"producer '{block.id}' production for '{entry.currency}'";
+                if (string.IsNullOrEmpty(entry.currency))
+                {
+                    Debug.LogError($"ChapterJsonImporter: producer '{block.id}' has a production entry with no currency. Skipping the producer - fix the JSON and re-import.");
+                    return null;
+                }
+                // production must never drain - never write that state
+                if (entry.amount < 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: {context} has a negative amount ({entry.amount}). Skipping the producer - fix the JSON and re-import.");
+                    return null;
+                }
+
+                var trigger = ToTrigger(entry.trigger, context);
+                var composes = ToComposes(entry.composes, context);
+                if (trigger == ProductionTrigger.None || composes == null)
+                    return null;
+
+                var gate = ToCondition(entry.gate, $"{context} (gate)");
+                configs.Add(new ProductionConfig(entry.currency, entry.amount, trigger, gate, composes.Value));
+            }
+            return configs;
+        }
+
         // the condition parse path (real DTO shape + conversion), exposed so
         // EditMode tests can cover nesting depth without an asset-writing import
         internal static Condition ParseCondition(string json, string context = "condition")
             => ToCondition(JsonConvert.DeserializeObject<ConditionBlock>(json, JsonSettings), context);
+
+        // the producer parse path, exposed like ParseCondition: tests cover
+        // the trigger/composes/gate mapping and its refusals without an
+        // asset-writing import
+        internal static List<ProductionConfig> ParseProducerProduction(string json)
+            => ToProductionConfigs(JsonConvert.DeserializeObject<ProducerBlock>(json, JsonSettings));
+
+        // the currency-entry parse path: tests cover that the pre-5.4 earn
+        // schema is refused rather than silently dropped
+        internal static bool ParseCurrencyEntryIsImportable(string json)
+            => IsImportableCurrencyEntry(JsonConvert.DeserializeObject<CurrencyEntryBlock>(json, JsonSettings));
 
         // the payload parse path, exposed for the same reason as ParseCondition:
         // tests cover which values the importer refuses to write without one
@@ -549,6 +638,42 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 default:
                     Debug.LogError($"ChapterJsonImporter: {context} has unknown scope '{scope}'. Defaulting to run.");
                     return ContentScope.Run;
+            }
+        }
+
+        // Trigger is a closed, code-defined set (ProductionTrigger); "tick"
+        // and "tap" are the JSON spellings, and anything else is a content
+        // error that skips the producer - a config that never fires is not
+        // the authored config.
+        private static ProductionTrigger ToTrigger(string trigger, string context)
+        {
+            switch (trigger)
+            {
+                case "tick":
+                    return ProductionTrigger.Tick;
+                case "tap":
+                    return ProductionTrigger.Tap;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown trigger '{trigger}' - a production config fires on 'tick' or 'tap'. Skipping the producer - fix the JSON and re-import.");
+                    return ProductionTrigger.None;
+            }
+        }
+
+        // A module-held config composes 'tapValue' or nothing (rule 11's
+        // vocabulary is unchanged by rule 13). Null signals an unknown
+        // spelling, which skips the producer.
+        private static ModifierTarget? ToComposes(string composes, string context)
+        {
+            switch (composes)
+            {
+                case null:
+                case "":
+                    return ModifierTarget.None;
+                case "tapValue":
+                    return ModifierTarget.TapValue;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown composes '{composes}' - a module-held config composes 'tapValue' or nothing. Skipping the producer - fix the JSON and re-import.");
+                    return null;
             }
         }
 
@@ -688,8 +813,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private static void EnsureFolders()
         {
             var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            foreach (var folder in new[] { ChaptersFolder, SectionsFolder, CurrenciesFolder, GeneratorsFolder,
-                UpgradesFolder, BarsFolder, BarGroupsFolder, EventsFolder, RewardsFolder })
+            foreach (var folder in new[] { ChaptersFolder, SectionsFolder, CurrenciesFolder, ProducersFolder,
+                GeneratorsFolder, UpgradesFolder, BarsFolder, BarGroupsFolder, EventsFolder, RewardsFolder })
                 Directory.CreateDirectory(Path.Combine(projectRoot, folder));
             AssetDatabase.Refresh();
         }
@@ -777,6 +902,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public UpgradeBlock[] upgrades = Array.Empty<UpgradeBlock>();
             public RewardEntryBlock[] rewards = Array.Empty<RewardEntryBlock>();
             public CurrencyEntryBlock[] currencies = Array.Empty<CurrencyEntryBlock>();
+            public ProducerBlock[] producers = Array.Empty<ProducerBlock>();
             public BarsBlock bars = new();
             public FansBlock fans = new();
             public EventBlock[] events = Array.Empty<EventBlock>();
@@ -817,7 +943,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private class ConstantsBlock
         {
             public RecordBuffBlock recordBuff = new();
-            public double tapBaseValue;
+
+            // detection only: the pre-5.4 schema's Jam yield, refused when
+            // present (it lives on the jam producer's cash config now)
+            public JToken tapBaseValue;
         }
 
         // a multiplier declares the currencies it affects (plural); production
@@ -905,20 +1034,36 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public PayloadBlock payload = new();
         }
 
-        // one chapter-declared currency; the currency owns its earn config
+        // one chapter-declared currency: pure state ({id, group})
         private class CurrencyEntryBlock
         {
             public string id = "";
             public string group = ""; // CurrencyGroupDefinition id, e.g. "run"
-            public EarnBlock earn = new();
+
+            // detection only: the pre-5.4 schema's engagement earn, refused
+            // when present (production lives on producers now)
+            public JToken earn;
         }
 
-        // engagement earn: passive tick + Jam taps, gated by a reveal flag
-        private class EarnBlock
+        // a module-held production source: the module prefab presenting it
+        // plus the production configs it fires (design doc section 12, rule 13)
+        private class ProducerBlock
         {
-            public string revealFlag = "";
-            public double perSec;
-            public double perTap;
+            public string id = "";
+            public string module = "";
+            public ProductionEntryBlock[] production = Array.Empty<ProductionEntryBlock>();
+        }
+
+        // one flat-rate source: amount is per second for tick, per tap for
+        // tap; the gate is the discriminated Condition shape like every other
+        // rule, and composes names the modifier target that scales the output
+        private class ProductionEntryBlock
+        {
+            public string currency = "";
+            public double amount;
+            public string trigger = "";
+            public string composes = "";
+            public ConditionBlock gate = new();
         }
 
         private class BarsBlock

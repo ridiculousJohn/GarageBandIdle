@@ -151,12 +151,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         // the fill currency readout lives here rather than the currency header;
         // the playable pass (slice 10) makes the header data-driven. One line
-        // per revealed fill currency; any earn-configured currency carries its
-        // earn rates (the currency owns its earn config).
+        // per revealed fill currency; a currency some producer creates carries
+        // its rates (production configs live on producers, design doc section
+        // 12 rule 13).
         private void RefreshPool()
         {
             var lines = new List<string>(_pools.Count);
-            var earn = _context.Game.EngagementEarn;
+            var production = _context.Game.Production;
             foreach (var pool in _pools)
             {
                 if (!IsRevealed(pool))
@@ -169,8 +170,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     continue;
 
                 var line = $"{definition.DisplayName}: {NumberFormatter.Format(_context.Game.Currencies.Get(pool.CurrencyId))}";
-                if (earn.HasEarn(pool.CurrencyId))
-                    line += $" (+{NumberFormatter.Format(earn.RatePerSecond(pool.CurrencyId))}/sec, +{NumberFormatter.Format(earn.PerTap(pool.CurrencyId))}/tap)";
+                if (production.HasProduction(pool.CurrencyId))
+                    line += $" (+{NumberFormatter.Format(production.RatePerSecond(pool.CurrencyId))}/sec, +{NumberFormatter.Format(production.PerTap(pool.CurrencyId))}/tap)";
                 lines.Add(line);
             }
             _poolLabel.text = string.Join("\n", lines);

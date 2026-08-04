@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
@@ -178,28 +179,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TapValueRewards_StackPerScope_AndRunResetKeepsPermanent()
         {
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(2, modifiers);
+            var tap = TestContent.MakeTapProduction(2, modifiers);
             var context = new EffectContext(TestContent.MakeEconomy(), new FlagSystem(), modifiers);
 
             TestContent.MakeTapValueReward("run_x2", 2.0).Apply(context, ContentScope.Run);
             TestContent.MakeTapValueReward("perm_x3", 3.0).Apply(context, ContentScope.PermanentInChapter);
-            Assert.AreEqual(12.0, tap.Value.ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
+            Assert.AreEqual(12.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
 
             modifiers.ResetRunScoped();
-            Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "the run reset keeps the permanent stack");
+            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "the run reset keeps the permanent stack");
         }
 
-        // fail closed on broken content: a negative base (invalid data - boot
+        // fail closed on broken content: a negative amount (invalid data - boot
         // validation reports it) must never drain cash on a tap, and no
         // multiplier can resurrect it
         [Test]
         public void TapValue_FailsClosedOnANegativeBase()
         {
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(-5, modifiers);
+            var tap = TestContent.MakeTapProduction(-5, modifiers);
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
 
-            Assert.AreEqual(0.0, tap.Value.ToDouble(), 1e-9, "never a draining tap");
+            Assert.AreEqual(0.0, tap.TapValue.ToDouble(), 1e-9, "never a draining tap");
         }
 
         // fail closed on broken content: a non-positive factor (invalid data -
@@ -208,45 +209,88 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TapValueMultiplier_FailsClosedOnANonPositiveFactor()
         {
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(2, modifiers);
+            var tap = TestContent.MakeTapProduction(2, modifiers);
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 0);
 
-            Assert.AreEqual(2.0, tap.Value.ToDouble(), 1e-9, "the value is untouched");
+            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9, "the value is untouched");
         }
 
-        // the UI advertises Tap.Value, so it needs a signal for every change to
-        // the value - applied modifiers and a run reset that cleared something -
-        // and no signal when nothing moved (rejected value, no-op reset, or a
-        // modifier on somebody else's target)
+        // Publishing is post-mutation: nothing notifies the UI from inside an
+        // operation - modifier grants and gate flips stay silent until the
+        // orchestrator's RefreshTapValue says the whole mutation has settled -
+        // and the refresh publishes only an actual move (one notification for
+        // the operation, none for a no-op, a rejected value, or somebody
+        // else's target).
         [Test]
-        public void TapValueChanged_FiresOnlyWhenTheValueMoves()
+        public void TapValueChanged_FiresOnRefresh_OnlyWhenTheValueMoved()
         {
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(2, modifiers);
+            var tap = TestContent.MakeTapProduction(2, modifiers);
             var changes = 0;
-            tap.ValueChanged += () => changes++;
+            tap.TapValueChanged += () => changes++;
 
-            modifiers.ResetRunScoped();
-            Assert.AreEqual(0, changes, "a no-op reset is silent");
+            tap.RefreshTapValue();
+            Assert.AreEqual(0, changes, "nothing moved, nothing published");
 
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.PermanentInChapter, 3);
-            Assert.AreEqual(2, changes, "each applied modifier notifies");
+            Assert.AreEqual(0, changes, "mid-mutation grants never notify the UI directly");
+
+            tap.RefreshTapValue();
+            Assert.AreEqual(1, changes, "one settled operation, one notification");
+            Assert.AreEqual(12.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x 2 x 3");
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 0);
-            Assert.AreEqual(2, changes, "a rejected value is silent");
-
             modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 5);
-            Assert.AreEqual(2, changes, "another target's modifier is not ours");
+            tap.RefreshTapValue();
+            Assert.AreEqual(1, changes, "a rejected value and another target's modifier move nothing");
 
             modifiers.ResetRunScoped();
-            Assert.AreEqual(3, changes, "clearing the run stack notifies");
-            Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "base 2 x permanent 3 after the reset");
+            tap.RefreshTapValue();
+            Assert.AreEqual(2, changes, "clearing the run stack moved the value");
+            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x permanent 3 after the reset");
+        }
+
+        // A composing config may carry any gate the data model supports (rule
+        // 13 forbids nothing): the tap pays it only while its gate holds, the
+        // evaluated value follows the gate immediately, and the post-mutation
+        // refresh is what tells the UI - so payout and display can never
+        // diverge across a gate transition.
+        [Test]
+        public void GatedComposingConfig_PaysAndPublishesOnItsGateTransition()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
+            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
+            {
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+                new("cash", 4, ProductionTrigger.Tap, new FlagSetCondition("amped"), ModifierTarget.TapValue),
+            });
+            var production = new ProductionSystem(new[] { producer }, currencies, modifiers,
+                TestContent.MakeContext(currencies, flags: flags));
+            var changes = 0;
+            production.TapValueChanged += () => changes++;
+
+            Assert.AreEqual(1.0, production.TapValue.ToDouble(), 1e-9, "the gated yield is dormant");
+            production.FireTap();
+            Assert.AreEqual(1.0, currencies.Get("cash").ToDouble(), 1e-9, "a tap pays only the open config");
+
+            flags.Set("amped");
+            Assert.AreEqual(5.0, production.TapValue.ToDouble(), 1e-9, "the evaluated value follows the gate");
+            Assert.AreEqual(0, changes, "no notification until the mutation settles");
+
+            production.RefreshTapValue();
+            Assert.AreEqual(1, changes, "the settled refresh publishes the gate transition");
+
+            production.FireTap();
+            Assert.AreEqual(6.0, currencies.Get("cash").ToDouble(), 1e-9,
+                "payout matches the advertised value: 1 + (1 + 4)");
         }
 
         // flat adds land before the multipliers, so a tap add is worth more once
@@ -255,13 +299,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TapValue_AddsComposeBeforeMultipliers()
         {
             var modifiers = new ModifierSystem();
-            var tap = new TapSystem(2, modifiers);
+            var tap = TestContent.MakeTapProduction(2, modifiers);
 
             modifiers.Grant(TapValue, ModifierOperation.Add, ContentScope.Run, 1);
-            Assert.AreEqual(3.0, tap.Value.ToDouble(), 1e-9, "base 2 + 1");
+            Assert.AreEqual(3.0, tap.TapValue.ToDouble(), 1e-9, "base 2 + 1");
 
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
-            Assert.AreEqual(6.0, tap.Value.ToDouble(), 1e-9, "(2 + 1) x 2, never 2 + (1 x 2)");
+            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "(2 + 1) x 2, never 2 + (1 x 2)");
         }
 
         [Test]

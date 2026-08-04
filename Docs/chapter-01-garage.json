@@ -35,8 +35,7 @@
       "affects": [ "cash" ],
       "note": "A multiplier declares which currencies it affects; generator production of anything it doesn't name is untouched. The Records buff is Ch1's only global multiplier and affects Cash."
     },
-    "incomeFormulaNote": "cashIncome = sum(gen.baseOutput * gen.count * genBuffs) * (1 + 0.02 * records) * encoreBoost. Catalog/Roadie multipliers are not present in Ch1.",
-    "tapBaseValue": 1
+    "incomeFormulaNote": "cashIncome = sum(gen.baseOutput * gen.count * genBuffs) * (1 + 0.02 * records) * encoreBoost. Catalog/Roadie multipliers are not present in Ch1. The Jam tap's cash yield is NOT a constant: it lives on the jam producer's cash config (see producers)."
   },
 
   "flags": [
@@ -209,8 +208,20 @@
     {
       "id": "rehearsal",
       "group": "run",
-      "earn": { "revealFlag": "covers", "perSec": 1, "perTap": 2 },
-      "note": "Rehearsal is a plain run-scoped currency, revealed by the `covers` flag. The currency OWNS its earn config: a passive tick (perSec) plus Jam taps (perTap) — engagement, not Cash — and consumers (bars) reference it by id. `group` is the CurrencyGroupDefinition id the currency belongs to (reset behavior comes from the group's flags, like every currency). A chapter can declare any number of fill currencies here, each with its own earn config and reveal flag."
+      "note": "Rehearsal is a plain run-scoped currency: pure state — a balance, a group, formatting (design doc §12 rule 13). How it is earned lives on the jam producer below, never here, and consumers (bars) reference it by id. `group` is the CurrencyGroupDefinition id the currency belongs to (reset behavior comes from the group's flags, like every currency)."
+    }
+  ],
+
+  "producers": [
+    {
+      "id": "jam",
+      "module": "module/tap",
+      "production": [
+        { "currency": "cash", "amount": 1, "trigger": "tap", "composes": "tapValue" },
+        { "currency": "rehearsal", "amount": 2, "trigger": "tap", "gate": { "type": "flagSet", "flag": "covers" } },
+        { "currency": "rehearsal", "amount": 1, "trigger": "tick", "gate": { "type": "flagSet", "flag": "covers" } }
+      ],
+      "note": "The Jam button's production configs (design doc §12 rule 13): every flat-rate currency source is {currency, amount, trigger, gate} HELD BY ITS PRODUCER. The cash config replaces the old constants.tapBaseValue and declares `composes: tapValue`, so tap buffs (stage_presence adds, event-tier multipliers) land on it exactly as before; the rehearsal configs replace the old earn block on the currency — 2/tap plus a 1/sec passive trickle, both gated on the `covers` flag (an ordinary Condition, not a bespoke revealFlag). Module-held configs NEVER idle-pay: generators are the only idle-eligible holder (§9), which is why the trickle lives here and not on an innate generator."
     }
   ],
 

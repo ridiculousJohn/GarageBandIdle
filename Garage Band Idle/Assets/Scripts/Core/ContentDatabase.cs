@@ -19,6 +19,7 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public Registry<CurrencyGroupDefinition> CurrencyGroups { get; }
         public Registry<CurrencyDefinition> Currencies { get; }
+        public Registry<ProducerDefinition> Producers { get; }
         public Registry<ChapterDefinition> Chapters { get; }
         public Registry<SectionDefinition> Sections { get; }
         public Registry<GeneratorDefinition> Generators { get; }
@@ -32,6 +33,7 @@ namespace RidiculousGaming.GarageBandIdle
         {
             CurrencyGroups = Load<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup, d => d.Id);
             Currencies = Load<CurrencyDefinition>(ContentLabels.Currency, d => d.Id);
+            Producers = Load<ProducerDefinition>(ContentLabels.Producer, d => d.Id);
             Chapters = Load<ChapterDefinition>(ContentLabels.Chapter, d => d.Id);
             Sections = Load<SectionDefinition>(ContentLabels.Section, d => d.Id);
             Generators = Load<GeneratorDefinition>(ContentLabels.Generator, d => d.Id);
@@ -54,10 +56,12 @@ namespace RidiculousGaming.GarageBandIdle
             IEnumerable<EventDefinition> events = null,
             IEnumerable<RewardDefinition> rewards = null,
             IEnumerable<CurrencyDefinition> currencies = null,
-            IEnumerable<CurrencyGroupDefinition> currencyGroups = null)
+            IEnumerable<CurrencyGroupDefinition> currencyGroups = null,
+            IEnumerable<ProducerDefinition> producers = null)
         {
             CurrencyGroups = new Registry<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup, currencyGroups ?? Array.Empty<CurrencyGroupDefinition>(), d => d.Id);
             Currencies = new Registry<CurrencyDefinition>(ContentLabels.Currency, currencies ?? Array.Empty<CurrencyDefinition>(), d => d.Id);
+            Producers = new Registry<ProducerDefinition>(ContentLabels.Producer, producers ?? Array.Empty<ProducerDefinition>(), d => d.Id);
             Chapters = new Registry<ChapterDefinition>(ContentLabels.Chapter, chapters ?? Array.Empty<ChapterDefinition>(), d => d.Id);
             Sections = new Registry<SectionDefinition>(ContentLabels.Section, sections ?? Array.Empty<SectionDefinition>(), d => d.Id);
             Generators = new Registry<GeneratorDefinition>(ContentLabels.Generator, generators ?? Array.Empty<GeneratorDefinition>(), d => d.Id);

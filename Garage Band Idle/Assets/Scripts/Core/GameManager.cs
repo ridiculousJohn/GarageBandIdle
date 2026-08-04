@@ -20,13 +20,13 @@ namespace RidiculousGaming.GarageBandIdle
 
         // the slice's hardcoded touchpoints; these stay string ids (not fields on
         // CurrencyManager) so the currency set remains open
-        public const string CashCurrencyId = "cash";
         public const string RecordsCurrencyId = "records";
 
         // UI display touchpoints only (CurrencyHeaderModule/TapModule name what
         // they show); the fan SYSTEM takes its ids from the chapter's fans
-        // config. The playable pass (slice 10) replaces these with a
-        // data-driven currency header.
+        // config, and what a tap PAYS is the jam producer's data. The playable
+        // pass (slice 10) replaces these with a data-driven currency header.
+        public const string CashCurrencyId = "cash";
         public const string FansCurrencyId = "fans";
         public const string FansUnlockFlagId = "fans";
 
@@ -38,8 +38,7 @@ namespace RidiculousGaming.GarageBandIdle
         public GeneratorSystem Generators { get; private set; }
         public UpgradeSystem Upgrades { get; private set; }
         public FanSystem Fans { get; private set; }
-        public TapSystem Tap { get; private set; }
-        public EngagementEarnSystem EngagementEarn { get; private set; }
+        public ProductionSystem Production { get; private set; }
         public RewardManager Rewards { get; private set; }
         public BarSystem Bars { get; private set; }
         public ConditionContext Conditions { get; private set; }
@@ -85,7 +84,6 @@ namespace RidiculousGaming.GarageBandIdle
                 Generators = new GeneratorSystem(Resolve(Database.Generators, CurrentChapter.GeneratorIds, "generator"), Currencies, Modifiers);
                 Upgrades = new UpgradeSystem(Resolve(Database.Upgrades, CurrentChapter.UpgradeIds, "upgrade"), Currencies, Flags, Modifiers);
                 Fans = new FanSystem(CurrentChapter.Fans, Currencies, Generators, Flags, Modifiers);
-                Tap = new TapSystem(CurrentChapter.TapBaseValue, Modifiers);
 
                 // the Records buff is derived, not granted: one modifier per
                 // currency the chapter's recordBuff declares, each reading the
@@ -96,11 +94,6 @@ namespace RidiculousGaming.GarageBandIdle
                     Modifiers.AddDerived(new RecordsIncomeModifier(
                         Currencies, RecordsCurrencyId, CurrentChapter.RecordBuff.PerRecord, currencyId));
                 }
-                // only the CURRENT chapter's declared currencies earn: flag
-                // ids may legitimately repeat across chapters, so ownership
-                // comes from the chapter's currency list, never from flags
-                EngagementEarn = new EngagementEarnSystem(
-                    Resolve(Database.Currencies, CurrentChapter.CurrencyIds, "currency"), Currencies, Flags);
                 Rewards = new RewardManager(Database.Rewards.All);
                 Bars = new BarSystem(Resolve(Database.BarGroups, CurrentChapter.BarGroupIds, "bar group"),
                     Database.Bars.All, Currencies, Rewards, new EffectContext(Currencies, Flags, Modifiers));
@@ -108,13 +101,21 @@ namespace RidiculousGaming.GarageBandIdle
 
                 Conditions = new ConditionContext(Currencies, Generators, Flags, RecordsCurrencyId, Database, Bars);
 
+                // built after the condition context because config gates are
+                // ordinary Conditions checked per firing. Only the CURRENT
+                // chapter's producers fire: flag ids may legitimately repeat
+                // across chapters, so ownership comes from the chapter's
+                // producer list, never from flags.
+                Production = new ProductionSystem(
+                    Resolve(Database.Producers, CurrentChapter.ProducerIds, "producer"), Currencies, Modifiers, Conditions);
+
                 // one boot pass covers every content reference - conditions,
                 // payloads, rewards, module addresses - so a mistake gets
                 // reported here, loudly, instead of surfacing mid-run
                 ContentValidator.Validate(Database, Conditions, Rewards);
             }
 
-            Currencies.ValidateReference(CashCurrencyId, "GameManager (tap)");
+            Currencies.ValidateReference(CashCurrencyId, "GameManager (UI cash display)");
             Currencies.ValidateReference(RecordsCurrencyId, "GameManager (income multiplier)");
 
             _tickSystem = GetComponent<TickSystem>();
@@ -164,24 +165,34 @@ namespace RidiculousGaming.GarageBandIdle
 
             // fill currencies accrue, then bars drain the pool into the active
             // bar in the same tick, so a selected bar advances with no pool lag
-            EngagementEarn.Tick(seconds);
+            Production.Tick(seconds);
             Bars.Tick();
+
+            // the tick has fully settled - production, drains, completions,
+            // whatever modifiers or flags they granted - so the tap value is
+            // final: publish it only now (a bar completing mid-tick could set
+            // a flag some config's gate reads, so no earlier point is safe)
+            Production.RefreshTapValue();
         }
 
-        // the tap action; cash per tap is the chapter base composed with every
-        // modifier targeting tap value - flat adds (stage_presence) and event-tier
-        // multipliers alike, all of it inside TapSystem.Value
+        // the tap action: every tap-triggered production config fires - the
+        // cash yield (composed with every modifier targeting tap value: flat
+        // adds like stage_presence, event-tier multipliers) and the fill
+        // currencies alike, all authored on the jam producer
         public void Jam()
         {
             if (CurrentChapter == null)
                 return;
 
-            Currencies.Add(CashCurrencyId, Tap.Value);
+            Production.FireTap();
 
-            // taps also yield the fill currencies; drain immediately so the
-            // active bar visibly nudges on the tap, not a tick later
-            EngagementEarn.OnJamTap();
+            // drain immediately so the active bar visibly nudges on the tap,
+            // not a tick later
             Bars.Tick();
+
+            // the whole tap has settled (yields paid, bars drained, anything
+            // a completion granted): publish the tap value only now
+            Production.RefreshTapValue();
         }
 
         public bool BuyUpgrade(Upgrade upgrade)
@@ -194,6 +205,11 @@ namespace RidiculousGaming.GarageBandIdle
             // the spend moves a balance, which can satisfy a content unlock's
             // gate right now (the same reason BuyGenerator re-evaluates)
             Upgrades.EvaluateContentUnlocks(Conditions);
+
+            // the purchase has settled (buff granted, unlocks evaluated):
+            // publish the tap value only now, never from a modifier callback
+            // midway through the operation
+            Production.RefreshTapValue();
             return true;
         }
 
@@ -208,6 +224,10 @@ namespace RidiculousGaming.GarageBandIdle
             // content unlock's gate (play_for_crowd: own 1 Drummer) - right now
             Generators.EvaluateUnlocks(Conditions);
             Upgrades.EvaluateContentUnlocks(Conditions);
+
+            // settled, then publish (an unlock just evaluated can have granted
+            // a tap buff or set a flag a config's gate reads)
+            Production.RefreshTapValue();
             return true;
         }
     }

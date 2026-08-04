@@ -153,6 +153,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - upgrade
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 74357138ff949c948959bb67394a51b7
+    m_Address: producer/jam
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - producer
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7e3a5c9b1f264d80b4a6c8e0d2f41739
     m_Address: module/currency-header
     m_ReadOnly: 0

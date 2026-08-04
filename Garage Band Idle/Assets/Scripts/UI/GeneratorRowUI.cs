@@ -63,7 +63,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // nothing else would repaint it: Refresh is otherwise driven by
         // OwnedChanged alone, so a bought buff (amp_strings, kit_upgrade) left
         // the old "+X/sec" standing until the next purchase - the same
-        // staleness TapSystem.ValueChanged cures for the Jam label. A run reset
+        // staleness ProductionSystem.TapValueChanged cures for the Jam label. A run reset
         // clearing those grants arrives through here too.
         public void HandleModifierChanged(ModifierTargetKey target)
         {

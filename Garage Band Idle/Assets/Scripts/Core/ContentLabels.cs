@@ -8,6 +8,7 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public const string Currency = "currency";
         public const string CurrencyGroup = "currency-group";
+        public const string Producer = "producer";
         public const string Chapter = "chapter";
         public const string Section = "section";
         public const string Generator = "generator";
