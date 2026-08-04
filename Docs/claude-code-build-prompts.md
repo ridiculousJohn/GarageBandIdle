@@ -19,6 +19,14 @@ foundations that touch code already written, so they are introduced explicitly h
 pretended to be forward-only. Slices 4–10 assume 3.5 is in place and build on it. Slice **5.4**
 establishes the production-config shape (§12 rule 13: every flat-rate currency source lives on its
 producer — generators and the Jam module — never on the currency) and retrofits slices 1–5 onto it.
+Between 5.4 and 5.5 sit four **audit-driven normalization passes**, committed but not written as
+slices because each removed an accident rather than adding a capability: **A** — a purchase or unlock
+latches before it grants, so a notification always finds the latch already set (state, then notify);
+**B** — upgrade payloads and rewards grant through one `GameEffect` family with one importer
+vocabulary; **C** — an effect's lifetime is declared exactly once, by the fact that owns it (§12 rule
+11); **D** — condition evaluation is invalidation-driven, not polled: `ConditionContext` holds the
+aggregate dirty signal and `GameManager.Settle()` is the single post-mutation seam. Find them in the
+git log between `023bd47` and `dfded84`; slices 5.5 onward assume all four.
 Slice **5.5** establishes the economy-context boundary from the design's multi-economy revision
 (§12 rule 12), assumes 5.4, and retrofits slices 1–5 onto it. Slice **5.6** finishes 3.5's reveal
 work by retiring the last bare `revealFlag` fields, so every progressive reveal is a Condition asked
@@ -363,10 +371,13 @@ still play identically.
 > condition context — into
 > an `EconomyContext` built by a factory from (chapter definition, ContentDatabase, permanent pool,
 > recipe). The context ends every top-level operation (tick, tap, purchase, and later release,
-> restore, focus-gain) with a **post-mutation evaluation step** — the seam GameManager's
-> `RefreshTapValue` call sites currently are, folded into one place — so condition-dependent
+> restore, focus-gain) with a **post-mutation evaluation step** — so condition-dependent
 > published values (the tap value today; anything gate-driven later) re-evaluate exactly once, after
-> the whole mutation settles, and a new operation cannot forget to. The recipe declares which global derivations register (§12 rule 12): the frontier recipe
+> the whole mutation settles, and a new operation cannot forget to. **That seam already exists** as
+> `GameManager.Settle()` (pass D): the condition-invalidation drain plus the tap-value refresh, called
+> from the tick, the tap, and each purchase. This is a **move** into the context, not a build — and a
+> discarded context must `Dispose()` its `ConditionContext`, which holds live subscriptions to the
+> systems it reads. The recipe declares which global derivations register (§12 rule 12): the frontier recipe
 > registers the Records income modifiers (reading the permanent pool through the chapter's
 > `recordBuff`); a later event recipe will not — that absence IS slice 8's fixed baseline, so the
 > factory takes the recipe now even though only the frontier recipe exists yet. Inside the context,
