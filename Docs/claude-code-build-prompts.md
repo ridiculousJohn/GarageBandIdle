@@ -40,7 +40,11 @@ importer refuses a stale `revealFlag` key, and `album.revealFlag` is deleted rat
 (no importer DTO ever read it), so slice 6 reveals Release through its section's `visibleWhen` like
 every other module. One cost it carries forward: a null Condition means "no gate", so a chapter that
 omits `activeWhen` accrues fans from the first frame where an empty flag id used to be reported.
-Slices 6–10 assume all three.
+Slice **5.7** is written but **not built**: it retires `FanSystem` by making fan accrual an ordinary
+module-held production config plus a derived `FanRate` modifier, so §9's "fans never idle-pay" holds
+because of who holds the config rather than because a tick was left out of a list. It must land
+before slice 6, whose release walks each system's facts — deleting a system is cheaper before that
+walk is written than after. Slices 6–10 assume all four.
 
 ---
 
@@ -497,6 +501,89 @@ into the factory, and slice 6 is the first thing that would give the currently-u
 starts accrual; the `covers` flag still reveals the Rehearsal readout and the cover bars); the
 importer refuses a `revealFlag` key; no definition asset or config struct holds a bare reveal-flag
 id; the test suite is green.
+
+---
+
+## 5.7 — CONSOLIDATION: fan accrual is production (retiring `FanSystem`)
+
+This slice adds no new gameplay. It removes the last currency source that produces outside the
+production-config vocabulary 5.4 established: fan accrual is its own system, with its own tick, its
+own rate math, and its own activation gate, none of it reachable through the mechanism every other
+flat-rate source uses. It sits here for two reasons. §9's promise that fans never idle-pay currently
+rests on `FanSystem` being a separate tick that slice 9 must remember to exclude — a fact held in a
+comment rather than enforced by the architecture — and rule 13 already says the holder is what
+decides idle-eligibility. And slice 6's release walks each system's facts, so deleting a system is
+cheaper before that walk is written than after. `FanSystem` is also the only place a currency's rate
+is computed by a bespoke formula rather than composed from modifiers, which is why the fan rate is
+the one rate no reward, buff or event tier can reach without naming `FanRate` specifically.
+
+> Read `/docs/garage-band-idle-design.md` — §3, §6, §9 (idle pays only generator-held configs), §11
+> (fan rate must not be shortcut by time away), and §12 rules 11 and 13. This is a
+> refactor/foundation pass; **do not change observable gameplay.** Chapter 1's fan rate must read
+> 0.22/s with one Drummer owned and compose cover-bar rewards exactly as it does today.
+>
+> **1. The base rate becomes a module-held production config.** The chapter's `baseFansPerSec` moves
+> into a `ProductionConfig`: `{ currency: fans, amount: 0.2, trigger: tick, composes: fanRate, gate:
+> ownedCount drummer >= 1 }`. Author it on a **new `band` producer** rather than on the existing jam
+> producer, and make `ProducerDefinition.ModuleAddress` **optional**, meaning "nothing presents this
+> producer; it is a passive source." The alternative — hanging fans off the jam producer — was
+> considered and rejected: it works behaviorally (configs fire from the chapter's producer list, not
+> from which modules are visible) but it encodes a lie, and it breaks the first time a chapter has
+> fans without a Jam button. Module-held is the whole point: §9's boundary is the holder, so a
+> passive source that is not a generator can never idle-pay, with no per-config flag to author or get
+> wrong.
+>
+> **2. The per-bandmate bonus becomes a derived modifier.** Add `BandmateFanRateModifier :
+> DerivedModifier` — `Target = ModifierTargetKey.Global(ModifierTarget.FanRate)`, `Operation = Add`,
+> `Value = perBandmateOwnedBonus × bandmateCount`, reading `GeneratorSystem` live. Register it in
+> `EconomyContextFactory` beside the Records modifiers. This is `RecordsIncomeModifier`'s exact shape
+> and for the same reason: nothing grants it, it is on from boot, and it carries no scope because its
+> lifetime is its source's (rule 11). `ModifierComposition` is `(base + adds) × multipliers`, so the
+> composed result is `(0.2 + 0.02n) × coverRewards` — the identity `FanSystem.RatePerSecond` computes
+> today. **Prove that equality with a test before deleting anything.**
+>
+> **3. `ProductionSystem` stops hardcoding TapValue.** Two sites: the constructor guard that refuses
+> any `composes` but `None`/`TapValue`, and `Composed()`, which applies only the TapValue target.
+> Both generalize to `modifiers.For(ModifierTargetKey.Global(config.Composes))`. The importer's
+> `ToComposes` gains `fanRate`. This deletes a special case rather than adding one — the restriction
+> was a fossil of TapValue being the only composing target that existed in 5.4, exactly the shape
+> `9ab9b75` removed from the effect vocabulary.
+>
+> **4. Fans in `recordBuff.affects` is refused.** One guarantee weakens in this slice and must be
+> replaced rather than dropped. Today it is *impossible* for the Records income multiplier to touch
+> fans, because `FanSystem` only ever applies `FanRate`; afterward, fan production flows through
+> `ProductionSystem` and stays untouched only because `recordBuff.affects` happens to list `["cash"]`.
+> Adding `"fans"` there would let Records inflate the fan rate and time away shortcut the Records
+> payout — the coupling §11 forbids and the same failure `ContentValidator` already guards by
+> requiring fans sit in a group that resets on release. So `ContentValidator` **refuses the chapter's
+> fans currency in `recordBuff.affects`**, reported as the §11 violation it is. A compile-time
+> impossibility becomes a content check, and an unchecked content mistake is not an acceptable trade.
+>
+> **5. `FanSystem` deletes, and `FansConfig` keeps only what is not production.** Consumers:
+> `CurrencyHeaderModule` reads `Production.RatePerSecond(fansCurrencyId)`; `EconomyContext` drops the
+> `Fans` property, the `Fans.Tick(seconds)` call, and `Fans` from its system list. `Active` and
+> `BandmateCount` have no runtime callers outside the class — `BandmateCount` moves into the new
+> modifier, which is the only thing that still needs it. `FansConfig` keeps `currencyId` and
+> `perBandmateOwnedBonus` (the modifier's tuning) and loses `baseFansPerSec` and `activeWhen`, both of
+> which are now production. Note what 5.6 bought here: because the gate is already a Condition, this
+> is a **relocation onto the config's `gate`**, not a conversion.
+>
+> **6. Importer + validation + retrofit.** The fans block's `baseFansPerSec` and `activeWhen` keys are
+> **refused** as stale JSON — the same fail-closed rule 5.4 applied to a currency `earn` block and 5.6
+> applied to `revealFlag` — and since a fans config is not skippable content, they report and the
+> chapter still imports (the `constants.tapBaseValue` shape, not the currency-entry shape). Validate
+> that a producer with no module address still declares production, since it has no other reason to
+> exist. Retrofit the ~11 `FanSystem` constructions in the editor tests onto `ProductionSystem`, and
+> the Chapter 1 content assertions about `chapter.Fans` onto the `band` producer's config.
+>
+> Goal: no system computes a currency's rate by a bespoke formula; fan accrual is a gated production
+> config plus a derived modifier, and "fans never idle-pay" is true because of who holds the config
+> rather than because a tick was left out of a list. Stop here.
+
+✅ **Test & commit:** Chapter 1 plays identically end-to-end — fan rate reads 0.22/s with one Drummer,
+cover-bar rewards still stack multiplicatively on it, and fans still start only once a Drummer is
+owned; `FanSystem` no longer exists; the importer refuses `baseFansPerSec` and `activeWhen`; boot
+validation refuses the fans currency in `recordBuff.affects`; the test suite is green.
 
 ---
 
