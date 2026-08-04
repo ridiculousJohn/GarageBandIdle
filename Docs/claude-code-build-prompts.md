@@ -11,7 +11,7 @@ Build order and why: each slice depends on the ones before it (offline earnings 
 tick; prestige needs the currency block split; the content-unlock upgrades are what reveal
 fans/covers/album). Building bottom-up keeps a break isolated to the slice you just added.
 
-**Progress marker:** slices 0–5 and **5.4** are already built and tested. Slice **3.5** is a dedicated consolidation pass
+**Progress marker:** slices 0–5, **5.4** and **5.5** are already built and tested. Slice **3.5** is a dedicated consolidation pass
 that establishes the cross-cutting foundations — a single `Condition` type + evaluator, one flag
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
@@ -25,10 +25,14 @@ latches before it grants, so a notification always finds the latch already set (
 **B** — upgrade payloads and rewards grant through one `GameEffect` family with one importer
 vocabulary; **C** — an effect's lifetime is declared exactly once, by the fact that owns it (§12 rule
 11); **D** — condition evaluation is invalidation-driven, not polled: `ConditionContext` holds the
-aggregate dirty signal and `GameManager.Settle()` is the single post-mutation seam. Find them in the
+aggregate dirty signal and one post-mutation seam settles every operation (built as
+`GameManager.Settle()`; 5.5 moved it to `EconomyContext.Settle()`). Find them in the
 git log between `023bd47` and `dfded84`; slices 5.5 onward assume all four.
-Slice **5.5** establishes the economy-context boundary from the design's multi-economy revision
-(§12 rule 12), assumes 5.4, and retrofits slices 1–5 onto it. Slice **5.6** finishes 3.5's reveal
+Slice **5.5** established the economy-context boundary from the design's multi-economy revision
+(§12 rule 12) and retrofitted slices 1–5 onto it: one permanent pool plus one frontier
+`EconomyContext` built from a recipe, `ICurrencies`/`CurrencyRouter` resolving an id to its owning
+pool at construction, and re-projection from facts as the only way a modifier comes into existence
+(`ModifierSystem.ResetRunScoped()` is deleted; `ResetGranted()` is total). Slice **5.6** finishes 3.5's reveal
 work by retiring the last bare `revealFlag` fields, so every progressive reveal is a Condition asked
 through the one evaluator (§12 rules 8 and 9); it assumes 5.5 and must land before slice 6, which
 would otherwise give the currently-unread `album.revealFlag` its first consumer. Slices 6–10 assume
@@ -338,7 +342,7 @@ currency `earn` block; the test suite is green.
 
 ---
 
-## 5.5 — CONSOLIDATION: the economy context (permanent pool, context factory, focus lifecycle)
+## 5.5 — CONSOLIDATION: the economy context (permanent pool, context factory, focus lifecycle)  ✅ done
 
 This slice adds no new gameplay. It establishes the economy-context boundary from the design's
 multi-economy revision passes and **retrofits slices 1–5 onto it**, so that slice 6's release is an
