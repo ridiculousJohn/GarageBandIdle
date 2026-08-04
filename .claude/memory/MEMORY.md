@@ -9,3 +9,5 @@
 - [Quote directive before editing](quote-directive-before-editing.md) — standing protocol: first edit of a task is preceded by Acting on: "<John's words>"; nothing quotable = no edit
 - [No inaction epilogues](no-inaction-epilogues.md) — never close a response with what you didn't do ("nothing edited"); repo state is a fact, restraint is not news
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) — never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
+- [Pre-5.5 normalization sequence](pre-5-5-normalization-sequence.md) — audit-driven A/B/C/D pass between slices 5 and 5.5 that the build doc doesn't mention; D is all that's left, its shape is settled, John owns the dropdown check
+- [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) — verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
