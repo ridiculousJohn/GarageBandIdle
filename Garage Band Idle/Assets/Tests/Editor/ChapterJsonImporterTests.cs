@@ -199,6 +199,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 @"{ ""id"": ""rehearsal"", ""group"": ""run"" }"));
         }
 
+        // the pre-5.6 schema revealed a bar group by bare flag id; reveal is a
+        // Condition now, so a leftover revealFlag is refused rather than
+        // silently ignored - ignoring it would import the group with no gate,
+        // showing it from the first frame
+        [Test]
+        public void BarGroup_WithARevealFlagKey_IsRefused()
+        {
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: bar group 'learn_covers' carries a 'revealFlag' key - reveal is a Condition under 'visibleWhen' (design doc section 12, rules 8 and 9). Skipping it - fix the JSON and re-import.");
+            Assert.IsFalse(ChapterJsonImporter.ParseBarGroupIsImportable(
+                @"{ ""id"": ""learn_covers"", ""revealFlag"": ""covers"", ""fillMode"": ""perBar"" }"));
+
+            Assert.IsTrue(ChapterJsonImporter.ParseBarGroupIsImportable(
+                @"{ ""id"": ""learn_covers"", ""visibleWhen"": { ""type"": ""flagSet"", ""flag"": ""covers"" }, ""fillMode"": ""perBar"" }"));
+        }
+
         // a per-sec multiplier carries the currencies it affects as data, so the
         // payload can name any number of them without a code change - the same
         // contract constants.recordBuff.affects follows

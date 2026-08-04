@@ -4,8 +4,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // Fan accrual (design doc sections 3 and 6): fans are a function of band
     // size and time ONLY - never Cash or Cash/sec - so income alone cannot
-    // shortcut the album payout (section 11). Dormant until the activation flag
-    // (set by the chapter's play_for_crowd-style content unlock) latches on.
+    // shortcut the album payout (section 11). Dormant until the activation gate
+    // holds (Chapter 1: the flag its play_for_crowd content unlock sets).
     // Rate modifiers (cover-bar rewards) live in ModifierSystem under FanRate.
     public class FanSystem
     {
@@ -14,24 +14,27 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly FansConfig _config;
         private readonly ICurrencies _currencies;
         private readonly GeneratorSystem _generators;
-        private readonly FlagSystem _flags;
+        private readonly ConditionContext _conditions;
         private readonly ModifierSystem _modifiers;
 
-        // the accrual currency and activation flag come from the chapter's fans
+        // the accrual currency and activation gate come from the chapter's fans
         // config (JSON), not from code
         public FanSystem(FansConfig config, ICurrencies currencies, GeneratorSystem generators,
-            FlagSystem flags, ModifierSystem modifiers)
+            ConditionContext conditions, ModifierSystem modifiers)
         {
             _config = config;
             _currencies = currencies;
             _generators = generators;
-            _flags = flags;
+            _conditions = conditions;
             _modifiers = modifiers;
 
             _currencies.ValidateReference(config.CurrencyId, "FanSystem (accrual)");
         }
 
-        public bool Active => _flags.IsSet(_config.RevealFlagId);
+        // a gameplay gate, not a display check: it decides whether fans accrue
+        // at all, and it is an ordinary Condition, so a chapter can start
+        // accrual on a balance or a completed bar as easily as on a flag
+        public bool Active => ConditionEvaluator.IsMet(_config.ActiveWhen, _conditions);
 
         // owned units across bandmate generators (IsBandmate - gear never counts)
         public int BandmateCount

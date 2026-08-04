@@ -79,7 +79,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 Resolve(database.Generators, chapter.GeneratorIds, "generator"), router, modifiers);
             var upgrades = new UpgradeSystem(
                 Resolve(database.Upgrades, chapter.UpgradeIds, "upgrade"), router, flags, modifiers);
-            var fans = new FanSystem(chapter.Fans, router, generators, flags, modifiers);
 
             var rewards = new RewardManager(database.Rewards.All);
             var effects = new EffectContext(router, flags, modifiers);
@@ -88,6 +87,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
             var conditions = new ConditionContext(router, generators, flags,
                 GameManager.RecordsCurrencyId, database, bars);
+
+            // built after the condition context for the same reason
+            // ProductionSystem is: fan activation is an ordinary Condition, so
+            // the system that asks it cannot exist before the context it asks
+            // through.
+            var fans = new FanSystem(chapter.Fans, router, generators, conditions, modifiers);
 
             // built after the condition context because config gates are
             // ordinary Conditions checked per firing. Only THIS chapter's

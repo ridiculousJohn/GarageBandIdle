@@ -405,7 +405,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void BarGroupWithNoBars_IsReported()
         {
             var currencies = TestContent.MakeEconomy();
-            var group = TestContent.MakeBarGroup("learn_covers", "fans", new List<string>());
+            var group = TestContent.MakeBarGroup("learn_covers", new FlagSetCondition("fans"), new List<string>());
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 barGroupIds: new List<string> { "learn_covers" });
             var database = new ContentDatabase(chapters: new[] { ch1 }, barGroups: new[] { group });

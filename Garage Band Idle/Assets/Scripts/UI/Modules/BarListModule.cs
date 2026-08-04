@@ -8,9 +8,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
 {
     // Module: the fillable-bar list. Instantiates one BarRowUI per bar across
     // the chapter's bar groups (the count is content-driven) and shows the fill
-    // currency readout. Rows of a group stay hidden until its reveal flag sets;
-    // in Chapter 1 the hosting section gates on the same flag, but a later
-    // chapter can put two groups with different flags in one section.
+    // currency readout. Rows of a group stay hidden until its visibility
+    // Condition holds; in Chapter 1 the hosting section gates on the same flag,
+    // but a later chapter can put two groups with different gates in one
+    // section.
     // This module presents PerBarContinuousRuntime groups; the bind-time type
     // check is content-pairing validation (a group with a different fill
     // behavior ships its own module prefab), not runtime mode dispatch.
@@ -26,14 +27,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly List<(PerBarContinuousRuntime runtime, Action handler)> _selectionHandlers = new();
 
         // the pool readout derives from the bars on display: each distinct
-        // fill currency, in bar order, tagged with the reveal flags of the
+        // fill currency, in bar order, tagged with the visibility gates of the
         // groups that fill from it. A currency renders only while at least
         // one owning group is revealed, so a hidden group can't leak its
-        // pool ahead of its flag.
+        // pool ahead of its gate.
         private class PoolEntry
         {
             public string CurrencyId;
-            public readonly List<string> RevealFlagIds = new();
+            public readonly List<Condition> VisibleWhen = new();
         }
 
         private readonly List<PoolEntry> _pools = new();
@@ -55,14 +56,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 {
                     var row = Instantiate(_rowPrefab, _listRoot);
                     row.Bind(context, runtime, bar);
-                    row.gameObject.SetActive(context.Flags.IsSet(group.RevealFlagId));
+                    row.gameObject.SetActive(
+                        ConditionEvaluator.IsMet(group.VisibleWhen, context.Economy.Conditions));
                     _rows.Add(row);
 
                     var pool = _pools.Find(p => p.CurrencyId == bar.Definition.FillCurrencyId);
                     if (pool == null)
                         _pools.Add(pool = new PoolEntry { CurrencyId = bar.Definition.FillCurrencyId });
-                    if (!pool.RevealFlagIds.Contains(group.RevealFlagId))
-                        pool.RevealFlagIds.Add(group.RevealFlagId);
+                    if (!pool.VisibleWhen.Contains(group.VisibleWhen))
+                        pool.VisibleWhen.Add(group.VisibleWhen);
                 }
 
                 // selection moved: the old and new target both need their labels
@@ -81,7 +83,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             bars.BarProgressChanged += HandleBarChanged;
             bars.BarCompleted += HandleBarChanged;
             context.Economy.Currencies.BalanceChanged += HandleBalanceChanged;
-            context.Flags.FlagSet += HandleFlagSet;
+            context.Economy.Conditions.Settled += HandleConditionsSettled;
 
             RefreshPool();
         }
@@ -96,7 +98,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             foreach (var (runtime, handler) in _selectionHandlers)
                 runtime.ActiveBarChanged -= handler;
             _context.Economy.Currencies.BalanceChanged -= HandleBalanceChanged;
-            _context.Flags.FlagSet -= HandleFlagSet;
+            _context.Economy.Conditions.Settled -= HandleConditionsSettled;
         }
 
         private void HandleBarChanged(BarState bar)
@@ -129,21 +131,24 @@ namespace RidiculousGaming.GarageBandIdle.UI
             }
         }
 
-        private void HandleFlagSet(string flagId)
+        // one settled signal covers every gate input (a flag latched, a balance
+        // crossed, a bar completed), so each row re-reads its own group's
+        // Condition rather than matching against whatever just changed
+        private void HandleConditionsSettled()
         {
             foreach (var row in _rows)
             {
-                if (row.Bar.Group.RevealFlagId == flagId)
-                    row.gameObject.SetActive(true);
+                row.gameObject.SetActive(
+                    ConditionEvaluator.IsMet(row.Bar.Group.VisibleWhen, _context.Economy.Conditions));
             }
             RefreshPool();
         }
 
         private bool IsRevealed(PoolEntry pool)
         {
-            foreach (var flagId in pool.RevealFlagIds)
+            foreach (var condition in pool.VisibleWhen)
             {
-                if (_context.Flags.IsSet(flagId))
+                if (ConditionEvaluator.IsMet(condition, _context.Economy.Conditions))
                     return true;
             }
             return false;

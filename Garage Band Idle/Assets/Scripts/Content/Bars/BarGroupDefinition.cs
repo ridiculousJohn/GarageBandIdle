@@ -4,9 +4,12 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.Content
 {
     // An ordered group of fillable bars that reveals as one unit (Learn Covers).
-    // Reveal runs through the flag registry like all content; the group's scope
-    // drives reset on album release. How the group fills is the polymorphic
-    // BarFillBehavior: the concrete type is the mode, chosen at import.
+    // Visibility is an ordinary Condition asked through the one evaluator, like
+    // every other gate in the game (design doc section 12, rules 8 and 9) - a
+    // group can gate on a flag, a balance or a completed bar, not just a flag.
+    // The group's scope drives reset on album release. How the group fills is
+    // the polymorphic BarFillBehavior: the concrete type is the mode, chosen at
+    // import.
     [CreateAssetMenu(
         fileName = "NewBarGroup",
         menuName = "GarageBandIdle/Bar Group")]
@@ -19,9 +22,10 @@ namespace RidiculousGaming.GarageBandIdle.Content
         [SerializeField]
         private string _displayName;
 
-        [SerializeField]
-        [Tooltip("Flag that reveals the group (the single reveal registry).")]
-        private string _revealFlagId;
+        [SerializeReference]
+        [SubclassPicker]
+        [Tooltip("Must hold for the group to show, evaluated like every other gate. None = always visible.")]
+        private Condition _visibleWhen;
 
         [SerializeReference]
         [SubclassPicker]
@@ -39,19 +43,19 @@ namespace RidiculousGaming.GarageBandIdle.Content
 
         public string Id => _id;
         public string DisplayName => _displayName;
-        public string RevealFlagId => _revealFlagId;
+        public Condition VisibleWhen => _visibleWhen;
         public BarFillBehavior FillBehavior => _fillBehavior;
         public ContentScope Scope => _scope;
         public IReadOnlyList<string> BarIds => _barIds;
 
 #if UNITY_EDITOR
         // importer-only: bar group assets are generated from chapter JSON
-        public void EditorInitialize(string id, string displayName, string revealFlagId,
+        public void EditorInitialize(string id, string displayName, Condition visibleWhen,
             BarFillBehavior fillBehavior, ContentScope scope, List<string> barIds)
         {
             _id = id;
             _displayName = displayName;
-            _revealFlagId = revealFlagId;
+            _visibleWhen = visibleWhen;
             _fillBehavior = fillBehavior;
             _scope = scope;
             _barIds = barIds;

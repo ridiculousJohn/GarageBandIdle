@@ -106,12 +106,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
-        public static BarGroupDefinition MakeBarGroup(string id, string revealFlagId,
+        public static BarGroupDefinition MakeBarGroup(string id, Condition visibleWhen,
             List<string> barIds, BarFillBehavior fillBehavior = null,
             ContentScope scope = ContentScope.Run)
         {
             var definition = Track(ScriptableObject.CreateInstance<BarGroupDefinition>());
-            definition.EditorInitialize(id, id, revealFlagId,
+            definition.EditorInitialize(id, id, visibleWhen,
                 fillBehavior ?? new PerBarContinuousFill(), scope, barIds);
             return definition;
         }
@@ -130,21 +130,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // a minimal coherent chapter: declared flags plus the id lists that
-        // form its content closure. The fans config uses the standard economy's
-        // currency and must reveal on a declared flag, so include
-        // fansRevealFlagId (default "fans") in flagIds.
+        // form its content closure. Fan accrual gates on a Condition; the
+        // default is `flagSet fans`, which every caller relies on to start
+        // dormant, so a chapter fixture still has to declare "fans" in flagIds.
+        // Pass fansActiveWhen to gate accrual on anything else.
         public static ChapterDefinition MakeChapter(string id, List<string> flagIds,
             List<string> sectionIds = null, List<string> generatorIds = null,
             List<string> upgradeIds = null, List<string> barGroupIds = null,
             List<string> eventIds = null, List<string> currencyIds = null,
             List<string> producerIds = null,
-            string fansRevealFlagId = "fans", double recordBuffPerRecord = 0.02,
+            Condition fansActiveWhen = null, double recordBuffPerRecord = 0.02,
             int index = 1, int capstoneRecordsGate = 30, string fansCurrencyId = "fans")
         {
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
             definition.EditorInitialize(id, index, id, "", "", "", capstoneRecordsGate,
                 new RecordBuffConfig(recordBuffPerRecord, new List<string> { "cash" }),
-                new FansConfig(fansCurrencyId, fansRevealFlagId, 0.2, 0.02),
+                new FansConfig(fansCurrencyId, fansActiveWhen ?? new FlagSetCondition("fans"), 0.2, 0.02),
                 flagIds, currencyIds ?? new List<string>(), producerIds ?? new List<string>(),
                 sectionIds ?? new List<string>(), generatorIds ?? new List<string>(),
                 upgradeIds ?? new List<string>(), barGroupIds ?? new List<string>(),

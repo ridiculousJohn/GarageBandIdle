@@ -194,7 +194,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
 
             Assert.AreEqual("fans", chapter.Fans.CurrencyId, "accrual currency comes from the JSON fans block");
-            Assert.AreEqual("fans", chapter.Fans.RevealFlagId, "activation flag comes from the JSON fans block");
+            var activeWhen = chapter.Fans.ActiveWhen as FlagSetCondition;
+            Assert.IsNotNull(activeWhen, "fan accrual is gated by a flag condition from the JSON fans block");
+            Assert.AreEqual("fans", activeWhen.FlagId, "activation gate comes from the JSON fans block");
             Assert.AreEqual(0.2, chapter.Fans.BaseFansPerSec, 1e-9);
             Assert.AreEqual(0.02, chapter.Fans.PerBandmateOwnedBonus, 1e-9);
         }
@@ -366,7 +368,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             CollectionAssert.AreEqual(new[] { "learn_covers" }, chapter.BarGroupIds);
 
             var group = LoadById<BarGroupDefinition>(BarGroupsFolder, "learn_covers");
-            Assert.AreEqual("covers", group.RevealFlagId);
+            var groupGate = group.VisibleWhen as FlagSetCondition;
+            Assert.IsNotNull(groupGate, "learn_covers reveals on a flag condition");
+            Assert.AreEqual("covers", groupGate.FlagId);
             // the concrete behavior type is the fill mode; the importer maps
             // the JSON's (fillMode, delivery) pair onto it
             Assert.IsInstanceOf<PerBarContinuousFill>(group.FillBehavior);

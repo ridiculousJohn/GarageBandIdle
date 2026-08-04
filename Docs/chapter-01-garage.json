@@ -239,7 +239,7 @@
       {
         "id": "learn_covers",
         "name": "Learn Covers",
-        "revealFlag": "covers",
+        "visibleWhen": { "type": "flagSet", "flag": "covers" },
         "fillMode": "perBar",
         "delivery": "continuous",
         "deliveryNote": "How fill currency moves from the pool into the target. `continuous`: accrued Rehearsal streams into the group's active (player-selected) bar as it arrives; the pool only holds a balance when no bar is selected. The fillMode + delivery pair maps onto a BarFillBehavior class at import; future modes (tap a fixed chunk, dump the pool) are sibling classes with new vocabulary.",
@@ -257,7 +257,7 @@
 
   "fans": {
     "currency": "fans",
-    "revealFlag": "fans",
+    "activeWhen": { "type": "flagSet", "flag": "fans" },
     "baseFansPerSec": 0.2,
     "perBandmateOwnedBonus": 0.02,
     "perBandmateNote": "Applies per owned unit of any generator with `isBandmate: true` (behavior-as-data — the fan system reads the flag, it does not name drummer/bassist/guitarist). Ties fan rate to band size.",
@@ -267,7 +267,6 @@
   "album": {
     "id": "cut_demo",
     "displayName": "Cut a Demo",
-    "revealFlag": "album",
     "unlock": {
       "type": "compound",
       "all": [

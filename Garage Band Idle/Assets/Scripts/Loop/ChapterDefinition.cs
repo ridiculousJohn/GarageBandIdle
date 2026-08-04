@@ -168,8 +168,10 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     }
 
     // Fan accrual config (design doc section 6): fan rate is a function of band
-    // size and time only, never Cash. The currency accrued into and the flag
-    // that activates accrual are chapter data, not code bindings.
+    // size and time only, never Cash. The currency accrued into and the gate
+    // that activates accrual are chapter data, not code bindings. Activation is
+    // an ordinary Condition (rules 8 and 9), so a chapter can start fans on a
+    // balance or a completed bar rather than only on a flag.
     [Serializable]
     public class FansConfig
     {
@@ -178,9 +180,10 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         [Tooltip("Currency id the fan system accrues into.")]
         private string _currencyId;
 
-        [SerializeField]
-        [Tooltip("Flag that activates fan accrual (the single reveal registry).")]
-        private string _revealFlagId;
+        [SerializeReference]
+        [SubclassPicker]
+        [Tooltip("Must hold for fans to accrue, evaluated like every other gate. None = always accruing.")]
+        private Condition _activeWhen;
 
         [SerializeField]
         private double _baseFansPerSec;
@@ -190,17 +193,17 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         private double _perBandmateOwnedBonus;
 
         public string CurrencyId => _currencyId;
-        public string RevealFlagId => _revealFlagId;
+        public Condition ActiveWhen => _activeWhen;
         public double BaseFansPerSec => _baseFansPerSec;
         public double PerBandmateOwnedBonus => _perBandmateOwnedBonus;
 
         public FansConfig() { }
 
 #if UNITY_EDITOR
-        public FansConfig(string currencyId, string revealFlagId, double baseFansPerSec, double perBandmateOwnedBonus)
+        public FansConfig(string currencyId, Condition activeWhen, double baseFansPerSec, double perBandmateOwnedBonus)
         {
             _currencyId = currencyId;
-            _revealFlagId = revealFlagId;
+            _activeWhen = activeWhen;
             _baseFansPerSec = baseFansPerSec;
             _perBandmateOwnedBonus = perBandmateOwnedBonus;
         }

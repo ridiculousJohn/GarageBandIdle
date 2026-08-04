@@ -252,6 +252,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var barCount = 0;
             foreach (var group in data.bars?.groups ?? Array.Empty<BarGroupBlock>())
             {
+                if (!IsImportableBarGroup(group))
+                    continue;
+
                 var barIds = new List<string>();
                 foreach (var bar in group.bars ?? Array.Empty<BarBlock>())
                 {
@@ -274,7 +277,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 var groupAsset = LoadOrCreate<BarGroupDefinition>($"{BarGroupsFolder}/{group.id}.asset");
                 var fillBehavior = ToFillBehavior(group.fillMode, group.delivery, $"bar group '{group.id}'");
                 var groupScope = ToScope(data.bars.scope, $"bar group '{group.id}'");
-                ApplyIfChanged(groupAsset, asset => asset.EditorInitialize(group.id, group.name, group.revealFlag,
+                var visibleWhen = ToCondition(group.visibleWhen, $"bar group '{group.id}' (visibleWhen)");
+                ApplyIfChanged(groupAsset, asset => asset.EditorInitialize(group.id, group.name, visibleWhen,
                     fillBehavior, groupScope, barIds));
                 barGroupIds.Add(group.id);
             }
@@ -304,6 +308,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             // validation reports it too
             if ((data.fans?.baseFansPerSec ?? 0) < 0 || (data.fans?.perBandmateOwnedBonus ?? 0) < 0)
                 Debug.LogError("ChapterJsonImporter: fans block has negative earn values. Fix the JSON and re-import.");
+            // the pre-5.6 schema activated accrual on a bare flag id; it is a
+            // Condition under 'activeWhen' now. The chapter still imports (a
+            // fans config is not skippable content) and boot validation reports
+            // the missing gate.
+            if (!string.IsNullOrEmpty(data.fans?.revealFlag))
+                Debug.LogError("ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by a Condition under 'activeWhen' (design doc section 12, rules 8 and 9). Fix the JSON and re-import.");
             // the pre-5.4 schema put the Jam yield in constants; a leftover
             // tapBaseValue would silently disagree with the jam producer's
             // cash config, so its presence is refused rather than dropped
@@ -315,7 +325,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
                 new List<string>(data.constants?.recordBuff?.affects ?? Array.Empty<string>()));
-            var fans = new FansConfig(data.fans?.currency, data.fans?.revealFlag,
+            var fans = new FansConfig(data.fans?.currency,
+                ToCondition(data.fans?.activeWhen, $"chapter '{data.chapter.id}' (fans activeWhen)"),
                 data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0);
             ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
                 data.chapter.name, data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
@@ -541,6 +552,22 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return true;
         }
 
+        // one bar group's import decision. The pre-5.6 schema revealed a group
+        // by bare flag id; reveal is a Condition now (design doc section 12,
+        // rules 8 and 9), and a stale `revealFlag` is JSON that used to mean
+        // something, so it is refused loudly rather than silently ignored. The
+        // group is skipped rather than imported gateless: a group whose gate
+        // was dropped shows from the first frame, which is the one failure the
+        // reveal registry exists to prevent.
+        private static bool IsImportableBarGroup(BarGroupBlock block)
+        {
+            if (string.IsNullOrEmpty(block.revealFlag))
+                return true;
+
+            Debug.LogError($"ChapterJsonImporter: bar group '{block.id}' carries a 'revealFlag' key - reveal is a Condition under 'visibleWhen' (design doc section 12, rules 8 and 9). Skipping it - fix the JSON and re-import.");
+            return false;
+        }
+
         // Converts a producer's production entries, or null when any entry is
         // invalid - a producer missing one of its yields is not the authored
         // producer, so the whole block is skipped rather than half-written.
@@ -594,6 +621,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // schema is refused rather than silently dropped
         internal static bool ParseCurrencyEntryIsImportable(string json)
             => IsImportableCurrencyEntry(JsonConvert.DeserializeObject<CurrencyEntryBlock>(json, JsonSettings));
+
+        // the bar-group parse path, for the same reason: tests cover that the
+        // pre-5.6 revealFlag schema is refused rather than silently ignored
+        internal static bool ParseBarGroupIsImportable(string json)
+            => IsImportableBarGroup(JsonConvert.DeserializeObject<BarGroupBlock>(json, JsonSettings));
 
         // the payload parse path, exposed for the same reason as ParseCondition:
         // tests cover which values the importer refuses to write without one
@@ -1107,6 +1139,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public string id = "";
             public string name = "";
+            public ConditionBlock visibleWhen = new();
+
+            // pre-5.6 schema: reveal was a bare flag id. Kept as a field ONLY so
+            // its presence can be refused - see IsImportableBarGroup.
             public string revealFlag = "";
             public string fillMode = "";
             public string delivery = "";
@@ -1125,6 +1161,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private class FansBlock
         {
             public string currency = "";
+            public ConditionBlock activeWhen = new();
+
+            // pre-5.6 schema, kept only to be refused - see ImportChapter's
+            // fans handling. Accrual is a gate now, not a flag lookup.
             public string revealFlag = "";
             public double baseFansPerSec;
             public double perBandmateOwnedBonus;

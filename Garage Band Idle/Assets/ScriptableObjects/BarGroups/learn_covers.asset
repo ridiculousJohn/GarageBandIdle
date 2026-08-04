@@ -14,9 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.BarGroupDefinition
   _id: learn_covers
   _displayName: Learn Covers
-  _revealFlagId: covers
+  _visibleWhen:
+    rid: 1000
   _fillBehavior:
-    rid: 5051021696154730514
+    rid: 1001
   _scope: 1
   _barIds:
   - cover_1
@@ -25,6 +26,10 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 5051021696154730514
+    - rid: 1000
+      type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _flagId: covers
+    - rid: 1001
       type: {class: PerBarContinuousFill, ns: RidiculousGaming.GarageBandIdle.Content, asm: Assembly-CSharp}
       data: 

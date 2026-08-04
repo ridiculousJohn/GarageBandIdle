@@ -135,7 +135,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)")
                 && !context.Currencies.ResetsOnAlbumRelease(chapter.Fans.CurrencyId))
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' fans currency '{chapter.Fans.CurrencyId}' is in a currency group that survives an album release - fans would compound across runs and inflate the Records payout.");
-            ValidateFlag(chapter.Fans.RevealFlagId, context, $"Chapter '{chapter.Id}' (fans revealFlag)");
+            ConditionEvaluator.Validate(chapter.Fans.ActiveWhen, context, $"Chapter '{chapter.Id}' (fans activeWhen)");
 
             // negative tuning drains or dead-ends instead of earning; runtime
             // fails closed on all of it (guarded ticks, zeroed tap), so
@@ -382,7 +382,7 @@ namespace RidiculousGaming.GarageBandIdle
                 group.FillBehavior.Validate(context, $"Bar group '{group.Id}' (fillBehavior)");
             if (group.Scope == ContentScope.None)
                 Debug.LogError($"ContentValidator: Bar group '{group.Id}' has scope None (uninitialized).");
-            ValidateFlag(group.RevealFlagId, context, $"Bar group '{group.Id}' (revealFlag)");
+            ConditionEvaluator.Validate(group.VisibleWhen, context, $"Bar group '{group.Id}' (visibleWhen)");
             // a group with no bars reveals an empty region and can never satisfy
             // a barsCompleted gate, so anything waiting on it waits forever
             if (group.BarIds.Count == 0)
@@ -504,14 +504,6 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!registry.Contains(id))
                     Debug.LogError($"ContentValidator: {source} references unknown {typeof(T).Name} id '{id}'.");
             }
-        }
-
-        private static void ValidateFlag(string flagId, ConditionContext context, string source)
-        {
-            if (string.IsNullOrEmpty(flagId))
-                Debug.LogError($"ContentValidator: {source} has an empty flag id.");
-            else if (context.Flags != null && !context.Flags.IsKnown(flagId))
-                Debug.LogError($"ContentValidator: {source} references flag '{flagId}', which the chapter does not declare.");
         }
 
         private static void ValidateRewardReference(string rewardId, RewardManager rewards, string source)

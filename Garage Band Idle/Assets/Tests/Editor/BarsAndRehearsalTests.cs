@@ -38,7 +38,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
+            fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -51,7 +51,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeBar("cover_2", "rehearsal", 300, "fan_rate_x1_15"),
                 TestContent.MakeBar("cover_3", "rehearsal", 600, "fan_rate_x1_20"),
             };
-            var group = TestContent.MakeBarGroup("learn_covers", "covers",
+            var group = TestContent.MakeBarGroup("learn_covers", new FlagSetCondition("covers"),
                 new List<string> { "cover_1", "cover_2", "cover_3" });
 
             return new BarSystem(new[] { group }, bars, currencies, rewards,
@@ -65,7 +65,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
+            fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -78,9 +78,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeBar("cover_2", "rehearsal", 300),
                 TestContent.MakeBar("song_1", "rehearsal", 100, "fan_rate_x1_20"),
             };
-            var run = TestContent.MakeBarGroup("learn_covers", "covers",
+            var run = TestContent.MakeBarGroup("learn_covers", new FlagSetCondition("covers"),
                 new List<string> { "cover_1", "cover_2" });
-            var permanent = TestContent.MakeBarGroup("setlist", "covers",
+            var permanent = TestContent.MakeBarGroup("setlist", new FlagSetCondition("covers"),
                 new List<string> { "song_1" }, scope: ContentScope.PermanentInChapter);
 
             return new BarSystem(new[] { run, permanent }, bars, currencies, rewards,
@@ -271,7 +271,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var group = ScriptableObject.CreateInstance<BarGroupDefinition>();
             group.hideFlags = HideFlags.HideAndDontSave;
-            group.EditorInitialize("broken", "broken", "covers", null,
+            group.EditorInitialize("broken", "broken", new FlagSetCondition("covers"), null,
                 ContentScope.Run, new List<string> { "cover_1" });
 
             LogAssert.Expect(LogType.Error, "BarSystem: bar group 'broken' has no fill behavior. Skipping it.");
@@ -296,13 +296,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
             });
             var bars = new[] { TestContent.MakeBar("broken_cover", "rehearsal", 0, "fan_rate_x1_15") };
-            var group = TestContent.MakeBarGroup("learn_covers", "covers", new List<string> { "broken_cover" });
+            var group = TestContent.MakeBarGroup("learn_covers", new FlagSetCondition("covers"), new List<string> { "broken_cover" });
 
             LogAssert.Expect(LogType.Error,
                 "BarSystem: bar 'broken_cover' has a non-positive fill requirement (0). Skipping it.");
@@ -388,7 +388,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", "fans", 0.2, 0.02), currencies, generators, flags, modifiers);
+            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
             var rewards = new RewardManager(new[] { TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15) });
 
             var bars = new[]
@@ -396,8 +396,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeBar("cover_1", "rehearsal", 100, "fan_rate_x1_15"),
                 TestContent.MakeBar("song_1", "rehearsal", 100, "fan_rate_x1_15"),
             };
-            var run = TestContent.MakeBarGroup("learn_covers", "covers", new List<string> { "cover_1" });
-            var permanent = TestContent.MakeBarGroup("setlist", "covers", new List<string> { "song_1" },
+            var run = TestContent.MakeBarGroup("learn_covers", new FlagSetCondition("covers"), new List<string> { "cover_1" });
+            var permanent = TestContent.MakeBarGroup("setlist", new FlagSetCondition("covers"), new List<string> { "song_1" },
                 scope: ContentScope.PermanentInChapter);
             var system = new BarSystem(new[] { run, permanent }, bars, currencies, rewards,
                 new EffectContext(currencies, flags, modifiers));
