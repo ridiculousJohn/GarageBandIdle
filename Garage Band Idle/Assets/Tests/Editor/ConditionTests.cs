@@ -222,6 +222,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public StubBarCompletion(int completed) => _completed = completed;
 
             public int CompletedCount(string groupId) => _completed;
+
+            // a stub count never moves, so there is nothing to subscribe to
+            public event System.Action<Content.BarState> BarCompleted { add { } remove { } }
         }
 
         [Test]

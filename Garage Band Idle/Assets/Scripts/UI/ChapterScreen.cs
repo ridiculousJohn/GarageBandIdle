@@ -43,16 +43,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (_sections.Count == 0)
                 Debug.LogError($"ChapterScreen: chapter '{_game.CurrentChapter.Id}' has no sections - nothing to show. Re-run the chapter import.");
 
-            // one subscription per condition input: balances/earned totals/
-            // records > BalanceChanged, flags > FlagSet, ownedCount >
-            // GeneratorOwnedChanged, barsCompleted > BarCompleted. Every signal
-            // fires after its state settles, so evaluation never reads mid-
-            // mutation state and never depends on a proxy signal arriving later
-            _game.Flags.FlagSet += HandleFlagSet;
-            _game.Currencies.BalanceChanged += HandleBalanceChanged;
-            _game.Generators.GeneratorOwnedChanged += HandleGeneratorOwnedChanged;
-            _game.Bars.BarCompleted += HandleBarCompleted;
+            // One subscription for every condition input there is: the context
+            // holds the individual signals (balances, flags, owned counts,
+            // completed bars) and publishes once the drain has settled them, so
+            // a visibleWhen gate is never asked about half-applied state and this
+            // screen has no list of inputs to keep in step with the Condition
+            // vocabulary.
+            _game.Conditions.Settled += HandleConditionsSettled;
 
+            // no drain has run yet, so the opening reveal is asked for directly
             EvaluateSections();
         }
 
@@ -61,12 +60,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (_game == null)
                 return;
 
-            _game.Flags.FlagSet -= HandleFlagSet;
-            _game.Currencies.BalanceChanged -= HandleBalanceChanged;
-            if (_game.Generators != null)
-                _game.Generators.GeneratorOwnedChanged -= HandleGeneratorOwnedChanged;
-            if (_game.Bars != null)
-                _game.Bars.BarCompleted -= HandleBarCompleted;
+            if (_game.Conditions != null)
+                _game.Conditions.Settled -= HandleConditionsSettled;
 
             foreach (var section in _sections)
             {
@@ -109,13 +104,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             return section;
         }
 
-        private void HandleFlagSet(string flagId) => EvaluateSections();
-
-        private void HandleBalanceChanged(string currencyId, BigNumber balance) => EvaluateSections();
-
-        private void HandleGeneratorOwnedChanged(Economy.Generator generator) => EvaluateSections();
-
-        private void HandleBarCompleted(Content.BarState bar) => EvaluateSections();
+        private void HandleConditionsSettled() => EvaluateSections();
 
         private void EvaluateSections()
         {

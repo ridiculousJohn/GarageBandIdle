@@ -29,15 +29,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 _rows.Add(row);
             }
 
-            // one subscription per condition input a gate can read, mirroring
-            // ChapterScreen: a buff gate is any Condition, so balances/earned
-            // totals, flags, owned counts and completed bars all move
-            // availability. UpgradeApplied hides a row once bought and
-            // UpgradeCleared brings it back when the album release drops the latch.
-            context.Game.Currencies.BalanceChanged += HandleBalanceChanged;
-            context.Game.Flags.FlagSet += HandleFlagSet;
-            context.Game.Generators.GeneratorOwnedChanged += HandleGeneratorOwnedChanged;
-            context.Game.Bars.BarCompleted += HandleBarCompleted;
+            // One subscription for availability, mirroring ChapterScreen: a buff
+            // gate is any Condition, so every condition input moves availability
+            // and the settled context is the one signal that covers all of them.
+            // UpgradeApplied and UpgradeCleared stay separate because they are row
+            // lifecycle rather than a gate: a row hides once bought and comes back
+            // when the album release drops the latch.
+            context.Game.Conditions.Settled += HandleConditionsSettled;
             context.Game.Upgrades.UpgradeApplied += HandleUpgradeApplied;
             context.Game.Upgrades.UpgradeCleared += HandleUpgradeCleared;
         }
@@ -47,12 +45,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (_context == null)
                 return;
 
-            _context.Game.Currencies.BalanceChanged -= HandleBalanceChanged;
-            _context.Game.Flags.FlagSet -= HandleFlagSet;
-            if (_context.Game.Generators != null)
-                _context.Game.Generators.GeneratorOwnedChanged -= HandleGeneratorOwnedChanged;
-            if (_context.Game.Bars != null)
-                _context.Game.Bars.BarCompleted -= HandleBarCompleted;
+            if (_context.Game.Conditions != null)
+                _context.Game.Conditions.Settled -= HandleConditionsSettled;
             if (_context.Game.Upgrades != null)
             {
                 _context.Game.Upgrades.UpgradeApplied -= HandleUpgradeApplied;
@@ -60,13 +54,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             }
         }
 
-        private void HandleBalanceChanged(string currencyId, BigNumber balance) => RefreshRows();
-
-        private void HandleFlagSet(string flagId) => RefreshRows();
-
-        private void HandleGeneratorOwnedChanged(Generator generator) => RefreshRows();
-
-        private void HandleBarCompleted(Content.BarState bar) => RefreshRows();
+        private void HandleConditionsSettled() => RefreshRows();
 
         private void HandleUpgradeApplied(Upgrade upgrade) => RefreshRows();
 

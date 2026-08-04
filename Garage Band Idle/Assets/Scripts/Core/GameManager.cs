@@ -48,6 +48,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         private TickSystem _tickSystem;
 
+        // the drain's evaluation, cached because Settle runs on every tick
+        private System.Action _evaluateUnlocks;
+
         private void Awake()
         {
             if (SingletonManager.DestroyIfRegistered(this))
@@ -100,6 +103,7 @@ namespace RidiculousGaming.GarageBandIdle
                 Sections = Resolve(Database.Sections, CurrentChapter.SectionIds, "section");
 
                 Conditions = new ConditionContext(Currencies, Generators, Flags, RecordsCurrencyId, Database, Bars);
+                _evaluateUnlocks = EvaluateUnlocks;
 
                 // built after the condition context because config gates are
                 // ordinary Conditions checked per firing. Only the CURRENT
@@ -144,7 +148,46 @@ namespace RidiculousGaming.GarageBandIdle
             if (_tickSystem != null)
                 _tickSystem.Ticked -= OnTicked;
 
+            // the context subscribes to the systems it reads, so a discarded
+            // one has to stop listening
+            Conditions?.Dispose();
+
             SingletonManager.Unregister(this);
+        }
+
+        // The one settle seam: the single point at which a completed mutation is
+        // declared finished and everything downstream of it runs. Unlock
+        // evaluation drains the condition context's dirty signal (which the four
+        // condition inputs raise, replacing the per-tick poll), and the tap value
+        // republishes. Both used to keep their own list of call sites - the same
+        // four points, maintained twice - and two such lists drift.
+        //
+        // Nothing here may be called from inside a system: a tick has bars still
+        // to drain, a purchase has unlocks still to evaluate, and this is the
+        // boundary that says neither is true anymore.
+        //
+        // Every mutation of a condition input today happens inside one of the
+        // four operations that end here. When the album release and save restore
+        // land (GeneratorSystem.ResetOwned/RestoreOwned, UpgradeSystem and
+        // ModifierSystem's ResetRunScoped), they end here too rather than growing
+        // a fifth pattern.
+        private void Settle()
+        {
+            Conditions.Drain(_evaluateUnlocks);
+
+            // unconditional, unlike the drain: the tap value can move for
+            // reasons no condition input reports (a granted modifier), and
+            // RefreshTapValue already publishes only an actual move
+            Production.RefreshTapValue();
+        }
+
+        // What the drain evaluates - generator reveals, then content unlocks, the
+        // order the poll ran them in. Held as a cached delegate on the field
+        // above so the seam allocates nothing per tick.
+        private void EvaluateUnlocks()
+        {
+            Generators.EvaluateUnlocks(Conditions);
+            Upgrades.EvaluateContentUnlocks(Conditions);
         }
 
         private void OnTicked(double seconds)
@@ -155,12 +198,9 @@ namespace RidiculousGaming.GarageBandIdle
             // production composes its own modifiers per currency (the Records
             // buff among them), so the tick passes no multipliers
             Generators.Tick(seconds);
-            Generators.EvaluateUnlocks(Conditions);
 
-            // content unlocks before fan accrual so a freshly-set fans flag
-            // starts accruing on the same tick; fans never take the income
-            // multiplier - fan rate is band size and time only
-            Upgrades.EvaluateContentUnlocks(Conditions);
+            // fans never take the income multiplier - fan rate is band size and
+            // time only
             Fans.Tick(seconds);
 
             // fill currencies accrue, then bars drain the pool into the active
@@ -169,10 +209,10 @@ namespace RidiculousGaming.GarageBandIdle
             Bars.Tick();
 
             // the tick has fully settled - production, drains, completions,
-            // whatever modifiers or flags they granted - so the tap value is
-            // final: publish it only now (a bar completing mid-tick could set
-            // a flag some config's gate reads, so no earlier point is safe)
-            Production.RefreshTapValue();
+            // whatever modifiers or flags they granted - so unlocks evaluate and
+            // the tap value publishes only now (a bar completing mid-tick could
+            // set a flag some config's gate reads, so no earlier point is safe)
+            Settle();
         }
 
         // the tap action: every tap-triggered production config fires - the
@@ -191,8 +231,8 @@ namespace RidiculousGaming.GarageBandIdle
             Bars.Tick();
 
             // the whole tap has settled (yields paid, bars drained, anything
-            // a completion granted): publish the tap value only now
-            Production.RefreshTapValue();
+            // a completion granted)
+            Settle();
         }
 
         public bool BuyUpgrade(Upgrade upgrade)
@@ -202,14 +242,12 @@ namespace RidiculousGaming.GarageBandIdle
             if (!Upgrades.TryBuy(upgrade, Conditions))
                 return false;
 
-            // the spend moves a balance, which can satisfy a content unlock's
-            // gate right now (the same reason BuyGenerator re-evaluates)
-            Upgrades.EvaluateContentUnlocks(Conditions);
-
-            // the purchase has settled (buff granted, unlocks evaluated):
-            // publish the tap value only now, never from a modifier callback
-            // midway through the operation
-            Production.RefreshTapValue();
+            // the purchase has settled (buff granted, cost charged), so unlocks
+            // evaluate and the tap value publishes here rather than from a
+            // modifier callback midway through the operation. The spend moved a
+            // balance, so the drain has something to do: a content unlock's gate
+            // can be satisfied right now, and reveal must not wait for the tick.
+            Settle();
             return true;
         }
 
@@ -220,14 +258,13 @@ namespace RidiculousGaming.GarageBandIdle
             if (!generator.TryBuy(Currencies))
                 return false;
 
-            // a purchase can satisfy another generator's ownedCount unlock - or a
-            // content unlock's gate (play_for_crowd: own 1 Drummer) - right now
-            Generators.EvaluateUnlocks(Conditions);
-            Upgrades.EvaluateContentUnlocks(Conditions);
-
-            // settled, then publish (an unlock just evaluated can have granted
-            // a tap buff or set a flag a config's gate reads)
-            Production.RefreshTapValue();
+            // the purchase has settled, so the drain runs here and not a tick
+            // later: it can satisfy another generator's ownedCount unlock or a
+            // content unlock's gate (play_for_crowd: own 1 Drummer), and buying
+            // a Drummer has to reveal Fans now. The tap value publishes after,
+            // since an unlock just evaluated can have granted a tap buff or set
+            // a flag a config's gate reads.
+            Settle();
             return true;
         }
     }
