@@ -543,6 +543,18 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
    completed bars, cleared tiers, clear counts) and never modifier grants; derived modifiers are
    never serialized. On load, each economy context re-projects its modifiers from the restored facts
    at construction (rule 12), so an effect can never disagree with the fact that produced it.
+   **[rev]** Re-projection is the **only** way a modifier comes into existence, at every boundary and
+   not just at load. An album release resets the facts it owns — balances, owned counts, run-scoped
+   purchase latches, bar progress — and then re-runs the projection, which rebuilds the modifier store
+   from whatever facts survived. It does **not** reach into the store to remove the run-scoped entries
+   and leave the rest. A store that is rebuilt cannot hold a stale or double-counted effect, so rule
+   11's "durability follows the fact" stops being an invariant something has to maintain and becomes
+   the only thing the code can express. Two mechanisms for one modifier set — filter in place on
+   release, rebuild from facts on load — would be written by different slices, exercised on different
+   days, and able to disagree silently; that disagreement is exactly the compounding failure rule 11
+   describes. The obligation re-projection takes on in exchange is **totality**: every fact class that
+   produces a modifier must be walkable at construction, which is what the context's recipe (rule 12)
+   declares.
 7. **[rev]** Store each cleared chapter's replay economy as its own state block (local currency,
    generators, goal `k`, last-interaction timestamp), separate from frontier state — in code, its own
    currency pool and context instance (rule 12), not scope tags inside shared managers. The only

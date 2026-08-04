@@ -384,6 +384,17 @@ still play identically.
 > currency resolution is a construction-time ownership map over (pool + permanent pool): consumers
 > keep one lookup and one aggregated balance-changed subscription.
 >
+> **The projection is the only door a modifier enters through** (§12 rule 6, settled 2026-08-04).
+> Nothing outside the recipe grants, and no boundary edits the store in place: **delete
+> `ModifierSystem.ResetRunScoped()`**, and make a reset mean "reset the facts, re-run the projection".
+> Assert the property that buys: every fact class producing a modifier is walkable at construction, so
+> a fact class added later cannot be silently skipped — that assertion is what replaces the safety the
+> single central reset call used to provide. Eighteen test call sites currently use `ResetRunScoped()`
+> to simulate a run reset (`ModifierSystemTests`, `BarsAndRehearsalTests`, `FansAndContentUnlockTests`,
+> `EconomyMathTests`, `UpgradePayloadTests`); they move to resetting facts and re-projecting, which is
+> what slice 6's release will actually do. `UpgradeSystem.ResetRunScoped()` **stays** — it clears
+> purchase latches, which are facts.
+>
 > **4. Focus lifecycle skeleton.** A context is constructed → focused ⇄ unfocused → discarded, with
 > exactly one focused context at a time; only the focused context receives the tick (GameManager
 > routes it). Record a last-interaction timestamp on focus loss — the value idle earnings (slice 9)
@@ -481,11 +492,14 @@ id; the test suite is green.
 >   has `resetsOnAlbumRelease = true` (Cash, Fans, Rehearsal), every generator's owned count, every
 >   upgrade/bar whose `scope == run` (buff upgrades, cover bars). KEEP the permanent block — Records,
 >   `contentUnlock` upgrade effects, **flags** (content stays revealed across demos), Roadies.
->   The **effects** half of that reset is one `ResetRunScoped()` call on the modifier registry (§12
->   rule 11), not a per-system enumeration — every run-scoped multiplier and bonus lives there, so
->   fan rate, tap value, generator output and global income all clear in one operation and a system
->   added later cannot be forgotten. What the release still walks per-system is *state*: currency
->   balances, owned counts, bar progress, and the buff-upgrade purchase latches.
+>   The **effects** half is not a reset at all (§12 rules 6 and 11): the release resets *facts* and
+>   then re-runs the context's projection, which rebuilds the modifier store from whatever facts
+>   survived. Do NOT reach into the modifier registry to strip the run-scoped grants and leave the
+>   rest — that is a second mechanism for the same modifier set, and it can disagree with the load
+>   path, which has only facts to rebuild from. What the release walks per-system is exactly the
+>   *facts*: currency balances, owned counts, bar progress, and the buff-upgrade purchase latches.
+>   `ModifierSystem.ResetRunScoped()` is deleted in 5.5; if it still exists when you reach this slice,
+>   that means 5.5 was left incomplete — it is not permission to call it.
 > - Write the release as an operation on the bundled economy context (design §12 rule 12), not as
 >   GameManager code reaching at its own properties: the Records award writes the permanent pool, the
 >   resets walk the chapter context's systems, and the same orchestration must later run unchanged
