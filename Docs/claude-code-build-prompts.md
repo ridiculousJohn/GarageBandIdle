@@ -20,7 +20,11 @@ pretended to be forward-only. Slices 4–10 assume 3.5 is in place and build on 
 establishes the production-config shape (§12 rule 13: every flat-rate currency source lives on its
 producer — generators and the Jam module — never on the currency) and retrofits slices 1–5 onto it.
 Slice **5.5** establishes the economy-context boundary from the design's multi-economy revision
-(§12 rule 12), assumes 5.4, and retrofits slices 1–5 onto it; slices 6–9 assume both.
+(§12 rule 12), assumes 5.4, and retrofits slices 1–5 onto it. Slice **5.6** finishes 3.5's reveal
+work by retiring the last bare `revealFlag` fields, so every progressive reveal is a Condition asked
+through the one evaluator (§12 rules 8 and 9); it assumes 5.5 and must land before slice 6, which
+would otherwise give the currently-unread `album.revealFlag` its first consumer. Slices 6–10 assume
+all three.
 
 ---
 
@@ -389,6 +393,69 @@ still play identically.
 ✅ **Test & commit:** Chapter 1 plays identically end-to-end; boot validation catches a misplaced
 currency (a run-scoped global group, a roster id in a global group, a shadowed id); the test suite
 is green with context-based fixtures.
+
+---
+
+## 5.6 — CONSOLIDATION: reveal is a Condition (retiring the last `revealFlag` fields)
+
+This slice adds no new gameplay. It removes the last bare reveal-flag-id fields from the definition
+assets, so progressive reveal has exactly one vocabulary — a Condition evaluated by the shared
+evaluator (§12 rules 8 and 9) — rather than a Condition for sections and gates plus a hardcoded flag
+id for three other things. 5.4 already did this once, where the production config's gate replaced
+"the bespoke `revealFlag` string" the earn config carried; this finishes the same move on the
+remaining sites. It sits here for two reasons: 5.5 has just rewritten every system's construction
+into the factory, and slice 6 is the first thing that would give the currently-unread
+`album.revealFlag` a consumer — after which this is four sites instead of three.
+
+> Read `/docs/garage-band-idle-design.md` — §3, §6, and §12 rules 8 and 9 (one `Condition` type
+> evaluated by one evaluator; one flag registry for all progressive reveal, with **no parallel reveal
+> paths**). This is a refactor/foundation pass; **do not change observable gameplay.** Chapter 1
+> authors a `flagSet` condition at every site below, so every reveal fires on exactly the flag it
+> fires on today.
+>
+> **1. The three surviving fields.** `BarGroupDefinition.revealFlag` and the chapter `fans` block's
+> `revealFlag` become Conditions. The `album` block's `revealFlag` is **deleted, not converted**: the
+> importer does not read the album block at all today, so the field has no consumer, and slice 6
+> reveals the Release button through its section's `visibleWhen` the way every other module is
+> revealed. Do not let slice 6 make that field live.
+>
+> **2. Fan activation is a gate, not a flag lookup.** `FanSystem.Active` evaluates a Condition
+> through the condition context instead of `_flags.IsSet(_config.RevealFlagId)`. This is a *gameplay*
+> gate — it decides whether fans accrue at all — so `FanSystem` now constructs after the condition
+> context, exactly the reordering `ProductionSystem` took in 5.4. Chapter 1 authors
+> `flagSet fans`, so accrual still starts when `play_for_crowd` applies; what changes is that fan
+> activation can gate on a balance or a completed bar like every other gate in the game.
+>
+> **3. Bar-group reveal is a gate.** `BarListModule` evaluates each group's Condition instead of
+> comparing flag ids, and its `FlagSet` subscription collapses into the condition context's `Settled`
+> signal (the same collapse `ChapterScreen` and `UpgradeListModule` already made); `BarProgressChanged`
+> and `BarCompleted` stay, since those are bar display rather than a gate. The pool readout's
+> `IsRevealed` becomes a Condition evaluation per owning group — keep the existing capability that two
+> groups with different reveal gates can share one section, and keep the rule that a pool renders only
+> while at least one owning group is revealed.
+>
+> **4. Importer + validation.** The JSON keys are named for the facts they express, not shared: a bar
+> group takes `visibleWhen` (it is visibility, the same key a section uses) and the fans block takes
+> `activeWhen` (it is accrual). The importer **refuses** a `revealFlag` key as stale JSON rather than
+> silently ignoring it, the same fail-closed rule 5.4 applied to a currency `earn` block. In
+> `ContentValidator`, the two `ValidateFlag` calls for these sites become ordinary Condition
+> validation, which already reports an unresolvable id and a non-positive threshold — a reveal gate
+> gets the same checks every other gate gets, which is the point.
+>
+> **5. Retrofit.** Update the editor fixtures (`TestContent.MakeBarGroup`, `MakeChapter`) to author
+> Conditions, and the two content tests asserting a flag id (`chapter.Fans.RevealFlagId`,
+> `group.RevealFlagId`) to assert the Condition instead. **Out of scope:** the hardcoded UI display
+> ids in `CurrencyHeaderModule` (`CashCurrencyId`, `FansCurrencyId`, `FansUnlockFlagId`) — 5.5
+> declared those slice-10 debt, they are independent of these fields, and they stay.
+>
+> Goal: Chapter 1 plays exactly as before, but no definition asset carries a reveal-flag id — every
+> reveal in the game, from a section to a bar group to fan accrual, is one Condition asked through one
+> evaluator. Stop here.
+
+✅ **Test & commit:** Chapter 1 plays identically end-to-end (buying a Drummer still reveals Fans and
+starts accrual; the `covers` flag still reveals the Rehearsal readout and the cover bars); the
+importer refuses a `revealFlag` key; no definition asset or config struct holds a bare reveal-flag
+id; the test suite is green.
 
 ---
 
