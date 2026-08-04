@@ -11,7 +11,7 @@ Build order and why: each slice depends on the ones before it (offline earnings 
 tick; prestige needs the currency block split; the content-unlock upgrades are what reveal
 fans/covers/album). Building bottom-up keeps a break isolated to the slice you just added.
 
-**Progress marker:** slices 0–5, **5.4** and **5.5** are already built and tested. Slice **3.5** is a dedicated consolidation pass
+**Progress marker:** slices 0–5, **5.4**, **5.5** and **5.6** are already built and tested. Slice **3.5** is a dedicated consolidation pass
 that establishes the cross-cutting foundations — a single `Condition` type + evaluator, one flag
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
@@ -32,11 +32,15 @@ Slice **5.5** established the economy-context boundary from the design's multi-e
 (§12 rule 12) and retrofitted slices 1–5 onto it: one permanent pool plus one frontier
 `EconomyContext` built from a recipe, `ICurrencies`/`CurrencyRouter` resolving an id to its owning
 pool at construction, and re-projection from facts as the only way a modifier comes into existence
-(`ModifierSystem.ResetRunScoped()` is deleted; `ResetGranted()` is total). Slice **5.6** finishes 3.5's reveal
+(`ModifierSystem.ResetRunScoped()` is deleted; `ResetGranted()` is total). Slice **5.6** finished 3.5's reveal
 work by retiring the last bare `revealFlag` fields, so every progressive reveal is a Condition asked
-through the one evaluator (§12 rules 8 and 9); it assumes 5.5 and must land before slice 6, which
-would otherwise give the currently-unread `album.revealFlag` its first consumer. Slices 6–10 assume
-all three.
+through the one evaluator (§12 rules 8 and 9): `BarGroupDefinition.VisibleWhen` and
+`FansConfig.ActiveWhen` are Conditions, `FanSystem` constructs after the condition context, the
+importer refuses a stale `revealFlag` key, and `album.revealFlag` is deleted rather than converted
+(no importer DTO ever read it), so slice 6 reveals Release through its section's `visibleWhen` like
+every other module. One cost it carries forward: a null Condition means "no gate", so a chapter that
+omits `activeWhen` accrues fans from the first frame where an empty flag id used to be reported.
+Slices 6–10 assume all three.
 
 ---
 
@@ -433,7 +437,7 @@ is green with context-based fixtures.
 
 ---
 
-## 5.6 — CONSOLIDATION: reveal is a Condition (retiring the last `revealFlag` fields)
+## 5.6 — CONSOLIDATION: reveal is a Condition (retiring the last `revealFlag` fields)  ✅ done
 
 This slice adds no new gameplay. It removes the last bare reveal-flag-id fields from the definition
 assets, so progressive reveal has exactly one vocabulary — a Condition evaluated by the shared

@@ -9,5 +9,6 @@
 - [Quote directive before editing](quote-directive-before-editing.md) — standing protocol: first edit of a task is preceded by Acting on: "<John's words>"; nothing quotable = no edit
 - [No inaction epilogues](no-inaction-epilogues.md) — never close a response with what you didn't do ("nothing edited"); repo state is a fact, restraint is not news
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) — never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
-- [Economy context as built](economy-context-as-built.md) — slice 5.5 landed `f12ba3e`; re-projection is the only door a modifier enters; which guarantees are test-only (rebuild-after-construction, multi-context focus); next is 5.6 before slice 6
+- [Economy context as built](economy-context-as-built.md) — slice 5.5 landed `f12ba3e`; re-projection is the only door a modifier enters; which guarantees are test-only (rebuild-after-construction, multi-context focus); next is slice 6
+- [Reveal is a Condition](reveal-is-a-condition.md) — slice 5.6 landed `5b8a917`; the fail-open gap it left, the two stale-key refusal shapes, and why the fan base rate never checks for a band
 - [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) — verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
