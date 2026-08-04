@@ -356,13 +356,21 @@ still play identically.
 > startup instance holding every currency whose group is global — Records today, Roadies later —
 > created once, never reset by any run operation, and destined to be the permanent save block
 > (slice 9). A group that is both run-scoped and global is incoherent ("resets on whose release?"):
-> the importer refuses it and boot validation reports it on existing assets.
+> boot validation reports it. That is the only enforcement point, and deliberately so — currency
+> group assets are hand-authored (`[CreateAssetMenu]`, `ScriptableObjects/CurrencyGroups/`), never
+> generated from the chapter JSON, so there is no import path to refuse the combination on. Do not
+> make groups importable to gain one; the case that matters is an existing asset with both flags set,
+> which is exactly what boot validation sees.
 >
-> **2. The chapter's currency roster is authored.** Extend the chapter JSON and importer so a chapter
-> declares its full local currency list — `cash` and `fans` join `rehearsal` in the `currencies`
-> array, as the bare `{id, group}` entries 5.4 left them (production lives on producers, never on a
-> currency entry) — and `ChapterDefinition.CurrencyIds` carries
-> the roster. A context builds its pool from that roster, never from `Database.Currencies.All`.
+> **2. The chapter's currency roster is authored.** A chapter declares its full local currency list:
+> `cash` and `fans` join `rehearsal` in the chapter JSON's `currencies` array, as the bare
+> `{id, group}` entries 5.4 left them (production lives on producers, never on a currency entry).
+> `ChapterDefinition.CurrencyIds` and the importer that fills it **already exist** — 5.4 left the
+> field carrying a one-entry roster, and `ContentValidator` already checks that every id in it
+> resolves. So this foundation is two things only: add the two missing JSON entries, and make the
+> pool read the roster. What has no implementation yet is the reading: `CurrencyManager` is still
+> constructed from `Database.Currencies.All` in `GameManager.Awake`, which is the line that has to
+> die. A context builds its pool from the roster, never from `Database.Currencies.All`.
 > Validate at construction: every roster id resolves, no roster id belongs to a global group, and no
 > id exists in both the pool and the permanent pool — shadowing is an error, never a fall-through.
 >
@@ -389,11 +397,14 @@ still play identically.
 > `ModifierSystem.ResetRunScoped()`**, and make a reset mean "reset the facts, re-run the projection".
 > Assert the property that buys: every fact class producing a modifier is walkable at construction, so
 > a fact class added later cannot be silently skipped — that assertion is what replaces the safety the
-> single central reset call used to provide. Eighteen test call sites currently use `ResetRunScoped()`
-> to simulate a run reset (`ModifierSystemTests`, `BarsAndRehearsalTests`, `FansAndContentUnlockTests`,
-> `EconomyMathTests`, `UpgradePayloadTests`); they move to resetting facts and re-projecting, which is
-> what slice 6's release will actually do. `UpgradeSystem.ResetRunScoped()` **stays** — it clears
-> purchase latches, which are facts.
+> single central reset call used to provide. Eleven test call sites currently call
+> `modifiers.ResetRunScoped()` to simulate a run reset — `FansAndContentUnlockTests` 3,
+> `ModifierSystemTests` 3, `BarsAndRehearsalTests` 2, `UpgradePayloadTests` 2, `EconomyMathTests` 1 —
+> and they move to resetting facts and re-projecting, which is what slice 6's release will actually do.
+> Migrating eleven is the whole job; the counts are per file so a finished migration is checkable
+> rather than estimated. `UpgradeSystem.ResetRunScoped()` **stays** — it clears purchase latches,
+> which are facts — so the three `upgrades.ResetRunScoped()` calls in `UpgradePayloadTests` stay
+> untouched, and the two receivers must not be confused when counting.
 >
 > **4. Focus lifecycle skeleton.** A context is constructed → focused ⇄ unfocused → discarded, with
 > exactly one focused context at a time; only the focused context receives the tick (GameManager
