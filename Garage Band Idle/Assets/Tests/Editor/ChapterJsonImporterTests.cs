@@ -48,6 +48,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(condition.Evaluate(context), "the innermost all satisfies the nested any");
         }
 
+        // The conversion backstop, not the refusal: the pre-pass now aborts the
+        // whole import on a child with no type (see ConditionFaults_* below), so
+        // reaching this in production means the pre-pass missed a site. Kept
+        // covered because the message is the only thing that would say so.
         [Test]
         public void Condition_CompoundChildWithNoType_IsReportedAndSkipped()
         {
@@ -55,13 +59,116 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var flags = new FlagSystem();
             var context = TestContent.MakeContext(currencies, flags: flags);
 
-            LogAssert.Expect(LogType.Error, "ChapterJsonImporter: compound condition has a child with no type. Skipping it.");
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: condition all[0] is a compound child with no type - the condition pre-pass should have aborted the import. Skipping it.");
             var condition = ChapterJsonImporter.ParseCondition(
                 @"{ ""type"": ""compound"", ""all"": [ {}, { ""type"": ""flagSet"", ""flag"": ""fans"" } ] }");
 
             Assert.IsFalse(condition.Evaluate(context));
             flags.Set("fans");
             Assert.IsTrue(condition.Evaluate(context), "the surviving child governs the gate");
+        }
+
+        // The condition pre-pass (design doc section 12, rules 8 and 9). An
+        // unconvertible condition becomes null, null means "no gate", and boot
+        // validation cannot object because a null Condition is legal content
+        // everywhere - so the import refuses the whole file rather than writing an
+        // asset whose gate silently stands open.
+        [TestCase(@"{ ""type"": ""flagset"", ""flag"": ""covers"" }",
+            "condition has condition type 'flagset', which maps to no Condition subclass.",
+            TestName = "UnknownType_IncludingWrongCasing")]
+        [TestCase(@"{ ""type"": ""compound"" }",
+            "condition is a compound condition with no children.",
+            TestName = "CompoundWithNoChildren")]
+        // `type` is the one key whose misspelling nothing else can catch: the
+        // unrecognized-key report lives past the empty-type return, so this
+        // would otherwise import as content with no gate at all
+        [TestCase(@"{ ""typ"": ""flagSet"", ""flag"": ""covers"" }",
+            "condition has a condition object with no 'type' (unrecognized key(s): typ) - a condition is identified by its 'type', so this would import as no gate.",
+            TestName = "MisspelledTypeKey")]
+        [TestCase(@"{ ""flag"": ""covers"" }",
+            "condition has a condition object with no 'type' - a condition is identified by its 'type', so this would import as no gate.",
+            TestName = "AuthoredFieldsButNoTypeAtAll")]
+        // Presence, not contents: these three are what a half-finished gate leaves
+        // behind, and after deserialization they are indistinguishable from an
+        // absent key UNLESS the DTO field carries no initializer.
+        [TestCase(@"{ ""type"": """" }",
+            "condition has a condition object with no 'type' - a condition is identified by its 'type', so this would import as no gate.",
+            TestName = "TypeKeyPresentButEmpty")]
+        [TestCase(@"{ ""flag"": """" }",
+            "condition has a condition object with no 'type' - a condition is identified by its 'type', so this would import as no gate.",
+            TestName = "FieldKeyPresentButEmpty")]
+        [TestCase(@"{ ""all"": [] }",
+            "condition has a condition object with no 'type' - a condition is identified by its 'type', so this would import as no gate.",
+            TestName = "CompoundListPresentButEmpty")]
+        [TestCase(@"{ ""type"": ""compound"", ""all"": [ {} ] }",
+            "condition all[0] is a compound child with no type.",
+            TestName = "CompoundChildWithNoType")]
+        [TestCase(@"{ ""type"": ""compound"", ""all"": [ { ""type"": ""compound"", ""any"": [ { ""type"": ""flagSet"", ""flag"": ""fans"" }, {} ] } ] }",
+            "condition all[0] any[1] is a compound child with no type.",
+            TestName = "NestedChild_FaultCarriesThePath")]
+        public void ConditionFaults_MalformedInputIsAFault(string json, string expectedFault)
+        {
+            // exactly one fault: a compound with a bad child must not ALSO claim it
+            // has no children - those are different mistakes, so the count is taken
+            // on the raw arrays rather than on the children that survived
+            CollectionAssert.AreEqual(new[] { expectedFault }, ChapterJsonImporter.ParseConditionFaults(json));
+        }
+
+        // The regression that matters most: a false positive here aborts EVERY
+        // import. No gate is legal content at all seven authoring sites, and the
+        // DTO materializes an absent block as an empty instance, so "no type" has
+        // to stay indistinguishable from "no gate authored".
+        [TestCase("{}", TestName = "AbsentGate")]
+        [TestCase("null", TestName = "ExplicitNullGate")]
+        [TestCase(@"{ ""type"": ""currency"", ""currency"": ""cash"", ""value"": 250 }", TestName = "currency")]
+        [TestCase(@"{ ""type"": ""currencyEarnedTotal"", ""currency"": ""cash"", ""value"": 100 }", TestName = "currencyEarnedTotal")]
+        [TestCase(@"{ ""type"": ""ownedCount"", ""generator"": ""drummer"", ""value"": 1 }", TestName = "ownedCount")]
+        [TestCase(@"{ ""type"": ""flagSet"", ""flag"": ""covers"" }", TestName = "flagSet")]
+        [TestCase(@"{ ""type"": ""barsCompleted"", ""group"": ""learn_covers"", ""value"": 3 }", TestName = "barsCompleted")]
+        [TestCase(@"{ ""type"": ""recordsCumulative"", ""value"": 5 }", TestName = "recordsCumulative")]
+        [TestCase(@"{ ""type"": ""compound"", ""all"": [ { ""type"": ""flagSet"", ""flag"": ""covers"" } ] }", TestName = "compound")]
+        public void ConditionFaults_ValidAndAbsentGatesAreNotFaults(string json)
+        {
+            Assert.IsEmpty(ChapterJsonImporter.ParseConditionFaults(json));
+        }
+
+        // The one authored spelling presence-testing cannot reach, recorded as a
+        // test so it is a known exception rather than a surprise. `value` is a
+        // plain double, so it cannot report its own absence, and making it
+        // nullable would spread `?? 0` through the conversion to catch a block
+        // naming no type, no currency and no threshold - it declares nothing.
+        // Anything alongside it IS caught, which is what keeps the hole this
+        // narrow.
+        [Test]
+        public void ConditionFaults_BareZeroValue_IsTheKnownExceptionAndReadsAsAbsent()
+        {
+            Assert.IsEmpty(ChapterJsonImporter.ParseConditionFaults(@"{ ""value"": 0 }"),
+                "a plain double cannot distinguish an authored 0 from omission");
+
+            // one more key beside it and presence-testing sees the block again
+            CollectionAssert.AreEqual(
+                new[] { "condition has a condition object with no 'type' - a condition is identified by its 'type', so this would import as no gate." },
+                ChapterJsonImporter.ParseConditionFaults(@"{ ""value"": 0, ""currency"": """" }"));
+        }
+
+        // Every fault, not the first: an author fixing a chapter wants the whole
+        // list, not one import round trip per typo.
+        [Test]
+        public void ConditionFaults_ReportsEveryFaultRatherThanStoppingAtTheFirst()
+        {
+            var faults = ChapterJsonImporter.ParseConditionFaults(@"{
+                ""type"": ""compound"",
+                ""all"": [ { ""type"": ""flagset"" }, {} ],
+                ""any"": [ { ""type"": ""compound"" } ]
+            }");
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "condition all[0] has condition type 'flagset', which maps to no Condition subclass.",
+                "condition all[1] is a compound child with no type.",
+                "condition any[0] is a compound condition with no children.",
+            }, faults);
         }
 
         // absent and explicit-null gates both mean "no gate" - the Newtonsoft
@@ -204,15 +311,29 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // the pre-5.6 schema revealed a bar group by bare flag id; reveal is a
         // Condition now, so a leftover revealFlag is refused rather than
         // silently ignored - ignoring it would import the group with no gate,
-        // showing it from the first frame
-        [Test]
-        public void BarGroup_WithARevealFlagKey_IsRefused()
+        // showing it from the first frame.
+        //
+        // Refused on PRESENCE, like the fans keys below: `""` is a stale key just
+        // as much as a filled-in one, and it is the spelling a contents test lets
+        // through - which is what makes it the one worth naming.
+        [TestCase(@"{ ""id"": ""learn_covers"", ""revealFlag"": ""covers"", ""fillMode"": ""perBar"" }",
+            TestName = "FilledIn")]
+        [TestCase(@"{ ""id"": ""learn_covers"", ""revealFlag"": """", ""fillMode"": ""perBar"" }",
+            TestName = "EmptySpelling")]
+        public void BarGroup_WithARevealFlagKey_IsRefused_EvenItsEmptySpelling(string json)
         {
             LogAssert.Expect(LogType.Error,
                 "ChapterJsonImporter: bar group 'learn_covers' carries a 'revealFlag' key - reveal is a Condition under 'visibleWhen' (design doc section 12, rules 8 and 9). Skipping it - fix the JSON and re-import.");
-            Assert.IsFalse(ChapterJsonImporter.ParseBarGroupIsImportable(
-                @"{ ""id"": ""learn_covers"", ""revealFlag"": ""covers"", ""fillMode"": ""perBar"" }"));
 
+            Assert.IsFalse(ChapterJsonImporter.ParseBarGroupIsImportable(json));
+        }
+
+        // The other half of a presence test, and the reason the DTO field lost its
+        // `= ""` initializer in the same change: with the initializer still there,
+        // an absent key would read as `""` and refuse EVERY bar group.
+        [Test]
+        public void BarGroup_WithNoRevealFlagKey_Imports()
+        {
             Assert.IsTrue(ChapterJsonImporter.ParseBarGroupIsImportable(
                 @"{ ""id"": ""learn_covers"", ""visibleWhen"": { ""type"": ""flagSet"", ""flag"": ""covers"" }, ""fillMode"": ""perBar"" }"));
         }

@@ -163,7 +163,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             definition.EditorInitialize(id, index, id, "", "", "", capstoneRecordsGate,
                 new RecordBuffConfig(recordBuffPerRecord, recordBuffAffects ?? new List<string> { "cash" }),
                 new FansConfig(fansCurrencyId, perBandmateOwnedBonus),
-                flagIds, currencyIds ?? new List<string>(), producerIds ?? new List<string>(),
+                // the chapter-local half of the standard economy; records is
+                // global, so no chapter declares it
+                flagIds, currencyIds ?? new List<string> { "cash", "fans" }, producerIds ?? new List<string>(),
                 sectionIds ?? new List<string>(), generatorIds ?? new List<string>(),
                 upgradeIds ?? new List<string>(), barGroupIds ?? new List<string>(),
                 eventIds ?? new List<string>());
@@ -206,18 +208,45 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
-        // the standard two-group, three-currency economy most fixtures need
-        public static CurrencyManager MakeEconomy()
-        {
-            var groups = new[] { MakeGroup("run", true), MakeGroup("permanent", false) };
-            var currencies = new[]
+        // The standard two-group, three-currency economy, as DEFINITIONS. Records
+        // is placed Global like the real game's: it lives in the permanent pool,
+        // which every economy routes to, so it is reachable from every chapter
+        // without appearing in any chapter's roster.
+        public static CurrencyGroupDefinition[] StandardGroups()
+            => new[] { MakeGroup("run", true), MakeGroup("permanent", false, CurrencyPlacement.Global) };
+
+        public static CurrencyDefinition[] StandardCurrencies()
+            => new[]
             {
                 MakeCurrency("cash", "run"),
                 MakeCurrency("fans", "run"),
                 MakeCurrency("records", "permanent"),
             };
-            return new CurrencyManager(groups, currencies);
-        }
+
+        // the standard two-group, three-currency economy most fixtures need
+        public static CurrencyManager MakeEconomy()
+            => new(StandardGroups(), StandardCurrencies());
+
+        // A ContentDatabase for fixtures: the injection constructor, except the
+        // currencies and their groups default to the standard set instead of to
+        // empty. Boot validation resolves a chapter's currency references against
+        // the DATABASE (ChapterCurrencies), so a fixture registering currencies
+        // only in a CurrencyManager describes content where nothing resolves -
+        // and every test would drown in that rather than in what it is asserting.
+        public static ContentDatabase MakeDatabase(
+            IEnumerable<ChapterDefinition> chapters = null,
+            IEnumerable<SectionDefinition> sections = null,
+            IEnumerable<GeneratorDefinition> generators = null,
+            IEnumerable<UpgradeDefinition> upgrades = null,
+            IEnumerable<BarDefinition> bars = null,
+            IEnumerable<BarGroupDefinition> barGroups = null,
+            IEnumerable<EventDefinition> events = null,
+            IEnumerable<RewardDefinition> rewards = null,
+            IEnumerable<CurrencyDefinition> currencies = null,
+            IEnumerable<CurrencyGroupDefinition> currencyGroups = null,
+            IEnumerable<ProducerDefinition> producers = null)
+            => new(chapters, sections, generators, upgrades, bars, barGroups, events, rewards,
+                currencies ?? StandardCurrencies(), currencyGroups ?? StandardGroups(), producers);
 
         // evaluation context over live test systems; no ContentDatabase, which
         // makes Validate fall back to the systems themselves

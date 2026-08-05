@@ -143,33 +143,25 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private static List<CurrencyDefinition> ResolveRoster(ChapterDefinition chapter,
             ContentDatabase database, CurrencyManager permanentPool)
         {
+            // The content rules - an id that resolves to no definition, and an id
+            // whose group is placed Global (the chapter would accrue into its own
+            // Records while the permanent pool's, which the income buff and the
+            // capstone gate read, stayed at zero) - belong to ChapterCurrencies,
+            // which is also what boot validation asks. One implementation, so a
+            // roster validation accepts cannot be one construction then refuses.
+            var content = new ChapterCurrencies(database, chapter);
+            content.ValidateRoster();
+
             var roster = new List<CurrencyDefinition>();
-
-            foreach (var id in chapter.CurrencyIds)
+            foreach (var currency in content.RosterDefinitions)
             {
-                if (!database.Currencies.TryGet(id, out var currency))
+                // The one rule content cannot answer: whether the pool actually
+                // handed to this economy already holds the id. Globals are caught
+                // above, but the permanent pool is an object a caller supplies,
+                // so only the caller's pool can be asked about it.
+                if (permanentPool != null && permanentPool.Contains(currency.Id))
                 {
-                    Debug.LogError($"EconomyContextFactory: chapter '{chapter.Id}' roster names unknown currency id '{id}'. Re-run the chapter import.");
-                    continue;
-                }
-
-                // Placement says which pool owns the balance, so a roster naming
-                // a global currency is asking for a second copy of it. Refused
-                // rather than honored: the chapter would accrue into its own
-                // Records while the permanent pool's - the one the income buff
-                // and the capstone gate read - stayed at zero.
-                var group = database.CurrencyGroups.TryGet(currency.GroupId ?? "", out var groupDefinition)
-                    ? groupDefinition
-                    : null;
-                if (group != null && group.Placement == CurrencyPlacement.Global)
-                {
-                    Debug.LogError($"EconomyContextFactory: chapter '{chapter.Id}' roster names currency '{id}', whose group '{group.Id}' is placed Global - it is held by the startup pool and must not be in a chapter roster.");
-                    continue;
-                }
-
-                if (permanentPool != null && permanentPool.Contains(id))
-                {
-                    Debug.LogError($"EconomyContextFactory: chapter '{chapter.Id}' roster names currency '{id}', which the permanent pool already holds - two balances for one id means every read picks one arbitrarily.");
+                    Debug.LogError($"EconomyContextFactory: chapter '{chapter.Id}' roster names currency '{currency.Id}', which the permanent pool already holds - two balances for one id means every read picks one arbitrarily.");
                     continue;
                 }
 

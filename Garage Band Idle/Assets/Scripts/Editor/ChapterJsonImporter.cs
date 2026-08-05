@@ -70,6 +70,32 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 return;
             }
 
+            // A malformed condition aborts the whole import (design doc section
+            // 12, rules 8 and 9). A condition that cannot convert becomes null,
+            // and null means "no gate" - so dropping one silently UNGATES its
+            // content: a generator revealed at boot, a buff with nothing to meet,
+            // a section shown from the first frame. Boot validation cannot catch
+            // it either, because a null Condition is legal content everywhere.
+            //
+            // Aborting rather than skipping the affected asset: a skip leaves the
+            // previous import's asset on disk (ApplyIfChanged never runs) while
+            // the chapter list drops its id, so the content silently vanishes
+            // from the game and boot validation sees a healthy-looking orphan.
+            // An import is one manual action over one file, so refusing all of it
+            // costs a re-run and leaves no partial state. This runs BEFORE
+            // EnsureFolders and every LoadOrCreate, which is what makes "nothing
+            // was written" true rather than approximately true.
+            var conditionFaults = CollectConditionFaults(data);
+            if (conditionFaults.Count > 0)
+            {
+                foreach (var fault in conditionFaults)
+                    Debug.LogError($"ChapterJsonImporter: {fault}");
+                // one grep-able line: batchmode exits 0 either way, so the
+                // headless verify loop needs a token of its own to check
+                Debug.LogError($"ChapterJsonImporter: IMPORT ABORTED - {conditionFaults.Count} malformed condition(s); nothing was written. Fix the JSON and re-import.");
+                return;
+            }
+
             EnsureFolders();
 
             // flags: the chapter's declared reveal registry
@@ -454,10 +480,149 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return guids.Length;
         }
 
+        // ---- the condition pre-pass ------------------------------------------
+
+        // Every condition block in the file, walked before a single asset is
+        // touched. The seven sites below are the complete set of places a
+        // Condition is authored, and a new one has to be added here - that is the
+        // cost of the guarantee. Checking at the conversion sites instead is what
+        // fell open in the first place: a conversion that answers "no gate" for
+        // bad input reads as success at every call site, so no caller could tell
+        // an absent gate from an unconvertible one.
+        private static List<string> CollectConditionFaults(ChapterFile data)
+        {
+            var faults = new List<string>();
+
+            foreach (var block in data.sections ?? Array.Empty<SectionBlock>())
+                CollectConditionFaults(block.visibleWhen, $"section '{block.id}' (visibleWhen)", faults);
+
+            foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
+                CollectConditionFaults(block.unlock, $"generator '{block.id}' (unlock)", faults);
+
+            foreach (var block in data.upgrades ?? Array.Empty<UpgradeBlock>())
+                CollectConditionFaults(block.gate, $"upgrade '{block.id}' (gate)", faults);
+
+            foreach (var group in data.bars?.groups ?? Array.Empty<BarGroupBlock>())
+                CollectConditionFaults(group.visibleWhen, $"bar group '{group.id}' (visibleWhen)", faults);
+
+            foreach (var block in data.producers ?? Array.Empty<ProducerBlock>())
+            {
+                foreach (var entry in block.production ?? Array.Empty<ProductionEntryBlock>())
+                    CollectConditionFaults(entry.gate, $"producer '{block.id}' production for '{entry.currency}' (gate)", faults);
+            }
+
+            foreach (var block in data.events ?? Array.Empty<EventBlock>())
+            {
+                CollectConditionFaults(block.availableWhen, $"event '{block.id}' (availableWhen)", faults);
+                foreach (var tier in block.tiers ?? Array.Empty<TierBlock>())
+                    CollectConditionFaults(tier.goal, $"event '{block.id}' tier {tier.tier} (goal)", faults);
+            }
+
+            return faults;
+        }
+
+        // One condition block and everything nested under it. An absent block is
+        // NOT a fault: the DTO materializes a missing gate as an empty instance,
+        // and no gate is legal content at every site above. The fault is
+        // authored-but-unconvertible - the only case where the null that reaches
+        // an asset means something other than what the author wrote.
+        private static void CollectConditionFaults(ConditionBlock block, string context, List<string> faults)
+        {
+            if (block == null)
+                return;
+
+            if (string.IsNullOrEmpty(block.type))
+            {
+                // An absent gate materializes as the DTO's DEFAULT instance, so
+                // "no type" alone does not mean "no gate" - it means "no gate"
+                // only when nothing else was authored either. A block carrying
+                // anything at all had a gate intended for it, and `type` is the
+                // one key whose misspelling the unrecognized-key check cannot
+                // report: ToCondition returns on the empty type before
+                // ValidateThreshold ever runs, so `"typ": "flagSet"` would
+                // otherwise import as content with no gate at all.
+                if (IsAuthored(block))
+                    faults.Add($"{context} has a condition object with no 'type'{DescribeKeys(block)} - a condition is identified by its 'type', so this would import as no gate.");
+                return;
+            }
+
+            if (block.type != "compound")
+            {
+                if (!IsKnownConditionType(block.type))
+                    faults.Add($"{context} has condition type '{block.type}', which maps to no Condition subclass.");
+                return;
+            }
+
+            var all = block.all ?? Array.Empty<ConditionBlock>();
+            var any = block.any ?? Array.Empty<ConditionBlock>();
+
+            // Counted on the RAW arrays, never on the children that converted: a
+            // compound authored empty and one whose every child is malformed are
+            // different mistakes, and reporting them identically sends the author
+            // looking in the wrong place.
+            if (all.Length == 0 && any.Length == 0)
+                faults.Add($"{context} is a compound condition with no children.");
+
+            CollectChildFaults(all, $"{context} all", faults);
+            CollectChildFaults(any, $"{context} any", faults);
+        }
+
+        // Whether anything was written inside the block - the test that separates
+        // "no gate authored" from "a gate authored wrongly". PRESENCE, not
+        // contents: the reference fields carry no initializers, so non-null means
+        // the key was in the JSON whatever it held. Testing contents instead
+        // would wave through `{"type": ""}` and `{"flag": ""}`, which are the
+        // spellings a half-finished gate leaves behind - and the ones least
+        // likely to be caught by eye.
+        //
+        // The extension bucket counts too: a key that matched no field is still
+        // something the author typed. `value` is the documented exception (see
+        // ConditionBlock) - a plain double cannot report its own absence, so a
+        // bare `{"value": 0}` still reads as an absent gate.
+        private static bool IsAuthored(ConditionBlock block)
+            => (block.unrecognized != null && block.unrecognized.Count > 0)
+               || block.type != null
+               || block.currency != null
+               || block.generator != null
+               || block.flag != null
+               || block.group != null
+               || block.all != null
+               || block.any != null
+               || block.value != 0;
+
+        // names the misspelled keys when there are any, since that is the edit
+        private static string DescribeKeys(ConditionBlock block)
+            => block.unrecognized != null && block.unrecognized.Count > 0
+                ? $" (unrecognized key(s): {string.Join(", ", block.unrecognized.Keys)})"
+                : string.Empty;
+
+        // A child with no type is a fault, not a skip. CompoundCondition already
+        // fails closed on a null child in `all` and reports it at boot, so
+        // preserving the null would be safe there - but a child dropped from
+        // `any` leaves a compound quietly WEAKER rather than closed, and one rule
+        // for both lists is what keeps that asymmetry from mattering.
+        private static void CollectChildFaults(ConditionBlock[] children, string context, List<string> faults)
+        {
+            for (var i = 0; i < children.Length; i++)
+            {
+                if (children[i] == null || string.IsNullOrEmpty(children[i].type))
+                {
+                    faults.Add($"{context}[{i}] is a compound child with no type.");
+                    continue;
+                }
+
+                CollectConditionFaults(children[i], $"{context}[{i}]", faults);
+            }
+        }
+
         // Maps a JSON condition ({ "type": ... }) onto the Condition subclass
         // family. An absent gate means no gate: the DTO initializers materialize
         // absent objects as empty instances, so an empty type returns null
         // (always met).
+        //
+        // Every OTHER null this can return is unconvertible input, which
+        // CollectConditionFaults has already aborted the import over - so by the
+        // time anything calls this, null means exactly one thing.
         private static Condition ToCondition(ConditionBlock block, string context)
         {
             if (block == null || string.IsNullOrEmpty(block.type))
@@ -469,7 +634,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 var any = ToConditionList(block.any, $"{context} any");
                 if (all.Count == 0 && any.Count == 0)
                 {
-                    Debug.LogError("ChapterJsonImporter: compound condition has no children. Importing no gate.");
+                    // unreachable: the pre-pass aborts on an empty compound before
+                    // anything is written, so reaching this says the pre-pass
+                    // missed a site rather than that the JSON is bad
+                    Debug.LogError($"ChapterJsonImporter: {context} is a compound condition with no children - the condition pre-pass should have aborted the import. Importing no gate.");
                     return null;
                 }
                 return new CompoundCondition(all, any);
@@ -487,9 +655,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             for (var i = 0; i < children.Length; i++)
             {
                 var block = children[i];
+                // unreachable for the same reason, and still a skip rather than a
+                // refusal: the abort IS the refusal, and this caller has no way
+                // to perform one
                 if (block == null || string.IsNullOrEmpty(block.type))
                 {
-                    Debug.LogError("ChapterJsonImporter: compound condition has a child with no type. Skipping it.");
+                    Debug.LogError($"ChapterJsonImporter: {context}[{i}] is a compound child with no type - the condition pre-pass should have aborted the import. Skipping it.");
                     continue;
                 }
 
@@ -531,6 +702,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private static bool IsThresholdType(string type)
             => type is "currency" or "currencyEarnedTotal" or "ownedCount"
                 or "barsCompleted" or "recordsCumulative";
+
+        // The types ToSimpleCondition maps, for the pre-pass to test before any
+        // asset exists. Two spellings of one list that must agree - the same
+        // duplication IsThresholdType above already carries for five of the six
+        // names, which is why this sits beside it rather than somewhere tidier.
+        // ToSimpleCondition's default case is the backstop that says they drifted.
+        private static bool IsKnownConditionType(string type)
+            => type is "currency" or "currencyEarnedTotal" or "ownedCount"
+                or "flagSet" or "barsCompleted" or "recordsCumulative";
 
         // one currency entry's import decision: pure state ({id, group}) only -
         // the pre-5.4 schema put engagement earn on the currency, and an earn
@@ -588,9 +768,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // group is skipped rather than imported gateless: a group whose gate
         // was dropped shows from the first frame, which is the one failure the
         // reveal registry exists to prevent.
+        //
+        // Tested on PRESENCE, never contents: `"revealFlag": ""` is a stale key
+        // just as much as a filled-in one, and a contents test waves through
+        // exactly the spelling least likely to be caught by eye. That is why the
+        // DTO field carries no initializer - null is the only way to say absent.
         private static bool IsImportableBarGroup(BarGroupBlock block)
         {
-            if (string.IsNullOrEmpty(block.revealFlag))
+            if (block.revealFlag == null)
                 return true;
 
             Debug.LogError($"ChapterJsonImporter: bar group '{block.id}' carries a 'revealFlag' key - reveal is a Condition under 'visibleWhen' (design doc section 12, rules 8 and 9). Skipping it - fix the JSON and re-import.");
@@ -640,6 +825,16 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         internal static Condition ParseCondition(string json, string context = "condition")
             => ToCondition(JsonConvert.DeserializeObject<ConditionBlock>(json, JsonSettings), context);
 
+        // the condition pre-pass over one block, exposed for the same reason:
+        // tests cover which spellings abort an import - and, just as importantly,
+        // which do NOT - without writing a single asset
+        internal static List<string> ParseConditionFaults(string json, string context = "condition")
+        {
+            var faults = new List<string>();
+            CollectConditionFaults(JsonConvert.DeserializeObject<ConditionBlock>(json, JsonSettings), context, faults);
+            return faults;
+        }
+
         // the producer parse path, exposed like ParseCondition: tests cover
         // the trigger/composes/gate mapping and its refusals without an
         // asset-writing import
@@ -685,7 +880,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 case "recordsCumulative":
                     return new RecordsCumulativeCondition(value);
                 default:
-                    Debug.LogError($"ChapterJsonImporter: condition type '{type}' maps to no Condition subclass. Importing no gate.");
+                    // unreachable: the pre-pass refuses an unknown type before
+                    // any asset is written, so reaching this means the two
+                    // spellings of the type list disagree (IsKnownConditionType)
+                    Debug.LogError($"ChapterJsonImporter: condition type '{type}' maps to no Condition subclass - the condition pre-pass should have aborted the import. Importing no gate.");
                     return null;
             }
         }
@@ -1065,11 +1263,28 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // any depth - matching the recursive CompoundCondition family.
         private class ConditionBlock
         {
-            public string type = "";
-            public string currency = "";
-            public string generator = "";
-            public string flag = "";
-            public string group = "";
+            // Every reference-type field is left WITHOUT an initializer on
+            // purpose, the same rule FansBlock's retired keys follow: null means
+            // "the key is absent", so an authored-empty value stays
+            // distinguishable from omission. IsAuthored rests on exactly this -
+            // `{}` is a legitimate absent gate, while `{"type": ""}`,
+            // `{"flag": ""}` and `{"all": []}` are gates someone wrote and got
+            // wrong, and importing those as "no gate" is the silent ungating the
+            // preflight exists to stop.
+            public string type;
+            public string currency;
+            public string generator;
+            public string flag;
+            public string group;
+
+            // The one field that stays a plain double, and so the one authored
+            // spelling the preflight cannot see: a bare `{"value": 0}` is
+            // identical to omission after deserialization. Left as a known
+            // exception rather than made nullable, which would spread `?? 0`
+            // through the conversion for a block that names no type, no currency
+            // and no threshold - it says nothing on its own. Any other key
+            // alongside it IS caught, and once a type is present a zero value is
+            // reported by ValidateThreshold and fails closed at evaluation.
             public double value;
 
             // Any key that matches no field above lands here instead of being
@@ -1080,8 +1295,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             // met before play starts.
             [JsonExtensionData]
             public IDictionary<string, JToken> unrecognized;
-            public ConditionBlock[] all = Array.Empty<ConditionBlock>();
-            public ConditionBlock[] any = Array.Empty<ConditionBlock>();
+            public ConditionBlock[] all;
+            public ConditionBlock[] any;
         }
 
         private class GeneratorBlock
@@ -1174,8 +1389,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public ConditionBlock visibleWhen = new();
 
             // pre-5.6 schema: reveal was a bare flag id. Kept as a field ONLY so
-            // its presence can be refused - see IsImportableBarGroup.
-            public string revealFlag = "";
+            // its presence can be refused - see IsImportableBarGroup. Left
+            // WITHOUT an initializer on purpose, the same as FansBlock's retired
+            // keys: null means "the key is absent", so any authored value is
+            // detectable including the one that reads as empty ("").
+            public string revealFlag;
             public string fillMode = "";
             public string delivery = "";
             public BarBlock[] bars = Array.Empty<BarBlock>();

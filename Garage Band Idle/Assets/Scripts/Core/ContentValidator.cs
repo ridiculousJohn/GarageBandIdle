@@ -24,15 +24,25 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public static void Validate(ContentDatabase database, ConditionContext context, RewardManager rewards)
         {
-            ValidateRecordsSurviveRelease(context);
+            var orphan = ChapterScoped(new ChapterCurrencies(database, null), context.RecordsCurrencyId, database, null);
+
+            ValidateRecordsSurviveRelease(orphan);
             ValidateChapterIndices(database);
             ValidateCurrencyPlacement(database);
 
             var visited = new Visited();
             foreach (var chapter in database.Chapters.All)
-                ValidateChapter(chapter, database, ChapterScoped(context, database, chapter), rewards, visited);
+            {
+                // the roster is checked per chapter here rather than only when an
+                // economy is constructed from it - construction happens for the
+                // frontier chapter alone, which left every later chapter's roster
+                // unexamined until the player reached it
+                var currencies = new ChapterCurrencies(database, chapter);
+                currencies.ValidateRoster();
+                ValidateChapter(chapter, database,
+                    ChapterScoped(currencies, context.RecordsCurrencyId, database, chapter), rewards, visited);
+            }
 
-            var orphan = ChapterScoped(context, database, null);
             foreach (var currency in database.Currencies.All)
                 if (!visited.Currencies.Contains(currency.Id))
                     ValidateCurrency(currency, orphan);
@@ -102,6 +112,18 @@ namespace RidiculousGaming.GarageBandIdle
                 else if (group.Placement == CurrencyPlacement.Global && group.ResetsOnAlbumRelease)
                     Debug.LogError($"ContentValidator: currency group '{group.Id}' is placed Global and also resets on album release - a global currency is held by a pool no release touches, so the two cannot both be true.");
             }
+
+            // Both of a currency's lifetime facts come from its group - which pool
+            // holds it, and whether a release resets it - so a group reference
+            // that resolves to nothing leaves both unanswered: it lands in no
+            // pool by placement and reads as surviving every release. CurrencyManager
+            // reports this too, but only for currencies it was constructed with,
+            // which is the frontier chapter's pool and the permanent one.
+            foreach (var currency in database.Currencies.All)
+            {
+                if (!string.IsNullOrEmpty(currency.Id) && !database.CurrencyGroups.Contains(currency.GroupId))
+                    Debug.LogError($"ContentValidator: currency '{currency.Id}' references unknown group id '{currency.GroupId}' - placement and the album-release reset both come from the group, so it would land in no pool and survive every release.");
+            }
         }
 
         // The starting chapter is the lowest index (GameManager) and advancement
@@ -164,7 +186,10 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a non-positive capstoneRecordsGate ({chapter.CapstoneRecordsGate}) - the capstone would unlock before play starts.");
 
             ValidateFlagDeclarations(chapter);
-            ValidateIds(chapter.CurrencyIds, database.Currencies, $"Chapter '{chapter.Id}' (currencies)");
+            // no ValidateIds over the roster: ChapterCurrencies.ValidateRoster
+            // reports an unresolvable entry as part of the roster rules it owns,
+            // and says what to do about it (re-run the import) rather than only
+            // that the id is unknown
             foreach (var id in chapter.CurrencyIds)
             {
                 if (!database.Currencies.TryGet(id, out var currency))
@@ -350,6 +375,12 @@ namespace RidiculousGaming.GarageBandIdle
             // loudly here, not degrade to wrong gameplay. Growth < 1
             // (shrinking costs) is legal.
             context.Currencies.ValidateReference(generator.CostCurrencyId, $"Generator '{generator.Id}' (cost currency)");
+            // What it pays into, checked here rather than only in GeneratorSystem:
+            // that constructor sees one chapter's generators, so an orphan or a
+            // later chapter's generator producing into a nonexistent currency had
+            // nothing looking at it. Only checkable for every chapter once the
+            // resolver is the declaring chapter's rather than the frontier's.
+            context.Currencies.ValidateReference(generator.ProducesCurrencyId, $"Generator '{generator.Id}' (produces)");
             if (generator.BaseCost <= 0)
                 Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive base cost ({generator.BaseCost}) - it would be free to buy.");
             if (generator.CostGrowth <= 0)
@@ -490,14 +521,34 @@ namespace RidiculousGaming.GarageBandIdle
                 reward.Effect.Validate(context, $"Reward '{reward.Id}' (effect)");
         }
 
-        // conditions and payloads resolve content ids through the database and
-        // flag ids through the declaring chapter's list; the orphan pass (null
-        // chapter) gets an unrestricted FlagSystem, so flag-known checks pass
-        // instead of false-positive against an arbitrary chapter
-        private static ConditionContext ChapterScoped(ConditionContext context, ContentDatabase database, ChapterDefinition chapter)
-            => new(context.Currencies, context.Generators,
+        // Conditions and payloads resolve content ids through the database, and
+        // BOTH per-chapter declaration lists through the chapter being validated:
+        // flags through its FlagIds, currencies through its CurrencyIds. The
+        // orphan pass (null chapter) gets the unrestricted form of each, so
+        // declaration-membership checks pass instead of false-positiving against
+        // an arbitrary chapter - no declaration list governs an orphan.
+        //
+        // Nothing here comes from the running economy any more. The currencies a
+        // chapter may reference is a content question, and answering it from the
+        // frontier's pool made every OTHER chapter's currencies unresolvable -
+        // correct only while one chapter exists. Generators and bars were carried
+        // in for the same reason and are unused: both conditions resolve those
+        // ids through the database already.
+        // Generators and bars are deliberately null. Every Validate that resolves
+        // one of those ids prefers the database registry (the branch that exists
+        // precisely to cover ids outside the running chapter), so the live
+        // systems were never read here - they were only subscribed to, by a
+        // ConditionContext that nothing then disposed, leaving the running
+        // systems holding a reference to every validation context ever built.
+        // Not passing what is not read is the fix; disposal would only tidy up
+        // after a subscription that had no reason to exist.
+        //
+        // The records id is all this still needs from the caller's context.
+        private static ConditionContext ChapterScoped(ChapterCurrencies currencies, string recordsCurrencyId,
+            ContentDatabase database, ChapterDefinition chapter)
+            => new(currencies, null,
                 chapter != null ? new FlagSystem(chapter.FlagIds) : new FlagSystem(),
-                context.RecordsCurrencyId, database, context.Bars);
+                recordsCurrencyId, database, null);
 
         // which definitions some chapter's closure validated, so the orphan
         // pass covers exactly the rest

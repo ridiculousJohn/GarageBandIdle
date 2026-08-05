@@ -95,34 +95,26 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
-        // whether any module-held config produces this currency; drives the
-        // rate readout beside a fill currency's balance
+        // Every query below reports what production can do RIGHT NOW, gates
+        // included - the same question Tick and FireTap answer when they decide
+        // what to pay. A readout that ignored a gate would advertise a yield the
+        // tap does not deliver, which is worse than showing nothing because the
+        // number looks authored rather than stale.
+
+        // whether any module-held config can currently produce this currency;
+        // drives the rate readout beside a fill currency's balance, so the
+        // readout appears exactly while something can fill it
         public bool HasProduction(string currencyId)
-            => Find(_tick, currencyId) != null || Find(_tap, currencyId) != null;
+            => HasLiveConfig(_tick, currencyId) || HasLiveConfig(_tap, currencyId);
 
         // zero while every config for the currency is dormant (gate unmet)
         public BigNumber RatePerSecond(string currencyId)
-        {
-            var total = BigNumber.Zero;
-            foreach (var config in _tick)
-            {
-                if (config.CurrencyId == currencyId && ConditionEvaluator.IsMet(config.Gate, _conditions))
-                    total += Composed(config);
-            }
-            return total;
-        }
+            => Sum(_tick, currencyId);
 
-        // the configured per-tap yield, for display; firing itself stays gated
+        // the composed per-tap yield, on the same terms: a dormant config pays
+        // nothing when FireTap runs, so it contributes nothing here either
         public BigNumber PerTap(string currencyId)
-        {
-            var total = BigNumber.Zero;
-            foreach (var config in _tap)
-            {
-                if (config.CurrencyId == currencyId)
-                    total += Composed(config);
-            }
-            return total;
-        }
+            => Sum(_tap, currencyId);
 
         public void Tick(double seconds)
         {
@@ -180,14 +172,31 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return value < BigNumber.Zero ? BigNumber.Zero : value;
         }
 
-        private static ProductionConfig Find(List<ProductionConfig> configs, string currencyId)
+        // the one place a query decides which configs count: same currency, gate
+        // holding. Sum and HasLiveConfig share it so a readout and the guard that
+        // decides whether to show the readout can never disagree.
+        private bool Counts(ProductionConfig config, string currencyId)
+            => config.CurrencyId == currencyId && ConditionEvaluator.IsMet(config.Gate, _conditions);
+
+        private BigNumber Sum(List<ProductionConfig> configs, string currencyId)
+        {
+            var total = BigNumber.Zero;
+            foreach (var config in configs)
+            {
+                if (Counts(config, currencyId))
+                    total += Composed(config);
+            }
+            return total;
+        }
+
+        private bool HasLiveConfig(List<ProductionConfig> configs, string currencyId)
         {
             foreach (var config in configs)
             {
-                if (config.CurrencyId == currencyId)
-                    return config;
+                if (Counts(config, currencyId))
+                    return true;
             }
-            return null;
+            return false;
         }
     }
 }

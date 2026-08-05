@@ -116,6 +116,44 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "+per-tap amount on a Jam tap");
         }
 
+        // The readout answers the same question the payout does. A tap config
+        // whose gate is unmet pays nothing when FireTap runs, so advertising
+        // "+2/tap" beside the balance would promise a yield tapping does not
+        // deliver - and unlike a stale number, an authored-looking one gives the
+        // player no reason to doubt it.
+        [Test]
+        public void ProductionReadout_HonoursGates_TheSameWayThePayoutDoes()
+        {
+            var rehearsal = TestContent.MakeCurrency("rehearsal", "run");
+            var currencies = new CurrencyManager(new[] { TestContent.MakeGroup("run", true) }, new[] { rehearsal });
+            var flags = new FlagSystem();
+            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
+            {
+                new("rehearsal", 1, ProductionTrigger.Tick, new FlagSetCondition("covers"), ModifierTarget.None),
+                new("rehearsal", 2, ProductionTrigger.Tap, new FlagSetCondition("covers"), ModifierTarget.None),
+            });
+            var production = new ProductionSystem(new[] { producer }, currencies, new ModifierSystem(),
+                TestContent.MakeContext(currencies, flags: flags));
+
+            Assert.IsFalse(production.HasProduction("rehearsal"), "nothing can fill it while the gate is shut");
+            Assert.AreEqual(0.0, production.PerTap("rehearsal").ToDouble(), 1e-9, "a dormant tap config advertises nothing");
+            Assert.AreEqual(0.0, production.RatePerSecond("rehearsal").ToDouble(), 1e-9);
+
+            // what a tap actually pays while the gate is shut - the number the
+            // readout has to agree with
+            production.FireTap();
+            Assert.AreEqual(0.0, currencies.Get("rehearsal").ToDouble(), 1e-9);
+
+            flags.Set("covers");
+
+            Assert.IsTrue(production.HasProduction("rehearsal"));
+            Assert.AreEqual(2.0, production.PerTap("rehearsal").ToDouble(), 1e-9);
+            Assert.AreEqual(1.0, production.RatePerSecond("rehearsal").ToDouble(), 1e-9);
+
+            production.FireTap();
+            Assert.AreEqual(2.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the tap pays what the readout advertised");
+        }
+
         // a chapter can hold several independently produced fill currencies -
         // each config carries its own gate (an ordinary Condition, design doc
         // section 12 rule 13), and a currency no config names never accrues
