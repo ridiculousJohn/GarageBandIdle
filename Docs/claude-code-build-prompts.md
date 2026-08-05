@@ -40,11 +40,13 @@ importer refuses a stale `revealFlag` key, and `album.revealFlag` is deleted rat
 (no importer DTO ever read it), so slice 6 reveals Release through its section's `visibleWhen` like
 every other module. One cost it carries forward: a null Condition means "no gate", so a chapter that
 omits `activeWhen` accrues fans from the first frame where an empty flag id used to be reported.
-Slice **5.7** is written but **not built**: it retires `FanSystem` by making fan accrual an ordinary
-module-held production config plus a derived `FanRate` modifier, so §9's "fans never idle-pay" holds
-because of who holds the config rather than because a tick was left out of a list. It must land
-before slice 6, whose release walks each system's facts — deleting a system is cheaper before that
-walk is written than after. Slices 6–10 assume all four.
+Slice **5.7** retired `FanSystem`: fan accrual is a tick config on a module-less `band` producer plus
+a derived `FanRate` add, so §9's "fans never idle-pay" holds because of who holds the config rather
+than because a tick was left out of a list, and the gate names the band (`ownedCount drummer ≥ 1`)
+instead of relying on which upgrade sets a flag. It also generalized `composes` beyond `tapValue`,
+with `ProductionConfig.IsComposable` as the single home for what a config may compose — a rule
+`ProductionSystem` and `ContentValidator` had briefly disagreed about, which is what made Chapter 1's
+own content fail boot validation. Slices 6–10 assume all four.
 
 ---
 
@@ -504,7 +506,7 @@ id; the test suite is green.
 
 ---
 
-## 5.7 — CONSOLIDATION: fan accrual is production (retiring `FanSystem`)
+## 5.7 — CONSOLIDATION: fan accrual is production (retiring `FanSystem`)  ✅ done
 
 This slice adds no new gameplay. It removes the last currency source that produces outside the
 production-config vocabulary 5.4 established: fan accrual is its own system, with its own tick, its
