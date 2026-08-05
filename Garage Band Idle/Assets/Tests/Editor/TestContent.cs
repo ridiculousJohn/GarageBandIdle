@@ -79,6 +79,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 MakeContext(currencies, flags: flags));
         }
 
+        // The fan-accrual path as the game authors it: a passive producer (no
+        // module) holding one tick config that composes FanRate, plus the derived
+        // per-bandmate Add registered on the modifier stack. Both halves together,
+        // because either alone is not the fan rate - the composed value is
+        // (base + perBandmate x bandmates) x rewards.
+        public static ProductionSystem MakeFanProduction(ModifierSystem modifiers,
+            GeneratorSystem generators, ICurrencies currencies, ConditionContext conditions,
+            Condition gate = null, double baseFansPerSec = 0.2, double perBandmateOwnedBonus = 0.02)
+        {
+            var producer = MakeProducer("band", new List<ProductionConfig>
+            {
+                new("fans", baseFansPerSec, ProductionTrigger.Tick, gate, ModifierTarget.FanRate),
+            }, moduleAddress: null);
+            modifiers.AddDerived(new BandmateFanRateModifier(generators, perBandmateOwnedBonus));
+            return new ProductionSystem(new[] { producer }, currencies, modifiers, conditions);
+        }
+
         public static GeneratorDefinition MakeGenerator(string id, string produces,
             double baseCost, double costGrowth, double baseOutput, Condition unlock = null,
             bool isBandmate = false, string costCurrency = "cash")
@@ -130,22 +147,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // a minimal coherent chapter: declared flags plus the id lists that
-        // form its content closure. Fan accrual gates on a Condition; the
-        // default is `flagSet fans`, which every caller relies on to start
-        // dormant, so a chapter fixture still has to declare "fans" in flagIds.
-        // Pass fansActiveWhen to gate accrual on anything else.
+        // form its content closure. Fan accrual itself is a production config on
+        // a producer, so a chapter fixture declares only which currency is fans
+        // and the per-bandmate tuning - see MakeFanProduction for the accrual.
         public static ChapterDefinition MakeChapter(string id, List<string> flagIds,
             List<string> sectionIds = null, List<string> generatorIds = null,
             List<string> upgradeIds = null, List<string> barGroupIds = null,
             List<string> eventIds = null, List<string> currencyIds = null,
             List<string> producerIds = null,
-            Condition fansActiveWhen = null, double recordBuffPerRecord = 0.02,
-            int index = 1, int capstoneRecordsGate = 30, string fansCurrencyId = "fans")
+            double perBandmateOwnedBonus = 0.02, double recordBuffPerRecord = 0.02,
+            int index = 1, int capstoneRecordsGate = 30, string fansCurrencyId = "fans",
+            List<string> recordBuffAffects = null)
         {
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
             definition.EditorInitialize(id, index, id, "", "", "", capstoneRecordsGate,
-                new RecordBuffConfig(recordBuffPerRecord, new List<string> { "cash" }),
-                new FansConfig(fansCurrencyId, fansActiveWhen ?? new FlagSetCondition("fans"), 0.2, 0.02),
+                new RecordBuffConfig(recordBuffPerRecord, recordBuffAffects ?? new List<string> { "cash" }),
+                new FansConfig(fansCurrencyId, perBandmateOwnedBonus),
                 flagIds, currencyIds ?? new List<string>(), producerIds ?? new List<string>(),
                 sectionIds ?? new List<string>(), generatorIds ?? new List<string>(),
                 upgradeIds ?? new List<string>(), barGroupIds ?? new List<string>(),

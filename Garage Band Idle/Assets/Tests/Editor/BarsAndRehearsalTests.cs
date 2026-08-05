@@ -34,11 +34,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         private static BarSystem MakeCoversSetup(CurrencyManager currencies, FlagSystem flags,
-            out FanSystem fans)
+            out ProductionSystem fans)
         {
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -61,11 +62,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // MakeCoversSetup plus a permanent-in-chapter group, for the run-reset
         // scope split
         private static BarSystem MakeTwoScopeSetup(CurrencyManager currencies, FlagSystem flags,
-            out FanSystem fans, out ModifierSystem modifiers)
+            out ProductionSystem fans, out ModifierSystem modifiers)
         {
             modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -211,7 +213,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bars.Tick();
 
             Assert.AreEqual(1, completions);
-            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9, "fan-rate reward applied on completion");
+            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9, "fan-rate reward applied on completion");
             Assert.IsNull(covers.ActiveBar, "completion clears the target");
 
             // further ticks and reselection attempts must not re-apply
@@ -221,7 +223,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bars.Tick();
             Assert.AreEqual(1, completions, "a completed bar never re-completes");
             Assert.IsNull(covers.ActiveBar, "a completed bar cannot be re-selected");
-            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
+            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9);
         }
 
         [Test]
@@ -238,7 +240,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             covers.SetActiveBar("cover_2");
 
             Assert.AreEqual(2, bars.CompletedCount("learn_covers"));
-            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
+            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9);
         }
 
         [Test]
@@ -296,7 +298,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var rewards = new RewardManager(new RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -311,7 +314,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(0, system.GetBars("learn_covers").Count, "the rejected bar has no state");
             Assert.AreEqual(0, system.CompletedCount("learn_covers"), "it never satisfies a barsCompleted gate");
-            Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "no reward granted");
+            Assert.AreEqual(0.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "no reward granted");
         }
 
         // state-then-notify: the drain's BalanceChanged is a synchronous signal
@@ -372,7 +375,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsTrue(bars.GetBars("setlist")[0].Completed, "permanent-in-chapter survives the run reset");
             Assert.AreEqual(1, bars.CompletedCount("setlist"));
-            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9, "the reset re-applies no rewards");
+            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "the reset re-applies no rewards");
         }
 
         // One reward ASSET, two lifetimes - the property a scope field on the reward
@@ -388,7 +391,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var rewards = new RewardManager(new[] { TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15) });
 
             var bars = new[]
@@ -406,12 +410,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ((PerBarContinuousRuntime)system.GetRuntime("learn_covers")).SetActiveBar("cover_1");
             currencies.Add("rehearsal", 100);
             ((PerBarContinuousRuntime)system.GetRuntime("setlist")).SetActiveBar("song_1");
-            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9,
                 "the one asset granted once per completion");
 
             TestContent.RunReset(modifiers, bars: system);
 
-            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9,
                 "the run group's completion is gone so its grant did not come back; the permanent group's completion survived and re-granted the same asset");
         }
 
@@ -442,12 +446,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             coversRuntime.SetActiveBar("cover_1"); // run group, grants x1.15
             currencies.Add("rehearsal", 100);
             setlistRuntime.SetActiveBar("song_1"); // permanent-in-chapter group, grants x1.2
-            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond("fans").ToDouble(), 1e-9,
                 "both grants stack while the run lives");
 
             TestContent.RunReset(modifiers, bars: bars);
 
-            Assert.AreEqual(0.2 * 1.2, fans.RatePerSecond.ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 1.2, fans.RatePerSecond("fans").ToDouble(), 1e-9,
                 "the run group's completion reset so its grant is not re-projected; the permanent group's survived and is");
         }
 
@@ -520,7 +524,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(list[2].Completed);
             Assert.AreEqual(2, bars.CompletedCount("learn_covers"));
             Assert.AreEqual(0, completions, "a restored completion is fact, not an occurrence");
-            Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "restore grants no rewards");
+            Assert.AreEqual(0.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "restore grants no rewards");
 
             // authoritative in both directions: below the requirement un-completes
             bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber> { ["cover_1"] = 10 }));

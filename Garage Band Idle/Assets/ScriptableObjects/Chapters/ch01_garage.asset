@@ -29,9 +29,6 @@ MonoBehaviour:
     - cash
   _fans:
     _currencyId: fans
-    _activeWhen:
-      rid: 1000
-    _baseFansPerSec: 0.2
     _perBandmateOwnedBonus: 0.02
   _flagIds:
   - fans
@@ -43,6 +40,7 @@ MonoBehaviour:
   - rehearsal
   _producerIds:
   - jam
+  - band
   _sectionIds:
   - garage_floor
   - the_band
@@ -65,10 +63,3 @@ MonoBehaviour:
   - learn_covers
   _eventIds:
   - garage_jam
-  references:
-    version: 2
-    RefIds:
-    - rid: 1000
-      type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        _flagId: fans

@@ -125,7 +125,19 @@ namespace RidiculousGaming.GarageBandIdle
             ConditionContext context, RewardManager rewards, Visited visited)
         {
             foreach (var currencyId in chapter.RecordBuff.AffectsCurrencyIds)
+            {
                 context.Currencies.ValidateReference(currencyId, $"Chapter '{chapter.Id}' (recordBuff affects)");
+                // Before 5.7 this was impossible rather than checked: fan accrual
+                // was its own system and only ever composed FanRate, so no income
+                // multiplier could reach it. Fan production is an ordinary config
+                // now, so the only thing keeping Records off the fan rate is this
+                // list - and Records inflating fans would let time away shortcut
+                // the Records payout, the coupling section 11 exists to prevent
+                // and the same failure the reset-on-release check above guards
+                // from the other side.
+                if (!string.IsNullOrEmpty(chapter.Fans.CurrencyId) && currencyId == chapter.Fans.CurrencyId)
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' lists its fans currency '{currencyId}' in recordBuff affects - the Records multiplier must never reach the fan rate, or time away shortcuts the Records payout (design doc section 11).");
+            }
             // Fans are the run's performance meter and the Records payout reads
             // fansThisRun, so they have to return to zero on release. Filed in a
             // group that keeps them, fans compound across runs: the payout inflates
@@ -135,14 +147,14 @@ namespace RidiculousGaming.GarageBandIdle
             if (context.Currencies.ValidateReference(chapter.Fans.CurrencyId, $"Chapter '{chapter.Id}' (fans currency)")
                 && !context.Currencies.ResetsOnAlbumRelease(chapter.Fans.CurrencyId))
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' fans currency '{chapter.Fans.CurrencyId}' is in a currency group that survives an album release - fans would compound across runs and inflate the Records payout.");
-            ConditionEvaluator.Validate(chapter.Fans.ActiveWhen, context, $"Chapter '{chapter.Id}' (fans activeWhen)");
 
             // negative tuning drains or dead-ends instead of earning; runtime
             // fails closed on all of it (guarded ticks, zeroed tap), so
             // without these reports the systems would just look mysteriously
-            // dead
-            if (chapter.Fans.BaseFansPerSec < 0 || chapter.Fans.PerBandmateOwnedBonus < 0)
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has negative fan earn values.");
+            // dead. The base rate is a production config now and is checked as
+            // one, with every other config.
+            if (chapter.Fans.PerBandmateOwnedBonus < 0)
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative fans perBandmateOwnedBonus ({chapter.Fans.PerBandmateOwnedBonus}).");
             if (chapter.RecordBuff.PerRecord < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative recordBuff perRecord ({chapter.RecordBuff.PerRecord}).");
             // the primary pacing knob (design doc section 11): at zero the
@@ -279,7 +291,12 @@ namespace RidiculousGaming.GarageBandIdle
         // these reports would just look mysteriously dead.
         private static void ValidateProducer(ProducerDefinition producer, ConditionContext context)
         {
-            ValidateModuleAddress(producer.ModuleAddress, $"Producer '{producer.Id}'");
+            // a producer with no module is a passive source (fan accrual): nothing
+            // presents it, so there is no address to resolve. Its production is
+            // still required below - with no module and no configs it would be a
+            // definition that does and shows nothing.
+            if (!string.IsNullOrEmpty(producer.ModuleAddress))
+                ValidateModuleAddress(producer.ModuleAddress, $"Producer '{producer.Id}'");
 
             if (producer.Production.Count == 0)
                 Debug.LogError($"ContentValidator: Producer '{producer.Id}' has no production configs - it would produce nothing.");
@@ -293,11 +310,12 @@ namespace RidiculousGaming.GarageBandIdle
                     Debug.LogError($"ContentValidator: {source} has a negative amount ({config.Amount}).");
                 if (config.Trigger == ProductionTrigger.None)
                     Debug.LogError($"ContentValidator: {source} has trigger None (uninitialized) - it would never fire.");
-                // module-held configs compose TapValue or nothing; a config
-                // declaring any other kind would scale by a composition no
-                // module fires, so the runtime ignores it
-                if (config.Composes != ModifierTarget.None && config.Composes != ModifierTarget.TapValue)
-                    Debug.LogError($"ContentValidator: {source} declares composition '{config.Composes}', which no module-held config composes.");
+                // a config composes through Global(target), so the target has to
+                // be one that composes globally - ProductionConfig.IsComposable
+                // owns that rule and ProductionSystem asks the same question, so
+                // boot validation and the runtime guard cannot disagree
+                if (!ProductionConfig.IsComposable(config.Composes))
+                    Debug.LogError($"ContentValidator: {source} declares composition '{config.Composes}', which a config cannot compose - it must be a defined target that composes globally (a qualified target like GeneratorOutput would read an empty bucket).");
                 ConditionEvaluator.Validate(config.Gate, context, $"{source} (gate)");
             }
         }

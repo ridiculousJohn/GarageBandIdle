@@ -70,7 +70,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             var fans = _context.Economy.Currencies.Get(GameManager.FansCurrencyId);
             _fansLabel.text = $"{_fansDefinition.DisplayName}: {NumberFormatter.Format(fans, _fansDefinition)}" +
-                $"  (+{NumberFormatter.Format(_context.Economy.Fans.RatePerSecond)}/s)";
+                $"  (+{NumberFormatter.Format(_context.Economy.Production.RatePerSecond(GameManager.FansCurrencyId))}/s)";
         }
     }
 }

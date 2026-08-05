@@ -51,7 +51,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public ModifierSystem Modifiers { get; }
         public GeneratorSystem Generators { get; }
         public UpgradeSystem Upgrades { get; }
-        public FanSystem Fans { get; }
         public ProductionSystem Production { get; }
         public BarSystem Bars { get; }
         public RewardManager Rewards { get; }
@@ -74,7 +73,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public EconomyContext(ChapterDefinition chapter, EconomyRecipe recipe, CurrencyRouter router,
             FlagSystem flags, ModifierSystem modifiers, GeneratorSystem generators, UpgradeSystem upgrades,
-            FanSystem fans, ProductionSystem production, BarSystem bars, RewardManager rewards,
+            ProductionSystem production, BarSystem bars, RewardManager rewards,
             ConditionContext conditions, IReadOnlyList<SectionDefinition> sections)
         {
             Chapter = chapter;
@@ -84,7 +83,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Modifiers = modifiers;
             Generators = generators;
             Upgrades = upgrades;
-            Fans = fans;
             Production = production;
             Bars = bars;
             Rewards = rewards;
@@ -167,12 +165,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // buff among them), so the tick passes no multipliers
             Generators.Tick(seconds);
 
-            // fans never take the income multiplier - fan rate is band size and
-            // time only
-            Fans.Tick(seconds);
-
-            // fill currencies accrue, then bars drain the pool into the active
-            // bar in the same tick, so a selected bar advances with no pool lag
+            // fill currencies and fans accrue, then bars drain the pool into the
+            // active bar in the same tick, so a selected bar advances with no
+            // pool lag. Fan accrual is an ordinary module-held config here, which
+            // is what keeps it out of the idle payout (section 9: only
+            // generator-held configs idle-pay) - and it takes the FanRate
+            // composition, never the income multiplier, which holds as long as
+            // the chapter's fans currency stays out of recordBuff.affects.
+            // ContentValidator refuses it there, because time away must not
+            // shortcut the Records payout (section 11).
             Production.Tick(seconds);
             Bars.Tick();
 
@@ -268,7 +269,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // parameter list, so it cannot fall out of step with what exists.
         private void CollectFactSources()
         {
-            foreach (var system in new object[] { Generators, Upgrades, Fans, Production, Bars, Rewards, Flags, Modifiers })
+            foreach (var system in new object[] { Generators, Upgrades, Production, Bars, Rewards, Flags, Modifiers })
             {
                 if (system is IModifierFactSource source)
                     _factSources.Add(source);

@@ -5,6 +5,7 @@ using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -26,6 +27,41 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private const string BarGroupsFolder = "Assets/ScriptableObjects/BarGroups";
         private const string EventsFolder = "Assets/ScriptableObjects/Events";
         private const string RewardsFolder = "Assets/ScriptableObjects/Rewards";
+
+        // Boot validation, run over the REAL shipped content instead of a
+        // fixture: the same four steps GameManager.Awake takes, so anything it
+        // would report at boot fails here first.
+        //
+        // This exists because of how slice 5.7's FanRate generalization got
+        // through with a hole in it. ProductionSystem was generalized and
+        // ContentValidator was not, so Chapter 1's own band producer would have
+        // reported an error on every boot - and nothing caught it, because the
+        // importer does not run the validator and every validator test built its
+        // own broken fixture. A rule that shipped content is expected to satisfy
+        // has to be exercised against shipped content.
+        [Test]
+        public void RealChapterContent_PassesBootValidation()
+        {
+            var database = new ContentDatabase();
+            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+
+            ChapterDefinition starting = null;
+            foreach (var chapter in database.Chapters.All)
+            {
+                if (starting == null || chapter.Index < starting.Index)
+                    starting = chapter;
+            }
+            Assert.IsNotNull(starting, "no chapter assets - run 'GarageBandIdle > Import Chapter 1 JSON'");
+
+            using var frontier = EconomyContextFactory.Build(starting, database, permanent,
+                EconomyRecipe.FrontierChapter);
+            Assert.IsNotNull(frontier, "the frontier economy failed to build from shipped content");
+
+            // an unexpected Debug.LogError fails the test, so a clean run IS the
+            // assertion: boot validation reports nothing about real content
+            ContentValidator.Validate(database, frontier.Conditions, frontier.Rewards);
+            LogAssert.NoUnexpectedReceived();
+        }
 
         private static T LoadRequired<T>(string path) where T : Object
         {
@@ -193,12 +229,34 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
 
-            Assert.AreEqual("fans", chapter.Fans.CurrencyId, "accrual currency comes from the JSON fans block");
-            var activeWhen = chapter.Fans.ActiveWhen as FlagSetCondition;
-            Assert.IsNotNull(activeWhen, "fan accrual is gated by a flag condition from the JSON fans block");
-            Assert.AreEqual("fans", activeWhen.FlagId, "activation gate comes from the JSON fans block");
-            Assert.AreEqual(0.2, chapter.Fans.BaseFansPerSec, 1e-9);
+            Assert.AreEqual("fans", chapter.Fans.CurrencyId, "which currency is fans comes from the JSON fans block");
             Assert.AreEqual(0.02, chapter.Fans.PerBandmateOwnedBonus, 1e-9);
+        }
+
+        // Fan accrual is production like every other flat-rate source (design
+        // doc section 12, rule 13), held by a producer with NO module: nothing
+        // presents it, and because it is not a generator it can never idle-pay
+        // (section 9). The gate names the band directly rather than relying on
+        // which upgrade happens to set a flag.
+        [Test]
+        public void BandProducer_HoldsFanAccrual_GatedOnOwningABandmate()
+        {
+            var band = LoadById<ProducerDefinition>(ProducersFolder, "band");
+
+            Assert.IsTrue(string.IsNullOrEmpty(band.ModuleAddress),
+                "the band producer is passive - no module presents it");
+            Assert.AreEqual(1, band.Production.Count);
+
+            var accrual = band.Production[0];
+            Assert.AreEqual("fans", accrual.CurrencyId);
+            Assert.AreEqual(0.2, accrual.Amount, 1e-9, "the base fan rate comes from the JSON config");
+            Assert.AreEqual(ProductionTrigger.Tick, accrual.Trigger);
+            Assert.AreEqual(ModifierTarget.FanRate, accrual.Composes,
+                "so cover-bar rewards and the per-bandmate bonus compose through one stack");
+
+            var gate = accrual.Gate as OwnedCountCondition;
+            Assert.IsNotNull(gate, "fans accrue only once a bandmate is owned");
+            Assert.AreEqual("drummer", gate.GeneratorId);
         }
 
         // production lives on the producer (design doc section 12, rule 13):
@@ -215,8 +273,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // on purpose: it is placed Global and lives in the startup pool.
             CollectionAssert.AreEqual(new[] { "cash", "fans", "rehearsal" }, chapter.CurrencyIds,
                 "if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the roster");
-            CollectionAssert.AreEqual(new[] { "jam" }, chapter.ProducerIds,
-                "the jam producer - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
+            CollectionAssert.AreEqual(new[] { "jam", "band" }, chapter.ProducerIds,
+                "the jam producer and the passive band producer holding fan accrual - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
 
             var jam = LoadById<ProducerDefinition>(ProducersFolder, "jam");
             Assert.AreEqual("module/tap", jam.ModuleAddress);

@@ -213,6 +213,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - currency-group
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d70416e6306a6304a888c6bffbdfca85
+    m_Address: producer/band
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - producer
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: da80299a70a642698ac9d17878e6ed62
     m_Address: currency/Cash
     m_ReadOnly: 0

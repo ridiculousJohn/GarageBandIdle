@@ -56,6 +56,23 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public Condition Gate => _gate;
         public ModifierTarget Composes => _composes;
 
+        // Which targets a config may declare, in ONE place - the runtime guard
+        // and boot validation both ask here, so they cannot drift into
+        // disagreeing about what is authorable (the trap 5.7 walked into by
+        // generalizing ProductionSystem and leaving ContentValidator behind).
+        //
+        // None is always legal: the config pays its raw amount. Anything else
+        // must be a defined target that composes GLOBALLY, because a config
+        // composes through ModifierTargetKey.Global(kind) - so a qualifier-
+        // requiring target like GeneratorOutput or CurrencyProduction can never
+        // be one. Composed globally it would read an empty bucket and scale by
+        // nothing at all, which is worse than a refusal because it looks like it
+        // worked.
+        public static bool IsComposable(ModifierTarget composes)
+            => composes == ModifierTarget.None
+                || (Enum.IsDefined(typeof(ModifierTarget), composes)
+                    && !ModifierTargetKey.RequiresQualifier(composes));
+
         public ProductionConfig() { }
 
 #if UNITY_EDITOR

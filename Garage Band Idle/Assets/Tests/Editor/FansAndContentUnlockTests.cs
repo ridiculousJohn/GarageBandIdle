@@ -98,15 +98,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var generators = new GeneratorSystem(
                 new[] { TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true) },
                 currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
 
             fans.Tick(10);
             Assert.AreEqual(0.0, currencies.Get("fans").ToDouble(), 1e-9, "no accrual before the flag");
-            Assert.AreEqual(0.0, fans.RatePerSecond.ToDouble(), 1e-9);
+            Assert.AreEqual(0.0, fans.RatePerSecond("fans").ToDouble(), 1e-9);
 
             flags.Set("fans");
 
-            Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "base rate once active");
+            Assert.AreEqual(0.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "base rate once active");
             fans.Tick(10);
             Assert.AreEqual(2.0, currencies.Get("fans").ToDouble(), 1e-9, "rate x seconds");
         }
@@ -119,13 +120,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var context = new EffectContext(currencies, flags, modifiers);
 
             TestContent.MakeFanRateReward("boost_a", 1.15).Apply(context, ContentScope.Run);
             TestContent.MakeFanRateReward("boost_b", 1.15).Apply(context, ContentScope.Run);
 
-            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9);
+            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9);
         }
 
         // Modifiers carry their scope, and the scope comes from whoever APPLIES the
@@ -145,7 +147,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var upgrades = new UpgradeSystem(new[]
             {
                 // no gate = met from the start, so both apply on the first pass
@@ -157,11 +160,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(0.2 * 1.5 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9, "both scopes stack");
+            Assert.AreEqual(0.2 * 1.5 * 2.0, fans.RatePerSecond("fans").ToDouble(), 1e-9, "both scopes stack");
 
             TestContent.RunReset(modifiers, upgrades);
 
-            Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond.ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 2.0, fans.RatePerSecond("fans").ToDouble(), 1e-9,
                 "the run latch cleared so its multiplier was not re-projected; the permanent latch survived and was");
         }
 
@@ -176,13 +179,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant on 'FanRate' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
             modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 0);
 
-            Assert.AreEqual(0.2, fans.RatePerSecond.ToDouble(), 1e-9, "the rate is untouched");
+            Assert.AreEqual(0.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "the rate is untouched");
         }
 
         // tap-value payloads target TapValue and stack per scope, mirroring
@@ -353,7 +357,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             flags.Set("fans");
             var modifiers = new ModifierSystem();
             var generators = new GeneratorSystem(new GeneratorDefinition[0], currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var rewards = new Content.RewardManager(new Content.RewardDefinition[]
             {
                 TestContent.MakeFanRateReward("fan_rate_x1_15", 1.15),
@@ -365,10 +370,48 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(rewards.Contains("nope"));
 
             rewards.Apply("fan_rate_x1_15", context, ContentScope.Run);
-            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond.ToDouble(), 1e-9, "pool reward applied by id");
+            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9, "pool reward applied by id");
 
             rewards.Apply("open_backroom", context, ContentScope.Run);
             Assert.IsTrue(flags.IsSet("backroom"), "setFlag rewards run through the same registry");
+        }
+
+        // The identity 5.7 rests on: the composed fan rate is
+        // (baseFansPerSec + perBandmate x bandmates) x rewards, which is exactly
+        // what FanSystem computed by hand before it was deleted. Chapter 1's
+        // observable number - 0.22/s with one Drummer - is the anchor, and the
+        // multiplier leg proves the reward scales the COMBINED base-plus-derived
+        // value rather than the base alone. Separate tests cover each term; this
+        // one is the composition, because that is the claim "no gameplay change"
+        // actually makes.
+        [Test]
+        public void FanRate_ComposesBasePlusBandmateAdd_ThenRewardMultipliers()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            flags.Set("fans");
+            var modifiers = new ModifierSystem();
+            var generators = new GeneratorSystem(new[]
+            {
+                TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true),
+            }, currencies, modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
+
+            TestContent.BuyTimes(generators.Get("drummer"), currencies, 1);
+            Assert.AreEqual(0.22, fans.RatePerSecond("fans").ToDouble(), 1e-9,
+                "0.2 base + 0.02 x 1 bandmate - the rate Chapter 1 shows after the first Drummer");
+
+            var effects = new EffectContext(currencies, flags, modifiers);
+            TestContent.MakeFanRateReward("boost", 1.15).Apply(effects, ContentScope.Run);
+
+            Assert.AreEqual(0.22 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9,
+                "the multiplier scales base + bandmate add together, never the base alone");
+
+            // and it accrues at exactly that rate, so the composition is what the
+            // player is actually paid - not just what a readout advertises
+            fans.Tick(10);
+            Assert.AreEqual(0.22 * 1.15 * 10, currencies.Get("fans").ToDouble(), 1e-9);
         }
 
         [Test]
@@ -384,20 +427,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeGenerator("drummer", "cash", 500, 1.15, 3, isBandmate: true),
                 TestContent.MakeGenerator("bassist", "cash", 4000, 1.15, 20, isBandmate: true),
             }, currencies, modifiers);
-            var fans = new FanSystem(new FansConfig("fans", new FlagSetCondition("fans"), 0.2, 0.02), currencies, generators, new ConditionContext(currencies, generators, flags), modifiers);
+            var fans = TestContent.MakeFanProduction(modifiers, generators, currencies,
+                new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
 
             TestContent.BuyTimes(generators.Get("drummer"), currencies, 2);
             TestContent.BuyTimes(generators.Get("bassist"), currencies, 1);
-            Assert.AreEqual(3, fans.BandmateCount);
-            Assert.AreEqual(0.26, fans.RatePerSecond.ToDouble(), 1e-9, "0.2 + 0.02 x 3 bandmates");
+            Assert.AreEqual(0.06, modifiers.For(FanRate).Add.ToDouble(), 1e-9,
+                "3 bandmates x 0.02, contributed as a derived Add on the fan rate");
+            Assert.AreEqual(0.26, fans.RatePerSecond("fans").ToDouble(), 1e-9, "0.2 + 0.02 x 3 bandmates");
 
             // gear must not move the rate
             TestContent.BuyTimes(generators.Get("practice_amp"), currencies, 5);
-            Assert.AreEqual(0.26, fans.RatePerSecond.ToDouble(), 1e-9, "amps never change fan rate");
+            Assert.AreEqual(0.26, fans.RatePerSecond("fans").ToDouble(), 1e-9, "amps never change fan rate");
 
             // neither must Cash itself - fan rate is band size and time only
             currencies.Add("cash", 1e9);
-            Assert.AreEqual(0.26, fans.RatePerSecond.ToDouble(), 1e-9, "cash never changes fan rate");
+            Assert.AreEqual(0.26, fans.RatePerSecond("fans").ToDouble(), 1e-9, "cash never changes fan rate");
         }
     }
 }

@@ -124,12 +124,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     Debug.LogError($"ChapterJsonImporter: duplicate producer id '{block.id}'. Keeping the first.");
                     continue;
                 }
-                if (string.IsNullOrEmpty(block.module))
-                {
-                    Debug.LogError($"ChapterJsonImporter: producer '{block.id}' names no module. Skipping it - fix the JSON and re-import.");
-                    continue;
-                }
-
+                // a producer with no module is a PASSIVE source: nothing presents
+                // it and the player never touches it, which is how fan accrual
+                // is authored. It is still module-held in the sense section 9
+                // means - not a generator, so it never idle-pays. What it must
+                // have is production, which ToProductionConfigs refuses without.
                 var configs = ToProductionConfigs(block);
                 if (configs == null)
                     continue;
@@ -306,14 +305,16 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             // negative tuning drains or dead-ends instead of earning; the
             // chapter still imports (config is not skippable content) - boot
             // validation reports it too
-            if ((data.fans?.baseFansPerSec ?? 0) < 0 || (data.fans?.perBandmateOwnedBonus ?? 0) < 0)
-                Debug.LogError("ChapterJsonImporter: fans block has negative earn values. Fix the JSON and re-import.");
-            // the pre-5.6 schema activated accrual on a bare flag id; it is a
-            // Condition under 'activeWhen' now. The chapter still imports (a
-            // fans config is not skippable content) and boot validation reports
-            // the missing gate.
-            if (!string.IsNullOrEmpty(data.fans?.revealFlag))
-                Debug.LogError("ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by a Condition under 'activeWhen' (design doc section 12, rules 8 and 9). Fix the JSON and re-import.");
+            if ((data.fans?.perBandmateOwnedBonus ?? 0) < 0)
+                Debug.LogError("ChapterJsonImporter: fans block has a negative perBandmateOwnedBonus. Fix the JSON and re-import.");
+            // Three pre-5.7 keys, all now production: the base rate and its gate
+            // are a config on a producer (design doc section 12, rule 13), which
+            // is what keeps fan accrual out of the idle payout by construction
+            // (section 9). Refused rather than ignored, the same fail-closed rule
+            // the currency 'earn' block and the bar group's 'revealFlag' get. The
+            // chapter still imports - a fans config is not skippable content - and
+            // boot validation reports what the missing production leaves behind.
+            ReportStaleFansKeys(data.fans);
             // the pre-5.4 schema put the Jam yield in constants; a leftover
             // tapBaseValue would silently disagree with the jam producer's
             // cash config, so its presence is refused rather than dropped
@@ -325,9 +326,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
                 new List<string>(data.constants?.recordBuff?.affects ?? Array.Empty<string>()));
-            var fans = new FansConfig(data.fans?.currency,
-                ToCondition(data.fans?.activeWhen, $"chapter '{data.chapter.id}' (fans activeWhen)"),
-                data.fans?.baseFansPerSec ?? 0, data.fans?.perBandmateOwnedBonus ?? 0);
+            var fans = new FansConfig(data.fans?.currency, data.fans?.perBandmateOwnedBonus ?? 0);
             ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
                 data.chapter.name, data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
                 data.chapter.capstoneRecordsGate, recordBuff,
@@ -552,6 +551,36 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return true;
         }
 
+        // The three pre-5.7 fans keys, all now production: the base rate and its
+        // gate are a config on a producer (design doc section 12, rule 13), which
+        // is what keeps fan accrual out of the idle payout by construction
+        // (section 9). Refused rather than ignored, the same fail-closed rule the
+        // currency 'earn' block and the bar group's 'revealFlag' get. The chapter
+        // still imports - a fans config is not skippable content - and boot
+        // validation reports what the missing production leaves behind.
+        //
+        // Each test is PRESENCE, never contents: `"activeWhen": {}` and
+        // `"revealFlag": ""` are stale keys just as much as filled-in ones, and a
+        // contents test would wave through exactly the spellings least likely to
+        // be noticed by hand.
+        private static void ReportStaleFansKeys(FansBlock block)
+        {
+            if (block == null)
+                return;
+
+            if (block.baseFansPerSec != null)
+                Debug.LogError("ChapterJsonImporter: fans block still carries 'baseFansPerSec' - the base fan rate is a production config on a producer (design doc section 12, rule 13). Fix the JSON and re-import.");
+            if (block.revealFlag != null)
+                Debug.LogError("ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by the production config's gate (design doc section 12, rules 8, 9 and 13). Fix the JSON and re-import.");
+            if (block.activeWhen != null)
+                Debug.LogError("ChapterJsonImporter: fans block still carries 'activeWhen' - the accrual gate moved onto the production config's 'gate' (design doc section 12, rule 13). Fix the JSON and re-import.");
+        }
+
+        // the fans-block parse path, exposed like ParseCondition: tests cover that
+        // every stale key is refused on presence, including its empty spelling
+        internal static void ParseFansBlockStaleKeys(string json)
+            => ReportStaleFansKeys(JsonConvert.DeserializeObject<FansBlock>(json, JsonSettings));
+
         // one bar group's import decision. The pre-5.6 schema revealed a group
         // by bare flag id; reveal is a Condition now (design doc section 12,
         // rules 8 and 9), and a stale `revealFlag` is JSON that used to mean
@@ -695,9 +724,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
         }
 
-        // A module-held config composes 'tapValue' or nothing (rule 11's
-        // vocabulary is unchanged by rule 13). Null signals an unknown
-        // spelling, which skips the producer.
+        // Which modifier target a config's output composes through. Any target
+        // the family defines is authorable - the old tapValue-only restriction
+        // was a fossil of TapValue being the only composing target that existed
+        // in 5.4. Null signals an unknown spelling, which skips the producer.
         private static ModifierTarget? ToComposes(string composes, string context)
         {
             switch (composes)
@@ -707,8 +737,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     return ModifierTarget.None;
                 case "tapValue":
                     return ModifierTarget.TapValue;
+                case "fanRate":
+                    return ModifierTarget.FanRate;
                 default:
-                    Debug.LogError($"ChapterJsonImporter: {context} has unknown composes '{composes}' - a module-held config composes 'tapValue' or nothing. Skipping the producer - fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown composes '{composes}' - a config composes 'tapValue', 'fanRate' or nothing. Skipping the producer - fix the JSON and re-import.");
                     return null;
             }
         }
@@ -1161,13 +1193,19 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private class FansBlock
         {
             public string currency = "";
-            public ConditionBlock activeWhen = new();
-
-            // pre-5.6 schema, kept only to be refused - see ImportChapter's
-            // fans handling. Accrual is a gate now, not a flag lookup.
-            public string revealFlag = "";
-            public double baseFansPerSec;
             public double perBandmateOwnedBonus;
+
+            // pre-5.7 schema, kept only to be refused - see ReportStaleFansKeys.
+            // All three are production now: the base rate and its gate live on a
+            // producer's config. Every one of them is left WITHOUT an initializer
+            // on purpose, so null means "the key is absent" and any authored value
+            // is detectable - including the ones that read as empty: 0, {} and "".
+            // A refusal that tests the contents rather than the presence lets the
+            // emptiest spelling of a stale key through silently, which is the one
+            // case a fail-closed rule exists for.
+            public double? baseFansPerSec;
+            public ConditionBlock activeWhen;
+            public string revealFlag;
         }
 
         private class EventBlock

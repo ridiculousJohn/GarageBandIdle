@@ -88,11 +88,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var conditions = new ConditionContext(router, generators, flags,
                 GameManager.RecordsCurrencyId, database, bars);
 
-            // built after the condition context for the same reason
-            // ProductionSystem is: fan activation is an ordinary Condition, so
-            // the system that asks it cannot exist before the context it asks
-            // through.
-            var fans = new FanSystem(chapter.Fans, router, generators, conditions, modifiers);
 
             // built after the condition context because config gates are
             // ordinary Conditions checked per firing. Only THIS chapter's
@@ -117,8 +112,17 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 }
             }
 
+            // band size raises the fan rate, derived for the same reason: it is a
+            // function of owned counts, so nothing grants it and nothing has to
+            // re-apply it after a release resets those counts. Unconditional,
+            // unlike the Records buff - every economy that has generators has a
+            // band, and an event sandbox's fixed baseline comes from the tier
+            // rules rather than from withholding this.
+            modifiers.AddDerived(new BandmateFanRateModifier(
+                generators, chapter.Fans.PerBandmateOwnedBonus));
+
             var context = new EconomyContext(chapter, recipe, router, flags, modifiers, generators, upgrades,
-                fans, production, bars, rewards, conditions,
+                production, bars, rewards, conditions,
                 Resolve(database.Sections, chapter.SectionIds, "section"));
 
             // A fresh economy has no facts, so this grants nothing; a loaded one

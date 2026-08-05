@@ -169,8 +169,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // its yields is not the authored producer - and each refusal says why
         [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""hold"" } ] }",
             "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown trigger 'hold' - a production config fires on 'tick' or 'tap'. Skipping the producer - fix the JSON and re-import.")]
-        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""fanRate"" } ] }",
-            "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown composes 'fanRate' - a module-held config composes 'tapValue' or nothing. Skipping the producer - fix the JSON and re-import.")]
+        // 'fanRate' is authorable since 5.7 (fan accrual is a config); what stays
+        // refused is a spelling the family does not define, casing included
+        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""fanrate"" } ] }",
+            "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown composes 'fanrate' - a config composes 'tapValue', 'fanRate' or nothing. Skipping the producer - fix the JSON and re-import.")]
         [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": -1, ""trigger"": ""tap"" } ] }",
             "ChapterJsonImporter: producer 'jam' production for 'cash' has a negative amount (-1). Skipping the producer - fix the JSON and re-import.")]
         [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""amount"": 1, ""trigger"": ""tap"" } ] }",
@@ -213,6 +215,47 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsTrue(ChapterJsonImporter.ParseBarGroupIsImportable(
                 @"{ ""id"": ""learn_covers"", ""visibleWhen"": { ""type"": ""flagSet"", ""flag"": ""covers"" }, ""fillMode"": ""perBar"" }"));
+        }
+
+        // fan accrual is production since 5.7, so the three keys that used to
+        // describe it on the chapter are stale JSON. Each is refused on PRESENCE,
+        // which is what these empty spellings prove: a contents test would let
+        // `{}` and `""` through silently, and the emptiest form of a stale key is
+        // the one least likely to be spotted by eye.
+        [TestCase(@"{ ""currency"": ""fans"", ""baseFansPerSec"": 0 }",
+            "ChapterJsonImporter: fans block still carries 'baseFansPerSec' - the base fan rate is a production config on a producer (design doc section 12, rule 13). Fix the JSON and re-import.")]
+        [TestCase(@"{ ""currency"": ""fans"", ""revealFlag"": """" }",
+            "ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by the production config's gate (design doc section 12, rules 8, 9 and 13). Fix the JSON and re-import.")]
+        [TestCase(@"{ ""currency"": ""fans"", ""activeWhen"": {} }",
+            "ChapterJsonImporter: fans block still carries 'activeWhen' - the accrual gate moved onto the production config's 'gate' (design doc section 12, rule 13). Fix the JSON and re-import.")]
+        public void FansBlock_RefusesEveryStaleKey_EvenItsEmptySpelling(string json, string expectedError)
+        {
+            LogAssert.Expect(LogType.Error, expectedError);
+            ChapterJsonImporter.ParseFansBlockStaleKeys(json);
+        }
+
+        // the fans block as 5.7 leaves it: currency plus the per-bandmate tuning,
+        // nothing about production
+        [Test]
+        public void FansBlock_WithNoStaleKeys_ReportsNothing()
+        {
+            ChapterJsonImporter.ParseFansBlockStaleKeys(
+                @"{ ""currency"": ""fans"", ""perBandmateOwnedBonus"": 0.02 }");
+        }
+
+        // the other half of making fanRate authorable: it has to MAP, not merely
+        // stop being refused
+        [Test]
+        public void ProductionConfig_ComposesFanRate_MapsToTheFanRateTarget()
+        {
+            var configs = ChapterJsonImporter.ParseProducerProduction(
+                @"{ ""id"": ""band"", ""production"": [ { ""currency"": ""fans"", ""amount"": 0.2, ""trigger"": ""tick"", ""composes"": ""fanRate"" } ] }");
+
+            Assert.IsNotNull(configs);
+            Assert.AreEqual(1, configs.Count);
+            Assert.AreEqual(ModifierTarget.FanRate, configs[0].Composes);
+            Assert.AreEqual(ProductionTrigger.Tick, configs[0].Trigger);
+            Assert.AreEqual("fans", configs[0].CurrencyId);
         }
 
         // a per-sec multiplier carries the currencies it affects as data, so the

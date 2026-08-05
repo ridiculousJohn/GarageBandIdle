@@ -24,8 +24,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // the evaluated value actually moved.
     public class ProductionSystem
     {
-        private static readonly ModifierTargetKey TapValueTarget = ModifierTargetKey.Global(ModifierTarget.TapValue);
-
         private readonly List<ProductionConfig> _tick = new();
         private readonly List<ProductionConfig> _tap = new();
         private readonly ICurrencies _currencies;
@@ -54,10 +52,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 {
                     // fail closed on broken content - the importer refuses
                     // these states and boot validation reports stale assets;
-                    // a config that slipped through must not silently fire
-                    if (config.Composes != ModifierTarget.None && config.Composes != ModifierTarget.TapValue)
+                    // a config that slipped through must not silently fire.
+                    // ProductionConfig.IsComposable owns the rule, so this and
+                    // boot validation cannot disagree about what is authorable.
+                    if (!ProductionConfig.IsComposable(config.Composes))
                     {
-                        Debug.LogError($"ProductionSystem: producer '{producer.Id}' config for '{config.CurrencyId}' declares composition '{config.Composes}', which no module-held config composes. Ignoring the config.");
+                        Debug.LogError($"ProductionSystem: producer '{producer.Id}' config for '{config.CurrencyId}' declares composition '{config.Composes}', which a config cannot compose - it must be a defined target that composes globally. Ignoring the config.");
                         continue;
                     }
 
@@ -167,14 +167,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             TapValueChanged?.Invoke();
         }
 
-        // A config composes exactly the target it declares. Anything landing
-        // below zero yields nothing and no multiplier resurrects it - the same
-        // fail-closed rule TapSystem had, so a tap can never drain cash.
+        // A config composes exactly the target it declares - tapValue for the
+        // Jam yield, fanRate for fan accrual, and whatever a later chapter
+        // declares, with no per-target branch here. Anything landing below zero
+        // yields nothing and no multiplier resurrects it - the same fail-closed
+        // rule TapSystem had, so a tap can never drain cash.
         private BigNumber Composed(ProductionConfig config)
         {
-            var value = config.Composes == ModifierTarget.TapValue
-                ? _modifiers.For(TapValueTarget).ApplyTo(config.Amount)
-                : (BigNumber)config.Amount;
+            var value = config.Composes == ModifierTarget.None
+                ? (BigNumber)config.Amount
+                : _modifiers.For(ModifierTargetKey.Global(config.Composes)).ApplyTo(config.Amount);
             return value < BigNumber.Zero ? BigNumber.Zero : value;
         }
 

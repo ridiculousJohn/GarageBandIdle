@@ -153,7 +153,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 new("cash", -1, ProductionTrigger.Tap, null, ModifierTarget.None),
                 new("merch", 1, ProductionTrigger.None, null, ModifierTarget.None),
-                new("cash", 1, ProductionTrigger.Tick, null, ModifierTarget.FanRate),
+                // FanRate is authorable since 5.7 (fan accrual is a config); what
+                // a config still cannot compose is a QUALIFIED target - composed
+                // through Global(...) it would read an empty bucket and scale by
+                // nothing, which looks like it worked
+                new("cash", 1, ProductionTrigger.Tick, null, ModifierTarget.GeneratorOutput),
             });
             var hollow = TestContent.MakeProducer("hollow", new List<ProductionConfig>());
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
@@ -168,7 +172,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Producer 'broken' (config for 'merch') has trigger None (uninitialized) - it would never fire.");
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Producer 'broken' (config for 'cash') declares composition 'FanRate', which no module-held config composes.");
+                "ContentValidator: Producer 'broken' (config for 'cash') declares composition 'GeneratorOutput', which a config cannot compose - it must be a defined target that composes globally (a qualified target like GeneratorOutput would read an empty bucket).");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Producer 'hollow' has no production configs - it would produce nothing.");
             ContentValidator.Validate(database, context, NoRewards);
@@ -309,6 +313,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' fans currency 'fans' is in a currency group that survives an album release - fans would compound across runs and inflate the Records payout.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // Before 5.7 this was impossible rather than checked: fan accrual was its
+        // own system and only ever composed FanRate, so no income multiplier could
+        // reach it. Fan production is an ordinary config now, so this list is the
+        // only thing keeping Records off the fan rate - and Records inflating fans
+        // would let time away shortcut the Records payout (design doc section 11),
+        // the same failure the reset-on-release check guards from the other side.
+        [Test]
+        public void FansCurrencyInRecordBuffAffects_IsRefused()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                recordBuffAffects: new List<string> { "cash", "fans" });
+            var database = new ContentDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' lists its fans currency 'fans' in recordBuff affects - the Records multiplier must never reach the fan rate, or time away shortcuts the Records payout (design doc section 11).");
             ContentValidator.Validate(database, context, NoRewards);
         }
 

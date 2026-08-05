@@ -167,44 +167,35 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 #endif
     }
 
-    // Fan accrual config (design doc section 6): fan rate is a function of band
-    // size and time only, never Cash. The currency accrued into and the gate
-    // that activates accrual are chapter data, not code bindings. Activation is
-    // an ordinary Condition (rules 8 and 9), so a chapter can start fans on a
-    // balance or a completed bar rather than only on a flag.
+    // What the chapter declares about fans that is NOT production (design doc
+    // section 6). The base rate and its gate are an ordinary production config
+    // on a producer (rule 13) like every other flat-rate source; what remains
+    // here is the per-bandmate tuning, which is a rate MODIFIER rather than a
+    // source, and the currency id - which is not a binding for accrual but the
+    // answer to "which currency is this chapter's fans", asked by the checks
+    // that keep fans resetting on release and out of the Records multiplier
+    // (section 11).
     [Serializable]
     public class FansConfig
     {
         [SerializeField]
         [DefinitionId(typeof(CurrencyDefinition))]
-        [Tooltip("Currency id the fan system accrues into.")]
+        [Tooltip("Currency id this chapter treats as fans. Accrual itself is a production config on a producer.")]
         private string _currencyId;
 
-        [SerializeReference]
-        [SubclassPicker]
-        [Tooltip("Must hold for fans to accrue, evaluated like every other gate. None = always accruing.")]
-        private Condition _activeWhen;
-
         [SerializeField]
-        private double _baseFansPerSec;
-
-        [SerializeField]
-        [Tooltip("Bonus fans/sec per owned bandmate unit (not gear like the practice amp).")]
+        [Tooltip("Bonus fans/sec per owned bandmate unit (not gear like the practice amp). Applied as a derived Add on the FanRate target.")]
         private double _perBandmateOwnedBonus;
 
         public string CurrencyId => _currencyId;
-        public Condition ActiveWhen => _activeWhen;
-        public double BaseFansPerSec => _baseFansPerSec;
         public double PerBandmateOwnedBonus => _perBandmateOwnedBonus;
 
         public FansConfig() { }
 
 #if UNITY_EDITOR
-        public FansConfig(string currencyId, Condition activeWhen, double baseFansPerSec, double perBandmateOwnedBonus)
+        public FansConfig(string currencyId, double perBandmateOwnedBonus)
         {
             _currencyId = currencyId;
-            _activeWhen = activeWhen;
-            _baseFansPerSec = baseFansPerSec;
             _perBandmateOwnedBonus = perBandmateOwnedBonus;
         }
 #endif
