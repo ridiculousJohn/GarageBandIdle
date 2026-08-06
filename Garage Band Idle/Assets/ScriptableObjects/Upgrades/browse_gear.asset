@@ -10,27 +10,27 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: da0688336f1d57f48bbcb6016a7a2455, type: 3}
-  m_Name: play_for_crowd
+  m_Name: browse_gear
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
-  _id: play_for_crowd
-  _displayName: Play for a Crowd
+  _id: browse_gear
+  _displayName: Browse the Gear
   _type: 2
   _scope: 1
   _costCurrencyId: cash
   _costAmount: 0
   _gate:
-    rid: 1002
+    rid: 1000
   _payload:
-    rid: 1003
+    rid: 1001
   references:
     version: 2
     RefIds:
-    - rid: 1002
-      type: {class: OwnedCountCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+    - rid: 1000
+      type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        _generatorId: drummer
-        _value: 1
-    - rid: 1003
+        _currencyId: cash
+        _value: 250
+    - rid: 1001
       type: {class: SetFlagEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        _flagId: fans
+        _flagId: gear

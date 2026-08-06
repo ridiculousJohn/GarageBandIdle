@@ -56,7 +56,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public RewardManager Rewards { get; }
         public ConditionContext Conditions { get; }
 
-        // the chapter's sections in layout order, resolved from its id list
+        // The chapter's sections in layout order, resolved from its id list.
+        // Definitions only: section visibility is a pure function of each
+        // visibleWhen over this economy's state, so there is no section state
+        // to hold - persistence comes from what the conditions read (flags
+        // carry the lifetimes), and the screen evaluates live on the settled
+        // signal.
         public IReadOnlyList<SectionDefinition> Sections { get; }
 
         // Focus lifecycle (rule 7): constructed -> focused <-> unfocused ->
@@ -217,7 +222,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public bool BuyGenerator(Generator generator)
         {
-            if (generator == null || !generator.Unlocked)
+            // asked live, the same question the row that offered the button
+            // answers - so a generator can never be bought through a row the
+            // player is only still looking at because something latched
+            if (generator == null || !generator.IsUnlocked(Conditions))
                 return false;
             if (!generator.TryBuy(Currencies))
                 return false;
@@ -232,6 +240,66 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return true;
         }
 
+        // The Records a release performed right now would bank: the album
+        // payout formula over the current fans balance (design doc section 5).
+        // One home for the read, so the UI's preview and the release itself
+        // cannot disagree about what a demo is worth. A chapter that declares
+        // no fans currency banks nothing - the release is still a legal reset.
+        public BigNumber PendingReleaseRecords()
+        {
+            var fansCurrencyId = Chapter?.Fans?.CurrencyId;
+            return string.IsNullOrEmpty(fansCurrencyId)
+                ? BigNumber.Zero
+                : ProductionCalculator.RecordsEarned(Currencies.Get(fansCurrencyId));
+        }
+
+        // The album release (design doc section 5, prestige): bank the run's
+        // fans as Records, then reset the run and rebuild the modifier store
+        // from the facts that survived. Written as an operation on this bundled
+        // context (rule 12) so the same orchestration later runs unchanged
+        // against other instances; returns the Records banked so the caller can
+        // present the payout.
+        public BigNumber ReleaseAlbum()
+        {
+            // the award reads the fans balance the reset is about to zero, so it
+            // goes first. Routed through Currencies: the router resolves the
+            // Records id to the pool that owns it (the permanent one), and Add
+            // accrues the earned total the income buff and the capstone gate
+            // both read - a total that outlives every demo because the Records
+            // group is the thing declaring it permanent.
+            var earned = PendingReleaseRecords();
+            if (earned > BigNumber.Zero)
+                Currencies.Add(Conditions.RecordsCurrencyId, earned);
+
+            // Facts first, all of them, before the store is touched (rule 6): a
+            // projection over half-reset facts would rebuild effects this release
+            // is in the middle of removing. Each reset is scope/group-driven -
+            // no name list - and each keeps exactly what its own declaration
+            // says survives: permanent-in-chapter upgrade latches, permanent bar
+            // groups, permanent flags. Run-scoped facts go, flags included -
+            // there is no category a release spares wholesale. Balances, and the
+            // earned totals measured off them, reset on THIS economy's own pool
+            // only; the global pool is no run's to reset.
+            Pool.ResetCurrenciesOnAlbumRelease();
+            Generators.ResetOwned();
+            Upgrades.ResetRunScoped();
+            Bars.ResetRunScopedGroups();
+            // flags too: a run-scoped flag clears here and comes back only when
+            // a setter whose own fact survives or re-fires asserts it again -
+            // the projection below re-sets every flag whose setter's latch
+            // survived, which is exactly rule 6's rebuild applied to reveals.
+            // Sections need no walk of their own: their visibility derives from
+            // these facts, so it resets because the facts did.
+            Flags.ResetRunScoped();
+
+            // the rebuild, then the seam: run-scoped effects are gone because
+            // the facts behind them are gone, never because anything filtered
+            // the store - and the whole mutation settles exactly once.
+            ProjectModifiers();
+            Settle();
+            return earned;
+        }
+
         // ---- the settle seam -------------------------------------------------
 
         // The one point at which a completed mutation is declared finished and
@@ -242,9 +310,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // twice - and two such lists drift.
         //
         // Public because a boundary the context does not own yet ends here too:
-        // slice 6's release and slice 9's restore mutate facts through this
-        // context and then declare them settled, rather than growing a second
-        // pattern for saying the same thing.
+        // slice 9's restore mutates facts through this context and then declares
+        // them settled, rather than growing a second pattern for saying the same
+        // thing (the release, once external for the same reason, is ReleaseAlbum
+        // above now).
         public void Settle()
         {
             Conditions.Drain(_evaluateUnlocks);
@@ -255,12 +324,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Production.RefreshTapValue();
         }
 
-        // What the drain evaluates - generator reveals, then content unlocks, the
-        // order the poll ran them in. Held as a cached delegate on the field
-        // above so the seam allocates nothing per tick.
+        // What the drain evaluates: content unlocks, the only reveal that is
+        // state. Sections and generator rows are deliberately absent - their
+        // visibility is derived per settle by whoever renders them, from the
+        // same conditions, so there is nothing here to keep in step. Held as a
+        // cached delegate on the field above so the seam allocates nothing per
+        // tick.
         private void EvaluateUnlocks()
         {
-            Generators.EvaluateUnlocks(Conditions);
             Upgrades.EvaluateContentUnlocks(Conditions);
         }
 

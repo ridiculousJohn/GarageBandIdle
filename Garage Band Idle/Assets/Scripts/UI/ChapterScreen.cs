@@ -9,9 +9,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // Composes the chapter's screen from data: for each SectionDefinition the
     // chapter names, instantiates its module prefabs (addressable, by address)
     // under the canvas root and initializes them through IChapterModule.
-    // Sections start hidden until their visibleWhen condition holds, then latch
-    // visible - the design doc's progressive reveal (section 2), driven by flags
-    // and the shared Condition language.
+    //
+    // A section is visible exactly while its visibleWhen holds, re-evaluated
+    // each settle - the same live shape BarListModule uses for bar groups. No
+    // latch lives here (one briefly did, twice): "stays once earned" is a
+    // property of the STATE a condition reads, so it is authored by gating on
+    // a fact with that lifetime - a flag, whose declaration says whether a
+    // release clears it, or a monotonic earned-total - never remembered by
+    // the UI. That is what keeps visibility derivable: a release resets facts
+    // and this screen just reads the new answers.
     public class ChapterScreen : MonoBehaviour
     {
         [SerializeField] private RectTransform _sectionsRoot;
@@ -20,7 +26,6 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             public SectionDefinition Definition;
             public readonly List<GameObject> Modules = new();
-            public bool Revealed;
         }
 
         private GameManager _game;
@@ -42,7 +47,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
             }
 
-            _context = new ChapterContext(_game, _economy);
+            _context = new ChapterContext(_economy);
 
             foreach (var section in _economy.Sections)
                 _sections.Add(BuildSection(section));
@@ -51,14 +56,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 Debug.LogError($"ChapterScreen: chapter '{_economy.Chapter.Id}' has no sections - nothing to show. Re-run the chapter import.");
 
             // One subscription for every condition input there is: the context
-            // holds the individual signals (balances, flags, owned counts,
-            // completed bars) and publishes once the drain has settled them, so
-            // a visibleWhen gate is never asked about half-applied state and this
-            // screen has no list of inputs to keep in step with the Condition
-            // vocabulary.
+            // publishes once a drain has settled the mutation, so a visibleWhen
+            // is never asked about half-applied state and this screen has no
+            // list of inputs to keep in step with the Condition vocabulary.
             _economy.Conditions.Settled += HandleConditionsSettled;
 
-            // no drain has run yet, so the opening reveal is asked for directly
+            // GameManager settles the frontier once at boot, so the opening
+            // evaluation reads latched unlocks rather than pre-drain state
             EvaluateSections();
         }
 
@@ -94,8 +98,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     continue;
                 }
 
-                // initialize while still hidden so event subscriptions are live
-                // before the section reveals
+                // initialize even when starting hidden so event subscriptions
+                // are live before the section shows
                 if (instance.TryGetComponent<IChapterModule>(out var module))
                     module.Initialize(_context);
                 else
@@ -114,14 +118,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             foreach (var section in _sections)
             {
-                if (section.Revealed)
-                    continue;
-                if (!ConditionEvaluator.IsMet(section.Definition.VisibleWhen, _economy.Conditions))
-                    continue;
-
-                section.Revealed = true;
+                var visible = ConditionEvaluator.IsMet(section.Definition.VisibleWhen, _economy.Conditions);
                 foreach (var module in section.Modules)
-                    module.SetActive(true);
+                {
+                    if (module != null && module.activeSelf != visible)
+                        module.SetActive(visible);
+                }
             }
         }
     }

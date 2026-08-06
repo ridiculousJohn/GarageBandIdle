@@ -15,22 +15,22 @@ MonoBehaviour:
   _id: learn_covers
   _displayName: Learn Some Covers
   _type: 2
-  _scope: 2
+  _scope: 1
   _costCurrencyId: cash
   _costAmount: 0
   _gate:
-    rid: 1002
+    rid: 1000
   _payload:
-    rid: 1003
+    rid: 1001
   references:
     version: 2
     RefIds:
-    - rid: 1002
+    - rid: 1000
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: fans
         _value: 25
-    - rid: 1003
+    - rid: 1001
       type: {class: SetFlagEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _flagId: covers

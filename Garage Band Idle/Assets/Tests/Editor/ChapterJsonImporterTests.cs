@@ -338,6 +338,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 @"{ ""id"": ""learn_covers"", ""visibleWhen"": { ""type"": ""flagSet"", ""flag"": ""covers"" }, ""fillMode"": ""perBar"" }"));
         }
 
+        // A flag latch's lifetime: absence is the permanent default (every
+        // pre-scope flag keeps exactly its old behavior), the spellings map,
+        // and a typo never opts a flag into resetting. Sections deliberately
+        // have no scope key - visibility is a live function of visibleWhen.
+        [TestCase(@"{ ""id"": ""album"" }", ContentScope.PermanentInChapter, TestName = "Absent")]
+        [TestCase(@"{ ""id"": ""covers"", ""scope"": ""run"" }", ContentScope.Run, TestName = "Run")]
+        [TestCase(@"{ ""id"": ""album"", ""scope"": ""permanentInChapter"" }", ContentScope.PermanentInChapter, TestName = "Permanent")]
+        public void FlagScope_MapsTheAuthoredSpellings(string json, ContentScope expected)
+        {
+            Assert.AreEqual(expected, ChapterJsonImporter.ParseFlagScope(json));
+        }
+
+        [Test]
+        public void FlagScope_UnknownSpellingReportsAndDefaultsToThePermanentLatch()
+        {
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: flag has unknown scope 'Run' - a flag latch is 'run' or 'permanentInChapter'. Defaulting to permanentInChapter.");
+
+            Assert.AreEqual(ContentScope.PermanentInChapter,
+                ChapterJsonImporter.ParseFlagScope(@"{ ""id"": ""covers"", ""scope"": ""Run"" }"));
+        }
+
         // fan accrual is production since 5.7, so the three keys that used to
         // describe it on the chapter are stale JSON. Each is refused on PRESENCE,
         // which is what these empty spellings prove: a contents test would let

@@ -23,7 +23,7 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         public override bool Evaluate(ConditionContext context)
-            => ThresholdIsMet(_value, context.Currencies.GetLifetimeEarned(context.RecordsCurrencyId));
+            => ThresholdIsMet(_value, context.Currencies.GetEarned(context.RecordsCurrencyId));
 
         public override void Validate(ConditionContext context, string source)
         {

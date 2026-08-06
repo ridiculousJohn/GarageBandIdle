@@ -98,7 +98,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             EnsureFolders();
 
-            // flags: the chapter's declared reveal registry
+            // flags: the chapter's declared reveal registry, each latch
+            // carrying its declared lifetime (absent scope = the permanent
+            // default). The setBy/reveals keys stay documentation - who sets a
+            // flag is the setter's payload, and boot validation checks that
+            // relation from the payload side.
+            var flags = new List<FlagDeclaration>();
             var flagIds = new List<string>();
             foreach (var flag in data.flags ?? Array.Empty<FlagBlock>())
             {
@@ -107,7 +112,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 else if (flagIds.Contains(flag.id))
                     Debug.LogError($"ChapterJsonImporter: duplicate flag id '{flag.id}'. Keeping the first.");
                 else
+                {
                     flagIds.Add(flag.id);
+                    flags.Add(new FlagDeclaration(flag.id,
+                        ToLatchScope(flag.scope, $"flag '{flag.id}'", "a flag latch")));
+                }
             }
 
             // The chapter's currency roster (design doc section 12, rule 12):
@@ -353,10 +362,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
                 new List<string>(data.constants?.recordBuff?.affects ?? Array.Empty<string>()));
             var fans = new FansConfig(data.fans?.currency, data.fans?.perBandmateOwnedBonus ?? 0);
+            // the album's unlock is the release OFFER's gate (design doc section
+            // 5): the UI enables the release only while it holds. An absent block
+            // means no gate - always offered once revealed - like every other
+            // condition site.
+            var album = new AlbumConfig(ToCondition(data.album?.unlock, "album (unlock)"));
             ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
                 data.chapter.name, data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
                 data.chapter.capstoneRecordsGate, recordBuff,
-                fans, flagIds, currencyIds, producerIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
+                fans, album, flags, currencyIds, producerIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
 
             MarkAllContentAddressable();
 
@@ -483,7 +497,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // ---- the condition pre-pass ------------------------------------------
 
         // Every condition block in the file, walked before a single asset is
-        // touched. The seven sites below are the complete set of places a
+        // touched. The eight sites below are the complete set of places a
         // Condition is authored, and a new one has to be added here - that is the
         // cost of the guarantee. Checking at the conversion sites instead is what
         // fell open in the first place: a conversion that answers "no gate" for
@@ -495,6 +509,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             foreach (var block in data.sections ?? Array.Empty<SectionBlock>())
                 CollectConditionFaults(block.visibleWhen, $"section '{block.id}' (visibleWhen)", faults);
+
+            CollectConditionFaults(data.album?.unlock, "album (unlock)", faults);
 
             foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
                 CollectConditionFaults(block.unlock, $"generator '{block.id}' (unlock)", faults);
@@ -888,6 +904,39 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
         }
 
+        // A flag latch's declared lifetime. An ABSENT key is the default,
+        // permanentInChapter - once latched, latched through every album
+        // release (a taught system stays taught) - which is why this does not
+        // reuse ToScope: upgrades and bar groups always author their scope, so
+        // absence is a mistake there, while almost every flag wants the default
+        // and should not have to spell it. Unknown spellings (including
+        // authored-empty "") default to the latch too: the failure mode of a
+        // typo is then "behaves like it always has", never "silently starts
+        // resetting". Sections deliberately have no scope: their visibility is
+        // a live function of visibleWhen, and persistence belongs to the state
+        // the condition reads - this converter, applied to the flag.
+        private static ContentScope ToLatchScope(string scope, string context, string subject)
+        {
+            switch (scope)
+            {
+                case null:
+                    return ContentScope.PermanentInChapter;
+                case "run":
+                    return ContentScope.Run;
+                case "permanentInChapter":
+                    return ContentScope.PermanentInChapter;
+                default:
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown scope '{scope}' - {subject} is 'run' or 'permanentInChapter'. Defaulting to permanentInChapter.");
+                    return ContentScope.PermanentInChapter;
+            }
+        }
+
+        // the flag-scope parse path, exposed like ParseCondition: tests cover
+        // that absence means the permanent latch and a typo never opts into resets
+        internal static ContentScope ParseFlagScope(string json)
+            => ToLatchScope(JsonConvert.DeserializeObject<FlagBlock>(json, JsonSettings).scope,
+                "flag", "a flag latch");
+
         // Scope is a closed, code-defined set (ContentScope); the strings here
         // are the JSON spellings, and anything else is a content error.
         private static ContentScope ToScope(string scope, string context)
@@ -1198,12 +1247,27 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public ProducerBlock[] producers = Array.Empty<ProducerBlock>();
             public BarsBlock bars = new();
             public FansBlock fans = new();
+            public AlbumBlock album = new();
             public EventBlock[] events = Array.Empty<EventBlock>();
+        }
+
+        // the album block's imported half: the unlock is the release OFFER's
+        // gate (the id, displayName, resets/keeps and formula fields stay
+        // documentation - the reset is group/scope-driven and the formula is
+        // code, see ProductionCalculator.RecordsEarned)
+        private class AlbumBlock
+        {
+            public ConditionBlock unlock = new();
         }
 
         private class FlagBlock
         {
             public string id = "";
+
+            // the latch's lifetime. No initializer on purpose: null means "the
+            // key is absent", which is the default (permanentInChapter), and an
+            // authored-empty "" stays distinguishable from omission.
+            public string scope;
         }
 
         // one entry in the shared reward pool; which fields matter depends on type

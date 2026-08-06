@@ -5,8 +5,11 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.UI
 {
     // Module: the generator list. Instantiates one GeneratorRowUI per chapter
-    // generator (the count is content-driven); rows reveal as their generators
-    // unlock.
+    // generator (the count is content-driven) and sets each row's visibility
+    // from a live read of its unlock condition every time conditions settle -
+    // the same way ChapterScreen decides a section's visibility. Nothing
+    // latches, so a row disappears again when its gate stops holding (a
+    // release zeroes the fleet an ownedCount unlock reads).
     public class GeneratorListModule : MonoBehaviour, IChapterModule
     {
         [SerializeField] private RectTransform _listRoot;
@@ -26,8 +29,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 _rows.Add(row);
             }
 
+            RefreshVisibility();
+
             context.Economy.Currencies.BalanceChanged += HandleBalanceChanged;
-            context.Economy.Generators.GeneratorUnlocked += HandleGeneratorUnlocked;
+            context.Economy.Conditions.Settled += RefreshVisibility;
 
             // the third system signal a row's display reads: output modifiers.
             // Subscribed here rather than per row because Changed is a system
@@ -42,7 +47,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
 
             _context.Economy.Currencies.BalanceChanged -= HandleBalanceChanged;
-            _context.Economy.Generators.GeneratorUnlocked -= HandleGeneratorUnlocked;
+            _context.Economy.Conditions.Settled -= RefreshVisibility;
             _context.Economy.Modifiers.Changed -= HandleModifierChanged;
         }
 
@@ -58,13 +63,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 row.HandleModifierChanged(target);
         }
 
-        private void HandleGeneratorUnlocked(Generator generator)
+        private void RefreshVisibility()
         {
+            var conditions = _context.Economy.Conditions;
             foreach (var row in _rows)
-            {
-                if (row.Generator == generator)
-                    row.Show();
-            }
+                row.SetVisible(row.Generator.IsUnlocked(conditions));
         }
     }
 }

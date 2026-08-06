@@ -30,10 +30,18 @@ MonoBehaviour:
   _fans:
     _currencyId: fans
     _perBandmateOwnedBonus: 0.02
-  _flagIds:
-  - fans
-  - covers
-  - album
+  _album:
+    _releaseWhen:
+      rid: 1000
+  _flags:
+  - _id: fans
+    _scope: 1
+  - _id: covers
+    _scope: 1
+  - _id: gear
+    _scope: 1
+  - _id: album
+    _scope: 2
   _currencyIds:
   - cash
   - fans
@@ -46,6 +54,7 @@ MonoBehaviour:
   - the_band
   - the_gear
   - rehearsal_space
+  - the_release
   _generatorIds:
   - practice_amp
   - drummer
@@ -56,6 +65,7 @@ MonoBehaviour:
   - amp_strings
   - kit_upgrade
   - tight_set
+  - browse_gear
   - play_for_crowd
   - learn_covers
   - cut_demo
@@ -63,3 +73,23 @@ MonoBehaviour:
   - learn_covers
   _eventIds:
   - garage_jam
+  references:
+    version: 2
+    RefIds:
+    - rid: 1000
+      type: {class: CompoundCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _all:
+        - rid: 1001
+        - rid: 1002
+        _any: []
+    - rid: 1001
+      type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _currencyId: fans
+        _value: 50
+    - rid: 1002
+      type: {class: BarsCompletedCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _groupId: learn_covers
+        _value: 1

@@ -52,10 +52,14 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         [SerializeField]
         private FansConfig _fans = new();
 
+        [SerializeField]
+        private AlbumConfig _album = new();
+
         [Header("Content")]
         [SerializeField]
-        [Tooltip("Progress flags this chapter's content may set - the single reveal registry. Anything not listed here is a typo.")]
-        private List<string> _flagIds = new();
+        [Tooltip("Progress flags this chapter's content may set - the single reveal registry, each with its " +
+            "latch's declared lifetime. Anything not listed here is a typo.")]
+        private List<FlagDeclaration> _flags = new();
 
         [SerializeField]
         [DefinitionId(typeof(CurrencyDefinition))]
@@ -98,7 +102,22 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         public int CapstoneRecordsGate => _capstoneRecordsGate;
         public RecordBuffConfig RecordBuff => _recordBuff;
         public FansConfig Fans => _fans;
-        public IReadOnlyList<string> FlagIds => _flagIds;
+        public AlbumConfig Album => _album;
+        public IReadOnlyList<FlagDeclaration> Flags => _flags;
+
+        // the declared ids alone, for consumers that only resolve or validate
+        // identity (the scope is FlagSystem's business, given the declarations)
+        public IReadOnlyList<string> FlagIds
+        {
+            get
+            {
+                var ids = new List<string>(_flags.Count);
+                foreach (var flag in _flags)
+                    ids.Add(flag?.Id);
+                return ids;
+            }
+        }
+
         public IReadOnlyList<string> CurrencyIds => _currencyIds;
         public IReadOnlyList<string> ProducerIds => _producerIds;
         public IReadOnlyList<string> SectionIds => _sectionIds;
@@ -111,8 +130,8 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         // importer-only: chapter assets are generated from chapter JSON
         public void EditorInitialize(string id, int index, string displayName, string theme,
             string storyBeatOpen, string storyBeatCapstone, int capstoneRecordsGate,
-            RecordBuffConfig recordBuff, FansConfig fans,
-            List<string> flagIds, List<string> currencyIds, List<string> producerIds,
+            RecordBuffConfig recordBuff, FansConfig fans, AlbumConfig album,
+            List<FlagDeclaration> flags, List<string> currencyIds, List<string> producerIds,
             List<string> sectionIds, List<string> generatorIds, List<string> upgradeIds,
             List<string> barGroupIds, List<string> eventIds)
         {
@@ -125,7 +144,8 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             _capstoneRecordsGate = capstoneRecordsGate;
             _recordBuff = recordBuff;
             _fans = fans;
-            _flagIds = flagIds;
+            _album = album ?? new AlbumConfig();
+            _flags = flags;
             _currencyIds = currencyIds;
             _producerIds = producerIds;
             _sectionIds = sectionIds;
@@ -163,6 +183,35 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         {
             _perRecord = perRecord;
             _affectsCurrencyIds = affectsCurrencyIds;
+        }
+#endif
+    }
+
+    // What the chapter declares about the album beyond the payout formula
+    // (design doc section 5). ReleaseWhen is the OFFER's gate, not the
+    // operation's: the UI presents the release only while it holds (asked
+    // through the one evaluator like every gate), re-met each run because its
+    // inputs are run facts - while EconomyContext.ReleaseAlbum stays ungated,
+    // since the capstone implicitly cuts an album regardless of any offer.
+    // None means always offered once revealed, the same null-condition
+    // convention every other gate site uses.
+    [Serializable]
+    public class AlbumConfig
+    {
+        [SerializeReference]
+        [SubclassPicker]
+        [Tooltip("Must hold for a release to be offered (the button enabled); none = always offered. " +
+            "Gates the offer only - the release operation itself stays callable (the capstone releases regardless).")]
+        private Condition _releaseWhen;
+
+        public Condition ReleaseWhen => _releaseWhen;
+
+        public AlbumConfig() { }
+
+#if UNITY_EDITOR
+        public AlbumConfig(Condition releaseWhen)
+        {
+            _releaseWhen = releaseWhen;
         }
 #endif
     }

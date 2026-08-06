@@ -95,6 +95,11 @@ namespace RidiculousGaming.GarageBandIdle
                 // payloads, rewards, module addresses - so a mistake gets
                 // reported here, loudly, instead of surfacing mid-run
                 ContentValidator.Validate(Database, Frontier.Conditions, Frontier.Rewards);
+
+                // the initial drain: unlocks and the tap value evaluate once at
+                // boot, so ChapterScreen's opening visibility pass reads
+                // latched state rather than pre-drain state
+                Frontier.Settle();
             }
 
             _tickSystem = GetComponent<TickSystem>();
@@ -137,15 +142,10 @@ namespace RidiculousGaming.GarageBandIdle
             Focused?.Tick(seconds);
         }
 
-        // ---- the player actions the UI calls ---------------------------------
-        // Thin routes to the focused economy, kept here because the UI holds a
-        // GameManager reference; each operation ends at the context's settle
-        // seam, never here.
-
-        public void Jam() => Focused?.Jam();
-
-        public bool BuyUpgrade(Upgrade upgrade) => Focused?.BuyUpgrade(upgrade) ?? false;
-
-        public bool BuyGenerator(Generator generator) => Focused?.BuyGenerator(generator) ?? false;
+        // Deliberately NO player-action routes here. They existed as thin
+        // Focused?.Jam()-style forwards, and that indirection is exactly what
+        // let a module display one economy's numbers while mutating whichever
+        // context happened to hold focus. A module acts on the economy its
+        // ChapterContext shows; focus governs the tick (rule 7), nothing else.
     }
 }

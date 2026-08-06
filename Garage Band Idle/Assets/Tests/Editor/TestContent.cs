@@ -157,15 +157,29 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             List<string> producerIds = null,
             double perBandmateOwnedBonus = 0.02, double recordBuffPerRecord = 0.02,
             int index = 1, int capstoneRecordsGate = 30, string fansCurrencyId = "fans",
-            List<string> recordBuffAffects = null)
+            List<string> recordBuffAffects = null, Condition albumReleaseWhen = null,
+            List<FlagDeclaration> flags = null)
         {
+            // string ids remain the fixture-friendly spelling: each becomes a
+            // permanent-latch declaration, the same default absent JSON gets.
+            // A fixture testing flag lifetimes passes declarations instead.
+            var declarations = flags;
+            if (declarations == null)
+            {
+                declarations = new List<FlagDeclaration>();
+                foreach (var flagId in flagIds ?? new List<string>())
+                    declarations.Add(new FlagDeclaration(flagId));
+            }
+
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
             definition.EditorInitialize(id, index, id, "", "", "", capstoneRecordsGate,
                 new RecordBuffConfig(recordBuffPerRecord, recordBuffAffects ?? new List<string> { "cash" }),
                 new FansConfig(fansCurrencyId, perBandmateOwnedBonus),
+                // null (the default) is a legal album gate: always offered
+                new AlbumConfig(albumReleaseWhen),
                 // the chapter-local half of the standard economy; records is
                 // global, so no chapter declares it
-                flagIds, currencyIds ?? new List<string> { "cash", "fans" }, producerIds ?? new List<string>(),
+                declarations, currencyIds ?? new List<string> { "cash", "fans" }, producerIds ?? new List<string>(),
                 sectionIds ?? new List<string>(), generatorIds ?? new List<string>(),
                 upgradeIds ?? new List<string>(), barGroupIds ?? new List<string>(),
                 eventIds ?? new List<string>());
@@ -265,7 +279,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // uses, so the tests exercise the mechanism the release will use rather
         // than a reset call that only existed for them.
         public static void RunReset(ModifierSystem modifiers, UpgradeSystem upgrades = null,
-            BarSystem bars = null, GeneratorSystem generators = null)
+            BarSystem bars = null, GeneratorSystem generators = null, FlagSystem flags = null)
         {
             // facts first, all of them, before the store is touched: a
             // projection that ran against half-reset facts would rebuild
@@ -273,6 +287,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             upgrades?.ResetRunScoped();
             bars?.ResetRunScopedGroups();
             generators?.ResetOwned();
+            flags?.ResetRunScoped();
 
             modifiers.ResetGranted();
             upgrades?.ProjectModifiers();

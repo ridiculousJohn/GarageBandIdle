@@ -39,7 +39,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void HandleJamClicked()
         {
-            _context.Game.Jam();
+            _context.Economy.Jam();
         }
     }
 }

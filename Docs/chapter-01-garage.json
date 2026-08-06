@@ -39,18 +39,19 @@
   },
 
   "flags": [
-    { "id": "fans",   "setBy": "upgrade:play_for_crowd", "reveals": "Fans currency + fan meter" },
-    { "id": "covers", "setBy": "upgrade:learn_covers",   "reveals": "Rehearsal currency + Learn Covers bar group" },
+    { "id": "fans",   "scope": "run", "setBy": "upgrade:play_for_crowd", "reveals": "Fans currency + fan meter" },
+    { "id": "covers", "scope": "run", "setBy": "upgrade:learn_covers",   "reveals": "Rehearsal currency + Learn Covers bar group" },
+    { "id": "gear",   "scope": "run", "setBy": "upgrade:browse_gear",    "reveals": "The Gear buff list" },
     { "id": "album",  "setBy": "upgrade:cut_demo",       "reveals": "Album/Cut-a-Demo (prestige) button" }
   ],
-  "flagsNote": "The single reveal registry. Flags are permanent-in-chapter. A content-unlock upgrade (or a reward) sets a flag via a `setFlag` payload; anything that should appear when a system exists gates on `{ \"type\": \"flagSet\", \"flag\": <id> }`.",
+  "flagsNote": "The single reveal registry. A content-unlock upgrade (or a reward) sets a flag via a `setFlag` payload; anything that should appear when a system exists gates on `{ \"type\": \"flagSet\", \"flag\": <id> }`. Each flag's `scope` declares its latch's lifetime (absent = permanentInChapter, survives demos): a `run` flag clears at every album release, so everything gating on it goes dark together and re-arms when its run-scoped setter re-fires — the second-run flow re-walks the progression (band → fans → covers) instead of opening with everything taught. A run flag needs a run-scoped setter (boot-validated): with only permanent setters the projection re-asserts it in the same release. `setBy` is documentation only — the payload is the authoritative setter, and boot validation sweeps payloads to warn on a flag no content sets.",
 
   "sections": [
     {
       "id": "garage_floor",
       "name": "The Garage Floor",
       "modules": [ "module/currency-header", "module/tap" ],
-      "note": "No visibleWhen: visible from chapter start. Module ids are Addressable keys resolved through a string→prefab registry loaded by label; a section reveals as a group when its visibleWhen Condition holds (progressive reveal, design doc §2)."
+      "note": "No visibleWhen: visible from chapter start. Module ids are Addressable keys resolved through a string→prefab registry loaded by label. A section shows exactly WHILE its visibleWhen holds — evaluated live, no latch of its own (progressive reveal, design doc §2). Persistence is authored in the STATE the condition reads: gate on a flag and the section inherits the flag's declared lifetime; gate on a monotonic value (earned totals) and it can never strobe; a threshold moment worth remembering is latched by a passive contentUnlock setting a flag (see browse_gear)."
     },
     {
       "id": "the_band",
@@ -63,15 +64,22 @@
       "id": "the_gear",
       "name": "The Gear",
       "modules": [ "module/upgrade-list" ],
-      "visibleWhen": { "type": "currency", "currency": "cash", "value": 250 },
-      "note": "The buff list. Gated to the first buff's own gate (stage_presence at 250 Cash) so the region never shows empty - a section reveal latches, while each row appears and disappears on its own gate and purchase state, which is what brings rows back after an album release."
+      "visibleWhen": { "type": "flagSet", "flag": "gear" },
+      "note": "The buff list. Shows while the run-scoped `gear` flag is set — latched by browse_gear the first time the run holds 250 Cash (stage_presence's own gate), so spending below 250 mid-run never hides a region you're using, and each demo re-hides it until the new run can afford gear again. Each row still appears and disappears on its own gate and purchase state."
     },
     {
       "id": "rehearsal_space",
       "name": "The Rehearsal Space",
       "modules": [ "module/bar-list" ],
       "visibleWhen": { "type": "flagSet", "flag": "covers" },
-      "note": "The bars region: Learn Covers rows plus the Rehearsal readout. Gates on the covers flag (set by learn_covers at 25 Fans) — the same flag that activates Rehearsal accrual and reveals the bar group, so the whole system appears as one moment."
+      "note": "The bars region: Learn Covers rows plus the Rehearsal readout. Gates on the covers flag (set by learn_covers at 25 Fans) — the same run-scoped flag that activates Rehearsal accrual and reveals the bar group, so the whole system appears as one moment, disappears at each demo, and re-opens as one moment when the run re-earns it."
+    },
+    {
+      "id": "the_release",
+      "name": "The Release",
+      "modules": [ "module/release" ],
+      "visibleWhen": { "type": "flagSet", "flag": "album" },
+      "note": "The Cut a Demo (prestige) button, §5. Gates on the album flag (set by cut_demo at 50 Fans + 1 cover) like every other module — no bespoke reveal. The REGION stays through every demo after the first because the album flag's latch is permanent-in-chapter — while the button's pressability is the album block's `unlock` below, re-met each run."
     }
   ],
 
@@ -157,24 +165,34 @@
     },
 
     {
+      "id": "browse_gear",
+      "name": "Browse the Gear",
+      "type": "contentUnlock",
+      "scope": "run",
+      "cost": { "currency": "cash", "amount": 0 },
+      "gate": { "type": "currency", "currency": "cash", "value": 250 },
+      "payload": { "effect": "setFlag", "flag": "gear" },
+      "note": "The passive threshold latch: the_gear section can't gate on the Cash balance directly (spending would strobe it), so the first time a run holds 250 Cash this sets the run-scoped `gear` flag and the section reads THAT. State remembers; the section just looks."
+    },
+    {
       "id": "play_for_crowd",
       "name": "Play for a Crowd",
       "type": "contentUnlock",
-      "scope": "permanentInChapter",
+      "scope": "run",
       "cost": { "currency": "cash", "amount": 0 },
       "gate": { "type": "ownedCount", "generator": "drummer", "value": 1 },
       "payload": { "effect": "setFlag", "flag": "fans" },
-      "note": "Stage 2. Recruiting your first Drummer sets the `fans` flag — which reveals the Fans currency and meter."
+      "note": "Stage 2. Recruiting your first Drummer sets the `fans` flag — which reveals the Fans currency and meter. Run-scoped, like the flag it sets: each demo resets the band, so the fans meter goes dark and re-appears when the run's first Drummer is recruited — no fans display before a band exists."
     },
     {
       "id": "learn_covers",
       "name": "Learn Some Covers",
       "type": "contentUnlock",
-      "scope": "permanentInChapter",
+      "scope": "run",
       "cost": { "currency": "cash", "amount": 0 },
       "gate": { "type": "currency", "currency": "fans", "value": 25 },
       "payload": { "effect": "setFlag", "flag": "covers" },
-      "note": "Stage 3. Sets the `covers` flag — reveals the Rehearsal currency and the Learn Covers bar group."
+      "note": "Stage 3. Sets the `covers` flag — reveals the Rehearsal currency and the Learn Covers bar group. Run-scoped, like the flag: rehearsal is meaningless without a band and an audience, so each demo the whole covers system (section, bars, accrual — everything gating on the flag) goes dark and re-opens as one moment when the run re-reaches 25 fans. This is what makes re-learning a cover a real leg of the release gate."
     },
     {
       "id": "cut_demo",
@@ -280,11 +298,11 @@
         { "type": "barsCompleted", "group": "learn_covers", "value": 1 }
       ]
     },
-    "resets": [ "cash", "generators.owned", "upgrades.buff", "fans", "bars", "rehearsal" ],
-    "keeps": [ "records", "upgrades.contentUnlock", "flags", "roadies" ],
+    "resets": [ "cash", "fans", "rehearsal", "generators.owned", "upgrades.buff", "upgrades.contentUnlock (scope: run)", "flags (scope: run)", "bars (group scope: run)" ],
+    "keeps": [ "records", "upgrades.contentUnlock (scope: permanentInChapter)", "flags (scope: permanentInChapter)", "roadies" ],
     "recordsFormula": "floor( (fansThisRun / 5) ^ 0.5 )",
     "recordsFormulaExamples": { "50fans": 3, "125fans": 5, "500fans": 10, "2000fans": 20 },
-    "note": "Releasing resets the run and awards Records. Reset is driven by currency group `resetsOnAlbumRelease` + upgrade/bar `scope`, not a hardcoded name list. Flags are kept (content stays revealed across demos). Each Record = +2% permanent global income, so the next run is faster."
+    "note": "Releasing resets the run and awards Records. Reset is driven by currency group `resetsOnAlbumRelease` + upgrade/bar/flag `scope`, not a hardcoded name list. Flags and content unlocks split by their DECLARED scope, so `keeps` above is not a blanket rule: `album` (set by cut_demo) is permanent and The Release section stays visible across demos, while `fans`, `covers` and `gear` are run-scoped and clear together with their run-scoped setters (play_for_crowd, learn_covers, browse_gear) - which is what makes the second run re-walk band -> fans -> covers -> gear instead of opening with everything revealed. Sections carry no scope of their own: visibility is a live read of `visibleWhen`, so a section goes dark exactly when the facts behind it reset, and an earned-total gate resets because its currency's group does. Each Record = +2% permanent global income, so the next run is faster. `unlock` is the release OFFER's live gate: the button is pressable only while it holds, so it disarms at every release (fans and cover completions are run facts) and re-arms on the re-climb — the release OPERATION itself stays ungated, since the capstone implicitly cuts an album regardless."
   },
 
   "events": [

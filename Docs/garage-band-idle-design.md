@@ -85,8 +85,10 @@ income, so the next run is faster. The player repeats this loop several times wi
 **The chapter loop (outer).** Cumulative Records unlock the current chapter's capstone gig.
 **[rev]** Playing the capstone **implicitly cuts an album** — the run's Fans bank as Records as part
 of the show — and then advances the player to the next chapter, whose economy opens fresh (run
-currencies are per-chapter, §2/§3). Chapter progress — Records, flags, unlocks — is never reset: the
-climb is forward only. After advancing, releasing an album resets the run back to the start of the
+currencies are per-chapter, §2/§3). Permanent chapter progress — Records, and any flag or unlock
+declared permanent-in-chapter — is never reset: the climb is forward only. Run-scoped flags and
+unlocks are the other tier and reset with every album release (§2), which is what makes a second run
+re-walk the progression. After advancing, releasing an album resets the run back to the start of the
 *current* chapter, not the garage.
 
 Records are the link between the loops: they raise income and gate chapter advancement. Chapter
@@ -139,6 +141,27 @@ chapter's Cash stays in the thousands–millions range is structural rather than
 up in stages. Each such upgrade should introduce a change in play — a new mechanic, sub-loop, or
 automation step — rather than only increasing a number, so that a chapter keeps changing as the player
 works through it instead of settling into a single repeated action.
+
+**[rev] Settled:** a section is visible exactly *while* its `visibleWhen` holds — evaluated live,
+with no latch or lifetime of its own. Persistence is a property of STATE, never of UI: "stays once
+earned" is authored by gating on a fact with that lifetime — a flag (whose declaration carries the
+scope), or a monotonic value like an earned total — and a threshold moment worth remembering is
+latched by a passive content unlock setting a flag (Ch. 1's `browse_gear` at 250 Cash). Gating a
+region directly on a spendable balance is an authoring smell: it strobes with every purchase.
+Distinct from visibility is an action's *pressability* (e.g. the release button, §5), a live
+condition on the content the module presents.
+
+**[rev] Settled:** flags declare their lifetime on their declaration in the chapter's flags list —
+never on the `setFlag` effects that set them, so one flag cannot carry two lifetimes. A run-scoped
+flag clears at every release, and everything gating on it (sections, bar groups, production
+configs, meters) goes dark together, re-arming when a run-scoped setter's own gate re-fires — so a
+whole sub-system re-opens through ONE condition authored in ONE place. This is how the second run
+re-walks the chapter's progression (band → fans → covers → gear) instead of opening with every
+system already on screen: Ch. 1 authors `fans`, `covers` and `gear` (and their setter unlocks) as
+run-scoped, while `album` stays permanent — the release button's *region* is knowledge, its
+pressability an offer (§5). Boot validation enforces the pairing: a run-scoped flag whose setters
+are all permanent is a content error (the release's own projection would re-assert it), and a flag
+no content sets warns.
 
 Once a chapter is cleared it remains available as a replay economy (§8.1).
 
@@ -234,6 +257,14 @@ record).
 - **Cumulative Records** unlock each chapter's capstone at a set threshold (§11).
 
 An early album cycle takes seconds to minutes; cycles get faster as Records accumulate.
+
+**[rev] Settled:** the release is *offered* only while the chapter's album unlock condition holds
+(the same condition that first revealed it — e.g. Ch. 1's 50 Fans + 1 learned cover). Its inputs are
+run values the release itself resets, so the offer disarms at every release and re-arms on the
+re-climb — including re-learning a cover, since bars are run-scoped. The release *region* stays on
+screen because the `album` flag it gates on is permanent-in-chapter (§2); only pressability tracks
+the condition. The release *operation* is deliberately ungated: the capstone implicitly cuts an
+album (§2) whether or not the offer holds.
 
 ---
 

@@ -3,9 +3,10 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // JSON type "currencyEarnedTotal": the lifetime earned total of a currency is
-    // at least Value. Spending never lowers it (CurrencyManager.GetLifetimeEarned),
-    // so once met it stays met for the run.
+    // JSON type "currencyEarnedTotal": the earned total of a currency is at
+    // least Value. Spending never lowers it (CurrencyManager.GetEarned), so
+    // once met it stays met for as long as the currency's group keeps the
+    // total - for a run-reset group, the rest of the run.
     [Serializable]
     public class CurrencyEarnedTotalCondition : Condition
     {
@@ -28,7 +29,7 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         public override bool Evaluate(ConditionContext context)
-            => ThresholdIsMet(_value, context.Currencies.GetLifetimeEarned(_currencyId));
+            => ThresholdIsMet(_value, context.Currencies.GetEarned(_currencyId));
 
         public override void Validate(ConditionContext context, string source)
         {

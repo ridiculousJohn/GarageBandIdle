@@ -5,11 +5,15 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // Runtime home of a chapter's generators: builds Generator state from the
-    // chapter's definition list, produces into CurrencyManager on tick, and
-    // reveals generators as their unlock conditions are met. State is keyed by
-    // generator id, so the generator set stays open - new generators are new
-    // assets, not code. Unlock conditions are validated by the boot validation
-    // pass (ContentValidator), not here.
+    // chapter's definition list and produces into CurrencyManager on tick.
+    // State is keyed by generator id, so the generator set stays open - new
+    // generators are new assets, not code. Unlock conditions are validated by
+    // the boot validation pass (ContentValidator), not here.
+    //
+    // Reveal is deliberately absent: whether a generator is on offer is a live
+    // read of its unlock condition (Generator.IsUnlocked), asked by whoever
+    // renders it, so nothing here has to remember - or fail to forget - that a
+    // row was once shown.
     public class GeneratorSystem
     {
         private readonly List<Generator> _generators = new();
@@ -17,9 +21,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly List<string> _producedCurrencyIds = new();
         private readonly ICurrencies _currencies;
         private readonly ModifierSystem _modifiers;
-
-        // fires once per generator when its unlock conditions are first met
-        public event Action<Generator> GeneratorUnlocked;
 
         // fires whenever any generator's owned count changes (purchases, run
         // resets, restores) - the signal behind ownedCount conditions
@@ -137,22 +138,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
             foreach (var generator in changed)
                 generator.NotifyOwnedChanged();
-        }
-
-        // reveals any still-locked generator whose condition now holds; called on
-        // tick and after purchases (an ownedCount unlock can trip mid-tick)
-        public void EvaluateUnlocks(ConditionContext context)
-        {
-            foreach (var generator in _generators)
-            {
-                if (generator.Unlocked)
-                    continue;
-                if (!ConditionEvaluator.IsMet(generator.Definition.Unlock, context))
-                    continue;
-
-                generator.MarkUnlocked();
-                GeneratorUnlocked?.Invoke(generator);
-            }
         }
 
     }

@@ -171,7 +171,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         public void Set(string id, BigNumber value) => throw Unsupported(nameof(Set));
 
-        public BigNumber GetLifetimeEarned(string id) => throw Unsupported(nameof(GetLifetimeEarned));
+        public BigNumber GetEarned(string id) => throw Unsupported(nameof(GetEarned));
 
         private static NotSupportedException Unsupported(string member)
             => new($"ChapterCurrencies.{member}: balances belong to a running economy, not to content. "

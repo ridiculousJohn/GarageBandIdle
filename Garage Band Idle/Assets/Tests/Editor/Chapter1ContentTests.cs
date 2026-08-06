@@ -128,8 +128,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
 
-            CollectionAssert.AreEqual(new[] { "fans", "covers", "album" }, chapter.FlagIds,
+            CollectionAssert.AreEqual(new[] { "fans", "covers", "gear", "album" }, chapter.FlagIds,
                 "the chapter declares exactly the JSON flags array, in order");
+
+            // the second-run flow (design doc section 2): fans, covers and gear
+            // clear at every release so their systems re-arm on the re-climb;
+            // album survives, so the release region stays taught (its
+            // pressability is the album unlock, not the flag)
+            Assert.AreEqual(ContentScope.Run, chapter.Flags[0].Scope, "fans re-arms each run");
+            Assert.AreEqual(ContentScope.Run, chapter.Flags[1].Scope, "covers re-arms each run");
+            Assert.AreEqual(ContentScope.Run, chapter.Flags[2].Scope, "gear re-arms each run");
+            Assert.AreEqual(ContentScope.PermanentInChapter, chapter.Flags[3].Scope, "album is knowledge");
         }
 
         [TestCase(0, "practice_amp", 60, 0.4)]
@@ -197,31 +206,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // stage 0: tap only - nothing revealed below the 100-earned threshold
             currencies.Add("cash", 99);
-            generators.EvaluateUnlocks(context);
-            Assert.IsFalse(amp.Unlocked, "amp stays locked at 99 lifetime cash");
+            Assert.IsFalse(amp.IsUnlocked(context), "amp stays locked at 99 earned cash");
 
             currencies.Add("cash", 1);
-            generators.EvaluateUnlocks(context);
-            Assert.IsTrue(amp.Unlocked, "amp unlocks at exactly 100 lifetime cash");
-            Assert.IsFalse(drummer.Unlocked);
-            Assert.IsFalse(bassist.Unlocked);
-            Assert.IsFalse(guitarist.Unlocked);
+            Assert.IsTrue(amp.IsUnlocked(context), "amp unlocks at exactly 100 earned cash");
+            Assert.IsFalse(drummer.IsUnlocked(context));
+            Assert.IsFalse(bassist.IsUnlocked(context));
+            Assert.IsFalse(guitarist.IsUnlocked(context));
 
             // spending below the threshold must not re-lock or block anything:
-            // the gate is lifetime-earned, not balance
+            // the gate is the earned total, not the balance
             TestContent.BuyTimes(amp, currencies, 5);
-            generators.EvaluateUnlocks(context);
-            Assert.IsTrue(drummer.Unlocked, "drummer unlocks at 5 amps");
-            Assert.IsFalse(bassist.Unlocked);
+            Assert.IsTrue(amp.IsUnlocked(context), "amp stays offered after its own cost is spent");
+            Assert.IsTrue(drummer.IsUnlocked(context), "drummer unlocks at 5 amps");
+            Assert.IsFalse(bassist.IsUnlocked(context));
 
             TestContent.BuyTimes(drummer, currencies, 5);
-            generators.EvaluateUnlocks(context);
-            Assert.IsTrue(bassist.Unlocked, "bassist unlocks at 5 drummers");
-            Assert.IsFalse(guitarist.Unlocked);
+            Assert.IsTrue(bassist.IsUnlocked(context), "bassist unlocks at 5 drummers");
+            Assert.IsFalse(guitarist.IsUnlocked(context));
 
             TestContent.BuyTimes(bassist, currencies, 5);
-            generators.EvaluateUnlocks(context);
-            Assert.IsTrue(guitarist.Unlocked, "guitarist unlocks at 5 bassists");
+            Assert.IsTrue(guitarist.IsUnlocked(context), "guitarist unlocks at 5 bassists");
         }
 
         [Test]
@@ -360,6 +365,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, covers.Value, 1e-9);
         }
 
+        // the second-run flow's unlock lifetimes: the teaching unlocks whose
+        // flags re-arm each run are themselves run-scoped (their latches clear,
+        // so they re-fire on their own gates), while cut_demo stays permanent -
+        // its flag is knowledge, and the release offer re-arms through the
+        // album unlock instead
+        [TestCase("play_for_crowd", ContentScope.Run)]
+        [TestCase("learn_covers", ContentScope.Run)]
+        [TestCase("browse_gear", ContentScope.Run)]
+        [TestCase("cut_demo", ContentScope.PermanentInChapter)]
+        public void ContentUnlockScopes_MatchTheSecondRunFlow(string id, ContentScope expected)
+        {
+            Assert.AreEqual(expected, LoadById<UpgradeDefinition>(UpgradesFolder, id).Scope);
+        }
+
         // the Ch1 income buff declares what it multiplies instead of implying
         // cash from its effect name, so a chapter whose generators produce
         // something else needs no code change to keep them out of it
@@ -390,7 +409,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Sections_MatchJson()
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
-            CollectionAssert.AreEqual(new[] { "garage_floor", "the_band", "the_gear", "rehearsal_space" },
+            CollectionAssert.AreEqual(new[] { "garage_floor", "the_band", "the_gear", "rehearsal_space", "the_release" },
                 chapter.SectionIds);
 
             var garageFloor = LoadById<SectionDefinition>(SectionsFolder, "garage_floor");
@@ -403,13 +422,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("cash", visibleWhen.CurrencyId);
             Assert.AreEqual(100, visibleWhen.Value, 1e-9);
 
-            // the buff list reveals on the first buff's own gate, so the region
-            // never shows before it has a row to show
+            // the buff list shows while the gear flag is set: a balance gate
+            // here would strobe with every purchase, so the threshold moment is
+            // latched as STATE (browse_gear sets the run-scoped flag at 250
+            // Cash) and the section reads the flag live
             var theGear = LoadById<SectionDefinition>(SectionsFolder, "the_gear");
-            var gearGate = theGear.VisibleWhen as CurrencyBalanceCondition;
-            Assert.IsNotNull(gearGate, "the_gear reveals on a currency balance condition");
-            Assert.AreEqual("cash", gearGate.CurrencyId);
-            Assert.AreEqual(250, gearGate.Value, 1e-9, "stage_presence's own gate");
+            var gearGate = theGear.VisibleWhen as FlagSetCondition;
+            Assert.IsNotNull(gearGate, "the_gear shows on a flag condition");
+            Assert.AreEqual("gear", gearGate.FlagId);
             CollectionAssert.AreEqual(new[] { "module/upgrade-list" }, theGear.ModuleAddresses);
 
             var rehearsalSpace = LoadById<SectionDefinition>(SectionsFolder, "rehearsal_space");
@@ -417,6 +437,46 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNotNull(coversGate, "rehearsal_space reveals on a flag condition");
             Assert.AreEqual("covers", coversGate.FlagId);
             CollectionAssert.AreEqual(new[] { "module/bar-list" }, rehearsalSpace.ModuleAddresses);
+
+            // the prestige button reveals through its section's visibleWhen like
+            // every other module (5.6 deleted album.revealFlag so slice 6 could
+            // do exactly this) - the flag cut_demo latches at 50 Fans + 1 cover
+            var theRelease = LoadById<SectionDefinition>(SectionsFolder, "the_release");
+            var albumGate = theRelease.VisibleWhen as FlagSetCondition;
+            Assert.IsNotNull(albumGate, "the_release reveals on a flag condition");
+            Assert.AreEqual("album", albumGate.FlagId);
+            CollectionAssert.AreEqual(new[] { "module/release" }, theRelease.ModuleAddresses);
+
+            // No section carries a lifetime of its own: visibility is a live
+            // function of visibleWhen, and each section's persistence comes
+            // from what its condition reads - the run-scoped gear and covers
+            // flags reset with the demo, the permanent album flag doesn't, and
+            // the_band's earned-total is monotonic so it can never strobe.
+        }
+
+        // The release offer's gate (design doc section 5): the JSON album
+        // block's unlock, imported as an ordinary Condition. Its inputs are run
+        // facts - a fans balance and a bar completion - so the offer disarms at
+        // every release and re-arms on the re-climb, cover re-learned included.
+        [Test]
+        public void AlbumUnlock_MatchesJson()
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+
+            var unlock = chapter.Album.ReleaseWhen as CompoundCondition;
+            Assert.IsNotNull(unlock, "the album unlock is the JSON's compound condition");
+            Assert.AreEqual(2, unlock.All.Count);
+            Assert.AreEqual(0, unlock.Any.Count);
+
+            var fans = unlock.All[0] as CurrencyBalanceCondition;
+            Assert.IsNotNull(fans, "first leg: the fans balance");
+            Assert.AreEqual("fans", fans.CurrencyId);
+            Assert.AreEqual(50, fans.Value, 1e-9);
+
+            var cover = unlock.All[1] as BarsCompletedCondition;
+            Assert.IsNotNull(cover, "second leg: a learned cover");
+            Assert.AreEqual("learn_covers", cover.GroupId);
+            Assert.AreEqual(1, cover.Value, 1e-9);
         }
 
         [Test]

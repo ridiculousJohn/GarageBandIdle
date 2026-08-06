@@ -532,6 +532,62 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
+        // a run-scoped flag whose only setter is a permanent fact: the release
+        // clears the flag and the projection re-asserts it from the surviving
+        // latch in the same operation, so the declared scope does nothing
+        [Test]
+        public void RunScopedFlagWithOnlyPermanentSetters_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var setter = TestContent.MakeUpgrade("teach", UpgradeType.ContentUnlock,
+                ContentScope.PermanentInChapter, null, new SetFlagEffect("covers"));
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                flags: new List<FlagDeclaration> { new("covers", ContentScope.Run) },
+                upgradeIds: new List<string> { "teach" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
+                upgrades: new[] { setter });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' flag 'covers' is run-scoped but every setter is permanent - the release clears it and the projection re-asserts it in the same operation, so the scope has no effect.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // a flag no content sets is a warning, not an error: everything gated
+        // on it silently never appears, but a system flag set from code (slice
+        // 7's chapter-advance flag) is legitimate and invisible to the sweep
+        [Test]
+        public void FlagNoContentSets_IsWarnedAbout()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "orphan" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Warning,
+                "ContentValidator: Chapter 'ch1' declares flag 'orphan' but no content sets it - unless code sets it, every flagSet gate on it stays closed and the content behind them can never appear.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // the run-scope rule is satisfied from any setter kind that resets with
+        // the run - a run-scoped bar group's reward is as re-firing as an
+        // upgrade - so coherent authoring stays silent
+        [Test]
+        public void RunScopedFlagWithARunScopedSetter_IsSilent()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var setter = TestContent.MakeUpgrade("teach", UpgradeType.ContentUnlock,
+                ContentScope.Run, null, new SetFlagEffect("covers"));
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                flags: new List<FlagDeclaration> { new("covers", ContentScope.Run) },
+                upgradeIds: new List<string> { "teach" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
+                upgrades: new[] { setter });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
         // the starting chapter is the lowest index, so an index is an ordinal:
         // sharing one makes which chapter starts arbitrary
         [Test]

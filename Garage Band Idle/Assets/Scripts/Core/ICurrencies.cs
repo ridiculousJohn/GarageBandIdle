@@ -31,8 +31,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         void Set(string id, BigNumber value);
 
-        // total ever earned (starting value excluded); spends never lower it
-        BigNumber GetLifetimeEarned(string id);
+        // total earned over the scope the currency's group declares (starting
+        // value excluded); spends never lower it
+        BigNumber GetEarned(string id);
 
         CurrencyDefinition GetDefinition(string id);
 

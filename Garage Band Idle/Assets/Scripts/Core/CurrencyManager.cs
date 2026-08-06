@@ -20,7 +20,12 @@ namespace RidiculousGaming.GarageBandIdle
         private readonly Dictionary<string, CurrencyDefinition> _definitions = new();
         private readonly Dictionary<string, CurrencyGroupDefinition> _groups = new();
         private readonly Dictionary<string, BigNumber> _balances = new();
-        private readonly Dictionary<string, BigNumber> _lifetimeEarned = new();
+        // total earned per currency, backing the earned-total gates. Deliberately
+        // NOT named for a lifetime: how long it lives is the currency GROUP's
+        // call, exactly as the balance's is. For a group that resets on release
+        // this is the run's earnings; for a permanent group (Records) it is the
+        // lifetime total. One field, one place the scope is declared.
+        private readonly Dictionary<string, BigNumber> _earned = new();
 
         // fires on every balance change with the currency id and new balance;
         // UI listens here, nothing polls
@@ -68,7 +73,7 @@ namespace RidiculousGaming.GarageBandIdle
 
                 _definitions.Add(definition.Id, definition);
                 _balances.Add(definition.Id, definition.StartingValue);
-                _lifetimeEarned.Add(definition.Id, BigNumber.Zero);
+                _earned.Add(definition.Id, BigNumber.Zero);
             }
         }
 
@@ -123,27 +128,29 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             }
 
-            // positive additions accrue into the lifetime-earned stat backing
+            // positive additions accrue into the earned stat backing
             // earned-total unlock gates; spends (negative adds) never lower it
-            if (amount > BigNumber.Zero && _lifetimeEarned.ContainsKey(id))
-                _lifetimeEarned[id] += amount;
+            if (amount > BigNumber.Zero && _earned.ContainsKey(id))
+                _earned[id] += amount;
 
             Set(id, Get(id) + amount);
         }
 
-        // total ever earned (starting value excluded); used by earned-total gates
-        public BigNumber GetLifetimeEarned(string id)
+        // Total earned over the scope the currency's group declares (starting
+        // value excluded); used by earned-total gates. Spending never lowers it,
+        // so a gate on it holds for as long as that scope does.
+        public BigNumber GetEarned(string id)
         {
             if (string.IsNullOrEmpty(id))
             {
-                Debug.LogError("CurrencyManager: GetLifetimeEarned with a null or empty currency id. Returning zero.");
+                Debug.LogError("CurrencyManager: GetEarned with a null or empty currency id. Returning zero.");
                 return BigNumber.Zero;
             }
 
-            if (_lifetimeEarned.TryGetValue(id, out var earned))
+            if (_earned.TryGetValue(id, out var earned))
                 return earned;
 
-            Debug.LogError($"CurrencyManager: GetLifetimeEarned on unknown currency id '{id}'. Returning zero.");
+            Debug.LogError($"CurrencyManager: GetEarned on unknown currency id '{id}'. Returning zero.");
             return BigNumber.Zero;
         }
 
@@ -199,8 +206,20 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!_groups.TryGetValue(definition.GroupId, out var group))
                     continue;
 
-                if (group.ResetsOnAlbumRelease)
-                    Set(definition.Id, definition.StartingValue);
+                if (!group.ResetsOnAlbumRelease)
+                    continue;
+
+                // The earned total is the same fact as the balance, measured
+                // differently, so it resets on the same group decision. Leaving
+                // it standing is what kept earned-total gates (the band section,
+                // the practice amp) met forever after the first demo.
+                //
+                // Cleared BEFORE the balance, because Set publishes: a
+                // BalanceChanged subscriber must never observe this currency
+                // with its balance back at the start and its earned total still
+                // standing (state, then notify).
+                _earned[definition.Id] = BigNumber.Zero;
+                Set(definition.Id, definition.StartingValue);
             }
         }
     }

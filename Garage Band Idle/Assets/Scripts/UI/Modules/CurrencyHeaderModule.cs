@@ -22,7 +22,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
             _fansDefinition = context.Economy.Currencies.GetDefinition(GameManager.FansCurrencyId);
 
             context.Economy.Currencies.BalanceChanged += HandleBalanceChanged;
-            context.Flags.FlagSet += HandleFlagSet;
+
+            // the settled signal, not FlagSet: the fans flag can also CLEAR (a
+            // run-scoped flag resets with the run), and a reveal that only ever
+            // listened for "set" could never un-reveal - the same collapse
+            // BarListModule made in 5.6
+            context.Economy.Conditions.Settled += HandleConditionsSettled;
 
             _fansLabel.gameObject.SetActive(context.Flags.IsSet(GameManager.FansUnlockFlagId));
             RefreshCash();
@@ -35,7 +40,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
 
             _context.Economy.Currencies.BalanceChanged -= HandleBalanceChanged;
-            _context.Flags.FlagSet -= HandleFlagSet;
+            _context.Economy.Conditions.Settled -= HandleConditionsSettled;
         }
 
         private void HandleBalanceChanged(string currencyId, BigNumber balance)
@@ -46,12 +51,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 RefreshFans();
         }
 
-        private void HandleFlagSet(string flagId)
+        private void HandleConditionsSettled()
         {
-            if (flagId != GameManager.FansUnlockFlagId)
+            var revealed = _context.Flags.IsSet(GameManager.FansUnlockFlagId);
+            if (_fansLabel.gameObject.activeSelf == revealed)
                 return;
 
-            _fansLabel.gameObject.SetActive(true);
+            _fansLabel.gameObject.SetActive(revealed);
             RefreshFans();
         }
 

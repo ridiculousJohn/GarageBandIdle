@@ -74,3 +74,7 @@ crashlytics-build.properties
 # files the tooling writes beside it
 .claude/settings.local.json
 .claude/settings.local.json.tmp.*
+
+# NUnit results dropped in the project folder by headless test runs
+# (-runTests writes one per run, named with a timestamp)
+TestResults-*.xml

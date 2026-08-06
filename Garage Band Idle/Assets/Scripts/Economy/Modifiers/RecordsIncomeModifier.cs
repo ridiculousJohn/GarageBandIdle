@@ -40,6 +40,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public override BigNumber Value
             => ProductionCalculator.IncomeMultiplier(
-                _currencies.GetLifetimeEarned(_recordsCurrencyId), _perRecord);
+                _currencies.GetEarned(_recordsCurrencyId), _perRecord);
     }
 }

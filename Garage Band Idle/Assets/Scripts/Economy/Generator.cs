@@ -12,9 +12,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public int Owned { get; private set; }
 
-        // set once by GeneratorSystem when the definition's unlock conditions are met
-        public bool Unlocked { get; private set; }
-
         // fires after a successful purchase changes Owned; code-only subscribers
         public event Action OwnedChanged;
 
@@ -89,7 +86,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return true;
         }
 
-        internal void MarkUnlocked() => Unlocked = true;
+        // Whether this generator is on offer right now: a LIVE read of its
+        // unlock condition, never a latch. It was a latch, and a latch is
+        // one-way - after a release zeroed the fleet, every row the player had
+        // ever seen stayed on screen because nothing could un-set it. What a
+        // reveal remembers has to be remembered by the state the condition
+        // reads (an earned total, a scoped flag), not by a bool out here.
+        public bool IsUnlocked(ConditionContext context)
+            => ConditionEvaluator.IsMet(Definition.Unlock, context);
 
         // run reset: state-only, no notification - GeneratorSystem fires
         // OwnedChanged after EVERY generator has settled, so a subscriber

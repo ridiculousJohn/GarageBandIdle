@@ -10,18 +10,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
         [Test]
-        public void StartingValue_SeedsBalance_ButNotLifetimeEarned()
+        public void StartingValue_SeedsBalance_ButNotEarned()
         {
             var groups = new[] { TestContent.MakeGroup("run", true) };
             var currencies = new[] { TestContent.MakeCurrency("cash", "run", startingValue: 25) };
             var manager = new CurrencyManager(groups, currencies);
 
             Assert.AreEqual(25.0, manager.Get("cash").ToDouble(), 1e-9);
-            Assert.AreEqual(0.0, manager.GetLifetimeEarned("cash").ToDouble(), 1e-9);
+            Assert.AreEqual(0.0, manager.GetEarned("cash").ToDouble(), 1e-9);
         }
 
         [Test]
-        public void Add_AccruesLifetimeEarned_AndSpendingNeverLowersIt()
+        public void Add_AccruesEarned_AndSpendingNeverLowersIt()
         {
             var manager = TestContent.MakeEconomy();
 
@@ -30,7 +30,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             manager.Add("cash", 50);
 
             Assert.AreEqual(110.0, manager.Get("cash").ToDouble(), 1e-9);
-            Assert.AreEqual(150.0, manager.GetLifetimeEarned("cash").ToDouble(), 1e-9);
+            Assert.AreEqual(150.0, manager.GetEarned("cash").ToDouble(), 1e-9);
         }
 
         [Test]

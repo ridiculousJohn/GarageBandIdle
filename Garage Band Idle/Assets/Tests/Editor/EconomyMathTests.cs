@@ -36,6 +36,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(expected, multiplier.ToDouble(), 1e-9);
         }
 
+        // the album payout, floor((fans / 5) ^ 0.5) - the four worked examples
+        // are the JSON's recordsFormulaExamples, plus the edges: below 5 fans
+        // the floor gives nothing, and zero fans is a legal (empty) release
+        [TestCase(0, 0)]
+        [TestCase(4, 0)]
+        [TestCase(5, 1)]
+        [TestCase(50, 3)]
+        [TestCase(125, 5)]
+        [TestCase(500, 10)]
+        [TestCase(2000, 20)]
+        public void RecordsEarned_FollowsTheAlbumPayoutFormula(double fansThisRun, int expected)
+        {
+            var earned = ProductionCalculator.RecordsEarned(fansThisRun);
+
+            Assert.AreEqual(expected, earned.ToDouble(), 1e-9);
+        }
+
         [Test]
         public void TotalPerSecond_SumsOnlyTheRequestedCurrency()
         {

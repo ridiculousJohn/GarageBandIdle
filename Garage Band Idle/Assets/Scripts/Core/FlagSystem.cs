@@ -4,11 +4,44 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // Progress flags: string ids set once and observed anywhere - the single
-    // reveal registry (design doc section 12, rule 9). Content-unlock upgrades
-    // and setFlag rewards set them; sections, currencies, and gates observe them
-    // through FlagSetCondition. Flags only ever latch on - scoping/reset rules
-    // arrive with the save/prestige slices.
+    // One flag the chapter declares: the id everything gates on, and the
+    // latch's LIFETIME (design doc section 12, rule 11) - declared here, on the
+    // flag, never on the setFlag effects that set it, so one flag cannot carry
+    // two lifetimes. PermanentInChapter (the default) survives album releases:
+    // taught systems stay taught. Run clears at every release, so everything
+    // gating on the flag goes dark together and re-arms when a run-scoped
+    // setter re-fires - which is what makes a whole sub-system (section, bars,
+    // accrual) re-earnable each run through ONE condition authored in ONE
+    // place, the setter's gate.
+    [Serializable]
+    public class FlagDeclaration
+    {
+        [SerializeField]
+        [Tooltip("Stable flag id, e.g. fans / covers / album. Never rename once saves exist.")]
+        private string _id;
+
+        [SerializeField]
+        [Tooltip("The latch's lifetime. PermanentInChapter (the default): survives album releases. " +
+            "Run: clears at every release - pair it with a run-scoped setter, or nothing re-sets it.")]
+        private ContentScope _scope = ContentScope.PermanentInChapter;
+
+        public string Id => _id;
+        public ContentScope Scope => _scope;
+
+        public FlagDeclaration() { }
+
+        public FlagDeclaration(string id, ContentScope scope = ContentScope.PermanentInChapter)
+        {
+            _id = id;
+            _scope = scope;
+        }
+    }
+
+    // Progress flags: string ids set by content (content-unlock upgrades,
+    // setFlag rewards) and observed anywhere through FlagSetCondition - the
+    // single reveal registry (design doc section 12, rule 9). A flag latches
+    // on; whether an album release clears it is the flag's declared scope, so
+    // un-setting is a boundary's decision, never an evaluation's.
     public class FlagSystem
     {
         private readonly HashSet<string> _flags = new();
@@ -17,15 +50,45 @@ namespace RidiculousGaming.GarageBandIdle
         // loaded, or a test fixture that doesn't care about declarations)
         private readonly HashSet<string> _known;
 
+        // the declared-run-scope subset; an undeclared or unrestricted flag
+        // defaults to the permanent latch, so a typo can never opt a flag
+        // INTO resetting
+        private readonly HashSet<string> _runScoped;
+
         // fires once per flag, when it is first set
         public event Action<string> FlagSet;
 
+        // fires once per flag when a run reset clears a run-scoped latch, the
+        // counterpart to FlagSet. Both fire only after ALL state for the
+        // operation has settled (state, then notify).
+        public event Action<string> FlagCleared;
+
         public FlagSystem() { }
 
+        // fixture/validation convenience: a known set with every flag on the
+        // permanent default
         public FlagSystem(IEnumerable<string> knownIds)
         {
             if (knownIds != null)
                 _known = new HashSet<string>(knownIds);
+        }
+
+        public FlagSystem(IEnumerable<FlagDeclaration> declarations)
+        {
+            if (declarations == null)
+                return;
+
+            _known = new HashSet<string>();
+            _runScoped = new HashSet<string>();
+            foreach (var declaration in declarations)
+            {
+                if (declaration == null || string.IsNullOrEmpty(declaration.Id))
+                    continue;
+
+                _known.Add(declaration.Id);
+                if (declaration.Scope == ContentScope.Run)
+                    _runScoped.Add(declaration.Id);
+            }
         }
 
         // false only when a declared-flags list exists and the id is not on it;
@@ -43,6 +106,35 @@ namespace RidiculousGaming.GarageBandIdle
 
             if (_flags.Add(id))
                 FlagSet?.Invoke(id);
+        }
+
+        // Run reset (album release): every set run-scoped flag clears, and
+        // everything gating on it goes dark at the next settle - re-set only by
+        // a setter whose own fact re-fires (the projection re-asserts flags
+        // whose setters' latches SURVIVED, which is why a run flag with only
+        // permanent setters is a content error). All state settles before any
+        // notification fires, and a no-op reset stays silent.
+        public bool ResetRunScoped()
+        {
+            if (_runScoped == null)
+                return false;
+
+            List<string> cleared = null;
+            foreach (var id in _runScoped)
+            {
+                if (!_flags.Remove(id))
+                    continue;
+
+                cleared ??= new List<string>();
+                cleared.Add(id);
+            }
+
+            if (cleared == null)
+                return false;
+
+            foreach (var id in cleared)
+                FlagCleared?.Invoke(id);
+            return true;
         }
     }
 }

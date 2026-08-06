@@ -46,7 +46,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             // BuyUpgrade re-evaluates content unlocks; the module refreshes every
             // row off UpgradeApplied, so this row hides itself through Refresh
-            _context.Game.BuyUpgrade(Upgrade);
+            _context.Economy.BuyUpgrade(Upgrade);
         }
 
         // Availability and affordability are separate questions: an ungated or

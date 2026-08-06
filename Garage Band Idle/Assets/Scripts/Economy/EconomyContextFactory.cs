@@ -71,9 +71,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // game composes through here, so no system holds its own stack
             var modifiers = new ModifierSystem();
 
-            // the chapter's declared flags are the known set; setting or gating
-            // on anything else is reported as a content mistake
-            var flags = new FlagSystem(chapter.FlagIds);
+            // the chapter's declared flags are the known set (setting or gating
+            // on anything else is reported as a content mistake), each latch
+            // carrying the lifetime its declaration states
+            var flags = new FlagSystem(chapter.Flags);
 
             var generators = new GeneratorSystem(
                 Resolve(database.Generators, chapter.GeneratorIds, "generator"), router, modifiers);

@@ -30,7 +30,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             _buyButton.onClick.AddListener(HandleBuyClicked);
             Generator.OwnedChanged += Refresh;
 
-            gameObject.SetActive(Generator.Unlocked);
+            // visibility is not this row's call - the module sets it from the
+            // unlock condition, live, every settle
             Refresh();
         }
 
@@ -43,13 +44,22 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void HandleBuyClicked()
         {
-            _context.Game.BuyGenerator(Generator);
+            _context.Economy.BuyGenerator(Generator);
         }
 
-        public void Show()
+        // Shown or hidden by the module from a live read of the unlock
+        // condition, so this goes both ways: a row that was on offer before a
+        // release goes dark again when the fleet it was gated on resets.
+        // Repaints on the way back in, since the numbers moved while it was
+        // hidden and the per-signal handlers below skip inactive rows.
+        public void SetVisible(bool visible)
         {
-            gameObject.SetActive(true);
-            Refresh();
+            if (gameObject.activeSelf == visible)
+                return;
+
+            gameObject.SetActive(visible);
+            if (visible)
+                Refresh();
         }
 
         // affordability moves whenever the cost currency's balance moves

@@ -24,9 +24,12 @@ namespace RidiculousGaming.GarageBandIdle
             _flagId = flagId;
         }
 
-        // the scope is unused: a flag is permanent within its chapter by
-        // definition, so it latches through the reveal registry rather than
-        // being granted as a scoped modifier
+        // The scope parameter is deliberately unused: a flag's lifetime is
+        // declared exactly once, on its FlagDeclaration (rule 11), never by
+        // whoever sets it - two setters could otherwise give one flag two
+        // lifetimes. The setter's own scope still matters indirectly: it
+        // decides whether the projection re-asserts this flag after a release
+        // clears it.
         public override void Apply(EffectContext context, ContentScope scope) => context.Flags.Set(_flagId);
 
         public override void Validate(ConditionContext context, string source)

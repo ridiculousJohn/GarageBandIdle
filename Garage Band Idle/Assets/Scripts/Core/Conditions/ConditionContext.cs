@@ -67,7 +67,12 @@ namespace RidiculousGaming.GarageBandIdle
             if (Currencies != null)
                 Currencies.BalanceChanged += HandleBalanceChanged;
             if (Flags != null)
+            {
+                // both directions: a cleared flag moves flagSet answers exactly
+                // as a set one does, and a run reset is when it happens
                 Flags.FlagSet += HandleFlagSet;
+                Flags.FlagCleared += HandleFlagSet;
+            }
             if (Generators != null)
                 Generators.GeneratorOwnedChanged += HandleGeneratorOwnedChanged;
             if (Bars != null)
@@ -79,7 +84,10 @@ namespace RidiculousGaming.GarageBandIdle
             if (Currencies != null)
                 Currencies.BalanceChanged -= HandleBalanceChanged;
             if (Flags != null)
+            {
                 Flags.FlagSet -= HandleFlagSet;
+                Flags.FlagCleared -= HandleFlagSet;
+            }
             if (Generators != null)
                 Generators.GeneratorOwnedChanged -= HandleGeneratorOwnedChanged;
             if (Bars != null)

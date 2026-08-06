@@ -75,8 +75,8 @@ namespace RidiculousGaming.GarageBandIdle
 
         public void Set(string id, BigNumber value) => Route(id, nameof(Set))?.Set(id, value);
 
-        public BigNumber GetLifetimeEarned(string id)
-            => Route(id, nameof(GetLifetimeEarned))?.GetLifetimeEarned(id) ?? BigNumber.Zero;
+        public BigNumber GetEarned(string id)
+            => Route(id, nameof(GetEarned))?.GetEarned(id) ?? BigNumber.Zero;
 
         public CurrencyDefinition GetDefinition(string id) => Route(id, nameof(GetDefinition))?.GetDefinition(id);
 

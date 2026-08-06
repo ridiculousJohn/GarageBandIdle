@@ -170,6 +170,11 @@ namespace RidiculousGaming.GarageBandIdle
                 && !context.Currencies.ResetsOnAlbumRelease(chapter.Fans.CurrencyId))
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' fans currency '{chapter.Fans.CurrencyId}' is in a currency group that survives an album release - fans would compound across runs and inflate the Records payout.");
 
+            // the release offer's gate, checked like every other authored
+            // condition (unresolvable ids, undeclared flags); null is legal -
+            // always offered once revealed
+            ConditionEvaluator.Validate(chapter.Album.ReleaseWhen, context, $"Chapter '{chapter.Id}' album (unlock)");
+
             // negative tuning drains or dead-ends instead of earning; runtime
             // fails closed on all of it (guarded ticks, zeroed tap), so
             // without these reports the systems would just look mysteriously
@@ -185,7 +190,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (chapter.CapstoneRecordsGate <= 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a non-positive capstoneRecordsGate ({chapter.CapstoneRecordsGate}) - the capstone would unlock before play starts.");
 
-            ValidateFlagDeclarations(chapter);
+            ValidateFlagDeclarations(chapter, database, rewards);
             // no ValidateIds over the roster: ChapterCurrencies.ValidateRoster
             // reports an unresolvable entry as part of the roster rules it owns,
             // and says what to do about it (re-run the import) rather than only
@@ -289,7 +294,8 @@ namespace RidiculousGaming.GarageBandIdle
         // flag check anywhere is measured against it - so a blank entry declares
         // nothing and a repeat says the same thing twice, both of which read as
         // an authoring slip in the JSON flags array.
-        private static void ValidateFlagDeclarations(ChapterDefinition chapter)
+        private static void ValidateFlagDeclarations(ChapterDefinition chapter, ContentDatabase database,
+            RewardManager rewards)
         {
             var declared = new HashSet<string>();
             foreach (var flagId in chapter.FlagIds)
@@ -298,6 +304,75 @@ namespace RidiculousGaming.GarageBandIdle
                     Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' declares an empty flag id.");
                 else if (!declared.Add(flagId))
                     Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' declares flag '{flagId}' more than once.");
+            }
+
+            // Who sets each flag, swept from the payload side - the setter's
+            // effect is the authoritative declaration (the JSON's setBy key is
+            // prose nothing checks). Each setter records its owning FACT's
+            // scope, because that scope decides whether the flag comes back
+            // after a release: a permanent latch re-asserts its flag through
+            // the projection, a run-scoped one re-fires on its own gate.
+            var setterScopes = new Dictionary<string, List<ContentScope>>();
+
+            void Record(GameEffect effect, ContentScope ownerScope)
+            {
+                if (effect is not SetFlagEffect setFlag || string.IsNullOrEmpty(setFlag.FlagId))
+                    return;
+                if (!setterScopes.TryGetValue(setFlag.FlagId, out var scopes))
+                    setterScopes.Add(setFlag.FlagId, scopes = new List<ContentScope>());
+                scopes.Add(ownerScope);
+            }
+
+            foreach (var id in chapter.UpgradeIds)
+            {
+                if (database.Upgrades.TryGet(id, out var upgrade))
+                    Record(upgrade.Payload, upgrade.Scope);
+            }
+
+            foreach (var groupId in chapter.BarGroupIds)
+            {
+                if (!database.BarGroups.TryGet(groupId, out var group))
+                    continue;
+                foreach (var barId in group.BarIds)
+                {
+                    // unknown reward ids are already reported against the bar;
+                    // Get answers null quietly for this sweep
+                    if (database.Bars.TryGet(barId, out var bar))
+                        Record(rewards?.Get(bar.RewardId)?.Effect, group.Scope);
+                }
+            }
+
+            foreach (var eventId in chapter.EventIds)
+            {
+                if (!database.Events.TryGet(eventId, out var gameEvent))
+                    continue;
+                foreach (var tier in gameEvent.Tiers)
+                    Record(rewards?.Get(tier.RewardId)?.Effect, tier.Scope);
+            }
+
+            foreach (var flag in chapter.Flags)
+            {
+                if (flag == null || string.IsNullOrEmpty(flag.Id))
+                    continue;
+
+                // A flag no content sets is PROBABLY dead - everything gated on
+                // it silently never appears, and at runtime an unset flag looks
+                // exactly like a not-yet-earned one. A warning rather than an
+                // error, because a system flag set from code (slice 7's
+                // chapter-advance flag) is legitimate and invisible to this
+                // sweep.
+                if (!setterScopes.TryGetValue(flag.Id, out var scopes))
+                {
+                    Debug.LogWarning($"ContentValidator: Chapter '{chapter.Id}' declares flag '{flag.Id}' but no content sets it - unless code sets it, every flagSet gate on it stays closed and the content behind them can never appear.");
+                    continue;
+                }
+
+                // a run-scoped flag needs at least one setter whose own fact
+                // resets with the run: with only permanent setters, the release
+                // clears the flag and the projection immediately re-asserts it
+                // from the surviving latch, so the declared scope does nothing
+                if (flag.Scope == ContentScope.Run && !scopes.Contains(ContentScope.Run))
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' flag '{flag.Id}' is run-scoped but every setter is permanent - the release clears it and the projection re-asserts it in the same operation, so the scope has no effect.");
             }
         }
 
