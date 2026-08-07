@@ -53,7 +53,7 @@ namespace RidiculousGaming.GarageBandIdle
                     ValidateProducer(producer, orphan);
             foreach (var section in database.Sections.All)
                 if (!visited.Sections.Contains(section.Id))
-                    ValidateSection(section, orphan, null, database);
+                    ValidateSection(section, orphan, null, database, null);
             foreach (var generator in database.Generators.All)
                 if (!visited.Generators.Contains(generator.Id))
                     ValidateGenerator(generator, orphan);
@@ -72,6 +72,9 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var reward in database.Rewards.All)
                 if (!visited.Rewards.Contains(reward.Id))
                     ValidateRewardDefinition(reward, orphan);
+            foreach (var beat in database.StoryBeats.All)
+                if (!visited.StoryBeats.Contains(beat.Id))
+                    ValidateStoryBeat(beat, orphan, null);
         }
 
         // Records are the one permanent progression currency: the income buff and
@@ -191,8 +194,10 @@ namespace RidiculousGaming.GarageBandIdle
             ValidateIds(chapter.StoryBeatIds, database.StoryBeats, $"Chapter '{chapter.Id}' (storyBeats)");
             foreach (var id in chapter.StoryBeatIds)
             {
-                if (database.StoryBeats.TryGet(id, out var beat))
-                    ValidateStoryBeat(beat, context, chapter);
+                if (!database.StoryBeats.TryGet(id, out var beat))
+                    continue;
+                visited.StoryBeats.Add(id);
+                ValidateStoryBeat(beat, context, chapter);
             }
             // no ValidateIds over the roster: ChapterCurrencies.ValidateRoster
             // reports an unresolvable entry as part of the roster rules it owns,
@@ -224,37 +229,33 @@ namespace RidiculousGaming.GarageBandIdle
             ValidateIds(chapter.BarGroupIds, database.BarGroups, $"Chapter '{chapter.Id}' (barGroups)");
             ValidateIds(chapter.EventIds, database.Events, $"Chapter '{chapter.Id}' (events)");
 
-            foreach (var id in chapter.SectionIds)
-            {
-                if (!database.Sections.TryGet(id, out var section))
-                    continue;
-                visited.Sections.Add(id);
-                ValidateSection(section, context, chapter, database);
-            }
-
             // Which producers this chapter's sections actually present. This is the
             // check that replaces ProducerDefinition.ModuleAddress (retired in 6.5):
             // "who presents this producer" is derived from the section entries that
             // name it rather than restated on the producer, so the two can no longer
             // disagree - and the thing worth reporting was never the missing string
             // but the consequence, a tap surface the player cannot reach.
-            var presentedDefinitions = new HashSet<string>();
-            foreach (var sectionId in chapter.SectionIds)
+            //
+            // Filled by the binding check as it walks each section, because that check
+            // is the only place the module's FAMILY is known. An id read off any entry
+            // regardless of family counts a card as presenting the producer whose id it
+            // happens to share, which is precisely the dead-Jam-button case
+            // ValidateModuleBinding exists to catch - reported on the entry, then
+            // silently forgiven here.
+            var presentedProducers = new HashSet<string>();
+            foreach (var id in chapter.SectionIds)
             {
-                if (!database.Sections.TryGet(sectionId, out var section))
+                if (!database.Sections.TryGet(id, out var section))
                     continue;
-                foreach (var entry in section.Modules)
-                {
-                    if (entry != null && !string.IsNullOrEmpty(entry.DefinitionId))
-                        presentedDefinitions.Add(entry.DefinitionId);
-                }
+                visited.Sections.Add(id);
+                ValidateSection(section, context, chapter, database, presentedProducers);
             }
 
             foreach (var id in chapter.ProducerIds)
             {
                 if (!database.Producers.TryGet(id, out var producer) || !producer.HasTapConfigs)
                     continue; // a passive producer (fan accrual) needs no surface
-                if (!presentedDefinitions.Contains(id))
+                if (!presentedProducers.Contains(id))
                     Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' producer '{id}' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
             }
 
@@ -402,13 +403,18 @@ namespace RidiculousGaming.GarageBandIdle
         // visibleWhen, so there is no gate here to check. What is left is that the
         // card would have something to show, and that a read latch it records is a
         // flag the chapter actually declares.
+        //
+        // The flag half is skipped for an orphan (null chapter), the same allowance
+        // every other flag check makes - no declaration list governs a beat no chapter
+        // lists. The text check is not skipped: an empty beat shows an empty card
+        // whoever lists it, which is why the orphan pass reaches this at all.
         private static void ValidateStoryBeat(StoryBeatDefinition beat, ConditionContext context,
             ChapterDefinition chapter)
         {
             if (string.IsNullOrEmpty(beat.Text))
                 Debug.LogError($"ContentValidator: Story beat '{beat.Id}' has no text - its card would show nothing.");
 
-            if (string.IsNullOrEmpty(beat.ReadFlagId))
+            if (string.IsNullOrEmpty(beat.ReadFlagId) || chapter == null)
                 return; // recording the read is optional
 
             var declaration = FindFlag(chapter, beat.ReadFlagId);
@@ -572,8 +578,11 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
+        // presentedProducers collects the tap producers this section's entries present,
+        // for the chapter-level "nothing presents this tap surface" check. Null for an
+        // orphan, which belongs to no chapter that could ask the question.
         private static void ValidateSection(SectionDefinition section, ConditionContext context,
-            ChapterDefinition chapter, ContentDatabase database)
+            ChapterDefinition chapter, ContentDatabase database, HashSet<string> presentedProducers)
         {
             ConditionEvaluator.Validate(section.VisibleWhen, context, $"Section '{section.Id}' (visibleWhen)");
             // a section IS its modules: with none, its reveal shows an empty region.
@@ -607,7 +616,9 @@ namespace RidiculousGaming.GarageBandIdle
                         ? $"ContentValidator: Section '{section.Id}' lists module '{entry.Address}' more than once - it would be instantiated twice."
                         : $"ContentValidator: Section '{section.Id}' lists module '{entry.Address}' for '{entry.DefinitionId}' more than once - it would be instantiated twice.");
                 }
-                ValidateModuleBinding(entry, section, chapter, database);
+                var presented = ValidateModuleBinding(entry, section, chapter, database);
+                if (presented != null)
+                    presentedProducers?.Add(presented);
             }
         }
 
@@ -626,12 +637,31 @@ namespace RidiculousGaming.GarageBandIdle
         // The whole binding check is skipped for an orphan (null chapter), the same
         // allowance the flag checks make: no declaration list governs a section no
         // chapter lists.
-        private static void ValidateModuleBinding(SectionModule entry, SectionDefinition section,
+        // Returns the tap producer this entry presents, or null - the family answer the
+        // chapter's "nothing presents this tap surface" check needs. It comes back from
+        // here rather than being re-derived because this is where the prefab that knows
+        // the family is already in hand; asking again outside would mean loading every
+        // module a second time to learn what this call just read.
+        private static string ValidateModuleBinding(SectionModule entry, SectionDefinition section,
             ChapterDefinition chapter, ContentDatabase database)
         {
             var source = $"Section '{section.Id}' module '{entry.Address}'";
+
+            // No address names no prefab, so nothing below could check anything - and
+            // the entry still counts as a module, so the empty-section check passes it
+            // too. Left unreported, the first thing to notice would be ChapterScreen
+            // failing to instantiate an empty key at reveal time, with only the address
+            // it was handed to go on.
+            if (string.IsNullOrEmpty(entry.Address))
+            {
+                Debug.LogError(string.IsNullOrEmpty(entry.DefinitionId)
+                    ? $"ContentValidator: Section '{section.Id}' has a module entry with no address - there is no prefab to instantiate at reveal time."
+                    : $"ContentValidator: Section '{section.Id}' has a module entry for '{entry.DefinitionId}' with no address - there is no prefab to instantiate at reveal time.");
+                return null;
+            }
+
             if (!TryLoadModulePrefab(entry.Address, source, out var module, out var handle))
-                return;
+                return null;
 
             try
             {
@@ -643,17 +673,17 @@ namespace RidiculousGaming.GarageBandIdle
                     // would be read by nobody - which looks like a binding and is not
                     if (!string.IsNullOrEmpty(entry.DefinitionId))
                         Debug.LogError($"ContentValidator: {source} names definition '{entry.DefinitionId}', but that module presents a whole roster and reads no definition id.");
-                    return;
+                    return null;
                 }
 
                 if (string.IsNullOrEmpty(entry.DefinitionId))
                 {
                     Debug.LogError($"ContentValidator: {source} presents a {required} but its section entry names none - the module would present nothing.");
-                    return;
+                    return null;
                 }
 
                 if (chapter == null)
-                    return;
+                    return null;
 
                 switch (required)
                 {
@@ -662,13 +692,18 @@ namespace RidiculousGaming.GarageBandIdle
                             Debug.LogError($"ContentValidator: {source} presents producer '{entry.DefinitionId}', which chapter '{chapter.Id}' does not declare - the module would present nothing.");
                         else if (database.Producers.TryGet(entry.DefinitionId, out var producer) && !producer.HasTapConfigs)
                             Debug.LogError($"ContentValidator: {source} presents producer '{entry.DefinitionId}', which authors no tap configs - pressing it would pay nothing.");
-                        break;
+                        // presented whether or not the id resolved: an undeclared id is
+                        // not in the chapter's producer list for the surface check to
+                        // look up, so withholding it would only say the same thing twice
+                        return entry.DefinitionId;
 
                     case ModuleDefinitionKind.StoryBeat:
                         if (!Names(chapter.StoryBeatIds, entry.DefinitionId))
                             Debug.LogError($"ContentValidator: {source} presents story beat '{entry.DefinitionId}', which chapter '{chapter.Id}' does not declare - the card would show nothing.");
-                        break;
+                        return null;
                 }
+
+                return null;
             }
             finally
             {
@@ -909,6 +944,7 @@ namespace RidiculousGaming.GarageBandIdle
             public readonly HashSet<string> Bars = new();
             public readonly HashSet<string> Events = new();
             public readonly HashSet<string> Rewards = new();
+            public readonly HashSet<string> StoryBeats = new();
         }
 
         private static void ValidateIds<T>(IReadOnlyList<string> ids, ContentDatabase.Registry<T> registry, string source)
@@ -931,30 +967,32 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // Loads a module prefab so its declared requirement can be read. Returns the
-        // handle for release: the address check beside this one leaks its handle
-        // today, and adding a second leak per module would not be an improvement.
+        // handle so a successful load is released by the caller that borrowed it, and
+        // every failing path releases here before returning false.
         // A prefab with no IChapterModule is reported here rather than only at
         // instantiation - ChapterScreen says the same thing, but at boot the section
         // that names it is still in hand.
+        //
+        // Every way this fails is reported, because this is now the only check the
+        // address gets: an address resolving to no prefab throws out of LoadAssetAsync
+        // and lands in the catch. The caller refuses an empty address before calling,
+        // since there is no key to attempt and the section is the useful thing to name.
         private static bool TryLoadModulePrefab(string address, string source,
             out IChapterModule module, out AsyncOperationHandle<GameObject> handle)
         {
             module = null;
             handle = default;
-            if (string.IsNullOrEmpty(address))
-                return false;
 
             try
             {
                 handle = Addressables.LoadAssetAsync<GameObject>(address);
                 var prefab = handle.WaitForCompletion();
                 if (prefab == null)
-                    return false; // the address check reports an unresolvable address
-
-                if (prefab.TryGetComponent(out module))
+                    Debug.LogError($"ContentValidator: {source} references module address '{address}', which resolves to no prefab - the section would fail to instantiate it at reveal time.");
+                else if (prefab.TryGetComponent(out module))
                     return true;
-
-                Debug.LogError($"ContentValidator: {source} has no IChapterModule component on its root - the section would instantiate it and initialize nothing.");
+                else
+                    Debug.LogError($"ContentValidator: {source} has no IChapterModule component on its root - the section would instantiate it and initialize nothing.");
             }
             catch (System.Exception exception)
             {
@@ -965,15 +1003,6 @@ namespace RidiculousGaming.GarageBandIdle
                 Addressables.Release(handle);
             handle = default;
             return false;
-        }
-
-        // a module address must resolve to at least one addressable location, or
-        // the section will fail to instantiate it at reveal time
-        private static void ValidateModuleAddress(string address, string source)
-        {
-            var locations = Addressables.LoadResourceLocationsAsync(address, typeof(GameObject)).WaitForCompletion();
-            if (locations == null || locations.Count == 0)
-                Debug.LogError($"ContentValidator: {source} references module address '{address}', which resolves to no addressable prefab.");
         }
     }
 }

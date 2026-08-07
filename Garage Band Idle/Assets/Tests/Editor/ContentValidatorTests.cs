@@ -345,6 +345,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
+        // Story beats are a registry like any other, so the orphan pass owes them the
+        // same treatment: an empty beat shows an empty card whoever lists it. The read
+        // flag is the half that is skipped, for the reason every other orphan skips its
+        // flag checks - no chapter's declaration list governs a beat no chapter lists.
+        [Test]
+        public void OrphanStoryBeat_KeepsItsTextCheck_WithoutFlagFalsePositives()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var stale = TestContent.MakeStoryBeat("beat_stale", "", "ghost");
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, storyBeats: new[] { stale });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            // the empty text is reported; the undeclared 'ghost' read flag is not
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Story beat 'beat_stale' has no text - its card would show nothing.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
         // the importer refuses to write either of these, so reaching them means
         // a stale asset from before the payload declared its currencies - the
         // same belt-and-braces the reward and generator value checks get
@@ -892,6 +911,58 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             ContentValidator.Validate(database, context, NoRewards);
             LogAssert.NoUnexpectedReceived();
+        }
+
+        // The presented-producer sweep has to ask the same family question the binding
+        // check asks. Reading an id off ANY entry counts a module that presents no
+        // producer at all as presenting one: the roster entry below is already a
+        // reported mistake, and taking its id as a tap surface forgave the consequence -
+        // a Jam button no section renders. Two errors, not one.
+        //
+        // A roster module rather than a story card because no module declares StoryBeat
+        // yet; the same hole, reachable through the family that exists today.
+        [Test]
+        public void ProducerIdOnAModuleThatPresentsNoProducer_DoesNotCountAsPresented()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var jam = TestContent.MakeProducer("jam", new List<ProductionConfig>
+            {
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+            });
+            var section = TestContent.MakeSection("floor", null,
+                modules: new List<SectionModule> { new("module/generator-list", "jam") });
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                sectionIds: new List<string> { "floor" },
+                producerIds: new List<string> { "jam" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section },
+                producers: new[] { jam });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Section 'floor' module 'module/generator-list' names definition 'jam', but that module presents a whole roster and reads no definition id.");
+            // the consequence a family-blind sweep swallowed
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' producer 'jam' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // An entry with no address names no prefab, so it satisfies the "a section is
+        // its modules" check while every check that needs the prefab is skipped. Boot is
+        // where the section naming it is still in hand - ChapterScreen's instantiate
+        // failure knows only the empty key it was handed.
+        [Test]
+        public void ModuleEntryWithNoAddress_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var section = TestContent.MakeSection("floor", null,
+                modules: new List<SectionModule> { new("", "jam") });
+            var ch1 = TestContent.MakeChapter("ch1", null, sectionIds: new List<string> { "floor" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Section 'floor' has a module entry for 'jam' with no address - there is no prefab to instantiate at reveal time.");
+            ContentValidator.Validate(database, context, NoRewards);
         }
 
         // The bar half of the same rule: a run-scoped group's bars reset at every
