@@ -376,14 +376,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(flags.IsSet("backroom"), "setFlag rewards run through the same registry");
         }
 
-        // The identity 5.7 rests on: the composed fan rate is
-        // (baseFansPerSec + perBandmate x bandmates) x rewards, which is exactly
-        // what FanSystem computed by hand before it was deleted. Chapter 1's
-        // observable number - 0.22/s with one Drummer - is the anchor, and the
-        // multiplier leg proves the reward scales the COMBINED base-plus-derived
-        // value rather than the base alone. Separate tests cover each term; this
-        // one is the composition, because that is the claim "no gameplay change"
-        // actually makes.
+        // The composed fan rate is (baseFansPerSec + perBandmate x bandmates) x
+        // rewards. Chapter 1's observable number - 0.22/s with one Drummer - is
+        // the anchor, and the multiplier leg proves the reward scales the
+        // COMBINED base-plus-derived value rather than the base alone. Separate
+        // tests cover each term; this one is the composition, because every term
+        // can be individually correct and still compose wrong.
         [Test]
         public void FanRate_ComposesBasePlusBandmateAdd_ThenRewardMultipliers()
         {

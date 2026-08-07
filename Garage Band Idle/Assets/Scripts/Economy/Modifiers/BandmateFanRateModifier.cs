@@ -14,8 +14,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     //
     // Adds rather than multiplies, so the composed rate is
     // (baseFansPerSec + perBandmate x bandmates) x coverBarRewards - the
-    // composition ModifierComposition already defines, and the identity the fan
-    // rate had when FanSystem computed it by hand.
+    // composition ModifierComposition already defines.
     public class BandmateFanRateModifier : DerivedModifier
     {
         private readonly GeneratorSystem _generators;
