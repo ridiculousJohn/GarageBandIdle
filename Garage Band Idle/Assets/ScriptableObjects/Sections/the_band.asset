@@ -14,14 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: the_band
   _displayName: The Band
-  _moduleAddresses:
-  - module/generator-list
+  _modules:
+  - _address: module/generator-list
+    _definitionId:
   _visibleWhen:
-    rid: 5051021696154730506
+    rid: 1000
   references:
     version: 2
     RefIds:
-    - rid: 5051021696154730506
+    - rid: 1000
       type: {class: CurrencyEarnedTotalCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash

@@ -14,14 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: the_release
   _displayName: The Release
-  _moduleAddresses:
-  - module/release
+  _modules:
+  - _address: module/release
+    _definitionId:
   _visibleWhen:
-    rid: 1000
+    rid: 1001
   references:
     version: 2
     RefIds:
-    - rid: 1000
+    - rid: 1001
       type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _flagId: album

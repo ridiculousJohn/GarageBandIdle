@@ -26,6 +26,12 @@ namespace RidiculousGaming.GarageBandIdle
         // CurrencyManager) so the currency set remains open
         public const string RecordsCurrencyId = "records";
 
+        // the second global currency: banked by the capstone, allocated in Chapter 2.
+        // A currency rather than a manager - a balance, an earned total, conditions,
+        // a save block and formatting all come for free, and a second owner for one
+        // number is a synchronization bug waiting for a second writer.
+        public const string RoadiesCurrencyId = "roadies";
+
         // UI display touchpoints only (CurrencyHeaderModule/TapModule name what
         // they show); the fan SYSTEM takes its ids from the chapter's fans
         // config, and what a tap PAYS is the jam producer's data. The playable

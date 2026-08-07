@@ -38,6 +38,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private const string BarGroupsFolder = "Assets/ScriptableObjects/BarGroups";
         private const string EventsFolder = "Assets/ScriptableObjects/Events";
         private const string RewardsFolder = "Assets/ScriptableObjects/Rewards";
+        private const string StoryBeatsFolder = "Assets/ScriptableObjects/StoryBeats";
 
         // an explicit null in the JSON behaves exactly like an absent field:
         // the member keeps its DTO initializer, the single source of "absent"
@@ -159,17 +160,27 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     Debug.LogError($"ChapterJsonImporter: duplicate producer id '{block.id}'. Keeping the first.");
                     continue;
                 }
-                // a producer with no module is a PASSIVE source: nothing presents
-                // it and the player never touches it, which is how fan accrual
-                // is authored. It is still module-held in the sense section 9
-                // means - not a generator, so it never idle-pays. What it must
-                // have is production, which ToProductionConfigs refuses without.
+                // A stale `module` key is refused rather than ignored (the same
+                // treatment 5.6 gave `revealFlag`): which module presents a producer
+                // is the SECTION's declaration now, so a file still carrying this
+                // states a binding nothing reads, and silently dropping it would
+                // read as accepted.
+                if (!string.IsNullOrEmpty(block.module))
+                {
+                    Debug.LogError($"ChapterJsonImporter: producer '{block.id}' carries a 'module' key - which module presents a producer is authored on the SECTION's module entry as 'definition' (design doc section 12, rule 13). Skipping it - remove the key and re-import.");
+                    continue;
+                }
+
+                // What a producer must have is production, which ToProductionConfigs
+                // refuses without. Whether anything PRESENTS it is boot validation's
+                // question: a tap producer needs a surface, a passive one (fan
+                // accrual) does not.
                 var configs = ToProductionConfigs(block);
                 if (configs == null)
                     continue;
 
                 var producerAsset = LoadOrCreate<ProducerDefinition>($"{ProducersFolder}/{block.id}.asset");
-                ApplyIfChanged(producerAsset, asset => asset.EditorInitialize(block.id, block.module, configs));
+                ApplyIfChanged(producerAsset, asset => asset.EditorInitialize(block.id, configs));
                 producerIds.Add(block.id);
             }
 
@@ -200,7 +211,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             foreach (var block in data.sections ?? Array.Empty<SectionBlock>())
             {
                 var asset = LoadOrCreate<SectionDefinition>($"{SectionsFolder}/{block.id}.asset");
-                var modules = new List<string>(block.modules ?? Array.Empty<string>());
+                var modules = ToSectionModules(block.modules, $"section '{block.id}'");
                 // a section IS its modules: one with none reveals an empty region
                 // when its visibleWhen holds. Written anyway (an empty region is
                 // inert, not wrong) so the rest of the chapter still imports.
@@ -358,6 +369,26 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             if ((data.constants?.recordBuff?.perRecord ?? 0) < 0)
                 Debug.LogError("ChapterJsonImporter: recordBuff block has a negative perRecord. Fix the JSON and re-import.");
 
+            // Story beats are ordinary content now (6.5): a definition, an id list on
+            // the chapter, and a section module entry naming which one a card
+            // presents. They were two inline strings on the chapter, which is why
+            // they could not be revealed or listed like anything else.
+            var storyBeatIds = new List<string>();
+            foreach (var block in data.storyBeats ?? Array.Empty<StoryBeatBlock>())
+            {
+                if (string.IsNullOrEmpty(block.id))
+                {
+                    Debug.LogError("ChapterJsonImporter: storyBeats contains an entry with an empty id. Skipping it.");
+                    continue;
+                }
+                if (string.IsNullOrEmpty(block.text))
+                    Debug.LogError($"ChapterJsonImporter: story beat '{block.id}' has no text - its card would show nothing.");
+
+                var beatAsset = LoadOrCreate<StoryBeatDefinition>($"{StoryBeatsFolder}/{block.id}.asset");
+                ApplyIfChanged(beatAsset, beat => beat.EditorInitialize(block.id, block.text, block.readFlag));
+                storyBeatIds.Add(block.id);
+            }
+
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
                 new List<string>(data.constants?.recordBuff?.affects ?? Array.Empty<string>()));
@@ -367,17 +398,28 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             // means no gate - always offered once revealed - like every other
             // condition site.
             var album = new AlbumConfig(ToCondition(data.album?.unlock, "album (unlock)"));
+            var capstone = ToCapstone(data.capstone);
             ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
-                data.chapter.name, data.chapter.theme, data.chapter.storyBeatOpen, data.chapter.storyBeatCapstone,
-                data.chapter.capstoneRecordsGate, recordBuff,
-                fans, album, flags, currencyIds, producerIds, sectionIds, generatorIds, upgradeIds, barGroupIds, eventIds));
+                data.chapter.name, data.chapter.theme, recordBuff,
+                fans, album, capstone, flags, currencyIds, producerIds, sectionIds, generatorIds, upgradeIds,
+                barGroupIds, eventIds, storyBeatIds));
 
             MarkAllContentAddressable();
 
             AssetDatabase.SaveAssets();
+            // Rewrites every generated asset in the CURRENT serialized form, which is
+            // what drops keys whose field no longer exists on the class - Unity leaves
+            // an orphan line (`_moduleAddress:` after 6.5 retired it) in the YAML
+            // until something rewrites the file, and ApplyIfChanged never does,
+            // because the two serialized forms it compares both already lack the
+            // field. Idempotent: an asset already in canonical form is rewritten
+            // byte-identically.
+            AssetDatabase.ForceReserializeAssets(GeneratedAssetPaths());
+            StripTrailingWhitespaceFromGeneratedAssets();
             var summary = $"Imported '{data.chapter.id}' - {flagIds.Count} flags, {producerIds.Count} producers, " +
                 $"{sectionIds.Count} sections, {generatorIds.Count} generators, {upgradeIds.Count} upgrades, " +
-                $"{barGroupIds.Count} bar groups ({barCount} bars), {eventIds.Count} events, {rewardIds.Count} rewards. " +
+                $"{barGroupIds.Count} bar groups ({barCount} bars), {eventIds.Count} events, {rewardIds.Count} rewards, " +
+                $"{storyBeatIds.Count} story beats. " +
                 "All content marked addressable.";
             Debug.Log($"ChapterJsonImporter: {summary}");
             if (!Application.isBatchMode)
@@ -408,6 +450,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             count += MarkType<BarGroupDefinition>(settings, ContentLabels.BarGroup);
             count += MarkType<EventDefinition>(settings, ContentLabels.Event);
             count += MarkType<RewardDefinition>(settings, ContentLabels.Reward);
+            count += MarkType<StoryBeatDefinition>(settings, ContentLabels.StoryBeat);
             count += MarkModulePrefabs(settings);
 
             AssetDatabase.SaveAssets();
@@ -502,6 +545,114 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // cost of the guarantee. Checking at the conversion sites instead is what
         // fell open in the first place: a conversion that answers "no gate" for
         // bad input reads as success at every call site, so no caller could tell
+        // The capstone, built from its authored block. The unlock goes through the
+        // same ToCondition every other gate uses - there is no second reading of the
+        // threshold anywhere, which is the point of deleting capstoneRecordsGate
+        // rather than keeping it in step.
+        //
+        // onComplete's friendly keys map onto the ONE effect family: a Roadie grant
+        // is a one-shot GrantCurrencyEffect, the completion flag is a projectable
+        // SetFlagEffect, and both together are a CompoundEffect. So the capstone gets
+        // no bespoke completion handler, and the Roadie cannot be paid a second time
+        // by a release, a load, or a reprojection - the projection refuses it.
+        //
+        // An absent capstone block is legal and produces an unauthored config: not
+        // every chapter needs one, and validation asks IsAuthored before demanding
+        // any of its parts.
+        private static CapstoneConfig ToCapstone(CapstoneBlock block)
+        {
+            if (block == null || string.IsNullOrEmpty(block.id))
+                return new CapstoneConfig();
+
+            var effects = new List<GameEffect>();
+
+            if (block.onComplete != null && block.onComplete.grantRoadies > 0)
+                effects.Add(new GrantCurrencyEffect(GameManager.RoadiesCurrencyId, block.onComplete.grantRoadies));
+            else if (block.onComplete != null && block.onComplete.grantRoadies < 0)
+                Debug.LogError($"ChapterJsonImporter: capstone '{block.id}' grants {block.onComplete.grantRoadies} roadies - an award is never a charge. Refusing it: fix the JSON and re-import.");
+
+            var completionFlag = block.onComplete?.completionFlag;
+            if (!string.IsNullOrEmpty(completionFlag))
+                effects.Add(new SetFlagEffect(completionFlag));
+            else
+                Debug.LogError($"ChapterJsonImporter: capstone '{block.id}' names no onComplete.completionFlag - nothing would record that the chapter finished.");
+
+            // one child needs no wrapper; the compound exists for the mixed case
+            GameEffect onComplete = effects.Count switch
+            {
+                0 => null,
+                1 => effects[0],
+                _ => new CompoundEffect(effects),
+            };
+
+            return new CapstoneConfig(block.id, block.name,
+                ToCondition(block.unlock, $"capstone '{block.id}' (unlock)"), completionFlag, onComplete);
+        }
+
+        // A section's module entries, in either authored form. Both produce the same
+        // SectionModule, so the runtime never learns which spelling was used.
+        //
+        // Fails closed on everything malformed rather than defaulting: an entry that
+        // is neither a string nor an object, an object with no address, or an object
+        // carrying a key this schema does not define. An unknown key is the
+        // interesting one - "definitionId" or "producer" instead of "definition"
+        // would otherwise import as a module presenting NOTHING, which reads at
+        // runtime as a button that pays nothing rather than as a typo.
+        private static List<SectionModule> ToSectionModules(JToken[] entries, string context)
+        {
+            var modules = new List<SectionModule>();
+            foreach (var entry in entries ?? Array.Empty<JToken>())
+            {
+                if (entry == null || entry.Type == JTokenType.Null)
+                {
+                    Debug.LogError($"ChapterJsonImporter: {context} has a null module entry. Skipping it.");
+                    continue;
+                }
+
+                if (entry.Type == JTokenType.String)
+                {
+                    var address = entry.Value<string>();
+                    if (string.IsNullOrEmpty(address))
+                    {
+                        Debug.LogError($"ChapterJsonImporter: {context} has an empty module address. Skipping it.");
+                        continue;
+                    }
+                    modules.Add(new SectionModule(address));
+                    continue;
+                }
+
+                if (entry.Type != JTokenType.Object)
+                {
+                    Debug.LogError($"ChapterJsonImporter: {context} has a module entry of type {entry.Type} - a module is either an address string or an object with 'module' and optional 'definition'. Skipping it.");
+                    continue;
+                }
+
+                var block = (JObject)entry;
+                var unknown = new List<string>();
+                foreach (var property in block.Properties())
+                {
+                    if (property.Name != "module" && property.Name != "definition" && property.Name != "note")
+                        unknown.Add(property.Name);
+                }
+                if (unknown.Count > 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: {context} has a module entry with unknown key(s) '{string.Join("', '", unknown)}' - only 'module', 'definition' and 'note' are defined. Refusing it: fix the JSON and re-import.");
+                    continue;
+                }
+
+                var moduleAddress = block.Value<string>("module");
+                if (string.IsNullOrEmpty(moduleAddress))
+                {
+                    Debug.LogError($"ChapterJsonImporter: {context} has a module entry with no 'module' address. Skipping it.");
+                    continue;
+                }
+
+                modules.Add(new SectionModule(moduleAddress, block.Value<string>("definition")));
+            }
+
+            return modules;
+        }
+
         // an absent gate from an unconvertible one.
         private static List<string> CollectConditionFaults(ChapterFile data)
         {
@@ -511,6 +662,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 CollectConditionFaults(block.visibleWhen, $"section '{block.id}' (visibleWhen)", faults);
 
             CollectConditionFaults(data.album?.unlock, "album (unlock)", faults);
+            CollectConditionFaults(data.capstone?.unlock, "capstone (unlock)", faults);
 
             foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
                 CollectConditionFaults(block.unlock, $"generator '{block.id}' (unlock)", faults);
@@ -1125,11 +1277,71 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private static string ToDisplayName(string id)
             => string.IsNullOrEmpty(id) ? id : char.ToUpperInvariant(id[0]) + id.Substring(1);
 
+        // Unity's YAML writer emits `key: ` - with a trailing space - for an empty
+        // serialized string, which lands in every generated asset that has one (the
+        // section modules' blank definitionId is the live case) and makes
+        // `git diff --check` complain about content nobody typed.
+        //
+        // Stripped after SaveAssets rather than fought at the serializer, which has no
+        // setting for it. Safe because ApplyIfChanged only rewrites an asset whose
+        // serialized form actually differs: a stripped file is byte-identical to
+        // Unity's apart from the trailing spaces, so it does not churn on the next
+        // import. Cosmetic only - nothing reads these bytes but git.
+        private static void StripTrailingWhitespaceFromGeneratedAssets()
+        {
+            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            var stripped = 0;
+
+            foreach (var folder in GeneratedAssetFolders)
+            {
+                var absolute = Path.Combine(projectRoot, folder);
+                if (!Directory.Exists(absolute))
+                    continue;
+
+                foreach (var file in Directory.GetFiles(absolute, "*.asset"))
+                {
+                    var original = File.ReadAllText(file);
+                    var cleaned = TrailingWhitespace.Replace(original, "");
+                    if (cleaned == original)
+                        continue;
+
+                    File.WriteAllText(file, cleaned);
+                    stripped++;
+                }
+            }
+
+            if (stripped > 0)
+                AssetDatabase.Refresh();
+        }
+
+        private static readonly Regex TrailingWhitespace = new(@"[ \t]+(?=\r?\n)", RegexOptions.Compiled);
+
+        // every generated definition asset, for the reserialize pass
+        private static List<string> GeneratedAssetPaths()
+        {
+            var paths = new List<string>();
+            foreach (var folder in GeneratedAssetFolders)
+            {
+                if (!AssetDatabase.IsValidFolder(folder))
+                    continue;
+                foreach (var guid in AssetDatabase.FindAssets("t:ScriptableObject", new[] { folder }))
+                    paths.Add(AssetDatabase.GUIDToAssetPath(guid));
+            }
+            return paths;
+        }
+
+        private static IEnumerable<string> GeneratedAssetFolders => new[]
+        {
+            ChaptersFolder, SectionsFolder, CurrenciesFolder, ProducersFolder, GeneratorsFolder,
+            UpgradesFolder, BarsFolder, BarGroupsFolder, EventsFolder, RewardsFolder, StoryBeatsFolder,
+        };
+
         private static void EnsureFolders()
         {
             var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             foreach (var folder in new[] { ChaptersFolder, SectionsFolder, CurrenciesFolder, ProducersFolder,
-                GeneratorsFolder, UpgradesFolder, BarsFolder, BarGroupsFolder, EventsFolder, RewardsFolder })
+                GeneratorsFolder, UpgradesFolder, BarsFolder, BarGroupsFolder, EventsFolder, RewardsFolder,
+                StoryBeatsFolder })
                 Directory.CreateDirectory(Path.Combine(projectRoot, folder));
             AssetDatabase.Refresh();
         }
@@ -1248,6 +1460,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public BarsBlock bars = new();
             public FansBlock fans = new();
             public AlbumBlock album = new();
+            public CapstoneBlock capstone = new();
+            public StoryBeatBlock[] storyBeats = Array.Empty<StoryBeatBlock>();
             public EventBlock[] events = Array.Empty<EventBlock>();
         }
 
@@ -1258,6 +1472,34 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private class AlbumBlock
         {
             public ConditionBlock unlock = new();
+        }
+
+        // The capstone, imported for the first time in 6.5 - the block existed in
+        // the JSON and was skipped entirely, so the authored `unlock` was dead data
+        // while a scalar capstoneRecordsGate stated the same threshold elsewhere.
+        private class CapstoneBlock
+        {
+            public string id = "";
+            public string name = "";
+            public ConditionBlock unlock = new();
+            public CapstoneCompletionBlock onComplete = new();
+        }
+
+        // What completing the capstone grants. Friendly authoring vocabulary that
+        // maps onto the ONE effect family: grantRoadies becomes a one-shot currency
+        // grant, completionFlag becomes a projectable setFlag, and the pair becomes a
+        // compound - so the capstone needs no bespoke handler and cannot pay twice.
+        private class CapstoneCompletionBlock
+        {
+            public int grantRoadies;
+            public string completionFlag = "";
+        }
+
+        private class StoryBeatBlock
+        {
+            public string id = "";
+            public string text = "";
+            public string readFlag = "";
         }
 
         private class FlagBlock
@@ -1292,9 +1534,6 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public int index;
             public string name = "";
             public string theme = "";
-            public string storyBeatOpen = "";
-            public string storyBeatCapstone = "";
-            public int capstoneRecordsGate;
         }
 
         private class ConstantsBlock
@@ -1318,7 +1557,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public string id = "";
             public string name = "";
-            public string[] modules = Array.Empty<string>();
+
+            // Heterogeneous on purpose: a module is either a bare address string
+            // ("module/tap") or an object naming what it presents ({ "module":
+            // "module/tap", "definition": "jam" }). Most modules render a whole
+            // roster and need no id, so forcing every entry into the object form
+            // would be ceremony on four out of five lines. Read as JToken because
+            // that is the only shape that can be both.
+            public JToken[] modules = Array.Empty<JToken>();
             public ConditionBlock visibleWhen = new();
         }
 
@@ -1421,10 +1667,20 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
         // a module-held production source: the module prefab presenting it
         // plus the production configs it fires (design doc section 12, rule 13)
+        // No `module` key: which module presents a producer is the SECTION's
+        // declaration (a module entry's `definition`), and 6.5 retired the producer's
+        // own copy of it rather than keep two declarations of one relationship. A
+        // leftover `module` key is refused below rather than ignored, so a stale JSON
+        // does not read as accepted.
         private class ProducerBlock
         {
             public string id = "";
+
+            // Retired in 6.5 and kept ONLY to detect it: a value here is refused at
+            // import rather than dropped, so a stale chapter file fails loudly
+            // instead of appearing to migrate.
             public string module = "";
+
             public ProductionEntryBlock[] production = Array.Empty<ProductionEntryBlock>();
         }
 

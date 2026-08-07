@@ -27,6 +27,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private const string BarGroupsFolder = "Assets/ScriptableObjects/BarGroups";
         private const string EventsFolder = "Assets/ScriptableObjects/Events";
         private const string RewardsFolder = "Assets/ScriptableObjects/Rewards";
+        private const string StoryBeatsFolder = "Assets/ScriptableObjects/StoryBeats";
 
         // Boot validation, run over the REAL shipped content instead of a
         // fixture: the same four steps GameManager.Awake takes, so anything it
@@ -69,6 +70,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNotNull(asset,
                 $"Missing asset at '{path}'. Run 'GarageBandIdle > Import Chapter 1 JSON' first.");
             return asset;
+        }
+
+        // a section's module addresses in layout order; the definition ids each
+        // entry carries are asserted where they matter
+        private static string[] Addresses(SectionDefinition section)
+        {
+            var addresses = new string[section.Modules.Count];
+            for (var i = 0; i < addresses.Length; i++)
+                addresses[i] = section.Modules[i].Address;
+            return addresses;
         }
 
         private static T[] LoadAllIn<T>(string folder) where T : Object
@@ -120,7 +131,83 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.02, chapter.RecordBuff.PerRecord, 1e-9);
             CollectionAssert.AreEqual(new[] { "cash" }, chapter.RecordBuff.AffectsCurrencyIds,
                 "the Records buff declares exactly the currencies it affects");
-            Assert.AreEqual(30, chapter.CapstoneRecordsGate);
+
+            // The chapter gate has ONE authored home now (6.5): the capstone's
+            // unlock Condition. The scalar capstoneRecordsGate that used to state
+            // the same 30 is deleted rather than kept in step - it was the copy
+            // being read while the authored Condition was never imported at all.
+            var capstone = chapter.Capstone;
+            Assert.IsTrue(capstone.IsAuthored, "Chapter 1 declares a capstone");
+            Assert.AreEqual("backyard_party", capstone.Id);
+            var gate = capstone.Unlock as RecordsCumulativeCondition;
+            Assert.IsNotNull(gate, "the capstone gate is the authored recordsCumulative Condition");
+            Assert.AreEqual(30, gate.Value, 1e-9);
+            Assert.AreEqual("chapter_2_unlocked", capstone.CompletionFlagId);
+        }
+
+        // The capstone's completion payload, as data: one Roadie that can only be
+        // paid on acquisition, plus the chapter-advance flag that re-projects safely.
+        // Its being a compound is what lets one authored block do both without the
+        // capstone growing a bespoke completion handler.
+        [Test]
+        public void CapstoneOnComplete_GrantsARoadieOnceAndSetsTheAdvanceFlag()
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+
+            var payload = chapter.Capstone.OnComplete as CompoundEffect;
+            Assert.IsNotNull(payload, "onComplete imports as a compound: a payout plus a flag");
+            Assert.IsTrue(payload.ContainsOneShot, "the Roadie grant is a payout");
+            Assert.AreEqual(EffectProjection.Projectable, payload.Projection,
+                "the compound itself is safe to project - it filters its own one-shot children");
+
+            var roadies = payload.Effects[0] as GrantCurrencyEffect;
+            Assert.IsNotNull(roadies, "grantRoadies imports as a currency grant");
+            Assert.AreEqual("roadies", roadies.CurrencyId);
+            Assert.AreEqual(1.0, roadies.Amount, 1e-9);
+            Assert.AreEqual(EffectProjection.OneShot, roadies.Projection,
+                "paid once ever - no release, load or reprojection banks a second one");
+
+            var flag = payload.Effects[1] as SetFlagEffect;
+            Assert.IsNotNull(flag, "completionFlag imports as an ordinary setFlag");
+            Assert.AreEqual("chapter_2_unlocked", flag.FlagId);
+            Assert.AreEqual(EffectProjection.Projectable, flag.Projection);
+        }
+
+        // Story beats are content: a definition each, listed on the chapter. The
+        // prose used to be two inline strings on the chapter asset, which is why
+        // beats could not be revealed or listed like anything else.
+        [Test]
+        public void StoryBeats_AreContentTheChapterLists()
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            CollectionAssert.AreEqual(new[] { "beat_open", "beat_capstone" }, chapter.StoryBeatIds);
+
+            var open = LoadById<StoryBeatDefinition>(StoryBeatsFolder, "beat_open");
+            Assert.IsTrue(open.Text.StartsWith("It starts in the garage"));
+            Assert.IsTrue(string.IsNullOrEmpty(open.ReadFlagId),
+                "Ch1 records no read latch, so nothing gates on having read a beat yet");
+
+            var capstoneBeat = LoadById<StoryBeatDefinition>(StoryBeatsFolder, "beat_capstone");
+            Assert.IsTrue(capstoneBeat.Text.Contains("first roadie"));
+        }
+
+        // Roadies is an ordinary global currency, filed in the same permanent group
+        // as Records - no manager, and deliberately NOT in the chapter roster, which
+        // both ChapterCurrencies and the factory refuse for a global id.
+        [Test]
+        public void Roadies_IsAGlobalPermanentCurrency_OutsideTheChapterRoster()
+        {
+            var roadies = LoadById<CurrencyDefinition>(CurrenciesFolder, "roadies");
+            Assert.AreEqual("permanent", roadies.GroupId);
+            Assert.AreEqual(0.0, roadies.StartingValue, 1e-9);
+
+            var permanent = LoadById<CurrencyGroupDefinition>(GroupsFolder, "permanent");
+            Assert.AreEqual(CurrencyPlacement.Global, permanent.Placement);
+            Assert.IsFalse(permanent.ResetsOnAlbumRelease);
+
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            CollectionAssert.DoesNotContain(chapter.CurrencyIds, "roadies",
+                "a global currency in a chapter roster means two balances for one id");
         }
 
         [Test]
@@ -128,8 +215,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
 
-            CollectionAssert.AreEqual(new[] { "fans", "covers", "gear", "album" }, chapter.FlagIds,
-                "the chapter declares exactly the JSON flags array, in order");
+            CollectionAssert.AreEqual(new[] { "fans", "covers", "gear", "album", "chapter_2_unlocked" },
+                chapter.FlagIds, "the chapter declares exactly the JSON flags array, in order");
 
             // the second-run flow (design doc section 2): fans, covers and gear
             // clear at every release so their systems re-arm on the re-climb;
@@ -139,6 +226,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(ContentScope.Run, chapter.Flags[1].Scope, "covers re-arms each run");
             Assert.AreEqual(ContentScope.Run, chapter.Flags[2].Scope, "gear re-arms each run");
             Assert.AreEqual(ContentScope.PermanentInChapter, chapter.Flags[3].Scope, "album is knowledge");
+
+            // The capstone's one fact (6.5), and permanent for a sharper reason than
+            // album's: run-scoped, the next demo would clear it and re-open a
+            // finished chapter. It is both "this chapter is done" and "chapter 2 may
+            // open" - nothing in Ch1 can tell those apart, so it is one flag.
+            Assert.AreEqual(ContentScope.PermanentInChapter, chapter.Flags[4].Scope,
+                "a finished chapter stays finished across demos");
         }
 
         [TestCase(0, "practice_amp", 60, 0.4)]
@@ -248,8 +342,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var band = LoadById<ProducerDefinition>(ProducersFolder, "band");
 
-            Assert.IsTrue(string.IsNullOrEmpty(band.ModuleAddress),
-                "the band producer is passive - no module presents it");
+            // passive: nothing presents it, and 6.5 made that a DERIVED fact - no
+            // section module entry names it - rather than a blank field on the asset
+            Assert.IsFalse(band.HasTapConfigs, "a passive producer authors no tap surface");
             Assert.AreEqual(1, band.Production.Count);
 
             var accrual = band.Production[0];
@@ -282,8 +377,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the jam producer and the passive band producer holding fan accrual - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
 
             var jam = LoadById<ProducerDefinition>(ProducersFolder, "jam");
-            Assert.AreEqual("module/tap", jam.ModuleAddress);
+            Assert.IsTrue(jam.HasTapConfigs, "the jam producer is a tap surface");
             Assert.AreEqual(3, jam.Production.Count);
+
+            // Which module presents it lives on the SECTION now (6.5): the producer
+            // carries no module of its own, so the binding has exactly one home and
+            // boot validation reports a tap producer no section presents.
+            var garageFloor = LoadById<SectionDefinition>(SectionsFolder, "garage_floor");
+            Assert.AreEqual("jam", garageFloor.Modules[1].DefinitionId);
 
             var cash = jam.Production[0];
             Assert.AreEqual("cash", cash.CurrencyId);
@@ -414,7 +515,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var garageFloor = LoadById<SectionDefinition>(SectionsFolder, "garage_floor");
             Assert.IsNull(garageFloor.VisibleWhen, "garage_floor is visible from chapter start");
-            CollectionAssert.AreEqual(new[] { "module/currency-header", "module/tap" }, garageFloor.ModuleAddresses);
+            CollectionAssert.AreEqual(new[] { "module/currency-header", "module/tap" }, Addresses(garageFloor));
+
+            // The Jam button names the producer it fires (6.5). Before that a tap
+            // fired every tap config in the chapter, so this binding existed in the
+            // JSON and nowhere in the runtime.
+            var tapEntry = garageFloor.Modules[1];
+            Assert.AreEqual("module/tap", tapEntry.Address);
+            Assert.AreEqual("jam", tapEntry.DefinitionId, "the tap module presents the jam producer");
+            Assert.IsTrue(string.IsNullOrEmpty(garageFloor.Modules[0].DefinitionId),
+                "the currency header renders a roster, so it names no single definition");
 
             var theBand = LoadById<SectionDefinition>(SectionsFolder, "the_band");
             var visibleWhen = theBand.VisibleWhen as CurrencyEarnedTotalCondition;
@@ -430,13 +540,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var gearGate = theGear.VisibleWhen as FlagSetCondition;
             Assert.IsNotNull(gearGate, "the_gear shows on a flag condition");
             Assert.AreEqual("gear", gearGate.FlagId);
-            CollectionAssert.AreEqual(new[] { "module/upgrade-list" }, theGear.ModuleAddresses);
+            CollectionAssert.AreEqual(new[] { "module/upgrade-list" }, Addresses(theGear));
 
             var rehearsalSpace = LoadById<SectionDefinition>(SectionsFolder, "rehearsal_space");
             var coversGate = rehearsalSpace.VisibleWhen as FlagSetCondition;
             Assert.IsNotNull(coversGate, "rehearsal_space reveals on a flag condition");
             Assert.AreEqual("covers", coversGate.FlagId);
-            CollectionAssert.AreEqual(new[] { "module/bar-list" }, rehearsalSpace.ModuleAddresses);
+            CollectionAssert.AreEqual(new[] { "module/bar-list" }, Addresses(rehearsalSpace));
 
             // the prestige button reveals through its section's visibleWhen like
             // every other module (5.6 deleted album.revealFlag so slice 6 could
@@ -445,7 +555,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var albumGate = theRelease.VisibleWhen as FlagSetCondition;
             Assert.IsNotNull(albumGate, "the_release reveals on a flag condition");
             Assert.AreEqual("album", albumGate.FlagId);
-            CollectionAssert.AreEqual(new[] { "module/release" }, theRelease.ModuleAddresses);
+            CollectionAssert.AreEqual(new[] { "module/release" }, Addresses(theRelease));
 
             // No section carries a lifetime of its own: visibility is a live
             // function of visibleWhen, and each section's persistence comes

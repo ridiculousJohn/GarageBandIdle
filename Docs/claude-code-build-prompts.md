@@ -11,7 +11,7 @@ Build order and why: each slice depends on the ones before it (offline earnings 
 tick; prestige needs the currency block split; the content-unlock upgrades are what reveal
 fans/covers/album). Building bottom-up keeps a break isolated to the slice you just added.
 
-**Progress marker:** slices 0–5, **5.4**, **5.5**, **5.6**, **5.7** and **6** are already built and tested. Slice **3.5** is a dedicated consolidation pass
+**Progress marker:** slices 0–5, **5.4**, **5.5**, **5.6**, **5.7**, **6** and **6.5** are already built and tested. Slice **3.5** is a dedicated consolidation pass
 that establishes the cross-cutting foundations — a single `Condition` type + evaluator, one flag
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
@@ -47,6 +47,17 @@ instead of relying on which upgrade sets a flag. It also generalized `composes` 
 with `ProductionConfig.IsComposable` as the single home for what a config may compose — a rule
 `ProductionSystem` and `ContentValidator` had briefly disagreed about, which is what made Chapter 1's
 own content fail boot validation. Slices 6–10 assume all four.
+Slice **6.5** is a consolidation pass, audit-driven like 5.4–5.7, that establishes the economy
+snapshot/seed contract (one restore order, one state type, recipe-driven filtering), makes effect
+replay behavior a property of the effect TYPE so a payout cannot be paid twice by any path, and lets a
+module be told which definition it presents — which cashed in the producer/module binding that had
+been authored and dead since 5.4, so a tap fires its own producer rather than every tap config in the
+chapter. It also made the capstone, story beats and Roadies into ordinary content: `CapstoneConfig`
+holds the sole authored chapter gate (the scalar `capstoneRecordsGate` is deleted), story beats became
+a definition type with a chapter id list instead of two inline strings, and Roadies is a global
+currency in the existing permanent group. Slices 7–10 assume all of it: 7 consumes `CapstoneConfig`
+instead of inventing a gate, 8 builds its sandbox by SEEDING a context rather than resetting one, and
+9's load is that same restore with a wider fact set. It changed no observable gameplay.
 
 ---
 
@@ -623,25 +634,193 @@ faster; Records formula matches the examples in the JSON.
 
 ---
 
-## 7 — Records manager + capstone / chapter gate
+## 6.5 — CONSOLIDATION: the snapshot/seed contract, effect projection, parameterized modules  ✅ done
 
-> Implement Records tracking and the chapter capstone per §1–§2, §5 and the `capstone` entry.
+This slice adds no new gameplay. It exists because slices 7–9 each introduce state or grants that the
+current code has no mechanism for, and three of them would otherwise each invent their own.
+
+The load-bearing gap is the snapshot. Slice 8 builds its event sandbox as "a freshly constructed
+economy context whose recipe projects the chapter's permanent-in-chapter facts only" — that is a
+partial restore, and slice 9's load is the same operation with a wider fact set. Today
+`EconomyContextFactory.Build` can only produce an EMPTY economy: bars and generators have restore
+helpers, upgrade latches and flags have none, and `CurrencyManager` can set a balance but not the
+lifetime-earned total. That last one is not a gap in the abstract. Both the capstone gate
+(`RecordsCumulativeCondition`) and the entire permanent income buff (`RecordsIncomeModifier`) read
+`GetEarned("records")`, so restoring the Records *balance* and nothing else would load a save showing
+the right number with the capstone re-locked and the multiplier back at 1.0.
+
+The second gap is that re-projection re-applies whole payloads. That is safe today only because every
+`GameEffect` happens to be idempotent — grant a modifier, set a flag. Slice 7's "grant 1 Roadie" is
+the first payout in the game, and a payout behind a latch is paid again at every release, every load,
+every projection. The dangerous path is not the projection, which this slice teaches to refuse
+payouts; it is RE-ACQUISITION, which is re-entrant by design: `ResetRunScoped` clears run-scoped
+latches at each release and `EvaluateContentUnlocks` re-applies any unlock whose gate still holds.
+That is how the second-run reveal walk works, and it is why the rule below is a content rule enforced
+at boot rather than a runtime guard.
+
+The third gap is smaller but it is what makes two "later" items later forever: a module cannot be
+told which definition it presents. `IChapterModule.Initialize` takes only a `ChapterContext`, so
+`ProducerDefinition.ModuleAddress` is authored, validated, and dead — `FireTap()` fires every tap
+config in the chapter — and a story beat cannot be a content piece because two cards would share one
+prefab with no way to differ. One parameter fixes both.
+
+> Read `/docs/garage-band-idle-design.md` — §5, §6.1, §9, §12 rules 6, 11, 12 and 13. This is a
+> refactor/foundation pass; **do not change observable gameplay.** Chapter 1 must play exactly as it
+> does today: same tap value, same fan rate, same reveal order, same release behavior and re-climb.
+> The story-beat and Roadies content added here is not yet presented by any UI.
 >
-> - `RecordsManager` tracks cumulative Records and exposes the permanent income multiplier.
-> - The capstone `unlock` is a `recordsCumulative ≥ 30` Condition (same evaluator, same type the event
->   availability uses). When it holds, unlock "Play the Backyard Party."
+> **1. Split state ownership, then give restore its missing primitives.** The permanent pool's
+> currencies (Records, Roadies) belong to the pool's owner and are captured exactly once;
+> `EconomyContext.CaptureLocalState()` covers this context's own pool plus its generators, upgrade
+> latches, bars and flags, and must never reach through the router into the permanent pool. Add
+> `CurrencyManager.Restore(id, balance, earnedTotal, notify)`, `UpgradeSystem.RestoreApplied(ids,
+> notify)`, `FlagSystem.Restore(flagIds, notify)`, and a `notify` parameter on the existing
+> `GeneratorSystem.RestoreOwned` / `BarSystem.RestoreProgress` **without changing their current
+> defaults**. Restore is REPLACEMENT, not merge: a flag, latch, count, bar or balance absent from the
+> snapshot is cleared, zeroed, or returned to its starting value. Modifiers are never captured — they
+> are always projected.
+>
+> **2. Make restore atomic.** `EconomyContext.Restore` runs one order and nothing else may: restore
+> raw facts silently → `Conditions.MarkDirty()` → project with modifier notifications deferred →
+> `Settle()` → replay the terminal notifications inside a condition-invalidation suppression scope →
+> finish with the condition context clean. `MarkDirty` is mandatory, not decorative: a second restore
+> into a settled context finds `_dirty == false` and `Drain` returns having evaluated nothing, so
+> nothing may rely on the fresh-context default. Silencing only the fact primitives is not enough —
+> `ResetGranted` and each re-`Grant` fire `Modifiers.Changed`, which `GeneratorListModule` subscribes
+> to, so the projection is deferred too. The replay publishes balances, owned counts, bar progress and
+> modifier targets. It does NOT publish `UpgradeApplied`/`UpgradeCleared`, because a
+> restored latch is not an acquisition — the same reason `ProjectModifiers` already refuses to re-fire
+> them — and it does NOT publish flags: a flag is only ever READ through a Condition, so everything
+> gating on one already re-asked at the settle, and `FlagSet` means "just latched", which a restored
+> latch is not. Use suppression rather than a second drain, or "which `Settled` is the terminal one" has two
+> answers. This is scoped restoration behavior, NOT a general transaction system for every operation.
+>
+> **3. Build every economy through the same door.** `Build(database, chapter, permanentPool, recipe,
+> seed)` applies the seed through `Restore`, so the order in 2 has exactly one implementation. The
+> recipe gains permanent-pool ROUTING beside its projection filter: `Shared` for the frontier,
+> `Isolated` for an event sandbox, which gets a private pool from `BuildPermanentPool` so a stray
+> `Add("records")` can only reach the sandbox's own. State the consequence rather than leaving it to
+> be discovered: inside an isolated sandbox `recordsCumulative` reads zero, and that IS the fixed
+> baseline. Seed filtering is recipe-driven over ONE state type — empty for a new run,
+> permanent-in-chapter facts only for a sandbox (no run latches, flags, counts or balances), the whole
+> local snapshot for a load — so `frontier.CaptureLocalState()` filtered by recipe is how a sandbox is
+> built, and the sandbox path and the load path are the same mechanism.
+>
+> **4. Effect replay behavior is owned by the effect type.** `EffectProjection { Projectable, OneShot
+> }` plus a recursive `ContainsOneShot`, and two entry points that both keep `ContentScope`:
+> `ApplyOnAcquisition` and `Project`. `GrantModifierEffect` and `SetFlagEffect` are projectable; a new
+> `GrantCurrencyEffect` is one-shot; a new `CompoundEffect` mirrors
+> `CompoundCondition` — acquisition applies every child, projection recurses into all of them and lets
+> each answer for itself, validation recurses. Do not add a third `Composite` enum
+> value: a compound's projectability is a function of its children, and the two questions callers
+> actually ask (may I project this? does anything under here pay out?) are answered by the two members
+> above. **`Project` on a one-shot is a SILENT no-op, not an error.** "Nothing to re-apply" is the
+> correct answer for a payout; a permanent latch carrying one is legal content whose projection runs at
+> every release and every load, so reporting would be a log line per boundary describing working
+> content — and filtering silently is what lets `UpgradeSystem`, `BarGroupRuntime` and `CompoundEffect`
+> all just project their children with no per-caller kind check to get wrong. What prevents a double
+> payment is `Project` never paying, plus the content rule below; never a log line.
+> `SetFlagEffect` staying projectable is load-bearing, not convenient — the release depends on
+> the projection re-asserting flags whose setters' latches survived, and `ContentValidator` enforces
+> the corollary. Give it a regression test of its own.
+> Then close the re-acquisition path as a CONTENT rule: `ContentValidator` refuses a one-shot effect
+> (or a compound containing one) on **every content unlock**, whatever its scope, plus a run-scoped bar
+> group's reward and later a run-scoped event tier. Scope looks like the deciding property and is not:
+> a content unlock is DEFINED by applying automatically whenever its gate holds and its latch is
+> absent, and a release clears run-scoped latches while a RESTORE clears any latch its snapshot omits
+> (restore is replacement) — so an older or partial snapshot re-pays a permanent unlock exactly as a
+> release re-pays a run-scoped one. It costs nothing: a buff goes through `TryBuy` and charges again,
+> the capstone is applied by slice 7 on a player action, and an event tier is player-achieved.
+> `OneShot` means paid once, ever; a deliberate per-run payout would be a third classification, not a
+> reinterpretation of this one.
+>
+> **5. A module can be told which definition it presents.** `SectionDefinition`'s module entries
+> become `{address, definitionId?}` pairs and `IChapterModule.Initialize` takes the id (five of the
+> six existing modules ignore it); `ChapterScreen`, the importer, and the duplicate-module validator
+> check (keyed on address+id now) follow. Cash in immediately on the binding that was already
+> authored: `module/tap` carries `definitionId: "jam"`, and `ProductionSystem.FireTap(producerId)` /
+> `EconomyContext.Jam(producerId)` fire that producer's configs instead of every tap config in the
+> chapter. Chapter 1 has one tap producer, so this changes nothing observable — and it is the whole
+> reason a second one is not a rewrite.
+>
+> **6. The capstone and story beats become ordinary content.** Add `CapstoneConfig` to
+> `ChapterDefinition` beside `AlbumConfig`: `id`, `displayName`, `unlock` Condition,
+> `completionFlagId`, `onComplete` effect. The JSON's `capstone.unlock` becomes the sole authored gate
+> — import it through the same condition parser every other gate uses, and DELETE
+> `chapter.capstoneRecordsGate` from the JSON, the asset, the importer and its validator check rather
+> than reading both. That check needs no bespoke replacement: `ValidateThreshold` already reports a
+> non-positive threshold on all five threshold condition types, `ThresholdIsMet` already fails closed
+> on one, and `CompoundCondition.Validate` already refuses an empty compound — so validating the
+> authored `unlock` like any other gate covers it. What none of that covers is a NULL `unlock`, which
+> by this codebase's own convention means "no gate" and would offer the capstone at boot, so that is
+> the one new check. `capstone.onComplete` imports as a `CompoundEffect` of `GrantCurrencyEffect("roadies", 1)`
+> and `SetFlagEffect("chapter_2_unlocked")`; that one flag is both the completion and the advance fact
+> (two would be two facts for one event), declared permanent-in-chapter in the chapter's `flags`
+> array, and named by `completionFlagId`.
+> Story beats stop being two inline strings on the chapter and become `StoryBeatDefinition { id, text,
+> readFlagId? }` — a definition, a `ContentLabels` entry, a `ContentDatabase` registry and a
+> `chapter.storyBeatIds` list, which is the leg generators, upgrades and bars already have and beats
+> lacked. They carry NO unlock and NO scope: reveal is their section's `visibleWhen`, exactly as it is
+> for the Jam button, which is what 5 makes possible. `fireStoryBeat` is never imported — a beat is
+> pulled by its section's condition, not pushed by the capstone. Retire
+> `ChapterDefinition.StoryBeatOpen`/`StoryBeatCapstone` and move Chapter 1's two beats into assets.
+> Do NOT author the beat sections or build a `module/story-beat` prefab here: no such prefab exists
+> and `ValidateModuleAddress` fails boot on a section pointing at a missing address. Slice 10 places
+> them.
+> Finally, add Roadies as an ordinary currency — hand-authored `Roadies.asset` mirroring
+> `Records.asset`, filed in the existing Global `permanent` group, labelled for Addressables, and
+> **not** in the chapter's currency roster, which `ChapterCurrencies` and `ResolveRoster` both refuse
+> for a global id. No `RoadiesManager` and no `RecordsManager`: a currency already has a balance, an
+> earned total, conditions, a save block and formatting.
+>
+> Goal: a context can be captured, restored, and seeded by recipe with one implementation of the
+> order; a payout cannot be paid twice by any path; a module knows what it presents; and the capstone,
+> story beats and Roadies exist as content for slice 7 to consume rather than invent. Stop here.
+
+✅ **Test & commit:** Records balance and earned total round-trip independently, and a restored Records
+total reactivates both the capstone gate and the income modifier; a different snapshot clears the
+flags and latches absent from it while the same one reapplies idempotently; silent restore still
+forces condition evaluation and finishes with the context clean; no observer sees partial state,
+`Modifiers.Changed` included; projecting a one-shot pays nothing and logs nothing, and a mixed
+`CompoundEffect` grants Roadies once while reprojecting its flag; validation refuses a one-shot on any
+content unlock and on a run-scoped bar group's reward; sandbox
+writes cannot reach the shared permanent pool; permanent-in-chapter seeding excludes run facts and
+rebuilds the expected derived modifiers; the capstone consults its authored `Condition` and no scalar
+gate; a null capstone unlock and a completion flag its payload never sets are both refused at boot;
+Roadies resolve through the Global permanent
+group; `CaptureLocalState()` contains no permanent currency; and the existing release / second-run
+walk still passes unchanged.
+
+---
+
+## 7 — Capstone / chapter gate (on 6.5's contract)
+
+> Implement the chapter capstone per §1–§2, §5 and the `capstone` entry. **Records need no manager**
+> — 6.5 settled this: Records are a global currency, the cumulative total is
+> `CurrencyManager.GetEarned`, the income buff derives from that same fact, and the release already
+> awards through `EconomyContext`. A second owner for one number is a synchronization bug waiting for
+> a second writer.
+>
+> - The capstone's availability is `CapstoneConfig.Unlock` — the authored `recordsCumulative ≥ 30`
+>   Condition 6.5 imports, asked through the one evaluator like every other gate. Do not re-derive the
+>   threshold: there is no scalar gate left to read. When it holds, offer "Play the Backyard Party."
 > - On capstone completion: first perform the standard album release (slice 6's path — the run's
 >   Fans bank as Records; design §1–§2: the capstone implicitly cuts an album, so no run value is
->   stranded at the chapter boundary); then grant 1 Roadie to a permanent pool but keep the Roadie
->   allocation/replay UI LOCKED (`roadieSystemUIUnlocked: false` — deferred to Chapter 2); fire the
->   `storyBeatCapstone` text; set an "advance to Chapter 2" flag (Chapter 2 content doesn't exist
->   yet — just mark it).
+>   stranded at the chapter boundary); then apply `CapstoneConfig.OnComplete` through the ACQUISITION
+>   path, which is what grants the Roadie once and sets `chapter_2_unlocked`. The Roadie
+>   allocation/replay UI stays LOCKED (`roadieSystemUIUnlocked: false` — deferred to Chapter 2), and
+>   Chapter 2 content does not exist yet, so the flag just marks the boundary.
+> - The story beat is not fired by this code. `storyBeatCapstone` is a `StoryBeatDefinition` whose
+>   section gates on `chapter_2_unlocked`, so setting the flag above IS what reveals it — the same
+>   pull every other module's reveal uses. Slice 10 builds the card that presents it.
 >
-> Goal: reaching 30 cumulative Records unlocks the capstone; playing it shows the story beat, banks
-> the first Roadie (no allocation UI), and flags chapter advancement. Stop here.
+> Goal: reaching 30 cumulative Records offers the capstone; playing it banks the run as Records,
+> grants the first Roadie exactly once (no allocation UI), and sets the chapter-advance flag. Stop
+> here.
 
-✅ **Test & commit:** capstone unlocks at 30 Records via `recordsCumulative`; the implicit release
-banks Fans as Records; story beat fires; Roadie banked; advance flag set.
+✅ **Test & commit:** capstone unlocks at 30 Records via its authored `recordsCumulative` Condition;
+the implicit release banks Fans as Records; the Roadie is granted once and survives a reprojection;
+advance flag set.
 
 ---
 

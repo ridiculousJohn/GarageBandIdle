@@ -35,15 +35,36 @@ namespace RidiculousGaming.GarageBandIdle.Content
         // a run-scoped payoff in one place and a permanent one in another - a scope
         // field on the asset could not express it, and could disagree with the
         // source that already declares one.
-        public void Apply(EffectContext context, ContentScope scope)
+        //
+        // Both of the effect family's entry points are forwarded rather than one
+        // (design doc section 12, rule 6): a bar completing is an acquisition, a
+        // projection over the bars already recorded as complete is not, and a
+        // reward that pays currency must be able to tell those apart. The reward
+        // itself makes no decision here - it names the payoff, the effect owns the
+        // replay rule.
+        public void ApplyOnAcquisition(EffectContext context, ContentScope scope)
         {
-            if (_effect == null)
-            {
-                Debug.LogError($"RewardDefinition: reward '{_id}' has no effect. Nothing granted.");
+            if (!HasEffect())
                 return;
-            }
 
-            _effect.Apply(context, scope);
+            _effect.ApplyOnAcquisition(context, scope);
+        }
+
+        public void Project(EffectContext context, ContentScope scope)
+        {
+            if (!HasEffect())
+                return;
+
+            _effect.Project(context, scope);
+        }
+
+        private bool HasEffect()
+        {
+            if (_effect != null)
+                return true;
+
+            Debug.LogError($"RewardDefinition: reward '{_id}' has no effect. Nothing granted.");
+            return false;
         }
 
 #if UNITY_EDITOR

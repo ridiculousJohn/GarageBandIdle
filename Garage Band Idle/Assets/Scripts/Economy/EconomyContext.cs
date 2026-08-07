@@ -155,6 +155,191 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 source.ProjectModifiers();
         }
 
+        // ---- capture and restore ---------------------------------------------
+
+        // This economy's own facts (design doc section 12, rule 12). Reads Pool,
+        // never Currencies: the router would reach the permanent pool, and Records
+        // and Roadies are not this context's to claim - one pool, one writer, or an
+        // event sandbox's capture becomes a second opinion on permanent progress.
+        public EconomyLocalSnapshot CaptureLocalState()
+            => new(
+                Pool.CaptureAll(),
+                Generators.CaptureOwned(),
+                Upgrades.CaptureApplied(),
+                Bars.CaptureProgress(),
+                Flags.CaptureSetFlags(),
+                Bars.CaptureActiveBars());
+
+        // The seed another economy is built from, filtered by what that economy is
+        // FOR. An event sandbox takes the chapter's permanent facts and none of the
+        // run's - that absence is the fixed baseline (design doc section 6.1), and
+        // it is declared here rather than produced by a reset somewhere.
+        //
+        // Filtering lives on the context rather than in a static over the snapshot
+        // because every question it asks is a CONTENT question - is this flag
+        // run-scoped, does this currency's group reset on release - and the systems
+        // here are what already resolved the declarations. A filter reading a scope
+        // recorded inside the snapshot would be reading a copy that goes stale.
+        public EconomyLocalSnapshot CaptureSeedFor(EconomyRecipe recipe)
+        {
+            switch (recipe?.Kind)
+            {
+                case EconomyRecipeKind.EventSandbox:
+                    return PermanentInChapterFacts();
+
+                // A frontier economy seeded from another economy is a load, and a
+                // load carries everything. A replay economy (rule 7) is not built
+                // yet and must not silently get the frontier's whole state, so it
+                // fails closed to the empty seed until its own rules exist.
+                case EconomyRecipeKind.FrontierChapter:
+                    return CaptureLocalState();
+                default:
+                    return EconomyLocalSnapshot.Empty;
+            }
+        }
+
+        // Restores this economy's facts and settles, as ONE operation nothing can
+        // observe halfway (the ordering the whole contract rests on):
+        //
+        //   raw facts, silently -> mark dirty -> project (modifiers deferred)
+        //   -> settle -> replay notifications under suppression
+        //
+        // Every step earns its place. The primitives are silent because a
+        // subscriber must never read a fleet restored with balances not yet
+        // restored. MarkDirty is required precisely BECAUSE they are silent: the
+        // condition context learns of every input through those same events, so
+        // without it a restore into an already-settled context leaves the dirty
+        // flag false and the drain evaluates nothing - and the fresh-context
+        // default cannot cover it, since a second restore is exactly the case that
+        // matters. The projection is deferred too, because it clears the modifier
+        // store before rebuilding it and a row reading its rate mid-rebuild reads a
+        // wrong one. The replay is suppressed so it cannot re-dirty what the settle
+        // just consumed, which keeps this one pass with one terminal Settled rather
+        // than a drain, a replay, and a second drain nobody can name the end of.
+        //
+        // The settle is a BOUNDED FIXPOINT rather than one pass, and that is the one
+        // place restore deliberately differs from a tick. Drain clears its dirty flag
+        // before evaluating, so a content unlock applied during the drain - setting a
+        // flag that opens something else - leaves work pending. A tick can leave that
+        // for the next tick; a restore cannot, because it is a boundary the player
+        // sees before any tick is guaranteed to run, and a freshly seeded sandbox may
+        // never get one. So this drains until nothing is pending, and reports a cycle
+        // rather than spinning.
+        public void Restore(EconomyLocalSnapshot snapshot)
+        {
+            snapshot ??= EconomyLocalSnapshot.Empty;
+
+            Modifiers.BeginDeferredNotifications();
+
+            // Each primitive replaces over its OWN content rather than over the
+            // snapshot's keys, so anything the snapshot omits returns to its default
+            // instead of surviving from before.
+            Pool.RestoreAll(snapshot.Currencies, notify: false);
+            Generators.RestoreOwned(snapshot.GeneratorsOwned, notify: false);
+            Upgrades.RestoreApplied(snapshot.AppliedUpgradeIds, notify: false);
+            // progress first, which also drops every standing selection; then the
+            // snapshot's own selections, so a group is pouring into a bar if and only
+            // if the snapshot said it was
+            Bars.RestoreProgress(snapshot.BarProgress, notify: false);
+            Bars.RestoreActiveBars(snapshot.ActiveBarByGroup, notify: false);
+            Flags.Restore(snapshot.SetFlagIds, notify: false);
+
+            Conditions.MarkDirty();
+            ProjectModifiers();
+
+            // The bound is a diagnostic, not a tuning knob: a chapter's unlock chain
+            // is a handful deep, so exhausting this means content whose gates
+            // re-trigger each other rather than a legitimately long chain.
+            //
+            // The passes are drained INSIDE a Settled deferral and the tap value is
+            // refreshed once at the end, so however many passes it takes, subscribers
+            // see one settled signal describing finished state. Calling the public
+            // Settle() per pass - which is what this did - published every
+            // intermediate one: a section visible because pass one latched its flag,
+            // beside a tap value pass two had not yet moved. That is the half-derived
+            // state the whole method exists to prevent, arriving through the seam
+            // meant to guarantee its absence.
+            const int maxPasses = 8;
+            var passes = 0;
+            using (Conditions.DeferSettled())
+            {
+                do
+                {
+                    Conditions.Drain(_evaluateUnlocks);
+                    passes++;
+                }
+                while (Conditions.IsDirty && passes < maxPasses);
+
+                if (Conditions.IsDirty)
+                    Debug.LogError($"EconomyContext: restore of chapter '{Chapter?.Id}' still had condition work pending after {maxPasses} drain passes - content whose unlocks re-trigger each other. Leaving it for the next tick.");
+
+                // inside the deferral, so the composed tap value is final before the
+                // single Settled fires on the way out
+                Production.RefreshTapValue();
+            }
+
+            using (Conditions.SuppressInvalidation())
+            {
+                Modifiers.EndDeferredNotifications();
+                Pool.RepublishAll();
+                Generators.RepublishOwned();
+                Bars.RepublishAll();
+                // Flags are deliberately not replayed. A flag is only ever READ
+                // through a Condition, so everything gating on one already re-asked
+                // at the settle above - and FlagSet means "just latched", which a
+                // restored latch is not, the same distinction that keeps
+                // UpgradeApplied out of this replay.
+            }
+        }
+
+        // The chapter's permanent facts, with every run fact dropped. Each rule
+        // asks the declaration that owns the lifetime, so a chapter that scopes its
+        // content differently filters differently with no change here.
+        private EconomyLocalSnapshot PermanentInChapterFacts()
+        {
+            // a currency survives if its GROUP says a release does not take it
+            var currencies = new Dictionary<string, CurrencyState>();
+            foreach (var entry in Pool.CaptureAll())
+            {
+                if (!Pool.ResetsOnAlbumRelease(entry.Key))
+                    currencies.Add(entry.Key, entry.Value);
+            }
+
+            var upgrades = new List<string>();
+            foreach (var id in Upgrades.CaptureApplied())
+            {
+                if (Upgrades.ScopeOf(id) != ContentScope.Run)
+                    upgrades.Add(id);
+            }
+
+            var flags = new List<string>();
+            foreach (var id in Flags.CaptureSetFlags())
+            {
+                if (!Flags.IsRunScoped(id))
+                    flags.Add(id);
+            }
+
+            var bars = new Dictionary<string, IReadOnlyDictionary<string, BigNumber>>();
+            foreach (var entry in Bars.CaptureProgress())
+            {
+                var group = Bars.GetRuntime(entry.Key)?.Group;
+                if (group != null && group.Scope != ContentScope.Run)
+                    bars.Add(entry.Key, entry.Value);
+            }
+
+            // Generator counts are absent unconditionally, and that is a rule rather
+            // than an omission: the fleet is re-bought every run (the release zeroes
+            // it), so there is no such thing as a permanent owned count. A sandbox
+            // therefore starts with no band, which is what "tap-only" means before
+            // the debuff is even applied.
+            //
+            // Bar SELECTIONS are absent for the same kind of reason: a selection is a
+            // decision about where to pour this run's fill currency, and a sandbox
+            // has none of that currency to pour. Inheriting the frontier's target
+            // would be a live pointer into a run the sandbox is not playing.
+            return new EconomyLocalSnapshot(currencies, null, upgrades, bars, flags);
+        }
+
         // ---- operations ------------------------------------------------------
 
         public void Tick(double seconds)
@@ -189,13 +374,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Settle();
         }
 
-        // the tap action: every tap-triggered production config fires - the cash
-        // yield (composed with every modifier targeting tap value: flat adds
-        // like stage_presence, event-tier multipliers) and the fill currencies
-        // alike, all authored on the jam producer
-        public void Jam()
+        // The tap action for ONE producer: every tap-triggered config that producer
+        // holds fires - the cash yield (composed with every modifier targeting tap
+        // value: flat adds like stage_presence, event-tier multipliers) and the fill
+        // currencies alike. Chapter 1 passes "jam", the only tap surface it authors;
+        // the parameter exists so a second one (Merch/Sell) is a module entry and a
+        // producer asset rather than a rewrite of what a tap means.
+        public void Jam(string producerId)
         {
-            Production.FireTap();
+            Production.FireTap(producerId);
 
             // drain immediately so the active bar visibly nudges on the tap, not
             // a tick later

@@ -15,7 +15,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private CurrencyDefinition _cashDefinition;
         private CurrencyDefinition _fansDefinition;
 
-        public void Initialize(ChapterContext context)
+        // renders a roster resolved from the chapter, so it presents no single
+        // definition and its section entry names none
+        public ModuleDefinitionKind RequiredDefinition => ModuleDefinitionKind.None;
+
+        public void Initialize(ChapterContext context, string definitionId)
         {
             _context = context;
             _cashDefinition = context.Economy.Currencies.GetDefinition(GameManager.CashCurrencyId);

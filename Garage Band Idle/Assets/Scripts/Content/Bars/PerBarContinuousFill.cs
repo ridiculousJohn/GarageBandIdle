@@ -113,15 +113,49 @@ namespace RidiculousGaming.GarageBandIdle.Content
             return true;
         }
 
-        // after a restore the selection can never sit on a completed bar -
-        // Drain must never hold a completed target, exactly as completing it
-        // by drain would have cleared it
+        // A restore REPLACES, so the selection it replaces goes first -
+        // unconditionally, exactly as a run reset drops it. Clearing only a
+        // COMPLETED target (which is what this did) left an unrelated pre-restore
+        // bar selected, and the next drain poured restored fill currency into it:
+        // the snapshot decided every balance and every progress value, and then a
+        // decision from before the restore decided where the currency went.
+        //
+        // Whatever selection the snapshot itself carries is re-established
+        // afterwards by RestoreActiveBar, so a group ends up selected if and only if
+        // the snapshot said so.
         internal override bool ReconcileAfterRestore()
         {
-            if (_activeBar == null || !_activeBar.Completed)
+            if (_activeBar == null)
                 return false;
 
             _activeBar = null;
+            return true;
+        }
+
+        internal override string CaptureActiveBarId() => _activeBar?.Definition.Id;
+
+        // Re-establishes a saved selection, silently. Refuses a completed target for
+        // the reason the drain does: Drain must never hold a completed bar, so a
+        // snapshot naming one (stale save data, or a bar whose requirement was
+        // retuned downwards) leaves the group unselected rather than stuck.
+        internal override bool RestoreActiveBar(string barId)
+        {
+            if (string.IsNullOrEmpty(barId))
+                return false;
+
+            var target = FindBar(barId);
+            if (target == null)
+            {
+                Debug.LogError($"PerBarContinuousRuntime: RestoreActiveBar with unknown bar id '{barId}' in group '{Group.Id}'. Leaving the group unselected.");
+                return false;
+            }
+            if (target.Completed)
+                return false;
+
+            if (_activeBar == target)
+                return false;
+
+            _activeBar = target;
             return true;
         }
 

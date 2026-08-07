@@ -3,8 +3,10 @@ using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
 using RidiculousGaming.GarageBandIdle.Loop;
+using RidiculousGaming.GarageBandIdle.UI;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace RidiculousGaming.GarageBandIdle
 {
@@ -51,7 +53,7 @@ namespace RidiculousGaming.GarageBandIdle
                     ValidateProducer(producer, orphan);
             foreach (var section in database.Sections.All)
                 if (!visited.Sections.Contains(section.Id))
-                    ValidateSection(section, orphan);
+                    ValidateSection(section, orphan, null, database);
             foreach (var generator in database.Generators.All)
                 if (!visited.Generators.Contains(generator.Id))
                     ValidateGenerator(generator, orphan);
@@ -60,7 +62,7 @@ namespace RidiculousGaming.GarageBandIdle
                     ValidateUpgrade(upgrade, orphan);
             foreach (var group in database.BarGroups.All)
                 if (!visited.BarGroups.Contains(group.Id))
-                    ValidateBarGroup(group, database, orphan);
+                    ValidateBarGroup(group, database, orphan, rewards);
             foreach (var bar in database.Bars.All)
                 if (!visited.Bars.Contains(bar.Id))
                     ValidateBar(bar, orphan, rewards);
@@ -184,13 +186,14 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative fans perBandmateOwnedBonus ({chapter.Fans.PerBandmateOwnedBonus}).");
             if (chapter.RecordBuff.PerRecord < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative recordBuff perRecord ({chapter.RecordBuff.PerRecord}).");
-            // the primary pacing knob (design doc section 11): at zero the
-            // capstone is reachable before the player has released anything, so
-            // the chapter has no length at all
-            if (chapter.CapstoneRecordsGate <= 0)
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a non-positive capstoneRecordsGate ({chapter.CapstoneRecordsGate}) - the capstone would unlock before play starts.");
-
+            ValidateCapstone(chapter, context);
             ValidateFlagDeclarations(chapter, database, rewards);
+            ValidateIds(chapter.StoryBeatIds, database.StoryBeats, $"Chapter '{chapter.Id}' (storyBeats)");
+            foreach (var id in chapter.StoryBeatIds)
+            {
+                if (database.StoryBeats.TryGet(id, out var beat))
+                    ValidateStoryBeat(beat, context, chapter);
+            }
             // no ValidateIds over the roster: ChapterCurrencies.ValidateRoster
             // reports an unresolvable entry as part of the roster rules it owns,
             // and says what to do about it (re-run the import) rather than only
@@ -226,7 +229,33 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!database.Sections.TryGet(id, out var section))
                     continue;
                 visited.Sections.Add(id);
-                ValidateSection(section, context);
+                ValidateSection(section, context, chapter, database);
+            }
+
+            // Which producers this chapter's sections actually present. This is the
+            // check that replaces ProducerDefinition.ModuleAddress (retired in 6.5):
+            // "who presents this producer" is derived from the section entries that
+            // name it rather than restated on the producer, so the two can no longer
+            // disagree - and the thing worth reporting was never the missing string
+            // but the consequence, a tap surface the player cannot reach.
+            var presentedDefinitions = new HashSet<string>();
+            foreach (var sectionId in chapter.SectionIds)
+            {
+                if (!database.Sections.TryGet(sectionId, out var section))
+                    continue;
+                foreach (var entry in section.Modules)
+                {
+                    if (entry != null && !string.IsNullOrEmpty(entry.DefinitionId))
+                        presentedDefinitions.Add(entry.DefinitionId);
+                }
+            }
+
+            foreach (var id in chapter.ProducerIds)
+            {
+                if (!database.Producers.TryGet(id, out var producer) || !producer.HasTapConfigs)
+                    continue; // a passive producer (fan accrual) needs no surface
+                if (!presentedDefinitions.Contains(id))
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' producer '{id}' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
             }
 
             foreach (var id in chapter.GeneratorIds)
@@ -254,7 +283,7 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!database.BarGroups.TryGet(id, out var group))
                     continue;
                 visited.BarGroups.Add(id);
-                ValidateBarGroup(group, database, context);
+                ValidateBarGroup(group, database, context, rewards);
 
                 foreach (var barId in group.BarIds)
                 {
@@ -290,6 +319,113 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
+        // The capstone (design doc sections 1-2 and 5). Its unlock is now the SOLE
+        // authored source of the chapter gate, so what used to be a check on a
+        // scalar `capstoneRecordsGate > 0` becomes ordinary condition validation
+        // plus one thing ordinary validation cannot cover.
+        //
+        // Non-positive thresholds need nothing bespoke: every threshold condition
+        // calls Condition.ValidateThreshold, which reports one, and ThresholdIsMet
+        // fails closed so the gate is never met rather than always met. An empty
+        // compound is likewise already refused. What none of that catches is a NULL
+        // unlock, because by this codebase's convention a null Condition means "no
+        // gate" and is always met - which for a capstone means the chapter ends
+        // before it starts.
+        private static void ValidateCapstone(ChapterDefinition chapter, ConditionContext context)
+        {
+            var capstone = chapter.Capstone;
+            if (capstone == null || !capstone.IsAuthored)
+                return; // a chapter need not declare one
+
+            if (capstone.Unlock == null)
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' has no unlock condition - a null gate is always met, so the capstone would be offered at boot.");
+            else
+                ConditionEvaluator.Validate(capstone.Unlock, context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (unlock)");
+
+            // The completion flag is the chapter boundary, so it has to outlive a
+            // release: anything other than permanent-in-chapter clears at the next
+            // demo and re-opens a finished chapter. Compared for EQUALITY rather than
+            // against Run alone - None is the un-migrated value a hand-edited
+            // declaration can hold, and it is no more a lifetime than Run is.
+            if (string.IsNullOrEmpty(capstone.CompletionFlagId))
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' names no completion flag - nothing would record that the chapter finished.");
+            else
+            {
+                var declaration = FindFlag(chapter, capstone.CompletionFlagId);
+                if (declaration == null)
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' names completion flag '{capstone.CompletionFlagId}', which the chapter does not declare.");
+                else if (declaration.Scope != ContentScope.PermanentInChapter)
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone completion flag '{capstone.CompletionFlagId}' is declared {declaration.Scope} - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
+            }
+
+            if (capstone.OnComplete == null)
+            {
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' has no onComplete payload - completing it would grant nothing.");
+                return;
+            }
+
+            capstone.OnComplete.Validate(context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (onComplete)");
+
+            // The two halves have to name the SAME flag. Validated separately they
+            // each pass while disagreeing: the payload grants a Roadie and sets some
+            // other flag - or none - and the configured completion fact is never
+            // recorded, so slice 7 runs the capstone and the chapter never registers
+            // as finished. The flag-declaration sweep only warns about a flag nothing
+            // sets, which a payload setting the WRONG flag does not trigger.
+            if (!string.IsNullOrEmpty(capstone.CompletionFlagId)
+                && !SetsFlag(capstone.OnComplete, capstone.CompletionFlagId))
+                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' declares completion flag '{capstone.CompletionFlagId}' but its onComplete payload never sets it - completing the capstone would grant its rewards without recording that the chapter finished.");
+        }
+
+        // Whether an effect sets this flag anywhere beneath it, compounds included -
+        // the capstone's payload is a compound, so a non-recursive check would see
+        // only the wrapper.
+        private static bool SetsFlag(GameEffect effect, string flagId)
+        {
+            switch (effect)
+            {
+                case SetFlagEffect setFlag:
+                    return setFlag.FlagId == flagId;
+                case CompoundEffect compound:
+                    foreach (var child in compound.Effects)
+                    {
+                        if (SetsFlag(child, flagId))
+                            return true;
+                    }
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        // A beat is content that a card presents; its reveal is its SECTION's
+        // visibleWhen, so there is no gate here to check. What is left is that the
+        // card would have something to show, and that a read latch it records is a
+        // flag the chapter actually declares.
+        private static void ValidateStoryBeat(StoryBeatDefinition beat, ConditionContext context,
+            ChapterDefinition chapter)
+        {
+            if (string.IsNullOrEmpty(beat.Text))
+                Debug.LogError($"ContentValidator: Story beat '{beat.Id}' has no text - its card would show nothing.");
+
+            if (string.IsNullOrEmpty(beat.ReadFlagId))
+                return; // recording the read is optional
+
+            var declaration = FindFlag(chapter, beat.ReadFlagId);
+            if (declaration == null)
+                Debug.LogError($"ContentValidator: Story beat '{beat.Id}' records its read on flag '{beat.ReadFlagId}', which chapter '{chapter.Id}' does not declare.");
+        }
+
+        private static FlagDeclaration FindFlag(ChapterDefinition chapter, string flagId)
+        {
+            foreach (var declaration in chapter.Flags)
+            {
+                if (declaration != null && declaration.Id == flagId)
+                    return declaration;
+            }
+            return null;
+        }
+
         // The declared flag list is the chapter's whole reveal vocabulary - every
         // flag check anywhere is measured against it - so a blank entry declares
         // nothing and a repeat says the same thing twice, both of which read as
@@ -314,13 +450,24 @@ namespace RidiculousGaming.GarageBandIdle
             // the projection, a run-scoped one re-fires on its own gate.
             var setterScopes = new Dictionary<string, List<ContentScope>>();
 
+            // Recurses through compounds: a payload that sets a flag alongside
+            // something else (the capstone's Roadie + advance flag) is a setter just
+            // as much as a bare setFlag is, and pattern-matching only the bare form
+            // would report correct content as a flag nothing sets.
             void Record(GameEffect effect, ContentScope ownerScope)
             {
-                if (effect is not SetFlagEffect setFlag || string.IsNullOrEmpty(setFlag.FlagId))
-                    return;
-                if (!setterScopes.TryGetValue(setFlag.FlagId, out var scopes))
-                    setterScopes.Add(setFlag.FlagId, scopes = new List<ContentScope>());
-                scopes.Add(ownerScope);
+                switch (effect)
+                {
+                    case SetFlagEffect setFlag when !string.IsNullOrEmpty(setFlag.FlagId):
+                        if (!setterScopes.TryGetValue(setFlag.FlagId, out var scopes))
+                            setterScopes.Add(setFlag.FlagId, scopes = new List<ContentScope>());
+                        scopes.Add(ownerScope);
+                        return;
+                    case CompoundEffect compound:
+                        foreach (var child in compound.Effects)
+                            Record(child, ownerScope);
+                        return;
+                }
             }
 
             foreach (var id in chapter.UpgradeIds)
@@ -349,6 +496,14 @@ namespace RidiculousGaming.GarageBandIdle
                 foreach (var tier in gameEvent.Tiers)
                     Record(rewards?.Get(tier.RewardId)?.Effect, tier.Scope);
             }
+
+            // The capstone sets the chapter-advance flag through an ordinary
+            // setFlag, so it belongs in this sweep - otherwise correct content trips
+            // the "no content sets it" warning below. Recorded as permanent, which
+            // is what a chapter boundary is: completing the capstone is not a fact a
+            // release takes back.
+            if (chapter.Capstone != null && chapter.Capstone.IsAuthored)
+                Record(chapter.Capstone.OnComplete, ContentScope.PermanentInChapter);
 
             foreach (var flag in chapter.Flags)
             {
@@ -391,13 +546,10 @@ namespace RidiculousGaming.GarageBandIdle
         // these reports would just look mysteriously dead.
         private static void ValidateProducer(ProducerDefinition producer, ConditionContext context)
         {
-            // a producer with no module is a passive source (fan accrual): nothing
-            // presents it, so there is no address to resolve. Its production is
-            // still required below - with no module and no configs it would be a
-            // definition that does and shows nothing.
-            if (!string.IsNullOrEmpty(producer.ModuleAddress))
-                ValidateModuleAddress(producer.ModuleAddress, $"Producer '{producer.Id}'");
-
+            // No module check: a producer names no module any more (6.5). Which
+            // module presents it is the SECTION's declaration, and whether a tap
+            // producer has one at all is checked in ValidateChapter, where the
+            // section list is in hand.
             if (producer.Production.Count == 0)
                 Debug.LogError($"ContentValidator: Producer '{producer.Id}' has no production configs - it would produce nothing.");
 
@@ -420,26 +572,118 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        private static void ValidateSection(SectionDefinition section, ConditionContext context)
+        private static void ValidateSection(SectionDefinition section, ConditionContext context,
+            ChapterDefinition chapter, ContentDatabase database)
         {
             ConditionEvaluator.Validate(section.VisibleWhen, context, $"Section '{section.Id}' (visibleWhen)");
             // a section IS its modules: with none, its reveal shows an empty region.
             // The importer reports it too but writes the asset anyway (an empty
             // region is inert, not wrong), so this is the check that sees it in
             // loaded content - freshly imported or hand-edited alike.
-            if (section.ModuleAddresses.Count == 0)
+            if (section.Modules.Count == 0)
                 Debug.LogError($"ContentValidator: Section '{section.Id}' has no modules - its reveal would show an empty region.");
 
-            // the list is instantiated in order with no de-duplication, so a repeat
+            // The list is instantiated in order with no de-duplication, so a repeat
             // puts two of the same module in the region, each wired to the same
-            // systems - a doubled readout rather than an error anyone would trace
+            // systems - a doubled readout rather than an error anyone would trace.
+            //
+            // Keyed on address AND definition id, because a repeated ADDRESS is now
+            // legitimate: two story-beat cards are one prefab presenting two beats.
+            // What is still a mistake is the same prefab presenting the same thing
+            // twice.
             var seen = new HashSet<string>();
-            foreach (var address in section.ModuleAddresses)
+            foreach (var entry in section.Modules)
             {
-                if (!seen.Add(address))
-                    Debug.LogError($"ContentValidator: Section '{section.Id}' lists module '{address}' more than once - it would be instantiated twice.");
-                ValidateModuleAddress(address, $"Section '{section.Id}'");
+                if (entry == null)
+                {
+                    Debug.LogError($"ContentValidator: Section '{section.Id}' has a null module entry.");
+                    continue;
+                }
+
+                var key = $"{entry.Address}|{entry.DefinitionId}";
+                if (!seen.Add(key))
+                {
+                    Debug.LogError(string.IsNullOrEmpty(entry.DefinitionId)
+                        ? $"ContentValidator: Section '{section.Id}' lists module '{entry.Address}' more than once - it would be instantiated twice."
+                        : $"ContentValidator: Section '{section.Id}' lists module '{entry.Address}' for '{entry.DefinitionId}' more than once - it would be instantiated twice.");
+                }
+                ValidateModuleBinding(entry, section, chapter, database);
             }
+        }
+
+        // The binding a parameterized module entry declares, checked against what the
+        // module actually needs (ModuleDefinitionKind). Membership in ANY of the
+        // chapter's content lists is not enough: a tap button naming a story beat and
+        // a card naming the jam producer both resolve that way, the producer counts
+        // as presented, and the Jam button is dead. So the module is asked what family
+        // it requires, and the id is resolved against exactly that.
+        //
+        // The prefab is the authority because it is the thing with the requirement -
+        // a table of addresses here would restate what a prefab already knows and
+        // could disagree with it. Loading one asset per entry is the same order of
+        // cost as the address check beside it.
+        //
+        // The whole binding check is skipped for an orphan (null chapter), the same
+        // allowance the flag checks make: no declaration list governs a section no
+        // chapter lists.
+        private static void ValidateModuleBinding(SectionModule entry, SectionDefinition section,
+            ChapterDefinition chapter, ContentDatabase database)
+        {
+            var source = $"Section '{section.Id}' module '{entry.Address}'";
+            if (!TryLoadModulePrefab(entry.Address, source, out var module, out var handle))
+                return;
+
+            try
+            {
+                var required = module.RequiredDefinition;
+
+                if (required == ModuleDefinitionKind.None)
+                {
+                    // it renders a roster resolved from the chapter, so an id here
+                    // would be read by nobody - which looks like a binding and is not
+                    if (!string.IsNullOrEmpty(entry.DefinitionId))
+                        Debug.LogError($"ContentValidator: {source} names definition '{entry.DefinitionId}', but that module presents a whole roster and reads no definition id.");
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(entry.DefinitionId))
+                {
+                    Debug.LogError($"ContentValidator: {source} presents a {required} but its section entry names none - the module would present nothing.");
+                    return;
+                }
+
+                if (chapter == null)
+                    return;
+
+                switch (required)
+                {
+                    case ModuleDefinitionKind.TapProducer:
+                        if (!Names(chapter.ProducerIds, entry.DefinitionId))
+                            Debug.LogError($"ContentValidator: {source} presents producer '{entry.DefinitionId}', which chapter '{chapter.Id}' does not declare - the module would present nothing.");
+                        else if (database.Producers.TryGet(entry.DefinitionId, out var producer) && !producer.HasTapConfigs)
+                            Debug.LogError($"ContentValidator: {source} presents producer '{entry.DefinitionId}', which authors no tap configs - pressing it would pay nothing.");
+                        break;
+
+                    case ModuleDefinitionKind.StoryBeat:
+                        if (!Names(chapter.StoryBeatIds, entry.DefinitionId))
+                            Debug.LogError($"ContentValidator: {source} presents story beat '{entry.DefinitionId}', which chapter '{chapter.Id}' does not declare - the card would show nothing.");
+                        break;
+                }
+            }
+            finally
+            {
+                Addressables.Release(handle);
+            }
+        }
+
+        private static bool Names(IReadOnlyList<string> ids, string id)
+        {
+            for (var i = 0; i < ids.Count; i++)
+            {
+                if (ids[i] == id)
+                    return true;
+            }
+            return false;
         }
 
         private static void ValidateGenerator(GeneratorDefinition generator, ConditionContext context)
@@ -495,11 +739,38 @@ namespace RidiculousGaming.GarageBandIdle
             if (upgrade.Payload == null)
                 Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload.");
             else
+            {
                 upgrade.Payload.Validate(context, $"Upgrade '{upgrade.Id}' (payload)");
+
+                // UpgradeDefinition owns the rule; this reports it with the chapter in
+                // hand. UpgradeSystem asks the SAME question and refuses to register
+                // the upgrade, which is what keeps the payout from being banked by the
+                // boot settle before this report is ever printed.
+                if (upgrade.CarriesRepeatablePayout)
+                    Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' is a content unlock carrying a one-shot effect - a content unlock re-applies through the acquisition path whenever its latch is absent and its gate holds (a release clears run-scoped latches, and a restore clears any the snapshot omits), so the payout would be granted more than once. Move the payout to content acquired by a player action: a bought buff, an event tier, or the capstone.");
+            }
         }
 
-        private static void ValidateBarGroup(BarGroupDefinition group, ContentDatabase database, ConditionContext context)
+        private static void ValidateBarGroup(BarGroupDefinition group, ContentDatabase database,
+            ConditionContext context, RewardManager rewards)
         {
+            // The bar-group half of the re-acquisition rule (see
+            // ValidateOneShotIsNotRepeatable): a run-scoped group's bars reset at
+            // every release and are re-completed, so a payout on one is paid every
+            // run. Checked from the GROUP because a bar does not know which group
+            // holds it - the scope that decides this lives here.
+            if (group.Scope == ContentScope.Run)
+            {
+                foreach (var barId in group.BarIds)
+                {
+                    if (!database.Bars.TryGet(barId, out var bar))
+                        continue;
+                    var effect = rewards?.Get(bar.RewardId)?.Effect;
+                    if (effect != null && effect.ContainsOneShot)
+                        Debug.LogError($"ContentValidator: Bar '{bar.Id}' is in run-scoped group '{group.Id}' and its reward carries a one-shot effect - the release resets the bar, so re-completing it would pay again every run.");
+                }
+            }
+
             if (group.FillBehavior == null)
                 Debug.LogError($"ContentValidator: Bar group '{group.Id}' has no fill behavior.");
             else
@@ -657,6 +928,43 @@ namespace RidiculousGaming.GarageBandIdle
 
             if (!rewards.Contains(rewardId))
                 Debug.LogError($"ContentValidator: {source} references unknown reward id '{rewardId}'.");
+        }
+
+        // Loads a module prefab so its declared requirement can be read. Returns the
+        // handle for release: the address check beside this one leaks its handle
+        // today, and adding a second leak per module would not be an improvement.
+        // A prefab with no IChapterModule is reported here rather than only at
+        // instantiation - ChapterScreen says the same thing, but at boot the section
+        // that names it is still in hand.
+        private static bool TryLoadModulePrefab(string address, string source,
+            out IChapterModule module, out AsyncOperationHandle<GameObject> handle)
+        {
+            module = null;
+            handle = default;
+            if (string.IsNullOrEmpty(address))
+                return false;
+
+            try
+            {
+                handle = Addressables.LoadAssetAsync<GameObject>(address);
+                var prefab = handle.WaitForCompletion();
+                if (prefab == null)
+                    return false; // the address check reports an unresolvable address
+
+                if (prefab.TryGetComponent(out module))
+                    return true;
+
+                Debug.LogError($"ContentValidator: {source} has no IChapterModule component on its root - the section would instantiate it and initialize nothing.");
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError($"ContentValidator: {source} could not be loaded to check what it presents ({exception.Message}).");
+            }
+
+            if (handle.IsValid())
+                Addressables.Release(handle);
+            handle = default;
+            return false;
         }
 
         // a module address must resolve to at least one addressable location, or

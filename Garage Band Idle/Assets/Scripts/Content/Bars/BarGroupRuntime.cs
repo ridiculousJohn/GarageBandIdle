@@ -64,7 +64,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
             // reward asset and the content that pays it can never disagree about how
             // long the effect lives.
             if (!string.IsNullOrEmpty(bar.Definition.RewardId))
-                _rewards.Apply(bar.Definition.RewardId, _effectContext, Group.Scope);
+                _rewards.ApplyOnAcquisition(bar.Definition.RewardId, _effectContext, Group.Scope);
 
             Completed?.Invoke(bar);
         }
@@ -85,7 +85,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
             foreach (var bar in _bars)
             {
                 if (bar.Completed && !string.IsNullOrEmpty(bar.Definition.RewardId))
-                    _rewards.Apply(bar.Definition.RewardId, _effectContext, Group.Scope);
+                    _rewards.Project(bar.Definition.RewardId, _effectContext, Group.Scope);
             }
         }
 
@@ -100,5 +100,18 @@ namespace RidiculousGaming.GarageBandIdle.Content
         internal virtual bool ReconcileAfterRunReset() => false;
         internal virtual bool ReconcileAfterRestore() => false;
         internal virtual void NotifyModeStateChanged() { }
+
+        // The mode's own saved state, for modes that have any. A player-directed
+        // group has a selection - which bar the pool is draining into - and that is
+        // INTENT rather than progress, so it is captured and restored alongside the
+        // bar values rather than being derived from them. Modes with no selection
+        // (a future dump-the-pool or fixed-order mode) answer null and ignore the
+        // restore, which is why this is a virtual pair here rather than a cast to
+        // PerBarContinuousFill in BarSystem.
+        internal virtual string CaptureActiveBarId() => null;
+
+        // Returns whether mode state changed; notification is the host's, deferred
+        // until every group has settled (state, then notify).
+        internal virtual bool RestoreActiveBar(string barId) => false;
     }
 }

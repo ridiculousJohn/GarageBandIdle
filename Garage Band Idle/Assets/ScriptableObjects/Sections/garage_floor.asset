@@ -14,9 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: garage_floor
   _displayName: The Garage Floor
-  _moduleAddresses:
-  - module/currency-header
-  - module/tap
+  _modules:
+  - _address: module/currency-header
+    _definitionId:
+  - _address: module/tap
+    _definitionId: jam
   _visibleWhen:
     rid: -2
   references:

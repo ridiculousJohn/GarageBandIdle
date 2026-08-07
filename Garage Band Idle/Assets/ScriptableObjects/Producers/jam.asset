@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: jam
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ProducerDefinition
   _id: jam
-  _moduleAddress: module/tap
   _production:
   - _currencyId: cash
     _amount: 1

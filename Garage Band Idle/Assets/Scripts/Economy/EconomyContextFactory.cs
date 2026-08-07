@@ -55,7 +55,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // pool, and "everything that was imported" is not a statement about
         // which economy owns what.
         public static EconomyContext Build(ChapterDefinition chapter, ContentDatabase database,
-            CurrencyManager permanentPool, EconomyRecipe recipe)
+            CurrencyManager permanentPool, EconomyRecipe recipe, EconomyLocalSnapshot seed = null)
         {
             if (chapter == null)
             {
@@ -63,9 +63,23 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return null;
             }
 
+            // The recipe decides which permanent pool this economy can reach, and it
+            // is a routing decision rather than a filter: an event sandbox gets a
+            // PRIVATE pool built from the same Global definitions, so a stray write
+            // to Records or Roadies inside a challenge lands somewhere that is
+            // discarded with the context. Withholding the income modifier alone
+            // would have left the sandbox able to bank real progress.
+            var reachablePermanentPool = recipe != null && recipe.PoolRouting == PermanentPoolRouting.Isolated
+                ? BuildPermanentPool(database)
+                : permanentPool;
+
+            // The roster is still checked against the pool the CALLER owns, not the
+            // private one: shadowing a global id is a content mistake regardless of
+            // which economy is being built, and asking the fresh pool would let a
+            // sandbox accept a roster the frontier refuses.
             var pool = new CurrencyManager(database.CurrencyGroups.All,
                 ResolveRoster(chapter, database, permanentPool));
-            var router = new CurrencyRouter(pool, permanentPool);
+            var router = new CurrencyRouter(pool, reachablePermanentPool);
 
             // built before the systems that read it: every stat effect in the
             // game composes through here, so no system holds its own stack
@@ -126,12 +140,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 production, bars, rewards, conditions,
                 Resolve(database.Sections, chapter.SectionIds, "section"));
 
-            // A fresh economy has no facts, so this grants nothing; a loaded one
-            // (slice 9) has restored latches and completed bars, and this is what
-            // turns them back into effects. Running it unconditionally is the
-            // point - the projection is the only door a modifier enters through,
-            // so there is no path that skips it (rule 6).
-            context.ProjectModifiers();
+            // Every economy comes up through the SAME door (design doc section 12,
+            // rule 6): apply the seed, project, settle, announce - one order, one
+            // implementation, inside EconomyContext.Restore. A new run passes the
+            // empty seed and the sequence still runs, which is the point: a fresh
+            // economy and a loaded one are the same operation with different data,
+            // so there is no second path that could skip the projection or forget to
+            // settle. Empty rather than null so "restore nothing" is data a caller
+            // can pass rather than a call it omits.
+            context.Restore(seed ?? EconomyLocalSnapshot.Empty);
             return context;
         }
 

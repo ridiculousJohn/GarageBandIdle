@@ -117,7 +117,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // every count settles before any notification fires, so a subscriber
         // never observes a half-restored fleet (state, then notify). An
         // unknown id is stale save data: reported and skipped.
-        public void RestoreOwned(IReadOnlyDictionary<string, int> ownedById)
+        //
+        // REPLACEMENT, not a merge: a generator the snapshot omits is restored to
+        // zero, not left holding whatever this fleet had. A new run's empty seed
+        // and a load are then the same operation with different data, which is
+        // what lets EconomyContext.Restore be the only place the order lives.
+        //
+        // notify: false defers publication to the context-wide restore, which
+        // announces one settled state after projection. The default is unchanged,
+        // so every existing caller behaves exactly as before.
+        public void RestoreOwned(IReadOnlyDictionary<string, int> ownedById, bool notify = true)
         {
             if (ownedById == null)
             {
@@ -136,9 +145,44 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 if (generator.RestoreOwned(entry.Value))
                     changed.Add(generator);
             }
+
+            // the replacement half: anything the snapshot did not name goes to zero
+            foreach (var generator in _generators)
+            {
+                if (ownedById.ContainsKey(generator.Definition.Id))
+                    continue;
+                if (generator.RestoreOwned(0))
+                    changed.Add(generator);
+            }
+
+            if (!notify)
+                return;
+
             foreach (var generator in changed)
                 generator.NotifyOwnedChanged();
         }
 
+        // Re-announces every owned count. The notification half of a silent
+        // restore: OwnedChanged carries no delta, so replaying it for the whole
+        // fleet is a full refresh, which is what a restore is.
+        public void RepublishOwned()
+        {
+            foreach (var generator in _generators)
+                generator.NotifyOwnedChanged();
+        }
+
+        // Owned counts for a capture, in the chapter's declaration order. Only
+        // non-zero counts are recorded: zero is what an absent entry restores to,
+        // so writing it would be stating the default twice.
+        public IReadOnlyDictionary<string, int> CaptureOwned()
+        {
+            var owned = new Dictionary<string, int>();
+            foreach (var generator in _generators)
+            {
+                if (generator.Owned > 0)
+                    owned.Add(generator.Definition.Id, generator.Owned);
+            }
+            return owned;
+        }
     }
 }

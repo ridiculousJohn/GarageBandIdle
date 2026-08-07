@@ -104,7 +104,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeContext(currencies, flags: flags));
 
             production.Tick(10);
-            production.FireTap();
+            production.FireTap("jam");
             Assert.AreEqual(0.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "no accrual before the gate");
             Assert.AreEqual(0.0, production.RatePerSecond("rehearsal").ToDouble(), 1e-9);
 
@@ -112,7 +112,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             production.Tick(10);
             Assert.AreEqual(10.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "per-sec amount x seconds");
-            production.FireTap();
+            production.FireTap("jam");
             Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "+per-tap amount on a Jam tap");
         }
 
@@ -141,7 +141,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // what a tap actually pays while the gate is shut - the number the
             // readout has to agree with
-            production.FireTap();
+            production.FireTap("jam");
             Assert.AreEqual(0.0, currencies.Get("rehearsal").ToDouble(), 1e-9);
 
             flags.Set("covers");
@@ -150,7 +150,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2.0, production.PerTap("rehearsal").ToDouble(), 1e-9);
             Assert.AreEqual(1.0, production.RatePerSecond("rehearsal").ToDouble(), 1e-9);
 
-            production.FireTap();
+            production.FireTap("jam");
             Assert.AreEqual(2.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the tap pays what the readout advertised");
         }
 
@@ -178,7 +178,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             flags.Set("covers");
             production.Tick(10);
-            production.FireTap();
+            production.FireTap("jam");
 
             Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the gated-open currency earns tick + tap");
             Assert.AreEqual(0.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "its own gate governs it, not another's");
@@ -533,6 +533,57 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             string groupId, Dictionary<string, BigNumber> progressByBarId)
             => new Dictionary<string, IReadOnlyDictionary<string, BigNumber>> { [groupId] = progressByBarId };
 
+        // A selection is player INTENT, not progress, so a restore has to say what it
+        // is - and before 6.5 it said nothing: RestoreProgress cleared a selection
+        // only when its bar had become complete, so an unrelated pre-restore target
+        // survived and the next drain poured the restored fill currency into it. Every
+        // balance and every progress value came from the snapshot; where the currency
+        // went came from a decision made before it.
+        [Test]
+        public void RestoreProgress_DropsAnyStandingSelection_AndRestoreActiveBarsPutsBackTheSnapshots()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            flags.Set("covers");
+            var bars = MakeCoversSetup(currencies, flags, out _);
+            var runtime = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
+
+            runtime.SetActiveBar("cover_3");
+            Assert.AreEqual("cover_3", runtime.ActiveBar.Definition.Id);
+
+            // a snapshot about cover_1 only - it says nothing about cover_3, so
+            // nothing may still be pouring into cover_3
+            bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber> { ["cover_1"] = 10 }));
+            Assert.IsNull(runtime.ActiveBar, "the standing selection went with the state it belonged to");
+
+            bars.RestoreActiveBars(new Dictionary<string, string> { ["learn_covers"] = "cover_1" });
+            Assert.AreEqual("cover_1", runtime.ActiveBar.Definition.Id, "the snapshot's own choice is back");
+
+            // and it round-trips
+            CollectionAssert.AreEquivalent(new[] { "learn_covers" }, bars.CaptureActiveBars().Keys);
+            Assert.AreEqual("cover_1", bars.CaptureActiveBars()["learn_covers"]);
+        }
+
+        // Drain must never hold a completed target, so a snapshot naming one - stale
+        // save data, or a requirement retuned downwards - leaves the group unselected
+        // rather than stuck on a bar that can take nothing.
+        [Test]
+        public void RestoreActiveBars_RefusesACompletedTarget()
+        {
+            var currencies = MakeEconomyWithRehearsal();
+            var flags = new FlagSystem();
+            flags.Set("covers");
+            var bars = MakeCoversSetup(currencies, flags, out _);
+            var runtime = (PerBarContinuousRuntime)bars.GetRuntime("learn_covers");
+
+            bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber> { ["cover_1"] = 120 }));
+            Assert.IsTrue(bars.GetBars("learn_covers")[0].Completed);
+
+            bars.RestoreActiveBars(new Dictionary<string, string> { ["learn_covers"] = "cover_1" });
+
+            Assert.IsNull(runtime.ActiveBar, "a completed bar is never the drain's target");
+        }
+
         // save/load: the snapshot re-establishes progress through the same
         // clamp-and-derive rule as accrual - a restored completion is
         // recorded fact (no reward, no BarCompleted), and the derivation
@@ -564,10 +615,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0, completions, "a restored completion is fact, not an occurrence");
             Assert.AreEqual(0.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "restore grants no rewards");
 
-            // authoritative in both directions: below the requirement un-completes
+            // Authoritative in both directions, and REPLACEMENT rather than a merge
+            // (6.5): cover_1 falls below its requirement and un-completes, AND the
+            // bars this snapshot does not name return to zero instead of keeping
+            // what they held - so cover_3's completion goes with them. A merge would
+            // leave a previous restore's progress standing under a different
+            // snapshot, which is two routes to one state.
             bars.RestoreProgress(Snapshot("learn_covers", new Dictionary<string, BigNumber> { ["cover_1"] = 10 }));
             Assert.IsFalse(list[0].Completed);
-            Assert.AreEqual(1, bars.CompletedCount("learn_covers"));
+            Assert.AreEqual(0.0, list[2].Progress.ToDouble(), 1e-9,
+                "a bar the snapshot omits is cleared, not left alone");
+            Assert.AreEqual(0, bars.CompletedCount("learn_covers"));
 
             // corrupt save data fails closed to an empty bar
             LogAssert.Expect(LogType.Error,

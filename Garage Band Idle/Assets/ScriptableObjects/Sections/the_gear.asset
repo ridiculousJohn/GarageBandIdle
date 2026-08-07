@@ -14,14 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: the_gear
   _displayName: The Gear
-  _moduleAddresses:
-  - module/upgrade-list
+  _modules:
+  - _address: module/upgrade-list
+    _definitionId:
   _visibleWhen:
-    rid: 1001
+    rid: 1000
   references:
     version: 2
     RefIds:
-    - rid: 1001
+    - rid: 1000
       type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _flagId: gear

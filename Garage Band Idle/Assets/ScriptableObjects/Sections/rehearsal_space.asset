@@ -14,15 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: rehearsal_space
   _displayName: The Rehearsal Space
-  _moduleAddresses:
-  - module/bar-list
+  _modules:
+  - _address: module/bar-list
+    _definitionId:
   _visibleWhen:
-    rid: 1000
-  _scope: 1
+    rid: 1001
   references:
     version: 2
     RefIds:
-    - rid: 1000
+    - rid: 1001
       type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _flagId: covers

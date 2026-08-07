@@ -22,9 +22,7 @@
     "index": 1,
     "name": "Garage / Basement",
     "theme": "The band forms in a garage and plays its first backyard show.",
-    "storyBeatOpen": "It starts in the garage. Just you, a beat-up amp, and a handful of songs you half-know. Time to make some noise.",
-    "storyBeatCapstone": "The backyard's packed. You plug in, count off, and for three minutes the whole neighborhood is yours. Someone's already asking when the next one is — and a guy named Dave offers to haul your gear. You've got your first roadie.",
-    "capstoneRecordsGate": 30
+    "note": "The story beats moved to the `storyBeats` array below and the capstone threshold to `capstone.unlock` - both were second homes for something authored elsewhere. `capstoneRecordsGate` stated the same number as `capstone.unlock` while the Condition was the one nothing imported, and the beats were the only content kind with no definition of their own, which is why they could not be revealed or listed like anything else."
   },
 
   "constants": {
@@ -42,7 +40,9 @@
     { "id": "fans",   "scope": "run", "setBy": "upgrade:play_for_crowd", "reveals": "Fans currency + fan meter" },
     { "id": "covers", "scope": "run", "setBy": "upgrade:learn_covers",   "reveals": "Rehearsal currency + Learn Covers bar group" },
     { "id": "gear",   "scope": "run", "setBy": "upgrade:browse_gear",    "reveals": "The Gear buff list" },
-    { "id": "album",  "setBy": "upgrade:cut_demo",       "reveals": "Album/Cut-a-Demo (prestige) button" }
+    { "id": "album",  "setBy": "upgrade:cut_demo",       "reveals": "Album/Cut-a-Demo (prestige) button" },
+    { "id": "chapter_2_unlocked", "setBy": "capstone:backyard_party", "reveals": "the capstone story beat; marks the chapter boundary",
+      "note": "Permanent-in-chapter (the default): a run-scoped completion flag would clear at the next release and re-open a finished chapter. ONE flag, not two - it is both 'this chapter is finished' and 'chapter 2 may open', and nothing in Ch1 can tell those apart. Set by the capstone's onComplete through an ordinary setFlag effect rather than by capstone code, so the flag-setter sweep in boot validation can see it." }
   ],
   "flagsNote": "The single reveal registry. A content-unlock upgrade (or a reward) sets a flag via a `setFlag` payload; anything that should appear when a system exists gates on `{ \"type\": \"flagSet\", \"flag\": <id> }`. Each flag's `scope` declares its latch's lifetime (absent = permanentInChapter, survives demos): a `run` flag clears at every album release, so everything gating on it goes dark together and re-arms when its run-scoped setter re-fires — the second-run flow re-walks the progression (band → fans → covers) instead of opening with everything taught. A run flag needs a run-scoped setter (boot-validated): with only permanent setters the projection re-asserts it in the same release. `setBy` is documentation only — the payload is the authoritative setter, and boot validation sweeps payloads to warn on a flag no content sets.",
 
@@ -50,7 +50,11 @@
     {
       "id": "garage_floor",
       "name": "The Garage Floor",
-      "modules": [ "module/currency-header", "module/tap" ],
+      "modules": [
+        "module/currency-header",
+        { "module": "module/tap", "definition": "jam",
+          "note": "A module entry names the definition it presents when the prefab alone cannot say. The Jam button fires THIS producer's tap configs - previously a tap fired every tap producer in the chapter, which was invisible with one and wrong with two. Modules that render a whole roster (the currency header above, generator/upgrade/bar lists) stay bare address strings." }
+      ],
       "note": "No visibleWhen: visible from chapter start. Module ids are Addressable keys resolved through a string→prefab registry loaded by label. A section shows exactly WHILE its visibleWhen holds — evaluated live, no latch of its own (progressive reveal, design doc §2). Persistence is authored in the STATE the condition reads: gate on a flag and the section inherits the flag's declared lifetime; gate on a monotonic value (earned totals) and it can never strobe; a threshold moment worth remembering is latched by a passive contentUnlock setting a flag (see browse_gear)."
     },
     {
@@ -242,7 +246,7 @@
   "producers": [
     {
       "id": "jam",
-      "module": "module/tap",
+      "moduleNote": "No `module` key: which module presents a producer is authored on the SECTION's module entry (`{ module, definition }`, see garage_floor above), and the runtime fires THAT producer's tap configs. The producer used to restate it here, validated and read by nothing, so a tap fired every tap producer in the chapter - two declarations of one relationship, able to disagree. A leftover `module` key is now refused at import. 'Nothing presents this producer' is derived instead: no section entry names it, which boot validation reports for a TAP producer (a surface nobody can press) and allows for a passive one like `band`.",
       "production": [
         { "currency": "cash", "amount": 1, "trigger": "tap", "composes": "tapValue" },
         { "currency": "rehearsal", "amount": 2, "trigger": "tap", "gate": { "type": "flagSet", "flag": "covers" } },
@@ -348,17 +352,29 @@
     }
   ],
 
+  "storyBeats": [
+    {
+      "id": "beat_open",
+      "text": "It starts in the garage. Just you, a beat-up amp, and a handful of songs you half-know. Time to make some noise."
+    },
+    {
+      "id": "beat_capstone",
+      "text": "The backyard's packed. You plug in, count off, and for three minutes the whole neighborhood is yours. Someone's already asking when the next one is — and a guy named Dave offers to haul your gear. You've got your first roadie."
+    }
+  ],
+  "storyBeatsNote": "Story beats are ordinary content: a definition with an id and text, listed on the chapter, presented by a card module whose section entry names which beat it shows. They carry NO unlock and NO scope, because reveal is their SECTION's visibleWhen exactly as it is for the Jam button — beat_open in an always-visible section, beat_capstone in one gating on `chapter_2_unlocked`. Optional `readFlag` records that a beat was dismissed, for content that wants to gate on having read it; Ch1 authors none, so nothing records the read yet. Slice 10 builds the card prefab and places both in sections — a section pointing at a module address with no prefab fails boot validation, so the sections are authored there rather than here.",
+
   "capstone": {
     "id": "backyard_party",
     "name": "Play the Backyard Party",
     "unlock": { "type": "recordsCumulative", "value": 30 },
+    "unlockNote": "The SOLE authored source of the chapter gate, and the primary pacing knob. Imported through the same ConditionEvaluator every other gate uses; the old scalar `chapter.capstoneRecordsGate` is deleted rather than kept in step, because two homes for one threshold meant the authored Condition was the one being ignored.",
     "onComplete": {
       "grantRoadies": 1,
-      "roadieSystemUIUnlocked": false,
-      "roadieNote": "First Roadie is a story reward here. The allocation/replay system stays locked until Chapter 2.",
-      "fireStoryBeat": "storyBeatCapstone",
-      "advanceToChapter": 2
-    }
+      "completionFlag": "chapter_2_unlocked"
+    },
+    "onCompleteNote": "Friendly keys over ONE effect family: grantRoadies imports as a one-shot grantCurrency effect on the global `roadies` currency, completionFlag as a projectable setFlag, and the pair as a compound. One-shot means paid once ever - the projection refuses it, so no release, load or reprojection can bank a second Roadie. The Roadie allocation/replay UI stays locked until Chapter 2; there is no field for that here because a locked UI is the absence of a Chapter 2, not a fact to author.",
+    "storyBeatNote": "No `fireStoryBeat` key: the capstone does not push a beat. `beat_capstone` below is revealed by its SECTION's visibleWhen gating on `chapter_2_unlocked`, which is the same pull every other module's reveal uses - setting the flag IS showing the beat."
   },
 
   "progression": [
@@ -374,9 +390,9 @@
 
   "balanceTargets": {
     "timeToFirstDemoSeconds": 300,
-    "capstoneRecordsGate": 30,
     "estDemoCyclesToCapstone": "8-12",
-    "primaryPacingKnob": "capstoneRecordsGate — raise/lower before touching generator or fan curves",
+    "primaryPacingKnob": "capstone.unlock.value — raise/lower before touching generator or fan curves",
+    "primaryPacingKnobNote": "This is a POINTER, not a second copy. It used to restate the threshold as `capstoneRecordsGate: 30` here as well, which is how a tuning number ends up with three homes and two of them stale.",
     "tuneAgainst": "a player with full multiplier stack active (here just Encore up to 4x + records); confirm the chapter still takes meaningful play time"
   }
 }

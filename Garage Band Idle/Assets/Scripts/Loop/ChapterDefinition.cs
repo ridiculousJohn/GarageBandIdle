@@ -32,20 +32,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         [TextArea]
         private string _theme;
 
-        [Header("Story")]
-        [SerializeField]
-        [TextArea]
-        private string _storyBeatOpen;
-
-        [SerializeField]
-        [TextArea]
-        private string _storyBeatCapstone;
-
         [Header("Tuning")]
-        [SerializeField]
-        [Tooltip("Cumulative Records required to unlock the capstone gig. The primary pacing knob.")]
-        private int _capstoneRecordsGate;
-
         [SerializeField]
         private RecordBuffConfig _recordBuff = new();
 
@@ -54,6 +41,9 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 
         [SerializeField]
         private AlbumConfig _album = new();
+
+        [SerializeField]
+        private CapstoneConfig _capstone = new();
 
         [Header("Content")]
         [SerializeField]
@@ -93,16 +83,20 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         [DefinitionId(typeof(EventDefinition))]
         private List<string> _eventIds = new();
 
+        [SerializeField]
+        [DefinitionId(typeof(StoryBeatDefinition))]
+        [Tooltip("Story beats this chapter authors. A section's module entry names which one a card " +
+            "presents; reveal is that section's visibleWhen, like every other module.")]
+        private List<string> _storyBeatIds = new();
+
         public string Id => _id;
         public int Index => _index;
         public string DisplayName => _displayName;
         public string Theme => _theme;
-        public string StoryBeatOpen => _storyBeatOpen;
-        public string StoryBeatCapstone => _storyBeatCapstone;
-        public int CapstoneRecordsGate => _capstoneRecordsGate;
         public RecordBuffConfig RecordBuff => _recordBuff;
         public FansConfig Fans => _fans;
         public AlbumConfig Album => _album;
+        public CapstoneConfig Capstone => _capstone;
         public IReadOnlyList<FlagDeclaration> Flags => _flags;
 
         // the declared ids alone, for consumers that only resolve or validate
@@ -125,26 +119,24 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         public IReadOnlyList<string> UpgradeIds => _upgradeIds;
         public IReadOnlyList<string> BarGroupIds => _barGroupIds;
         public IReadOnlyList<string> EventIds => _eventIds;
+        public IReadOnlyList<string> StoryBeatIds => _storyBeatIds;
 
 #if UNITY_EDITOR
         // importer-only: chapter assets are generated from chapter JSON
         public void EditorInitialize(string id, int index, string displayName, string theme,
-            string storyBeatOpen, string storyBeatCapstone, int capstoneRecordsGate,
-            RecordBuffConfig recordBuff, FansConfig fans, AlbumConfig album,
+            RecordBuffConfig recordBuff, FansConfig fans, AlbumConfig album, CapstoneConfig capstone,
             List<FlagDeclaration> flags, List<string> currencyIds, List<string> producerIds,
             List<string> sectionIds, List<string> generatorIds, List<string> upgradeIds,
-            List<string> barGroupIds, List<string> eventIds)
+            List<string> barGroupIds, List<string> eventIds, List<string> storyBeatIds)
         {
             _id = id;
             _index = index;
             _displayName = displayName;
             _theme = theme;
-            _storyBeatOpen = storyBeatOpen;
-            _storyBeatCapstone = storyBeatCapstone;
-            _capstoneRecordsGate = capstoneRecordsGate;
             _recordBuff = recordBuff;
             _fans = fans;
             _album = album ?? new AlbumConfig();
+            _capstone = capstone ?? new CapstoneConfig();
             _flags = flags;
             _currencyIds = currencyIds;
             _producerIds = producerIds;
@@ -153,6 +145,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             _upgradeIds = upgradeIds;
             _barGroupIds = barGroupIds;
             _eventIds = eventIds;
+            _storyBeatIds = storyBeatIds ?? new List<string>();
         }
 #endif
     }
@@ -212,6 +205,71 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         public AlbumConfig(Condition releaseWhen)
         {
             _releaseWhen = releaseWhen;
+        }
+#endif
+    }
+
+    // The chapter capstone (design doc sections 1-2 and 5): the gig that ends the
+    // chapter. Parallel to AlbumConfig, and for the same reason - it is a thing the
+    // chapter declares about itself rather than an entry in one of the content id
+    // lists.
+    //
+    // The unlock Condition is the SOLE authored source of the gate. A scalar
+    // `capstoneRecordsGate` used to sit on the chapter as well, stating the same
+    // threshold in a second place while the authored Condition was never imported at
+    // all - so the two could disagree and the one the designer wrote was the one
+    // being ignored. Nothing re-derives a threshold from anywhere now: slice 7 asks
+    // this Condition through the same evaluator every other gate uses.
+    [Serializable]
+    public class CapstoneConfig
+    {
+        [SerializeField]
+        [Tooltip("Stable string id, e.g. backyard_party.")]
+        private string _id;
+
+        [SerializeField]
+        private string _displayName;
+
+        [SerializeReference]
+        [SubclassPicker]
+        [Tooltip("Must hold for the capstone to be offered - the chapter's primary pacing knob " +
+            "(Ch1: recordsCumulative >= 30). Asked through the one evaluator like every gate.")]
+        private Condition _unlock;
+
+        [SerializeField]
+        [Tooltip("Flag latched when the capstone completes. ONE fact, not two: it is both 'this chapter " +
+            "is finished' and 'chapter 2 may open', and nothing in Chapter 1 can tell those apart. " +
+            "Must be declared permanent-in-chapter in the chapter's flags list.")]
+        private string _completionFlagId;
+
+        [SerializeReference]
+        [SubclassPicker]
+        [Tooltip("What completing it grants - Ch1: one Roadie (one-shot) plus the completion flag " +
+            "(projectable), as a compound. Applied through the ACQUISITION path exactly once.")]
+        private GameEffect _onComplete;
+
+        public string Id => _id;
+        public string DisplayName => _displayName;
+        public Condition Unlock => _unlock;
+        public string CompletionFlagId => _completionFlagId;
+        public GameEffect OnComplete => _onComplete;
+
+        // whether the chapter authors a capstone at all. Chapter 1 does; a
+        // hand-made fixture chapter usually does not, and validation must not
+        // demand one of every chapter that exists.
+        public bool IsAuthored => !string.IsNullOrEmpty(_id);
+
+        public CapstoneConfig() { }
+
+#if UNITY_EDITOR
+        public CapstoneConfig(string id, string displayName, Condition unlock, string completionFlagId,
+            GameEffect onComplete)
+        {
+            _id = id;
+            _displayName = displayName;
+            _unlock = unlock;
+            _completionFlagId = completionFlagId;
+            _onComplete = onComplete;
         }
 #endif
     }

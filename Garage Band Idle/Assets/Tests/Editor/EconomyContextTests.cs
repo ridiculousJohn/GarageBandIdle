@@ -245,15 +245,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- the projection --------------------------------------------------
 
-        // Construction re-projects (design doc section 12, rule 6): a fresh
-        // economy has no facts so nothing is granted, and every boundary that
-        // resets facts asks for the same rebuild. Here the fact is a latched
-        // content unlock, and the rebuild is what puts its buff back.
+        // Construction re-projects (design doc section 12, rule 6): the store is
+        // built from the FACTS that exist, and every boundary that resets facts
+        // asks for the same rebuild. Here the fact is a latched content unlock,
+        // and the rebuild is what puts its buff back.
+        //
+        // The gate is deliberately UNMET at construction, which is how "reads
+        // facts, not definitions" is still provable now that construction settles
+        // (6.5: Build seeds, projects and settles as one operation, so an unlock
+        // whose gate already holds latches before Build returns). An unlatched
+        // upgrade is a definition the context can see and a fact it does not have.
         [Test]
         public void ProjectModifiers_RebuildsGrantsFromTheFactsThatExist()
         {
             var upgrade = TestContent.MakeUpgrade("permanent_tap", UpgradeType.ContentUnlock,
-                ContentScope.PermanentInChapter, null,
+                ContentScope.PermanentInChapter, new CurrencyBalanceCondition("cash", 10),
                 new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4));
             var chapter = MakeChapter(upgradeIds: new List<string> { "permanent_tap" });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition> { upgrade });
@@ -261,8 +267,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
             Assert.AreEqual(0.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
-                "construction projected an economy with no facts yet: nothing granted");
+                "the gate does not hold, so there is no latch to project from");
 
+            context.Currencies.Add("cash", 10);
             context.Settle();
             Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
                 "the unlock's gate held, so it latched and granted");
@@ -272,6 +279,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             context.ProjectModifiers();
             Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
                 "re-projecting from the surviving latch grants exactly once again");
+        }
+
+        // The construction sequence 6.5 established: a context comes back seeded,
+        // projected AND settled, so a caller never has to know to settle it. The
+        // ungated unlock below is the shape that used to need an external Settle -
+        // it is latched and granted before Build returns.
+        [Test]
+        public void Build_ReturnsAContextThatHasAlreadySettled()
+        {
+            var upgrade = TestContent.MakeUpgrade("open_now", UpgradeType.ContentUnlock,
+                ContentScope.PermanentInChapter, null,
+                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4));
+            var chapter = MakeChapter(upgradeIds: new List<string> { "open_now" });
+            var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition> { upgrade });
+
+            var context = EconomyContextFactory.Build(chapter, database,
+                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+
+            Assert.IsTrue(context.Upgrades.Get("open_now").Applied,
+                "an ungated content unlock latched during construction");
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+                "and its payload is in the store, with no external Settle");
         }
 
         // ---- focus lifecycle -------------------------------------------------

@@ -129,6 +129,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - bar
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 52d46845cebab2f45b698e2d2c3acb0e
+    m_Address: story-beat/beat_capstone
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - story-beat
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 57e300fe5d2c65949af52f9e5ccb30e2
     m_Address: reward/fan_rate_x1_20
     m_ReadOnly: 0
@@ -201,6 +207,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - bar
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b7c3e1a94d5f4e2b8a6c0d1e2f3a4b5c
+    m_Address: currency/Roadies
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - currency
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bd172a6a6600e274b8c55a6c64c31d6c
     m_Address: reward/tap_value_x1_25
     m_ReadOnly: 0
@@ -266,6 +278,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - chapter
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f6b914986730c1249ad63bb6c8d11b68
+    m_Address: story-beat/beat_open
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - story-beat
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: a84e26c054cc3934abc54db007d36bf0, type: 2}

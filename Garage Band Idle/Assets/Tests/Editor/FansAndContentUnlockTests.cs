@@ -124,8 +124,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var context = new EffectContext(currencies, flags, modifiers);
 
-            TestContent.MakeFanRateReward("boost_a", 1.15).Apply(context, ContentScope.Run);
-            TestContent.MakeFanRateReward("boost_b", 1.15).Apply(context, ContentScope.Run);
+            TestContent.MakeFanRateReward("boost_a", 1.15).ApplyOnAcquisition(context, ContentScope.Run);
+            TestContent.MakeFanRateReward("boost_b", 1.15).ApplyOnAcquisition(context, ContentScope.Run);
 
             Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9);
         }
@@ -209,10 +209,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(12.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
+            Assert.AreEqual(12.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
 
             TestContent.RunReset(modifiers, upgrades);
-            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9,
+            Assert.AreEqual(6.0, tap.TapValue("jam").ToDouble(), 1e-9,
                 "only the permanent latch was left to re-project");
         }
 
@@ -226,7 +226,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tap = TestContent.MakeTapProduction(-5, modifiers);
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
 
-            Assert.AreEqual(0.0, tap.TapValue.ToDouble(), 1e-9, "never a draining tap");
+            Assert.AreEqual(0.0, tap.TapValue("jam").ToDouble(), 1e-9, "never a draining tap");
         }
 
         // fail closed on broken content: a non-positive factor (invalid data -
@@ -241,7 +241,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 0);
 
-            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9, "the value is untouched");
+            Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9, "the value is untouched");
         }
 
         // Publishing is post-mutation: nothing notifies the UI from inside an
@@ -256,7 +256,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var tap = TestContent.MakeTapProduction(2, modifiers);
             var changes = 0;
-            tap.TapValueChanged += () => changes++;
+            tap.TapValueChanged += _ => changes++;
 
             tap.RefreshTapValue();
             Assert.AreEqual(0, changes, "nothing moved, nothing published");
@@ -267,7 +267,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             tap.RefreshTapValue();
             Assert.AreEqual(1, changes, "one settled operation, one notification");
-            Assert.AreEqual(12.0, tap.TapValue.ToDouble(), 1e-9, "base 2 x 2 x 3");
+            Assert.AreEqual(12.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 2 x 2 x 3");
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
@@ -279,7 +279,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             modifiers.ResetGranted();
             tap.RefreshTapValue();
             Assert.AreEqual(2, changes, "rebuilding the store moved the value");
-            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9,
+            Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9,
                 "base 2: an emptied store composes to identity until the projection re-runs");
         }
 
@@ -302,20 +302,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var production = new ProductionSystem(new[] { producer }, currencies, modifiers,
                 TestContent.MakeContext(currencies, flags: flags));
             var changes = 0;
-            production.TapValueChanged += () => changes++;
+            production.TapValueChanged += _ => changes++;
 
-            Assert.AreEqual(1.0, production.TapValue.ToDouble(), 1e-9, "the gated yield is dormant");
-            production.FireTap();
+            Assert.AreEqual(1.0, production.TapValue("jam").ToDouble(), 1e-9, "the gated yield is dormant");
+            production.FireTap("jam");
             Assert.AreEqual(1.0, currencies.Get("cash").ToDouble(), 1e-9, "a tap pays only the open config");
 
             flags.Set("amped");
-            Assert.AreEqual(5.0, production.TapValue.ToDouble(), 1e-9, "the evaluated value follows the gate");
+            Assert.AreEqual(5.0, production.TapValue("jam").ToDouble(), 1e-9, "the evaluated value follows the gate");
             Assert.AreEqual(0, changes, "no notification until the mutation settles");
 
             production.RefreshTapValue();
             Assert.AreEqual(1, changes, "the settled refresh publishes the gate transition");
 
-            production.FireTap();
+            production.FireTap("jam");
             Assert.AreEqual(6.0, currencies.Get("cash").ToDouble(), 1e-9,
                 "payout matches the advertised value: 1 + (1 + 4)");
         }
@@ -329,10 +329,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tap = TestContent.MakeTapProduction(2, modifiers);
 
             modifiers.Grant(TapValue, ModifierOperation.Add, ContentScope.Run, 1);
-            Assert.AreEqual(3.0, tap.TapValue.ToDouble(), 1e-9, "base 2 + 1");
+            Assert.AreEqual(3.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 2 + 1");
 
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 2);
-            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "(2 + 1) x 2, never 2 + (1 x 2)");
+            Assert.AreEqual(6.0, tap.TapValue("jam").ToDouble(), 1e-9, "(2 + 1) x 2, never 2 + (1 x 2)");
         }
 
         [Test]
@@ -344,7 +344,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // a flag is permanent within its chapter by definition, so the scope the
             // applier passes is not consulted - the latch is not a scoped modifier
-            TestContent.MakeSetFlagReward("open_backroom", "backroom").Apply(context, ContentScope.Run);
+            TestContent.MakeSetFlagReward("open_backroom", "backroom").ApplyOnAcquisition(context, ContentScope.Run);
 
             Assert.IsTrue(flags.IsSet("backroom"));
         }
@@ -369,10 +369,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(rewards.Contains("fan_rate_x1_15"));
             Assert.IsFalse(rewards.Contains("nope"));
 
-            rewards.Apply("fan_rate_x1_15", context, ContentScope.Run);
+            rewards.ApplyOnAcquisition("fan_rate_x1_15", context, ContentScope.Run);
             Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9, "pool reward applied by id");
 
-            rewards.Apply("open_backroom", context, ContentScope.Run);
+            rewards.ApplyOnAcquisition("open_backroom", context, ContentScope.Run);
             Assert.IsTrue(flags.IsSet("backroom"), "setFlag rewards run through the same registry");
         }
 
@@ -403,7 +403,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "0.2 base + 0.02 x 1 bandmate - the rate Chapter 1 shows after the first Drummer");
 
             var effects = new EffectContext(currencies, flags, modifiers);
-            TestContent.MakeFanRateReward("boost", 1.15).Apply(effects, ContentScope.Run);
+            TestContent.MakeFanRateReward("boost", 1.15).ApplyOnAcquisition(effects, ContentScope.Run);
 
             Assert.AreEqual(0.22 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9,
                 "the multiplier scales base + bandmate add together, never the base alone");

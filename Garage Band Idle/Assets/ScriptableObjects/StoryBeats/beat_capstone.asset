@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 702ea906a42f1b94d92a2e634bea6f78, type: 3}
+  m_Name: beat_capstone
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.StoryBeatDefinition
+  _id: beat_capstone
+  _text: "The backyard's packed. You plug in, count off, and for three minutes the
+    whole neighborhood is yours. Someone's already asking when the next one is \u2014
+    and a guy named Dave offers to haul your gear. You've got your first roadie."
+  _readFlagId:

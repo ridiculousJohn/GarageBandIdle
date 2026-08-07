@@ -70,6 +70,25 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public Condition Gate => _gate;
         public GameEffect Payload => _payload;
 
+        // Whether this upgrade would pay out more than once (design doc section 12,
+        // rule 6). A content unlock applies AUTOMATICALLY whenever its gate holds and
+        // its latch is absent, and both halves are reachable at any scope: a release
+        // clears run-scoped latches, and a restore clears any latch its snapshot omits
+        // because restore is replacement. So a payout behind one is granted again
+        // every time that happens.
+        //
+        // The rule lives here, on the definition, because two callers must not be able
+        // to disagree about it: ContentValidator reports it at boot, and UpgradeSystem
+        // refuses to register the upgrade at all - and the refusal is what makes the
+        // report safe to arrive late. Validation runs AFTER the frontier economy is
+        // built and settled, so a validator-only rule would report a payout the boot
+        // settle had already banked.
+        //
+        // A bought buff is exempt: TryBuy charges the cost again, so re-buying and
+        // re-paying is coherent rather than free.
+        public bool CarriesRepeatablePayout
+            => _type == UpgradeType.ContentUnlock && _payload != null && _payload.ContainsOneShot;
+
 #if UNITY_EDITOR
         // importer-only: upgrade assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, UpgradeType type, ContentScope scope,

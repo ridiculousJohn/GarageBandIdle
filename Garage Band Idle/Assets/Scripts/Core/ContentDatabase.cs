@@ -28,6 +28,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Registry<BarGroupDefinition> BarGroups { get; }
         public Registry<EventDefinition> Events { get; }
         public Registry<RewardDefinition> Rewards { get; }
+        public Registry<StoryBeatDefinition> StoryBeats { get; }
 
         public ContentDatabase()
         {
@@ -42,6 +43,7 @@ namespace RidiculousGaming.GarageBandIdle
             BarGroups = Load<BarGroupDefinition>(ContentLabels.BarGroup, d => d.Id);
             Events = Load<EventDefinition>(ContentLabels.Event, d => d.Id);
             Rewards = Load<RewardDefinition>(ContentLabels.Reward, d => d.Id);
+            StoryBeats = Load<StoryBeatDefinition>(ContentLabels.StoryBeat, d => d.Id);
         }
 
         // direct-injection alternative to Addressables discovery: tests (and
@@ -57,7 +59,8 @@ namespace RidiculousGaming.GarageBandIdle
             IEnumerable<RewardDefinition> rewards = null,
             IEnumerable<CurrencyDefinition> currencies = null,
             IEnumerable<CurrencyGroupDefinition> currencyGroups = null,
-            IEnumerable<ProducerDefinition> producers = null)
+            IEnumerable<ProducerDefinition> producers = null,
+            IEnumerable<StoryBeatDefinition> storyBeats = null)
         {
             CurrencyGroups = new Registry<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup, currencyGroups ?? Array.Empty<CurrencyGroupDefinition>(), d => d.Id);
             Currencies = new Registry<CurrencyDefinition>(ContentLabels.Currency, currencies ?? Array.Empty<CurrencyDefinition>(), d => d.Id);
@@ -70,6 +73,7 @@ namespace RidiculousGaming.GarageBandIdle
             BarGroups = new Registry<BarGroupDefinition>(ContentLabels.BarGroup, barGroups ?? Array.Empty<BarGroupDefinition>(), d => d.Id);
             Events = new Registry<EventDefinition>(ContentLabels.Event, events ?? Array.Empty<EventDefinition>(), d => d.Id);
             Rewards = new Registry<RewardDefinition>(ContentLabels.Reward, rewards ?? Array.Empty<RewardDefinition>(), d => d.Id);
+            StoryBeats = new Registry<StoryBeatDefinition>(ContentLabels.StoryBeat, storyBeats ?? Array.Empty<StoryBeatDefinition>(), d => d.Id);
         }
 
         // Synchronous label load, held for the app's lifetime (definitions are

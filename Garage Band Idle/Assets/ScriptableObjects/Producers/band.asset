@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: band
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ProducerDefinition
   _id: band
-  _moduleAddress: 
   _production:
   - _currencyId: fans
     _amount: 0.2

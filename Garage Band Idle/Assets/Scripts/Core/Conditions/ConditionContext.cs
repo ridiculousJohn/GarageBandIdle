@@ -48,6 +48,15 @@ namespace RidiculousGaming.GarageBandIdle
         // the initial pass
         private bool _dirty = true;
 
+        // nesting depth of SuppressInvalidation scopes; while non-zero the
+        // condition inputs are observed but do not dirty the flag
+        private int _suppressDepth;
+
+        // nesting depth of DeferSettled scopes, and whether a drain happened inside
+        // one - so many drains publish once, on the way out
+        private int _deferSettledDepth;
+        private bool _settledPending;
+
         public ConditionContext(ICurrencies currencies, GeneratorSystem generators, FlagSystem flags,
             string recordsCurrencyId = "records", ContentDatabase database = null, IBarCompletionSource bars = null)
         {
@@ -111,15 +120,118 @@ namespace RidiculousGaming.GarageBandIdle
 
             _dirty = false;
             evaluate?.Invoke();
+            Publish();
+        }
+
+        // Coalesces Settled for the duration of the scope: however many drains run
+        // inside it, subscribers hear about it ONCE, on the way out. This does not
+        // weaken the "consuming the signal without publishing it is not expressible"
+        // property Drain rests on - every drain inside still publishes, the
+        // publication is just deferred and merged.
+        //
+        // It exists for the restore's bounded fixpoint. That loop drains repeatedly
+        // by design: pass one applies an unlock whose flag opens something else, pass
+        // two picks it up. Publishing each pass would hand subscribers exactly the
+        // half-derived state atomic restore exists to prevent - a section visible
+        // because pass one latched its flag, beside a row still missing the buff pass
+        // two grants.
+        public SettledDeferral DeferSettled() => new(this);
+
+        public readonly struct SettledDeferral : IDisposable
+        {
+            private readonly ConditionContext _context;
+
+            internal SettledDeferral(ConditionContext context)
+            {
+                _context = context;
+                if (_context != null)
+                    _context._deferSettledDepth++;
+            }
+
+            public void Dispose()
+            {
+                if (_context == null)
+                    return;
+
+                _context._deferSettledDepth--;
+                if (_context._deferSettledDepth > 0 || !_context._settledPending)
+                    return;
+
+                _context._settledPending = false;
+                _context.Settled?.Invoke();
+            }
+        }
+
+        private void Publish()
+        {
+            if (_deferSettledDepth > 0)
+            {
+                _settledPending = true;
+                return;
+            }
+
             Settled?.Invoke();
         }
 
-        private void HandleBalanceChanged(string currencyId, BigNumber balance) => _dirty = true;
+        // Forces the next drain to evaluate. Required by any mutation that changes
+        // state WITHOUT publishing - a context-wide restore silences its primitives
+        // so no observer sees partial state, which also silences the very events
+        // this class listens to. Without this, a restore into an already-settled
+        // context leaves _dirty false and Drain returns having evaluated nothing:
+        // no unlocks, no Settled, no reveal. It cannot be left to the fresh-context
+        // default either, since that is true exactly once and a second restore is
+        // the case the guarantee is about.
+        public void MarkDirty() => _dirty = true;
 
-        private void HandleFlagSet(string flagId) => _dirty = true;
+        // Whether a drain would evaluate anything. Read by the restore's bounded
+        // fixpoint: Drain clears the flag BEFORE evaluating, so a flag or latch the
+        // evaluation itself applies leaves work pending, and a restore has to be able
+        // to ask whether it is finished rather than assume one pass was enough.
+        public bool IsDirty => _dirty;
 
-        private void HandleGeneratorOwnedChanged(Economy.Generator generator) => _dirty = true;
+        // Suppresses invalidation for the duration of the scope. Used by the
+        // notification REPLAY at the end of a restore: those events describe state
+        // that has already been drained and settled, so letting them dirty the flag
+        // would demand a second drain - and then "which Settled is the terminal
+        // one" has two answers. Suppressing instead keeps the restore one pass and
+        // lets it finish provably clean.
+        //
+        // Returned as its concrete type so `using` needs no boxing, and nested
+        // (depth-counted) because a caller may already be inside one.
+        public InvalidationSuppression SuppressInvalidation() => new(this);
 
-        private void HandleBarCompleted(Content.BarState bar) => _dirty = true;
+        public readonly struct InvalidationSuppression : IDisposable
+        {
+            private readonly ConditionContext _context;
+
+            internal InvalidationSuppression(ConditionContext context)
+            {
+                _context = context;
+                if (_context != null)
+                    _context._suppressDepth++;
+            }
+
+            public void Dispose()
+            {
+                if (_context != null)
+                    _context._suppressDepth--;
+            }
+        }
+
+        // Every condition input funnels through here, so suppression is one rule in
+        // one place rather than a check each handler could forget.
+        private void Invalidate()
+        {
+            if (_suppressDepth == 0)
+                _dirty = true;
+        }
+
+        private void HandleBalanceChanged(string currencyId, BigNumber balance) => Invalidate();
+
+        private void HandleFlagSet(string flagId) => Invalidate();
+
+        private void HandleGeneratorOwnedChanged(Economy.Generator generator) => Invalidate();
+
+        private void HandleBarCompleted(Content.BarState bar) => Invalidate();
     }
 }

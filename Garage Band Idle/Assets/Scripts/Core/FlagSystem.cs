@@ -95,6 +95,15 @@ namespace RidiculousGaming.GarageBandIdle
         // validation uses this to catch typos in content
         public bool IsKnown(string id) => _known == null || _known.Contains(id);
 
+        // Whether this flag's latch is declared run-scoped. Asked by the snapshot
+        // filter that builds an event sandbox's seed: a sandbox takes the chapter's
+        // permanent facts and none of the run's, and the answer to "is this flag a
+        // run fact" is already resolved here from the declarations. Keeping it here
+        // rather than recording a scope per flag in the snapshot is deliberate -
+        // scope is CONTENT, so re-deriving it from the declarations cannot go stale
+        // the way a copy in saved state would.
+        public bool IsRunScoped(string id) => _runScoped != null && _runScoped.Contains(id);
+
         public bool IsSet(string id) => _flags.Contains(id);
 
         public void Set(string id)
@@ -107,6 +116,89 @@ namespace RidiculousGaming.GarageBandIdle
             if (_flags.Add(id))
                 FlagSet?.Invoke(id);
         }
+
+        // Restore (save load, event-sandbox seeding): REPLACES the whole latch
+        // set. Every flag in the snapshot ends up set and every flag currently set
+        // that the snapshot omits ends up cleared - a merge would let a previous
+        // restore's flags survive into a different snapshot, which is the same
+        // class of bug as a selective modifier reset (design doc section 12, rule
+        // 6): two ways to arrive at one state, able to disagree.
+        //
+        // A flag the chapter no longer declares is SKIPPED rather than latched,
+        // which is the one place this deliberately differs from Set. Set latches an
+        // undeclared flag because it is content executing and losing progress is
+        // worse than a stray latch; here the id comes from stored state, and since
+        // every gate validates against the declaration list, nothing can be gating
+        // on it - latching it would achieve nothing and would pollute the next
+        // capture.
+        //
+        // All state settles before any notification fires, and notify: false defers
+        // the whole set to the context-wide restore (state, then notify).
+        public void Restore(IReadOnlyCollection<string> setFlagIds, bool notify = true)
+        {
+            if (setFlagIds == null)
+            {
+                Debug.LogError("FlagSystem: Restore with no saved flags. Ignoring - clearing every flag was more likely a missing snapshot than an authored empty one.");
+                return;
+            }
+
+            var wanted = new HashSet<string>();
+            foreach (var id in setFlagIds)
+            {
+                if (string.IsNullOrEmpty(id))
+                    continue;
+                if (!IsKnown(id))
+                {
+                    Debug.LogError($"FlagSystem: Restore names flag '{id}', which the chapter does not declare. Skipping it - no gate can reference an undeclared flag.");
+                    continue;
+                }
+                wanted.Add(id);
+            }
+
+            List<string> cleared = null;
+            List<string> set = null;
+
+            foreach (var id in _flags)
+            {
+                if (!wanted.Contains(id))
+                    (cleared ??= new List<string>()).Add(id);
+            }
+            foreach (var id in wanted)
+            {
+                if (!_flags.Contains(id))
+                    (set ??= new List<string>()).Add(id);
+            }
+
+            if (cleared != null)
+            {
+                foreach (var id in cleared)
+                    _flags.Remove(id);
+            }
+            if (set != null)
+            {
+                foreach (var id in set)
+                    _flags.Add(id);
+            }
+
+            if (!notify)
+                return;
+
+            if (cleared != null)
+            {
+                foreach (var id in cleared)
+                    FlagCleared?.Invoke(id);
+            }
+            if (set != null)
+            {
+                foreach (var id in set)
+                    FlagSet?.Invoke(id);
+            }
+        }
+
+        // Every flag currently latched, for a capture. A copy rather than the live
+        // set: a snapshot that aliased this would change under the caller as the
+        // game ran on.
+        public IReadOnlyCollection<string> CaptureSetFlags() => new List<string>(_flags);
 
         // Run reset (album release): every set run-scoped flag clears, and
         // everything gating on it goes dark at the next settle - re-set only by

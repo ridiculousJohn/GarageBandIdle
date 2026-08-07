@@ -57,11 +57,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
-        public static ProducerDefinition MakeProducer(string id, List<ProductionConfig> production,
-            string moduleAddress = "module/tap")
+        public static ProducerDefinition MakeProducer(string id, List<ProductionConfig> production)
         {
             var definition = Track(ScriptableObject.CreateInstance<ProducerDefinition>());
-            definition.EditorInitialize(id, moduleAddress, production);
+            definition.EditorInitialize(id, production);
             return definition;
         }
 
@@ -91,7 +90,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var producer = MakeProducer("band", new List<ProductionConfig>
             {
                 new("fans", baseFansPerSec, ProductionTrigger.Tick, gate, ModifierTarget.FanRate),
-            }, moduleAddress: null);
+            });
             modifiers.AddDerived(new BandmateFanRateModifier(generators, perBandmateOwnedBonus));
             return new ProductionSystem(new[] { producer }, currencies, modifiers, conditions);
         }
@@ -112,6 +111,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var definition = Track(ScriptableObject.CreateInstance<UpgradeDefinition>());
             definition.EditorInitialize(id, id, type, scope, costCurrencyId, costAmount,
                 gate, payload);
+            return definition;
+        }
+
+        public static StoryBeatDefinition MakeStoryBeat(string id, string text, string readFlagId = null)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<StoryBeatDefinition>());
+            definition.EditorInitialize(id, text, readFlagId);
             return definition;
         }
 
@@ -137,13 +143,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // content error, so a fixture that only cares about visibility still has to
         // be a coherent section. The address has to resolve through Addressables
         // like the running game's would.
+        //
+        // The default is a ROSTER module (the generator list), because those present
+        // no single definition - a section entry for one names no id, which is what a
+        // fixture wants when it is not about bindings at all. The tap module would
+        // report a missing producer id on every such fixture, since 6.5 made a
+        // module's requirement something boot validation enforces.
+        //
+        // Addresses are still the fixture's parameter, since almost no test cares
+        // which definition a module presents; each becomes a SectionModule with no
+        // definition id.
         public static SectionDefinition MakeSection(string id, Condition visibleWhen = null,
-            List<string> moduleAddresses = null)
+            List<string> moduleAddresses = null, List<SectionModule> modules = null)
         {
             var definition = Track(ScriptableObject.CreateInstance<SectionDefinition>());
             definition.EditorInitialize(id, id,
-                moduleAddresses ?? new List<string> { "module/tap" }, visibleWhen);
+                modules ?? ToModules(moduleAddresses ?? new List<string> { "module/generator-list" }), visibleWhen);
             return definition;
+        }
+
+        private static List<SectionModule> ToModules(List<string> addresses)
+        {
+            var modules = new List<SectionModule>(addresses.Count);
+            foreach (var address in addresses)
+                modules.Add(new SectionModule(address));
+            return modules;
         }
 
         // a minimal coherent chapter: declared flags plus the id lists that
@@ -156,9 +180,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             List<string> eventIds = null, List<string> currencyIds = null,
             List<string> producerIds = null,
             double perBandmateOwnedBonus = 0.02, double recordBuffPerRecord = 0.02,
-            int index = 1, int capstoneRecordsGate = 30, string fansCurrencyId = "fans",
+            int index = 1, string fansCurrencyId = "fans",
             List<string> recordBuffAffects = null, Condition albumReleaseWhen = null,
-            List<FlagDeclaration> flags = null)
+            List<FlagDeclaration> flags = null, CapstoneConfig capstone = null,
+            List<string> storyBeatIds = null)
         {
             // string ids remain the fixture-friendly spelling: each becomes a
             // permanent-latch declaration, the same default absent JSON gets.
@@ -172,17 +197,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
 
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
-            definition.EditorInitialize(id, index, id, "", "", "", capstoneRecordsGate,
+            definition.EditorInitialize(id, index, id, "",
                 new RecordBuffConfig(recordBuffPerRecord, recordBuffAffects ?? new List<string> { "cash" }),
                 new FansConfig(fansCurrencyId, perBandmateOwnedBonus),
                 // null (the default) is a legal album gate: always offered
                 new AlbumConfig(albumReleaseWhen),
+                // an unauthored capstone by default: not every chapter declares one,
+                // and validation asks IsAuthored before demanding any of its parts
+                capstone ?? new CapstoneConfig(),
                 // the chapter-local half of the standard economy; records is
                 // global, so no chapter declares it
                 declarations, currencyIds ?? new List<string> { "cash", "fans" }, producerIds ?? new List<string>(),
                 sectionIds ?? new List<string>(), generatorIds ?? new List<string>(),
                 upgradeIds ?? new List<string>(), barGroupIds ?? new List<string>(),
-                eventIds ?? new List<string>());
+                eventIds ?? new List<string>(), storyBeatIds ?? new List<string>());
             return definition;
         }
 
@@ -258,9 +286,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             IEnumerable<RewardDefinition> rewards = null,
             IEnumerable<CurrencyDefinition> currencies = null,
             IEnumerable<CurrencyGroupDefinition> currencyGroups = null,
-            IEnumerable<ProducerDefinition> producers = null)
+            IEnumerable<ProducerDefinition> producers = null,
+            IEnumerable<StoryBeatDefinition> storyBeats = null)
             => new(chapters, sections, generators, upgrades, bars, barGroups, events, rewards,
-                currencies ?? StandardCurrencies(), currencyGroups ?? StandardGroups(), producers);
+                currencies ?? StandardCurrencies(), currencyGroups ?? StandardGroups(), producers, storyBeats);
 
         // evaluation context over live test systems; no ContentDatabase, which
         // makes Validate fall back to the systems themselves

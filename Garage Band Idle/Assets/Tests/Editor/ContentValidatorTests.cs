@@ -4,6 +4,7 @@ using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -21,6 +22,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
         private static RewardManager NoRewards => new(Array.Empty<RewardDefinition>());
+
+        // A tap producer needs some section module presenting it (6.5) or boot
+        // validation reports a tap surface nobody can press - the check that replaced
+        // ProducerDefinition.ModuleAddress. Fixtures about a producer's CONFIGS author
+        // the presenting section so they stay coherent content rather than tripping an
+        // unrelated rule.
+        private static SectionDefinition TapSectionFor(string producerId)
+            => TestContent.MakeSection($"presents_{producerId}", null,
+                modules: new List<SectionModule> { new("module/tap", producerId) });
 
         // Currency group placement (design doc section 12, rule 12) is checked
         // here and nowhere else: group assets are hand-authored, never generated
@@ -246,10 +256,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 new("cash", 1, ProductionTrigger.Tap, new FlagSetCondition("two"), ModifierTarget.None),
             });
+            var section = TapSectionFor("busk");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "one" },
-                producerIds: new List<string> { "busk" });
+                producerIds: new List<string> { "busk" },
+                sectionIds: new List<string> { section.Id });
             var ch2 = TestContent.MakeChapter("ch2", new List<string> { "fans", "two" }, index: 2);
-            var database = TestContent.MakeDatabase(chapters: new[] { ch1, ch2 }, producers: new[] { poached });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1, ch2 }, producers: new[] { poached },
+                sections: new[] { section });
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
@@ -293,9 +306,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new("cash", 1, ProductionTrigger.Tick, null, ModifierTarget.GeneratorOutput),
             });
             var hollow = TestContent.MakeProducer("hollow", new List<ProductionConfig>());
+            var section = TapSectionFor("broken");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
-                producerIds: new List<string> { "broken", "hollow" });
-            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { broken, hollow });
+                producerIds: new List<string> { "broken", "hollow" },
+                sectionIds: new List<string> { section.Id });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { broken, hollow },
+                sections: new[] { section });
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
@@ -520,15 +536,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void SectionListingAModuleTwice_IsReported()
         {
             var currencies = TestContent.MakeEconomy();
+            // a roster module twice: two generator lists in one region, each wired to
+            // the same systems. Repeating an ADDRESS is legitimate now (two beat cards
+            // are one prefab presenting two beats), so the key is address + id, and
+            // this is the case where they match.
             var doubled = TestContent.MakeSection("doubled", null,
-                new List<string> { "module/tap", "module/tap" });
+                new List<string> { "module/generator-list", "module/generator-list" });
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 sectionIds: new List<string> { "doubled" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { doubled });
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Section 'doubled' lists module 'module/tap' more than once - it would be instantiated twice.");
+                "ContentValidator: Section 'doubled' lists module 'module/generator-list' more than once - it would be instantiated twice.");
             ContentValidator.Validate(database, context, NoRewards);
         }
 
@@ -604,25 +624,296 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, context, NoRewards);
         }
 
-        // the capstone gate is the primary pacing knob (design doc section 11): at
-        // zero the chapter has no length, and the declared flag list is the
-        // chapter's whole reveal vocabulary, so a blank or repeated entry is a slip
+        // the declared flag list is the chapter's whole reveal vocabulary, so a
+        // blank or repeated entry is a slip
         [Test]
-        public void ZeroCapstoneGate_AndFlagListSlips_AreReported()
+        public void FlagListSlips_AreReported()
         {
             var currencies = TestContent.MakeEconomy();
-            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "covers", "covers", "" },
-                capstoneRecordsGate: 0);
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "covers", "covers", "" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
             var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
-            LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' has a non-positive capstoneRecordsGate (0) - the capstone would unlock before play starts.");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' declares flag 'covers' more than once.");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' declares an empty flag id.");
             ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // The capstone gate is the primary pacing knob (design doc section 11), and
+        // 6.5 made its authored Condition the only home for it. A NULL unlock is the
+        // one case ordinary condition validation cannot report: by this codebase's
+        // convention a null Condition means "no gate" and is always met, so the
+        // chapter would end before it started. A non-positive THRESHOLD needs nothing
+        // bespoke - every threshold condition already reports one and ThresholdIsMet
+        // fails closed - which is why the old scalar check has no replacement beyond
+        // this.
+        [Test]
+        public void CapstoneWithNoUnlockCondition_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                flags: new List<FlagDeclaration> { new("done") },
+                capstone: new CapstoneConfig("backyard", "Backyard Party", null, "done",
+                    new SetFlagEffect("done")));
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.Flags), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' capstone 'backyard' has no unlock condition - a null gate is always met, so the capstone would be offered at boot.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // The completion flag IS the chapter boundary, so it has to outlive a
+        // release: run-scoped, the next demo clears it and a finished chapter
+        // re-opens. The second error is the existing scope rule catching the same
+        // asset from the other side - a run-scoped flag whose only setter is
+        // permanent has a scope that does nothing.
+        [Test]
+        public void RunScopedCapstoneCompletionFlag_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                flags: new List<FlagDeclaration> { new("done", ContentScope.Run) },
+                capstone: new CapstoneConfig("backyard", "Backyard Party",
+                    new RecordsCumulativeCondition(30), "done", new SetFlagEffect("done")));
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.Flags), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' capstone completion flag 'done' is declared Run - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' flag 'done' is run-scoped but every setter is permanent - the release clears it and the projection re-asserts it in the same operation, so the scope has no effect.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // The re-acquisition rule (6.5), and it covers EVERY content unlock rather
+        // than just the run-scoped ones. Scope looked like the deciding property and
+        // is not: a content unlock is applied automatically whenever its gate holds
+        // and its latch is absent, and both halves are reachable at either scope - a
+        // release clears run-scoped latches, and a RESTORE clears any latch its
+        // snapshot omits, because restore is replacement. So an older or partial
+        // snapshot re-pays a permanent unlock exactly as a release re-pays a
+        // run-scoped one. The projection cannot catch it, because re-acquiring is
+        // correct for everything except a payout - hence a content rule.
+        [TestCase(ContentScope.Run)]
+        [TestCase(ContentScope.PermanentInChapter)]
+        public void OneShotEffectOnAnyContentUnlock_IsReported(ContentScope scope)
+        {
+            var currencies = TestContent.MakeEconomy();
+            var upgrade = TestContent.MakeUpgrade("payday", UpgradeType.ContentUnlock, scope,
+                null, new GrantCurrencyEffect("cash", 100));
+            var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "payday" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
+                upgrades: new[] { upgrade });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Upgrade 'payday' is a content unlock carrying a one-shot effect - a content unlock re-applies through the acquisition path whenever its latch is absent and its gate holds (a release clears run-scoped latches, and a restore clears any the snapshot omits), so the payout would be granted more than once. Move the payout to content acquired by a player action: a bought buff, an event tier, or the capstone.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // A BUFF may carry a payout: TryBuy charges the cost again, so re-buying and
+        // re-paying is coherent rather than free. The rule is about what is acquired
+        // AUTOMATICALLY, not about payouts as such.
+        [Test]
+        public void OneShotEffectOnABoughtBuff_IsAllowed()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var upgrade = TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
+                null, new GrantCurrencyEffect("cash", 100), costAmount: 250);
+            var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "advance" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { upgrade });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            // a clean pass IS the assertion
+            ContentValidator.Validate(database, context, NoRewards);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // The two halves of the capstone have to name the SAME flag. Validated
+        // separately they each pass while disagreeing: the payload grants its rewards
+        // and sets some other flag - or none - so slice 7 would run the capstone and
+        // the chapter would never register as finished. The flag-declaration sweep
+        // does not catch it, because a payload setting the WRONG flag still sets a
+        // flag.
+        [Test]
+        public void CapstonePayloadThatNeverSetsItsCompletionFlag_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                flags: new List<FlagDeclaration> { new("done"), new("something_else") },
+                capstone: new CapstoneConfig("backyard", "Backyard Party",
+                    new RecordsCumulativeCondition(30), "done",
+                    // a compound, so the check has to recurse rather than look at the
+                    // wrapper - and it sets the wrong flag
+                    new CompoundEffect(new List<GameEffect>
+                    {
+                        new GrantCurrencyEffect("cash", 1),
+                        new SetFlagEffect("something_else"),
+                    })));
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.Flags), database: database);
+
+            // The flag sweep also notices that nothing sets 'done', but only as a
+            // WARNING - it cannot tell a code-set system flag from a dead one. That is
+            // exactly why this check exists as an error: the capstone DECLARES the
+            // flag, so a payload not setting it is unambiguously wrong.
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' capstone 'backyard' declares completion flag 'done' but its onComplete payload never sets it - completing the capstone would grant its rewards without recording that the chapter finished.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // A completion flag with no declared lifetime is no more a chapter boundary
+        // than a run-scoped one: None is the un-migrated value a hand-edited
+        // declaration holds, so the check compares for equality with
+        // PermanentInChapter rather than merely excluding Run.
+        [Test]
+        public void CapstoneCompletionFlagWithNoScope_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                flags: new List<FlagDeclaration> { new("done", ContentScope.None) },
+                capstone: new CapstoneConfig("backyard", "Backyard Party",
+                    new RecordsCumulativeCondition(30), "done", new SetFlagEffect("done")));
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.Flags), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' capstone completion flag 'done' is declared None - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // A module entry's definitionId is the binding the runtime fires on, so an id
+        // the chapter does not declare is a module presenting nothing - a dead button
+        // or a blank card, which reads as a tuning problem rather than a typo.
+        [Test]
+        public void ModuleEntryNamingSomethingTheChapterDoesNotDeclare_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var section = TestContent.MakeSection("floor", null,
+                modules: new List<SectionModule> { new("module/tap", "no_such_producer") });
+            var ch1 = TestContent.MakeChapter("ch1", null, sectionIds: new List<string> { "floor" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Section 'floor' module 'module/tap' presents producer 'no_such_producer', which chapter 'ch1' does not declare - the module would present nothing.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // Membership in ANY of the chapter's content lists is not proof the id belongs
+        // to this module's family. Swap a producer id and a story-beat id across two
+        // entries and a family-blind check passes both - the jam producer even counts
+        // as presented, by the card - while the Jam button is dead. So the module
+        // declares what it needs (IChapterModule.RequiredDefinition) and the id is
+        // resolved against exactly that.
+        [Test]
+        public void TapModulePresentingSomethingThatIsNotAProducer_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var jam = TestContent.MakeProducer("jam", new List<ProductionConfig>
+            {
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+            });
+            var beat = TestContent.MakeStoryBeat("beat_open", "It starts in the garage.");
+            var section = TestContent.MakeSection("floor", null,
+                modules: new List<SectionModule> { new("module/tap", "beat_open") });
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                sectionIds: new List<string> { "floor" },
+                producerIds: new List<string> { "jam" },
+                storyBeatIds: new List<string> { "beat_open" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section },
+                producers: new[] { jam }, storyBeats: new[] { beat });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            // the beat IS declared by the chapter - the old check accepted it on that
+            // basis alone
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Section 'floor' module 'module/tap' presents producer 'beat_open', which chapter 'ch1' does not declare - the module would present nothing.");
+            // and the consequence the swap hides: nothing presents the real tap surface
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' producer 'jam' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // A roster module resolves what it shows from the chapter, so an id on its
+        // entry is read by nobody - it looks like a binding and is not.
+        [Test]
+        public void RosterModuleCarryingADefinitionId_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var section = TestContent.MakeSection("floor", null,
+                modules: new List<SectionModule> { new("module/generator-list", "drummer") });
+            var ch1 = TestContent.MakeChapter("ch1", null, sectionIds: new List<string> { "floor" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Section 'floor' module 'module/generator-list' names definition 'drummer', but that module presents a whole roster and reads no definition id.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // The check that replaced ProducerDefinition.ModuleAddress: who presents a
+        // producer is now DERIVED from the section entries naming it, so the two can
+        // no longer disagree - and what is worth reporting was never a missing string
+        // but the consequence, a tap surface the player cannot reach.
+        [Test]
+        public void TapProducerNoSectionPresents_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var orphaned = TestContent.MakeProducer("busk", new List<ProductionConfig>
+            {
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+            });
+            var ch1 = TestContent.MakeChapter("ch1", null, producerIds: new List<string> { "busk" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { orphaned });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' producer 'busk' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
+            ContentValidator.Validate(database, context, NoRewards);
+        }
+
+        // A passive producer needs no surface at all - that is what fan accrual is -
+        // so the rule keys on having TAP configs rather than on being presented.
+        [Test]
+        public void PassiveProducerNoSectionPresents_IsAllowed()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var band = TestContent.MakeProducer("band", new List<ProductionConfig>
+            {
+                new("fans", 0.2, ProductionTrigger.Tick, null, ModifierTarget.FanRate),
+            });
+            var ch1 = TestContent.MakeChapter("ch1", null, producerIds: new List<string> { "band" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { band });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            ContentValidator.Validate(database, context, NoRewards);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // The bar half of the same rule: a run-scoped group's bars reset at every
+        // release and are re-completed, and completing one applies its reward through
+        // the acquisition path. Checked from the GROUP, because a bar does not know
+        // which group holds it - the scope that decides this lives on the group.
+        [Test]
+        public void OneShotRewardOnARunScopedBarGroup_IsReported()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var reward = TestContent.MakeReward("payout", new GrantCurrencyEffect("cash", 50));
+            var bar = TestContent.MakeBar("cover_1", "cash", 100, "payout");
+            var group = TestContent.MakeBarGroup("learn_covers", null, new List<string> { "cover_1" },
+                scope: ContentScope.Run);
+            var ch1 = TestContent.MakeChapter("ch1", null, barGroupIds: new List<string> { "learn_covers" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
+                bars: new[] { bar }, barGroups: new[] { group }, rewards: new[] { reward });
+            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Bar 'cover_1' is in run-scoped group 'learn_covers' and its reward carries a one-shot effect - the release resets the bar, so re-completing it would pay again every run.");
+            ContentValidator.Validate(database, context, new RewardManager(new[] { reward }));
         }
 
         // a group with no bars reveals an empty region and can never satisfy a

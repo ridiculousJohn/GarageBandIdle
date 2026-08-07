@@ -53,6 +53,24 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     continue;
                 }
 
+                // Fail closed on the one content mistake that MUTATES permanent state
+                // before anyone can report it (design doc section 12, rule 6). Boot
+                // validation runs after the frontier economy is built and settled, and
+                // that settle evaluates content unlocks through the acquisition path -
+                // so a content unlock carrying a payout whose gate holds at startup
+                // would have banked Records or Roadies before the validator said a
+                // word. Refusing to register it is what makes the report safe to
+                // arrive late.
+                //
+                // UpgradeDefinition.CarriesRepeatablePayout owns the rule, so this and
+                // boot validation cannot disagree about what is authorable - the same
+                // shape ProductionConfig.IsComposable has.
+                if (definition.CarriesRepeatablePayout)
+                {
+                    Debug.LogError($"UpgradeSystem: upgrade '{definition.Id}' is a content unlock carrying a one-shot effect - it applies automatically whenever its latch is absent and its gate holds, so the payout would be granted more than once. Refusing to register it; move the payout to content acquired by a player action.");
+                    continue;
+                }
+
                 if (!string.IsNullOrEmpty(definition.CostCurrencyId))
                     _currencies.ValidateReference(definition.CostCurrencyId, $"Upgrade '{definition.Id}' (cost)");
                 ValidatePayload(definition);
@@ -149,7 +167,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // spend fires BalanceChanged, so no condition evaluator or UI
             // subscriber observes the money gone with the buff not yet granted
             upgrade.MarkApplied();
-            payload.Apply(_effectContext, upgrade.Definition.Scope);
+            payload.ApplyOnAcquisition(_effectContext, upgrade.Definition.Scope);
             _currencies.Add(currencyId, -cost);
             UpgradeApplied?.Invoke(upgrade);
             return true;
@@ -194,6 +212,74 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return true;
         }
 
+        // Restore (save load, event-sandbox seeding): REPLACES the whole latch set.
+        // Every upgrade named ends up applied and every currently-applied upgrade
+        // the snapshot omits ends up cleared, for the same reason FlagSystem.Restore
+        // replaces rather than merges - a merge leaves a previous restore's latches
+        // standing under a different snapshot, which is two routes to one state.
+        //
+        // This restores FACTS only. Nothing here re-applies a payload: the caller
+        // re-projects afterwards (EconomyContext.Restore), which is what turns these
+        // latches back into effects and is also what keeps a one-shot payload from
+        // being paid again by a load - the projection refuses it, the acquisition
+        // path is never taken.
+        //
+        // Notifications are deliberately absent even when notify is true: a restored
+        // latch is not an acquisition and not a loss of one, exactly as
+        // ProjectModifiers refuses to re-fire UpgradeApplied. The parameter exists so
+        // the signature matches the other primitives and so a caller reading the
+        // restore sequence sees the same shape everywhere; the UI re-reads on the
+        // settled signal.
+        public void RestoreApplied(IReadOnlyCollection<string> appliedIds, bool notify = true)
+        {
+            if (appliedIds == null)
+            {
+                Debug.LogError("UpgradeSystem: RestoreApplied with no saved latches. Ignoring - clearing every latch was more likely a missing snapshot than an authored empty one.");
+                return;
+            }
+
+            var wanted = new HashSet<string>();
+            foreach (var id in appliedIds)
+            {
+                if (string.IsNullOrEmpty(id))
+                    continue;
+                if (!_byId.ContainsKey(id))
+                {
+                    Debug.LogError($"UpgradeSystem: RestoreApplied names unknown upgrade id '{id}'. Skipping it - stale saved state naming an upgrade this chapter does not list.");
+                    continue;
+                }
+                wanted.Add(id);
+            }
+
+            foreach (var upgrade in _upgrades)
+            {
+                if (wanted.Contains(upgrade.Definition.Id))
+                    upgrade.MarkApplied();
+                else
+                    upgrade.ClearApplied();
+            }
+        }
+
+        // The latched upgrade ids, for a capture. Ordered by the chapter's
+        // declaration order like every other projection input, so two captures of
+        // one state are identical.
+        public IReadOnlyCollection<string> CaptureApplied()
+        {
+            var applied = new List<string>();
+            foreach (var upgrade in _upgrades)
+            {
+                if (upgrade.Applied)
+                    applied.Add(upgrade.Definition.Id);
+            }
+            return applied;
+        }
+
+        // The declared lifetime of an upgrade's latch, for the snapshot filter that
+        // builds an event sandbox's seed - the same question FlagSystem.IsRunScoped
+        // answers, and re-derived from content for the same reason.
+        public ContentScope ScopeOf(string upgradeId)
+            => _byId.TryGetValue(upgradeId ?? "", out var upgrade) ? upgrade.Definition.Scope : ContentScope.None;
+
         public string FactSourceName => "upgrade purchase latches";
 
         // The projection (design doc section 12, rule 6): every latched upgrade
@@ -203,6 +289,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // and a projection is not an acquisition; a row that hid itself when
         // bought is already hidden. Nothing latches or unlatches here, which is
         // what makes this safe to run at any boundary.
+        //
+        // Project, not ApplyOnAcquisition: the payload's one-shot parts (a
+        // currency award) are refused or filtered by the effect family itself, so
+        // a latch that survives a release cannot pay out again. This method is
+        // where the difference between the two entry points earns its keep.
         public void ProjectModifiers()
         {
             foreach (var upgrade in _upgrades)
@@ -212,7 +303,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
                 // a missing payload was already reported when the latch was set;
                 // a projection repeating it every boundary would be noise
-                upgrade.Definition.Payload?.Apply(_effectContext, upgrade.Definition.Scope);
+                upgrade.Definition.Payload?.Project(_effectContext, upgrade.Definition.Scope);
             }
         }
 
@@ -234,7 +325,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             {
                 // the upgrade's declared scope travels with the grant, so the
                 // effect's lifetime is never a second declaration
-                payload.Apply(_effectContext, upgrade.Definition.Scope);
+                payload.ApplyOnAcquisition(_effectContext, upgrade.Definition.Scope);
             }
 
             UpgradeApplied?.Invoke(upgrade);

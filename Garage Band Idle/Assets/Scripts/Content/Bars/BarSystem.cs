@@ -137,7 +137,18 @@ namespace RidiculousGaming.GarageBandIdle.Content
         // reconciliation - before any notification fires (state, then
         // notify), so a subscriber never observes a partially restored
         // system. Unknown ids are stale save data: reported and skipped.
-        public void RestoreProgress(IReadOnlyDictionary<string, IReadOnlyDictionary<string, BigNumber>> progressByGroupAndBarId)
+        // REPLACEMENT, not a merge: the walk is over every group this chapter
+        // declares rather than over the snapshot's keys, so a bar the snapshot
+        // omits is restored to zero progress instead of keeping whatever it held.
+        // That is what makes a new run's empty seed and a load the same operation,
+        // and it is why every group reconciles afterwards - a group whose bars were
+        // all zeroed has a selection to settle just as much as one that was filled.
+        //
+        // notify: false defers publication to the context-wide restore (see
+        // EconomyContext.Restore); the default is unchanged for every existing
+        // caller.
+        public void RestoreProgress(IReadOnlyDictionary<string, IReadOnlyDictionary<string, BigNumber>> progressByGroupAndBarId,
+            bool notify = true)
         {
             if (progressByGroupAndBarId == null)
             {
@@ -148,6 +159,35 @@ namespace RidiculousGaming.GarageBandIdle.Content
             var restoredBars = new List<BarState>();
             var changedModes = new List<BarGroupRuntime>();
 
+            foreach (var definition in _groupOrder)
+            {
+                var runtime = _groups[definition.Id];
+                progressByGroupAndBarId.TryGetValue(definition.Id, out var savedBars);
+
+                foreach (var bar in runtime.Bars)
+                {
+                    var progress = BigNumber.Zero;
+                    if (savedBars != null && savedBars.TryGetValue(bar.Definition.Id, out var saved))
+                        progress = saved;
+
+                    // nothing to say about a bar that was already where the
+                    // snapshot puts it, which keeps the notification set to what
+                    // actually moved
+                    if (bar.Progress == progress)
+                        continue;
+
+                    bar.RestoreProgress(progress);
+                    restoredBars.Add(bar);
+                }
+
+                if (runtime.ReconcileAfterRestore())
+                    changedModes.Add(runtime);
+            }
+
+            // stale saved state naming content this chapter no longer declares.
+            // Reported after the restore rather than instead of it: the ids that DO
+            // resolve are still restored, and a rename should not cost the player
+            // every other bar's progress.
             foreach (var groupEntry in progressByGroupAndBarId)
             {
                 if (!_groups.TryGetValue(groupEntry.Key ?? "", out var runtime))
@@ -157,31 +197,113 @@ namespace RidiculousGaming.GarageBandIdle.Content
                 }
                 if (groupEntry.Value == null)
                 {
-                    Debug.LogError($"BarSystem: RestoreProgress with no saved bars for group '{groupEntry.Key}'. Skipping it.");
+                    Debug.LogError($"BarSystem: RestoreProgress with no saved bars for group '{groupEntry.Key}'.");
                     continue;
                 }
-
                 foreach (var barEntry in groupEntry.Value)
                 {
-                    var bar = runtime.FindBar(barEntry.Key);
-                    if (bar == null)
-                    {
+                    if (runtime.FindBar(barEntry.Key) == null)
                         Debug.LogError($"BarSystem: RestoreProgress with unknown bar id '{barEntry.Key}' in group '{groupEntry.Key}'. Skipping it.");
-                        continue;
-                    }
-
-                    bar.RestoreProgress(barEntry.Value);
-                    restoredBars.Add(bar);
                 }
-
-                if (runtime.ReconcileAfterRestore())
-                    changedModes.Add(runtime);
             }
+
+            if (!notify)
+                return;
 
             foreach (var bar in restoredBars)
                 BarProgressChanged?.Invoke(bar);
             foreach (var runtime in changedModes)
                 runtime.NotifyModeStateChanged();
+        }
+
+        // Re-announces every bar's progress and every group's mode state. The
+        // notification half of a silent restore: both events carry current state
+        // rather than a delta, so a total replay is a full refresh - which is what a
+        // restore is, and cheaper to reason about than a computed change set that
+        // has to stay in step with the restore above.
+        //
+        // BarCompleted is deliberately NOT among them. It is the occurrence signal
+        // for a bar finishing, and a restored completion is recorded fact, not an
+        // occurrence - the same distinction ProjectCompletedRewards is built on.
+        public void RepublishAll()
+        {
+            foreach (var definition in _groupOrder)
+            {
+                var runtime = _groups[definition.Id];
+                foreach (var bar in runtime.Bars)
+                    BarProgressChanged?.Invoke(bar);
+                runtime.NotifyModeStateChanged();
+            }
+        }
+
+        // Re-establishes each group's saved selection, after RestoreProgress has
+        // cleared whatever was selected before. Two calls rather than one parameter
+        // on RestoreProgress because the two are separable facts - progress is what
+        // was earned, a selection is what the player chose - and a mode with no
+        // selection ignores this entirely.
+        //
+        // REPLACEMENT: a group the snapshot does not name stays unselected, since
+        // RestoreProgress dropped its selection unconditionally.
+        public void RestoreActiveBars(IReadOnlyDictionary<string, string> activeBarByGroup, bool notify = true)
+        {
+            if (activeBarByGroup == null)
+            {
+                Debug.LogError("BarSystem: RestoreActiveBars with no saved selections. Ignoring.");
+                return;
+            }
+
+            List<BarGroupRuntime> changed = null;
+            foreach (var entry in activeBarByGroup)
+            {
+                if (!_groups.TryGetValue(entry.Key ?? "", out var runtime))
+                {
+                    Debug.LogError($"BarSystem: RestoreActiveBars with unknown bar group id '{entry.Key}'. Skipping it.");
+                    continue;
+                }
+
+                if (runtime.RestoreActiveBar(entry.Value))
+                    (changed ??= new List<BarGroupRuntime>()).Add(runtime);
+            }
+
+            if (!notify || changed == null)
+                return;
+
+            foreach (var runtime in changed)
+                runtime.NotifyModeStateChanged();
+        }
+
+        // Each group's selection for a capture; a group with none is absent.
+        public IReadOnlyDictionary<string, string> CaptureActiveBars()
+        {
+            var byGroup = new Dictionary<string, string>();
+            foreach (var definition in _groupOrder)
+            {
+                var barId = _groups[definition.Id].CaptureActiveBarId();
+                if (!string.IsNullOrEmpty(barId))
+                    byGroup.Add(definition.Id, barId);
+            }
+            return byGroup;
+        }
+
+        // Bar progress for a capture, group by group in declaration order. Only
+        // non-zero progress is recorded, since zero is what an absent entry
+        // restores to.
+        public IReadOnlyDictionary<string, IReadOnlyDictionary<string, BigNumber>> CaptureProgress()
+        {
+            var byGroup = new Dictionary<string, IReadOnlyDictionary<string, BigNumber>>();
+            foreach (var definition in _groupOrder)
+            {
+                var bars = new Dictionary<string, BigNumber>();
+                foreach (var bar in _groups[definition.Id].Bars)
+                {
+                    if (bar.Progress > BigNumber.Zero)
+                        bars.Add(bar.Definition.Id, bar.Progress);
+                }
+
+                if (bars.Count > 0)
+                    byGroup.Add(definition.Id, bars);
+            }
+            return byGroup;
         }
 
         public string FactSourceName => "completed bars";

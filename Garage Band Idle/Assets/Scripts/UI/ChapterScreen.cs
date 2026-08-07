@@ -85,8 +85,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             var section = new SectionInstance { Definition = definition };
 
-            foreach (var address in definition.ModuleAddresses)
+            foreach (var entry in definition.Modules)
             {
+                var address = entry?.Address;
                 GameObject instance;
                 try
                 {
@@ -99,9 +100,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 }
 
                 // initialize even when starting hidden so event subscriptions
-                // are live before the section shows
+                // are live before the section shows. The entry's definitionId
+                // travels with it, so a prefab used twice in one chapter presents
+                // two different things.
                 if (instance.TryGetComponent<IChapterModule>(out var module))
-                    module.Initialize(_context);
+                    module.Initialize(_context, entry?.DefinitionId);
                 else
                     Debug.LogError($"ChapterScreen: module '{address}' has no IChapterModule component on its root.");
 

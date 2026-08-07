@@ -28,12 +28,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var tap = TestContent.MakeTapProduction(1, modifiers);
 
-            new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1).Apply(Context(modifiers), ContentScope.Run);
+            new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1).ApplyOnAcquisition(Context(modifiers), ContentScope.Run);
 
-            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9, "base 1 + 1");
+            Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 1 + 1");
 
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 3);
-            Assert.AreEqual(6.0, tap.TapValue.ToDouble(), 1e-9, "(1 + 1) x 3");
+            Assert.AreEqual(6.0, tap.TapValue("jam").ToDouble(), 1e-9, "(1 + 1) x 3");
         }
 
         [Test]
@@ -49,7 +49,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(system.Get("practice_amp"), currencies, 1);
             TestContent.BuyTimes(system.Get("drummer"), currencies, 1);
 
-            new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 2, new List<string> { "practice_amp" }).Apply(Context(modifiers), ContentScope.Run);
+            new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 2, new List<string> { "practice_amp" }).ApplyOnAcquisition(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(0.8, system.Get("practice_amp").ProductionPerSecond.ToDouble(), 1e-9, "0.4 x 2");
             Assert.AreEqual(3.0, system.Get("drummer").ProductionPerSecond.ToDouble(), 1e-9,
@@ -72,7 +72,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fansBefore = currencies.Get("fans");
 
             new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 1.5, new List<string> { "cash" })
-                .Apply(Context(modifiers), ContentScope.Run);
+                .ApplyOnAcquisition(Context(modifiers), ContentScope.Run);
             system.Tick(10);
 
             Assert.AreEqual(45.0, (currencies.Get("cash") - cashBefore).ToDouble(), 1e-9, "3 x 1.5 x 10s");
@@ -86,7 +86,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
 
             new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 2, new List<string> { "cash", "fans" })
-                .Apply(Context(modifiers), ContentScope.Run);
+                .ApplyOnAcquisition(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(2.0,
                 modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash")).Multiply.ToDouble(), 1e-9);
@@ -115,11 +115,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9);
+            Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9);
 
             TestContent.RunReset(modifiers, upgrades);
 
-            Assert.AreEqual(afterReset, tap.TapValue.ToDouble(), 1e-9);
+            Assert.AreEqual(afterReset, tap.TapValue("jam").ToDouble(), 1e-9);
         }
 
         // UpgradeSystem hands the owning definition's scope to the payload. The
@@ -140,10 +140,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(5.0, tap.TapValue.ToDouble(), 1e-9, "base 1 + 4");
+            Assert.AreEqual(5.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 1 + 4");
 
             TestContent.RunReset(modifiers, upgrades);
-            Assert.AreEqual(5.0, tap.TapValue.ToDouble(), 1e-9,
+            Assert.AreEqual(5.0, tap.TapValue("jam").ToDouble(), 1e-9,
                 "the definition's permanent-in-chapter scope kept the latch, and the projection rebuilt the grant from it");
         }
 
@@ -175,13 +175,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             currencies.BalanceChanged += (id, _) =>
             {
                 if (id == "cash")
-                    tapDuringSpend = tap.TapValue.ToDouble();
+                    tapDuringSpend = tap.TapValue("jam").ToDouble();
             };
             currencies.Add("cash", 1);
 
             Assert.IsTrue(upgrades.TryBuy(stagePresence, context), "gate met and affordable");
             Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "the declared currency is charged");
-            Assert.AreEqual(2.0, tap.TapValue.ToDouble(), 1e-9, "base 1 + the granted add");
+            Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 1 + the granted add");
             Assert.AreEqual(2.0, tapDuringSpend, 1e-9, "the buff was already granted when the spend fired");
 
             Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "an applied buff is never bought twice");

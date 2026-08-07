@@ -54,7 +54,7 @@ MonoBehaviour:
         _value: 1
     - rid: 1008
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
-      data: 
+      data:
     - rid: 1009
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
@@ -62,7 +62,7 @@ MonoBehaviour:
         _value: 500
     - rid: 1010
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
-      data: 
+      data:
     - rid: 1011
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
@@ -70,7 +70,7 @@ MonoBehaviour:
         _value: 2500
     - rid: 1012
       type: {class: AutomationDisabledDebuff, ns: RidiculousGaming.GarageBandIdle.Events, asm: Assembly-CSharp}
-      data: 
+      data:
     - rid: 1013
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:

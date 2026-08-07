@@ -39,7 +39,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private readonly List<PoolEntry> _pools = new();
 
-        public void Initialize(ChapterContext context)
+        // renders a roster resolved from the chapter, so it presents no single
+        // definition and its section entry names none
+        public ModuleDefinitionKind RequiredDefinition => ModuleDefinitionKind.None;
+
+        public void Initialize(ChapterContext context, string definitionId)
         {
             _context = context;
             var bars = context.Economy.Bars;

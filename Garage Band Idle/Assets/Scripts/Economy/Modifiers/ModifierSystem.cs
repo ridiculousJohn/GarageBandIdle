@@ -36,6 +36,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // this way, so the button can never show a stale amount).
         public event Action<ModifierTargetKey> Changed;
 
+        // nesting depth of deferral scopes, and the targets touched while deferring
+        private int _deferDepth;
+        private List<ModifierTargetKey> _deferred;
+
         public void Grant(ModifierTargetKey target, ModifierOperation operation, ContentScope scope, BigNumber value)
         {
             if (!IsAddressable(target, operation, "Grant"))
@@ -59,7 +63,58 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
 
             grants.Add(new Granted { Operation = operation, Scope = scope, Value = value });
-            Changed?.Invoke(target);
+            Raise(target);
+        }
+
+        // Defers Changed for the duration of a rebuild (design doc section 12, rule
+        // 6). A projection CLEARS the store and then re-grants from the surviving
+        // facts, so it necessarily passes through a state where a target's
+        // composition is wrong - every grant not yet re-applied is missing. Nothing
+        // may observe that: GeneratorListModule refreshes a row's rate off this
+        // event, so an undeferred projection redraws the fleet once per cleared
+        // target and once per re-grant, each read against a half-rebuilt store.
+        //
+        // Silencing the restore's FACT primitives is not enough on its own, which is
+        // the whole reason this exists - the projection between them is the loudest
+        // part of a restore.
+        //
+        // Publication is on End rather than on a separate flush, so a caller cannot
+        // defer and forget; the restore ends its deferral after the settle, which is
+        // what makes the replayed set describe finished state.
+        public void BeginDeferredNotifications() => _deferDepth++;
+
+        public void EndDeferredNotifications()
+        {
+            if (_deferDepth == 0)
+            {
+                Debug.LogError("ModifierSystem: EndDeferredNotifications without a matching Begin. Ignoring.");
+                return;
+            }
+
+            _deferDepth--;
+            if (_deferDepth > 0 || _deferred == null)
+                return;
+
+            var pending = _deferred;
+            _deferred = null;
+            foreach (var target in pending)
+                Changed?.Invoke(target);
+        }
+
+        // One target, once, in the order it was first touched: a projection grants
+        // several modifiers per target, and a subscriber only needs to know the
+        // composition moved.
+        private void Raise(ModifierTargetKey target)
+        {
+            if (_deferDepth == 0)
+            {
+                Changed?.Invoke(target);
+                return;
+            }
+
+            _deferred ??= new List<ModifierTargetKey>();
+            if (!_deferred.Contains(target))
+                _deferred.Add(target);
         }
 
         // boot-time registration for a modifier that computes its own value;
@@ -82,7 +137,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
 
             derived.Add(modifier);
-            Changed?.Invoke(modifier.Target);
+            Raise(modifier.Target);
         }
 
         // Everything modifying this target, composed. Derived values are read
@@ -158,7 +213,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return false;
 
             foreach (var target in cleared)
-                Changed?.Invoke(target);
+                Raise(target);
             return true;
         }
 

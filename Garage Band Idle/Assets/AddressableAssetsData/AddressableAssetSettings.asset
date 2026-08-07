@@ -15,7 +15,7 @@ MonoBehaviour:
   m_DefaultGroup: 7e88b09079791284ba6172b641ee646d
   m_currentHash:
     serializedVersion: 2
-    Hash: dafea213b0a2cb97bf49a7d08ef0d1cd
+    Hash: 00000000000000000000000000000000
   m_ExtractTypeTreeData: 0
   m_DisableWriteTypeTree: 0
   m_OptimizeCatalogSize: 0
@@ -114,6 +114,7 @@ MonoBehaviour:
     - bar
     - bar-group
     - producer
+    - story-beat
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: 3a8acf251fe8c334ab180ebe77f2bee3, type: 2}

@@ -25,16 +25,32 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     public class ProductionSystem
     {
         private readonly List<ProductionConfig> _tick = new();
+
+        // every tap config, for the currency-scoped readouts, which ask "what can
+        // fill this currency" across the whole chapter
         private readonly List<ProductionConfig> _tap = new();
+
+        // Tap configs BY PRODUCER, which is what a firing needs. Flattening these
+        // into one list is what made a tap fire every producer in the chapter:
+        // harmless while Jam is the only tap surface, and wrong the moment a
+        // Merch/Sell module exists, since pressing Jam would sell merch too. Which
+        // producer a module presents was always authored - only the runtime
+        // ignored it.
+        private readonly Dictionary<string, List<ProductionConfig>> _tapByProducer = new();
+
+        // declaration order, so RefreshTapValue publishes deterministically
+        private readonly List<string> _tapProducerOrder = new();
+        private readonly Dictionary<string, BigNumber> _lastTapValue = new();
+
         private readonly ICurrencies _currencies;
         private readonly ModifierSystem _modifiers;
         private readonly ConditionContext _conditions;
-        private BigNumber _lastTapValue;
 
-        // fires from RefreshTapValue when the composed tap value moved (buff
-        // bought, run reset, a config's gate transitioned); UI listens here,
-        // nothing polls
-        public event Action TapValueChanged;
+        // Fires from RefreshTapValue when a producer's composed tap value moved
+        // (buff bought, run reset, a config's gate transitioned), carrying WHICH
+        // producer - the same shape as BalanceChanged, so a module showing one tap
+        // surface ignores another's movement instead of redrawing on it.
+        public event Action<string> TapValueChanged;
 
         public ProductionSystem(IEnumerable<ProducerDefinition> producers, ICurrencies currencies,
             ModifierSystem modifiers, ConditionContext conditions)
@@ -68,6 +84,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                             break;
                         case ProductionTrigger.Tap:
                             _tap.Add(config);
+                            if (!_tapByProducer.TryGetValue(producer.Id, out var configs))
+                            {
+                                _tapByProducer.Add(producer.Id, configs = new List<ProductionConfig>());
+                                _tapProducerOrder.Add(producer.Id);
+                            }
+                            configs.Add(config);
                             break;
                         default:
                             Debug.LogError($"ProductionSystem: producer '{producer.Id}' config for '{config.CurrencyId}' has trigger None (uninitialized). Ignoring the config.");
@@ -76,23 +98,32 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 }
             }
 
-            _lastTapValue = TapValue;
+            foreach (var producerId in _tapProducerOrder)
+                _lastTapValue[producerId] = TapValue(producerId);
         }
 
-        // The composed Jam yield the button advertises: every tap config that
-        // composes TapValue, gates honored (Chapter 1: the cash config).
-        public BigNumber TapValue
+        // Whether this chapter authors a tap surface under this id. Asked by the
+        // module that presents one, so a stale definitionId is reported where it
+        // can name the module rather than failing silently on the first press.
+        public bool HasTapProducer(string producerId)
+            => !string.IsNullOrEmpty(producerId) && _tapByProducer.ContainsKey(producerId);
+
+        // The composed yield ONE tap surface advertises: that producer's tap
+        // configs that compose TapValue, gates honored (Chapter 1: the jam
+        // producer's cash config). Per producer rather than chapter-wide, so a
+        // button's label describes what pressing that button pays.
+        public BigNumber TapValue(string producerId)
         {
-            get
+            if (!_tapByProducer.TryGetValue(producerId ?? "", out var configs))
+                return BigNumber.Zero;
+
+            var total = BigNumber.Zero;
+            foreach (var config in configs)
             {
-                var total = BigNumber.Zero;
-                foreach (var config in _tap)
-                {
-                    if (config.Composes == ModifierTarget.TapValue && ConditionEvaluator.IsMet(config.Gate, _conditions))
-                        total += Composed(config);
-                }
-                return total;
+                if (config.Composes == ModifierTarget.TapValue && ConditionEvaluator.IsMet(config.Gate, _conditions))
+                    total += Composed(config);
             }
+            return total;
         }
 
         // Every query below reports what production can do RIGHT NOW, gates
@@ -129,11 +160,23 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
-        // the Jam tap: every tap-triggered config whose gate holds pays out,
-        // in producer list order (cash, then the engagement yields)
-        public void FireTap()
+        // One tap surface firing: every tap-triggered config THAT PRODUCER holds
+        // whose gate holds pays out, in the producer's own config order (cash, then
+        // the engagement yields). Naming the producer is the whole point - a press
+        // pays what the pressed thing produces, and nothing else.
+        public void FireTap(string producerId)
         {
-            foreach (var config in _tap)
+            if (!_tapByProducer.TryGetValue(producerId ?? "", out var configs))
+            {
+                // A module firing an unknown producer is broken wiring, not a
+                // no-op worth swallowing: the button would silently pay nothing
+                // forever, which reads as a tuning problem rather than a
+                // mis-authored module entry.
+                Debug.LogError($"ProductionSystem: FireTap for producer '{producerId}', which this chapter authors no tap configs for. Nothing paid.");
+                return;
+            }
+
+            foreach (var config in configs)
             {
                 if (!ConditionEvaluator.IsMet(config.Gate, _conditions))
                     continue;
@@ -151,12 +194,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // subscriber can observe a half-settled mutation (state, then notify).
         public void RefreshTapValue()
         {
-            var value = TapValue;
-            if (value == _lastTapValue)
-                return;
+            // per producer, in declaration order: each tap surface publishes only
+            // its own movement, so a chapter with two of them never redraws one
+            // because the other changed
+            foreach (var producerId in _tapProducerOrder)
+            {
+                var value = TapValue(producerId);
+                if (value == _lastTapValue[producerId])
+                    continue;
 
-            _lastTapValue = value;
-            TapValueChanged?.Invoke();
+                _lastTapValue[producerId] = value;
+                TapValueChanged?.Invoke(producerId);
+            }
         }
 
         // A config composes exactly the target it declares - tapValue for the
