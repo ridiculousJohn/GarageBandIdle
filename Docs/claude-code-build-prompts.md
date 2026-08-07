@@ -52,7 +52,9 @@ snapshot/seed contract (one restore order, one state type, recipe-driven filteri
 replay behavior a property of the effect TYPE so a payout cannot be paid twice by any path, and lets a
 module be told which definition it presents — which cashed in the producer/module binding that had
 been authored and dead since 5.4, so a tap fires its own producer rather than every tap config in the
-chapter. It also made the capstone, story beats and Roadies into ordinary content: `CapstoneConfig`
+chapter. The module declares the FAMILY it requires, and that one answer settles both directions:
+whether an entry's id resolves, and whether a tap producer is presented at all — so neither check can
+be satisfied by an id that happens to belong to some other registry. It also made the capstone, story beats and Roadies into ordinary content: `CapstoneConfig`
 holds the sole authored chapter gate (the scalar `capstoneRecordsGate` is deleted), story beats became
 a definition type with a chapter id list instead of two inline strings, and Roadies is a global
 currency in the existing permanent group. Slices 7–10 assume all of it: 7 consumes `CapstoneConfig`
@@ -765,7 +767,7 @@ prefab with no way to differ. One parameter fixes both.
 > pulled by its section's condition, not pushed by the capstone. Retire
 > `ChapterDefinition.StoryBeatOpen`/`StoryBeatCapstone` and move Chapter 1's two beats into assets.
 > Do NOT author the beat sections or build a `module/story-beat` prefab here: no such prefab exists
-> and `ValidateModuleAddress` fails boot on a section pointing at a missing address. Slice 10 places
+> and boot validation fails a section whose module address resolves to no prefab. Slice 10 places
 > them.
 > Finally, add Roadies as an ordinary currency — hand-authored `Roadies.asset` mirroring
 > `Records.asset`, filed in the existing Global `permanent` group, labelled for Addressables, and
