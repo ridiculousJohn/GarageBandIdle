@@ -1,9 +1,11 @@
 ---
 name: fan-accrual-is-production
 description: "What slice 5.7 established in Garage Band Idle - FanSystem retired, section 9's no-idle-fans promise made structural, and the two rules a review had to catch"
-metadata:
+metadata: 
   node_type: memory
   type: project
+  originSessionId: 4b1e1cef-e362-4fa3-8552-5aa1e87a6601
+  modified: 2026-08-07T22:07:36.513Z
 ---
 
 Slice 5.7 is committed (`1227bab`, 2026-08-04) and confirmed in Play: `FanSystem` is deleted. Fan accrual is a tick config on a `band` producer that carries no module address, composing `FanRate`, gated `ownedCount drummer >= 1`; the per-bandmate bonus is `BandmateFanRateModifier`, a `DerivedModifier` adding on the global `FanRate` target. Composed: `(0.2 + 0.02n) x rewards`. Follows [[reveal-is-a-condition]].
@@ -18,4 +20,4 @@ Slice 5.7 is committed (`1227bab`, 2026-08-04) and confirmed in Play: `FanSystem
 - **One guarantee moved from impossible to checked.** Records could never reach the fan rate while `FanSystem` only composed `FanRate`; now the only thing keeping it off is `recordBuff.affects`, so `ContentValidator` refuses the chapter's fans currency there (section 11: time away must not shortcut the Records payout).
 - **Refuse a stale JSON key on PRESENCE, never contents.** The three retired fans keys carry no field initializers, so null means absent and `"activeWhen": {}` / `"revealFlag": ""` / `baseFansPerSec: 0` are all caught. A contents test waves through the emptiest spelling - the one least likely to be spotted by eye. `IsImportableBarGroup` had this hole for `"revealFlag": ""` and it is closed (2026-08-05): the fix is TWO coupled edits, the `== null` check and dropping the DTO's `= ""` initializer, because changing only the check makes an absent key read as `""` and refuses every bar group.
 - **`RealChapterContent_PassesBootValidation` is the only thing validating shipped content outside Play.** The importer does not run `ContentValidator`, and every other validator test builds its own broken fixture - which is exactly how a boot error sat in the tree through a green suite. It repeats `GameManager.Awake`'s four steps over the real Addressables database and expects silence. Keep it green; a rule shipped content must satisfy has to be exercised against shipped content.
-- **Next: slice 7 (Records manager + capstone / chapter gate).** Slice 6 landed `f7ad34f`: its release walks each system's facts, and because 5.7 had already made fans production, fan accrual reset with the producers instead of needing a reset of its own. See [[project-layout-and-workflow]] for the slice workflow and [[unity-headless-verify-loop]] for verification.
+- **Slice 6 (`f7ad34f`) inherited this for free.** Its release walks each system's facts, and because 5.7 had already made fans production, fan accrual reset with the producers instead of needing a reset of its own. See [[project-layout-and-workflow]] for the slice workflow and how to derive the current position, and [[unity-headless-verify-loop]] for verification.
