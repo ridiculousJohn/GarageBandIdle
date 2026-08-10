@@ -44,6 +44,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void RealChapterContent_PassesBootValidation()
         {
             var database = new ContentDatabase();
+
+            // an unexpected Debug.LogError fails the test, so a clean run IS the
+            // assertion: boot validation reports nothing about real content. It
+            // runs before any permanent pool or economy is built, the order
+            // Awake runs it in.
+            ContentValidator.Validate(database, GameManager.RecordsCurrencyId,
+                new RewardManager(database.Rewards.All));
+
             var permanent = EconomyContextFactory.BuildPermanentPool(database);
 
             ChapterDefinition starting = null;
@@ -57,10 +65,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             using var frontier = EconomyContextFactory.Build(starting, database, permanent,
                 EconomyRecipe.FrontierChapter);
             Assert.IsNotNull(frontier, "the frontier economy failed to build from shipped content");
-
-            // an unexpected Debug.LogError fails the test, so a clean run IS the
-            // assertion: boot validation reports nothing about real content
-            ContentValidator.Validate(database, frontier.Conditions, frontier.Rewards);
             LogAssert.NoUnexpectedReceived();
         }
 

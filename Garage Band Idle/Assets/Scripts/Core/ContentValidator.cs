@@ -24,9 +24,9 @@ namespace RidiculousGaming.GarageBandIdle
     // are skipped, because no declaration list governs an orphan.
     public static class ContentValidator
     {
-        public static void Validate(ContentDatabase database, ConditionContext context, RewardManager rewards)
+        public static void Validate(ContentDatabase database, string recordsCurrencyId, RewardManager rewards)
         {
-            var orphan = ChapterScoped(new ChapterCurrencies(database, null), context.RecordsCurrencyId, database, null);
+            var orphan = ChapterScoped(new ChapterCurrencies(database, null), recordsCurrencyId, database, null);
 
             ValidateRecordsSurviveRelease(orphan);
             ValidateChapterIndices(database);
@@ -42,7 +42,7 @@ namespace RidiculousGaming.GarageBandIdle
                 var currencies = new ChapterCurrencies(database, chapter);
                 currencies.ValidateRoster();
                 ValidateChapter(chapter, database,
-                    ChapterScoped(currencies, context.RecordsCurrencyId, database, chapter), rewards, visited);
+                    ChapterScoped(currencies, recordsCurrencyId, database, chapter), rewards, visited);
             }
 
             foreach (var currency in database.Currencies.All)
@@ -924,7 +924,8 @@ namespace RidiculousGaming.GarageBandIdle
         // Not passing what is not read is the fix; disposal would only tidy up
         // after a subscription that had no reason to exist.
         //
-        // The records id is all this still needs from the caller's context.
+        // The records id is all this still needs from the caller - which is
+        // what lets boot run validation before any economy exists.
         private static ConditionContext ChapterScoped(ChapterCurrencies currencies, string recordsCurrencyId,
             ContentDatabase database, ChapterDefinition chapter)
             => new(currencies, null,

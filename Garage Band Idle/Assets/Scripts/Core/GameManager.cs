@@ -69,6 +69,19 @@ namespace RidiculousGaming.GarageBandIdle
             }
 
             Database = new ContentDatabase();
+
+            // One boot pass covers every content reference - conditions,
+            // payloads, rewards, module addresses - and it runs BEFORE any
+            // economy is built or settled: construction settles, and that settle
+            // acquires (an unlock whose gate holds at boot latches and grants
+            // during Build), so a report issued after construction described a
+            // mistake something had already acted on. The validator reads no
+            // running system - the reward manager it takes is built from the
+            // same database registry the factory reads - and it only reports
+            // (rule 10); refusing broken content the moment it would ACT stays
+            // each system's own fail-closed guard.
+            ContentValidator.Validate(Database, RecordsCurrencyId, new RewardManager(Database.Rewards.All));
+
             PermanentCurrencies = EconomyContextFactory.BuildPermanentPool(Database);
             PermanentCurrencies.ValidateReference(RecordsCurrencyId, "GameManager (income multiplier)");
 
@@ -96,17 +109,6 @@ namespace RidiculousGaming.GarageBandIdle
                 // economy, so a cash id missing from that chapter's roster is a
                 // blank readout, reported here rather than seen
                 Frontier.Currencies.ValidateReference(CashCurrencyId, "GameManager (UI cash display)");
-
-                // one boot pass covers every content reference - conditions,
-                // payloads, rewards, module addresses - so a mistake gets
-                // reported here, loudly, instead of surfacing mid-run
-                ContentValidator.Validate(Database, Frontier.Conditions, Frontier.Rewards);
-
-                // the factory's Restore already performed the initial drain and
-                // settle (EconomyContext.Restore drains to a fixpoint), and the
-                // validation above only reports - it moves no condition input -
-                // so this settle is redundant
-                Frontier.Settle();
             }
 
             _tickSystem = GetComponent<TickSystem>();

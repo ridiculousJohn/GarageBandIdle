@@ -23,6 +23,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static RewardManager NoRewards => new(Array.Empty<RewardDefinition>());
 
+        private const string RecordsId = GameManager.RecordsCurrencyId;
+
         // A tap producer needs some section module presenting it (6.5) or boot
         // validation reports a tap surface nobody can press - the check that replaced
         // ProducerDefinition.ModuleAddress. Fixtures about a producer's CONFIGS author
@@ -51,8 +53,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // would fire the fans check on a fixture that is not about fans
             var database = TestContent.MakeDatabase(chapters: new[] { chapter },
                 currencyGroups: new List<CurrencyGroupDefinition>(TestContent.StandardGroups()) { incoherent });
-            var context = new ConditionContext(TestContent.MakeEconomy(), null,
-                new FlagSystem(chapter.FlagIds), database: database);
 
             // "resets on whose release?" has no answer - a global currency is
             // held by a pool no release touches, so one of the two declarations
@@ -60,7 +60,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: currency group 'roadies' is placed Global and also resets on album release - a global currency is held by a pool no release touches, so the two cannot both be true.");
 
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         [Test]
@@ -73,21 +73,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var unmigrated = TestContent.MakeGroup("run", true, CurrencyPlacement.None);
             var database = TestContent.MakeDatabase(chapters: new[] { chapter },
                 currencyGroups: new[] { unmigrated, TestContent.MakeGroup("permanent", false, CurrencyPlacement.Global) });
-            var context = new ConditionContext(TestContent.MakeEconomy(), null,
-                new FlagSystem(chapter.FlagIds), database: database);
 
             // the un-migrated field: its currencies land in no pool at all, so
             // every balance in the group silently reads zero
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: currency group 'run' has no placement set (None) - its currencies would land in no pool and every balance would read zero. Set it to Chapter or Global.");
 
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         [Test]
         public void Flags_ValidateAgainstTheOwningChapter_NotTheActiveOne()
         {
-            var currencies = TestContent.MakeEconomy();
             var s1 = TestContent.MakeSection("s1", new FlagSetCondition("one"));
             var s2 = TestContent.MakeSection("s2", new FlagSetCondition("two"));
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "one" },
@@ -97,30 +94,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var database = TestContent.MakeDatabase(
                 chapters: new[] { ch1, ch2 }, sections: new[] { s1, s2 });
 
-            // ch1 plays the active chapter (its flags are the live context);
-            // ch2's content must still validate against ch2's own declarations
-            // - the pass reports nothing at all
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
-            ContentValidator.Validate(database, context, NoRewards);
+            // ch2's content validates against ch2's own declarations, whichever
+            // chapter is being played - the pass reports nothing at all
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         [Test]
         public void FlagFromAnotherChaptersList_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var poached = TestContent.MakeSection("poached", new FlagSetCondition("two"));
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "one" },
                 sectionIds: new List<string> { "poached" });
             var ch2 = TestContent.MakeChapter("ch2", new List<string> { "fans", "two" }, index: 2);
             var database = TestContent.MakeDatabase(chapters: new[] { ch1, ch2 }, sections: new[] { poached });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // "two" exists somewhere (ch2 declares it), but ch1 owns the
             // section - a flag another chapter declares can never be set while
             // ch1's FlagSystem is live, so this is a content error
             LogAssert.Expect(LogType.Error,
                 "Condition: Section 'poached' (visibleWhen) references flag 'two', which the chapter does not declare.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The currency half of the same guarantee. A chapter's roster says which
@@ -131,7 +124,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void Currencies_ValidateAgainstTheOwningChapter_NotTheActiveOne()
         {
-            var currencies = TestContent.MakeEconomy();
             var merch = TestContent.MakeCurrency("merch", "run");
             var stall = TestContent.MakeGenerator("stall", "merch", 10, 1.1, 1, costCurrency: "merch");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
@@ -142,16 +134,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 generators: new[] { stall },
                 currencies: new List<CurrencyDefinition>(TestContent.StandardCurrencies()) { merch });
 
-            // ch1 is the active chapter and has never heard of merch; ch2's
-            // generator both costs and produces it, and the pass says nothing
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
-            ContentValidator.Validate(database, context, NoRewards);
+            // ch1 has never heard of merch; ch2's generator both costs and
+            // produces it, and the pass says nothing
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         [Test]
         public void CurrencyFromAnotherChaptersRoster_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var merch = TestContent.MakeCurrency("merch", "run");
             var poached = TestContent.MakeGenerator("poached", "cash", 10, 1.1, 1, costCurrency: "merch");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
@@ -161,14 +151,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var database = TestContent.MakeDatabase(chapters: new[] { ch1, ch2 },
                 generators: new[] { poached },
                 currencies: new List<CurrencyDefinition>(TestContent.StandardCurrencies()) { merch });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // merch is a real currency, and ch1's generator still cannot charge
             // in it: the balance would live in ch2's pool, which ch1's economy
             // never routes to. Reported as undeclared, not as unknown.
             LogAssert.Expect(LogType.Error,
                 "ChapterCurrencies: Generator 'poached' (cost currency) references currency id 'merch', which chapter 'ch1' does not declare - add it to the chapter's currency roster, or reference a currency the chapter owns (globals are reachable from every chapter).");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // A roster is only read when an economy is CONSTRUCTED from it, and only
@@ -179,33 +168,29 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void LaterChapterRosteringAGlobalCurrency_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
             var ch2 = TestContent.MakeChapter("ch2", new List<string> { "fans" }, index: 2,
                 currencyIds: new List<string> { "cash", "fans", "records" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1, ch2 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // records lives in the startup pool; a chapter rostering it asks for
             // a second balance, and every read would pick one arbitrarily
             LogAssert.Expect(LogType.Error,
                 "ChapterCurrencies: chapter 'ch2' roster names currency 'records', whose group 'permanent' is placed Global - it is held by the startup pool and must not be in a chapter roster.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         [Test]
         public void LaterChapterRosteringAnUnknownCurrency_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
             var ch2 = TestContent.MakeChapter("ch2", new List<string> { "fans" }, index: 2,
                 currencyIds: new List<string> { "cash", "fans", "merch" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1, ch2 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ChapterCurrencies: chapter 'ch2' roster names unknown currency id 'merch'. Re-run the chapter import.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // both of a currency's lifetime facts come from its group, so a group
@@ -215,17 +200,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void CurrencyWithAnUnknownGroup_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var stray = TestContent.MakeCurrency("merch", "ghost_group");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 currencyIds: new List<string> { "cash", "fans", "merch" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 currencies: new List<CurrencyDefinition>(TestContent.StandardCurrencies()) { stray });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: currency 'merch' references unknown group id 'ghost_group' - placement and the album-release reset both come from the group, so it would land in no pool and survive every release.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // What a generator PAYS INTO was checked only by GeneratorSystem, which
@@ -234,15 +217,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void GeneratorProducingAnUnknownCurrency_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var orphan = TestContent.MakeGenerator("ghost_output", "merch", 10, 1.1, 1);
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, generators: new[] { orphan });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ChapterCurrencies: Generator 'ghost_output' (produces) references currency id 'merch', which resolves to no CurrencyDefinition asset.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // a chapter-listed producer's config gate validates against the OWNING
@@ -251,7 +232,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void ProducerGateFlag_ValidatesAgainstTheOwningChapter()
         {
-            var currencies = TestContent.MakeEconomy();
             var poached = TestContent.MakeProducer("busk", new List<ProductionConfig>
             {
                 new("cash", 1, ProductionTrigger.Tap, new FlagSetCondition("two"), ModifierTarget.None),
@@ -263,11 +243,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch2 = TestContent.MakeChapter("ch2", new List<string> { "fans", "two" }, index: 2);
             var database = TestContent.MakeDatabase(chapters: new[] { ch1, ch2 }, producers: new[] { poached },
                 sections: new[] { section });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "Condition: Producer 'busk' (config for 'cash') (gate) references flag 'two', which the chapter does not declare.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // negative tuning drains or dead-ends instead of earning - runtime
@@ -275,15 +254,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void NegativeRecordBuffTuning_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 recordBuffPerRecord: -0.02);
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' has a negative recordBuff perRecord (-0.02).");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // A producer IS its production configs, and every field is trusted per
@@ -294,7 +271,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void BrokenProducerConfigs_AreReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var broken = TestContent.MakeProducer("broken", new List<ProductionConfig>
             {
                 new("cash", -1, ProductionTrigger.Tap, null, ModifierTarget.None),
@@ -312,7 +288,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 sectionIds: new List<string> { section.Id });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { broken, hollow },
                 sections: new[] { section });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Producer 'broken' (config for 'cash') has a negative amount (-1).");
@@ -324,7 +299,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "ContentValidator: Producer 'broken' (config for 'cash') declares composition 'GeneratorOutput', which a config cannot compose - it must be a defined target that composes globally (a qualified target like GeneratorOutput would read an empty bucket).");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Producer 'hollow' has no production configs - it would produce nothing.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // stale/unlisted definitions keep every structural check; only the
@@ -333,16 +308,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void OrphanedContent_KeepsStructuralChecks_WithoutFlagFalsePositives()
         {
-            var currencies = TestContent.MakeEconomy();
             var stale = TestContent.MakeGenerator("stale", "cash", -5, 1.15, 1, new FlagSetCondition("ghost"));
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, generators: new[] { stale });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // the broken cost is reported; the undeclared 'ghost' flag is not
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Generator 'stale' has a non-positive base cost (-5) - it would be free to buy.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // Story beats are a registry like any other, so the orphan pass owes them the
@@ -352,16 +325,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void OrphanStoryBeat_KeepsItsTextCheck_WithoutFlagFalsePositives()
         {
-            var currencies = TestContent.MakeEconomy();
             var stale = TestContent.MakeStoryBeat("beat_stale", "", "ghost");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, storyBeats: new[] { stale });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // the empty text is reported; the undeclared 'ghost' read flag is not
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Story beat 'beat_stale' has no text - its card would show nothing.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // the importer refuses to write either of these, so reaching them means
@@ -370,7 +341,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void PerSecMultiplierPayload_UnappliableTuning_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var empty = TestContent.MakeUpgrade("empty_affects", UpgradeType.Buff, ContentScope.Run,
                 null, new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 1.5, new List<string>()), costAmount: 100);
             var zeroed = TestContent.MakeUpgrade("zeroed", UpgradeType.Buff, ContentScope.Run,
@@ -378,13 +348,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 upgradeIds: new List<string> { "empty_affects", "zeroed" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { empty, zeroed });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "GameEffect: Upgrade 'empty_affects' (payload) targets CurrencyProduction but names nothing to affect - the modifier could never apply.");
             LogAssert.Expect(LogType.Error,
                 "GameEffect: Upgrade 'zeroed' (payload) has a non-positive multiplier (0).");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // a buff is bought, so it must cost something; a content unlock is
@@ -393,7 +362,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void BuffWithNoCost_IsReported_AndAFreeContentUnlockIsNot()
         {
-            var currencies = TestContent.MakeEconomy();
             var free = TestContent.MakeUpgrade("free_buff", UpgradeType.Buff, ContentScope.Run,
                 null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1));
             var reveal = TestContent.MakeUpgrade("reveal", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
@@ -401,12 +369,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 upgradeIds: new List<string> { "free_buff", "reveal" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { free, reveal });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // only the buff reports - an unexpected second error would fail here
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Upgrade 'free_buff' is a buff with no cost - it would be free to buy.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // a buff must be payable, which takes two checks: an amount with no
@@ -415,7 +382,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void UpgradeCostCurrency_MustBeNamedAndResolve_WhenTheUpgradeCostsAnything()
         {
-            var currencies = TestContent.MakeEconomy();
             var unnamed = TestContent.MakeUpgrade("unnamed_currency", UpgradeType.Buff, ContentScope.Run,
                 null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costCurrencyId: "", costAmount: 250);
             var ghost = TestContent.MakeUpgrade("ghost_cost_currency", UpgradeType.Buff, ContentScope.Run,
@@ -425,7 +391,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 upgradeIds: new List<string> { "unnamed_currency", "ghost_cost_currency", "free_reveal" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { unnamed, ghost, free });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Upgrade 'unnamed_currency' costs 250 but names no cost currency - the purchase would charge nothing.");
@@ -433,7 +398,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "ChapterCurrencies: Upgrade 'ghost_cost_currency' (cost currency) references currency id 'merch', which resolves to no CurrencyDefinition asset.");
             // the free content unlock reports nothing - an unexpected third
             // error would fail here
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The permanent income buff and every capstone gate read the cumulative
@@ -444,9 +409,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void RecordsInAResettingGroup_IsReported()
         {
-            // the misfiling lives in the DATABASE, because that is what boot
-            // validation reads: a currency's group is content, so a pool built
-            // beside it would be describing the scenario somewhere nothing looks
+            // the misfiling lives in the DATABASE, because that is all boot
+            // validation reads: a currency's group is content
             var groups = new[] { TestContent.MakeGroup("run", true) };
             var currencies = new[]
             {
@@ -457,12 +421,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 currencies: currencies, currencyGroups: groups);
-            var context = new ConditionContext(new CurrencyManager(groups, currencies), null,
-                new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Records currency 'records' is in a currency group that resets on album release - permanent progress would return to zero every release.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The mirror of the Records check, and the reason both exist: Fans are the
@@ -484,12 +446,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 currencies: currencies, currencyGroups: groups);
-            var context = new ConditionContext(new CurrencyManager(groups, currencies), null,
-                new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' fans currency 'fans' is in a currency group that survives an album release - fans would compound across runs and inflate the Records payout.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // Before 5.7 this was impossible rather than checked: fan accrual was its
@@ -501,15 +461,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void FansCurrencyInRecordBuffAffects_IsRefused()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 recordBuffAffects: new List<string> { "cash", "fans" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' lists its fans currency 'fans' in recordBuff affects - the Records multiplier must never reach the fan rate, or time away shortcuts the Records payout (design doc section 11).");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // an unresolvable fans currency reports once, as a bad reference - the group
@@ -517,14 +475,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void UnknownFansCurrency_ReportsOnlyTheBadReference()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" }, fansCurrencyId: "ghost");
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ChapterCurrencies: Chapter 'ch1' (fans currency) references currency id 'ghost', which resolves to no CurrencyDefinition asset.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // a negative starting value puts the currency in debt at boot and again
@@ -532,7 +488,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void NegativeStartingValue_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var indebted = TestContent.MakeCurrency("merch", "run", startingValue: -5);
             // added to the standard economy rather than replacing it: the chapter
             // still needs a cash for its recordBuff and a fans for its fans
@@ -542,11 +497,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 currencyIds: new List<string> { "cash", "fans", "merch" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 currencies: new List<CurrencyDefinition>(TestContent.StandardCurrencies()) { indebted });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Currency 'merch' has a negative starting value (-5) - it would start in debt at boot and after every album release.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // the module list is instantiated in order with no de-duplication, so a
@@ -554,7 +508,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void SectionListingAModuleTwice_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             // a roster module twice: two generator lists in one region, each wired to
             // the same systems. Repeating an ADDRESS is legitimate now (two beat cards
             // are one prefab presenting two beats), so the key is address + id, and
@@ -564,11 +517,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 sectionIds: new List<string> { "doubled" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { doubled });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Section 'doubled' lists module 'module/generator-list' more than once - it would be instantiated twice.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // a run-scoped flag whose only setter is a permanent fact: the release
@@ -577,7 +529,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void RunScopedFlagWithOnlyPermanentSetters_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var setter = TestContent.MakeUpgrade("teach", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, null, new SetFlagEffect("covers"));
             var ch1 = TestContent.MakeChapter("ch1", null,
@@ -585,11 +536,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 upgradeIds: new List<string> { "teach" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 upgrades: new[] { setter });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' flag 'covers' is run-scoped but every setter is permanent - the release clears it and the projection re-asserts it in the same operation, so the scope has no effect.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // a flag no content sets is a warning, not an error: everything gated
@@ -598,14 +548,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void FlagNoContentSets_IsWarnedAbout()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "orphan" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Warning,
                 "ContentValidator: Chapter 'ch1' declares flag 'orphan' but no content sets it - unless code sets it, every flagSet gate on it stays closed and the content behind them can never appear.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // the run-scope rule is satisfied from any setter kind that resets with
@@ -614,7 +562,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void RunScopedFlagWithARunScopedSetter_IsSilent()
         {
-            var currencies = TestContent.MakeEconomy();
             var setter = TestContent.MakeUpgrade("teach", UpgradeType.ContentUnlock,
                 ContentScope.Run, null, new SetFlagEffect("covers"));
             var ch1 = TestContent.MakeChapter("ch1", null,
@@ -622,9 +569,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 upgradeIds: new List<string> { "teach" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 upgrades: new[] { setter });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // the starting chapter is the lowest index, so an index is an ordinal:
@@ -632,15 +578,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void ChaptersSharingAnIndex_AreReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" });
             var ch2 = TestContent.MakeChapter("ch2", new List<string> { "fans" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1, ch2 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapters 'ch1' and 'ch2' share index 1 - which one starts would be arbitrary.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // the declared flag list is the chapter's whole reveal vocabulary, so a
@@ -648,16 +592,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void FlagListSlips_AreReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "covers", "covers", "" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' declares flag 'covers' more than once.");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' declares an empty flag id.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The capstone gate is the primary pacing knob (design doc section 11), and
@@ -671,17 +613,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void CapstoneWithNoUnlockCondition_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done") },
                 capstone: new CapstoneConfig("backyard", "Backyard Party", null, "done",
                     new SetFlagEffect("done")));
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.Flags), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' capstone 'backyard' has no unlock condition - a null gate is always met, so the capstone would be offered at boot.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The completion flag IS the chapter boundary, so it has to outlive a
@@ -692,19 +632,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void RunScopedCapstoneCompletionFlag_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done", ContentScope.Run) },
                 capstone: new CapstoneConfig("backyard", "Backyard Party",
                     new RecordsCumulativeCondition(30), "done", new SetFlagEffect("done")));
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.Flags), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' capstone completion flag 'done' is declared Run - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' flag 'done' is run-scoped but every setter is permanent - the release clears it and the projection re-asserts it in the same operation, so the scope has no effect.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The re-acquisition rule (6.5), and it covers EVERY content unlock rather
@@ -720,17 +658,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [TestCase(ContentScope.PermanentInChapter)]
         public void OneShotEffectOnAnyContentUnlock_IsReported(ContentScope scope)
         {
-            var currencies = TestContent.MakeEconomy();
             var upgrade = TestContent.MakeUpgrade("payday", UpgradeType.ContentUnlock, scope,
                 null, new GrantCurrencyEffect("cash", 100));
             var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "payday" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 upgrades: new[] { upgrade });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Upgrade 'payday' is a content unlock carrying a one-shot effect - a content unlock re-applies through the acquisition path whenever its latch is absent and its gate holds (a release clears run-scoped latches, and a restore clears any the snapshot omits), so the payout would be granted more than once. Move the payout to content acquired by a player action: a bought buff, an event tier, or the capstone.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // A BUFF may carry a payout: TryBuy charges the cost again, so re-buying and
@@ -739,15 +675,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void OneShotEffectOnABoughtBuff_IsAllowed()
         {
-            var currencies = TestContent.MakeEconomy();
             var upgrade = TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
                 null, new GrantCurrencyEffect("cash", 100), costAmount: 250);
             var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "advance" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { upgrade });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // a clean pass IS the assertion
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -760,7 +694,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void CapstonePayloadThatNeverSetsItsCompletionFlag_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done"), new("something_else") },
                 capstone: new CapstoneConfig("backyard", "Backyard Party",
@@ -773,7 +706,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                         new SetFlagEffect("something_else"),
                     })));
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.Flags), database: database);
 
             // The flag sweep also notices that nothing sets 'done', but only as a
             // WARNING - it cannot tell a code-set system flag from a dead one. That is
@@ -781,7 +713,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // flag, so a payload not setting it is unambiguously wrong.
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' capstone 'backyard' declares completion flag 'done' but its onComplete payload never sets it - completing the capstone would grant its rewards without recording that the chapter finished.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // A completion flag with no declared lifetime is no more a chapter boundary
@@ -791,17 +723,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void CapstoneCompletionFlagWithNoScope_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done", ContentScope.None) },
                 capstone: new CapstoneConfig("backyard", "Backyard Party",
                     new RecordsCumulativeCondition(30), "done", new SetFlagEffect("done")));
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.Flags), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' capstone completion flag 'done' is declared None - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // A module entry's definitionId is the binding the runtime fires on, so an id
@@ -810,16 +740,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void ModuleEntryNamingSomethingTheChapterDoesNotDeclare_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var section = TestContent.MakeSection("floor", null,
                 modules: new List<SectionModule> { new("module/tap", "no_such_producer") });
             var ch1 = TestContent.MakeChapter("ch1", null, sectionIds: new List<string> { "floor" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Section 'floor' module 'module/tap' presents producer 'no_such_producer', which chapter 'ch1' does not declare - the module would present nothing.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // Membership in ANY of the chapter's content lists is not proof the id belongs
@@ -831,7 +759,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void TapModulePresentingSomethingThatIsNotAProducer_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var jam = TestContent.MakeProducer("jam", new List<ProductionConfig>
             {
                 new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
@@ -845,7 +772,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 storyBeatIds: new List<string> { "beat_open" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section },
                 producers: new[] { jam }, storyBeats: new[] { beat });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             // the beat IS declared by the chapter - the old check accepted it on that
             // basis alone
@@ -854,7 +780,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // and the consequence the swap hides: nothing presents the real tap surface
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' producer 'jam' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // A roster module resolves what it shows from the chapter, so an id on its
@@ -862,16 +788,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void RosterModuleCarryingADefinitionId_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var section = TestContent.MakeSection("floor", null,
                 modules: new List<SectionModule> { new("module/generator-list", "drummer") });
             var ch1 = TestContent.MakeChapter("ch1", null, sectionIds: new List<string> { "floor" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Section 'floor' module 'module/generator-list' names definition 'drummer', but that module presents a whole roster and reads no definition id.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The check that replaced ProducerDefinition.ModuleAddress: who presents a
@@ -881,18 +805,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void TapProducerNoSectionPresents_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var orphaned = TestContent.MakeProducer("busk", new List<ProductionConfig>
             {
                 new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
             });
             var ch1 = TestContent.MakeChapter("ch1", null, producerIds: new List<string> { "busk" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { orphaned });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' producer 'busk' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // A passive producer needs no surface at all - that is what fan accrual is -
@@ -900,16 +822,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void PassiveProducerNoSectionPresents_IsAllowed()
         {
-            var currencies = TestContent.MakeEconomy();
             var band = TestContent.MakeProducer("band", new List<ProductionConfig>
             {
                 new("fans", 0.2, ProductionTrigger.Tick, null, ModifierTarget.FanRate),
             });
             var ch1 = TestContent.MakeChapter("ch1", null, producerIds: new List<string> { "band" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { band });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -924,7 +844,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void ProducerIdOnAModuleThatPresentsNoProducer_DoesNotCountAsPresented()
         {
-            var currencies = TestContent.MakeEconomy();
             var jam = TestContent.MakeProducer("jam", new List<ProductionConfig>
             {
                 new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
@@ -936,14 +855,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 producerIds: new List<string> { "jam" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section },
                 producers: new[] { jam });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Section 'floor' module 'module/generator-list' names definition 'jam', but that module presents a whole roster and reads no definition id.");
             // the consequence a family-blind sweep swallowed
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' producer 'jam' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // An entry with no address names no prefab, so it satisfies the "a section is
@@ -953,16 +871,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void ModuleEntryWithNoAddress_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var section = TestContent.MakeSection("floor", null,
                 modules: new List<SectionModule> { new("", "jam") });
             var ch1 = TestContent.MakeChapter("ch1", null, sectionIds: new List<string> { "floor" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Section 'floor' has a module entry for 'jam' with no address - there is no prefab to instantiate at reveal time.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The bar half of the same rule: a run-scoped group's bars reset at every
@@ -972,7 +888,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void OneShotRewardOnARunScopedBarGroup_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var reward = TestContent.MakeReward("payout", new GrantCurrencyEffect("cash", 50));
             var bar = TestContent.MakeBar("cover_1", "cash", 100, "payout");
             var group = TestContent.MakeBarGroup("learn_covers", null, new List<string> { "cover_1" },
@@ -980,11 +895,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", null, barGroupIds: new List<string> { "learn_covers" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 bars: new[] { bar }, barGroups: new[] { group }, rewards: new[] { reward });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Bar 'cover_1' is in run-scoped group 'learn_covers' and its reward carries a one-shot effect - the release resets the bar, so re-completing it would pay again every run.");
-            ContentValidator.Validate(database, context, new RewardManager(new[] { reward }));
+            ContentValidator.Validate(database, RecordsId, new RewardManager(new[] { reward }));
         }
 
         // a group with no bars reveals an empty region and can never satisfy a
@@ -992,16 +906,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void BarGroupWithNoBars_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var group = TestContent.MakeBarGroup("learn_covers", new FlagSetCondition("fans"), new List<string>());
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 barGroupIds: new List<string> { "learn_covers" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, barGroups: new[] { group });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Bar group 'learn_covers' has no bars - it can never complete one.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // the importer reports a module-less section but still writes it, so boot
@@ -1010,16 +922,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void SectionWithNoModules_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var hollow = TestContent.MakeSection("hollow", null, new List<string>());
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 sectionIds: new List<string> { "hollow" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { hollow });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Section 'hollow' has no modules - its reveal would show an empty region.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // slice 8's runtime will trust every tier field, so a tier that cannot be
@@ -1030,7 +940,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void IncoherentEventTiers_AreReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var reward = TestContent.MakeTapValueReward("tap_x2", 2);
             var rewards = new RewardManager(new RewardDefinition[] { reward });
             var goal = new CurrencyBalanceCondition("cash", 500);
@@ -1043,7 +952,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 eventIds: new List<string> { "broken" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, events: new[] { broken });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Event 'broken' tier 1 is failable but has no timer (0s) - only timed tiers can fail.");
@@ -1055,7 +963,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "ContentValidator: Event 'broken' tier 2 has no reward - clearing it would grant nothing.");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Event 'broken' has tier number 2 following 2 - tier numbers ascend with list order, starting at 1.");
-            ContentValidator.Validate(database, context, rewards);
+            ContentValidator.Validate(database, RecordsId, rewards);
         }
 
         // A tier's scope is how long its clear lasts, and whatever it pays projects
@@ -1065,7 +973,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void EventTierWithNoScope_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var rewards = new RewardManager(new[] { TestContent.MakeTapValueReward("tap_x2", 2) });
             var unscoped = TestContent.MakeEvent("unscoped", new List<EventTier>
             {
@@ -1075,27 +982,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 eventIds: new List<string> { "unscoped" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, events: new[] { unscoped });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Event 'unscoped' tier 1 has scope None (uninitialized) - a tier clear needs a declared lifetime for anything to project from.");
-            ContentValidator.Validate(database, context, rewards);
+            ContentValidator.Validate(database, RecordsId, rewards);
         }
 
         // an event with no tiers has nothing to enter at all
         [Test]
         public void EventWithNoTiers_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var empty = TestContent.MakeEvent("empty", new List<EventTier>());
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 eventIds: new List<string> { "empty" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, events: new[] { empty });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Event 'empty' has no tiers - there would be nothing to enter.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // a declared currency that resolves to no asset would silently multiply
@@ -1104,17 +1008,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void PerSecMultiplierPayload_UnknownAffectedCurrency_IsReported()
         {
-            var currencies = TestContent.MakeEconomy();
             var upgrade = TestContent.MakeUpgrade("ghost_currency", UpgradeType.Buff, ContentScope.Run,
                 null, new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 1.5, new List<string> { "cash", "merch" }), costAmount: 100);
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 upgradeIds: new List<string> { "ghost_currency" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { upgrade });
-            var context = new ConditionContext(currencies, null, new FlagSystem(ch1.FlagIds), database: database);
 
             LogAssert.Expect(LogType.Error,
                 "ChapterCurrencies: Upgrade 'ghost_currency' (payload) references currency id 'merch', which resolves to no CurrencyDefinition asset.");
-            ContentValidator.Validate(database, context, NoRewards);
+            ContentValidator.Validate(database, RecordsId, NoRewards);
         }
     }
 }

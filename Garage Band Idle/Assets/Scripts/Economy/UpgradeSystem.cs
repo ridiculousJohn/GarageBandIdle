@@ -54,13 +54,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 }
 
                 // Fail closed on the one content mistake that MUTATES permanent state
-                // before anyone can report it (design doc section 12, rule 6). Boot
-                // validation runs after the frontier economy is built and settled, and
-                // that settle evaluates content unlocks through the acquisition path -
-                // so a content unlock carrying a payout whose gate holds at startup
-                // would have banked Records or Roadies before the validator said a
-                // word. Refusing to register it is what makes the report safe to
-                // arrive late.
+                // (design doc section 12, rule 6). Construction settles, and that settle
+                // evaluates content unlocks through the acquisition path - so a content
+                // unlock carrying a payout whose gate holds at startup would bank
+                // Records or Roadies the moment the economy is built. Boot validation
+                // reports the same mistake, but a report never throws (rule 10) and the
+                // boot carries on: refusing to register the upgrade is the only thing
+                // that changes what happens.
                 //
                 // UpgradeDefinition.CarriesRepeatablePayout owns the rule, so this and
                 // boot validation cannot disagree about what is authorable - the same
