@@ -237,22 +237,34 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         private Condition _unlock;
 
         [SerializeField]
-        [Tooltip("Flag latched when the capstone completes. ONE fact, not two: it is both 'this chapter " +
+        [Tooltip("Flag latched when the capstone completes - set by the completion OPERATION itself " +
+            "(slice 7), from this declaration, never authored as a payload effect: one declaration owns " +
+            "the fact, so payload and config cannot disagree. ONE fact, not two: it is both 'this chapter " +
             "is finished' and 'chapter 2 may open', and nothing in Chapter 1 can tell those apart. " +
             "Must be declared permanent-in-chapter in the chapter's flags list.")]
         private string _completionFlagId;
 
         [SerializeReference]
         [SubclassPicker]
-        [Tooltip("What completing it grants - Ch1: one Roadie (one-shot) plus the completion flag " +
-            "(projectable), as a compound. Applied through the ACQUISITION path exactly once.")]
+        [Tooltip("Re-applicable state completing it grants (modifiers, flags beyond the completion flag). " +
+            "Ch1 authors none - its awards are one-shot Actions below, and the completion flag is the " +
+            "operation's own job.")]
         private GameEffect _onComplete;
+
+        // the one-shot awards - Ch1: one Roadie. Executed by the completion
+        // operation exactly once; no release, load, or reprojection ever sees an
+        // action, which is what "paid once ever" means by construction.
+        [SerializeReference]
+        [SubclassPicker]
+        [Tooltip("One-shot awards completing it pays - Ch1: one Roadie. Executed once by the completion operation.")]
+        private List<GameAction> _actions = new();
 
         public string Id => _id;
         public string DisplayName => _displayName;
         public Condition Unlock => _unlock;
         public string CompletionFlagId => _completionFlagId;
         public GameEffect OnComplete => _onComplete;
+        public IReadOnlyList<GameAction> Actions => _actions;
 
         // whether the chapter authors a capstone at all. Chapter 1 does; a
         // hand-made fixture chapter usually does not, and validation must not
@@ -263,13 +275,14 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 
 #if UNITY_EDITOR
         public CapstoneConfig(string id, string displayName, Condition unlock, string completionFlagId,
-            GameEffect onComplete)
+            GameEffect onComplete, List<GameAction> actions = null)
         {
             _id = id;
             _displayName = displayName;
             _unlock = unlock;
             _completionFlagId = completionFlagId;
             _onComplete = onComplete;
+            _actions = actions ?? new List<GameAction>();
         }
 #endif
     }

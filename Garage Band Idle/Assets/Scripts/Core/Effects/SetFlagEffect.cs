@@ -24,32 +24,36 @@ namespace RidiculousGaming.GarageBandIdle
             _flagId = flagId;
         }
 
-        // Projectable, and load-bearing rather than merely convenient: the album
-        // release clears run-scoped flags and then asks for the projection, which
-        // re-asserts every flag whose SETTER's latch survived (design doc section
-        // 12, rule 6). ContentValidator enforces the corollary - a run-scoped flag
-        // with only permanent setters has a scope that does nothing. Making this
-        // one-shot would leave permanently-unlocked content dark after the first
-        // demo.
-        public override EffectProjection Projection => EffectProjection.Projectable;
-
         // The scope parameter is deliberately unused: a flag's lifetime is
         // declared exactly once, on its FlagDeclaration (rule 11), never by
         // whoever sets it - two setters could otherwise give one flag two
         // lifetimes. The setter's own scope still matters indirectly: it
         // decides whether the projection re-asserts this flag after a release
-        // clears it.
+        // clears it (the release clears run-scoped flags, then the rebuild
+        // re-runs every surviving setter's Apply - design doc section 12, rule
+        // 6; the importer and boot validation both enforce the corollary, a
+        // run-scoped flag with only permanent setters has a scope that does
+        // nothing).
         //
         // Latching is idempotent (FlagSystem.Set fires only on a transition), so
-        // the inherited Project runs this unchanged.
-        public override void ApplyOnAcquisition(EffectContext context, ContentScope scope) => context.Flags.Set(_flagId);
+        // every rebuild boundary runs this unchanged.
+        public override void Apply(EffectContext context, ContentScope scope) => context.Flags.Set(_flagId);
 
         public override void Validate(ConditionContext context, string source)
         {
             if (string.IsNullOrEmpty(_flagId))
+            {
                 Debug.LogError($"GameEffect: {source} has a setFlag effect with an empty flag id.");
-            else if (context.Flags != null && !context.Flags.IsKnown(_flagId))
+                return;
+            }
+
+            if (context.Flags != null && !context.Flags.IsKnown(_flagId))
                 Debug.LogError($"GameEffect: {source} references flag '{_flagId}', which the chapter does not declare.");
+
+            // this effect's own disclosure to the boot flag-setter sweep, when
+            // one is listening - validation is the one sanctioned moment an
+            // effect describes itself to the validator
+            context.FlagSetterReport?.Invoke(_flagId);
         }
     }
 }

@@ -27,6 +27,12 @@ namespace RidiculousGaming.GarageBandIdle
 
         BigNumber Get(string id);
 
+        // whether the id resolves to a currency this surface can reach - the
+        // SILENT probe, for callers deciding whether to act (GetDefinition and
+        // ValidateReference both report, which is wrong for a preflight asked
+        // per attempt)
+        bool Contains(string id);
+
         void Add(string id, BigNumber amount);
 
         void Set(string id, BigNumber value);

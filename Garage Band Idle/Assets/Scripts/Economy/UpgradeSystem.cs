@@ -53,24 +53,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     continue;
                 }
 
-                // Fail closed on the one content mistake that MUTATES permanent state
-                // (design doc section 12, rule 6). Construction settles, and that settle
-                // evaluates content unlocks through the acquisition path - so a content
-                // unlock carrying a payout whose gate holds at startup would bank
-                // Records or Roadies the moment the economy is built. Boot validation
-                // reports the same mistake, but a report never throws (rule 10) and the
-                // boot carries on: refusing to register the upgrade is the only thing
-                // that changes what happens.
-                //
-                // UpgradeDefinition.CarriesRepeatablePayout owns the rule, so this and
-                // boot validation cannot disagree about what is authorable - the same
-                // shape ProductionConfig.IsComposable has.
-                if (definition.CarriesRepeatablePayout)
-                {
-                    Debug.LogError($"UpgradeSystem: upgrade '{definition.Id}' is a content unlock carrying a one-shot effect - it applies automatically whenever its latch is absent and its gate holds, so the payout would be granted more than once. Refusing to register it; move the payout to content acquired by a player action.");
-                    continue;
-                }
-
                 if (!string.IsNullOrEmpty(definition.CostCurrencyId))
                     _currencies.ValidateReference(definition.CostCurrencyId, $"Upgrade '{definition.Id}' (cost)");
                 ValidatePayload(definition);
@@ -143,13 +125,20 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             if (!ConditionEvaluator.IsMet(upgrade.Definition.Gate, context))
                 return false;
 
-            // fail closed on broken content (boot validation reports all three):
-            // never charge for a payload that would grant nothing, and never let
-            // a missing price or currency become an endless free purchase
+            // Fail closed on broken content (boot validation reports all of it):
+            // never charge for a purchase that would grant nothing, and never let
+            // a missing price or currency become an endless free purchase. A buff
+            // may coherently be all-payload, all-actions, or both - but an action
+            // ENTRY is not a grant: a null slot or an award of nothing must not
+            // become a charged no-op, so each action is asked whether it would
+            // actually execute, before any state moves.
             var payload = upgrade.Definition.Payload;
-            if (payload == null)
+            var anyExecutableAction = false;
+            foreach (var action in upgrade.Definition.Actions)
+                anyExecutableAction |= action != null && action.CanExecute(_effectContext);
+            if (payload == null && !anyExecutableAction)
             {
-                Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' has no payload. Refusing the purchase rather than charging for nothing.");
+                Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' has no payload and no executable action. Refusing the purchase rather than charging for nothing.");
                 return false;
             }
 
@@ -167,7 +156,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // spend fires BalanceChanged, so no condition evaluator or UI
             // subscriber observes the money gone with the buff not yet granted
             upgrade.MarkApplied();
-            payload.ApplyOnAcquisition(_effectContext, upgrade.Definition.Scope);
+            payload?.Apply(_effectContext, upgrade.Definition.Scope);
+
+            // The one-shot awards, and this is the ONLY line in the system that
+            // runs them: a purchase is a player action, re-buying re-pays because
+            // TryBuy re-charged. The auto-apply path (Apply below) never reads
+            // Actions, so a payout on a content unlock cannot run - there is no
+            // code on that path to run it.
+            foreach (var action in upgrade.Definition.Actions)
+                action?.Execute(_effectContext);
+
             _currencies.Add(currencyId, -cost);
             UpgradeApplied?.Invoke(upgrade);
             return true;
@@ -219,10 +217,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // standing under a different snapshot, which is two routes to one state.
         //
         // This restores FACTS only. Nothing here re-applies a payload: the caller
-        // re-projects afterwards (EconomyContext.Restore), which is what turns these
-        // latches back into effects and is also what keeps a one-shot payload from
-        // being paid again by a load - the projection refuses it, the acquisition
-        // path is never taken.
+        // re-projects afterwards (EconomyContext.Restore), which is what turns
+        // these latches back into effects. A load can never re-pay an award,
+        // because awards are GameActions on the purchase moment - no restore or
+        // projection path executes one.
         //
         // Notifications are deliberately absent even when notify is true: a restored
         // latch is not an acquisition and not a loss of one, exactly as
@@ -290,10 +288,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // bought is already hidden. Nothing latches or unlatches here, which is
         // what makes this safe to run at any boundary.
         //
-        // Project, not ApplyOnAcquisition: the payload's one-shot parts (a
-        // currency award) are refused or filtered by the effect family itself, so
-        // a latch that survives a release cannot pay out again. This method is
-        // where the difference between the two entry points earns its keep.
+        // Re-running Apply is safe for ANY payload, by construction: an effect is
+        // re-applicable state by definition of being a GameEffect, and the awards
+        // a purchase paid are GameActions this method cannot see - so a latch
+        // that survives a release rebuilds its buffs and can never pay again.
         public void ProjectModifiers()
         {
             foreach (var upgrade in _upgrades)
@@ -303,7 +301,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
                 // a missing payload was already reported when the latch was set;
                 // a projection repeating it every boundary would be noise
-                upgrade.Definition.Payload?.Project(_effectContext, upgrade.Definition.Scope);
+                upgrade.Definition.Payload?.Apply(_effectContext, upgrade.Definition.Scope);
             }
         }
 
@@ -323,9 +321,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
             else
             {
-                // the upgrade's declared scope travels with the grant, so the
-                // effect's lifetime is never a second declaration
-                payload.ApplyOnAcquisition(_effectContext, upgrade.Definition.Scope);
+                // The upgrade's declared scope travels with the grant, so the
+                // effect's lifetime is never a second declaration. Actions are
+                // deliberately NOT executed here: this path re-fires whenever the
+                // gate holds and the latch is absent (a release or restore can
+                // clear it), so a one-shot award run from here would pay again -
+                // awards run only from TryBuy, the moment that charges for them.
+                payload.Apply(_effectContext, upgrade.Definition.Scope);
             }
 
             UpgradeApplied?.Invoke(upgrade);

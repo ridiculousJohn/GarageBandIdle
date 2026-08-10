@@ -531,13 +531,14 @@ Assets/Scripts/
     EconomyContext.cs     // [rev] rule 12: the per-economy bundle (currency pool + systems + modifiers + flags), built from a projection recipe; the album release is its ReleaseAlbum operation
     ContentDatabase.cs    // [rev] Addressables discovery of all definition SOs by label; id→def registries
     Condition.cs / ConditionEvaluator.cs   // [rev] one gate/unlock/visibility/availability type + one evaluator
+    GameEffect.cs / GameAction.cs   // [rev] grants split by category: an effect is re-applicable state every rebuild re-runs; an action is a one-shot award only its player-action moment executes (a payout paid twice is inexpressible, not validated against)
     FlagSystem.cs         // [rev] single reveal registry; each flag's declared scope (run | permanent-in-chapter) decides what a release clears
   Loop/
     ChapterDefinition.cs / Chapter.cs   // mechanic, capstone, Records gate, story beat
     ChapterManager.cs     // forward-only advancement + unlocks
   Economy/
     GeneratorDefinition.cs / Generator.cs   // isBandmate is a data field the fan system reads   // [rev]
-    UpgradeDefinition.cs / Upgrade.cs   // [rev] payload = buff | setFlag (reveal via flag); gate = any Condition; scope = run | permanent-in-chapter
+    UpgradeDefinition.cs / Upgrade.cs   // [rev] payload = buff | setFlag (reveal via flag); gate = any Condition; scope = run | permanent-in-chapter; one-shot awards are GameActions, executed by the purchase alone
     BarDefinition.cs / BarGroupDefinition.cs / BarSystem.cs   // [rev] generic fillable bars (fillCurrency-driven); replaces LearnSongBar
     RewardDefinition.cs / RewardManager.cs   // [rev] shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
     CostCalculator.cs / ProductionCalculator.cs   // [rev] formula only; the modifiers that scale production live in the registry

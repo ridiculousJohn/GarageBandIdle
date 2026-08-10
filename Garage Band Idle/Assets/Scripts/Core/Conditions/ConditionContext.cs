@@ -38,6 +38,15 @@ namespace RidiculousGaming.GarageBandIdle
         // condition evaluate as unmet
         public IBarCompletionSource Bars { get; }
 
+        // Boot validation's ear, null everywhere else: while the validator's
+        // flag-setter sweep is listening, SetFlagEffect.Validate reports the flag
+        // it sets here. The sweep sees asset-level truth through the family's own
+        // validation traversal - CompoundEffect.Validate already forwards to
+        // children - rather than through an external walk into payload internals,
+        // and the scope pairing stays at the validator's call site (rule 11: the
+        // lifetime belongs to the owning fact).
+        public Action<string> FlagSetterReport { get; set; }
+
         // Fired by Drain once evaluation has settled: "conditions have moved,
         // re-ask." One subscription replaces the per-input set a view used to
         // hold, and it arrives after the drain rather than during it, so a

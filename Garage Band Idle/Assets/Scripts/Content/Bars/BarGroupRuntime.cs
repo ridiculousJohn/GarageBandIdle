@@ -64,7 +64,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
             // reward asset and the content that pays it can never disagree about how
             // long the effect lives.
             if (!string.IsNullOrEmpty(bar.Definition.RewardId))
-                _rewards.ApplyOnAcquisition(bar.Definition.RewardId, _effectContext, Group.Scope);
+                _rewards.Apply(bar.Definition.RewardId, _effectContext, Group.Scope);
 
             Completed?.Invoke(bar);
         }
@@ -85,7 +85,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
             foreach (var bar in _bars)
             {
                 if (bar.Completed && !string.IsNullOrEmpty(bar.Definition.RewardId))
-                    _rewards.Project(bar.Definition.RewardId, _effectContext, Group.Scope);
+                    _rewards.Apply(bar.Definition.RewardId, _effectContext, Group.Scope);
             }
         }
 

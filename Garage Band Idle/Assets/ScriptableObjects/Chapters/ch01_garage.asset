@@ -25,15 +25,17 @@ MonoBehaviour:
     _perBandmateOwnedBonus: 0.02
   _album:
     _releaseWhen:
-      rid: 1003
+      rid: 1000
   _capstone:
     _id: backyard_party
     _displayName: Play the Backyard Party
     _unlock:
-      rid: 1004
+      rid: 1001
     _completionFlagId: chapter_2_unlocked
     _onComplete:
-      rid: 1005
+      rid: -2
+    _actions:
+    - rid: 1002
   _flags:
   - _id: fans
     _scope: 1
@@ -82,39 +84,31 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 1003
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 1000
       type: {class: CompoundCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _all:
-        - rid: 1006
-        - rid: 1007
+        - rid: 1010
+        - rid: 1011
         _any: []
-    - rid: 1004
+    - rid: 1001
       type: {class: RecordsCumulativeCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _value: 30
-    - rid: 1005
-      type: {class: CompoundEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+    - rid: 1002
+      type: {class: GrantCurrencyAction, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        _effects:
-        - rid: 1008
-        - rid: 1009
-    - rid: 1006
+        _currencyId: roadies
+        _amount: 1
+    - rid: 1010
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: fans
         _value: 50
-    - rid: 1007
+    - rid: 1011
       type: {class: BarsCompletedCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _groupId: learn_covers
         _value: 1
-    - rid: 1008
-      type: {class: GrantCurrencyEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        _currencyId: roadies
-        _amount: 1
-    - rid: 1009
-      type: {class: SetFlagEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        _flagId: chapter_2_unlocked

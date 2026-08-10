@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
@@ -58,8 +59,22 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         [SerializeReference]
         [SubclassPicker]
-        [Tooltip("What the upgrade grants. Its lifetime is this asset's Scope, never a second declaration on the effect.")]
+        [Tooltip("What the upgrade grants: re-applicable state (modifiers, flags). Its lifetime is this asset's Scope, never a second declaration on the effect.")]
         private GameEffect _payload;
+
+        // One-shot awards belong here rather than in the payload, and the split is
+        // the safety rule (design doc section 12, rule 6): a content unlock applies
+        // AUTOMATICALLY whenever its gate holds and its latch is absent - a release
+        // clears run-scoped latches, a restore clears any latch its snapshot omits -
+        // so anything one-shot in a payload would be paid again every time. Actions
+        // run only from TryBuy, the one purchase moment, and the auto-apply path
+        // never reads this field, so the repeat is inexpressible rather than
+        // refused. A bought buff re-paying is coherent: TryBuy charges the cost
+        // again.
+        [SerializeReference]
+        [SubclassPicker]
+        [Tooltip("One-shot awards the PURCHASE pays (buffs only - content unlocks are never bought, so theirs would never run).")]
+        private List<GameAction> _actions = new();
 
         public string Id => _id;
         public string DisplayName => _displayName;
@@ -69,30 +84,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public double CostAmount => _costAmount;
         public Condition Gate => _gate;
         public GameEffect Payload => _payload;
-
-        // Whether this upgrade would pay out more than once (design doc section 12,
-        // rule 6). A content unlock applies AUTOMATICALLY whenever its gate holds and
-        // its latch is absent, and both halves are reachable at any scope: a release
-        // clears run-scoped latches, and a restore clears any latch its snapshot omits
-        // because restore is replacement. So a payout behind one is granted again
-        // every time that happens.
-        //
-        // The rule lives here, on the definition, because two callers must not be able
-        // to disagree about it: ContentValidator reports it at boot, and UpgradeSystem
-        // refuses to register the upgrade at all - and the refusal is what makes the
-        // report safe to arrive late. Validation runs AFTER the frontier economy is
-        // built and settled, so a validator-only rule would report a payout the boot
-        // settle had already banked.
-        //
-        // A bought buff is exempt: TryBuy charges the cost again, so re-buying and
-        // re-paying is coherent rather than free.
-        public bool CarriesRepeatablePayout
-            => _type == UpgradeType.ContentUnlock && _payload != null && _payload.ContainsOneShot;
+        public IReadOnlyList<GameAction> Actions => _actions;
 
 #if UNITY_EDITOR
         // importer-only: upgrade assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, UpgradeType type, ContentScope scope,
-            string costCurrencyId, double costAmount, Condition gate, GameEffect payload)
+            string costCurrencyId, double costAmount, Condition gate, GameEffect payload,
+            List<GameAction> actions = null)
         {
             _id = id;
             _displayName = displayName;
@@ -102,6 +100,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _costAmount = costAmount;
             _gate = gate;
             _payload = payload;
+            _actions = actions ?? new List<GameAction>();
         }
 #endif
     }

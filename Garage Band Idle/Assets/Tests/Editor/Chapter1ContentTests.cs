@@ -149,32 +149,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("chapter_2_unlocked", capstone.CompletionFlagId);
         }
 
-        // The capstone's completion payload, as data: one Roadie that can only be
-        // paid on acquisition, plus the chapter-advance flag that re-projects safely.
-        // Its being a compound is what lets one authored block do both without the
-        // capstone growing a bespoke completion handler.
+        // The capstone's completion grants, as data, split by category: the Roadie
+        // is a one-shot ACTION only the completion operation will execute (no
+        // release, load or reprojection path holds it), and the completion flag is
+        // the config's own declaration - never authored as a payload effect, so a
+        // copy able to disagree with the declaration does not exist.
         [Test]
-        public void CapstoneOnComplete_GrantsARoadieOnceAndSetsTheAdvanceFlag()
+        public void CapstoneOnComplete_ImportsTheRoadieAsAnAction_AndNoPayloadCopyOfTheFlag()
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            var capstone = chapter.Capstone;
 
-            var payload = chapter.Capstone.OnComplete as CompoundEffect;
-            Assert.IsNotNull(payload, "onComplete imports as a compound: a payout plus a flag");
-            Assert.IsTrue(payload.ContainsOneShot, "the Roadie grant is a payout");
-            Assert.AreEqual(EffectProjection.Projectable, payload.Projection,
-                "the compound itself is safe to project - it filters its own one-shot children");
+            Assert.IsNull(capstone.OnComplete,
+                "Ch1 authors no re-applicable completion state - its grants are the action and the declared flag");
 
-            var roadies = payload.Effects[0] as GrantCurrencyEffect;
-            Assert.IsNotNull(roadies, "grantRoadies imports as a currency grant");
+            Assert.AreEqual(1, capstone.Actions.Count);
+            var roadies = capstone.Actions[0] as GrantCurrencyAction;
+            Assert.IsNotNull(roadies, "grantRoadies imports as a one-shot action");
             Assert.AreEqual("roadies", roadies.CurrencyId);
             Assert.AreEqual(1.0, roadies.Amount, 1e-9);
-            Assert.AreEqual(EffectProjection.OneShot, roadies.Projection,
-                "paid once ever - no release, load or reprojection banks a second one");
 
-            var flag = payload.Effects[1] as SetFlagEffect;
-            Assert.IsNotNull(flag, "completionFlag imports as an ordinary setFlag");
-            Assert.AreEqual("chapter_2_unlocked", flag.FlagId);
-            Assert.AreEqual(EffectProjection.Projectable, flag.Projection);
+            Assert.AreEqual("chapter_2_unlocked", capstone.CompletionFlagId,
+                "the flag is the declaration the completion operation latches");
         }
 
         // Story beats are content: a definition each, listed on the chapter. The

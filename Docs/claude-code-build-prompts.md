@@ -651,14 +651,15 @@ lifetime-earned total. That last one is not a gap in the abstract. Both the caps
 `GetEarned("records")`, so restoring the Records *balance* and nothing else would load a save showing
 the right number with the capstone re-locked and the multiplier back at 1.0.
 
-The second gap is that re-projection re-applies whole payloads. That is safe today only because every
-`GameEffect` happens to be idempotent — grant a modifier, set a flag. Slice 7's "grant 1 Roadie" is
-the first payout in the game, and a payout behind a latch is paid again at every release, every load,
-every projection. The dangerous path is not the projection, which this slice teaches to refuse
-payouts; it is RE-ACQUISITION, which is re-entrant by design: `ResetRunScoped` clears run-scoped
-latches at each release and `EvaluateContentUnlocks` re-applies any unlock whose gate still holds.
-That is how the second-run reveal walk works, and it is why the rule below is a content rule enforced
-at boot rather than a runtime guard.
+The second gap is that re-projection re-applies whole payloads. **[rev]** (As built, this gap closed
+structurally rather than through the projection filter this preamble originally motivated.) Safe
+re-application is now what membership in `GameEffect` MEANS — grant a modifier, set a flag — and
+slice 7's "grant 1 Roadie", the first payout in the game, is not an effect at all: payouts are
+`GameAction`s on the player-action moment that earns them, unreachable from every release, load, and
+projection. The dangerous path was never the projection; it is RE-ACQUISITION, which is re-entrant
+by design: `ResetRunScoped` clears run-scoped latches at each release and `EvaluateContentUnlocks`
+re-applies any unlock whose gate still holds. That is how the second-run reveal walk works, and it
+is why the auto-apply path holds no actions to run.
 
 The third gap is smaller but it is what makes two "later" items later forever: a module cannot be
 told which definition it presents. `IChapterModule.Initialize` takes only a `ChapterContext`, so
@@ -708,33 +709,27 @@ prefab with no way to differ. One parameter fixes both.
 > local snapshot for a load — so `frontier.CaptureLocalState()` filtered by recipe is how a sandbox is
 > built, and the sandbox path and the load path are the same mechanism.
 >
-> **4. Effect replay behavior is owned by the effect type.** `EffectProjection { Projectable, OneShot
-> }` plus a recursive `ContainsOneShot`, and two entry points that both keep `ContentScope`:
-> `ApplyOnAcquisition` and `Project`. `GrantModifierEffect` and `SetFlagEffect` are projectable; a new
-> `GrantCurrencyEffect` is one-shot; a new `CompoundEffect` mirrors
-> `CompoundCondition` — acquisition applies every child, projection recurses into all of them and lets
-> each answer for itself, validation recurses. Do not add a third `Composite` enum
-> value: a compound's projectability is a function of its children, and the two questions callers
-> actually ask (may I project this? does anything under here pay out?) are answered by the two members
-> above. **`Project` on a one-shot is a SILENT no-op, not an error.** "Nothing to re-apply" is the
-> correct answer for a payout; a permanent latch carrying one is legal content whose projection runs at
-> every release and every load, so reporting would be a log line per boundary describing working
-> content — and filtering silently is what lets `UpgradeSystem`, `BarGroupRuntime` and `CompoundEffect`
-> all just project their children with no per-caller kind check to get wrong. What prevents a double
-> payment is `Project` never paying, plus the content rule below; never a log line.
-> `SetFlagEffect` staying projectable is load-bearing, not convenient — the release depends on
-> the projection re-asserting flags whose setters' latches survived, and `ContentValidator` enforces
-> the corollary. Give it a regression test of its own.
-> Then close the re-acquisition path as a CONTENT rule: `ContentValidator` refuses a one-shot effect
-> (or a compound containing one) on **every content unlock**, whatever its scope, plus a run-scoped bar
-> group's reward and later a run-scoped event tier. Scope looks like the deciding property and is not:
-> a content unlock is DEFINED by applying automatically whenever its gate holds and its latch is
-> absent, and a release clears run-scoped latches while a RESTORE clears any latch its snapshot omits
-> (restore is replacement) — so an older or partial snapshot re-pays a permanent unlock exactly as a
-> release re-pays a run-scoped one. It costs nothing: a buff goes through `TryBuy` and charges again,
-> the capstone is applied by slice 7 on a player action, and an event tier is player-achieved.
-> `OneShot` means paid once, ever; a deliberate per-run payout would be a third classification, not a
-> reinterpretation of this one.
+> **4. Effects re-apply; awards never replay — by category, not by filter.** **[rev]** (This step
+> originally specified `EffectProjection { Projectable, OneShot }` with `ApplyOnAcquisition`/`Project`
+> entry points and a `ContainsOneShot` content rule; the GameEffect/GameAction split replaced all of
+> it — the text below is the design as built.) `GameEffect` is re-applicable state by definition of
+> membership: `Apply` and `Validate` are its whole contract, and every rebuild boundary — release,
+> load, reprojection — re-runs `Apply` on whatever the surviving facts carry. `GrantModifierEffect`
+> re-grants over a store the projection just cleared; `SetFlagEffect` re-latches idempotently, and
+> that staying true is load-bearing, not convenient — the release depends on the rebuild re-asserting
+> flags whose setters' latches survived, and the importer and boot validation enforce the corollary
+> (a run-scoped flag needs a run-scoped setter). Give it a regression test of its own.
+> `CompoundEffect` mirrors `CompoundCondition` and owns the only child iteration anywhere; consumers
+> hold ONE `GameEffect` and never learn whether it is a group.
+> One-shot awards are NOT effects. `GameAction` — `Execute(EffectContext)`, `CanExecute`, `Validate`,
+> and no scope parameter, because a one-shot has no lifetime to declare — is its own family, with
+> `GrantCurrencyAction` its first member. Action lists live only on player-action moments (a bought
+> buff's purchase, an event tier's clear, the capstone's completion) and are executed by that
+> operation alone. No release, load, or reprojection path holds an action, so a payout paid twice is
+> INEXPRESSIBLE: there is no projection filter, no `OneShot` enum, and no content rule refusing
+> payouts on content unlocks, because the type system refuses them first — a currency award cannot
+> sit in a payload. The one remaining checkable mistake is the inverse: actions on a content unlock
+> would silently never pay (it is never bought), which `ContentValidator` reports.
 >
 > **5. A module can be told which definition it presents.** `SectionDefinition`'s module entries
 > become `{address, definitionId?}` pairs and `IChapterModule.Initialize` takes the id (five of the
@@ -755,10 +750,12 @@ prefab with no way to differ. One parameter fixes both.
 > on one, and `CompoundCondition.Validate` already refuses an empty compound — so validating the
 > authored `unlock` like any other gate covers it. What none of that covers is a NULL `unlock`, which
 > by this codebase's own convention means "no gate" and would offer the capstone at boot, so that is
-> the one new check. `capstone.onComplete` imports as a `CompoundEffect` of `GrantCurrencyEffect("roadies", 1)`
-> and `SetFlagEffect("chapter_2_unlocked")`; that one flag is both the completion and the advance fact
-> (two would be two facts for one event), declared permanent-in-chapter in the chapter's `flags`
-> array, and named by `completionFlagId`.
+> the one new check. **[rev]** `capstone.onComplete` splits by category: `grantRoadies` imports as a
+> one-shot `GrantCurrencyAction("roadies", 1)` in `CapstoneConfig.Actions`, and `completionFlag` is
+> the config's own declaration (`completionFlagId`) — the completion OPERATION latches it (slice 7),
+> no `SetFlagEffect` copy is built, so payload and declaration cannot disagree. That one flag is both
+> the completion and the advance fact (two would be two facts for one event), declared
+> permanent-in-chapter in the chapter's `flags` array.
 > Story beats stop being two inline strings on the chapter and become `StoryBeatDefinition { id, text,
 > readFlagId? }` — a definition, a `ContentLabels` entry, a `ContentDatabase` registry and a
 > `chapter.storyBeatIds` list, which is the leg generators, upgrades and bars already have and beats
@@ -783,12 +780,12 @@ prefab with no way to differ. One parameter fixes both.
 total reactivates both the capstone gate and the income modifier; a different snapshot clears the
 flags and latches absent from it while the same one reapplies idempotently; silent restore still
 forces condition evaluation and finishes with the context clean; no observer sees partial state,
-`Modifiers.Changed` included; projecting a one-shot pays nothing and logs nothing, and a mixed
-`CompoundEffect` grants Roadies once while reprojecting its flag; validation refuses a one-shot on any
-content unlock and on a run-scoped bar group's reward; sandbox
+`Modifiers.Changed` included; **[rev]** an award pays only when its operation executes it, a compound
+payload re-applies exactly at every rebuild, and a content unlock carrying actions is reported (it is
+never bought, so they would never pay); sandbox
 writes cannot reach the shared permanent pool; permanent-in-chapter seeding excludes run facts and
 rebuilds the expected derived modifiers; the capstone consults its authored `Condition` and no scalar
-gate; a null capstone unlock and a completion flag its payload never sets are both refused at boot;
+gate; a null capstone unlock is refused at boot;
 Roadies resolve through the Global permanent
 group; `CaptureLocalState()` contains no permanent currency; and the existing release / second-run
 walk still passes unchanged.
@@ -806,12 +803,25 @@ walk still passes unchanged.
 > - The capstone's availability is `CapstoneConfig.Unlock` — the authored `recordsCumulative ≥ 30`
 >   Condition 6.5 imports, asked through the one evaluator like every other gate. Do not re-derive the
 >   threshold: there is no scalar gate left to read. When it holds, offer "Play the Backyard Party."
-> - On capstone completion: first perform the standard album release (slice 6's path — the run's
->   Fans bank as Records; design §1–§2: the capstone implicitly cuts an album, so no run value is
->   stranded at the chapter boundary); then apply `CapstoneConfig.OnComplete` through the ACQUISITION
->   path, which is what grants the Roadie once and sets `chapter_2_unlocked`. The Roadie
->   allocation/replay UI stays LOCKED (`roadieSystemUIUnlocked: false` — deferred to Chapter 2), and
->   Chapter 2 content does not exist yet, so the flag just marks the boundary.
+> - **[rev]** On capstone completion, as ONE atomic `EconomyContext` operation ending at a single
+>   `Settle`: refuse if `CompletionFlagId` is already set (a finished chapter does not complete
+>   twice), and refuse if any capstone action answers `CanExecute` false — the preflight runs BEFORE
+>   the irreversible release below, the same charged-for-nothing rule `TryBuy` applies, because a
+>   completion that releases the album and then fails to award would strand the run. Then: first
+>   perform the standard album release (slice 6's path — the run's Fans bank as Records; design
+>   §1–§2: the capstone implicitly cuts an album, so no run value is stranded at the chapter
+>   boundary); then `Apply` `CapstoneConfig.OnComplete` if authored (re-applicable state — Ch1
+>   authors none), `Execute` each of `CapstoneConfig.Actions` (Ch1: the one Roadie — actions run
+>   only from this operation, so no release, load, or reprojection can pay a second one), and set the
+>   declared `CompletionFlagId` itself — the operation owns the flag from the declaration, no payload
+>   carries a copy.
+> - **[rev]** The completed capstone is a FACT SOURCE like any latch: whenever the declared
+>   `CompletionFlagId` is set, projection re-applies `OnComplete` with permanent scope — the flag IS
+>   the latch, so capstone-authored state survives every release, load, and reprojection exactly as
+>   the `GameEffect` contract requires (rule 6). Ch1 authors no `OnComplete`, so this is wiring, not
+>   behavior — but without it, any modifier a later chapter authors there would vanish at its first
+>   release. The Roadie allocation/replay UI stays LOCKED (`roadieSystemUIUnlocked: false` — deferred
+>   to Chapter 2), and Chapter 2 content does not exist yet, so the flag just marks the boundary.
 > - The story beat is not fired by this code. `storyBeatCapstone` is a `StoryBeatDefinition` whose
 >   section gates on `chapter_2_unlocked`, so setting the flag above IS what reveals it — the same
 >   pull every other module's reveal uses. Slice 10 builds the card that presents it.
@@ -821,8 +831,11 @@ walk still passes unchanged.
 > here.
 
 ✅ **Test & commit:** capstone unlocks at 30 Records via its authored `recordsCumulative` Condition;
-the implicit release banks Fans as Records; the Roadie is granted once and survives a reprojection;
-advance flag set.
+the implicit release banks Fans as Records; the Roadie is granted once — executed by the completion
+operation, invisible to every reprojection — and a second completion is refused on the set flag; an
+action that cannot execute refuses the completion BEFORE the release; capstone-authored `OnComplete`
+state re-projects from the completion-flag latch across a release; advance flag set by the operation
+from the declaration.
 
 ---
 

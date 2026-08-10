@@ -51,16 +51,15 @@ namespace RidiculousGaming.GarageBandIdle
             _qualifiers = qualifiers ?? new List<string>();
         }
 
-        // Projectable, and this is the effect the projection exists FOR: the
-        // store is cleared before every projection (ModifierSystem.ResetGranted),
-        // so re-granting rebuilds rather than compounds. Grants are deliberately
-        // not idempotent on their own - clearing first is what makes replaying
-        // them exact.
-        public override EffectProjection Projection => EffectProjection.Projectable;
-
-        // one grant per declared qualifier, so the effect reaches exactly what it
-        // names; a global kind is a single grant carrying no qualifier
-        public override void ApplyOnAcquisition(EffectContext context, ContentScope scope)
+        // One grant per declared qualifier, so the effect reaches exactly what it
+        // names; a global kind is a single grant carrying no qualifier.
+        //
+        // This is the effect the rebuild boundaries exist FOR: the store is
+        // cleared before every projection (ModifierSystem.ResetGranted), so
+        // re-granting rebuilds rather than compounds. Grants are deliberately not
+        // idempotent on their own - clearing first is what makes replaying them
+        // exact.
+        public override void Apply(EffectContext context, ContentScope scope)
         {
             if (!ModifierTargetKey.RequiresQualifier(_target))
             {

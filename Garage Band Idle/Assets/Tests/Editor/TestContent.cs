@@ -106,11 +106,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         public static UpgradeDefinition MakeUpgrade(string id, UpgradeType type, ContentScope scope,
             Condition gate, GameEffect payload,
-            string costCurrencyId = "cash", double costAmount = 0)
+            string costCurrencyId = "cash", double costAmount = 0,
+            List<GameAction> actions = null)
         {
             var definition = Track(ScriptableObject.CreateInstance<UpgradeDefinition>());
             definition.EditorInitialize(id, id, type, scope, costCurrencyId, costAmount,
-                gate, payload);
+                gate, payload, actions);
             return definition;
         }
 

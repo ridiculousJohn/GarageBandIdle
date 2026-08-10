@@ -467,5 +467,76 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsNull(ChapterJsonImporter.ParsePayload(json, "upgrade 'x'"));
         }
+
+        // ---- the flag-lifetime lint --------------------------------------------
+        // The authoring-time half: the same two rules boot validation runs over
+        // the loaded assets run here over the flat JSON, so the author hears
+        // about a dead or scope-less flag at import rather than at the next play.
+
+        // a run-scoped flag whose only setter is a permanent fact: the release
+        // clears the flag and the rebuild re-asserts it from the surviving latch
+        // in the same operation, so the declared scope does nothing
+        [Test]
+        public void FlagLint_RunScopedFlagWithOnlyPermanentSetters_IsReported()
+        {
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: flag 'covers' is run-scoped but every setter is permanent - the release clears it and the rebuild re-asserts it in the same operation, so the scope has no effect.");
+            ChapterJsonImporter.LintFlagLifetimes(@"{
+                ""flags"": [ { ""id"": ""covers"", ""scope"": ""run"" } ],
+                ""upgrades"": [ { ""id"": ""teach"", ""type"": ""contentUnlock"", ""scope"": ""permanentInChapter"",
+                    ""payload"": { ""effect"": ""setFlag"", ""flag"": ""covers"" } } ]
+            }");
+        }
+
+        // a flag no content sets is a warning, not an error: everything gated on
+        // it silently never appears, but a flag set from code alone is legitimate
+        // and invisible to the sweep
+        [Test]
+        public void FlagLint_FlagNoContentSets_IsWarnedAbout()
+        {
+            LogAssert.Expect(LogType.Warning,
+                "ChapterJsonImporter: chapter declares flag 'orphan' but no content sets it - unless code sets it, every flagSet gate on it stays closed and the content behind them can never appear.");
+            ChapterJsonImporter.LintFlagLifetimes(@"{ ""flags"": [ { ""id"": ""orphan"" } ] }");
+        }
+
+        // the run-scope rule is satisfied from any setter whose own fact resets
+        // with the run, so coherent authoring stays silent
+        [Test]
+        public void FlagLint_RunScopedFlagWithARunScopedSetter_IsSilent()
+        {
+            ChapterJsonImporter.LintFlagLifetimes(@"{
+                ""flags"": [ { ""id"": ""covers"", ""scope"": ""run"" } ],
+                ""upgrades"": [ { ""id"": ""teach"", ""type"": ""contentUnlock"", ""scope"": ""run"",
+                    ""payload"": { ""effect"": ""setFlag"", ""flag"": ""covers"" } } ]
+            }");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // the capstone's declared completion flag counts as a permanent setter -
+        // the completion operation latches it from the declaration, so a correct
+        // chapter must not warn its boundary flag as dead
+        [Test]
+        public void FlagLint_CapstoneCompletionFlag_CountsAsASetter()
+        {
+            ChapterJsonImporter.LintFlagLifetimes(@"{
+                ""flags"": [ { ""id"": ""chapter_2_unlocked"" } ],
+                ""capstone"": { ""id"": ""backyard"", ""onComplete"": { ""completionFlag"": ""chapter_2_unlocked"" } }
+            }");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // a setFlag REWARD is a setter through whatever names the reward - a bar
+        // carries its group's scope, so a run-scoped group satisfies the rule
+        [Test]
+        public void FlagLint_SetFlagRewardOnARunScopedBarGroup_CountsAsARunSetter()
+        {
+            ChapterJsonImporter.LintFlagLifetimes(@"{
+                ""flags"": [ { ""id"": ""backroom"", ""scope"": ""run"" } ],
+                ""rewards"": [ { ""id"": ""open_backroom"", ""type"": ""setFlag"", ""flag"": ""backroom"" } ],
+                ""bars"": { ""scope"": ""run"", ""groups"": [ { ""id"": ""learn_covers"",
+                    ""bars"": [ { ""id"": ""cover_1"", ""reward"": ""open_backroom"" } ] } ] }
+            }");
+            LogAssert.NoUnexpectedReceived();
+        }
     }
 }

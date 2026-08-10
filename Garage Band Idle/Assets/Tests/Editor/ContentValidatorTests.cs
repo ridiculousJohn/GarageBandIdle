@@ -523,6 +523,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
+        // The flag-lifetime checks run at BOTH layers: the importer lints the
+        // authored JSON for early feedback, and this pass covers the loaded
+        // assets - a stale or hand-edited asset can disagree with the file, and
+        // boot is what sees what the game actually runs. The setters surface
+        // through SetFlagEffect's own Validate (the context's listener), so no
+        // code outside the family walks a payload.
+
         // a run-scoped flag whose only setter is a permanent fact: the release
         // clears the flag and the projection re-asserts it from the surviving
         // latch in the same operation, so the declared scope does nothing
@@ -543,8 +550,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // a flag no content sets is a warning, not an error: everything gated
-        // on it silently never appears, but a system flag set from code (slice
-        // 7's chapter-advance flag) is legitimate and invisible to the sweep
+        // on it silently never appears, but a flag set from code alone is
+        // legitimate and invisible to the sweep
         [Test]
         public void FlagNoContentSets_IsWarnedAbout()
         {
@@ -557,8 +564,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // the run-scope rule is satisfied from any setter kind that resets with
-        // the run - a run-scoped bar group's reward is as re-firing as an
-        // upgrade - so coherent authoring stays silent
+        // the run, so coherent authoring stays silent
         [Test]
         public void RunScopedFlagWithARunScopedSetter_IsSilent()
         {
@@ -571,6 +577,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 upgrades: new[] { setter });
 
             ContentValidator.Validate(database, RecordsId, NoRewards);
+        }
+
+        // a setFlag REWARD is a setter through whatever names the reward - a bar
+        // carries its group's scope - and the reward's flags are collected once
+        // at its validation, then paired per reference. Silence proves both the
+        // run-scope rule and the no-content-sets warning saw the reward setter.
+        [Test]
+        public void RunScopedFlagSetByARunScopedBarGroupsReward_IsSilent()
+        {
+            var reward = TestContent.MakeReward("open_backroom", new SetFlagEffect("backroom"));
+            var bar = TestContent.MakeBar("cover_1", "cash", 100, "open_backroom");
+            var group = TestContent.MakeBarGroup("learn_covers", null, new List<string> { "cover_1" },
+                scope: ContentScope.Run);
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                flags: new List<FlagDeclaration> { new("backroom", ContentScope.Run) },
+                barGroupIds: new List<string> { "learn_covers" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
+                bars: new[] { bar }, barGroups: new[] { group }, rewards: new[] { reward });
+
+            ContentValidator.Validate(database, RecordsId, new RewardManager(new[] { reward }));
+            LogAssert.NoUnexpectedReceived();
         }
 
         // the starting chapter is the lowest index, so an index is an ordinal:
@@ -616,7 +643,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done") },
                 capstone: new CapstoneConfig("backyard", "Backyard Party", null, "done",
-                    new SetFlagEffect("done")));
+                    onComplete: null));
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
 
             LogAssert.Expect(LogType.Error,
@@ -626,16 +653,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // The completion flag IS the chapter boundary, so it has to outlive a
         // release: run-scoped, the next demo clears it and a finished chapter
-        // re-opens. The second error is the existing scope rule catching the same
-        // asset from the other side - a run-scoped flag whose only setter is
-        // permanent has a scope that does nothing.
+        // re-opens. The second error is the lifetime sweep catching the same
+        // declaration from the other side - the capstone counts as a permanent
+        // setter (the operation latches the flag), so a run-scoped flag with
+        // only that setter has a scope that does nothing.
         [Test]
         public void RunScopedCapstoneCompletionFlag_IsReported()
         {
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done", ContentScope.Run) },
                 capstone: new CapstoneConfig("backyard", "Backyard Party",
-                    new RecordsCumulativeCondition(30), "done", new SetFlagEffect("done")));
+                    new RecordsCumulativeCondition(30), "done", onComplete: null));
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
 
             LogAssert.Expect(LogType.Error,
@@ -645,38 +673,38 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // The re-acquisition rule (6.5), and it covers EVERY content unlock rather
-        // than just the run-scoped ones. Scope looked like the deciding property and
-        // is not: a content unlock is applied automatically whenever its gate holds
-        // and its latch is absent, and both halves are reachable at either scope - a
-        // release clears run-scoped latches, and a RESTORE clears any latch its
-        // snapshot omits, because restore is replacement. So an older or partial
-        // snapshot re-pays a permanent unlock exactly as a release re-pays a
-        // run-scoped one. The projection cannot catch it, because re-acquiring is
-        // correct for everything except a payout - hence a content rule.
+        // Actions execute on purchase and a content unlock is never bought, so an
+        // award authored on one would silently never pay - which reads as a tuning
+        // problem rather than the authoring mistake it is. (The old danger, an
+        // award PAID repeatedly by the auto-apply path, is not validated against
+        // any more because it is not expressible: that path executes no actions.)
         [TestCase(ContentScope.Run)]
         [TestCase(ContentScope.PermanentInChapter)]
-        public void OneShotEffectOnAnyContentUnlock_IsReported(ContentScope scope)
+        public void ActionsOnAContentUnlock_AreReported(ContentScope scope)
         {
             var upgrade = TestContent.MakeUpgrade("payday", UpgradeType.ContentUnlock, scope,
-                null, new GrantCurrencyEffect("cash", 100));
-            var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "payday" });
+                null, new SetFlagEffect("fans"),
+                actions: new List<GameAction> { new GrantCurrencyAction("cash", 100) });
+            var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
+                upgradeIds: new List<string> { "payday" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
                 upgrades: new[] { upgrade });
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Upgrade 'payday' is a content unlock carrying a one-shot effect - a content unlock re-applies through the acquisition path whenever its latch is absent and its gate holds (a release clears run-scoped latches, and a restore clears any the snapshot omits), so the payout would be granted more than once. Move the payout to content acquired by a player action: a bought buff, an event tier, or the capstone.");
+                "ContentValidator: Upgrade 'payday' is a content unlock carrying actions - actions execute on purchase, and a content unlock is never bought, so its award would never pay. Move it to a bought buff, an event tier, or the capstone.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // A BUFF may carry a payout: TryBuy charges the cost again, so re-buying and
-        // re-paying is coherent rather than free. The rule is about what is acquired
-        // AUTOMATICALLY, not about payouts as such.
+        // A BOUGHT buff may carry awards: TryBuy charges the cost again, so
+        // re-buying and re-paying is coherent rather than free. Its action ids
+        // still validate like any other reference.
         [Test]
-        public void OneShotEffectOnABoughtBuff_IsAllowed()
+        public void ActionsOnABoughtBuff_AreAllowed_AndTheirReferencesChecked()
         {
             var upgrade = TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantCurrencyEffect("cash", 100), costAmount: 250);
+                null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1),
+                costAmount: 250,
+                actions: new List<GameAction> { new GrantCurrencyAction("cash", 100) });
             var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "advance" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { upgrade });
 
@@ -685,35 +713,39 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
-        // The two halves of the capstone have to name the SAME flag. Validated
-        // separately they each pass while disagreeing: the payload grants its rewards
-        // and sets some other flag - or none - so slice 7 would run the capstone and
-        // the chapter would never register as finished. The flag-declaration sweep
-        // does not catch it, because a payload setting the WRONG flag still sets a
-        // flag.
+        // and a broken reference inside an action reports like any other id
         [Test]
-        public void CapstonePayloadThatNeverSetsItsCompletionFlag_IsReported()
+        public void ActionWithAnUnknownCurrency_IsReported()
+        {
+            var upgrade = TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
+                null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1),
+                costAmount: 250,
+                actions: new List<GameAction> { new GrantCurrencyAction("merch", 100) });
+            var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "advance" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { upgrade });
+
+            LogAssert.Expect(LogType.Error,
+                "ChapterCurrencies: Upgrade 'advance' (actions) references currency id 'merch', which resolves to no CurrencyDefinition asset.");
+            ContentValidator.Validate(database, RecordsId, NoRewards);
+        }
+
+        // The capstone's OnComplete effects are setters too, heard by the same
+        // collector and recorded permanent - a chapter boundary's grants are not
+        // facts a release takes back. Silence proves the capstone's payload
+        // validated with the listener installed; without it, 'stagecraft' would
+        // falsely warn as a flag nothing sets.
+        [Test]
+        public void FlagSetByTheCapstonesOnComplete_CountsAsAPermanentSetter()
         {
             var ch1 = TestContent.MakeChapter("ch1", null,
-                flags: new List<FlagDeclaration> { new("done"), new("something_else") },
+                flags: new List<FlagDeclaration> { new("done"), new("stagecraft") },
                 capstone: new CapstoneConfig("backyard", "Backyard Party",
                     new RecordsCumulativeCondition(30), "done",
-                    // a compound, so the check has to recurse rather than look at the
-                    // wrapper - and it sets the wrong flag
-                    new CompoundEffect(new List<GameEffect>
-                    {
-                        new GrantCurrencyEffect("cash", 1),
-                        new SetFlagEffect("something_else"),
-                    })));
+                    new SetFlagEffect("stagecraft")));
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
 
-            // The flag sweep also notices that nothing sets 'done', but only as a
-            // WARNING - it cannot tell a code-set system flag from a dead one. That is
-            // exactly why this check exists as an error: the capstone DECLARES the
-            // flag, so a payload not setting it is unambiguously wrong.
-            LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' capstone 'backyard' declares completion flag 'done' but its onComplete payload never sets it - completing the capstone would grant its rewards without recording that the chapter finished.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
+            LogAssert.NoUnexpectedReceived();
         }
 
         // A completion flag with no declared lifetime is no more a chapter boundary
@@ -726,7 +758,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done", ContentScope.None) },
                 capstone: new CapstoneConfig("backyard", "Backyard Party",
-                    new RecordsCumulativeCondition(30), "done", new SetFlagEffect("done")));
+                    new RecordsCumulativeCondition(30), "done", onComplete: null));
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
 
             LogAssert.Expect(LogType.Error,
@@ -881,25 +913,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // The bar half of the same rule: a run-scoped group's bars reset at every
-        // release and are re-completed, and completing one applies its reward through
-        // the acquisition path. Checked from the GROUP, because a bar does not know
-        // which group holds it - the scope that decides this lives on the group.
-        [Test]
-        public void OneShotRewardOnARunScopedBarGroup_IsReported()
-        {
-            var reward = TestContent.MakeReward("payout", new GrantCurrencyEffect("cash", 50));
-            var bar = TestContent.MakeBar("cover_1", "cash", 100, "payout");
-            var group = TestContent.MakeBarGroup("learn_covers", null, new List<string> { "cover_1" },
-                scope: ContentScope.Run);
-            var ch1 = TestContent.MakeChapter("ch1", null, barGroupIds: new List<string> { "learn_covers" });
-            var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
-                bars: new[] { bar }, barGroups: new[] { group }, rewards: new[] { reward });
-
-            LogAssert.Expect(LogType.Error,
-                "ContentValidator: Bar 'cover_1' is in run-scoped group 'learn_covers' and its reward carries a one-shot effect - the release resets the bar, so re-completing it would pay again every run.");
-            ContentValidator.Validate(database, RecordsId, new RewardManager(new[] { reward }));
-        }
+        // The old bar half of the payout rule needs no check at all now: a reward
+        // holds a GameEffect, awards are GameActions, and no reward can hold one -
+        // a re-completed bar re-paying is unauthorable rather than reported.
 
         // a group with no bars reveals an empty region and can never satisfy a
         // barsCompleted gate, so cut_demo's leg would wait forever

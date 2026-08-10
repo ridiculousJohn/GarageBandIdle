@@ -149,34 +149,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(context.Flags.IsSet("covers"), "omitted, so cleared");
         }
 
-        // The runtime half of the payout rule. A content unlock is applied
-        // automatically whenever its latch is absent and its gate holds, and restore
-        // clears any latch its snapshot omits - so one carrying a payout would be paid
-        // again by every such restore. UpgradeSystem refuses to REGISTER it, which is
-        // what makes the validator's report safe to arrive late: boot builds and
-        // settles the frontier economy before ContentValidator runs, so a
-        // validator-only rule would report a payout the boot settle had already banked.
+        // The runtime half of the payout rule, structural since the effect/action
+        // split. A content unlock is applied automatically whenever its latch is
+        // absent and its gate holds, and restore clears any latch its snapshot
+        // omits - so an award on one would be paid again by every such restore.
+        // Awards are GameActions now, and the auto-apply path executes none: the
+        // unlock latches, its payload applies, and nothing pays, because there is
+        // no code on that path to pay - not a guard refusing, an absence.
         [Test]
-        public void ContentUnlockCarryingAPayout_IsRefusedByTheSystem_SoNothingCanPayIt()
+        public void ContentUnlockCarryingActions_LatchesWithoutPaying()
         {
             var chapter = MakeChapter(upgradeIds: new List<string> { "payday" });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition>
             {
-                // ungated, so a single settle would apply it immediately
+                // ungated, so a single settle applies it immediately
                 TestContent.MakeUpgrade("payday", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
-                    null, new GrantCurrencyEffect(RoadiesId, 1)),
+                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4),
+                    actions: new List<GameAction> { new GrantCurrencyAction(RoadiesId, 1) }),
             });
             var permanent = EconomyContextFactory.BuildPermanentPool(database);
 
-            LogAssert.Expect(LogType.Error,
-                "UpgradeSystem: upgrade 'payday' is a content unlock carrying a one-shot effect - it applies automatically whenever its latch is absent and its gate holds, so the payout would be granted more than once. Refusing to register it; move the payout to content acquired by a player action.");
             using var context = Build(chapter, database, permanent);
 
+            Assert.IsTrue(context.Upgrades.Get("payday").Applied,
+                "the unlock latched at the construction settle");
             Assert.AreEqual(0.0, permanent.Get(RoadiesId).ToDouble(), 1e-9,
-                "construction settles, and the refusal is why that settle banked nothing");
-
-            LogAssert.Expect(LogType.Error, "UpgradeSystem: unknown upgrade id 'payday'.");
-            Assert.IsNull(context.Upgrades.Get("payday"), "it was never registered");
+                "and banked nothing: the auto-apply path executes no actions");
         }
 
         // Restoring the same snapshot repeatedly changes nothing - the property the
@@ -527,66 +525,55 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- effect replay ---------------------------------------------------
 
-        // Projection pays nothing for a payout, and does so SILENTLY. Not an error:
-        // "nothing to re-apply" is the correct answer for a one-shot, a permanent
-        // latch carrying one is legal content, and its projection runs at every
-        // release and every load - so reporting would be a log line per boundary
-        // describing working content. It also keeps every bulk caller uniform, with
-        // no per-caller kind check to get wrong.
+        // An award pays when its operation executes it, and there is nothing else
+        // to exercise: no rebuild path holds a GameAction, so "paid once ever" is
+        // the shape of the data rather than a filter with cases to test.
         [Test]
-        public void ProjectingAOneShot_PaysNothingAndSaysNothing()
+        public void GrantCurrencyAction_PaysOnExecute()
         {
             var currencies = TestContent.MakeEconomy();
             var effects = new EffectContext(currencies, new FlagSystem(), new ModifierSystem());
-            var payout = new GrantCurrencyEffect("cash", 100);
 
-            payout.ApplyOnAcquisition(effects, ContentScope.PermanentInChapter);
-            Assert.AreEqual(100.0, currencies.Get("cash").ToDouble(), 1e-9, "acquisition pays");
+            new GrantCurrencyAction("cash", 100).Execute(effects);
 
-            payout.Project(effects, ContentScope.PermanentInChapter);
-            payout.Project(effects, ContentScope.PermanentInChapter);
-
-            Assert.AreEqual(100.0, currencies.Get("cash").ToDouble(), 1e-9, "projection paid nothing");
-            // an unexpected Debug.LogError fails the test, so silence IS the assertion
-            LogAssert.NoUnexpectedReceived();
+            Assert.AreEqual(100.0, currencies.Get("cash").ToDouble(), 1e-9);
         }
 
-        // The capstone's shape: a payout plus a flag, in one payload. Acquisition
-        // runs both; projection runs the flag and skips the payout SILENTLY, because
-        // a mixed payload is legal content and projecting one must not log.
+        // A compound re-applies safely at every boundary because everything in it
+        // is re-applicable by construction - the payout that used to need
+        // filtering here is a GameAction now, unauthorable inside a payload.
         [Test]
-        public void MixedCompound_PaysOnceAndReprojectsItsFlagQuietly()
+        public void Compound_ReappliesExactly_AtTheRebuildBoundary()
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem(new[] { "chapter_2_unlocked" });
-            var effects = new EffectContext(currencies, flags, new ModifierSystem());
+            var modifiers = new ModifierSystem();
+            var effects = new EffectContext(currencies, flags, modifiers);
             var payload = new CompoundEffect(new List<GameEffect>
             {
-                new GrantCurrencyEffect("cash", 1),
+                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4),
                 new SetFlagEffect("chapter_2_unlocked"),
             });
 
-            Assert.IsTrue(payload.ContainsOneShot, "something under here pays out");
-            Assert.AreEqual(EffectProjection.Projectable, payload.Projection,
-                "yet the compound itself is safe to project - it filters its own children");
-
-            payload.ApplyOnAcquisition(effects, ContentScope.PermanentInChapter);
-            Assert.AreEqual(1.0, currencies.Get("cash").ToDouble(), 1e-9);
+            payload.Apply(effects, ContentScope.PermanentInChapter);
+            Assert.AreEqual(4.0, modifiers.For(ModifierTargetKey.Global(ModifierTarget.TapValue)).Add.ToDouble(), 1e-9);
             Assert.IsTrue(flags.IsSet("chapter_2_unlocked"));
 
-            payload.Project(effects, ContentScope.PermanentInChapter);
-            payload.Project(effects, ContentScope.PermanentInChapter);
+            // the rebuild pattern (rule 6): clear the store, re-run the payload
+            modifiers.ResetGranted();
+            payload.Apply(effects, ContentScope.PermanentInChapter);
 
-            Assert.AreEqual(1.0, currencies.Get("cash").ToDouble(), 1e-9, "paid once, ever");
-            Assert.IsTrue(flags.IsSet("chapter_2_unlocked"), "and the flag re-asserts safely");
+            Assert.AreEqual(4.0, modifiers.For(ModifierTargetKey.Global(ModifierTarget.TapValue)).Add.ToDouble(), 1e-9,
+                "re-running rebuilds exactly, never compounds");
+            Assert.IsTrue(flags.IsSet("chapter_2_unlocked"), "and the latch re-asserts idempotently");
         }
 
-        // SetFlagEffect being projectable is load-bearing rather than convenient: the
-        // release clears run-scoped flags and asks for the projection, which re-sets
-        // every flag whose SETTER's latch survived. Made one-shot, permanently
-        // unlocked content would go dark after the first demo.
+        // A flag re-asserting on re-Apply is load-bearing rather than convenient:
+        // the release clears run-scoped flags and asks for the rebuild, which
+        // re-sets every flag whose SETTER's latch survived. If setFlag could not
+        // re-run, permanently unlocked content would go dark after the first demo.
         [Test]
-        public void SetFlagEffect_StaysProjectableAcrossAnAlbumRelease()
+        public void SetFlagEffect_ReassertsAcrossAnAlbumRelease()
         {
             var chapter = MakeChapter(
                 upgradeIds: new List<string> { "cut_demo" },

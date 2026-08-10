@@ -124,8 +124,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
             var context = new EffectContext(currencies, flags, modifiers);
 
-            TestContent.MakeFanRateReward("boost_a", 1.15).ApplyOnAcquisition(context, ContentScope.Run);
-            TestContent.MakeFanRateReward("boost_b", 1.15).ApplyOnAcquisition(context, ContentScope.Run);
+            TestContent.MakeFanRateReward("boost_a", 1.15).Apply(context, ContentScope.Run);
+            TestContent.MakeFanRateReward("boost_b", 1.15).Apply(context, ContentScope.Run);
 
             Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9);
         }
@@ -344,7 +344,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // a flag is permanent within its chapter by definition, so the scope the
             // applier passes is not consulted - the latch is not a scoped modifier
-            TestContent.MakeSetFlagReward("open_backroom", "backroom").ApplyOnAcquisition(context, ContentScope.Run);
+            TestContent.MakeSetFlagReward("open_backroom", "backroom").Apply(context, ContentScope.Run);
 
             Assert.IsTrue(flags.IsSet("backroom"));
         }
@@ -369,10 +369,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(rewards.Contains("fan_rate_x1_15"));
             Assert.IsFalse(rewards.Contains("nope"));
 
-            rewards.ApplyOnAcquisition("fan_rate_x1_15", context, ContentScope.Run);
+            rewards.Apply("fan_rate_x1_15", context, ContentScope.Run);
             Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9, "pool reward applied by id");
 
-            rewards.ApplyOnAcquisition("open_backroom", context, ContentScope.Run);
+            rewards.Apply("open_backroom", context, ContentScope.Run);
             Assert.IsTrue(flags.IsSet("backroom"), "setFlag rewards run through the same registry");
         }
 
@@ -401,7 +401,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "0.2 base + 0.02 x 1 bandmate - the rate Chapter 1 shows after the first Drummer");
 
             var effects = new EffectContext(currencies, flags, modifiers);
-            TestContent.MakeFanRateReward("boost", 1.15).ApplyOnAcquisition(effects, ContentScope.Run);
+            TestContent.MakeFanRateReward("boost", 1.15).Apply(effects, ContentScope.Run);
 
             Assert.AreEqual(0.22 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9,
                 "the multiplier scales base + bandmate add together, never the base alone");

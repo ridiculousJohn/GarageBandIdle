@@ -102,8 +102,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             // flags: the chapter's declared reveal registry, each latch
             // carrying its declared lifetime (absent scope = the permanent
             // default). The setBy/reveals keys stay documentation - who sets a
-            // flag is the setter's payload, and boot validation checks that
-            // relation from the payload side.
+            // flag is the setter's payload, and the lifetime lint below checks
+            // that relation from the authored JSON.
             var flags = new List<FlagDeclaration>();
             var flagIds = new List<string>();
             foreach (var flag in data.flags ?? Array.Empty<FlagBlock>())
@@ -119,6 +119,13 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                         ToLatchScope(flag.scope, $"flag '{flag.id}'", "a flag latch")));
                 }
             }
+
+            // Lint, not a gate: the chapter still imports. The authoring-time half
+            // of the flag-lifetime rules - the same two checks boot validation
+            // runs over the LOADED assets (which can drift from this file) - run
+            // here over the flat JSON, so the author hears about a dead or
+            // scope-less flag at import rather than at the next play.
+            ValidateFlagLifetimes(data);
 
             // The chapter's currency roster (design doc section 12, rule 12):
             // every currency the chapter's economy owns, as pure state
@@ -610,11 +617,13 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // threshold anywhere, which is the point of deleting capstoneRecordsGate
         // rather than keeping it in step.
         //
-        // onComplete's friendly keys map onto the ONE effect family: a Roadie grant
-        // is a one-shot GrantCurrencyEffect, the completion flag is a projectable
-        // SetFlagEffect, and both together are a CompoundEffect. So the capstone gets
-        // no bespoke completion handler, and the Roadie cannot be paid a second time
-        // by a release, a load, or a reprojection - the projection refuses it.
+        // onComplete's friendly keys split by category. grantRoadies is a one-shot
+        // award, so it becomes a GrantCurrencyAction the completion operation will
+        // execute exactly once - no release, load, or reprojection can pay a second
+        // Roadie, because none of those paths execute actions. completionFlag is
+        // the config's own declaration and the OPERATION latches it (slice 7); no
+        // setFlag effect is built from it, so a payload copy able to disagree with
+        // the declaration is not authorable.
         //
         // An absent capstone block is legal and produces an unauthored config: not
         // every chapter needs one, and validation asks IsAuthored before demanding
@@ -624,29 +633,20 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             if (block == null || string.IsNullOrEmpty(block.id))
                 return new CapstoneConfig();
 
-            var effects = new List<GameEffect>();
+            var actions = new List<GameAction>();
 
             if (block.onComplete != null && block.onComplete.grantRoadies > 0)
-                effects.Add(new GrantCurrencyEffect(GameManager.RoadiesCurrencyId, block.onComplete.grantRoadies));
+                actions.Add(new GrantCurrencyAction(GameManager.RoadiesCurrencyId, block.onComplete.grantRoadies));
             else if (block.onComplete != null && block.onComplete.grantRoadies < 0)
                 Debug.LogError($"ChapterJsonImporter: capstone '{block.id}' grants {block.onComplete.grantRoadies} roadies - an award is never a charge. Refusing it: fix the JSON and re-import.");
 
             var completionFlag = block.onComplete?.completionFlag;
-            if (!string.IsNullOrEmpty(completionFlag))
-                effects.Add(new SetFlagEffect(completionFlag));
-            else
+            if (string.IsNullOrEmpty(completionFlag))
                 Debug.LogError($"ChapterJsonImporter: capstone '{block.id}' names no onComplete.completionFlag - nothing would record that the chapter finished.");
 
-            // one child needs no wrapper; the compound exists for the mixed case
-            GameEffect onComplete = effects.Count switch
-            {
-                0 => null,
-                1 => effects[0],
-                _ => new CompoundEffect(effects),
-            };
-
             return new CapstoneConfig(block.id, block.name,
-                ToCondition(block.unlock, $"capstone '{block.id}' (unlock)"), completionFlag, onComplete);
+                ToCondition(block.unlock, $"capstone '{block.id}' (unlock)"), completionFlag,
+                onComplete: null, actions);
         }
 
         // A section's module entries, in either authored form. Both produce the same
@@ -1149,6 +1149,102 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             => ToLatchScope(JsonConvert.DeserializeObject<FlagBlock>(json, JsonSettings).scope,
                 "flag", "a flag latch");
 
+        // the flag-lifetime lint path, exposed like ParseCondition: tests feed a
+        // whole chapter file and assert on the reports
+        internal static void LintFlagLifetimes(string chapterJson)
+            => ValidateFlagLifetimes(JsonConvert.DeserializeObject<ChapterFile>(chapterJson, JsonSettings));
+
+        // The flag-lifetime lint, over the authored JSON: which setters set each
+        // declared flag, recorded with the owning FACT's scope - that scope
+        // decides whether the flag comes back after a release (a permanent latch
+        // re-asserts its flag through the rebuild, a run-scoped one re-fires on
+        // its own gate). Boot validation runs the same two rules over the loaded
+        // assets; this copy exists for authoring-time feedback. Pure DTO reads,
+        // so nothing here re-runs a converter or double-reports its errors; the
+        // scope spellings are compared raw, with each site's own default (a
+        // fact's scope resolves Run for anything but 'permanentInChapter',
+        // mirroring ToScope; a flag declaration resolves Run only for 'run',
+        // mirroring ToLatchScope).
+        private static void ValidateFlagLifetimes(ChapterFile data)
+        {
+            static bool FactIsRunScoped(string spelling) => spelling != "permanentInChapter";
+
+            // reward id -> the flag its effect sets, for the setters that arrive
+            // through the reward pool (bars, event tiers)
+            var rewardFlags = new Dictionary<string, string>();
+            foreach (var reward in data.rewards ?? Array.Empty<RewardEntryBlock>())
+            {
+                if (reward.type == "setFlag" && !string.IsNullOrEmpty(reward.flag)
+                    && !rewardFlags.ContainsKey(reward.id ?? ""))
+                    rewardFlags.Add(reward.id ?? "", reward.flag);
+            }
+
+            var setterScopes = new Dictionary<string, List<bool>>();
+            void Record(string flagId, bool runScoped)
+            {
+                if (string.IsNullOrEmpty(flagId))
+                    return;
+                if (!setterScopes.TryGetValue(flagId, out var scopes))
+                    setterScopes.Add(flagId, scopes = new List<bool>());
+                scopes.Add(runScoped);
+            }
+            void RecordReward(string rewardId, bool runScoped)
+            {
+                if (rewardFlags.TryGetValue(rewardId ?? "", out var flagId))
+                    Record(flagId, runScoped);
+            }
+
+            foreach (var upgrade in data.upgrades ?? Array.Empty<UpgradeBlock>())
+            {
+                if (upgrade.payload?.effect == "setFlag")
+                    Record(upgrade.payload.flag, FactIsRunScoped(upgrade.scope));
+            }
+
+            foreach (var group in data.bars?.groups ?? Array.Empty<BarGroupBlock>())
+            {
+                foreach (var bar in group.bars ?? Array.Empty<BarBlock>())
+                    RecordReward(bar.reward, FactIsRunScoped(data.bars.scope));
+            }
+
+            foreach (var gameEvent in data.events ?? Array.Empty<EventBlock>())
+            {
+                foreach (var tier in gameEvent.tiers ?? Array.Empty<TierBlock>())
+                    RecordReward(tier.reward, FactIsRunScoped(tier.scope));
+            }
+
+            // The capstone's completion flag is set by the completion OPERATION,
+            // from the declaration - recorded as a permanent setter, which is what
+            // a chapter boundary is: completing the capstone is not a fact a
+            // release takes back.
+            var completionFlag = data.capstone?.onComplete?.completionFlag;
+            if (!string.IsNullOrEmpty(completionFlag))
+                Record(completionFlag, runScoped: false);
+
+            foreach (var flag in data.flags ?? Array.Empty<FlagBlock>())
+            {
+                if (string.IsNullOrEmpty(flag.id))
+                    continue;
+
+                // A flag no content sets is PROBABLY dead - everything gated on
+                // it silently never appears, and at runtime an unset flag looks
+                // exactly like a not-yet-earned one. A warning rather than an
+                // error, because a flag set from code alone is legitimate and
+                // invisible to this sweep.
+                if (!setterScopes.TryGetValue(flag.id, out var scopes))
+                {
+                    Debug.LogWarning($"ChapterJsonImporter: chapter declares flag '{flag.id}' but no content sets it - unless code sets it, every flagSet gate on it stays closed and the content behind them can never appear.");
+                    continue;
+                }
+
+                // a run-scoped flag needs at least one setter whose own fact
+                // resets with the run: with only permanent setters, the release
+                // clears the flag and the rebuild immediately re-asserts it from
+                // the surviving latch, so the declared scope does nothing
+                if (flag.scope == "run" && !scopes.Contains(true))
+                    Debug.LogError($"ChapterJsonImporter: flag '{flag.id}' is run-scoped but every setter is permanent - the release clears it and the rebuild re-asserts it in the same operation, so the scope has no effect.");
+            }
+        }
+
         // Scope is a closed, code-defined set (ContentScope); the strings here
         // are the JSON spellings, and anything else is a content error.
         private static ContentScope ToScope(string scope, string context)
@@ -1559,10 +1655,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public CapstoneCompletionBlock onComplete = new();
         }
 
-        // What completing the capstone grants. Friendly authoring vocabulary that
-        // maps onto the ONE effect family: grantRoadies becomes a one-shot currency
-        // grant, completionFlag becomes a projectable setFlag, and the pair becomes a
-        // compound - so the capstone needs no bespoke handler and cannot pay twice.
+        // What completing the capstone grants. Friendly authoring vocabulary split
+        // by category: grantRoadies becomes a one-shot GrantCurrencyAction the
+        // completion operation executes once, and completionFlag is the config's
+        // own declaration, latched by the operation - never built as an effect.
         private class CapstoneCompletionBlock
         {
             public int grantRoadies;

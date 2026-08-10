@@ -153,6 +153,12 @@ namespace RidiculousGaming.GarageBandIdle
         public CurrencyDefinition GetDefinition(string id)
             => !string.IsNullOrEmpty(id) && _definitions.TryGetValue(id, out var definition) ? definition : null;
 
+        // _reachable, not _definitions: Contains answers "can THIS surface reach
+        // the id" (the roster plus globals), the same set ValidateReference
+        // answers from - a currency that merely exists in some other chapter's
+        // roster is not reachable here
+        public bool Contains(string id) => !string.IsNullOrEmpty(id) && _reachable.Contains(id);
+
         // ---- balances: not a property of content ------------------------------
 
         // Accepted and never fired, rather than refused: ConditionContext

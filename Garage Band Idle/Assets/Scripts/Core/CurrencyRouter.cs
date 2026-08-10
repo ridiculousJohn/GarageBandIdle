@@ -69,6 +69,8 @@ namespace RidiculousGaming.GarageBandIdle
         public CurrencyManager OwnerOf(string id)
             => !string.IsNullOrEmpty(id) && _owners.TryGetValue(id, out var owner) ? owner : null;
 
+        public bool Contains(string id) => OwnerOf(id) != null;
+
         public BigNumber Get(string id) => Route(id, nameof(Get))?.Get(id) ?? BigNumber.Zero;
 
         public void Add(string id, BigNumber amount) => Route(id, nameof(Add))?.Add(id, amount);

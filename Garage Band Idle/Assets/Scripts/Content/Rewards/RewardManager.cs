@@ -40,23 +40,14 @@ namespace RidiculousGaming.GarageBandIdle.Content
         // event tier), not to the reward asset - which is what keeps one reward
         // reusable across sources whose lifetimes differ.
         //
-        // Two entry points, mirroring the effect family (design doc section 12,
-        // rule 6): a bar completing or a tier clearing is an ACQUISITION, while
-        // rebuilding the store from the completions already on record is a
-        // PROJECTION. Only the former may pay currency, and which is which is the
-        // calling site's knowledge - BarGroupRuntime.NotifyCompleted against
-        // ProjectCompletedRewards - so it is expressed as two methods rather than
-        // a flag nobody would read.
-        public void ApplyOnAcquisition(string rewardId, EffectContext context, ContentScope scope)
+        // One entry point: a reward is re-applicable state by construction (its
+        // effect is a GameEffect, and one-shot awards are GameActions no reward
+        // can hold), so the first completion and every rebuild over recorded
+        // completions run the same call.
+        public void Apply(string rewardId, EffectContext context, ContentScope scope)
         {
-            if (TryResolve(rewardId, "ApplyOnAcquisition", out var reward))
-                reward.ApplyOnAcquisition(context, scope);
-        }
-
-        public void Project(string rewardId, EffectContext context, ContentScope scope)
-        {
-            if (TryResolve(rewardId, "Project", out var reward))
-                reward.Project(context, scope);
+            if (TryResolve(rewardId, "Apply", out var reward))
+                reward.Apply(context, scope);
         }
 
         private bool TryResolve(string rewardId, string source, out RewardDefinition reward)

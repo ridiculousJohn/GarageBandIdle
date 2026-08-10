@@ -36,26 +36,16 @@ namespace RidiculousGaming.GarageBandIdle.Content
         // field on the asset could not express it, and could disagree with the
         // source that already declares one.
         //
-        // Both of the effect family's entry points are forwarded rather than one
-        // (design doc section 12, rule 6): a bar completing is an acquisition, a
-        // projection over the bars already recorded as complete is not, and a
-        // reward that pays currency must be able to tell those apart. The reward
-        // itself makes no decision here - it names the payoff, the effect owns the
-        // replay rule.
-        public void ApplyOnAcquisition(EffectContext context, ContentScope scope)
+        // One entry point, because a reward IS re-applicable state (a GameEffect):
+        // the first completion and every rebuild over the completions already on
+        // record run the same mutation. A one-shot award cannot be a reward at all
+        // - that is a GameAction, and no reward or projection path holds one.
+        public void Apply(EffectContext context, ContentScope scope)
         {
             if (!HasEffect())
                 return;
 
-            _effect.ApplyOnAcquisition(context, scope);
-        }
-
-        public void Project(EffectContext context, ContentScope scope)
-        {
-            if (!HasEffect())
-                return;
-
-            _effect.Project(context, scope);
+            _effect.Apply(context, scope);
         }
 
         private bool HasEffect()

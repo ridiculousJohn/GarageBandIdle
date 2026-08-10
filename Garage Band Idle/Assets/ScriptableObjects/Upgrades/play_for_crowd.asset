@@ -22,6 +22,7 @@ MonoBehaviour:
     rid: 1002
   _payload:
     rid: 1003
+  _actions: []
   references:
     version: 2
     RefIds:

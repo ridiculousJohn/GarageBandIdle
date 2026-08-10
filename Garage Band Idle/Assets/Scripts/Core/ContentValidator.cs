@@ -189,7 +189,23 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative fans perBandmateOwnedBonus ({chapter.Fans.PerBandmateOwnedBonus}).");
             if (chapter.RecordBuff.PerRecord < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative recordBuff perRecord ({chapter.RecordBuff.PerRecord}).");
+            // Who sets each declared flag, collected from the loaded ASSETS as
+            // they validate - not from the JSON, which the importer lints
+            // separately: a stale or hand-edited asset can disagree with the
+            // file, and boot is the only pass that sees what the game will
+            // actually run. Each setter records its owning FACT's scope, paired
+            // here at the call site (rule 11); the flag ids themselves surface
+            // through SetFlagEffect's own Validate, via the context's listener,
+            // so no code outside the family walks a payload.
+            var flagSetters = new Dictionary<string, List<ContentScope>>();
+
+            // the capstone's own grants are chapter-boundary facts: whatever its
+            // OnComplete sets is permanent, exactly like the declared completion
+            // flag recorded further down
+            context.FlagSetterReport = flagId => RecordSetter(flagSetters, flagId, ContentScope.PermanentInChapter);
             ValidateCapstone(chapter, context);
+            context.FlagSetterReport = null;
+
             ValidateFlagDeclarations(chapter, database, rewards);
             ValidateIds(chapter.StoryBeatIds, database.StoryBeats, $"Chapter '{chapter.Id}' (storyBeats)");
             foreach (var id in chapter.StoryBeatIds)
@@ -272,12 +288,18 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!database.Upgrades.TryGet(id, out var upgrade))
                     continue;
                 visited.Upgrades.Add(id);
+                context.FlagSetterReport = flagId => RecordSetter(flagSetters, flagId, upgrade.Scope);
                 ValidateUpgrade(upgrade, context);
+                context.FlagSetterReport = null;
             }
 
-            // rewards enter the closure through bars and event tiers; collect
-            // ids first so a reward two bars share validates once per chapter
+            // Rewards enter the closure through bars and event tiers; ids are
+            // collected first so a reward two bars share validates once per
+            // chapter. The setter scope is the REFERENCING content's (a bar
+            // carries its group's, a tier its own), so the reward's flags are
+            // collected once at validation and paired per reference below.
             var rewardIds = new HashSet<string>();
+            var rewardScopeRefs = new List<(string rewardId, ContentScope scope)>();
 
             foreach (var id in chapter.BarGroupIds)
             {
@@ -293,7 +315,10 @@ namespace RidiculousGaming.GarageBandIdle
                     visited.Bars.Add(barId);
                     ValidateBar(bar, context, rewards);
                     if (!string.IsNullOrEmpty(bar.RewardId))
+                    {
                         rewardIds.Add(bar.RewardId);
+                        rewardScopeRefs.Add((bar.RewardId, group.Scope));
+                    }
                 }
             }
 
@@ -306,17 +331,88 @@ namespace RidiculousGaming.GarageBandIdle
                 foreach (var tier in gameEvent.Tiers)
                 {
                     if (!string.IsNullOrEmpty(tier.RewardId))
+                    {
                         rewardIds.Add(tier.RewardId);
+                        rewardScopeRefs.Add((tier.RewardId, tier.Scope));
+                    }
                 }
             }
 
+            var rewardFlags = new Dictionary<string, List<string>>();
             foreach (var rewardId in rewardIds)
             {
                 // an unknown id is reported against the bar/tier that names it
                 if (!database.Rewards.TryGet(rewardId, out var reward))
                     continue;
                 visited.Rewards.Add(rewardId);
+                context.FlagSetterReport = flagId =>
+                {
+                    if (!rewardFlags.TryGetValue(rewardId, out var ids))
+                        rewardFlags.Add(rewardId, ids = new List<string>());
+                    ids.Add(flagId);
+                };
                 ValidateRewardDefinition(reward, context);
+                context.FlagSetterReport = null;
+            }
+
+            foreach (var (rewardId, scope) in rewardScopeRefs)
+            {
+                if (!rewardFlags.TryGetValue(rewardId, out var ids))
+                    continue;
+                foreach (var flagId in ids)
+                    RecordSetter(flagSetters, flagId, scope);
+            }
+
+            // The capstone's completion flag is set by the completion OPERATION,
+            // from the declaration - recorded as a permanent setter, which is what
+            // a chapter boundary is: completing the capstone is not a fact a
+            // release takes back.
+            if (chapter.Capstone != null && chapter.Capstone.IsAuthored
+                && !string.IsNullOrEmpty(chapter.Capstone.CompletionFlagId))
+                RecordSetter(flagSetters, chapter.Capstone.CompletionFlagId, ContentScope.PermanentInChapter);
+
+            ValidateFlagLifetimes(chapter, flagSetters);
+        }
+
+        private static void RecordSetter(Dictionary<string, List<ContentScope>> setters, string flagId,
+            ContentScope scope)
+        {
+            if (string.IsNullOrEmpty(flagId))
+                return;
+            if (!setters.TryGetValue(flagId, out var scopes))
+                setters.Add(flagId, scopes = new List<ContentScope>());
+            scopes.Add(scope);
+        }
+
+        // The flag-lifetime checks, over the setters the chapter's assets just
+        // disclosed. The importer runs the same two rules over the authored JSON
+        // for early feedback; this pass is the one that covers what the game
+        // actually loads.
+        private static void ValidateFlagLifetimes(ChapterDefinition chapter,
+            Dictionary<string, List<ContentScope>> setters)
+        {
+            foreach (var flag in chapter.Flags)
+            {
+                if (flag == null || string.IsNullOrEmpty(flag.Id))
+                    continue;
+
+                // A flag no content sets is PROBABLY dead - everything gated on
+                // it silently never appears, and at runtime an unset flag looks
+                // exactly like a not-yet-earned one. A warning rather than an
+                // error, because a flag set from code alone is legitimate and
+                // invisible to this sweep.
+                if (!setters.TryGetValue(flag.Id, out var scopes))
+                {
+                    Debug.LogWarning($"ContentValidator: Chapter '{chapter.Id}' declares flag '{flag.Id}' but no content sets it - unless code sets it, every flagSet gate on it stays closed and the content behind them can never appear.");
+                    continue;
+                }
+
+                // a run-scoped flag needs at least one setter whose own fact
+                // resets with the run: with only permanent setters, the release
+                // clears the flag and the projection immediately re-asserts it
+                // from the surviving latch, so the declared scope does nothing
+                if (flag.Scope == ContentScope.Run && !scopes.Contains(ContentScope.Run))
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' flag '{flag.Id}' is run-scoped but every setter is permanent - the release clears it and the projection re-asserts it in the same operation, so the scope has no effect.");
             }
         }
 
@@ -359,43 +455,20 @@ namespace RidiculousGaming.GarageBandIdle
                     Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone completion flag '{capstone.CompletionFlagId}' is declared {declaration.Scope} - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
             }
 
-            if (capstone.OnComplete == null)
+            // An absent onComplete is legal: completing always at least latches the
+            // declared completion flag, and the OPERATION sets that flag itself from
+            // the declaration above - the payload never carries a copy, so there is
+            // no second statement of the fact to keep in agreement (the check that
+            // used to walk the payload for it is gone because the mistake it caught
+            // is no longer authorable).
+            capstone.OnComplete?.Validate(context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (onComplete)");
+
+            foreach (var action in capstone.Actions)
             {
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' has no onComplete payload - completing it would grant nothing.");
-                return;
-            }
-
-            capstone.OnComplete.Validate(context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (onComplete)");
-
-            // The two halves have to name the SAME flag. Validated separately they
-            // each pass while disagreeing: the payload grants a Roadie and sets some
-            // other flag - or none - and the configured completion fact is never
-            // recorded, so slice 7 runs the capstone and the chapter never registers
-            // as finished. The flag-declaration sweep only warns about a flag nothing
-            // sets, which a payload setting the WRONG flag does not trigger.
-            if (!string.IsNullOrEmpty(capstone.CompletionFlagId)
-                && !SetsFlag(capstone.OnComplete, capstone.CompletionFlagId))
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' declares completion flag '{capstone.CompletionFlagId}' but its onComplete payload never sets it - completing the capstone would grant its rewards without recording that the chapter finished.");
-        }
-
-        // Whether an effect sets this flag anywhere beneath it, compounds included -
-        // the capstone's payload is a compound, so a non-recursive check would see
-        // only the wrapper.
-        private static bool SetsFlag(GameEffect effect, string flagId)
-        {
-            switch (effect)
-            {
-                case SetFlagEffect setFlag:
-                    return setFlag.FlagId == flagId;
-                case CompoundEffect compound:
-                    foreach (var child in compound.Effects)
-                    {
-                        if (SetsFlag(child, flagId))
-                            return true;
-                    }
-                    return false;
-                default:
-                    return false;
+                if (action == null)
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' has a null action entry.");
+                else
+                    action.Validate(context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (actions)");
             }
         }
 
@@ -435,7 +508,9 @@ namespace RidiculousGaming.GarageBandIdle
         // The declared flag list is the chapter's whole reveal vocabulary - every
         // flag check anywhere is measured against it - so a blank entry declares
         // nothing and a repeat says the same thing twice, both of which read as
-        // an authoring slip in the JSON flags array.
+        // an authoring slip in the JSON flags array. The flag-LIFETIME checks run
+        // separately (ValidateFlagLifetimes), after the chapter's payloads have
+        // validated and disclosed their setters.
         private static void ValidateFlagDeclarations(ChapterDefinition chapter, ContentDatabase database,
             RewardManager rewards)
         {
@@ -446,94 +521,6 @@ namespace RidiculousGaming.GarageBandIdle
                     Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' declares an empty flag id.");
                 else if (!declared.Add(flagId))
                     Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' declares flag '{flagId}' more than once.");
-            }
-
-            // Who sets each flag, swept from the payload side - the setter's
-            // effect is the authoritative declaration (the JSON's setBy key is
-            // prose nothing checks). Each setter records its owning FACT's
-            // scope, because that scope decides whether the flag comes back
-            // after a release: a permanent latch re-asserts its flag through
-            // the projection, a run-scoped one re-fires on its own gate.
-            var setterScopes = new Dictionary<string, List<ContentScope>>();
-
-            // Recurses through compounds: a payload that sets a flag alongside
-            // something else (the capstone's Roadie + advance flag) is a setter just
-            // as much as a bare setFlag is, and pattern-matching only the bare form
-            // would report correct content as a flag nothing sets.
-            void Record(GameEffect effect, ContentScope ownerScope)
-            {
-                switch (effect)
-                {
-                    case SetFlagEffect setFlag when !string.IsNullOrEmpty(setFlag.FlagId):
-                        if (!setterScopes.TryGetValue(setFlag.FlagId, out var scopes))
-                            setterScopes.Add(setFlag.FlagId, scopes = new List<ContentScope>());
-                        scopes.Add(ownerScope);
-                        return;
-                    case CompoundEffect compound:
-                        foreach (var child in compound.Effects)
-                            Record(child, ownerScope);
-                        return;
-                }
-            }
-
-            foreach (var id in chapter.UpgradeIds)
-            {
-                if (database.Upgrades.TryGet(id, out var upgrade))
-                    Record(upgrade.Payload, upgrade.Scope);
-            }
-
-            foreach (var groupId in chapter.BarGroupIds)
-            {
-                if (!database.BarGroups.TryGet(groupId, out var group))
-                    continue;
-                foreach (var barId in group.BarIds)
-                {
-                    // unknown reward ids are already reported against the bar;
-                    // Get answers null quietly for this sweep
-                    if (database.Bars.TryGet(barId, out var bar))
-                        Record(rewards?.Get(bar.RewardId)?.Effect, group.Scope);
-                }
-            }
-
-            foreach (var eventId in chapter.EventIds)
-            {
-                if (!database.Events.TryGet(eventId, out var gameEvent))
-                    continue;
-                foreach (var tier in gameEvent.Tiers)
-                    Record(rewards?.Get(tier.RewardId)?.Effect, tier.Scope);
-            }
-
-            // The capstone sets the chapter-advance flag through an ordinary
-            // setFlag, so it belongs in this sweep - otherwise correct content trips
-            // the "no content sets it" warning below. Recorded as permanent, which
-            // is what a chapter boundary is: completing the capstone is not a fact a
-            // release takes back.
-            if (chapter.Capstone != null && chapter.Capstone.IsAuthored)
-                Record(chapter.Capstone.OnComplete, ContentScope.PermanentInChapter);
-
-            foreach (var flag in chapter.Flags)
-            {
-                if (flag == null || string.IsNullOrEmpty(flag.Id))
-                    continue;
-
-                // A flag no content sets is PROBABLY dead - everything gated on
-                // it silently never appears, and at runtime an unset flag looks
-                // exactly like a not-yet-earned one. A warning rather than an
-                // error, because a system flag set from code (slice 7's
-                // chapter-advance flag) is legitimate and invisible to this
-                // sweep.
-                if (!setterScopes.TryGetValue(flag.Id, out var scopes))
-                {
-                    Debug.LogWarning($"ContentValidator: Chapter '{chapter.Id}' declares flag '{flag.Id}' but no content sets it - unless code sets it, every flagSet gate on it stays closed and the content behind them can never appear.");
-                    continue;
-                }
-
-                // a run-scoped flag needs at least one setter whose own fact
-                // resets with the run: with only permanent setters, the release
-                // clears the flag and the projection immediately re-asserts it
-                // from the surviving latch, so the declared scope does nothing
-                if (flag.Scope == ContentScope.Run && !scopes.Contains(ContentScope.Run))
-                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' flag '{flag.Id}' is run-scoped but every setter is permanent - the release clears it and the projection re-asserts it in the same operation, so the scope has no effect.");
             }
         }
 
@@ -771,41 +758,31 @@ namespace RidiculousGaming.GarageBandIdle
             else if (!string.IsNullOrEmpty(upgrade.CostCurrencyId))
                 context.Currencies.ValidateReference(upgrade.CostCurrencyId, $"Upgrade '{upgrade.Id}' (cost currency)");
             ConditionEvaluator.Validate(upgrade.Gate, context, $"Upgrade '{upgrade.Id}' (gate)");
-            if (upgrade.Payload == null)
-                Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload.");
-            else
-            {
-                upgrade.Payload.Validate(context, $"Upgrade '{upgrade.Id}' (payload)");
+            if (upgrade.Payload == null && upgrade.Actions.Count == 0)
+                Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload and no actions - it would grant nothing.");
+            upgrade.Payload?.Validate(context, $"Upgrade '{upgrade.Id}' (payload)");
 
-                // UpgradeDefinition owns the rule; this reports it with the chapter in
-                // hand. UpgradeSystem asks the SAME question and refuses to register
-                // the upgrade, which is what keeps the payout from being banked by the
-                // boot settle before this report is ever printed.
-                if (upgrade.CarriesRepeatablePayout)
-                    Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' is a content unlock carrying a one-shot effect - a content unlock re-applies through the acquisition path whenever its latch is absent and its gate holds (a release clears run-scoped latches, and a restore clears any the snapshot omits), so the payout would be granted more than once. Move the payout to content acquired by a player action: a bought buff, an event tier, or the capstone.");
+            foreach (var action in upgrade.Actions)
+            {
+                if (action == null)
+                {
+                    Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has a null action entry.");
+                    continue;
+                }
+                action.Validate(context, $"Upgrade '{upgrade.Id}' (actions)");
+
+                // actions run only from TryBuy, and a content unlock is never
+                // bought - an award authored on one would silently never pay,
+                // which reads as a tuning problem rather than the authoring
+                // mistake it is
+                if (upgrade.Type == UpgradeType.ContentUnlock)
+                    Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' is a content unlock carrying actions - actions execute on purchase, and a content unlock is never bought, so its award would never pay. Move it to a bought buff, an event tier, or the capstone.");
             }
         }
 
         private static void ValidateBarGroup(BarGroupDefinition group, ContentDatabase database,
             ConditionContext context, RewardManager rewards)
         {
-            // The bar-group half of the re-acquisition rule (see
-            // ValidateOneShotIsNotRepeatable): a run-scoped group's bars reset at
-            // every release and are re-completed, so a payout on one is paid every
-            // run. Checked from the GROUP because a bar does not know which group
-            // holds it - the scope that decides this lives here.
-            if (group.Scope == ContentScope.Run)
-            {
-                foreach (var barId in group.BarIds)
-                {
-                    if (!database.Bars.TryGet(barId, out var bar))
-                        continue;
-                    var effect = rewards?.Get(bar.RewardId)?.Effect;
-                    if (effect != null && effect.ContainsOneShot)
-                        Debug.LogError($"ContentValidator: Bar '{bar.Id}' is in run-scoped group '{group.Id}' and its reward carries a one-shot effect - the release resets the bar, so re-completing it would pay again every run.");
-                }
-            }
-
             if (group.FillBehavior == null)
                 Debug.LogError($"ContentValidator: Bar group '{group.Id}' has no fill behavior.");
             else

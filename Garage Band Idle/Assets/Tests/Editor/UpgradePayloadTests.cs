@@ -28,7 +28,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var tap = TestContent.MakeTapProduction(1, modifiers);
 
-            new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1).ApplyOnAcquisition(Context(modifiers), ContentScope.Run);
+            new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1).Apply(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 1 + 1");
 
@@ -49,7 +49,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(system.Get("practice_amp"), currencies, 1);
             TestContent.BuyTimes(system.Get("drummer"), currencies, 1);
 
-            new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 2, new List<string> { "practice_amp" }).ApplyOnAcquisition(Context(modifiers), ContentScope.Run);
+            new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 2, new List<string> { "practice_amp" }).Apply(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(0.8, system.Get("practice_amp").ProductionPerSecond.ToDouble(), 1e-9, "0.4 x 2");
             Assert.AreEqual(3.0, system.Get("drummer").ProductionPerSecond.ToDouble(), 1e-9,
@@ -72,7 +72,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fansBefore = currencies.Get("fans");
 
             new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 1.5, new List<string> { "cash" })
-                .ApplyOnAcquisition(Context(modifiers), ContentScope.Run);
+                .Apply(Context(modifiers), ContentScope.Run);
             system.Tick(10);
 
             Assert.AreEqual(45.0, (currencies.Get("cash") - cashBefore).ToDouble(), 1e-9, "3 x 1.5 x 10s");
@@ -86,7 +86,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
 
             new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 2, new List<string> { "cash", "fans" })
-                .ApplyOnAcquisition(Context(modifiers), ContentScope.Run);
+                .Apply(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(2.0,
                 modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash")).Multiply.ToDouble(), 1e-9);
@@ -187,6 +187,83 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "an applied buff is never bought twice");
         }
 
+        // The one place awards run: the purchase. Re-buying after a run reset
+        // re-pays because TryBuy re-charged; the rebuild boundary in between pays
+        // nothing, because no projection path holds a GameAction.
+        [Test]
+        public void TryBuy_ExecutesActionsOncePerPurchase_AndTheRebuildNeverDoes()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
+                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1),
+                    costAmount: 250,
+                    actions: new List<GameAction> { new GrantCurrencyAction("fans", 10) }),
+            }, currencies, flags, modifiers);
+            var context = TestContent.MakeContext(currencies, flags: flags);
+
+            currencies.Add("cash", 250);
+            Assert.IsTrue(upgrades.TryBuy(upgrades.Get("advance"), context));
+            Assert.AreEqual(10.0, currencies.Get("fans").ToDouble(), 1e-9, "the purchase paid the award");
+
+            upgrades.ProjectModifiers();
+            Assert.AreEqual(10.0, currencies.Get("fans").ToDouble(), 1e-9,
+                "the rebuild re-applied the payload and paid nothing - it cannot see actions");
+
+            TestContent.RunReset(modifiers, upgrades);
+            currencies.Add("cash", 250);
+            Assert.IsTrue(upgrades.TryBuy(upgrades.Get("advance"), context), "run-scoped: re-bought each run");
+            Assert.AreEqual(20.0, currencies.Get("fans").ToDouble(), 1e-9,
+                "re-buying re-pays: TryBuy re-charged, so this is a purchase, not a repeat");
+        }
+
+        // An action ENTRY is not a grant: a serialized null slot and an award of
+        // nothing both pass a count check while granting nothing, and a report
+        // never stops a boot - so TryBuy asks each action whether it would
+        // execute, and refuses before any state moves.
+        [Test]
+        public void TryBuy_RefusesAPurchaseWhoseActionsCannotExecute()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
+            var upgrades = new UpgradeSystem(new[]
+            {
+                TestContent.MakeUpgrade("hollow", UpgradeType.Buff, ContentScope.Run,
+                    null, payload: null, costAmount: 250,
+                    actions: new List<GameAction> { null }),
+                TestContent.MakeUpgrade("zeroed", UpgradeType.Buff, ContentScope.Run,
+                    null, payload: null, costAmount: 250,
+                    actions: new List<GameAction> { new GrantCurrencyAction("fans", 0) }),
+                // a positive award to a currency no reachable pool holds: Add
+                // would land nowhere, so the preflight must catch it too
+                TestContent.MakeUpgrade("ghost", UpgradeType.Buff, ContentScope.Run,
+                    null, payload: null, costAmount: 250,
+                    actions: new List<GameAction> { new GrantCurrencyAction("merch", 100) }),
+            }, currencies, flags, modifiers);
+            var context = TestContent.MakeContext(currencies, flags: flags);
+            currencies.Add("cash", 500);
+
+            LogAssert.Expect(LogType.Error,
+                "UpgradeSystem: upgrade 'hollow' has no payload and no executable action. Refusing the purchase rather than charging for nothing.");
+            Assert.IsFalse(upgrades.TryBuy(upgrades.Get("hollow"), context));
+            Assert.IsFalse(upgrades.Get("hollow").Applied, "nothing latched");
+
+            LogAssert.Expect(LogType.Error,
+                "UpgradeSystem: upgrade 'zeroed' has no payload and no executable action. Refusing the purchase rather than charging for nothing.");
+            Assert.IsFalse(upgrades.TryBuy(upgrades.Get("zeroed"), context));
+
+            LogAssert.Expect(LogType.Error,
+                "UpgradeSystem: upgrade 'ghost' has no payload and no executable action. Refusing the purchase rather than charging for nothing.");
+            Assert.IsFalse(upgrades.TryBuy(upgrades.Get("ghost"), context));
+
+            Assert.AreEqual(500.0, currencies.Get("cash").ToDouble(), 1e-9,
+                "no refusal charged anything");
+        }
+
         [Test]
         public void TryBuy_FiresUpgradeAppliedOncePerPurchase()
         {
@@ -261,7 +338,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             currencies.Add("cash", 1000);
 
             LogAssert.Expect(LogType.Error,
-                "UpgradeSystem: upgrade 'no_payload' has no payload. Refusing the purchase rather than charging for nothing.");
+                "UpgradeSystem: upgrade 'no_payload' has no payload and no executable action. Refusing the purchase rather than charging for nothing.");
             Assert.IsFalse(upgrades.TryBuy(upgrades.Get("no_payload"), context));
 
             Assert.IsFalse(upgrades.TryBuy(upgrades.Get("free_buff"), context), "a zero cost is not a free buff");
