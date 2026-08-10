@@ -510,7 +510,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Sections_MatchJson()
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
-            CollectionAssert.AreEqual(new[] { "garage_floor", "the_band", "the_gear", "rehearsal_space", "the_release" },
+            CollectionAssert.AreEqual(new[] { "garage_floor", "the_band", "the_gear", "rehearsal_space", "the_release", "the_backyard" },
                 chapter.SectionIds);
 
             var garageFloor = LoadById<SectionDefinition>(SectionsFolder, "garage_floor");
@@ -557,11 +557,59 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("album", albumGate.FlagId);
             CollectionAssert.AreEqual(new[] { "module/release" }, Addresses(theRelease));
 
+            // the capstone offer: region coarse (the first Record - cumulative,
+            // so it can never strobe), action precise (the button asks
+            // capstone.unlock live). Deliberately NOT the gate's own 30, which
+            // has exactly one authored home
+            var theBackyard = LoadById<SectionDefinition>(SectionsFolder, "the_backyard");
+            var backyardGate = theBackyard.VisibleWhen as RecordsCumulativeCondition;
+            Assert.IsNotNull(backyardGate, "the_backyard reveals on cumulative Records");
+            Assert.AreEqual(1, backyardGate.Value, 1e-9);
+            CollectionAssert.AreEqual(new[] { "module/capstone" }, Addresses(theBackyard));
+
             // No section carries a lifetime of its own: visibility is a live
             // function of visibleWhen, and each section's persistence comes
             // from what its condition reads - the run-scoped gear and covers
             // flags reset with the demo, the permanent album flag doesn't, and
             // the_band's earned-total is monotonic so it can never strobe.
+        }
+
+        // The capstone loop over the REAL shipped content: the authored gate
+        // refuses below 30 cumulative Records, and completion banks the run,
+        // grants the one Roadie, and latches chapter_2_unlocked - the
+        // operation's whole contract, exercised against the assets the game
+        // actually boots from rather than a fixture's idea of them.
+        [Test]
+        public void Capstone_CompletesOnShippedContent_AtTheAuthoredGate()
+        {
+            var database = new ContentDatabase();
+            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+
+            ChapterDefinition starting = null; // the same lowest-index resolution boot uses
+            foreach (var chapter in database.Chapters.All)
+            {
+                if (starting == null || chapter.Index < starting.Index)
+                    starting = chapter;
+            }
+            Assert.IsNotNull(starting, "no chapter assets - run 'GarageBandIdle > Import Chapter 1 JSON'");
+
+            using var frontier = EconomyContextFactory.Build(starting, database, permanent,
+                EconomyRecipe.FrontierChapter);
+
+            frontier.Currencies.Add(GameManager.RecordsCurrencyId, 29);
+            frontier.Currencies.Add("fans", 500);
+            Assert.IsFalse(frontier.CompleteCapstone(), "the authored recordsCumulative 30 refuses at 29");
+
+            frontier.Currencies.Add(GameManager.RecordsCurrencyId, 1);
+            Assert.IsTrue(frontier.CompleteCapstone(), "and completes at 30");
+
+            Assert.AreEqual(1.0, frontier.Currencies.Get(GameManager.RoadiesCurrencyId).ToDouble(), 1e-9,
+                "the first Roadie, granted exactly once by the completion");
+            Assert.IsTrue(frontier.Flags.IsSet("chapter_2_unlocked"), "the chapter boundary is marked");
+            Assert.AreEqual(0.0, frontier.Currencies.Get("fans").ToDouble(), 1e-9,
+                "the implicit release banked the run");
+            Assert.AreEqual(40.0, frontier.Currencies.GetEarned(GameManager.RecordsCurrencyId).ToDouble(), 1e-9,
+                "30 earned before plus floor((500/5)^0.5) = 10 from the implicit release");
         }
 
         // The release offer's gate (design doc section 5): the JSON album

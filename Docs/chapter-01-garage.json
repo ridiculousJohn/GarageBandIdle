@@ -84,6 +84,13 @@
       "modules": [ "module/release" ],
       "visibleWhen": { "type": "flagSet", "flag": "album" },
       "note": "The Cut a Demo (prestige) button, §5. Gates on the album flag (set by cut_demo at 50 Fans + 1 cover) like every other module — no bespoke reveal. The REGION stays through every demo after the first because the album flag's latch is permanent-in-chapter — while the button's pressability is the album block's `unlock` below, re-met each run."
+    },
+    {
+      "id": "the_backyard",
+      "name": "The Backyard",
+      "modules": [ "module/capstone" ],
+      "visibleWhen": { "type": "recordsCumulative", "value": 1 },
+      "note": "The capstone offer (Play the Backyard Party), §5. Appears with the prestige loop — the first Record, the same moment garage_jam's availableWhen uses — and DELIBERATELY not at the capstone gate's own value: `capstone.unlock` is the SOLE home of the pacing knob, and a section threshold restating it would be a second copy able to drift. Region coarse, action precise, the exact the_release arrangement: the button's pressability is the capstone's authored unlock asked live, so the goal is visible (disarmed) through the mid-game climb and arms when the gate holds. Cumulative Records are monotonic and permanent, so the section can never strobe; after completion it stays, button dark, while the completion flag reveals the story beat."
     }
   ],
 

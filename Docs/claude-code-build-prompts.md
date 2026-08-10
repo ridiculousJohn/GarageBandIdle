@@ -807,7 +807,12 @@ walk still passes unchanged.
 >   `Settle`: refuse if `CompletionFlagId` is already set (a finished chapter does not complete
 >   twice), and refuse if any capstone action answers `CanExecute` false — the preflight runs BEFORE
 >   the irreversible release below, the same charged-for-nothing rule `TryBuy` applies, because a
->   completion that releases the album and then fails to award would strand the run. Then: first
+>   completion that releases the album and then fails to award would strand the run. **[rev]** The
+>   operation ALSO refuses while its own `Unlock` is unmet (settled at build time, 2026-08-10):
+>   TryBuy's fail-closed shape rather than the release's offer-only gate, because the release's
+>   ungated operation is justified by the capstone needing to cut an album regardless of any offer,
+>   and no caller needs an ungated completion — a completion latches a permanent flag, so a UI bug
+>   must not be able to finish a chapter early. Then: first
 >   perform the standard album release (slice 6's path — the run's Fans bank as Records; design
 >   §1–§2: the capstone implicitly cuts an album, so no run value is stranded at the chapter
 >   boundary); then `Apply` `CapstoneConfig.OnComplete` if authored (re-applicable state — Ch1
@@ -825,6 +830,13 @@ walk still passes unchanged.
 > - The story beat is not fired by this code. `storyBeatCapstone` is a `StoryBeatDefinition` whose
 >   section gates on `chapter_2_unlocked`, so setting the flag above IS what reveals it — the same
 >   pull every other module's reveal uses. Slice 10 builds the card that presents it.
+>
+> - **[rev]** The offer surface lands in this slice (settled at build time, 2026-08-10): a
+>   `CapstoneModule` mirroring `ReleaseModule` (label from the config's `DisplayName`, the
+>   pending-Records preview from the one `PendingReleaseRecords` home, pressability from the
+>   capstone's own `Unlock`), in a new authored section `the_backyard` whose `visibleWhen` is
+>   `recordsCumulative >= 1` — deliberately NOT the gate's 30, which has exactly one authored home
+>   in `capstone.unlock`; region coarse, action precise, the `the_release` arrangement.
 >
 > Goal: reaching 30 cumulative Records offers the capstone; playing it banks the run as Records,
 > grants the first Roadie exactly once (no allocation UI), and sets the chapter-advance flag. Stop

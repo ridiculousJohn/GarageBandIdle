@@ -594,5 +594,43 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(context.Flags.IsSet("album"),
                 "the release cleared run-scoped flags and re-projected; album came back from its surviving latch");
         }
+
+        // The completed capstone is a fact source like any latch, and the
+        // declared completion flag IS the latch: whenever it is set, projection
+        // re-applies OnComplete with permanent scope. Ch1 authors no OnComplete,
+        // so this is the wiring that keeps a later chapter's capstone-authored
+        // state from vanishing at its first release - and the load half rides
+        // the snapshot's SetFlagIds, so nothing about the capstone is saved.
+        [Test]
+        public void CapstoneOnComplete_ReprojectsFromTheCompletionFlagLatch()
+        {
+            var capstone = new CapstoneConfig("backyard_party", "Play the Backyard Party",
+                new RecordsCumulativeCondition(1), "chapter_2_unlocked",
+                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4),
+                new List<GameAction>());
+            var chapter = TestContent.MakeChapter("garage", null,
+                currencyIds: new List<string> { "cash", "fans" },
+                flags: new List<FlagDeclaration> { new("chapter_2_unlocked") },
+                capstone: capstone,
+                recordBuffAffects: new List<string> { "cash" });
+            var database = MakeDatabase(chapter);
+            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            using var context = Build(chapter, database, permanent);
+
+            context.Currencies.Add(RecordsId, 1);
+            Assert.IsTrue(context.CompleteCapstone());
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+                "the operation applied OnComplete once");
+
+            context.ReleaseAlbum();
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+                "the release rebuilt the store, and the flag latch re-applied OnComplete exactly once");
+
+            var seed = context.CaptureLocalState();
+            using var loaded = Build(chapter, database, permanent, seed: seed);
+            Assert.IsTrue(loaded.Flags.IsSet("chapter_2_unlocked"), "the flag rode the snapshot");
+            Assert.AreEqual(4.0, loaded.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+                "and a load rebuilds the capstone's state from the flag alone");
+        }
     }
 }

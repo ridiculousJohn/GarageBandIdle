@@ -141,6 +141,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - reward
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5aec68757b9cea14590ff8535c3c0a2a
+    m_Address: section/the_backyard
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - section
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5d73ec3441964bcb9b7e504af3e46b25
     m_Address: currency/Records
     m_ReadOnly: 0
@@ -272,6 +278,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - section
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eab636e27b67eec561da19f0bd00b484
+    m_Address: module/capstone
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - module
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f1a7795fdd6886e488430f6abfe35c19
     m_Address: chapter/ch01_garage

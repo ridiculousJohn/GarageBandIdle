@@ -390,6 +390,159 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             context.SelectBar("setlist", "cover_1");
         }
 
+        // ---- CompleteCapstone --------------------------------------------------
+
+        private const string RoadiesId = GameManager.RoadiesCurrencyId;
+
+        // the real capstone's shape: gated on cumulative Records, declaring its
+        // completion flag, awarding one Roadie as a one-shot action
+        private static CapstoneConfig MakeCapstone(List<GameAction> actions = null, GameEffect onComplete = null)
+            => new("backyard_party", "Play the Backyard Party",
+                new RecordsCumulativeCondition(30), "chapter_2", onComplete,
+                actions ?? new List<GameAction> { new GrantCurrencyAction(RoadiesId, 1) });
+
+        // Roadies joins Records in the global group, like the running game's:
+        // the action's CanExecute probe needs a pool that owns the id to answer
+        // from, and the award has to land somewhere a release never resets.
+        private static EconomyContext BuildCapstoneEconomy(CapstoneConfig capstone,
+            List<UpgradeDefinition> upgrades = null, List<string> upgradeIds = null)
+        {
+            var chapter = TestContent.MakeChapter("garage", null,
+                currencyIds: new List<string> { "cash", "fans" },
+                upgradeIds: upgradeIds,
+                flags: new List<FlagDeclaration> { new("chapter_2") },
+                capstone: capstone);
+            var database = new ContentDatabase(
+                chapters: new[] { chapter },
+                upgrades: upgrades,
+                currencies: new[]
+                {
+                    TestContent.MakeCurrency("cash", "run"),
+                    TestContent.MakeCurrency("fans", "run"),
+                    TestContent.MakeCurrency(RecordsId, "permanent"),
+                    TestContent.MakeCurrency(RoadiesId, "permanent"),
+                },
+                currencyGroups: new[]
+                {
+                    TestContent.MakeGroup("run", true, CurrencyPlacement.Chapter),
+                    TestContent.MakeGroup("permanent", false, CurrencyPlacement.Global),
+                });
+            return EconomyContextFactory.Build(chapter, database,
+                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+        }
+
+        // The completion is one operation ending at one settle: the run banks
+        // through the release's own path (the payout formula has exactly one
+        // home), the declared flag latches, and an unlock gated on that flag is
+        // applied by the time the call returns - no tick, no second settle. The
+        // latched unlock is the proof the settle ran once, after ALL the facts:
+        // had the mid-operation release settled on its own, the unlock would
+        // have evaluated against a banked run whose chapter had not finished.
+        [Test]
+        public void CompleteCapstone_BanksTheRunAndLatchesTheFlag_InOneSettle()
+        {
+            var epilogue = TestContent.MakeUpgrade("epilogue", UpgradeType.ContentUnlock,
+                ContentScope.PermanentInChapter, new FlagSetCondition("chapter_2"),
+                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4));
+            var context = BuildCapstoneEconomy(MakeCapstone(),
+                upgrades: new List<UpgradeDefinition> { epilogue },
+                upgradeIds: new List<string> { "epilogue" });
+
+            context.Currencies.Add(RecordsId, 30); // the gate reads the earned total
+            context.Currencies.Add("fans", 500);   // floor((500/5)^0.5) = 10 Records
+
+            Assert.IsTrue(context.CompleteCapstone());
+
+            Assert.AreEqual(0.0, context.Currencies.Get("fans").ToDouble(), 1e-9,
+                "the capstone implicitly cut an album: the run reset");
+            Assert.AreEqual(40.0, context.Currencies.Get(RecordsId).ToDouble(), 1e-9,
+                "and the fans banked through the release's own formula");
+            Assert.IsTrue(context.Flags.IsSet("chapter_2"),
+                "the operation set its declared flag - no payload carried a copy");
+            Assert.IsTrue(context.Upgrades.Get("epilogue").Applied,
+                "an unlock gated on the flag latched with no tick: the operation settled itself");
+        }
+
+        // One-shot means once EVER, not once per path: the refusal, the release
+        // and the load all leave the payout alone, because none of those paths
+        // holds a GameAction to run - the operation that earned it is the only
+        // line in the system that executes it.
+        [Test]
+        public void CompleteCapstone_PaysActionsOnce_AndNoRebuildPaysThemAgain()
+        {
+            var context = BuildCapstoneEconomy(MakeCapstone());
+            context.Currencies.Add(RecordsId, 30);
+            context.Currencies.Add("fans", 125);
+
+            Assert.IsTrue(context.CompleteCapstone());
+            Assert.AreEqual(1.0, context.Currencies.Get(RoadiesId).ToDouble(), 1e-9, "the one-shot paid");
+
+            Assert.IsFalse(context.CompleteCapstone(), "a finished chapter does not complete twice");
+            context.ReleaseAlbum();
+            context.Restore(context.CaptureLocalState());
+
+            Assert.AreEqual(1.0, context.Currencies.Get(RoadiesId).ToDouble(), 1e-9,
+                "a second attempt, a release and a load all left the Roadie count alone");
+            Assert.IsTrue(context.Flags.IsSet("chapter_2"),
+                "and the permanent completion flag survived every boundary");
+        }
+
+        // The gate is asked by the operation, not only by the button that offered
+        // it (fail-closed like TryBuy, unlike the deliberately ungated release):
+        // a completion latches a permanent flag, so a UI bug must not be able to
+        // finish a chapter early.
+        [Test]
+        public void CompleteCapstone_RefusesWhileTheGateIsUnmet()
+        {
+            var context = BuildCapstoneEconomy(MakeCapstone());
+            context.Currencies.Add(RecordsId, 29);
+            context.Currencies.Add("fans", 500);
+
+            Assert.IsFalse(context.CompleteCapstone());
+
+            Assert.AreEqual(500.0, context.Currencies.Get("fans").ToDouble(), 1e-9,
+                "a refused completion releases nothing");
+            Assert.IsFalse(context.Flags.IsSet("chapter_2"));
+            Assert.AreEqual(0.0, context.Currencies.Get(RoadiesId).ToDouble(), 1e-9);
+        }
+
+        // The preflight runs BEFORE the irreversible release - the same
+        // charged-for-nothing rule TryBuy applies. A completion that banked the
+        // run and then failed to award would strand it: the run's fans are gone
+        // and the chapter can never pay what it promised.
+        [Test]
+        public void CompleteCapstone_RefusesWhenAnActionCannotExecute_BeforeTheRelease()
+        {
+            var context = BuildCapstoneEconomy(MakeCapstone(
+                actions: new List<GameAction> { new GrantCurrencyAction("merch", 1) }));
+            context.Currencies.Add(RecordsId, 30);
+            context.Currencies.Add("fans", 500);
+
+            LogAssert.Expect(LogType.Error, new Regex(
+                "capstone 'backyard_party' has an action that cannot execute"));
+
+            Assert.IsFalse(context.CompleteCapstone());
+
+            Assert.AreEqual(500.0, context.Currencies.Get("fans").ToDouble(), 1e-9,
+                "the refusal came before the release: the run was not banked for nothing");
+            Assert.IsFalse(context.Flags.IsSet("chapter_2"));
+        }
+
+        // a chapter with no capstone has nothing to complete, and a caller
+        // asking anyway is a broken caller - reported, not thrown out of
+        [Test]
+        public void CompleteCapstone_OnAChapterAuthoringNone_IsRefusedLoudly()
+        {
+            var chapter = MakeChapter();
+            var database = MakeDatabase(chapter);
+            var context = EconomyContextFactory.Build(chapter, database,
+                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+
+            LogAssert.Expect(LogType.Error, new Regex("authors no capstone"));
+
+            Assert.IsFalse(context.CompleteCapstone());
+        }
+
         // ---- focus lifecycle -------------------------------------------------
 
         // Only a focused economy accrues (rule 7). The context enforces it from

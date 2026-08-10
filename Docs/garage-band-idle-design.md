@@ -301,7 +301,16 @@ Moment-to-moment play draws on the systems defined elsewhere:
   income alone does not determine the album payout.
 - **Capstone gig** — unlocks at the Records gate; grants a Roadie and fires a story beat (§10).
   **[rev]** Playing it implicitly cuts an album (§5) — the run's Fans bank as Records — before
-  advancing, so no run value is stranded at the chapter boundary.
+  advancing, so no run value is stranded at the chapter boundary. **[rev]** The completion is one
+  atomic `EconomyContext` operation ending at a single settle, and unlike the deliberately ungated
+  release it is fail-closed: it refuses on an already-set completion flag, on an unmet unlock
+  Condition (the operation asks the gate itself, TryBuy-style — a completion latches a permanent
+  flag, so a UI bug must not finish a chapter early), and on any one-shot action that answers
+  `CanExecute` false, all before the irreversible release. The completed capstone is then a fact
+  source like any latch: the declared completion flag IS the latch, and projection re-applies the
+  capstone's `OnComplete` state from it at every rebuild. The offer surface is an ordinary module
+  (`module/capstone`) in a section gated coarsely (first Record) while the button's pressability is
+  the capstone's own unlock — region coarse, action precise, the release's exact arrangement.
 
 ### 6.1 Events
 
@@ -528,7 +537,7 @@ Assets/Scripts/
     TickSystem.cs         // fixed-interval update on real (DateTime) time
     BigNumber.cs          // wraps break_infinity.cs
     CurrencyManager.cs    // [rev] one class, one instance per pool: a startup pool (Records/Roadies) + one per economy context (run currencies)
-    EconomyContext.cs     // [rev] rule 12: the per-economy bundle (currency pool + systems + modifiers + flags), built from a projection recipe; the album release is its ReleaseAlbum operation
+    EconomyContext.cs     // [rev] rule 12: the per-economy bundle (currency pool + systems + modifiers + flags), built from a projection recipe; the album release is its ReleaseAlbum operation and the chapter gate its CompleteCapstone operation
     ContentDatabase.cs    // [rev] Addressables discovery of all definition SOs by label; id→def registries
     Condition.cs / ConditionEvaluator.cs   // [rev] one gate/unlock/visibility/availability type + one evaluator
     GameEffect.cs / GameAction.cs   // [rev] grants split by category: an effect is re-applicable state every rebuild re-runs; an action is a one-shot award only its player-action moment executes (a payout paid twice is inexpressible, not validated against)
@@ -544,6 +553,7 @@ Assets/Scripts/
     CostCalculator.cs / ProductionCalculator.cs   // [rev] formula only; the modifiers that scale production live in the registry
     ProductionConfig.cs / ProductionSystem.cs   // [rev] rule 13: {currency, amount, trigger, gate} held by producers; the system fires module-held configs (tap + tick); replaces EngagementEarnSystem/TapSystem
     Modifiers/ModifierSystem.cs   // [rev] one registry for every stat modifier: granted (carries scope) + derived (computed from a source); the composition rule lives here
+    CapstoneSystem.cs     // [rev] the completed-capstone fact source: the declared completion flag is the latch, projection re-applies OnComplete from it; the completion's own facts run only from CompleteCapstone
   Events/
     EventDefinition.cs / GameEvent.cs   // baseline reset, optional debuff, optional timer, goal, tier, reward
     EventManager.cs       // enter/quit/fail/succeed, tiers, sandboxed economy snapshot

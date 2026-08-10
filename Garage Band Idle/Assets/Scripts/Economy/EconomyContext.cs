@@ -54,6 +54,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public ProductionSystem Production { get; }
         public BarSystem Bars { get; }
         public RewardManager Rewards { get; }
+        public CapstoneSystem Capstone { get; }
         public ConditionContext Conditions { get; }
 
         // The chapter's sections in layout order, resolved from its id list.
@@ -78,7 +79,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public EconomyContext(ChapterDefinition chapter, EconomyRecipe recipe, CurrencyRouter router,
             FlagSystem flags, ModifierSystem modifiers, GeneratorSystem generators, UpgradeSystem upgrades,
-            ProductionSystem production, BarSystem bars, RewardManager rewards,
+            ProductionSystem production, BarSystem bars, RewardManager rewards, CapstoneSystem capstone,
             ConditionContext conditions, IReadOnlyList<SectionDefinition> sections)
         {
             Chapter = chapter;
@@ -91,6 +92,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Production = production;
             Bars = bars;
             Rewards = rewards;
+            Capstone = capstone;
             Conditions = conditions;
             Sections = sections ?? Array.Empty<SectionDefinition>();
 
@@ -477,6 +479,20 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // present the payout.
         public BigNumber ReleaseAlbum()
         {
+            var earned = ReleaseAlbumFacts();
+            Settle();
+            return earned;
+        }
+
+        // The release's facts without the seam: everything ReleaseAlbum does up
+        // to but not including Settle. Split out because the capstone completion
+        // is ONE operation that ends at ONE Settle - it releases, then applies
+        // its own facts, and only then declares the whole mutation finished. If
+        // it called ReleaseAlbum instead, the mid-operation settle would let an
+        // unlock evaluate between the release and the completion's facts,
+        // observing a banked run whose chapter has not finished banking.
+        private BigNumber ReleaseAlbumFacts()
+        {
             // the award reads the fans balance the reset is about to zero, so it
             // goes first. Routed through Currencies: the router resolves the
             // Records id to the pool that owns it (the permanent one), and Add
@@ -508,12 +524,59 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // these facts, so it resets because the facts did.
             Flags.ResetRunScoped();
 
-            // the rebuild, then the seam: run-scoped effects are gone because
-            // the facts behind them are gone, never because anything filtered
-            // the store - and the whole mutation settles exactly once.
+            // the rebuild: run-scoped effects are gone because the facts behind
+            // them are gone, never because anything filtered the store. The
+            // seam is the caller's - ReleaseAlbum settles here, the capstone
+            // completion after its own facts land.
             ProjectModifiers();
-            Settle();
             return earned;
+        }
+
+        // The capstone completion (design doc sections 1-2 and 5): one atomic
+        // operation ending at a single Settle. Every refusal comes BEFORE the
+        // irreversible release below - the same charged-for-nothing rule TryBuy
+        // applies, because a completion that banks the run and then fails to
+        // award would strand it. The refusal set is fail-closed like TryBuy's,
+        // not offer-gated like ReleaseAlbum's: a release is repeatable and
+        // harmless anytime, while a completion latches a permanent flag, so the
+        // gate is asked here and not only by the button that offered it.
+        public bool CompleteCapstone()
+        {
+            if (Chapter?.Capstone == null || !Chapter.Capstone.IsAuthored)
+            {
+                Debug.LogError($"EconomyContext: CompleteCapstone on chapter '{Chapter?.Id}', which authors no capstone. Ignoring.");
+                return false;
+            }
+
+            // a finished chapter does not complete twice - silent, because the
+            // UI calls this on a button press and a double-tap is not an error
+            if (Capstone.IsCompleted)
+                return false;
+
+            // availability is the authored unlock, asked through the one
+            // evaluator like every other gate - silent for the same reason a
+            // TryBuy under the gate is silent
+            if (!ConditionEvaluator.IsMet(Chapter.Capstone.Unlock, Conditions))
+                return false;
+
+            // loud: an action that cannot execute means broken content (boot
+            // validation reports the specifics), and refusing here is what
+            // keeps the release below from stranding the run
+            if (!Capstone.CanExecuteActions())
+            {
+                Debug.LogError($"EconomyContext: capstone '{Chapter.Capstone.Id}' has an action that cannot execute. Refusing the completion rather than releasing the album for nothing.");
+                return false;
+            }
+
+            // the capstone implicitly cuts an album (design doc sections 1-2):
+            // the run's fans bank as Records first, so no run value is stranded
+            // at the chapter boundary. Then the completion's own facts - the
+            // re-applicable OnComplete, the one-shot actions, the declared flag
+            // - and one settle for the whole mutation.
+            ReleaseAlbumFacts();
+            Capstone.ExecuteCompletion();
+            Settle();
+            return true;
         }
 
         // ---- the settle seam -------------------------------------------------
@@ -556,7 +619,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // parameter list, so it cannot fall out of step with what exists.
         private void CollectFactSources()
         {
-            foreach (var system in new object[] { Generators, Upgrades, Production, Bars, Rewards, Flags, Modifiers })
+            foreach (var system in new object[] { Generators, Upgrades, Production, Bars, Rewards, Capstone, Flags, Modifiers })
             {
                 if (system is IModifierFactSource source)
                     _factSources.Add(source);

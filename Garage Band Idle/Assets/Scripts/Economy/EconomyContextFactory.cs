@@ -100,6 +100,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var bars = new BarSystem(Resolve(database.BarGroups, chapter.BarGroupIds, "bar group"),
                 database.Bars.All, router, rewards, effects);
 
+            // every recipe gets one: an economy whose chapter authors no
+            // capstone holds an inert system (nothing latches, nothing
+            // projects), which is cheaper to reason about than a null another
+            // boundary has to remember to skip
+            var capstone = new CapstoneSystem(chapter.Capstone, flags, effects);
+
             var conditions = new ConditionContext(router, generators, flags,
                 GameManager.RecordsCurrencyId, database, bars);
 
@@ -137,7 +143,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 generators, chapter.Fans.PerBandmateOwnedBonus));
 
             var context = new EconomyContext(chapter, recipe, router, flags, modifiers, generators, upgrades,
-                production, bars, rewards, conditions,
+                production, bars, rewards, capstone, conditions,
                 Resolve(database.Sections, chapter.SectionIds, "section"));
 
             // Every economy comes up through the SAME door (design doc section 12,

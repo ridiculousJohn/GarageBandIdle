@@ -25,17 +25,17 @@ MonoBehaviour:
     _perBandmateOwnedBonus: 0.02
   _album:
     _releaseWhen:
-      rid: 1000
+      rid: 1003
   _capstone:
     _id: backyard_party
     _displayName: Play the Backyard Party
     _unlock:
-      rid: 1001
+      rid: 1004
     _completionFlagId: chapter_2_unlocked
     _onComplete:
       rid: -2
     _actions:
-    - rid: 1002
+    - rid: 1005
   _flags:
   - _id: fans
     _scope: 1
@@ -60,6 +60,7 @@ MonoBehaviour:
   - the_gear
   - rehearsal_space
   - the_release
+  - the_backyard
   _generatorIds:
   - practice_amp
   - drummer
@@ -86,28 +87,28 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1000
+    - rid: 1003
       type: {class: CompoundCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _all:
-        - rid: 1010
-        - rid: 1011
+        - rid: 1006
+        - rid: 1007
         _any: []
-    - rid: 1001
+    - rid: 1004
       type: {class: RecordsCumulativeCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _value: 30
-    - rid: 1002
+    - rid: 1005
       type: {class: GrantCurrencyAction, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: roadies
         _amount: 1
-    - rid: 1010
+    - rid: 1006
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: fans
         _value: 50
-    - rid: 1011
+    - rid: 1007
       type: {class: BarsCompletedCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _groupId: learn_covers
