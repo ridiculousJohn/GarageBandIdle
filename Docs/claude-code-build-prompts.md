@@ -852,19 +852,38 @@ from the declaration.
 >   balance itself — is never touched. On quit, fail, or success the context is discarded; nothing to
 >   unwind makes failure and quit free, and the sandbox's earnings die with it instead of polluting
 >   the run's earned-total gates.
+> - **[rev]** DELETE `EventDefinition.BaselineReset` while building that construction — along with the
+>   JSON `baselineReset` key (and its note), the importer's DTO field, and the `TestContent`
+>   parameter; the reimport rewrites `garage_jam.asset`. The field promised an action ("reset to a
+>   fixed baseline on entry") that the recipe design replaced with an ABSENCE — an isolated sandbox
+>   never held run state to reset — so nothing reads it today and nothing here should start: a config
+>   field nothing reads will eventually be believed by someone, and the first believer writes the
+>   reset this design exists to not need.
 > - Availability is a `recordsCumulative ≥ 1` Condition (available after the first demo). Each tier's
 >   `goal` is a `currency` Condition evaluated by the shared evaluator.
 > - garage_jam: debuff `automationDisabled` (generators paused, tap-only); timed and failable. Three
 >   tiers (goal 500/2500/10000, timer 60/60/45, reward `tap_value_x1_25`/`_x1_50`/`_x2` applied via
 >   `RewardManager`, scope permanent-in-chapter).
+> - **[rev]** Tier one-shot awards are `GameAction`s on the tier, executed by the clear operation
+>   alone — 6.5 §4 names the tier clear as one of the three player-action moments an action list may
+>   live on. The clear runs the same preflight rule as `TryBuy` and the capstone: refuse if any tier
+>   action answers `CanExecute` false, BEFORE the cleared-tier fact latches, because a tier that
+>   latched and then failed to pay can never pay — the clear does not re-fire. Ch1 authors none
+>   (garage_jam's tier rewards are re-applicable tap buffs through `RewardManager`, facts that
+>   re-project), so this ships in the posture `UpgradeDefinition.Actions` already ships in: the C#
+>   list and its execution seam exist and are tested with test content, and the JSON key waits for
+>   the first content that authors one.
 > - Failure/quit: reset that event's progress only; costs time, never permanent progress.
 >
 > Goal: I can enter garage_jam, play it tap-only against the timer at a fixed baseline, succeed for a
 > permanent-in-chapter tap buff (from the rewards pool) or quit/fail for free, and repeat at higher
 > tiers. Stop here.
 
-✅ **Test & commit:** baseline reset on entry; tap-only; timer + fail/quit are cheap; tiers escalate;
-reward applies from the pool.
+✅ **Test & commit:** fixed baseline by construction on entry — `recordsCumulative` reads zero inside
+the isolated sandbox, nothing reset, nothing filtered — and `baselineReset` is gone from the class,
+JSON, importer, and asset; tap-only; timer + fail/quit are cheap; tiers escalate; reward applies from
+the pool; a test-authored tier action pays once from the clear operation and never from any rebuild,
+and a failing `CanExecute` refuses the clear before the tier latches.
 
 ---
 
@@ -923,7 +942,18 @@ and zero below the threshold; checksum rejects edits.
 >   `CurrencyHeaderModule` and `TapModule`). Replace those UI consts with display driven by the
 >   chapter's revealed currencies, so a chapter with different currencies needs no UI code change.
 >   (The fan SYSTEM already takes its currency/flag from the chapter's `fans` config — this is the
->   remaining UI half.)
+>   remaining UI half.) **[rev]** The same display absorbs `BarListModule`'s pool readout: the
+>   fill-currency lines live there only as a stopgap (the module's own comment defers to this
+>   slice), and once the header renders the chapter's revealed currencies, a second readout
+>   answering "what do I have" from its own code path is a disagreement waiting for a divergence —
+>   drop `_poolLabel` and let the one display carry the fill currencies' balances and rates.
+> - **[rev]** Make module loading async and reveal-safe: `ChapterScreen.BuildSection` currently
+>   blocks on `Addressables.InstantiateAsync(...).WaitForCompletion()` per module at boot. Load
+>   asynchronously, but keep the invariant the blocking call was buying — a module is initialized,
+>   with its subscriptions live, BEFORE its section can show — so a gate that holds while a prefab
+>   is still in flight neither reveals an empty section nor costs the module the events it needed to
+>   hear. That invariant is why `BuildSection` initializes modules that start hidden; async loading
+>   must not reopen the gap the eager initialization closed.
 >
 > Goal: a new player can play Chapter 1 start to finish — tap, build, learn a cover, cut a demo,
 > loop, do the event, and hit the Backyard Party capstone. Stop here.
