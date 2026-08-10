@@ -1441,7 +1441,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         }
 
         // DTOs mirroring the JSON for Newtonsoft; unknown JSON fields (notes,
-        // _meta, capstone, progression, balanceTargets) are simply skipped.
+        // _meta, progression, balanceTargets) are simply skipped.
         // Field initializers stand in for absent fields (and explicit nulls,
         // via JsonSettings), so a block or array is never null and an absent
         // object is an empty instance.

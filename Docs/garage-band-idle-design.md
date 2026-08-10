@@ -235,9 +235,13 @@ currencies as they become affordable.
   registry (§12); the revealed content (a currency, a section, a bar group, a button) gates its own
   visibility on that flag. Rewards (§6.1) can set flags too. There is one reveal mechanism, not one per
   content type. **[rev]**
-- **Scope.** *Buff upgrades* are run-scoped: they reset on album release and are re-bought each run
-  (faster as Records accumulate). *Content-unlock upgrades* (new generator, currency, or mechanic) are
-  permanent within the chapter: the unlock persists across albums; only owned counts reset.
+- **Scope.** **[rev]** An upgrade's lifetime is authored on its declaration — `run` or
+  permanent-in-chapter — never implied by its type (one declaration owns the lifetime, the same rule
+  as flags, §2). *Buff upgrades* are run-scoped: they reset on album release and are re-bought each
+  run (faster as Records accumulate). *Content-unlock upgrades* (new generator, currency, or
+  mechanic) carry the scope their reveal needs: Ch. 1 authors its reveal chain (the `fans`/`covers`/
+  `gear` setters) run-scoped so the second run re-walks the progression (§2), while a
+  permanent-in-chapter unlock persists across albums with only owned counts resetting.
 
 ---
 
@@ -524,14 +528,13 @@ Assets/Scripts/
     TickSystem.cs         // fixed-interval update on real (DateTime) time
     BigNumber.cs          // wraps break_infinity.cs
     CurrencyManager.cs    // [rev] one class, one instance per pool: a startup pool (Records/Roadies) + one per economy context (run currencies)
-    EconomyContext.cs     // [rev] rule 12: the per-economy bundle (currency pool + systems + modifiers + flags), built from a projection recipe
+    EconomyContext.cs     // [rev] rule 12: the per-economy bundle (currency pool + systems + modifiers + flags), built from a projection recipe; the album release is its ReleaseAlbum operation
     ContentDatabase.cs    // [rev] Addressables discovery of all definition SOs by label; id→def registries
     Condition.cs / ConditionEvaluator.cs   // [rev] one gate/unlock/visibility/availability type + one evaluator
-    FlagManager.cs        // [rev] single reveal registry (permanent-in-chapter flags)
+    FlagSystem.cs         // [rev] single reveal registry; each flag's declared scope (run | permanent-in-chapter) decides what a release clears
   Loop/
     ChapterDefinition.cs / Chapter.cs   // mechanic, capstone, Records gate, story beat
     ChapterManager.cs     // forward-only advancement + unlocks
-    AlbumPrestige.cs      // reset run, compute + award Records
   Economy/
     GeneratorDefinition.cs / Generator.cs   // isBandmate is a data field the fan system reads   // [rev]
     UpgradeDefinition.cs / Upgrade.cs   // [rev] payload = buff | setFlag (reveal via flag); gate = any Condition; scope = run | permanent-in-chapter
@@ -544,8 +547,7 @@ Assets/Scripts/
     EventDefinition.cs / GameEvent.cs   // baseline reset, optional debuff, optional timer, goal, tier, reward
     EventManager.cs       // enter/quit/fail/succeed, tiers, sandboxed economy snapshot
   Meta/
-    RoadieManager.cs      // pool, per-venue allocation, product boost, replay ramp
-    RecordsManager.cs     // permanent buff + chapter-gate thresholds
+    RoadieAllocation.cs   // [rev] Chapter 2: per-venue allocation, product boost, replay ramp; the Roadie pool is the global `roadies` currency, not a manager
   Content/
     SongDefinition.cs / Song.cs         // Catalog (run) + Discography (permanent)
   Save/

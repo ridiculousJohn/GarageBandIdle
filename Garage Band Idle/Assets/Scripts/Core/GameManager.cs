@@ -102,9 +102,10 @@ namespace RidiculousGaming.GarageBandIdle
                 // reported here, loudly, instead of surfacing mid-run
                 ContentValidator.Validate(Database, Frontier.Conditions, Frontier.Rewards);
 
-                // the initial drain: unlocks and the tap value evaluate once at
-                // boot, so ChapterScreen's opening visibility pass reads
-                // latched state rather than pre-drain state
+                // the factory's Restore already performed the initial drain and
+                // settle (EconomyContext.Restore drains to a fixpoint), and the
+                // validation above only reports - it moves no condition input -
+                // so this settle is redundant
                 Frontier.Settle();
             }
 
