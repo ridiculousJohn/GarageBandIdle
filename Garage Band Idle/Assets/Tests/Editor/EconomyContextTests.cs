@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
+using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEngine;
@@ -301,6 +302,92 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "an ungated content unlock latched during construction");
             Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
                 "and its payload is in the store, with no external Settle");
+        }
+
+        // ---- SelectBar -------------------------------------------------------
+
+        // One cover bar filling from rehearsal, and a content unlock gated on
+        // completing it: the smallest content where a selection has something
+        // to settle.
+        private static EconomyContext BuildBarEconomy()
+        {
+            var chapter = TestContent.MakeChapter("garage", new List<string> { "gigs" },
+                currencyIds: new List<string> { "cash", "fans", "rehearsal" },
+                upgradeIds: new List<string> { "play_gigs" },
+                barGroupIds: new List<string> { "learn_covers" });
+            var database = TestContent.MakeDatabase(
+                chapters: new[] { chapter },
+                upgrades: new List<UpgradeDefinition>
+                {
+                    TestContent.MakeUpgrade("play_gigs", UpgradeType.ContentUnlock,
+                        ContentScope.PermanentInChapter,
+                        new BarsCompletedCondition("learn_covers", 1), new SetFlagEffect("gigs")),
+                },
+                bars: new List<BarDefinition> { TestContent.MakeBar("cover_1", "rehearsal", 120) },
+                barGroups: new List<BarGroupDefinition>
+                {
+                    TestContent.MakeBarGroup("learn_covers", null, new List<string> { "cover_1" }),
+                },
+                currencies: new[]
+                {
+                    TestContent.MakeCurrency("cash", "run"),
+                    TestContent.MakeCurrency("fans", "run"),
+                    TestContent.MakeCurrency("rehearsal", "run"),
+                    TestContent.MakeCurrency(RecordsId, "permanent"),
+                });
+            return EconomyContextFactory.Build(chapter, database,
+                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+        }
+
+        // Selection is a top-level operation, not a UI detail: retargeting pours
+        // the pool that accumulated while nothing was selected, the pour can
+        // complete the bar, and a completion is a condition input. No tick runs
+        // here, so the unlock latching is proof the operation settled itself.
+        [Test]
+        public void SelectBar_PoursTheAccumulatedPool_AndSettles()
+        {
+            var context = BuildBarEconomy();
+
+            context.Currencies.Add("rehearsal", 120);
+            Assert.IsFalse(context.Flags.IsSet("gigs"), "nothing has completed yet");
+
+            context.SelectBar("learn_covers", "cover_1");
+
+            Assert.AreEqual(0.0, context.Currencies.Get("rehearsal").ToDouble(), 1e-9,
+                "the accumulated pool poured on selection");
+            Assert.IsTrue(context.Upgrades.Get("play_gigs").Applied,
+                "the completion satisfied the barsCompleted gate with no tick: the operation settled");
+            Assert.IsTrue(context.Flags.IsSet("gigs"), "and the latched unlock's payload applied");
+        }
+
+        // the toggle's other half (BarRowUI re-selecting the active bar): a null
+        // bar id clears the target through the same operation
+        [Test]
+        public void SelectBar_WithANullBarId_ClearsTheTarget()
+        {
+            var context = BuildBarEconomy();
+            var covers = (PerBarContinuousRuntime)context.Bars.GetRuntime("learn_covers");
+
+            // a partial pour, so the selection is still standing to be cleared
+            context.Currencies.Add("rehearsal", 50);
+            context.SelectBar("learn_covers", "cover_1");
+            Assert.IsNotNull(covers.ActiveBar, "the partial pour left the bar selected");
+
+            context.SelectBar("learn_covers", null);
+
+            Assert.IsNull(covers.ActiveBar);
+        }
+
+        // an unknown group id is reported (by the bar system, which owns the
+        // roster) and the operation is refused rather than thrown out of
+        [Test]
+        public void SelectBar_ReportsAnUnknownGroupId()
+        {
+            var context = BuildBarEconomy();
+
+            LogAssert.Expect(LogType.Error, new Regex("unknown bar group id 'setlist'"));
+
+            context.SelectBar("setlist", "cover_1");
         }
 
         // ---- focus lifecycle -------------------------------------------------

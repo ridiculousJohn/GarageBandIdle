@@ -393,6 +393,35 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Settle();
         }
 
+        // The bar-selection action (player-directed fill, design doc section 6):
+        // point the group's pour at a bar, or clear the target (null). A
+        // top-level operation rather than a call on the runtime, because
+        // retargeting mutates the economy like any other action: pool built up
+        // while nothing was selected pours in immediately, and that pour can
+        // complete the bar and apply its reward - condition inputs a gate reads.
+        // The runtime cannot end the operation itself (nothing inside a system
+        // may call Settle), so the seam is reached from here, the same shape as
+        // Jam.
+        public void SelectBar(string groupId, string barId)
+        {
+            // an unknown group id was already reported by GetRuntime
+            var runtime = Bars.GetRuntime(groupId);
+            if (runtime == null)
+                return;
+
+            if (runtime is not PerBarContinuousRuntime perBar)
+            {
+                Debug.LogError($"EconomyContext: SelectBar on bar group '{groupId}', whose fill mode has no bar selection. Ignoring.");
+                return;
+            }
+
+            perBar.SetActiveBar(barId);
+
+            // the whole selection has settled: the immediate pour, and whatever
+            // a completion it caused granted
+            Settle();
+        }
+
         public bool BuyUpgrade(Upgrade upgrade)
         {
             if (!Upgrades.TryBuy(upgrade, Conditions))

@@ -37,12 +37,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
             _selectButton.onClick.RemoveListener(HandleSelectClicked);
         }
 
-        // toggle: selecting the active bar again clears the target and lets the
-        // pool accumulate until the player picks the next bar
+        // Toggle: selecting the active bar again clears the target and lets the
+        // pool accumulate until the player picks the next bar. Routed through
+        // the context operation rather than the runtime, because a selection
+        // pours the accumulated pool and can complete the bar - a mutation that
+        // has to settle, and settling is no row's job. The runtime this row
+        // holds is for reading (ActiveBar, labels), never for mutating.
         private void HandleSelectClicked()
         {
             var isActive = _runtime.ActiveBar == Bar;
-            _runtime.SetActiveBar(isActive ? null : Bar.Definition.Id);
+            _context.Economy.SelectBar(Bar.Group.Id, isActive ? null : Bar.Definition.Id);
         }
 
         public void Refresh()
