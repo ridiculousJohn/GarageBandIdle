@@ -202,7 +202,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 if (effect == null)
                     continue;
 
+                // null is the old-schema file report-and-skip; the id stays out of
+                // the pool, so whatever bar or tier names it reports the miss
                 var reward = LoadOrCreateReward($"{RewardsFolder}/{block.id}.asset");
+                if (reward == null)
+                    continue;
                 ApplyIfChanged(reward, asset => asset.EditorInitialize(block.id, block.name, effect));
                 rewardIds.Add(block.id);
             }
@@ -455,6 +459,62 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             AssetDatabase.SaveAssets();
             Debug.Log($"ChapterJsonImporter: {count} definition assets marked addressable.");
+        }
+
+        // The migration LoadOrCreateReward used to perform silently: a reward file
+        // written by an older schema no longer loads as a RewardDefinition, and the
+        // way forward is deleting it so the next import recreates it from the JSON.
+        // Deletion is destructive and a failed load has more causes than the one
+        // this fixes, so it runs from here - a deliberate action naming what it
+        // does - never as a side effect of importing.
+        [MenuItem("GarageBandIdle/Delete Old-Schema Reward Assets")]
+        public static void DeleteOldSchemaRewardAssets()
+        {
+            var deleted = 0;
+            var failed = 0;
+            if (AssetDatabase.IsValidFolder(RewardsFolder))
+            {
+                foreach (var guid in AssetDatabase.FindAssets("", new[] { RewardsFolder }))
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(guid);
+                    // The sweep is recursive and also returns folder objects. Only
+                    // top-level asset files are candidates: the import writes every
+                    // reward as '{RewardsFolder}/{id}.asset', so that is the whole
+                    // set the old automatic deletion could ever have touched - a
+                    // file in a nested folder is not this action's to take.
+                    if (!path.EndsWith(".asset"))
+                        continue;
+                    if (Path.GetDirectoryName(path)?.Replace('\\', '/') != RewardsFolder)
+                        continue;
+                    if (AssetDatabase.LoadAssetAtPath<RewardDefinition>(path) != null)
+                        continue;
+
+                    // count what actually happened: a locked or refused deletion
+                    // summarized as a success would report a migration that did
+                    // not occur
+                    if (AssetDatabase.DeleteAsset(path))
+                    {
+                        Debug.Log($"ChapterJsonImporter: deleted old-schema reward asset '{path}'.");
+                        deleted++;
+                    }
+                    else
+                    {
+                        Debug.LogError($"ChapterJsonImporter: failed to delete old-schema reward asset '{path}' - it is still on disk.");
+                        failed++;
+                    }
+                }
+            }
+
+            string summary;
+            if (deleted == 0 && failed == 0)
+                summary = "No old-schema reward assets found - everything in the rewards folder loads as a RewardDefinition.";
+            else if (failed == 0)
+                summary = $"{deleted} old-schema reward asset(s) deleted. Re-run 'GarageBandIdle > Import Chapter 1 JSON' to recreate them from the JSON.";
+            else
+                summary = $"{deleted} old-schema reward asset(s) deleted, {failed} could not be deleted (see the console for each). Re-run 'GarageBandIdle > Import Chapter 1 JSON' to recreate the deleted ones from the JSON.";
+            Debug.Log($"ChapterJsonImporter: {summary}");
+            if (!Application.isBatchMode)
+                EditorUtility.DisplayDialog("Reward migration", summary, "OK");
         }
 
         // Deleted assets leave dangling Addressables entries behind (they show as
@@ -1387,16 +1447,30 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             });
         }
 
-        // like LoadOrCreate, but an asset written by an older schema - back when a
+        // Like LoadOrCreate, but an asset written by an older schema - back when a
         // reward kind was its own RewardDefinition subclass - no longer loads as a
-        // RewardDefinition at all, so the file is replaced rather than collided with
+        // RewardDefinition at all. That file used to be deleted and recreated right
+        // here; it is reported and skipped now, because destroying an asset is not
+        // a decision an import may take on a failed LOAD - the same null comes back
+        // for a file that is unreadable in some way nobody has met yet, so deleting
+        // on it turns every future breakage into silent data loss. The deletion is
+        // the explicit menu action (DeleteOldSchemaRewardAssets), which names what
+        // it will do before it does it.
         private static RewardDefinition LoadOrCreateReward(string assetPath)
         {
             var existing = AssetDatabase.LoadAssetAtPath<RewardDefinition>(assetPath);
             if (existing != null)
                 return existing;
 
-            AssetDatabase.DeleteAsset(assetPath);
+            // a file on disk that did not load is the old-schema case; no file at
+            // all is an ordinary create
+            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            if (File.Exists(Path.Combine(projectRoot, assetPath)))
+            {
+                Debug.LogError($"ChapterJsonImporter: '{assetPath}' exists but does not load as a RewardDefinition - an asset written by an older schema. Skipping it - run 'GarageBandIdle > Delete Old-Schema Reward Assets', then re-import.");
+                return null;
+            }
+
             var asset = ScriptableObject.CreateInstance<RewardDefinition>();
             AssetDatabase.CreateAsset(asset, assetPath);
             return asset;
