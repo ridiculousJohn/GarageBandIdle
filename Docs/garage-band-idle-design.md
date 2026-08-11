@@ -22,8 +22,8 @@ a bigger venue with a new mechanic. All numbers below are starting values for tu
 > - **Run currencies are per-chapter ids** and idle accrual is per scope, paid when a scope is enabled
 >   (§2, §9) — there is no app-level "offline" and no single focused economy.
 >
-> One decision is recorded as **open** in rule 12: the settle boundary across scopes. §6.1 carries a
-> second, smaller one on whether an event timer pauses while its host scope is disabled.
+> One open question remains, in §6.1: whether an event timer pauses while its host scope is disabled,
+> still unverified against Ctrl C.
 
 ---
 
@@ -259,16 +259,35 @@ record).
 
 Mechanically the release is **one tier scope's reset** — the shallowest rung of the chapter's
 ladder (§1, §12 rules 12 and 14) — and everything below describes that rung rather than a unique
-operation. A reset runs as one atomic step ending at a single settle: the scope's **parent**
-orchestrates it (only the parent knows the sibling order the selector may name), the scope being reset
-**emits its payout on the way out**, and the emitted currency resolves by ordinary outward lookup, so a
-tier can bank into the chapter scope or straight to the root without its immediate parent being the
-recipient. Then the parent clears the selected scopes and re-runs projection (rule 6).
+operation. The award is not a distinguished kind of thing: a payout is a **`GameAction`**, the same
+one-shot award category every other payout already uses, differing only in that a formula computes its
+amount. There is no payout *field*, so "a rung with no payout" is a rung whose action list is empty,
+like any other content that declares nothing.
 
-Two authoring rules keep a payout coherent, both already enforced for the single-rung case and both now
-stated per rung: a rung's payout **source** must live in a scope the rung clears (otherwise the same
-value banks on every press, without limit), and its payout **target** must live further out than the
-rung (otherwise the payout is destroyed by the reset that produced it).
+What the operation guarantees is **order**. The scope's **parent** orchestrates it (only the parent
+knows the sibling order the selector may name); **every selected scope runs its own rung's actions
+first**, while the state those formulas read still exists; then the parent clears the selected scopes
+and re-runs projection (rule 6); then one settle at the root (rule 12). A granted currency resolves by
+ordinary outward lookup, so a rung can bank into the chapter scope or straight to the root without its
+immediate parent being the recipient.
+
+Every selected scope, not just the pressed one — that is what makes "the capstone implicitly cuts an
+album" (§6) literally true rather than a special case. The capstone selects the chapter's tier scopes,
+so the album rung's own Fans-to-Records action runs because its scope was selected. Nothing reaches
+across scopes to compute it, and nothing needs a second mechanism for the multi-rung press.
+
+Two authoring rules keep an award coherent, both already enforced for the single-rung case and both now
+stated per rung: an award's **inputs** must live in a scope the reset clears (otherwise the same value
+banks on every press, without limit), and its **target** must live further out than the reset reaches
+(otherwise the award is destroyed by the reset that produced it).
+
+A third rule follows from resolution rather than from lifetime: **an award can only read its own scope
+and outward** (rule 12), so a rung must be filed with the state its formulas read. This is why the
+per-scope arrangement above is the only one that works — a single capstone action trying to compute the
+Fans payout from the chapter scope could not see Fans at all, and the first two rules would not catch
+it, because *clears* and *can-read* are different relations: the capstone selects the tier holding Fans
+and still cannot read it. A formula needing two siblings' state is telling you those currencies belong
+in their common ancestor (§2), since sibling scopes are never on each other's chain.
 
 - **Resets:** Cash, gear, learn-songs bars, Fans, working Catalog.
 - **Keeps:** Records, Roadies, Discography.
@@ -322,7 +341,7 @@ Moment-to-moment play draws on the systems defined elsewhere:
 - **Capstone gig** — unlocks at the Records gate; grants a Roadie and fires a story beat (§10).
   Playing it implicitly cuts an album (§5) — the run's Fans bank as Records — before
   advancing, so no run value is stranded at the chapter boundary. The completion is one
-  atomic `EconomyContext` operation ending at a single settle, and unlike the deliberately ungated
+  atomic scope operation ending at a single root settle (rule 12), and unlike the deliberately ungated
   release it is fail-closed: it refuses on an already-set completion flag, on an unmet unlock
   Condition (the operation asks the gate itself, TryBuy-style — a completion latches a permanent
   flag, so a UI bug must not finish a chapter early), and on any one-shot action that answers
@@ -357,7 +376,7 @@ challenges — and it needs no economy of its own, no sandbox, no seed recipe, a
 That is what replaces the isolated-context design this section previously specified.
 
 - **On start,** the event **resets its host scope**, and that reset behaves exactly like the
-  rung's ordinary reset (§5) — it **emits its payout**. So entry banks the run rather than discarding
+  rung's ordinary reset (§5) — its **award actions run first**. So entry banks the run rather than discarding
   it, and entering costs nothing but time. This is deliberate and it is why entry does not ask: the
   reset happens either way, so the starting state is identical whether the player was paid or not, and
   declining payment would be pure loss. A "bank it first" ritual is the same stranding §2 removed from
@@ -384,9 +403,12 @@ That is what replaces the isolated-context design this section previously specif
   host scope is disabled — **open:** the pause is provisional, to be verified against Ctrl C before any
   timed event ships, since a timer that keeps running off-screen is a deadline the player cannot attend
   to and would have to be a deliberate choice rather than an inherited one.
-- **Failure:** a failed timed event resets that event's progress; the player can quit at any time.
-  Failing or quitting costs only the time spent and never permanent progress — which holds because entry
-  already banked the run.
+- **Failure:** a failed timed event **tears its component down** — the timer and the attempt end and the
+  handicap modifiers are removed, so the tier reverts to ordinary play. It clears nothing in the host
+  scope: the component holds no progress of its own, since the goal reads ordinary host currency, and
+  whatever the run accumulated stays where it is to be banked by the next reset like any other run. A
+  quit is the same teardown on the player's initiative. Failing or quitting therefore costs only the time
+  spent and never permanent progress — which holds because entry already banked the run.
 - **Reward on success:** a lateral bonus — a chapter-durable buff, a Roadie, a Catalog song, or local
   currency, drawn from the shared reward pool (§12). Event rewards never include Records or any currency
   that gates advancement, so an event is never a hard prerequisite; its reward size (above) is what sets
@@ -439,16 +461,20 @@ Replaying cleared chapters is the main way to earn Roadies through play, which k
 rather than purchase-only.
 
 A cleared chapter remains available as a self-contained economy with its own local currency,
-generators, and completion goal. This replay economy is isolated: the player's global income and
-progress do not apply inside it, so it runs at its own scale regardless of how far the player has
-advanced overall. The isolation is what keeps an early chapter worth replaying late — it cannot be
-cleared instantly by the player's accumulated power, because that power does not reach inside it.
-Isolation is achieved by construction, not exemption (§12 rules 7 and 12): a replay economy
-is a **second instance** of that chapter's scope definition, with its own balances under its own
-instance identity, reading outward only as far as the root's Roadie allocation. It shares no state with
-the frontier's instance of the same chapter, so event-tier buffs earned at the frontier do not apply
-inside a replay; after the capstone those facts are archival. The two instances are never enabled at
-once (rule 7), which is what replaces the old exactly-one-focused guarantee.
+generators, and completion goal: a **second instance** of that chapter's scope definition (§12 rule 7),
+placed in the tree like anything else. Nothing about a replay is special-cased. It resolves outward
+exactly as the first playthrough did and scales with every global modifier it reaches — Records income,
+Roadies, Encore — which is the same walk the first playthrough already ran, back when those totals
+happened to be zero. What does *not* cross between the two instances is anything a scope owns: local
+balances, generators, bars, cleared-tier facts. That falls out of each instance holding its own scopes
+rather than out of any filter, and it is why event-tier buffs earned at the frontier do not appear in a
+replay; after the capstone those facts are archival. The two instances are never enabled at once
+(rule 7), which is what replaces the old exactly-one-focused guarantee.
+
+What keeps an early chapter from being cleared instantly late is the **goal**, not a ceiling on the
+player's power. One consequence to author for: a replay's completion goal is `replayGoal(k)` below,
+which makes it **instance** data — a replay does not read the chapter definition's capstone gate, since
+`recordsCumulative` would be satisfied the moment the chapter became replayable.
 
 Replaying a chapter means building its local economy up to the current goal and clearing it, which
 awards a Roadie. Each clear raises that chapter's next goal:
@@ -591,8 +617,8 @@ Assets/Scripts/
     Scopes/ScopeDefinition.cs / Scope.cs   // rule 12: definition + instance (rule 7). A scope owns its truth (pool + systems + modifiers + flags), its sections, and an ORDERED list of child scopes; lifetime is placement, so this replaces EconomyContext, EconomyRecipe and CurrencyPlacement
     Scopes/ScopeChain.cs  // rule 12: the one iterator over "my scope outward to the root, enabled only" - three public resolvers (ResolveCurrency first-owner-wins / ResolveFlag any / ResolveModifiers accumulate) fold it their own way; no mode parameter
     Scopes/ResetTargetSelector.cs   // rule 14: polymorphic (self-and-contained | preceding-siblings | named), resolved by the scope owning the order, output closed downward
-    PrestigeTierDefinition.cs   // rule 12/14: one rung - payout formula, offer Condition, optional fail-closed operation gate, onComplete effect, one-shot actions, optional completion flag
-    PayoutFormula.cs      // polymorphic like Condition; Ch1's floor((fans/5)^0.5) is one instance
+    PrestigeTierDefinition.cs   // rule 12/14: one rung - offer Condition, optional fail-closed operation gate, onComplete effect, the one-shot GameActions the press runs (a payout is one of these, not a field of its own), optional completion flag, reset target selector
+    PayoutFormula.cs      // polymorphic like Condition; the amount a computed-grant GameAction awards - Ch1's floor((fans/5)^0.5) is one instance
     ContentDatabase.cs    // Addressables discovery of all definition SOs by label; id→def registries
     Condition.cs / ConditionEvaluator.cs   // one gate/unlock/visibility/availability type + one evaluator
     GameEffect.cs / GameAction.cs   // grants split by category: an effect is re-applicable state every rebuild re-runs; an action is a one-shot award only its player-action moment executes (a payout paid twice is inexpressible, not validated against)
@@ -611,7 +637,7 @@ Assets/Scripts/
     CapstoneSystem.cs     // the completed-capstone fact source: the declared completion flag is the latch, projection re-applies OnComplete from it; the completion is the chapter's deepest rung (rule 14)
   Events/
     EventDefinition.cs / GameEvent.cs   // optional debuff, optional timer, goal, tier, reward; NO baseline-reset field - entry resets the host scope
-    EventComponent.cs     // rule 12 / section 6.1: an event is a COMPONENT on a scope, never a scope. Start = reset the host (which emits its payout, so entry is free) + register handicap modifiers + start timers; ticks with the host; tears down on success/fail/quit. Replaces EventManager's sandboxed snapshot
+    EventComponent.cs     // rule 12 / section 6.1: an event is a COMPONENT on a scope, never a scope. Start = reset the host (whose award actions run first, so entry is free) + register handicap modifiers + start timers; ticks with the host; tears down on success/fail/quit, clearing nothing in the host. Replaces EventManager's sandboxed snapshot
   Meta/
     RoadieAllocation.cs   // Chapter 2: per-venue allocation, product boost, replay ramp; the Roadie pool is the global `roadies` currency, not a manager
   Content/
@@ -662,9 +688,12 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 7. A cleared chapter's replay economy is **another instance of that chapter's scope
    definition** (local currency, generators, goal `k`, last-interaction timestamp), separate from the
    frontier's instance — which is what makes scopes need a **definition/instance split**, the same one
-   `ChapterDefinition`/`Chapter` and `GeneratorDefinition`/`Generator` already have. Isolation is then
-   construction rather than exemption and needs no scope tags inside shared managers. The only
-   cross-writes are Roadie allocation in and Roadie award out.
+   `ChapterDefinition`/`Chapter` and `GeneratorDefinition`/`Generator` already have. Separation is then
+   construction rather than exemption and needs no scope tags inside shared managers: each instance owns
+   its own scopes, so an instance-local fact cannot reach the other one, while everything global stays
+   reachable by the ordinary outward walk. A replay is **not** isolated from the player's accumulated
+   power and is not meant to be (§8.1) — it runs the same resolution the first playthrough runs, and its
+   throttle is its goal ramp.
    There is no single "focused" economy. Scopes are **enabled or disabled**, plural: several
    are enabled at once (an outer scope keeps producing while the player works inside a tier), only
    enabled scopes are ticked, and a disabled scope accrues nothing live and is paid idle earnings when
@@ -685,9 +714,13 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     every referenced id resolves on load.
 11. Compose every stat modifier through one registry — no system keeps its own multiplier or
     bonus stack. Each asks for the composition on its target and applies it, where a target is a closed
-    kind (tap value, fan rate, a generator's output, a currency's production) plus, for the kinds that
-    act on one thing, the designer id they name. The rule is `(base + adds) × multipliers`, expressed in
-    exactly one place, so two systems cannot disagree about the order their modifiers apply in. A
+    kind (tap value, fan rate, a generator's output, a generator's cost, a currency's production) plus,
+    for the kinds that act on one thing, the designer id they name. The rule is
+    `(base + adds) × multipliers`, expressed in exactly one place, so two systems cannot disagree about
+    the order their modifiers apply in — with **cost taking multipliers only**, because a flat reduction
+    needs a floor and a cost at or below zero is a free generator. The list is closed and code-defined,
+    but that governs *how* a target is added, not which ones should exist: a number the game modifies and
+    the registry cannot name is a gap in this rule rather than a feature request. A
     **granted** modifier is a fact established at a moment (a bought buff, a completed bar, a cleared
     event tier) and is *stored*, in the scope holding that fact; a **derived** modifier is not stored at
     all — it computes from its source on every read, so it has no placement of its own and cannot give a
@@ -759,12 +792,36 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     Orchestration (a rung's reset, event entry, the capstone) is written against the scope, so a second
     economy is an instantiation rather than a rewrite (rule 7).
 
-    **OPEN DECISION — the settle boundary.** Every top-level operation ends at a single settle, so that
-    condition-dependent values re-evaluate exactly once after the whole mutation. In a tree, one mutation
-    spans scopes: a tier reset emits into an outer scope, whose subscribers must settle too. The settle
-    owner is presumably the outermost scope touched, and the deferral/suppression machinery would have to
-    work across scopes rather than inside one context — but this is **not resolved**, and it is the
-    invariant everything else rests on. Settle it before implementing the tree.
+    **The settle boundary.** The boundary is the **root of the tree**, always. Every top-level operation
+    ends at one root settle, so condition-dependent values re-evaluate exactly once after the whole
+    mutation — the same invariant a single context has today, and fixed rather than discovered. The
+    tempting alternative, that the outermost scope *touched* owns the settle, does not survive the
+    operations that need it: which scope is outermost is learned during the mutation, not before it (a
+    rung's reset emits its payout outward halfway through), while the deferral has to be open before the
+    first fact moves. Opening it at the root and narrowing afterward is the root boundary with extra
+    steps.
+
+    What is scoped is the *work*, not the boundary. Each scope carries its own dirty flag, raised by the
+    same condition inputs as today — its chain aggregates its ancestors' change signals, so an emit
+    outward dirties the emitter and everything inward that can read the recipient. The root's settle
+    drains the scopes whose flag is set, **outermost first**, because reads go outward and an inner
+    evaluation must see final outer state; then it refreshes the tap value for every enabled scope
+    holding a tap producer, unconditionally, since a granted modifier moves a tap value without any
+    condition input firing. The drain repeats while any scope is dirty, under the same bound as the
+    single-context restore — but the exhaustion diagnostic must name **which** scopes are still pending,
+    or it reports only that something somewhere re-triggers itself.
+
+    The settled signal stays **per scope**, raised for the scopes that actually drained. A root-owned
+    boundary is a statement about when a mutation is finished, not about who needs telling; one tree-wide
+    signal would have every module in every enabled scope re-ask on any change anywhere.
+
+    Two consequences worth stating because they are easy to miss. **Enabling a scope must dirty it** —
+    the world moved while it was disabled and nothing raised its flag, the same reason a restore marks
+    dirty explicitly rather than trusting the fresh-instance default. And **suppression is root-owned but
+    must reach every scope**: the depth counter can live in one place, but if it gates only the root's
+    invalidation, a restore's republish re-dirties descendants after the settle already consumed them and
+    "which signal is terminal" has two answers again. That is the one piece of the deferral machinery
+    that genuinely composes across scopes instead of nesting inside one.
 13. Every flat-rate currency source is a **production config** — `{currency id, amount,
     trigger: tick | tap, gate: Condition}` — held by its producer, never by the currency: a currency
     is pure state (a balance, a group, formatting), and the dependency points from producer to
@@ -823,15 +880,22 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     sources of truth for one scope's lifetime. The module reads whatever instantiated it.
 
 **Starter prompt for a code assistant:**
-> "In Unity (version X, iOS/Android), scaffold a nested-prestige idle core: a CurrencyManager with a run
-> block (Cash, Fans, Rehearsal, gear, catalog) and a permanent block (Records, Roadies) using
-> break_infinity.cs BigDouble; content discovered via Addressables; a single Condition type + evaluator
-> for all gates/unlocks/visibility; one flag registry for all progressive reveal; one modifier registry
-> every stat effect composes through, with no per-system multiplier stacks; an AlbumPrestige
-> action that clears the run block and awards Records from fans (later fans × catalog quality); a
-> ChapterManager with forward-only advancement gated by cumulative Records; a TickSystem on DateTime
-> deltas; and a checksummed JSON SaveSystem computing offline earnings at 50% base capped at 4h.
-> Event-driven, no per-frame polling."
+> "In Unity (version X, iOS/Android), scaffold a nested-prestige idle core built on a **scope tree**: a
+> scope owns its currency balances, modifiers, flags and systems, owns the sections that present them,
+> and holds an ordered list of child scopes — so a fact's lifetime is where it lives and no lifetime enum
+> exists anywhere; ids are unique tree-wide; balances use break_infinity.cs BigDouble. Resolution is one
+> chain iterator walking a scope outward to the root, behind three functions — ResolveCurrency (first
+> owner wins), ResolveFlag (any link), ResolveModifiers (accumulate) — never one function with a mode
+> parameter. Content discovered via Addressables; a single Condition type + evaluator for every
+> gate/unlock/visibility/activation rule; one flag registry per scope for all progressive reveal; one
+> modifier registry per scope that every stat effect composes through, with no per-system multiplier
+> stacks. Prestige is one parameterized operation rather than an album method: a rung declares a reset
+> target selector and a list of one-shot GameActions, the actions run before the clear so their formulas
+> can read what the reset is about to destroy, the clear is followed by re-projection from the surviving
+> facts, and the whole operation ends at one root settle. A ChapterManager with forward-only advancement
+> gated by cumulative Records; a TickSystem on DateTime deltas; and a checksummed JSON SaveSystem storing
+> one block per scope instance under a stable identity, with idle earnings accrued per scope and paid
+> when that scope is enabled, 50% base capped at 4h. Event-driven, no per-frame polling."
 
 ---
 
@@ -854,7 +918,7 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 - **Catalog (Ch. 6+):** quality-driven global multiplier that converts to Records on album release;
   Discography keeps a persistent list of best songs.
 - **Roadies:** permanent multiplier — additive within a venue (+5%/roadie), multiplicative across
-  venues. Earned from capstones and from replaying sealed chapter economies; buyable; earned and bought
+  venues. Earned from capstones and from replaying cleared chapters as second scope instances; buyable; earned and bought
   Roadies are identical; no purchase cap.
 - **Data model:** gates/unlocks/visibility/activation are a single `Condition` type (one
   evaluator); all progressive reveal runs through one flag registry (`setFlag` → `flagSet`); learn-songs
