@@ -792,7 +792,7 @@ walk still passes unchanged.
 
 ---
 
-## 7 — Capstone / chapter gate (on 6.5's contract)
+## 7 — Capstone / chapter gate (on 6.5's contract)  ✅ done
 
 > Implement the chapter capstone per §1–§2, §5 and the `capstone` entry. **Records need no manager**
 > — 6.5 settled this: Records are a global currency, the cumulative total is
@@ -851,31 +851,196 @@ from the declaration.
 
 ---
 
+## 7.5 — CONSOLIDATION: the scope tree (lifetime becomes placement)
+
+This slice adds no new gameplay. Chapter 1 must play *exactly* as it does after slice 7.
+
+It exists because `ContentScope` is a cascade hardcoded to two rungs — `Run = 1`,
+`PermanentInChapter = 2` — with a reset operation per rung (`ResetRunScoped` means "clear rung 1"; the
+chapter boundary has no reset at all, it discards the context). `ChapterDefinition` carries
+`AlbumConfig` and `CapstoneConfig` as two singleton fields, which is the same fixed-depth assumption
+expressed in content. Every chapter, forever, therefore gets exactly one within-chapter prestige and
+one capstone.
+
+That is not what the game needs. A chapter wants an ordered **ladder** of prestige rungs, each banking
+its own currency, where an intermediate currency is *spent* inside the chapter (higher generator tiers,
+recovery accelerators) and only the deepest rung banks Records. Some rungs reset only themselves; some
+reset every rung before them. None of that is expressible in a two-valued enum, and bolting a third
+value on repeats the mistake at depth 3.
+
+The replacement is one concept. A **scope** owns its truth (currency balances, modifiers, flags, and the
+systems whose facts it holds), owns what presents that truth (its sections), and holds an *ordered list
+of child scopes*. A fact's lifetime becomes **where it lives** rather than a value it declares — so no
+declaration can disagree with the reset acting on it, the same way the GameEffect/GameAction split made
+a double payout inexpressible rather than validated against. One concept absorbs `EconomyContext`,
+`EconomyRecipe`, `CurrencyPlacement`, and `ContentScope`.
+
+Do this **before slice 9.** `ContentScope`'s explicit enum values are a stated serialization contract,
+and there are no saves yet — so today this is an asset migration and after slice 9 it is a save
+migration. Slice 9 also builds its restore against whatever the lifetime model is.
+
+> Read `/docs/garage-band-idle-design.md` — §1, §2, §3, §5, §6.1, §9 and §12 rules 6, 7, 9, 11, 12, 13,
+> 14. This is a refactor. **Do not change observable gameplay:** same tap value, same fan rate, same
+> reveal order, same release behaviour, same re-climb, same capstone.
+>
+> **0. Settle the settle boundary FIRST — it is an open decision and everything rests on it.**
+> §12 rule 12 records it unresolved. Today every top-level operation ends at one `Settle`, with one
+> terminal `Settled`, so condition-dependent values re-evaluate exactly once after the whole mutation;
+> `EconomyContext.Restore` additionally runs a bounded fixpoint inside `DeferSettled` and replays
+> notifications under `SuppressInvalidation`. In a tree, one mutation spans scopes — a rung's reset
+> emits into an outer scope whose subscribers must settle too. Decide who owns the settle (the outermost
+> scope touched is the expected answer), how `DeferSettled`/`SuppressInvalidation` compose across scopes,
+> and write the decision into rule 12 *replacing* the OPEN DECISION block before writing code. Do not
+> discover this mid-refactor.
+>
+> **1. `ScopeDefinition` / `Scope`, with a definition/instance split.** A definition names the scope's
+> id, its `activeWhen` Condition, its currency roster, its sections, its ordered child scope ids, and
+> its prestige rung if it has one. An instance holds the runtime — pool, systems, modifiers, flags,
+> conditions — under a **stable instance identity**, because a replay economy (§8.1, rule 7) is a second
+> instance of a chapter's definition and slice 9's save is one block per instance. This is the same split
+> `ChapterDefinition`/`Chapter` and `GeneratorDefinition`/`Generator` already have.
+>
+> **2. One chain iterator, three public resolvers.** `ScopeChain` answers *what is in scope*: my scope
+> outward to the root, in order, enabled only. Exactly one implementation of that iteration, because
+> otherwise "in scope" has three answers that can drift. On top of it, **three public functions, not one
+> with a mode parameter** — `ResolveCurrency` (first owner wins; one balance), `ResolveFlag` (any link
+> satisfies), `ResolveModifiers` (every link contributes). "Accumulate a currency" is not a concept, so a
+> shared mode vocabulary would be a union of things that never apply to each other. `CurrencyRouter` is
+> already this at N=2 and shows the shape: it claims outermost-first, flattens the chain into an
+> `_owners` map at construction (a cache of the walk, not a per-read walk), refuses shadowing rather than
+> resolving it, and is `IDisposable` because it aggregates its pools' `BalanceChanged`. Generalize it;
+> keep all four of those properties. **Ids stay unique tree-wide** — that is what makes moving a
+> currency outward a pure data edit.
+>
+> Note the asymmetry and honour it: **reads go outward, change notifications go inward.** An inner module
+> gating on a root currency must re-evaluate when that currency moves, so a scope subscribes to its
+> ancestors' signals. `CurrencyRouter`'s own comment already names the failure — a discarded listener
+> keeps a dead economy's subscribers alive — and at N levels that disposal discipline is load-bearing.
+>
+> **3. Reset as one parameterized operation.** Delete `AlbumConfig`/`CapstoneConfig` as separate shapes
+> and add `PrestigeTierDefinition`: `id`, `displayName`, `payout` (a polymorphic `PayoutFormula` —
+> subclass-picked like `Condition`/`BarFillBehavior`, with Ch1's `floor((fans/5)^0.5)` as its first
+> member), `offer` Condition, optional `operationGate` Condition (null = ungated, today's release; set =
+> fail-closed, today's capstone), optional `onComplete` `GameEffect`, `GameAction[]`, optional
+> `completionFlagId`, and a `ResetTargetSelector`.
+>
+> The operation: **the parent orchestrates** (only it knows the sibling order a selector may name), the
+> scope being reset **emits its payout on the way out** (resolved outward, so a rung can bank to the root
+> without its immediate parent being the recipient), then the parent clears the selected scopes and
+> re-runs projection, then one settle per step 0. `ResetTargetSelector` is polymorphic —
+> self-and-contained, preceding-siblings, named — its output **closes downward**, and it lives on the
+> scope *instance*, never on the module presenting it (a prefab can be placed twice; a target list on it
+> would be two sources of truth for one lifetime).
+>
+> This deletes a special case rather than adding a parameter: `ReleaseAlbumFacts()` exists only so
+> `CompleteCapstone` can borrow the release's facts without its settle. With depth-based reset, "the
+> capstone implicitly cuts an album" is what selecting a deeper rung *means*, and the split goes.
+> `ReleaseModule` and `CapstoneModule` — already near-duplicates differing only in which gate they ask —
+> collapse into one `PrestigeModule` parameterized by rung id, which finally gives 6.5's `definitionId`
+> parameter its second real consumer.
+>
+> Enforce the two payout rules per rung, generalizing the two checks `ContentValidator` already has
+> hardcoded for the album (`ValidateRecordsSurviveRelease`, and the fans-must-reset check): a rung's
+> payout **source** must live in a scope that rung clears (else the same value banks on every press,
+> unbounded — and the release operation is deliberately ungated, so nothing else stops it), and its
+> **target** must live further out (else the payout is destroyed by its own reset).
+>
+> **4. Enabled scopes replace focus.** Delete the single focused context. Scopes are enabled or disabled,
+> **plural**: several are enabled at once, only enabled scopes tick, and an outer scope keeps producing
+> while the player works inside a tier. Exactly-one-focused is what previously made double-counting
+> impossible by construction, so re-home that guarantee explicitly: **two instances of one scope
+> definition are never enabled at once.** Module display becomes the three-way conjunction
+> `scope.activeWhen && section.visibleWhen && module's own condition`, with containment supplying the
+> implicit terms and a module's condition not even evaluated when its scope is inactive. Sections stay
+> **not scopes** — a section has no truth of its own and its condition answers a different question:
+> activation governs *simulation*, visibility governs *presentation*, and they must be independent
+> because an active scope has to keep simulating while its display is off-screen. Rule 9 still holds:
+> one mechanism, Conditions, evaluated at three levels.
+>
+> **5. Production direction, checked at import.** A producer may target a currency in its own scope or
+> further out, **never inward** — an outer generator producing into an inner currency outlives its own
+> target. Resolve the producer's scope and the target currency's scope and refuse a strictly-inner
+> target. `ProductionConfig` gains **no** lifetime field: its durability is its holder's and its gate
+> already reads flags that carry their own placement.
+>
+> **6. Re-author Chapter 1 as a one-rung ladder, changing nothing observable.** The chapter scope holds
+> `album`/`cut_demo` and the capstone offer; one tier scope holds cash/fans/rehearsal, the generators, the
+> buff upgrades, the cover bars, and the `fans`/`covers`/`gear` flags and their setters. The album rung's
+> selector is self-and-contained; the capstone's selects every tier scope. Every `scope: run` /
+> `permanentInChapter` key leaves the JSON — placement replaces it — and the importer refuses the old
+> keys rather than mapping them. Boot validation's flag rule generalizes verbatim: **a flag needs at
+> least one setter in its own scope or inside it.**
+>
+> **7. Delete, don't deprecate.** `ContentScope`, `CurrencyPlacement`, `EconomyRecipe` +
+> `EconomyRecipeKind`, `EconomyContext`, `CaptureSeedFor`, `PermanentInChapterFacts`, the `Isolated`
+> permanent-pool routing, `ModifierSystem`'s grant `scope` parameter, `Upgrades.ScopeOf`,
+> `Flags.IsRunScoped`, every `Reset*RunScoped*`, and `ICurrencies.ResetsOnAlbumRelease`. A left-behind
+> field promising a lifetime the tree now decides will eventually be believed.
+>
+> Goal: a chapter is a scope tree; a fact's lifetime is its placement; one reset operation serves every
+> rung; several scopes are enabled at once; and Chapter 1 plays identically to slice 7. Stop here.
+
+✅ **Test & commit:** the settle decision is written into rule 12 (the OPEN DECISION block is gone)
+before any code lands; Chapter 1's full slice-7 test suite passes unchanged, including the second-run
+reveal walk and the capstone; moving a currency's declaration one scope outward makes it survive a rung
+reset with no code change and every reference still resolving; a sibling scope's currency/flag/modifier
+is NOT reachable from its sibling, and the same fact filed in the common ancestor IS; three resolvers
+over one chain iterator, with a shadowed id refused rather than resolved; a rung's reset emits its
+payout before clearing and the emit resolves outward past its immediate parent; a selector's output is
+downward-closed; preceding-siblings is resolved by the parent and no scope enumerates its own siblings;
+a payout source filed outside its own rung is refused at boot, and so is a target filed inside it; a
+producer targeting a strictly-inner currency is refused at import; two instances of one scope definition
+cannot both be enabled; a module with a true condition stays hidden while its scope is inactive; and
+`ContentScope`, `CurrencyPlacement`, `EconomyRecipe` and `EconomyContext` no longer exist anywhere in
+the tree.
+
+---
+
 ## 8 — Events (Garage Jam Challenge)
 
-> Implement the event system per §6.1 and the `events` array (garage_jam).
+> Implement the event system per §6.1 and the `events` array (garage_jam). **[rev]** This slice was
+> rewritten after 7.5: the sandbox-context design it originally specified no longer exists, and the
+> machinery it was written against (`EconomyRecipe`, `CaptureSeedFor`, `PermanentInChapterFacts`, the
+> `Isolated` pool routing) was deleted there. Build the model below, not the one 6.5 anticipated.
 >
-> - `EventManager` runs a self-contained challenge in a **freshly constructed economy context**
->   (design §12 rule 12), never in the player's run: on entry, build an event context whose recipe
->   projects the chapter's permanent-in-chapter facts only — earlier tiers' rewards apply, no run
->   facts carry in, and the Records buff (a *derived* modifier, §12 rule 11) is never registered
->   because the recipe names no global facts. That absence IS the fixed baseline: nothing is filtered,
->   nothing is reset, and the suspended run — balances, lifetime-earned totals, modifiers, the Records
->   balance itself — is never touched. On quit, fail, or success the context is discarded; nothing to
->   unwind makes failure and quit free, and the sandbox's earnings die with it instead of polluting
->   the run's earned-total gates.
-> - **[rev]** DELETE `EventDefinition.BaselineReset` while building that construction — along with the
->   JSON `baselineReset` key (and its note), the importer's DTO field, and the `TestContent`
->   parameter; the reimport rewrites `garage_jam.asset`. The field promised an action ("reset to a
->   fixed baseline on entry") that the recipe design replaced with an ABSENCE — an isolated sandbox
->   never held run state to reset — so nothing reads it today and nothing here should start: a config
->   field nothing reads will eventually be believed by someone, and the first believer writes the
->   reset this design exists to not need.
+> - **An event is a COMPONENT on a scope, never a scope of its own** (design §6.1, §12 rule 12). It gets
+>   no economy, no pool, no seed, no projection filter. `EventComponent` attaches to the tier scope it
+>   challenges and lives inside that scope's lifecycle: it receives ticks with its host and tears itself
+>   down on success, failure, or quit. `EventManager` is a registry of which events are attached and
+>   running, not an owner of economies.
+> - **On entry, reset the host scope through its own rung** — which means the reset **emits its payout**
+>   exactly as an ordinary press would (§5, rule 14). Entry therefore *banks* the run instead of
+>   destroying it, and costs nothing but time. Do **not** offer a "bank first?" prompt: the reset happens
+>   either way so the starting state is identical, declining payment is pure loss, and §2 already removed
+>   this exact ritual from the capstone for the same reason. An option whose right answer never changes
+>   is a trap, not a choice.
+> - **The reset is the baseline; there is no fixed scale.** Outer scopes stay on the resolution chain, so
+>   every banked multiplier still applies and the event **scales with the player's accumulated power** —
+>   deliberately (§6.1). A tier may be unbeatable until the player has advanced further, and coming back
+>   stronger is the intended experience. Do not reintroduce a resolution ceiling, a baseline recipe, or
+>   any per-kind chain barrier to recover the old fixed floor; that model was dropped because it excluded
+>   the main power source and left a tier beatable now or never.
+> - **[rev]** DELETE `EventDefinition.BaselineReset` — with the JSON `baselineReset` key and its note, the
+>   importer's DTO field, and the `TestContent` parameter; the reimport rewrites `garage_jam.asset`. Entry
+>   *does* reset now, so the field is not merely unread — it is a boolean standing where a
+>   `ResetTargetSelector` on the host's rung already decides what clears. Two declarations of one reset,
+>   and the boolean is the one nothing consults.
+> - The **handicap is ordinary modifiers** (rule 11) that the component registers in its host scope and
+>   removes on teardown — resolved by the same outward walk as everything else, with no bespoke debuff
+>   path. `automationDisabled` is the Ch1 case.
 > - Availability is a `recordsCumulative ≥ 1` Condition (available after the first demo). Each tier's
 >   `goal` is a `currency` Condition evaluated by the shared evaluator.
 > - garage_jam: debuff `automationDisabled` (generators paused, tap-only); timed and failable. Three
 >   tiers (goal 500/2500/10000, timer 60/60/45, reward `tap_value_x1_25`/`_x1_50`/`_x2` applied via
->   `RewardManager`, scope permanent-in-chapter).
+>   `RewardManager`). A cleared tier is a fact filed in the **chapter** scope, so the ladder is not
+>   re-climbed after every demo; its reward's durability follows that placement (rule 11) with no scope
+>   declared on the reward.
+> - **The entry emit pays the rung payout and nothing more.** A rerun tier must not be farmable for
+>   advancement currency — the reward comes from the clear, the payout from the reset, and the two are
+>   separate. Guard it and test it.
+> - While a timed event runs, idle payouts are disabled (§9), and the timer pauses while its host scope
+>   is disabled. An untimed event at insufficient power is not *failed* — it is unfinishable, and the
+>   player quits.
 > - **[rev]** Tier one-shot awards are `GameAction`s on the tier, executed by the clear operation
 >   alone — 6.5 §4 names the tier clear as one of the three player-action moments an action list may
 >   live on. The clear runs the same preflight rule as `TryBuy` and the capstone: refuse if any tier
@@ -887,15 +1052,21 @@ from the declaration.
 >   the first content that authors one.
 > - Failure/quit: reset that event's progress only; costs time, never permanent progress.
 >
-> Goal: I can enter garage_jam, play it tap-only against the timer at a fixed baseline, succeed for a
-> permanent-in-chapter tap buff (from the rewards pool) or quit/fail for free, and repeat at higher
-> tiers. Stop here.
+> Goal: I can enter garage_jam — which banks my run on the way in — play it tap-only against the timer
+> with my accumulated multipliers still applying, succeed for a chapter-durable tap buff (from the
+> rewards pool) or quit/fail for free, and repeat at higher tiers. Stop here.
 
-✅ **Test & commit:** fixed baseline by construction on entry — `recordsCumulative` reads zero inside
-the isolated sandbox, nothing reset, nothing filtered — and `baselineReset` is gone from the class,
-JSON, importer, and asset; tap-only; timer + fail/quit are cheap; tiers escalate; reward applies from
-the pool; a test-authored tier action pays once from the clear operation and never from any rebuild,
-and a failing `CanExecute` refuses the clear before the tier latches.
+✅ **Test & commit:** entry resets the host scope *and* banks its payout, so a run entered at 50 Fans
+awards its 3 Records and the player is never asked to bank first; the event is a component on the host
+scope and no second pool, context, or seed is constructed anywhere; outer multipliers still resolve
+inside a running event (a player with more Records measurably out-produces one with fewer — the scaling
+is asserted, not incidental); handicap modifiers appear in the host scope on start and are gone after
+teardown; `baselineReset` is gone from the class, JSON, importer, asset and test content; tap-only;
+timer + fail/quit are cheap and cost nothing beyond time; the timer pauses while the host scope is
+disabled and idle payouts are off while it runs; tiers escalate and a cleared tier survives a demo; the
+reward applies from the pool; the entry emit pays only the rung payout and a repeated enter/quit cycle
+cannot farm advancement currency; a test-authored tier action pays once from the clear operation and
+never from any rebuild, and a failing `CanExecute` refuses the clear before the tier latches.
 
 ---
 
@@ -903,12 +1074,18 @@ and a failing `CanExecute` refuses the clear before the tier latches.
 
 > Implement persistence and offline earnings per §12 (rules 2, 4, 6) and the offline table in §9.
 >
-> - `SaveSystem`: serialize to JSON with a checksum; validate on load and reject/repair tampered
->   saves. Model the run block and permanent block as separate sections in the schema. The run block
->   holds Cash/Fans/Rehearsal balances, generator owned counts, buff-upgrade state, and bar progress;
->   the permanent block holds Records, `contentUnlock` effects, **flags**, Roadies, and the
->   permanent-in-chapter **facts** (the cleared event tiers are the Ch1 case; their tap buffs
->   re-project on load). An album release clears the run block and writes the permanent block.
+> - **[rev]** `SaveSystem`: serialize to JSON with a checksum; validate on load and reject/repair
+>   tampered saves. **The schema is one block per scope instance, nested as the scopes are** (design §12
+>   rule 6) — *not* a run block and a permanent block, because after 7.5 "run" and "permanent" are no
+>   longer two categories but positions in a tree of arbitrary depth. Each block holds only what its own
+>   scope owns: the tier scope's block carries cash/fans/rehearsal balances, generator owned counts, buff
+>   latches, bar progress and its flags; the chapter scope's carries the `album` flag, the `cut_demo`
+>   latch and the cleared event tiers; the root's carries Records and Roadies. A reset writes the blocks
+>   it did not clear and clears the ones it did, with no category rule on top.
+> - **[rev]** This makes **stable scope-instance identity** a hard requirement, not a nicety: a tier that
+>   has been reset and rebuilt must round-trip as the *same* scope, and a replay instance (§8.1, rule 7)
+>   must be distinguishable from the frontier's instance of the same definition. Identity is part of the
+>   schema; do not derive it from list position, which reordering would silently reassign.
 > - **No modifier is ever serialized.** Derived modifiers compute from a source on every read, so the
 >   Records buff comes back from the restored Records balance with nothing to save or migrate; writing
 >   one would create a second answer that can disagree with its source. Grants are the same decision,
@@ -916,22 +1093,26 @@ and a failing `CanExecute` refuses the clear before the tier latches.
 >   buffs are bought, which bars completed, which tiers cleared — and each economy context re-projects
 >   its grants from those facts at construction. One source of truth: an effect can never disagree
 >   with the fact that produced it.
-> - `IdleEarnings` (design §9, per-economy): each economy context stores a last-interaction
->   timestamp in its state block. On focus-gain — an app launch is just a focus-gain on the one Ch1
->   context — pay `generatorProductionPerSecond × min(idleSeconds, cap) × rate` using `DateTime`
->   deltas, rate = 0.5, cap = 4 hours, and nothing below a minimum idle threshold. Generator
->   production only: fans, rehearsal, and bars pause while unfocused. Show a collect screen with the
->   amount and a placeholder "Double it" button — a timed double-idle buff (an expiry fact modifiers
->   derive from, §12 rule 11), not a per-collect double; wire the actual ad later. With one chapter
->   this behaves exactly like classic offline earnings, but written against the context, chapter
->   switching (Ch2+) needs nothing new.
+> - **[rev]** `IdleEarnings` (design §9, **per scope**): each scope stores a last-interaction timestamp
+>   in its own save block. When a scope is **enabled** — an app launch just enables the scopes you return
+>   to — pay `generatorProductionPerSecond × min(idleSeconds, cap) × rate` using `DateTime` deltas,
+>   rate = 0.5, cap = 4 hours, and nothing below a minimum idle threshold. Generator production only:
+>   fans, rehearsal, and bars pause while their scope is disabled. Note this is per *scope*, not per
+>   economy, and several scopes are enabled at once (rule 7) — so only the scopes actually disabled accrue
+>   idle time, and an outer scope that stayed enabled has already produced live and must not be paid
+>   twice. Test that explicitly; it is the case the old exactly-one-focused rule made impossible for
+>   free. Show a collect screen with the amount and a placeholder "Double it" button — a timed
+>   double-idle buff (an expiry fact modifiers derive from, §12 rule 11), not a per-collect double; wire
+>   the actual ad later.
 >
 > Goal: closing and reopening restores state (including flags and bar progress); time away grants
 > idle Cash at 50% capped at 4h, and a below-threshold absence pays nothing; a tampered save is
 > rejected. Stop here.
 
-✅ **Test & commit:** state persists across restart; flags/bars restore; idle payout correct, capped,
-and zero below the threshold; checksum rejects edits.
+✅ **Test & commit:** state persists across restart; flags/bars restore; **[rev]** every scope instance
+round-trips into its own block and a reset-and-rebuilt tier is recognized as the same scope; idle payout
+correct, capped, and zero below the threshold; a scope that stayed enabled is NOT paid idle on top of
+what it produced live; checksum rejects edits.
 
 ---
 
@@ -944,8 +1125,15 @@ and zero below the threshold; checksum rejects edits.
 > - Show the `storyBeatOpen` card on first launch and the `storyBeatCapstone` at the capstone.
 > - Ensure the staged reveal reads cleanly — each stage a flag/Condition drives a section or module in:
 >   tap-only → first gear (`the_band` section at 100 Cash earned) → Fans (`fans` flag) → Rehearsal +
->   covers (`covers` flag) → Cut a Demo (`album` flag, target ~5 min to first demo) → repeat →
->   Garage Jam available → capstone at 30 Records.
+>   covers (`covers` flag) → Cut a Demo (`album` flag) → repeat → Garage Jam available → capstone at 30
+>   Records. **[rev]** After 7.5 a module shows when `scope.activeWhen && section.visibleWhen && its own
+>   condition` all hold, so check the reveal at all three levels — a section can be authored correctly and
+>   still stay dark because its scope is inactive, and that is the first thing to look at when a stage
+>   does not appear. Sections belong to a scope and are not scopes.
+> - **[rev]** The `~5 min to first demo` target this bullet used to assert is **not met** — simulated
+>   against the shipped numbers it is 12–18 min at human tap rates (`balanceTargets.timeToFirstDemoSeconds`
+>   says 300). Do not treat the target as satisfied because the loop is playable. It is a tuning problem,
+>   listed under "After this" below, and it is out of scope here — but do not paper over it either.
 > - Minimal but legible UI, laid out through the module registry: current Cash/Fans/Rehearsal/Records,
 >   generator rows, upgrade list, cover bars, Release button, event entry, collect screen. Use a
 >   `NumberFormatter` for big-number display (1.23K / 4.56M / etc.).
@@ -977,8 +1165,24 @@ and zero below the threshold; checksum rejects edits.
 ## After this
 
 Chapter 1 is playable. The remaining work is a separate phase, roughly:
-- **Tune** the pacing (time-to-first-demo, Records gate, cycles-to-capstone) by playing it — these
-  are feel-based and can't be judged from numbers alone.
+- **Tune** the pacing (time-to-first-demo, Records gate, cycles-to-capstone) by playing it — feel can't
+  be judged from numbers alone. **[rev]** But four things *were* judged from the numbers and should be
+  treated as known, not rediscovered by feel:
+  - **Time to first demo is 12–18 min**, not the 300s `balanceTargets` states. The binding constraint is
+    the release gate needing 50 Fans *and* a 120-Rehearsal cover when fan rate starts at 0.22/s and
+    Rehearsal does not accrue until 25 Fans.
+  - **The chapter takes ~2.2–3.4 h released-when-offered, or ~1.2 h in one long run.** Long runs win,
+    which is backwards for a prestige loop.
+  - **`estDemoCyclesToCapstone: "8-12"` is unreachable at both ends.** The 50-Fan offer gate guarantees
+    `floor(sqrt(50/5)) = 3` Records minimum per demo, so 10 demos always clear a 30 gate — 10 is a hard
+    *ceiling*, and 6–8 is typical.
+  - **Cycles barely accelerate: 14.5 → 11.9 min across ten demos (18%)**, against §5's promise that
+    "cycles get faster as Records accumulate." Root cause: `recordBuff.affects: ["cash"]` while the gate
+    is Fans, and every reset zeroes the band that *is* the fan rate — so the prestige currency does not
+    touch the bottleneck it exists to relieve.
+  The scope tree (7.5) is what makes the fixes expressible — an intermediate currency with a real sink,
+  prestige-bought generators filed one scope out, and Ctrl-C-style recovery accelerators that make each
+  loop cheaper rather than merely making the player stronger. It does not decide any of the numbers.
 - **Chapter 2** content (a new `chapter-02-*.json`) plus unlocking the Roadie allocation/replay UI.
   Because 3.5 made conditions, flags, rewards, bars, and layout fully data-driven and
   Addressables-discovered, Chapter 2 should be mostly new assets + JSON, not new systems.

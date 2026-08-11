@@ -3,93 +3,56 @@
 An idle game about a band rising from a garage to arenas. Play progresses through eight chapters, each
 a bigger venue with a new mechanic. All numbers below are starting values for tuning.
 
-> **Revision note (data-model consolidation pass).** Changes in this revision, all to keep the doc in
-> sync with the restructured `chapter-01-garage.json` and the build prompts:
-> - **§3** — Rehearsal added as a first-class run-scoped currency; "learn-songs bars" reframed as
->   generic *fillable bars* fed by a `fillCurrency`.
-> - **§4** — content-unlock reveal is now stated to run through the single flag registry.
-> - **§6** — learn-songs bars note that filling is *player-directed* when several are offered at once.
-> - **§12** — three architecture rules added (unified `Condition` type + evaluator; one flag registry
->   for all reveal; all content ScriptableObjects discovered via Addressables); `LearnSongBar.cs`
->   generalized to a bar/bar-group system; `UpgradeDefinition` payload comment updated to `setFlag`.
-> - **Appendix** — a "data model" line added.
-> Edited passages are marked inline with **[rev]**.
-
-> **Revision note (modifier consolidation pass).** Changes in this revision, all following the move of
-> every stat modifier out of the individual systems and into one registry:
-> - **§12** — architecture rule 11 added (one modifier registry: systems compose on read rather than
->   holding stacks, granted modifiers carry a scope and derived ones do not, one call resets the
->   run-scoped ones); `ProductionCalculator` noted as formula-only, `Modifiers/` added to the file
->   tree, and the starter prompt names the registry beside the Condition and flag rules.
-> Edited passages are marked inline with **[rev]**, as above.
-
-> **Revision note (economy-context pass).** Changes in this revision, all following the decision to
-> run every simultaneous economy (the frontier chapter, an event sandbox, a replay economy) as an
-> instance of one machinery rather than as filtered views of a single economy:
-> - **§2** — open decision flagged: whether frontier run currencies carry across a capstone
->   advancement or each chapter's are distinct ids; settle before Chapter 2 content.
-> - **§3** — currency *definitions* stay global; *balances* live in per-context pools, and a
->   currency's **group** declares its pool (placement joins reset behavior as group data).
-> - **§6.1** — the event baseline restated as a freshly constructed context, not a filtered view.
-> - **§8.1** — replay isolation restated as construction (own context, own currency ids, no
->   chapter-permanent inheritance), not exemption.
-> - **§12** — rule 6 sharpened (saves store facts, never grants); rule 7 (a replay economy is its own
->   pool and context instance); rule 11 extended (an effect's durability is its source fact's
->   durability); rule 12 added (the economy context and its per-context projection recipes);
->   `CurrencyManager` and the file tree updated to match.
-> Edited passages are marked inline with **[rev]**, as above.
-
-> **Revision note (idle-accrual pass).** Changes in this revision, all following the decision that
-> there is no app-level "offline" — idle earnings are per-economy, based on how long that specific
-> economy has been unfocused:
-> - **§6.1** — timed events disable idle payouts while running; the timer pauses while the event is
->   unfocused *(provisional — pause behavior to be verified against Ctrl C)*.
-> - **§9** — offline earnings restated as per-economy idle accrual on focus-gain (generator
->   production only; fans/rehearsal/bars pause while unfocused); the "Double it" ad grants a timed
->   double-idle buff (an expiry fact, the same shape as Encore) rather than doubling one collect.
-> - **§12** — rule 7 gains the per-economy last-interaction timestamp; rule 12 gains the context
->   lifecycle (constructed → focused ⇄ unfocused → discarded, exactly one focused).
-> - **File tree / appendix** — `OfflineEarnings.cs` renamed `IdleEarnings.cs`; summary lines updated.
-> Edited passages are marked inline with **[rev]**, as above.
-
-> **Revision note (per-chapter frontier pass).** The §2 open decision is settled: run currencies are
-> per-chapter ids and advancement opens the next chapter's economy fresh; the capstone implicitly
-> cuts an album so no run value is stranded at the boundary. Edits: **§1** (the capstone banks Fans
-> as Records before advancing), **§2** (decision settled), **§6** (capstone bullet), **§12** rule 12
-> (the unique-id policy now names each chapter's run currencies). Marked **[rev]** inline, as above.
-
-> **Revision note (production-config pass).** A currency no longer declares how it is earned: the
-> engagement earn config moves off the currency definition, and every flat-rate currency source
-> becomes a **production config** — `{currency, amount, trigger: tick | tap, gate: Condition}` —
-> held by its producer, pointing at the currency it creates (the same dependency direction
-> multipliers already use). Two holder kinds today: **generators** (their `produces`/`baseOutput` is
-> a tick-triggered config, scaled by owned count and wrapped in purchase mechanics) and **modules**
-> (the Jam button holds its per-tap yields — Cash, and Rehearsal once revealed — plus Rehearsal's
-> passive trickle). Currencies become pure state: a balance, a group, formatting. Idle eligibility
-> falls out by construction: generators are the only idle-eligible holder (§9), so module-held
-> production never idle-pays and no per-config idle flag exists. Edits: **§3** (Rehearsal bullet),
-> **§6** (tap bullet), **§9** (idle boundary restated as the holder), **§12** (rule 13 added; file
-> tree). Marked **[rev]** inline, as above.
+> **Doc state.** This spec has been through seven revision passes; earlier wordings live in this file's
+> git history rather than being reproduced here. What those passes settled, stated as the current
+> architecture rather than as changes:
+> - **One `Condition` type** and one evaluator for every gate, unlock, visibility and activation rule
+>   (§12 rule 8); **one flag registry** for all progressive reveal (rule 9); every content
+>   ScriptableObject discovered via Addressables (rule 10).
+> - **One modifier registry** (rule 11) — systems compose on read instead of holding their own stacks,
+>   and a grant lives in the same scope as the fact it projects from.
+> - **A chapter is a tree of scopes** (rule 12). A scope owns its truth, owns what presents that truth,
+>   and holds an *ordered* list of child scopes, so a fact's lifetime is **where it lives** rather than a
+>   value it declares. Nothing declares a lifetime: the `run` / `permanent-in-chapter` enum, the economy
+>   context and its projection recipe, `CurrencyPlacement`, and the event sandbox were all replaced by
+>   position in the tree.
+> - **Every flat-rate currency source is a production config** held by its producer rather than a field
+>   on the currency it creates, and a producer may only target its own scope or further out (rule 13).
+> - **A reset names a set of scopes**, chosen by a polymorphic reset target selector (rule 14).
+> - **Run currencies are per-chapter ids** and idle accrual is per scope, paid when a scope is enabled
+>   (§2, §9) — there is no app-level "offline" and no single focused economy.
+>
+> One decision is recorded as **open** in rule 12: the settle boundary across scopes. §6.1 carries a
+> second, smaller one on whether an event timer pauses while its host scope is disabled.
 
 ---
 
 ## 1. Core loop
 
-The game has two loops.
+The game has two *kinds* of loop — a fast one inside a chapter, a slow one across chapters
+— and the inner kind is a **ladder** rather than a single step. A chapter declares an ordered list of
+**tier scopes** (§12 rule 12), each with its own reset, its own banked currency, and its own offer.
+Chapter 1 declares one rung (the album); a later chapter may declare three, where pressing a deeper
+rung resets the shallower ones with it. What follows describes the shape of *a* rung — the shallowest
+is the one the player presses most.
 
 **The album loop (inner).** Within the current chapter the player taps for Cash, buys gear and
 bandmates, grows Fans, and then releases an album. Releasing an album resets the run — Cash, gear,
 Fans, and the working Catalog — and awards **Records**. Each Record permanently increases global
 income, so the next run is faster. The player repeats this loop several times within a chapter.
+A chapter with more than one rung banks a *different* currency at each: the shallow rung's
+payout is an intermediate currency the player spends inside the chapter, and only the deepest rung
+banks Records. Which rung carries the income multiplier, which carries the advancement gate, and
+which is purely archival is a per-chapter authoring decision, not a property of the ladder.
 
 **The chapter loop (outer).** Cumulative Records unlock the current chapter's capstone gig.
-**[rev]** Playing the capstone **implicitly cuts an album** — the run's Fans bank as Records as part
+Playing the capstone **implicitly cuts an album** — the run's Fans bank as Records as part
 of the show — and then advances the player to the next chapter, whose economy opens fresh (run
-currencies are per-chapter, §2/§3). Permanent chapter progress — Records, and any flag or unlock
-declared permanent-in-chapter — is never reset: the climb is forward only. Run-scoped flags and
-unlocks are the other tier and reset with every album release (§2), which is what makes a second run
-re-walk the progression. After advancing, releasing an album resets the run back to the start of the
-*current* chapter, not the garage.
+currencies are per-chapter, §2/§3). Progress filed *outside* the chapter's tier scopes —
+Records, and any flag or unlock living in the chapter scope or the root — is never reached by a rung's
+reset: the climb is forward only. What a rung *does* clear is whatever is filed inside it, flags and
+unlocks included (§2), which is what makes a second run re-walk the progression. After advancing,
+pressing a rung resets back to the start of the *current* chapter, not the garage.
 
 Records are the link between the loops: they raise income and gate chapter advancement. Chapter
 advancement therefore depends on releasing albums over time, not on a single large Cash total.
@@ -124,17 +87,26 @@ cumulative Records.
 Every chapter uses the same rhythm — tap, buy, grow Fans, release an album — with new gear, a new
 mechanic, and a higher Records gate.
 
-**Chapter anatomy.** A chapter consists of: local currencies (Cash, usually Fans, often a
-chapter-specific currency); generators; an upgrade tree (§4); a set of opt-in events (§6); and a
-capstone gig gated by Records.
+**Chapter anatomy.** A chapter is a **scope** (§12 rule 12) holding an ordered list of child
+**tier scopes**. The chapter scope owns whatever the whole chapter shares — the currencies more than
+one tier reads, the chapter-durable flags, the capstone offer — and each tier scope owns what its own
+reset destroys: that tier's currencies, generators, upgrades, bars, and flags. So the old list (local
+currencies, generators, an upgrade tree, opt-in events, a capstone gated by Records) is unchanged in
+content and changed in *filing*: every item now sits in the scope whose reset it should not survive,
+and that placement IS its lifetime.
 
-**[rev] Settled:** each chapter's run currencies are distinct ids, and advancement starts the new
+The consequence worth authoring against: **anything two tiers share must live in their nearest common
+ancestor.** Sibling scopes are not on each other's resolution chain, so a currency or modifier one
+tier needs from another cannot stay filed in that other tier — it moves up. Moving it up is a pure
+data edit, because ids are unique tree-wide and every reference resolves by id (§3).
+
+**Settled:** each chapter's run currencies are distinct ids, and advancement starts the new
 chapter's economy fresh (the Ctrl-C-compatible reading). To keep un-released value from being
 stranded — and to remove the release-before-capstone ritual stranding would create — the capstone
 implicitly cuts an album (§1, §6): the run's Fans convert to Records as part of the show, then the
-next chapter opens fresh. Every frontier context is therefore just the current chapter's context,
-with the same lifecycle as an event sandbox or replay economy (§12 rule 12), and §6's promise that a
-chapter's Cash stays in the thousands–millions range is structural rather than tuned.
+next chapter opens fresh. The frontier is therefore just the current chapter's scope
+instance, built from the same definition a replay economy instantiates (§12 rule 7), and §6's promise
+that a chapter's Cash stays in the thousands–millions range is structural rather than tuned.
 
 **Progressive reveal.** A chapter does not present all its mechanics at once. Content-unlock upgrades
 (§4) introduce new generators, currencies, and mechanics as the player buys them, so the chapter opens
@@ -142,26 +114,50 @@ up in stages. Each such upgrade should introduce a change in play — a new mech
 automation step — rather than only increasing a number, so that a chapter keeps changing as the player
 works through it instead of settling into a single repeated action.
 
-**[rev] Settled:** a section is visible exactly *while* its `visibleWhen` holds — evaluated live,
+**Settled:** a section is visible exactly *while* its `visibleWhen` holds — evaluated live,
 with no latch or lifetime of its own. Persistence is a property of STATE, never of UI: "stays once
-earned" is authored by gating on a fact with that lifetime — a flag (whose declaration carries the
-scope), or a monotonic value like an earned total — and a threshold moment worth remembering is
-latched by a passive content unlock setting a flag (Ch. 1's `browse_gear` at 250 Cash). Gating a
-region directly on a spendable balance is an authoring smell: it strobes with every purchase.
-Distinct from visibility is an action's *pressability* (e.g. the release button, §5), a live
-condition on the content the module presents.
+earned" is authored by gating on a fact with that lifetime — a flag (whose *placement* carries the
+lifetime, §12 rule 12), or a monotonic value like an earned total — and a threshold moment worth
+remembering is latched by a passive content unlock setting a flag (Ch. 1's `browse_gear` at 250
+Cash). Gating a region directly on a spendable balance is an authoring smell: it strobes with every
+purchase. Distinct from visibility is an action's *pressability* (e.g. the release button, §5), a
+live condition on the content the module presents.
 
-**[rev] Settled:** flags declare their lifetime on their declaration in the chapter's flags list —
-never on the `setFlag` effects that set them, so one flag cannot carry two lifetimes. A run-scoped
-flag clears at every release, and everything gating on it (sections, bar groups, production
-configs, meters) goes dark together, re-arming when a run-scoped setter's own gate re-fires — so a
-whole sub-system re-opens through ONE condition authored in ONE place. This is how the second run
-re-walks the chapter's progression (band → fans → covers → gear) instead of opening with every
-system already on screen: Ch. 1 authors `fans`, `covers` and `gear` (and their setter unlocks) as
-run-scoped, while `album` stays permanent — the release button's *region* is knowledge, its
-pressability an offer (§5). Boot validation enforces the pairing: a run-scoped flag whose setters
-are all permanent is a content error (the release's own projection would re-assert it), and a flag
-no content sets warns.
+**Settled:** visibility and *activation* are different axes, and both are Conditions (rule 8) —
+there is still exactly one reveal mechanism (rule 9), evaluated at three levels:
+
+```
+module shows  =  scope.activeWhen  AND  section.visibleWhen  AND  module's own condition
+```
+
+A **scope's** `activeWhen` governs **simulation** — is this state live, is it ticking, is it
+accruing. A **section's** `visibleWhen` governs **presentation** — should the player see this now.
+They must be independently settable, because an active scope has to keep simulating while its display
+is off-screen: an outer scope's generators produce the whole time the player is looking at an inner
+tier. Collapsing the two would make "visible" imply "ticking" and break background production and
+idle accrual outright. Containment supplies the conjunction, so a module never restates its scope's
+or its section's condition, and a module's own condition is not even evaluated when its scope is
+inactive.
+
+This is also why sections are **not** scopes: a section has no truth of its own and runs on its
+scope's context, and its condition answers a different question. Two structurally similar things
+answering different questions are two things.
+
+**Settled:** a flag's lifetime is **the scope it lives in** — not a value on its declaration,
+and never on the `setFlag` effects that set it, so one flag cannot carry two lifetimes. A flag filed
+in a tier scope clears when that tier resets, and everything gating on it (sections, bar groups,
+production configs, meters) goes dark together, re-arming when a setter in that same tier re-fires —
+so a whole sub-system re-opens through ONE condition authored in ONE place. This is how the second
+run re-walks the chapter's progression (band → fans → covers → gear) instead of opening with every
+system already on screen: Ch. 1 files `fans`, `covers` and `gear` (and their setter unlocks) in its
+one tier scope, while `album` sits in the chapter scope — the release button's *region* is knowledge,
+its pressability an offer (§5).
+
+Boot validation enforces the pairing, generalized to placement: **a flag needs at least one setter in
+its own scope or inside it.** If every setter is more durable than the flag, the rebuild re-asserts
+the flag in the same reset that cleared it, and the sub-system never goes dark. A flag no content sets
+still warns. The rule is unchanged in substance from the two-level version — only "run-scoped" and
+"permanent" became "which scope."
 
 Once a chapter is cleared it remains available as a replay economy (§8.1).
 
@@ -169,31 +165,36 @@ Once a chapter is cleared it remains available as a replay economy (§8.1).
 
 ## 3. Currencies
 
-Currencies are either **run-scoped** (reset on album release) or **permanent** (persist across
-albums).
+A currency's durability is **which scope holds its balance** (§12 rule 12). There is no
+`run` / `permanent` flag and no placement enum: a currency filed in a tier scope resets when that tier
+resets, one filed in the chapter scope survives every tier reset in that chapter, and one filed at the
+root survives everything. The headings below ("Run-scoped", "Permanent") therefore name Chapter 1's
+*filing*, not a property of the currencies themselves.
 
-**[rev]** A currency *definition* is global — one registry of everything assignable — but *balances*
-live in per-context pools (§12 rule 12): one permanent pool created at startup, plus one pool per
-economy context (the frontier chapter, an event sandbox, a replay economy). Which pool holds a
-currency's balance is declared by its **group**, so placement is group data beside
-`resetsOnAlbumRelease`; a run-scoped global currency is incoherent and fails validation. An album
-release resets balances *within* the living chapter pool — instance death and run reset are
-different events.
+A currency *definition* is still global — one registry of everything assignable — and **ids are unique
+across the whole tree**. Uniqueness is what makes durability re-tunable by data alone: to make a
+currency survive one more reset level you move its declaration up one scope, and every producer, cost,
+bar and condition referencing it resolves exactly as before. Shadowing is refused rather than resolved
+(rule 12) — an id present in two scopes has two balances, and every read would silently pick whichever
+the resolver reached first.
+
+Resetting a scope clears the balances *it* holds; it never reaches a balance held further out. Scope
+teardown and scope reset are different events (§5).
 
 **Run-scoped:**
 - **Cash** — earned by tapping and generators; spent on gear and upgrades.
 - **Gear & bandmates** — generators bought with Cash (+Cash/tap, +Cash/sec, +Fan rate). A generator
   flagged as a bandmate also raises the Fan rate (§6); bandmate-ness is a data flag, not a hardcoded
-  list. **[rev]**
+  list.
 - **Rehearsal (and later chapters' equivalent fill currencies)** — a run-scoped currency earned from
   engagement (a passive tick plus taps), spent to fill learn-songs bars. Rehearsal is Chapter 1's fill
   currency; a later chapter may define its own. It is an ordinary currency — pure state like any
   other; its accrual comes from production configs held by the chapter's Jam module (a per-tap yield
-  plus a passive trickle, §12 rule 13) and bars reference it by id. **[rev]**
+  plus a passive trickle, §12 rule 13) and bars reference it by id.
 - **Learn-songs bars** — generic *fillable bars* that pace a chapter (learn covers, rehearse). Each bar
   declares a `fillCurrency` (Rehearsal in Ch. 1), a fill requirement, and a reward granted on
   completion; the fill logic reads `fillCurrency` and is not covers-specific. Fed by a fill currency
-  rather than being their own opaque mechanic. Separate from the Catalog (§7). **[rev]**
+  rather than being their own opaque mechanic. Separate from the Catalog (§7).
 - **Fans** — the run's performance meter; determines the album's Records payout on release.
 - **Catalog (Ch. 6+)** — songs written during the run; a global income multiplier that converts to
   Records on album release (§7).
@@ -228,20 +229,26 @@ currencies as they become affordable.
 - **Gating.** An upgrade can be gated on any chapter currency, not only Cash. Which currency unlocks
   which upgrade defines the order in which the player develops each currency, and gives each chapter a
   distinct shape. A gate is expressed as a single `Condition` (§12), so gating on Fans instead of Cash
-  is the same shape with a different currency id — no special case. **[rev]**
+  is the same shape with a different currency id — no special case.
 - **Payloads.** An upgrade can grant a flat bonus, a multiplier, a new generator, a new currency, an
   automation step, a new sub-loop, or a new mechanic.
 - **Reveal.** A content-unlock upgrade reveals its content by **setting a flag** in the single flag
   registry (§12); the revealed content (a currency, a section, a bar group, a button) gates its own
   visibility on that flag. Rewards (§6.1) can set flags too. There is one reveal mechanism, not one per
-  content type. **[rev]**
-- **Scope.** **[rev]** An upgrade's lifetime is authored on its declaration — `run` or
-  permanent-in-chapter — never implied by its type (one declaration owns the lifetime, the same rule
-  as flags, §2). *Buff upgrades* are run-scoped: they reset on album release and are re-bought each
-  run (faster as Records accumulate). *Content-unlock upgrades* (new generator, currency, or
-  mechanic) carry the scope their reveal needs: Ch. 1 authors its reveal chain (the `fans`/`covers`/
-  `gear` setters) run-scoped so the second run re-walks the progression (§2), while a
-  permanent-in-chapter unlock persists across albums with only owned counts resetting.
+  content type.
+- **Scope.** An upgrade's lifetime is **the scope it lives in** — never implied by its type,
+  and never a value it declares (the same rule as flags and currencies, §2/§3). *Buff upgrades* are
+  filed in a tier scope: their purchase latch clears when that tier resets and they are re-bought each
+  run, faster as the banked currency accumulates. *Content-unlock upgrades* (new generator, currency,
+  or mechanic) are filed wherever their reveal needs to live: Ch. 1 files its reveal chain (the
+  `fans`/`covers`/`gear` setters) in the tier scope so the second run re-walks the progression (§2),
+  while an unlock filed in the chapter scope persists across every tier reset with only owned counts
+  going.
+- **Prestige-bought content.** Because placement is lifetime, a generator or upgrade priced in a
+  banked prestige currency needs no new concept — it is filed one scope out from the tier that resets,
+  so it survives the reset that pays for it. A generator's cost currency has always been independent of
+  what it produces (§6), so "buy with the intermediate currency, produce the tier's currency" is a
+  filing decision plus a cost id, not a feature.
 
 ---
 
@@ -249,6 +256,19 @@ currencies as they become affordable.
 
 Releasing an album is the run reset. Its name escalates thematically across chapters (demo, EP,
 record).
+
+Mechanically the release is **one tier scope's reset** — the shallowest rung of the chapter's
+ladder (§1, §12 rules 12 and 14) — and everything below describes that rung rather than a unique
+operation. A reset runs as one atomic step ending at a single settle: the scope's **parent**
+orchestrates it (only the parent knows the sibling order the selector may name), the scope being reset
+**emits its payout on the way out**, and the emitted currency resolves by ordinary outward lookup, so a
+tier can bank into the chapter scope or straight to the root without its immediate parent being the
+recipient. Then the parent clears the selected scopes and re-runs projection (rule 6).
+
+Two authoring rules keep a payout coherent, both already enforced for the single-rung case and both now
+stated per rung: a rung's payout **source** must live in a scope the rung clears (otherwise the same
+value banks on every press, without limit), and its payout **target** must live further out than the
+rung (otherwise the payout is destroyed by the reset that produced it).
 
 - **Resets:** Cash, gear, learn-songs bars, Fans, working Catalog.
 - **Keeps:** Records, Roadies, Discography.
@@ -262,12 +282,12 @@ record).
 
 An early album cycle takes seconds to minutes; cycles get faster as Records accumulate.
 
-**[rev] Settled:** the release is *offered* only while the chapter's album unlock condition holds
+**Settled:** the release is *offered* only while the chapter's album unlock condition holds
 (the same condition that first revealed it — e.g. Ch. 1's 50 Fans + 1 learned cover). Its inputs are
 run values the release itself resets, so the offer disarms at every release and re-arms on the
 re-climb — including re-learning a cover, since bars are run-scoped. The release *region* stays on
-screen because the `album` flag it gates on is permanent-in-chapter (§2); only pressability tracks
-the condition. The release *operation* is deliberately ungated: the capstone implicitly cuts an
+screen because the `album` flag it gates on lives in the **chapter** scope, outside the rung that
+resets (§2/§3); only pressability tracks the condition. The release *operation* is deliberately ungated: the capstone implicitly cuts an
 album (§2) whether or not the offer holds.
 
 ---
@@ -275,7 +295,7 @@ album (§2) whether or not the offer holds.
 ## 6. Within-a-chapter play & events
 
 Moment-to-moment play draws on the systems defined elsewhere:
-- **Tap ("Jam")** — early Cash source; its relevance falls off as gear automates income. **[rev]**
+- **Tap ("Jam")** — early Cash source; its relevance falls off as gear automates income.
   The button is an authored module that holds its tap-triggered production configs (§12 rule 13) —
   Cash always, Rehearsal once revealed — plus Rehearsal's passive trickle, so what engagement yields
   is producer data, never currency data or code.
@@ -295,13 +315,13 @@ Moment-to-moment play draws on the systems defined elsewhere:
   can never be authored without code behind it. Chapter 1's behavior is per-bar with continuous delivery
   (accrued currency streams into the active bar; selecting a bar IS the interaction); tap-a-chunk or
   dump-the-pool variants are sibling behavior classes, and their JSON vocabulary exists only once the
-  class does. **[rev]**
+  class does.
 - **Fans** — accrue passively once revealed: a base rate plus a per-bandmate bonus, a function of
   band size and time only — never Cash or income. Fan rate is tuned loosely relative to Cash so that
   income alone does not determine the album payout.
 - **Capstone gig** — unlocks at the Records gate; grants a Roadie and fires a story beat (§10).
-  **[rev]** Playing it implicitly cuts an album (§5) — the run's Fans bank as Records — before
-  advancing, so no run value is stranded at the chapter boundary. **[rev]** The completion is one
+  Playing it implicitly cuts an album (§5) — the run's Fans bank as Records — before
+  advancing, so no run value is stranded at the chapter boundary. The completion is one
   atomic `EconomyContext` operation ending at a single settle, and unlike the deliberately ungated
   release it is fail-closed: it refuses on an already-set completion flag, on an unmet unlock
   Condition (the operation asks the gate itself, TryBuy-style — a completion latches a permanent
@@ -311,6 +331,13 @@ Moment-to-moment play draws on the systems defined elsewhere:
   capstone's `OnComplete` state from it at every rebuild. The offer surface is an ordinary module
   (`module/capstone`) in a section gated coarsely (first Record) while the button's pressability is
   the capstone's own unlock — region coarse, action precise, the release's exact arrangement.
+  In ladder terms the capstone is the chapter's **deepest rung** (§1, §5): it selects every
+  tier scope in the chapter, so "it implicitly cuts an album" stops being a special case and becomes
+  simply what clearing a deeper rung means. What stays particular to it is declared rather than
+  hardcoded — the fail-closed operation gate (the release's is deliberately absent), the completion
+  flag it latches, and the chapter advance that follows. Whether that advance is the ladder's terminal
+  rung or a step above it is the open decision recorded in rule 12: a chapter boundary discards the
+  whole chapter scope, so it may need no reset implementation at all.
 
 ### 6.1 Events
 
@@ -325,29 +352,50 @@ beneficial to chapter pace that a reasonable player will do it, and skipping it 
 grind. The chapter is always completable without any given event, but only quickly with the events its
 tuning intends the player to do. Chapter pacing is set with each event's intended engagement in mind.
 
-- **On start,** the event constructs a fresh economy context at a fixed baseline (§12 rule 12): its
-  recipe projects the chapter's permanent-in-chapter facts only — earlier tiers' rewards apply, but
-  no run facts carry in and no global derivation (Records) is registered — so the challenge runs at
-  a fixed scale independent of the player's accumulated power, and the suspended run is never
-  touched. Quitting or failing discards the context; there is nothing to unwind. This is what lets a
-  debuff be meaningful — the player is working from a known floor rather than an arbitrary fortune.
-  **[rev]**
+**Settled:** an event is **not a scope**. It is a *component attached to* a scope — the tier it
+challenges — and it needs no economy of its own, no sandbox, no seed recipe, and no projection filter.
+That is what replaces the isolated-context design this section previously specified.
+
+- **On start,** the event **resets its host scope**, and that reset behaves exactly like the
+  rung's ordinary reset (§5) — it **emits its payout**. So entry banks the run rather than discarding
+  it, and entering costs nothing but time. This is deliberate and it is why entry does not ask: the
+  reset happens either way, so the starting state is identical whether the player was paid or not, and
+  declining payment would be pure loss. A "bank it first" ritual is the same stranding §2 removed from
+  the capstone, and an option whose right answer never changes is a trap rather than a choice. Having
+  reset its host, the event then registers its handicap (below) and runs the tier normally, receiving
+  ticks like anything else in that scope, and tearing itself down on success, failure, or quit.
+- **Scale.** An event **scales with the player's accumulated power**, deliberately. Resetting the
+  host scope zeroes that tier's own facts, but outer scopes stay on the resolution chain, so every
+  banked multiplier still applies. A tier may therefore be *unbeatable* until the player has advanced
+  further through the normal loop — "come back later" is the intended experience, and the returning
+  player's own growth is what makes the tier winnable. This replaces the fixed-baseline model, which
+  excluded the main power source and so left an event ladder that only its own clears could advance:
+  under a fixed floor a tier was beatable now or never. The promise that matters is untouched — an event
+  gated on the player's *power* still never gates *chapter advancement*.
 - **Goal:** reach a target amount of a currency.
 - **Debuff (optional):** the run is modified — generation halved, automation disabled, tap-only, a
   currency locked. Debuffs change how the loop is played, which is where an event's variety comes from.
-- **Timer (optional):** adds a time limit. Timed events are the only events that can be failed.
-  **[rev]** While a timed event is running, idle payouts (§9) are disabled; the timer pauses while
-  the event is unfocused *(provisional — verify the pause against Ctrl C)*.
-- **Failure:** a failed timed event resets that event's progress; the player can quit an event at any
-  time. Failing or quitting costs only the time spent, not permanent progress, so entering an event is
-  always low-risk.
-- **Reward on success:** a lateral bonus — a permanent-in-chapter buff, a Roadie, a Catalog song, or
-  local currency, drawn from the shared reward pool (§12). Event rewards never include Records or any
-  currency that gates advancement, so an event is never a hard prerequisite; its reward size (above) is
-  what sets how much it matters. **[rev]**
+  A debuff is an ordinary modifier (rule 11) registered in the host scope by the event
+  component, so it is resolved by the same outward walk as everything else and disappears when the
+  component tears down. A debuff is a power check rather than a constant-difficulty puzzle.
+- **Timer (optional):** adds a time limit. A timed event is the only kind that can be *failed*
+  outright; an untimed event at insufficient power is not failed so much as unfinishable, and the player
+  quits. While a timed event is running, idle payouts (§9) are disabled, and the timer pauses while its
+  host scope is disabled — **open:** the pause is provisional, to be verified against Ctrl C before any
+  timed event ships, since a timer that keeps running off-screen is a deadline the player cannot attend
+  to and would have to be a deliberate choice rather than an inherited one.
+- **Failure:** a failed timed event resets that event's progress; the player can quit at any time.
+  Failing or quitting costs only the time spent and never permanent progress — which holds because entry
+  already banked the run.
+- **Reward on success:** a lateral bonus — a chapter-durable buff, a Roadie, a Catalog song, or local
+  currency, drawn from the shared reward pool (§12). Event rewards never include Records or any currency
+  that gates advancement, so an event is never a hard prerequisite; its reward size (above) is what sets
+  how much it matters. The event's own reset must not bank a *reward* — the entry emit pays the
+  ordinary rung payout and nothing more, so a rerun tier cannot be farmed for advancement currency.
 - **Tiers:** an event can repeat at higher tiers with a higher starting requirement, a stronger debuff,
   and a larger reward. The rising requirement across tiers is a natural throttle, which makes tiered
-  events a repeatable source of Roadies.
+  events a repeatable source of Roadies. With scaling, the throttle is the player's power
+  curve rather than the requirement alone, which is what ties the event ladder to main progression.
 
 Event authoring guidelines: most events use debuffs; timed events are used sparingly; failure stays
 cheap; larger events include a decision (risk/reward, or which song to submit) rather than a single
@@ -395,11 +443,12 @@ generators, and completion goal. This replay economy is isolated: the player's g
 progress do not apply inside it, so it runs at its own scale regardless of how far the player has
 advanced overall. The isolation is what keeps an early chapter worth replaying late — it cannot be
 cleared instantly by the player's accumulated power, because that power does not reach inside it.
-**[rev]** Isolation is achieved by construction, not exemption (§12 rule 12): a replay economy is
-its own context with its own currency ids, projecting only the facts its recipe names — Roadie
-allocation and its own replay-local facts. It does not inherit the chapter's permanent-in-chapter
-facts (event-tier buffs earned at the frontier do not apply inside a replay); after the capstone,
-those facts are archival.
+Isolation is achieved by construction, not exemption (§12 rules 7 and 12): a replay economy
+is a **second instance** of that chapter's scope definition, with its own balances under its own
+instance identity, reading outward only as far as the root's Roadie allocation. It shares no state with
+the frontier's instance of the same chapter, so event-tier buffs earned at the frontier do not apply
+inside a replay; after the capstone those facts are archival. The two instances are never enabled at
+once (rule 7), which is what replaces the old exactly-one-focused guarantee.
 
 Replaying a chapter means building its local economy up to the current goal and clearing it, which
 awards a Roadie. Each clear raises that chapter's next goal:
@@ -438,23 +487,25 @@ larger venues reward more crew. Values to be set during tuning.
 All ads are opt-in and return a concrete reward; there are no forced interstitials. Everything
 purchasable is also earnable in-game.
 
-**Idle earnings (per economy). [rev]** There is no app-level "offline": each economy context (§12
-rule 12) tracks when it was last interacted with, and an unfocused economy accrues nothing live —
-instead it pays `generatorProduction × min(idleSeconds, cap) × rate` at the moment it gains focus,
-with **rate = 50%**, **cap = 4 hours** per economy (raisable via the Backstage Pass), and no payout
-below a minimum idle threshold (a too-quick refocus earns nothing). Closing the app is just the
-state where every economy is unfocused; launching is an ordinary focus-gain on the chapter you
-return to — so in-game chapter switching (Ch. 2+) and time away are one mechanic, not two.
-**Generator production only:** fans, rehearsal, and bar progress pause while unfocused — engagement
+**Idle earnings (per scope).** There is no app-level "offline": each **scope** (§12 rule 12)
+tracks when it was last interacted with, and a **disabled** scope accrues nothing live — instead it
+pays `generatorProduction × min(idleSeconds, cap) × rate` at the moment it is **enabled**, with
+**rate = 50%**, **cap = 4 hours** per scope (raisable via the Backstage Pass), and no payout below a
+minimum idle threshold (a too-quick re-enable earns nothing). Closing the app is just the state where
+every scope is disabled; launching enables the scopes you return to — so in-game chapter switching
+(Ch. 2+) and time away are one mechanic, not two. Note this is per *scope*, not per economy: several
+scopes are enabled at once (rule 7), and an outer scope's generators keep producing live while the
+player works inside a tier, so only the scopes actually disabled accrue idle time.
+**Generator production only:** fans, rehearsal, and bar progress pause while their scope is disabled — engagement
 currencies never earn while the player is not engaging, and idle fan accrual would let time away
-shortcut the Records payout (§11). **[rev]** With production configs (§12 rule 13) this boundary is
+shortcut the Records payout (§11). With production configs (§12 rule 13) this boundary is
 the holder, by construction: idle pays only configs held by generators. Module-held configs never
 idle-pay — a tap-triggered config cannot fire while nobody taps, and Rehearsal's passive trickle
 lives on the Jam module, not on a generator — so there is no per-config idle flag to author or get
 wrong. The base rate is set at 50% so that the doubled value is a full
 100%. Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
-**[rev]** Doubling is a **timed buff**, not a per-collect choice: the "Double it" ad grants a fact
+Doubling is a **timed buff**, not a per-collect choice: the "Double it" ad grants a fact
 with an expiry — every idle payout collected while it is active is doubled — rather than doubling
 one collect screen (doubling on every switch, as Ctrl C allows, over-serves frequent switchers).
 Structurally it is the same shape as Encore: a timed multiplier fact that modifiers derive from
@@ -462,7 +513,7 @@ Structurally it is the same shape as Encore: a timed multiplier fact that modifi
 
 | Player | Idle payout | How |
 |---|---|---|
-| Free, no action | 50% | Auto-collected on focus-gain |
+| Free, no action | 50% | Auto-collected when the scope is enabled |
 | Free, watches ad | 100% (2×) while the buff lasts | "Double it" ad grants a timed double-idle buff |
 | Backstage Pass owner | 100% (2×) always | The double-idle fact is permanently on |
 
@@ -528,7 +579,7 @@ Catalog multipliers) and confirm each chapter still takes meaningful play time.
 
 Content is data-driven via ScriptableObjects so chapters, gear, and songs are data assets. All
 definition ScriptableObjects are discovered at runtime through **Addressables** (a label per type),
-not direct references or hardcoded lists (see architecture rule 10). **[rev]**
+not direct references or hardcoded lists (see architecture rule 10).
 
 ```
 Assets/Scripts/
@@ -536,40 +587,44 @@ Assets/Scripts/
     GameManager.cs        // bootstrap, save/load + tick orchestration
     TickSystem.cs         // fixed-interval update on real (DateTime) time
     BigNumber.cs          // wraps break_infinity.cs
-    CurrencyManager.cs    // [rev] one class, one instance per pool: a startup pool (Records/Roadies) + one per economy context (run currencies)
-    EconomyContext.cs     // [rev] rule 12: the per-economy bundle (currency pool + systems + modifiers + flags), built from a projection recipe; the album release is its ReleaseAlbum operation and the chapter gate its CompleteCapstone operation
-    ContentDatabase.cs    // [rev] Addressables discovery of all definition SOs by label; id→def registries
-    Condition.cs / ConditionEvaluator.cs   // [rev] one gate/unlock/visibility/availability type + one evaluator
-    GameEffect.cs / GameAction.cs   // [rev] grants split by category: an effect is re-applicable state every rebuild re-runs; an action is a one-shot award only its player-action moment executes (a payout paid twice is inexpressible, not validated against)
-    FlagSystem.cs         // [rev] single reveal registry; each flag's declared scope (run | permanent-in-chapter) decides what a release clears
+    CurrencyManager.cs    // one class, one instance per scope that owns balances
+    Scopes/ScopeDefinition.cs / Scope.cs   // rule 12: definition + instance (rule 7). A scope owns its truth (pool + systems + modifiers + flags), its sections, and an ORDERED list of child scopes; lifetime is placement, so this replaces EconomyContext, EconomyRecipe and CurrencyPlacement
+    Scopes/ScopeChain.cs  // rule 12: the one iterator over "my scope outward to the root, enabled only" - three public resolvers (ResolveCurrency first-owner-wins / ResolveFlag any / ResolveModifiers accumulate) fold it their own way; no mode parameter
+    Scopes/ResetTargetSelector.cs   // rule 14: polymorphic (self-and-contained | preceding-siblings | named), resolved by the scope owning the order, output closed downward
+    PrestigeTierDefinition.cs   // rule 12/14: one rung - payout formula, offer Condition, optional fail-closed operation gate, onComplete effect, one-shot actions, optional completion flag
+    PayoutFormula.cs      // polymorphic like Condition; Ch1's floor((fans/5)^0.5) is one instance
+    ContentDatabase.cs    // Addressables discovery of all definition SOs by label; id→def registries
+    Condition.cs / ConditionEvaluator.cs   // one gate/unlock/visibility/availability type + one evaluator
+    GameEffect.cs / GameAction.cs   // grants split by category: an effect is re-applicable state every rebuild re-runs; an action is a one-shot award only its player-action moment executes (a payout paid twice is inexpressible, not validated against)
+    FlagSystem.cs         // single reveal registry, one instance per scope; a flag's lifetime is the scope holding it
   Loop/
     ChapterDefinition.cs / Chapter.cs   // mechanic, capstone, Records gate, story beat
     ChapterManager.cs     // forward-only advancement + unlocks
   Economy/
-    GeneratorDefinition.cs / Generator.cs   // isBandmate is a data field the fan system reads   // [rev]
-    UpgradeDefinition.cs / Upgrade.cs   // [rev] payload = buff | setFlag (reveal via flag); gate = any Condition; scope = run | permanent-in-chapter; one-shot awards are GameActions, executed by the purchase alone
-    BarDefinition.cs / BarGroupDefinition.cs / BarSystem.cs   // [rev] generic fillable bars (fillCurrency-driven); replaces LearnSongBar
-    RewardDefinition.cs / RewardManager.cs   // [rev] shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
-    CostCalculator.cs / ProductionCalculator.cs   // [rev] formula only; the modifiers that scale production live in the registry
-    ProductionConfig.cs / ProductionSystem.cs   // [rev] rule 13: {currency, amount, trigger, gate} held by producers; the system fires module-held configs (tap + tick); replaces EngagementEarnSystem/TapSystem
-    Modifiers/ModifierSystem.cs   // [rev] one registry for every stat modifier: granted (carries scope) + derived (computed from a source); the composition rule lives here
-    CapstoneSystem.cs     // [rev] the completed-capstone fact source: the declared completion flag is the latch, projection re-applies OnComplete from it; the completion's own facts run only from CompleteCapstone
+    GeneratorDefinition.cs / Generator.cs   // isBandmate is a data field the fan system reads
+    UpgradeDefinition.cs / Upgrade.cs   // payload = buff | setFlag (reveal via flag); gate = any Condition; NO scope field - lifetime is the scope it is filed in; one-shot awards are GameActions, executed by the purchase alone
+    BarDefinition.cs / BarGroupDefinition.cs / BarSystem.cs   // generic fillable bars (fillCurrency-driven); replaces LearnSongBar
+    RewardDefinition.cs / RewardManager.cs   // shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
+    CostCalculator.cs / ProductionCalculator.cs   // formula only; the modifiers that scale production live in the registry
+    ProductionConfig.cs / ProductionSystem.cs   // rule 13: {currency, amount, trigger, gate} held by producers; the system fires module-held configs (tap + tick); replaces EngagementEarnSystem/TapSystem
+    Modifiers/ModifierSystem.cs   // one registry per scope: granted (lives where its fact lives, no scope value) + derived (computed from a source); the composition rule lives here, resolution is the ScopeChain walk
+    CapstoneSystem.cs     // the completed-capstone fact source: the declared completion flag is the latch, projection re-applies OnComplete from it; the completion is the chapter's deepest rung (rule 14)
   Events/
-    EventDefinition.cs / GameEvent.cs   // baseline reset, optional debuff, optional timer, goal, tier, reward
-    EventManager.cs       // enter/quit/fail/succeed, tiers, sandboxed economy snapshot
+    EventDefinition.cs / GameEvent.cs   // optional debuff, optional timer, goal, tier, reward; NO baseline-reset field - entry resets the host scope
+    EventComponent.cs     // rule 12 / section 6.1: an event is a COMPONENT on a scope, never a scope. Start = reset the host (which emits its payout, so entry is free) + register handicap modifiers + start timers; ticks with the host; tears down on success/fail/quit. Replaces EventManager's sandboxed snapshot
   Meta/
-    RoadieAllocation.cs   // [rev] Chapter 2: per-venue allocation, product boost, replay ramp; the Roadie pool is the global `roadies` currency, not a manager
+    RoadieAllocation.cs   // Chapter 2: per-venue allocation, product boost, replay ramp; the Roadie pool is the global `roadies` currency, not a manager
   Content/
     SongDefinition.cs / Song.cs         // Catalog (run) + Discography (permanent)
   Save/
-    SaveData.cs / SaveSystem.cs         // JSON + checksum
-    IdleEarnings.cs       // [rev] per-economy idle accrual on focus-gain (time since that economy's last interaction), 50% base
+    SaveData.cs / SaveSystem.cs         // JSON + checksum; one block per SCOPE INSTANCE, nested as the scopes are, with stable instance identity (rule 6)
+    IdleEarnings.cs       // per-SCOPE idle accrual paid when a scope is enabled (time since that scope's last interaction), 50% base
   Monetization/
     AdManager.cs          // rewarded only (Encore top-up + offline Double it)
     IAPManager.cs         // Backstage Pass (non-consumable) + Roadie bundles (consumable) + Tip Jar
   UI/
     ChapterScreenUI.cs  StoryBeatUI.cs  CollectScreenUI.cs
-    SectionView.cs  ModuleRegistry.cs   // [rev] data-driven layout: sections + module→prefab (Addressables) with visibleWhen Conditions
+    SectionView.cs  ModuleRegistry.cs   // data-driven layout: sections + module→prefab (Addressables). A section belongs to a scope and is NOT a scope; a module shows when scope.activeWhen AND section.visibleWhen AND its own condition all hold (section 2)
     RoadieAllocationUI.cs  GeneratorRowUI.cs  NumberFormatter.cs
 ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bars/  Rewards/  Songs/
 ```
@@ -581,87 +636,136 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 3. Drive UI from events; do not poll balances per frame.
 4. Checksum saves and validate on load; cap offline earnings in the client.
 5. Keep content in ScriptableObjects, discovered via Addressables (rule 10); the regular per-chapter
-   gear curve can be generated by an editor script. **[rev]**
-6. **[rev]** Separate the run block and permanent block in the save schema. An album release clears
-   the run block and writes the permanent block. Saves store **facts** (balances, purchase latches,
-   completed bars, cleared tiers, clear counts) and never modifier grants; derived modifiers are
-   never serialized. On load, each economy context re-projects its modifiers from the restored facts
-   at construction (rule 12), so an effect can never disagree with the fact that produced it.
-   **[rev]** Re-projection is the **only** way a modifier comes into existence, at every boundary and
-   not just at load. An album release resets the facts it owns — balances, owned counts, run-scoped
-   purchase latches, bar progress — and then re-runs the projection, which rebuilds the modifier store
-   from whatever facts survived. It does **not** reach into the store to remove the run-scoped entries
-   and leave the rest. A store that is rebuilt cannot hold a stale or double-counted effect, so rule
-   11's "durability follows the fact" stops being an invariant something has to maintain and becomes
-   the only thing the code can express. Two mechanisms for one modifier set — filter in place on
-   release, rebuild from facts on load — would be written by different slices, exercised on different
-   days, and able to disagree silently; that disagreement is exactly the compounding failure rule 11
-   describes. The obligation re-projection takes on in exchange is **totality**: every fact class that
-   produces a modifier must be walkable at construction, which is what the context's recipe (rule 12)
-   declares.
-7. **[rev]** Store each cleared chapter's replay economy as its own state block (local currency,
-   generators, goal `k`, last-interaction timestamp), separate from frontier state — in code, its own
-   currency pool and context instance (rule 12), not scope tags inside shared managers. The only
+   gear curve can be generated by an editor script.
+6. The save is **one block per scope instance**, nested the way the scopes are (rule 12) —
+   which replaces the flat run-block/permanent-block split, since "run" and "permanent" are no longer
+   two categories but positions in a tree of arbitrary depth. This makes **stable scope-instance
+   identity** a save requirement: a tier that has been reset and rebuilt must be recognizable as the
+   same scope, and a replay instance must be distinguishable from the frontier's instance of the same
+   scope definition (rule 7). Saves store **facts** (balances, purchase latches, completed bars,
+   cleared tiers, clear counts) and never modifier grants; derived modifiers are never serialized. On
+   load, each scope re-projects its modifiers from the restored facts at construction, so an effect can
+   never disagree with the fact that produced it.
+   Re-projection is the **only** way a modifier comes into existence, at every boundary and
+   not just at load. A reset clears the facts held by the scopes it selected — balances, owned counts,
+   purchase latches, bar progress, flags — and then re-runs the projection, which rebuilds the modifier
+   store from whatever facts survived. It does **not** reach into the store to remove entries and leave
+   the rest. A store that is rebuilt cannot hold a stale or double-counted effect, so rule 11's
+   "durability follows the fact" stops being an invariant something has to maintain and becomes the only
+   thing the code can express. Two mechanisms for one modifier set — filter in place on reset, rebuild
+   from facts on load — would be written by different slices, exercised on different days, and able to
+   disagree silently; that disagreement is exactly the compounding failure rule 11 describes. The
+   obligation re-projection takes on in exchange is **totality**: every fact class that produces a
+   modifier must be walkable at construction. The scope tree discharges that structurally — a scope
+   holds the systems whose facts it owns, so a system that exists is a system that gets projected, and
+   there is no second list to keep in step.
+7. A cleared chapter's replay economy is **another instance of that chapter's scope
+   definition** (local currency, generators, goal `k`, last-interaction timestamp), separate from the
+   frontier's instance — which is what makes scopes need a **definition/instance split**, the same one
+   `ChapterDefinition`/`Chapter` and `GeneratorDefinition`/`Generator` already have. Isolation is then
+   construction rather than exemption and needs no scope tags inside shared managers. The only
    cross-writes are Roadie allocation in and Roadie award out.
-8. **[rev]** Express every gate/unlock/visibility/availability rule as a single `Condition` type
+   There is no single "focused" economy. Scopes are **enabled or disabled**, plural: several
+   are enabled at once (an outer scope keeps producing while the player works inside a tier), only
+   enabled scopes are ticked, and a disabled scope accrues nothing live and is paid idle earnings when
+   re-enabled (§9). Since exactly-one-focused is what previously made double-counting impossible by
+   construction, that guarantee needs its own statement here: **two instances of the same scope
+   definition are never enabled at once** — a replay instance and the frontier's instance of one
+   chapter are mutually exclusive. Each scope's last-interaction timestamp lives in its own save block.
+8. Express every gate/unlock/visibility/availability rule as a single `Condition` type
    evaluated by one `ConditionEvaluator` — no per-currency or per-rule branches. Condition types:
    `currency`, `currencyEarnedTotal`, `ownedCount`, `flagSet`, `barsCompleted`, `recordsCumulative`,
    `compound` (all/any).
-9. **[rev]** Drive all progressive reveal through one flag registry: a content-unlock upgrade (or a
+9. Drive all progressive reveal through one flag registry: a content-unlock upgrade (or a
    reward) sets a flag; revealed content gates its visibility on a `flagSet` Condition. No parallel
    reveal paths (no separate "unlockSystem").
-10. **[rev]** Discover all content ScriptableObjects (chapters, currencies, currency groups, generators,
+10. Discover all content ScriptableObjects (chapters, currencies, currency groups, generators,
     upgrades, events, bars, rewards) via Addressables labels; managers build their id→definition
     registries from the labelled assets, not from hardcoded lists or direct references. Validate that
     every referenced id resolves on load.
-11. **[rev]** Compose every stat modifier through one registry — no system keeps its own multiplier or
+11. Compose every stat modifier through one registry — no system keeps its own multiplier or
     bonus stack. Each asks for the composition on its target and applies it, where a target is a closed
     kind (tap value, fan rate, a generator's output, a currency's production) plus, for the kinds that
     act on one thing, the designer id they name. The rule is `(base + adds) × multipliers`, expressed in
     exactly one place, so two systems cannot disagree about the order their modifiers apply in. A
     **granted** modifier is a fact established at a moment (a bought buff, a completed bar, a cleared
-    event tier) and carries a `scope`; a **derived** modifier computes from a source on every read and
-    carries no scope, because its lifetime is its source's and two answers to "does this survive a
-    release" could disagree. Keep grants individually rather than accumulating them into one number:
+    event tier) and is *stored*, in the scope holding that fact; a **derived** modifier is not stored at
+    all — it computes from its source on every read, so it has no placement of its own and cannot give a
+    second answer to "does this survive a release." Keep grants individually rather than accumulating them into one number:
     that is what makes a run reset exact, and it makes the reset a single call instead of a per-system
     enumeration that silently misses whichever system was added last. A modifier reaches only the target
     it names, which is what keeps an income buff off a fans or merch producer.
-    **[rev]** The scope a grant carries is a working copy of its originating fact's declared scope, which
-    is the single authoritative lifetime: **an effect's durability is exactly the durability of the fact
-    it projects from.** Each fact declares that lifetime where the fact itself lives - the upgrade
-    definition for a bought buff, the bar group for a completed bar, the event tier for a cleared tier -
-    and never on the effect, nor on a reward definition, which is a reusable projection rather than a
-    fact and so has no lifetime of its own to declare. A scope on a shared reward could disagree with the
-    content applying it, and the disagreement is invisible: a run-scoped source granting a
-    permanent-in-chapter effect re-grants it every run and compounds without limit. Anything that must
-    survive a reset boundary is therefore derived from a fact that owns that lifetime (the Records total,
-    the Roadie allocation, an entitlement, a clear count) — there is no global grant store and no grant
-    ever migrates across a chapter boundary. Wanting a granted global effect is the smell that its
-    underlying fact has not been named yet.
-12. **[rev]** Bundle the per-economy systems (currency pool, generators, upgrades, bars, fans,
-    production (rule 13), modifiers, flags, condition context) into one **economy context**, constructed
-    from a recipe and instantiated per economy: one startup pool holds the global currencies, and each
-    frontier chapter, event sandbox, and replay economy is its own context. A context's recipe declares
-    which fact classes it projects into modifiers at construction:
+    A grant lives in the **same scope as the fact it projects from**, which is the single
+    authoritative lifetime: **an effect's durability is exactly the durability of the fact it projects
+    from.** That is now structural rather than copied — a grant does not carry a scope value that could
+    drift from its source, it simply sits where its source sits, and the reset that clears the fact
+    clears the grant with it. No lifetime is declared on the effect, nor on a reward definition, which is
+    a reusable projection rather than a fact and so has no lifetime of its own: a scope on a shared
+    reward could disagree with the content applying it, and the disagreement is invisible — a
+    short-lived source granting a longer-lived effect re-grants it every run and compounds without limit.
+    Anything that must survive a reset is therefore derived from a fact that lives further out (the
+    Records total, the Roadie allocation, an entitlement, a clear count). Wanting a granted global effect
+    is the smell that its underlying fact has not been named yet.
+    Modifier *resolution* is the outward walk of rule 12: a target composes every contribution
+    found from its own scope to the root, so a buff in an outer scope reaches inward without anything
+    registering it inward. This is also the only channel by which an outer scope influences an inner one
+    (rule 13).
+12. **The scope tree.** A **scope** is the unit of economy, lifetime, and presentation at once. It
+    owns: its **truth** — currency balances, modifiers, flags, and the systems (generators, upgrades,
+    bars, production, conditions) whose facts it holds; what **presents** that truth — its sections and
+    their modules (§2); and an **ordered list of child scopes**.
 
-    | Context | Projects |
-    |---|---|
-    | Frontier chapter | global facts + its chapter-permanent facts + run facts |
-    | Event sandbox | chapter-permanent facts only |
-    | Replay economy | Roadie allocation + replay-local facts |
+    This one concept replaces the economy context, its projection recipe, currency placement, and the
+    `run` / `permanent-in-chapter` lifetime enum. A fact's lifetime is **where it lives** — the scope
+    that resets it. Nothing declares a lifetime, so no declaration can disagree with the reset that acts
+    on it, the same way a payout paid twice is inexpressible rather than validated against.
 
-    Currency ids are unique wherever two balances are genuinely different things — **[rev]** each
-    chapter's run currencies (settled in §2) and a replay economy's local currency — so an id names
-    one balance and resolution is a construction-time ownership check, never a runtime fall-through. Orchestration (album release, event entry, capstone)
-    is written against the context, not against a global manager, so a second economy is an
-    instantiation rather than a rewrite.
-    **[rev]** A context has a lifecycle — constructed → focused ⇄ unfocused → discarded — with exactly
-    one focused context at a time. Only the focused context is ticked; unfocused economies accrue
-    nothing live and are paid idle earnings on focus-gain (§9), which is what makes double-counting
-    impossible by construction. Each context's last-interaction timestamp lives in its state block
-    (rule 7). The suspended run during an event is simply unfocused, and an app launch is an ordinary
-    focus-gain.
-13. **[rev]** Every flat-rate currency source is a **production config** — `{currency id, amount,
+    ```
+    root  (Records, Roadies, entitlements - nothing resets these)
+      +-- chapter scope  (what the whole chapter shares; the capstone offer)
+            +-- tier scope 1   (the shallowest rung - reset most often)
+            +-- tier scope 2
+            +-- ...            (ordered; the ladder of section 1)
+    ```
+
+    **Resolution walks outward.** A generator asking for its modifiers, a cost asking for a balance, a
+    Condition asking for a flag — each starts at its own scope and walks toward the root, the direction
+    of increasing durability. There are three resolutions and they are **three public functions**, not
+    one with a mode parameter, because what each does at a link genuinely differs:
+
+    | Resolving | At each link | Result |
+    |---|---|---|
+    | a currency | does this scope own the id? | first owner wins — one balance |
+    | a flag | is it set here? | any link satisfies |
+    | modifiers | collect whatever targets me | every link contributes |
+
+    "Accumulate a currency" is not a concept, so a shared mode vocabulary would be a union of things that
+    never apply to each other. One internal helper performs the iteration — which links, in what order,
+    which are enabled — so **what is in scope** has exactly one answer, and the three functions consume
+    it and fold it their own way.
+
+    **Sibling scopes are not on each other's chain.** Anything two scopes share therefore lives in their
+    nearest common ancestor (§2), and moving a declaration outward is how a fact becomes more durable.
+    **Ids are unique tree-wide** and shadowing is refused rather than resolved: an id in two scopes has
+    two balances, and every read would silently pick whichever the resolver reached first. Uniqueness is
+    also what makes the move a pure data edit.
+
+    **Invalidation runs the other way.** Reads go outward; change notifications go inward, because an
+    inner module gating on a root currency must re-evaluate when that currency moves. A scope therefore
+    subscribes to its ancestors' change signals, which makes disposal discipline load-bearing rather than
+    tidy — a discarded scope still listening keeps a dead economy's subscribers alive and feeds them
+    changes for something nobody is playing.
+
+    Orchestration (a rung's reset, event entry, the capstone) is written against the scope, so a second
+    economy is an instantiation rather than a rewrite (rule 7).
+
+    **OPEN DECISION — the settle boundary.** Every top-level operation ends at a single settle, so that
+    condition-dependent values re-evaluate exactly once after the whole mutation. In a tree, one mutation
+    spans scopes: a tier reset emits into an outer scope, whose subscribers must settle too. The settle
+    owner is presumably the outermost scope touched, and the deferral/suppression machinery would have to
+    work across scopes rather than inside one context — but this is **not resolved**, and it is the
+    invariant everything else rests on. Settle it before implementing the tree.
+13. Every flat-rate currency source is a **production config** — `{currency id, amount,
     trigger: tick | tap, gate: Condition}` — held by its producer, never by the currency: a currency
     is pure state (a balance, a group, formatting), and the dependency points from producer to
     currency, the same direction a multiplier points at its targets (§3). Two holder kinds exist
@@ -680,6 +784,43 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     else is refused at import and reported at boot. Sources
     with formula-driven rates stay their own systems — the fan rate is a function of band size (§6),
     not a flat amount — and rewards/grants are rule-11 facts, not production.
+    **Production direction.** A producer may only target a currency in **its own scope or further
+    out** — never inward. An outer generator producing into an inner scope's currency would outlive its
+    own target, and after the inner scope resets it would be paying into a balance that no longer has an
+    owner. The reverse is legal and load-bearing: an inner scope generating an outer currency is how a
+    tier feeds the chapter continuously, alongside the rung payout it emits on reset (§5). So influence
+    flows **inward only as modifiers** resolved on the outward walk (rule 11), and value flows **outward
+    only as production and payouts**. Both directions are statically checkable at import: resolve the
+    producer's scope and the target currency's scope and refuse a strictly-inner target. A production
+    config itself carries **no** lifetime declaration — its durability is its holder's, and its gate is
+    an ordinary Condition reading flags that carry their own placement, so adding a scope field here
+    would be a second answer to a question already answered twice.
+14. **Reset selection.** A reset names a **set of scopes**, chosen by a polymorphic **reset target
+    selector** — the same shape as `Condition`, `BarFillBehavior` and `GameEffect`, where the JSON
+    vocabulary maps onto a concrete class at import so a mode can never be authored without code behind
+    it. Members today:
+
+    | Selector | Selects |
+    |---|---|
+    | self and contained | this scope plus every scope inside it |
+    | preceding siblings | this scope plus the siblings *before* it in the parent's ordered child list |
+    | named | an explicit list of scope ids |
+
+    Two rules constrain any selector's output. **The set closes downward:** selecting a scope selects
+    everything inside it, because an inner scope may legitimately use an outer currency, and clearing the
+    outer while leaving the inner strands a cost or gate pointing at a balance with no owner. And **the
+    selector is resolved by the scope that owns the ordering** — a tier asking for "preceding siblings"
+    asks its parent, the only thing that knows the order. That is what keeps every read outward-only: no
+    scope enumerates its own siblings.
+
+    Order lives in the parent's **ordered child list** and nowhere else; a second ordering list would be a
+    second home for one fact. Because that order is semantic, reordering the list is a game-logic change
+    rather than a layout change, which the data should say out loud. Transient attachments (an event's
+    host relationship, §6.1) carry no ordinal at all, so a selector can never sweep one up.
+
+    The selector belongs to the **scope instance** (rule 7), never to the module that presents it: a
+    module is a prefab that can be placed more than once, so a target list living on it would be two
+    sources of truth for one scope's lifetime. The module reads whatever instantiated it.
 
 **Starter prompt for a code assistant:**
 > "In Unity (version X, iOS/Android), scaffold a nested-prestige idle core: a CurrencyManager with a run
@@ -696,32 +837,37 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 
 ## Appendix — at a glance
 
-- **Structure:** nested prestige — an inner album loop inside an outer, forward-only chapter climb
-  (8 chapters).
+- **Structure:** nested prestige on a **scope tree** — a chapter scope holding an ordered ladder of
+  tier scopes, inside an outer, forward-only chapter climb (8 chapters). A fact's lifetime is the scope
+  it lives in; resolution walks outward; a reset selects a downward-closed set of scopes.
 - **Records:** the single permanent progression currency; each Record raises global income, and
   cumulative Records gate chapter advancement.
 - **Per-chapter systems:** an upgrade tree (upgrades gated on any currency) plus opt-in events. Chapters
   reveal their mechanics progressively through content-unlock upgrades.
 - **Album (prestige):** resets the run, awards Records from run performance (Fans, and catalog quality
   from Ch. 6); repeated several times per chapter.
-- **Events:** self-contained challenges that reset the economy to a baseline; optional debuff and/or
-  timer; only timed events can fail; failure costs time only; rewards are lateral (never Records);
-  tiered.
+- **Events:** a *component* on a scope, not a scope of its own. Entry resets the host scope and
+  banks its payout, so entering costs nothing but time; optional debuff and/or timer; only timed events
+  can fail; rewards are lateral (never Records); tiered. Events deliberately **scale with** the player's
+  accumulated power, so a tier can be unbeatable until they advance further — "come back later" is the
+  intent, and no event ever gates chapter advancement.
 - **Catalog (Ch. 6+):** quality-driven global multiplier that converts to Records on album release;
   Discography keeps a persistent list of best songs.
 - **Roadies:** permanent multiplier — additive within a venue (+5%/roadie), multiplicative across
   venues. Earned from capstones and from replaying sealed chapter economies; buyable; earned and bought
   Roadies are identical; no purchase cap.
-- **Data model [rev]:** gates/unlocks are a single `Condition` type (one evaluator); all progressive
-  reveal runs through one flag registry (`setFlag` → `flagSet`); learn-songs bars are generic fillables
-  driven by a `fillCurrency` (Rehearsal in Ch. 1); every content ScriptableObject is discovered via
-  Addressables; currency definitions are global while balances live in per-context pools (the group
-  declares placement); every flat-rate currency source is a production config held by its producer
-  (generators and the Jam module — a currency never declares its own earn, and only generator-held
-  production idle-pays); saves store facts, never grants, and each economy context re-projects its
-  modifiers from those facts at construction.
-- **Monetization:** opt-in ads only (no forced interstitials); idle earnings are per-economy (50% of
-  generator production, paid on focus-gain) with a timed 2× double-idle buff from the "Double it" ad;
-  Encore 2× / Overdrive 4×; Backstage Pass (lifetime); Buy Roadies (repeatable); Tip Jar; no
-  subscriptions.
+- **Data model:** gates/unlocks/visibility/activation are a single `Condition` type (one
+  evaluator); all progressive reveal runs through one flag registry (`setFlag` → `flagSet`); learn-songs
+  bars are generic fillables driven by a `fillCurrency` (Rehearsal in Ch. 1); every content
+  ScriptableObject is discovered via Addressables; **lifetime is placement** — a currency, flag, upgrade,
+  bar or generator lives in the scope that resets it, ids are unique tree-wide, and there is no lifetime
+  enum, no placement enum and no projection recipe; every flat-rate currency source is a production
+  config held by its producer (a currency never declares its own earn, only generator-held production
+  idle-pays, and a producer may only target its own scope or further out); saves store facts, never
+  grants, one block per scope instance, and each scope re-projects its modifiers from those facts at
+  construction.
+- **Monetization:** opt-in ads only (no forced interstitials); idle earnings are per scope (50% of
+  generator production, paid when that scope is enabled) with a timed 2× double-idle buff from the
+  "Double it" ad; Encore 2× / Overdrive 4×; Backstage Pass (lifetime); Buy Roadies (repeatable); Tip
+  Jar; no subscriptions.
 - **Engine:** Unity.
