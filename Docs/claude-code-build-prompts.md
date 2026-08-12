@@ -902,9 +902,28 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > dirty it** (the world moved while it was disabled and nothing raised its flag — the same reason
 > `Restore` calls `MarkDirty` explicitly), and **suppression is root-owned but must reach every scope**,
 > or the restore's republish re-dirties descendants after the settle consumed them and "which signal is
-> terminal" has two answers again. Generalize the restore's bounded fixpoint to "drain while any scope is
-> dirty" under the same bound, and make its exhaustion diagnostic name **which** scopes are still
-> pending — naming the chapter says only that something somewhere re-triggers itself.
+> terminal" has two answers again.
+>
+> **[rev] The root's settle itself loops** — drain while any scope is dirty, under the same bound the
+> restore uses today, with an exhaustion diagnostic naming **which** scopes are still pending, since
+> naming the chapter says only that something somewhere re-triggers itself. This sentence previously read
+> as widening the restore's fixpoint alone, which left the ordinary settle single-pass and contradicted
+> §12 rule 12; the rule is the authority. `Drain` itself stays **one pass per call** — it clears the dirty
+> flag before evaluating, so a flag set during an evaluation is not swallowed by the drain that caused it
+> (`ConditionInvalidationTests` pins exactly this). The loop therefore belongs above `Drain`, in the
+> root's settle, which is where `Restore` already puts it.
+>
+> **[rev] Two consequences of the loop.** Each scope's drain sequence sits inside its own `DeferSettled`,
+> or a scope drained on two passes raises `Settled` twice — nesting within one scope, unlike suppression
+> above, which is the one piece that composes across them. And `EconomyContext.Restore` stops hand-rolling
+> its own fixpoint: its `DeferSettled` + drain-while-dirty + bound + `RefreshTapValue` block *is* the root
+> settle's body, so it calls the root settle rather than keeping a second copy in step.
+>
+> **[rev] Per-scope `Settled` is inert until its subscribers move.** `ChapterScreen` and the six modules
+> (`BarList`, `Capstone`, `CurrencyHeader`, `GeneratorList`, `Release`, `UpgradeList`) all subscribe to
+> `context.Economy.Conditions.Settled` — one context's signal. Each binds instead to the `Settled` of the
+> scope it lives in, or every module still re-asks on any change anywhere and the per-scope decision buys
+> nothing.
 >
 > **1. `ScopeDefinition` / `Scope`, with a definition/instance split.** A definition names the scope's
 > id, its `activeWhen` Condition, its currency roster, its sections, its ordered child scope ids, and
@@ -1133,7 +1152,10 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > rung; several scopes are enabled at once; and Chapter 1 plays identically to slice 7. Stop here.
 
 ✅ **Test & commit:** one operation ends at one root settle however many scopes it touched, and a scope
-enabled after the world moved re-evaluates on enable rather than staying stale; Chapter 1's full slice-7
+enabled after the world moved re-evaluates on enable rather than staying stale; **[rev]** an unlock whose
+flag opens another unlock resolves inside that one settle rather than waiting for the next tick, a scope
+drained on two passes of the loop raises `Settled` exactly once, and the bound's exhaustion error names
+the scopes still pending rather than the chapter; Chapter 1's full slice-7
 test suite passes unchanged, including the second-run
 reveal walk and the capstone; moving a currency's declaration one scope outward makes it survive a rung
 reset with no code change and every reference still resolving; a sibling scope's currency/flag/modifier
