@@ -933,7 +933,23 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > **3. Reset as one parameterized operation.** Delete `AlbumConfig`/`CapstoneConfig` as separate shapes
 > and add `PrestigeTierDefinition`: `id`, `displayName`, `offer` Condition, optional `operationGate`
 > Condition (null = ungated, today's release; set = fail-closed, today's capstone), optional `onComplete`
-> `GameEffect`, `GameAction[]`, optional `completionFlagId`, and a `ResetTargetSelector`.
+> `GameEffect`, `GameAction[]`, an optional **`completionLatch`** slot, and a `ResetTargetSelector`.
+>
+> The latch is a **named slot holding one flag-setting `GameAction`**, not a bare flag-id string. Only
+> `SetFlagEffect : GameEffect` exists today, and effect semantics are wrong here: an effect re-runs on
+> every rebuild, which is right for an upgrade's reveal flag (re-derivable from the saved upgrade latch)
+> and wrong for a completion, which has nothing more primitive behind it — `CapstoneSystem` projects
+> `OnComplete` *from* the flag. So add the action counterpart, set once at the press and persisted. The
+> slot keeps "which flag is this rung's completion?" readable off the definition, and boot validation's
+> setter sweep finds it through the family's own `Validate` — the same `FlagSetterReport` path
+> `SetFlagEffect` already uses — so no validator special case and no second declaration.
+>
+> **The slot's type is narrower than `GameAction`.** The operation has to *read* the target flag, not just
+> execute it: the already-completed refusal below asks whether this rung's flag is already set, and a bare
+> `GameAction` exposes no flag id. So the slot is typed to the flag-setting action concretely, or to an
+> interface carrying a `FlagId` — whichever, the requirement is that the id is readable without executing
+> anything, and that any other action type in that slot is refused at import and at boot. A
+> `GrantCurrencyAction` sitting there is content that would latch nothing while reporting a completion.
 >
 > **The payout is one of those `GameAction`s, not a field of its own.** 6.5 already classified it —
 > "payouts are `GameAction`s on the player-action moment that earns them, unreachable from every release,
@@ -944,11 +960,65 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > parameter of a computed-grant action, and a rung that awards nothing simply has an empty list — there
 > is no null payout to represent, and no "does this rung have a payout" branch to write.
 >
-> The operation: **the parent orchestrates** (only it knows the sibling order a selector may name),
-> **every selected scope runs its own rung's actions first** — while the state those formulas read still
-> exists, resolving outward so a rung can bank to the root without its immediate parent being the
-> recipient — then the parent clears the selected scopes and re-runs projection, then one root settle per
-> step 0.
+> The operation: **the parent orchestrates** (only it knows the sibling order a selector may name). The
+> **participants** are the initiating rung's scope *plus* every scope its selector chose, **de-duplicated**.
+> Both halves are load-bearing. The initiator is often *not* in its own selected set — Ch1's capstone rung
+> sits on the chapter scope and selects only the tier scopes, so "every selected scope runs its actions"
+> alone would bank the album and never grant the Roadie or latch the chapter's completion.
+> And it sometimes *is* — the album rung's selector is self-and-contained, so without the de-dup an
+> ordinary demo press would run its Fans-to-Records action twice.
+>
+> Then, in order:
+>
+> - **Refuse on the initiator alone, before anything moves.** A rung whose `completionLatch` flag is
+>   already set does not run a second time — silently, because the UI calls this from a button and a double-tap is
+>   not an error. A rung declaring an `operationGate` asks it here and refuses if it is unmet: fail-closed,
+>   asked by the *operation* and not only by the button that offered it, because a press that latches a
+>   permanent flag must not be reachable through a row the player is merely still looking at. A rung with
+>   no gate is ungated — today's release, repeatable and harmless at any time. `offer` is **not** asked
+>   here; it governs whether the rung is presented, not whether the press is legal.
+> - **Preflight every participant's actions, and the latch.** Refuse the whole operation if any answers
+>   `CanExecute` false, before anything executes and before any flag latches — the rule `TryBuy` and
+>   today's capstone already apply, now covering actions drawn from several scopes rather than one. The
+>   initiator's `completionLatch` is explicitly included: it sits outside `GameAction[]`, so "every
+>   participant's actions" would otherwise skip the one action guaranteed to run last, and a latch that
+>   cannot execute after every payout has already landed is the exact stranding this preflight exists to
+>   prevent. Loud, unlike the refusals above: an action that cannot execute is broken content.
+> - **Run the actions deepest scope first, initiating rung last**, while the state those formulas read
+>   still exists, resolving outward so a rung can bank to the root without its immediate parent being the
+>   recipient. Deepest-first is not an arbitrary tie-break: reads go outward, so an outer rung running
+>   first would write state an inner rung's formula then measures. Each rung must measure what the player
+>   pressed on, not what the press has already moved — a capstone awarding on cumulative Records has to
+>   run after the demo it implicitly cuts, not before it. Depth alone is only a *partial* order, so
+>   same-depth participants run in **the parent's authored child order, first to last** — the same list
+>   `preceding-siblings` resolves against (rule 14), so one authored ordering answers both questions
+>   instead of two that can disagree. Without it, two sibling tiers banking into the same ancestor currency
+>   would produce a result that depends on incidental enumeration order.
+> - A participant's own `offer`/`operationGate` is **not** re-checked. Those gate the player pressing that
+>   rung; they say nothing about it participating in a deeper press. A participating rung whose offer is
+>   currently false still runs its actions and pays whatever its formula computes, possibly zero —
+>   otherwise "the capstone implicitly cuts an album" would fail exactly when the album rung is not
+>   offerable, which is the stranding the implicit cut exists to prevent.
+> - **Run the initiator's `completionLatch`**, if it declares one — from the slot, never from a duplicate
+>   in `GameAction[]`. The flag is the latch and nothing more: `onComplete` is a `GameEffect`, so the
+>   operation never executes it — the projection below re-applies it *from* the flag on every rebuild,
+>   which is how `CapstoneSystem` already works and why a completed capstone survives a load with no
+>   effect serialized. **`onComplete` therefore requires the latch slot to be filled**: without a flag
+>   there is nothing to project from, so an authored effect would silently never exist. Refuse that
+>   pairing at import and at boot rather than leaving it to be discovered as a buff that never appears.
+>   The latch's flag must live outside whatever that rung's own selector clears — the same rule its
+>   awards' targets already obey, for the same reason.
+> - **No action may change the tree's shape or the enabled set.** Actions run before the clear, the
+>   projection and a settle that walks enabled scopes only, so an action that enables, disables or
+>   replaces scopes leaves the rest of the operation running against a tree that moved under it. Anything
+>   structural is a *reaction* to the settled facts, not a step inside the mutation — chapter advancement
+>   is the first instance, with `ChapterManager` acting on the latched completion flag once the operation
+>   has settled. Being one-shot, an action could not do it anyway: it would never replay on load, so the
+>   flag would have to drive the outcome regardless.
+> - **Then clear the selected scopes** — the *selected* set, not the participants. A scope that only
+>   initiated is not itself cleared, which is what keeps the capstone from wiping the completion flag it
+>   just latched. Re-run projection — which is where `onComplete` re-applies — then one root settle per
+>   step 0.
 >
 > Every selected scope, not just the pressed one. That is the whole of "the capstone implicitly cuts an
 > album": the capstone selects the chapter's tier scopes, so the album rung's own Fans-to-Records action
@@ -992,8 +1062,8 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > *clears* and *can-read* are different relations — the capstone selects the tier holding Fans, satisfying
 > the input rule, and still cannot see it. Refuse at boot, naming the rung and the currency it cannot
 > reach. In Chapter 1 this is already satisfied: the album rung sits in the tier scope holding Fans and
-> banks them, and the capstone rung sits in the chapter scope with actions that read nothing local (grant
-> a Roadie, latch the completion flag, advance). If a formula ever needs two siblings' state, the answer
+> banks them, and the capstone rung sits in the chapter scope, awarding and latching things that read
+> nothing local. If a formula ever needs two siblings' state, the answer
 > is to move that currency to their common ancestor (§2), since siblings are never on each other's chain.
 >
 > **4. Enabled scopes replace focus.** Delete the single focused context. Scopes are enabled or disabled,
@@ -1041,9 +1111,14 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > buff upgrades, the cover bars, and the `fans`/`covers`/`gear` flags and their setters. Each scope holds
 > the rung filed there: the **album rung on the tier scope**, whose Fans-to-Records action reads the Fans
 > sitting beside it, with a self-and-contained selector; the **capstone rung on the chapter scope**,
-> selecting every tier scope, with actions that read nothing local (grant a Roadie, latch the completion
-> flag, advance the chapter). That is the step-3 placement rule already satisfied rather than worked
-> around, and it is why a capstone press banks the demo without the capstone ever reading Fans. Every `scope: run` /
+> selecting every tier scope. Ch1 authors it as the JSON already reads —
+> `"onComplete": { "grantRoadies": 1, "completionFlag": "chapter_2_unlocked" }` — one award in
+> `GameAction[]` and one `completionLatch`. That is Chapter 1's content, not a cap: `GameAction[]` is a
+> list and a richer chapter's rung may award several things. What never belongs in it is a second flag
+> setter beside the latch slot, or anything structural, both by step 3. Chapter advancement is
+> `ChapterManager` reacting to the latched flag after the settle. That is the step-3 placement rule
+> already satisfied rather than worked around, and it is why a capstone press banks the demo without the
+> capstone ever reading Fans. Every `scope: run` /
 > `permanentInChapter` key leaves the JSON — placement replaces it — and the importer refuses the old
 > keys rather than mapping them. Boot validation's flag rule generalizes verbatim: **a flag needs at
 > least one setter in its own scope or inside it.**
@@ -1067,7 +1142,20 @@ over one chain iterator, with a shadowed id refused rather than resolved; every 
 own rung's actions before anything clears and a granted currency resolves outward past its immediate
 parent, so a capstone press banks the album tier's Fans without the capstone reading them; a selector's
 output is downward-closed; a reset clears in place, leaving the scope instance and every subscription on
-it intact; preceding-siblings is resolved by the parent and no scope enumerates its own
+it intact; a capstone press runs the capstone rung's OWN actions as well as the selected tiers' — the
+Roadie and the completion latch both land — while an ordinary demo press, whose selector
+contains its own scope, runs its payout exactly once; a participant whose `offer` is currently false
+still runs its actions; the initiating scope is not cleared unless its own selector selected it; and one
+participant answering `CanExecute` false refuses the whole press before any action runs or any flag
+latches; a rung whose completion flag is already set refuses silently and a rung whose `operationGate` is
+unmet refuses too, both before any state moves; same-depth participants run in the parent's authored child
+order; `onComplete` is never executed by the press and comes back from the latched flag on every rebuild,
+and a rung declaring `onComplete` with an empty `completionLatch` is refused at import and at boot; the
+latch is found by the flag-setter sweep with no validator special case; the latch's flag id is readable
+without executing it, a non-flag-setting action in that slot is refused at import and at boot, and the
+latch's own `CanExecute` is part of the preflight that runs before any payout; no action changes the tree's shape
+or enabled set, and `ChapterManager` advances off the latched flag after the settle rather than from an
+action; preceding-siblings is resolved by the parent and no scope enumerates its own
 siblings; an award whose inputs are filed outside the scopes its reset clears is refused at boot, so is
 a target filed inside them, and so is a rung filed where its own formulas cannot read; a
 producer targeting a strictly-inner currency is refused at import; a cost modifier filed in a tier scope
@@ -1139,6 +1227,11 @@ the tree.
 >   failure (that would run the award actions a second time in one cycle) and do **not** clear the host
 >   without one (that would be a second reset mechanism, reachable only from here). Costs time, never
 >   permanent progress.
+> - **Entry is an alternate release surface, and that is fine.** Entry runs the host rung's award actions,
+>   quit clears nothing, so enter → play → quit → enter does bank Records each cycle. That is not farming:
+>   it is the ordinary payout for Fans the player actually earned, the same thing pressing the release
+>   button would have paid. Do not write a guard against it. What must hold is narrower — teardown awards
+>   nothing at all, and entry runs the *rung's* actions only, never the event tier's reward.
 >
 > Goal: I can enter garage_jam — which banks my run on the way in — play it tap-only against the timer
 > with my accumulated multipliers still applying, succeed for a chapter-durable tap buff (from the
@@ -1154,8 +1247,9 @@ timer + fail/quit are cheap and cost nothing beyond time; a failed or quit run c
 host's Fans, cash and gear stand exactly where the attempt left them, no second payout is awarded on the
 way out, and the next reset banks them normally; the timer pauses while the host scope is
 disabled and idle payouts are off while it runs; tiers escalate and a cleared tier survives a demo; the
-reward applies from the pool; the entry emit pays only the rung payout and a repeated enter/quit cycle
-cannot farm advancement currency; a test-authored tier action pays once from the clear operation and
+reward applies from the pool; teardown awards nothing and entry runs the host rung's actions only, never
+the event tier's reward — a repeated enter/quit cycle banks exactly what an equivalent sequence of
+release presses would and no more; a test-authored tier action pays once from the clear operation and
 never from any rebuild, and a failing `CanExecute` refuses the clear before the tier latches.
 
 ---
@@ -1172,10 +1266,24 @@ never from any rebuild, and a failing `CanExecute` refuses the clear before the 
 >   latches, bar progress and its flags; the chapter scope's carries the `album` flag, the `cut_demo`
 >   latch and the cleared event tiers; the root's carries Records and Roadies. A reset writes the blocks
 >   it did not clear and clears the ones it did, with no category rule on top.
-> - **[rev]** This makes **stable scope-instance identity** a hard requirement, not a nicety: a tier that
->   has been reset and rebuilt must round-trip as the *same* scope, and a replay instance (§8.1, rule 7)
->   must be distinguishable from the frontier's instance of the same definition. Identity is part of the
->   schema; do not derive it from list position, which reordering would silently reassign.
+> - **[rev]** This makes **stable scope-instance identity** a hard requirement, not a nicety: a tier whose
+>   contents a reset has cleared must round-trip as the *same* scope, and a replay instance (§8.1, rule 7)
+>   must be distinguishable from the frontier's instance of the same definition. Identity therefore cannot
+>   be derived from anything a reset touches, since a reset changes all of it, nor from list position,
+>   which reordering would silently reassign. It is part of the schema. Note the instance itself is never
+>   rebuilt — 7.5 step 3 clears in place — so identity has to *survive a clear*, not survive a
+>   reconstruction.
+> - **A running event attempt is a scope fact and must persist.** Closing the app disables every scope,
+>   and slice 8 says a timed event's timer pauses while its host is disabled and idle payouts are off
+>   while it runs. With nothing in the schema naming an attempt, reload silently discards the component —
+>   and worse, the scope enables and pays idle income for time the event contract says earns nothing. The
+>   host scope's block carries the active attempt: event id, tier, and the timer's remaining state. The
+>   handicap modifiers are *not* saved; they re-project from that fact like any other grant (rule 11), and
+>   idle suppression is restored with it, before the scope is enabled and before any idle payout is
+>   computed. The timer pauses while the host is disabled (§6.1, settled), so what persists is the
+>   **remaining** time, never an absolute deadline — a deadline would make wall-clock absence burn the
+>   attempt, which is the behaviour that was rejected. A timed event's host is also paid **no** idle
+>   earnings for the time it was disabled; an untimed event's host is paid normally.
 > - **No modifier is ever serialized.** Derived modifiers compute from a source on every read, so the
 >   Records buff comes back from the restored Records balance with nothing to save or migrate; writing
 >   one would create a second answer that can disagree with its source. Grants are the same decision,
@@ -1200,7 +1308,9 @@ never from any rebuild, and a failing `CanExecute` refuses the clear before the 
 > rejected. Stop here.
 
 ✅ **Test & commit:** state persists across restart; flags/bars restore; **[rev]** every scope instance
-round-trips into its own block and a reset-and-rebuilt tier is recognized as the same scope; idle payout
+round-trips into its own block and a tier whose contents were cleared by a reset is recognized as the same
+scope; a timed event in progress survives a restart with its remaining time intact and its host paid no
+idle for the absence, while an untimed event's host is paid normally; idle payout
 correct, capped, and zero below the threshold; a scope that stayed enabled is NOT paid idle on top of
 what it produced live; checksum rejects edits.
 

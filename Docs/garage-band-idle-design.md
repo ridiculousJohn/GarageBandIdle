@@ -22,8 +22,7 @@ a bigger venue with a new mechanic. All numbers below are starting values for tu
 > - **Run currencies are per-chapter ids** and idle accrual is per scope, paid when a scope is enabled
 >   (§2, §9) — there is no app-level "offline" and no single focused economy.
 >
-> One open question remains, in §6.1: whether an event timer pauses while its host scope is disabled,
-> still unverified against Ctrl C.
+> No open questions remain.
 
 ---
 
@@ -353,10 +352,12 @@ Moment-to-moment play draws on the systems defined elsewhere:
   In ladder terms the capstone is the chapter's **deepest rung** (§1, §5): it selects every
   tier scope in the chapter, so "it implicitly cuts an album" stops being a special case and becomes
   simply what clearing a deeper rung means. What stays particular to it is declared rather than
-  hardcoded — the fail-closed operation gate (the release's is deliberately absent), the completion
-  flag it latches, and the chapter advance that follows. Whether that advance is the ladder's terminal
-  rung or a step above it is the open decision recorded in rule 12: a chapter boundary discards the
-  whole chapter scope, so it may need no reset implementation at all.
+  hardcoded — the fail-closed operation gate (the release's is deliberately absent) and the completion
+  latch it runs. The chapter advance is **not** part of the operation: no action may change the tree's
+  shape or its enabled set, since actions run before the clear, the projection and the settle. The
+  advance is a *reaction* to the settled completion flag, performed by `ChapterManager`. Being one-shot,
+  an action could not carry it anyway — it would never replay on load, so the flag has to drive the
+  outcome regardless, and driving it from the flag is the only form that survives a save.
 
 ### 6.1 Events
 
@@ -399,10 +400,12 @@ That is what replaces the isolated-context design this section previously specif
   component tears down. A debuff is a power check rather than a constant-difficulty puzzle.
 - **Timer (optional):** adds a time limit. A timed event is the only kind that can be *failed*
   outright; an untimed event at insufficient power is not failed so much as unfinishable, and the player
-  quits. While a timed event is running, idle payouts (§9) are disabled, and the timer pauses while its
-  host scope is disabled — **open:** the pause is provisional, to be verified against Ctrl C before any
-  timed event ships, since a timer that keeps running off-screen is a deadline the player cannot attend
-  to and would have to be a deliberate choice rather than an inherited one.
+  quits. **Settled:** the timer **pauses** while its host scope is disabled. The attempt waits where the
+  player left it, so closing the app is never a way to lose one — a deadline the player cannot attend to
+  is not a challenge. The exchange is that a timed event earns nothing while away: its host scope accrues
+  nothing and is paid **no** idle earnings for that time when it is enabled again (§9), rather than the
+  ordinary generator payout. Both halves are specific to *timed* events. An untimed event has no deadline
+  to protect and nothing to exchange for, so its host accrues and pays idle exactly as any other scope.
 - **Failure:** a failed timed event **tears its component down** — the timer and the attempt end and the
   handicap modifiers are removed, so the tier reverts to ordinary play. It clears nothing in the host
   scope: the component holds no progress of its own, since the goal reads ordinary host currency, and
@@ -617,11 +620,11 @@ Assets/Scripts/
     Scopes/ScopeDefinition.cs / Scope.cs   // rule 12: definition + instance (rule 7). A scope owns its truth (pool + systems + modifiers + flags), its sections, and an ORDERED list of child scopes; lifetime is placement, so this replaces EconomyContext, EconomyRecipe and CurrencyPlacement
     Scopes/ScopeChain.cs  // rule 12: the one iterator over "my scope outward to the root, enabled only" - three public resolvers (ResolveCurrency first-owner-wins / ResolveFlag any / ResolveModifiers accumulate) fold it their own way; no mode parameter
     Scopes/ResetTargetSelector.cs   // rule 14: polymorphic (self-and-contained | preceding-siblings | named), resolved by the scope owning the order, output closed downward
-    PrestigeTierDefinition.cs   // rule 12/14: one rung - offer Condition, optional fail-closed operation gate, onComplete effect, the one-shot GameActions the press runs (a payout is one of these, not a field of its own), optional completion flag, reset target selector
+    PrestigeTierDefinition.cs   // rule 12/14: one rung - offer Condition, optional fail-closed operation gate, onComplete effect (requires a latch to project from), the one-shot GameActions the press runs (a payout is one of these, not a field of its own), an optional completionLatch slot holding ONE flag-setting GameAction (not a flag-id string: the slot keeps one declaration and the setter sweep finds it through the family's own Validate), reset target selector
     PayoutFormula.cs      // polymorphic like Condition; the amount a computed-grant GameAction awards - Ch1's floor((fans/5)^0.5) is one instance
     ContentDatabase.cs    // Addressables discovery of all definition SOs by label; id→def registries
     Condition.cs / ConditionEvaluator.cs   // one gate/unlock/visibility/availability type + one evaluator
-    GameEffect.cs / GameAction.cs   // grants split by category: an effect is re-applicable state every rebuild re-runs; an action is a one-shot award only its player-action moment executes (a payout paid twice is inexpressible, not validated against)
+    GameEffect.cs / GameAction.cs   // grants split by category: an effect is re-applicable state every rebuild re-runs; an action is a one-shot award only its player-action moment executes (a payout paid twice is inexpressible, not validated against). Setting a flag exists in BOTH families and the choice is not stylistic: an effect where the flag re-derives from a more primitive saved fact (an upgrade's reveal flag, from its latch), an action where the flag IS the fact (a rung's completion, which OnComplete projects from)
     FlagSystem.cs         // single reveal registry, one instance per scope; a flag's lifetime is the scope holding it
   Loop/
     ChapterDefinition.cs / Chapter.cs   // mechanic, capstone, Records gate, story beat
