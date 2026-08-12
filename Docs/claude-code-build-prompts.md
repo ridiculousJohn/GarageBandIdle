@@ -855,6 +855,108 @@ from the declaration.
 
 ---
 
+## 7.4 — CONSOLIDATION: one producer per currency (rate and yield)
+
+This slice adds no new gameplay. Chapter 1 must play *exactly* as it does after slice 7 — same tap
+value, same fan rate, same costs, same reveal order.
+
+It exists because **"what creates cash" has no single answer.** Today it is `GeneratorDefinition`'s
+`baseOutput`, plus tick-triggered `ProductionConfig`s, plus tap-triggered ones — three mechanisms
+producing one currency, none of which owns it. The tell is already in the code: `ProductionSystem`
+carries `HasProduction(currencyId)` and `RatePerSecond(currencyId)`, which scan every config looking
+for one currency because the UI needs a per-currency view the model does not have. Those queries are
+the missing object, written as loops.
+
+The modifier layer already addresses that object. `ModifierTarget.CurrencyProduction`, qualified by
+currency id, means "the summed production of one currency" — a per-currency producer that production
+never implemented. Two layers describing one thing, one of which does not exist, is how they drift.
+
+Three separate symptoms all come from the same absence:
+
+- **`ProductionTrigger.Tick | Tap` names callers, not quantities.** A rate is per unit *time*; a yield
+  is per *occurrence*. Naming them after the clock and a gesture puts a UI action in the economy's
+  vocabulary, and the first demand-fired producer that is not a button press — an automation, an event
+  tier, a story beat — either lies about being a tap or gets a third value meaning the same as the
+  second. (Do not "unify" the two through a per-firing magnitude: multiplying a quantum by elapsed
+  seconds is a unit error that silently couples two numbers authored independently.)
+- **`ModifierTarget.TapValue` is global while firing is already per producer.** `_tapByProducer`
+  exists because flattening tap configs made one press fire every producer in the chapter; the
+  multiplier on what a press pays never learned the same lesson, so a buff on Jam would also raise a
+  Merch surface's yield, silently.
+- **`isBandmate` is a bool because a generator can hold exactly one output.** A bandmate makes cash
+  *and* fans; with one output there is nowhere to put the second, so it became a flag a system
+  branches on.
+
+Do this **before 7.5.** That slice makes a scope hold its producers; building it against the current
+shape files three mechanisms under every scope and guarantees a later slice to undo it — which is the
+pattern the `.5` slices have been paying for since 5.4.
+
+> Read `/docs/garage-band-idle-design.md` — §3, §6, §9 and §12 rules 11 and 13. This is a refactor.
+> **Do not change observable gameplay.** Every number Chapter 1 shows must be identical afterward.
+>
+> **1. `CurrencyProducer`, one per currency.** It owns two numbers: `Rate` (units per second) and
+> `Yield` (units per firing). Each is composed from **contributions that stay individually
+> addressable** — not a running scalar. Two live requirements depend on that: a generator row shows
+> what *that* generator makes, and idle pays only some contributions (step 6). This is the same shape
+> `ModifierSystem` already has, one composed value over many contributors, so production stops being a
+> second, weaker pattern beside it.
+>
+> **2. `ProductionContribution` replaces `ProductionConfig`** — `{currency id, amount, feeds: rate |
+> yield, gate: Condition}`. `feeds` is what the contribution *is*, which retires both `trigger` (a
+> caller) and the separate `composes` declaration (which number it scales is now the same fact). The
+> gate stays an ordinary rule-8 Condition, checked per composition. No lifetime field: durability is
+> its contributor's.
+>
+> **3. A contributor holds a LIST of contributions.** A **generator** holds contributions scaled by
+> owned count — the Chapter 1 amp authors one cash contribution; a bandmate authors cash *and* fans.
+> Delete `isBandmate` and whatever reads it: bandmate-ness is now two rows of data, and the fan rate's
+> per-bandmate amount moves onto the bandmate generators themselves at the same value. A **module**
+> holds contributions too, which is where Jam's cash yield and Rehearsal's trickle live.
+>
+> **4. Firing is external and unnamed.** `producer.Fire()` pays the composed yield. The producer never
+> records what fired it — a button, an automation and a test are indistinguishable below this line.
+> `TapModule` names the currency producer it fires, calls `Fire()`, and labels itself from `Yield`.
+> **"Tap" survives only in that module.** If the word appears in `Economy/`, `Core/`, the JSON schema
+> or a `ModifierTarget`, the slice is not done.
+>
+> **5. `ModifierTarget` becomes `CurrencyRate` and `CurrencyYield`, both qualified by currency id.**
+> `TapValue` retires into `CurrencyYield:cash`, `FanRate` into `CurrencyRate:fans`, and
+> `CurrencyProduction` *is* `CurrencyRate` — it already meant this. Append new values per the enum's own
+> rule and reimport rather than renumbering. `GeneratorOutput` is unchanged. After this every target
+> names one thing, which is the property rule 11 now states.
+>
+> **6. Idle eligibility is a property of the contribution, not a holder kind** (§9). An idle payout asks
+> a producer for its rate **composed from idle-eligible contributions only** — today, the generators'.
+> A yield can never idle-pay because nothing fires it while the player is away, so that half needs no
+> flag at all. Rehearsal's trickle is a module contribution and keeps pausing, exactly as now.
+>
+> **7. `ProductionSystem` becomes the collection of a scope's currency producers.** It integrates rates
+> over elapsed time and resolves a producer by currency id. `HasProduction` and `RatePerSecond` stop
+> being scans and become properties of the producer the caller already has.
+>
+> **8. Re-author the chapter JSON and the importer to match**, then reimport. Every generator row grows
+> a contributions list; the Jam producer's entries declare `feeds`; the bandmate bonus becomes fans
+> contributions at the same per-unit value. `ContentValidator` checks what step 5 makes checkable — a
+> contribution's currency resolves, its target producer is not strictly inward (§12 rule 13), and a
+> yield contribution belongs to a producer some module can fire.
+>
+> **9. Delete, don't deprecate.** `ProductionTrigger`, `ProductionConfig`, `ProducerDefinition`'s
+> `HasTapConfigs`, `GeneratorDefinition.isBandmate`, `ModifierTarget.TapValue`, `ModifierTarget.FanRate`,
+> and every tap-named member of `ProductionSystem`.
+>
+> Goal: Chapter 1 plays identically, and the economy contains no concept named after a gesture. Stop
+> here.
+
+✅ **Test & commit:** every Chapter 1 number is unchanged — tap payout, fan rate, generator costs, the
+first-demo pacing; a bandmate generator raises cash's rate *and* fans' rate with no flag anywhere; a
+yield buff moves the yield and leaves the rate alone, and vice versa; a buff on one currency's yield
+does not reach another's; idle pays a rate composed of generator contributions only, while a yield and
+a module trickle pay nothing; a contribution whose gate is unmet contributes zero to the composition
+its readout displays, so the readout and the payout cannot disagree; and `grep -ri tap` over
+`Assets/Scripts/Economy`, `Assets/Scripts/Core` and the chapter JSON returns nothing.
+
+---
+
 ## 7.5 — CONSOLIDATION: the scope tree (lifetime becomes placement)
 
 This slice adds no new gameplay. Chapter 1 must play *exactly* as it does after slice 7.
@@ -884,8 +986,8 @@ and there are no saves yet — so today this is an asset migration and after sli
 migration. Slice 9 also builds its restore against whatever the lifetime model is.
 
 > Read `/docs/garage-band-idle-design.md` — §1, §2, §3, §5, §6.1, §9 and §12 rules 6, 7, 9, 11, 12, 13,
-> 14. This is a refactor. **Do not change observable gameplay:** same tap value, same fan rate, same
-> reveal order, same release behaviour, same re-climb, same capstone.
+> 14. This is a refactor. **Do not change observable gameplay:** same yields, same rates, same reveal
+> order, same release behaviour, same re-climb, same capstone.
 >
 > **0. Build the settle boundary FIRST — everything else rests on it.** §12 rule 12 decides it; this
 > step implements that decision rather than re-opening it. Today every top-level operation ends at one
@@ -896,8 +998,8 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 >
 > Per rule 12: the boundary is the **root**, fixed rather than discovered, so an operation never has to
 > learn mid-mutation which scope owns its settle. Each scope carries its own dirty flag; the root's
-> settle drains the dirty ones **outermost first**, then refreshes the tap value for every enabled scope
-> holding a tap producer. The settled signal stays **per scope**, raised only for the scopes that
+> settle drains the dirty ones **outermost first**, then re-composes the currency producers of every
+> enabled scope (7.4). The settled signal stays **per scope**, raised only for the scopes that
 > drained. Two details that are easy to get wrong and expensive to find later: **enabling a scope must
 > dirty it** (the world moved while it was disabled and nothing raised its flag — the same reason
 > `Restore` calls `MarkDirty` explicitly), and **suppression is root-owned but must reach every scope**,
@@ -916,8 +1018,8 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > **[rev] Two consequences of the loop.** Each scope's drain sequence sits inside its own `DeferSettled`,
 > or a scope drained on two passes raises `Settled` twice — nesting within one scope, unlike suppression
 > above, which is the one piece that composes across them. And `EconomyContext.Restore` stops hand-rolling
-> its own fixpoint: its `DeferSettled` + drain-while-dirty + bound + `RefreshTapValue` block *is* the root
-> settle's body, so it calls the root settle rather than keeping a second copy in step.
+> its own fixpoint: its `DeferSettled` + drain-while-dirty + bound + producer re-composition block *is*
+> the root settle's body, so it calls the root settle rather than keeping a second copy in step.
 >
 > **[rev] Per-scope `Settled` is inert until its subscribers move.** `ChapterScreen` and the six modules
 > (`BarList`, `Capstone`, `CurrencyHeader`, `GeneratorList`, `Release`, `UpgradeList`) all subscribe to
@@ -1051,7 +1153,8 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > scope instance. The instance survives and each system resets what it owns, exactly as the album release
 > does today. Three things rest on that. The save's scope-instance identity (rule 6) stays stable without
 > having to be carried across a rebuild. Every UI binding held on a scope's systems — `Conditions.Settled`,
-> `Currencies.BalanceChanged`, `Modifiers.Changed`, `Upgrades.UpgradeApplied`, `Production.TapValueChanged`
+> `Currencies.BalanceChanged`, `Modifiers.Changed`, `Upgrades.UpgradeApplied`, a producer's composed-value
+> signal
 > — stays valid, where a rebuild would leave all of them pointing at a dead object several times per
 > chapter. And per step 0, a surviving instance keeps its dirty flag, so the reset marks it rather than
 > relying on a fresh instance's default. A later slice wanting true reinstantiation has to solve those
@@ -1097,19 +1200,21 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > because an active scope has to keep simulating while its display is off-screen. Rule 9 still holds:
 > one mechanism, Conditions, evaluated at three levels.
 >
-> **5. Production direction, checked at import.** A producer may target a currency in its own scope or
-> further out, **never inward** — an outer generator producing into an inner currency outlives its own
-> target. Resolve the producer's scope and the target currency's scope and refuse a strictly-inner
-> target. `ProductionConfig` gains **no** lifetime field: its durability is its holder's and its gate
-> already reads flags that carry their own placement.
+> **5. Production direction, checked at import.** A **contributor** may feed a producer in its own scope
+> or further out, **never inward** — an outer generator raising an inner currency's rate outlives its own
+> target. A producer lives in the scope of the currency it produces, which is what makes this static:
+> resolve the contributor's scope and the target currency's scope and refuse a strictly-inner target.
+> A contribution gains **no** lifetime field: its durability is its contributor's and its gate already
+> reads flags that carry their own placement. (7.4 built the contribution; this slice only gives the
+> check a tree to resolve against.)
 >
-> **6. Cost composes modifiers, the way production already does.** `ModifierTarget` has four values —
-> tap value, fan rate, generator output, currency production — and none is cost, so a cost buff cannot be
+> **6. Cost composes modifiers, the way production already does.** After 7.4 `ModifierTarget` has three
+> values — currency rate, currency yield, generator output — and none is cost, so a cost buff cannot be
 > authored; and `Generator.NextCost` is a parameterless property over a static formula, so nothing would
 > compose one if it could. The ladder above is designed around spending an intermediate currency on cost
 > reduction (Ctrl C's Syntax Highlighting is the reference shape), and rule 11 claims to be the one place
-> any number is modified — cost sitting outside it makes that claim false. The four existing targets are
-> an accumulated set, not a designed one: they are what authored content happened to ask for.
+> any number is modified — cost sitting outside it makes that claim false. 7.4 fixed the targets that
+> were named after Chapter 1's surfaces; this fixes the one that was never added at all.
 >
 > Add `GeneratorCost` to the enum (appended, explicit value, per its own rule), give `CostCalculator.Cost`
 > the composition `ProductionCalculator` already has, and let `NextCost` reach its scope's registry.
