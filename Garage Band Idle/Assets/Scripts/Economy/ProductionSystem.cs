@@ -120,7 +120,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var total = BigNumber.Zero;
             foreach (var config in configs)
             {
-                if (config.Composes == ModifierTarget.TapValue && ConditionEvaluator.IsMet(config.Gate, _conditions))
+                if (config.Composes == ModifierTarget.CurrencyYield && ConditionEvaluator.IsMet(config.Gate, _conditions))
                     total += Composed(config);
             }
             return total;
@@ -208,16 +208,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
-        // A config composes exactly the target it declares - tapValue for the
-        // Jam yield, fanRate for fan accrual, and whatever a later chapter
-        // declares, with no per-target branch here. Anything landing below zero
-        // yields nothing and no multiplier resurrects it - the same fail-closed
-        // rule TapSystem had, so a tap can never drain cash.
+        // A config composes exactly the target it declares, QUALIFIED BY ITS OWN
+        // CURRENCY - the yield of the currency it pays, or that currency's rate -
+        // with no per-target branch here. Qualifying by the config's own currency
+        // is what keeps a buff on one currency's payout off another's, which a
+        // single global bucket per kind could not express. Anything landing below
+        // zero yields nothing and no multiplier resurrects it, so a firing can
+        // never drain a balance.
         private BigNumber Composed(ProductionConfig config)
         {
             var value = config.Composes == ModifierTarget.None
                 ? (BigNumber)config.Amount
-                : _modifiers.For(ModifierTargetKey.Global(config.Composes)).ApplyTo(config.Amount);
+                : _modifiers.For(ModifierTargetKey.Of(config.Composes, config.CurrencyId)).ApplyTo(config.Amount);
             return value < BigNumber.Zero ? BigNumber.Zero : value;
         }
 

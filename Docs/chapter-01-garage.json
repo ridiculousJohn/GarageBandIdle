@@ -143,7 +143,7 @@
       "scope": "run",
       "cost": { "currency": "cash", "amount": 250 },
       "gate": { "type": "currency", "currency": "cash", "value": 250 },
-      "payload": { "effect": "tapValueAdd", "value": 1 },
+      "payload": { "effect": "currencyYieldAdd", "affects": ["cash"], "value": 1 },
       "note": "+1 Cash per tap."
     },
     {
@@ -171,7 +171,7 @@
       "scope": "run",
       "cost": { "currency": "cash", "amount": 20000 },
       "gate": { "type": "currency", "currency": "fans", "value": 30 },
-      "payload": { "effect": "currencyPerSecMultiplier", "affects": ["cash"], "value": 1.5 },
+      "payload": { "effect": "currencyRateMultiplier", "affects": ["cash"], "value": 1.5 },
       "note": "Gated on Fans, not Cash — demonstrates the gating web (§4). Same Condition shape as a Cash gate, just a different `currency` id, so no special-casing. The payload names the currencies it multiplies rather than implying Cash from the effect name, matching `constants.recordBuff.affects` — production of anything unlisted is untouched."
     },
 
@@ -224,13 +224,13 @@
   ],
 
   "rewards": [
-    { "id": "fan_rate_x1_15", "name": "Fan Rate ×1.15", "type": "fanRateMultiplier", "value": 1.15 },
-    { "id": "fan_rate_x1_20", "name": "Fan Rate ×1.20", "type": "fanRateMultiplier", "value": 1.2 },
-    { "id": "tap_value_x1_25", "name": "Tap Value ×1.25", "type": "tapValueMultiplier", "value": 1.25 },
-    { "id": "tap_value_x1_50", "name": "Tap Value ×1.50", "type": "tapValueMultiplier", "value": 1.5 },
-    { "id": "tap_value_x2", "name": "Tap Value ×2", "type": "tapValueMultiplier", "value": 2.0 }
+    { "id": "fan_rate_x1_15", "name": "Fan Rate ×1.15", "type": "currencyRateMultiplier", "affects": ["fans"], "value": 1.15 },
+    { "id": "fan_rate_x1_20", "name": "Fan Rate ×1.20", "type": "currencyRateMultiplier", "affects": ["fans"], "value": 1.2 },
+    { "id": "tap_value_x1_25", "name": "Tap Value ×1.25", "type": "currencyYieldMultiplier", "affects": ["cash"], "value": 1.25 },
+    { "id": "tap_value_x1_50", "name": "Tap Value ×1.50", "type": "currencyYieldMultiplier", "affects": ["cash"], "value": 1.5 },
+    { "id": "tap_value_x2", "name": "Tap Value ×2", "type": "currencyYieldMultiplier", "affects": ["cash"], "value": 2.0 }
   ],
-  "rewardsNote": "The shared reward pool. Bars and event tiers reference these by id; each `type` is friendly vocabulary the importer maps onto a GameEffect - the same effect family an upgrade's `payload` builds - so a reward and a buff granting the same thing share one handler and one validator. A reward's `type` and an upgrade's `payload.effect` are two keys over ONE vocabulary, and neither restricts which names it accepts: setFlag (with `flag: <id>`, revealing gated content through the same flag registry as content-unlock upgrades), tapValueAdd, tapValueMultiplier, fanRateMultiplier, generatorOutputMultiplier (with `generator: <id>`), currencyPerSecMultiplier (with `affects: [<id>...]`). A reward paying a flat tap bonus or a buff raising fan rate are both legal - the earlier split was an artifact of two class families, not a rule.",
+  "rewardsNote": "The shared reward pool. Bars and event tiers reference these by id; each `type` is friendly vocabulary the importer maps onto a GameEffect - the same effect family an upgrade's `payload` builds - so a reward and a buff granting the same thing share one handler and one validator. A reward's `type` and an upgrade's `payload.effect` are two keys over ONE vocabulary, and neither restricts which names it accepts: setFlag (with `flag: <id>`, revealing gated content through the same flag registry as content-unlock upgrades), currencyRateAdd, currencyRateMultiplier, currencyYieldAdd, currencyYieldMultiplier (each with `affects: [<id>...]`), and generatorOutputMultiplier (with `generator: <id>`). Every numeric name is <target><operation>, and the ids it names are the ones it reaches - LEAVING THE LIST OUT reaches every member of that family in scope (design doc rule 11), which is how a buff meaning double all generator output is authored without listing generators. A reward paying a flat yield bonus or a buff raising a rate are both legal - the earlier split was an artifact of two class families, not a rule.",
   "rewardsScopeNote": "A reward entry declares NO scope. The lifetime belongs to whatever applies it: a cover bar's reward lives as long as its bar group's `bars.scope`, an event tier's lives as long as the tier's own `scope`. That is one declaration per fact: a scope on the shared asset could disagree with the content paying it (a run-scoped bar granting a permanent multiplier would re-grant and compound every run), and it is what lets the same reward be a run payoff in one place and permanent in another.",
 
   "currencies": [
@@ -255,19 +255,19 @@
       "id": "jam",
       "moduleNote": "No `module` key: which module presents a producer is authored on the SECTION's module entry (`{ module, definition }`, see garage_floor above), and the runtime fires THAT producer's tap configs. The producer used to restate it here, validated and read by nothing, so a tap fired every tap producer in the chapter - two declarations of one relationship, able to disagree. A leftover `module` key is now refused at import. 'Nothing presents this producer' is derived instead: no section entry names it, which boot validation reports for a TAP producer (a surface nobody can press) and allows for a passive one like `band`.",
       "production": [
-        { "currency": "cash", "amount": 1, "trigger": "tap", "composes": "tapValue" },
+        { "currency": "cash", "amount": 1, "trigger": "tap", "composes": "yield" },
         { "currency": "rehearsal", "amount": 2, "trigger": "tap", "gate": { "type": "flagSet", "flag": "covers" } },
         { "currency": "rehearsal", "amount": 1, "trigger": "tick", "gate": { "type": "flagSet", "flag": "covers" } }
       ],
-      "note": "The Jam button's production configs (design doc §12 rule 13): every flat-rate currency source is {currency, amount, trigger, gate} HELD BY ITS PRODUCER. The cash config replaces the old constants.tapBaseValue and declares `composes: tapValue`, so tap buffs (stage_presence adds, event-tier multipliers) land on it exactly as before; the rehearsal configs replace the old earn block on the currency — 2/tap plus a 1/sec passive trickle, both gated on the `covers` flag (an ordinary Condition, not a bespoke revealFlag). Module-held configs NEVER idle-pay: generators are the only idle-eligible holder (§9), which is why the trickle lives here and not on an innate generator."
+      "note": "The Jam button's production configs (design doc §12 rule 13): every flat-rate currency source is {currency, amount, trigger, gate} HELD BY ITS PRODUCER. The cash config declares `composes: yield`, which composes CurrencyYield:cash - qualified by the config’s own currency, so a buff on one currency’s payout never reaches another’s; the rehearsal configs replace the old earn block on the currency — 2/tap plus a 1/sec passive trickle, both gated on the `covers` flag (an ordinary Condition, not a bespoke revealFlag). What accrues over an absence is structural (§9): a rate does, a yield cannot, because nothing fires a producer while the player is gone. The trickle is a rate and accrues; the per-press configs pay nothing for time away."
     },
     {
       "id": "band",
       "production": [
-        { "currency": "fans", "amount": 0.2, "trigger": "tick", "composes": "fanRate",
+        { "currency": "fans", "amount": 0.2, "trigger": "tick", "composes": "rate",
           "gate": { "type": "ownedCount", "generator": "drummer", "value": 1 } }
       ],
-      "note": "Fan accrual, as an ordinary production config (design doc §12 rule 13) rather than a system of its own. No `module` key: nothing presents this producer, the player never touches it, and that is exactly the point — a passive source that is NOT a generator can never idle-pay (§9), so \"fans pause while unfocused\" holds because of who holds the config, not because a tick was left out of a list. `composes: fanRate` means cover-bar rewards (multipliers) and the per-bandmate bonus (a derived Add) compose through the one modifier stack: (0.2 + 0.02×bandmates) × rewards. The gate names the band directly — the base rate never checked for one, so before 5.7 the only thing tying accrual to having a band was which upgrade happened to set the `fans` flag."
+      "note": "Fan accrual, as an ordinary production config (design doc §12 rule 13) rather than a system of its own. No `module` key: nothing presents this producer, the player never touches it, and that is exactly the point — it is an ordinary rate contribution and accrues over an absence exactly as cash does (§9) - there is no exempt currency and no holder kind deciding it. `composes: rate` means cover-bar rewards (multipliers) and the per-bandmate bonus (a derived Add) compose through the one modifier stack on CurrencyRate:fans: (0.2 + 0.02×bandmates) × rewards. The gate names the band directly — the base rate never checked for one, so before 5.7 the only thing tying accrual to having a band was which upgrade happened to set the `fans` flag."
     }
   ],
 

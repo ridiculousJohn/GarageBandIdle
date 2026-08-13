@@ -250,7 +250,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var configs = ChapterJsonImporter.ParseProducerProduction(@"{
                 ""id"": ""jam"", ""module"": ""module/tap"",
                 ""production"": [
-                    { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""tapValue"" },
+                    { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""yield"" },
                     { ""currency"": ""rehearsal"", ""amount"": 2, ""trigger"": ""tap"", ""gate"": { ""type"": ""flagSet"", ""flag"": ""covers"" } },
                     { ""currency"": ""rehearsal"", ""amount"": 1, ""trigger"": ""tick"", ""gate"": { ""type"": ""flagSet"", ""flag"": ""covers"" } }
                 ]
@@ -261,7 +261,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("cash", configs[0].CurrencyId);
             Assert.AreEqual(1.0, configs[0].Amount, 1e-9);
             Assert.AreEqual(ProductionTrigger.Tap, configs[0].Trigger);
-            Assert.AreEqual(ModifierTarget.TapValue, configs[0].Composes);
+            Assert.AreEqual(ModifierTarget.CurrencyYield, configs[0].Composes);
             Assert.IsNull(configs[0].Gate, "no gate = always on");
 
             Assert.AreEqual(ModifierTarget.None, configs[1].Composes, "absent composes = the raw amount");
@@ -279,7 +279,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // 'fanRate' is authorable since 5.7 (fan accrual is a config); what stays
         // refused is a spelling the family does not define, casing included
         [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""fanrate"" } ] }",
-            "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown composes 'fanrate' - a config composes 'tapValue', 'fanRate' or nothing. Skipping the producer - fix the JSON and re-import.")]
+            "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown composes 'fanrate' - a config composes 'rate', 'yield' or nothing. Skipping the producer - fix the JSON and re-import.")]
         [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": -1, ""trigger"": ""tap"" } ] }",
             "ChapterJsonImporter: producer 'jam' production for 'cash' has a negative amount (-1). Skipping the producer - fix the JSON and re-import.")]
         [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""amount"": 1, ""trigger"": ""tap"" } ] }",
@@ -392,11 +392,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ProductionConfig_ComposesFanRate_MapsToTheFanRateTarget()
         {
             var configs = ChapterJsonImporter.ParseProducerProduction(
-                @"{ ""id"": ""band"", ""production"": [ { ""currency"": ""fans"", ""amount"": 0.2, ""trigger"": ""tick"", ""composes"": ""fanRate"" } ] }");
+                @"{ ""id"": ""band"", ""production"": [ { ""currency"": ""fans"", ""amount"": 0.2, ""trigger"": ""tick"", ""composes"": ""rate"" } ] }");
 
             Assert.IsNotNull(configs);
             Assert.AreEqual(1, configs.Count);
-            Assert.AreEqual(ModifierTarget.FanRate, configs[0].Composes);
+            Assert.AreEqual(ModifierTarget.CurrencyRate, configs[0].Composes);
             Assert.AreEqual(ProductionTrigger.Tick, configs[0].Trigger);
             Assert.AreEqual("fans", configs[0].CurrencyId);
         }
@@ -408,11 +408,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Payload_CurrencyPerSecMultiplier_CarriesItsAffectedCurrencies()
         {
             var payload = ChapterJsonImporter.ParsePayload(
-                @"{ ""effect"": ""currencyPerSecMultiplier"", ""affects"": [""cash"", ""merch""], ""value"": 1.5 }",
+                @"{ ""effect"": ""currencyRateMultiplier"", ""affects"": [""cash"", ""merch""], ""value"": 1.5 }",
                 "upgrade 'tight_set'") as GrantModifierEffect;
 
             Assert.IsNotNull(payload, "the effect maps onto a currency-production modifier");
-            Assert.AreEqual(ModifierTarget.CurrencyProduction, payload.Target);
+            Assert.AreEqual(ModifierTarget.CurrencyRate, payload.Target);
             Assert.AreEqual(ModifierOperation.Multiply, payload.Operation);
             Assert.AreEqual(1.5, payload.Value, 1e-9);
             CollectionAssert.AreEqual(new[] { "cash", "merch" }, payload.Qualifiers);
@@ -424,12 +424,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // two-family split happened to keep on one side. A reward paying a flat tap
         // bonus is coherent content, and nothing should have refused it but the
         // accident of which class family used to own the handler.
-        [TestCase(@"{ ""type"": ""tapValueAdd"", ""value"": 3 }",
-            @"{ ""effect"": ""tapValueAdd"", ""value"": 3 }")]
+        [TestCase(@"{ ""type"": ""currencyYieldAdd"", ""value"": 3 }",
+            @"{ ""effect"": ""currencyYieldAdd"", ""value"": 3 }")]
         [TestCase(@"{ ""type"": ""generatorOutputMultiplier"", ""generator"": ""practice_amp"", ""value"": 2 }",
             @"{ ""effect"": ""generatorOutputMultiplier"", ""generator"": ""practice_amp"", ""value"": 2 }")]
-        [TestCase(@"{ ""type"": ""fanRateMultiplier"", ""value"": 1.15 }",
-            @"{ ""effect"": ""fanRateMultiplier"", ""value"": 1.15 }")]
+        [TestCase(@"{ ""type"": ""currencyRateMultiplier"", ""value"": 1.15 }",
+            @"{ ""effect"": ""currencyRateMultiplier"", ""value"": 1.15 }")]
         public void RewardAndPayload_AuthorTheSameEffectVocabulary(string rewardJson, string payloadJson)
         {
             var asReward = (GrantModifierEffect)ChapterJsonImporter.ParseRewardEffect(rewardJson, "reward 'r'");
@@ -453,15 +453,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 @"{ ""type"": ""teleport"", ""value"": 1 }", "reward 'r'"));
         }
 
-        // a multiplier naming nothing could never apply, and a non-positive one
-        // would zero or negate the production stack it lands in - neither is
-        // written, and the upgrade's absent payload is what boot validation
-        // then reports
-        [TestCase(@"{ ""effect"": ""currencyPerSecMultiplier"", ""value"": 1.5 }",
-            "ChapterJsonImporter: upgrade 'x' currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Refusing it - fix the JSON and re-import.")]
-        [TestCase(@"{ ""effect"": ""currencyPerSecMultiplier"", ""affects"": [""cash""], ""value"": 0 }",
-            "ChapterJsonImporter: upgrade 'x' has a non-positive currencyPerSecMultiplier (0). Refusing it - fix the JSON and re-import.")]
-        public void Payload_CurrencyPerSecMultiplier_RefusesWhatCouldNeverApply(string json, string expectedError)
+        // a non-positive multiplier would zero or negate the production stack it
+        // lands in, so it is never written and the upgrade's absent payload is
+        // what boot validation then reports
+        [TestCase(@"{ ""effect"": ""currencyRateMultiplier"", ""affects"": [""cash""], ""value"": 0 }",
+            "ChapterJsonImporter: upgrade 'x' has a non-positive currencyRateMultiplier (0). Refusing it - fix the JSON and re-import.")]
+        public void Payload_CurrencyRateMultiplier_RefusesWhatCouldNeverApply(string json, string expectedError)
         {
             LogAssert.Expect(LogType.Error, expectedError);
 

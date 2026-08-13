@@ -351,7 +351,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("fans", accrual.CurrencyId);
             Assert.AreEqual(0.2, accrual.Amount, 1e-9, "the base fan rate comes from the JSON config");
             Assert.AreEqual(ProductionTrigger.Tick, accrual.Trigger);
-            Assert.AreEqual(ModifierTarget.FanRate, accrual.Composes,
+            Assert.AreEqual(ModifierTarget.CurrencyRate, accrual.Composes,
                 "so cover-bar rewards and the per-bandmate bonus compose through one stack");
 
             var gate = accrual.Gate as OwnedCountCondition;
@@ -390,7 +390,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("cash", cash.CurrencyId);
             Assert.AreEqual(1.0, cash.Amount, 1e-9, "replaces the old constants.tapBaseValue");
             Assert.AreEqual(ProductionTrigger.Tap, cash.Trigger);
-            Assert.AreEqual(ModifierTarget.TapValue, cash.Composes, "tap buffs land on the cash yield");
+            Assert.AreEqual(ModifierTarget.CurrencyYield, cash.Composes, "tap buffs land on the cash yield");
             Assert.IsNull(cash.Gate, "cash per tap is ungated");
 
             var rehearsalTap = jam.Production[1];
@@ -491,7 +491,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var payload = tightSet.Payload as GrantModifierEffect;
             Assert.IsNotNull(payload,
                 "tight_set payload grants a modifier - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON'");
-            Assert.AreEqual(ModifierTarget.CurrencyProduction, payload.Target,
+            Assert.AreEqual(ModifierTarget.CurrencyRate, payload.Target,
                 "the friendly currencyPerSecMultiplier maps onto currency production");
             Assert.AreEqual(ModifierOperation.Multiply, payload.Operation);
             Assert.AreEqual(1.5, payload.Value, 1e-9);
@@ -672,7 +672,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 // with the bars it came from
                 var effect = reward.Effect as GrantModifierEffect;
                 Assert.IsNotNull(effect, $"reward '{rewardId}' grants a modifier");
-                Assert.AreEqual(ModifierTarget.FanRate, effect.Target);
+                Assert.AreEqual(ModifierTarget.CurrencyRate, effect.Target);
             }
         }
 
@@ -691,7 +691,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var reward = LoadById<RewardDefinition>(RewardsFolder, rewardId);
             var effect = reward.Effect as GrantModifierEffect;
             Assert.IsNotNull(effect, $"reward '{rewardId}' grants a modifier");
-            Assert.AreEqual(ModifierTarget.TapValue, effect.Target);
+            Assert.AreEqual(ModifierTarget.CurrencyYield, effect.Target);
             Assert.AreEqual(value, effect.Value, 1e-9);
 
             // the tier's own clear state is what carries a lifetime; the grant

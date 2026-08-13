@@ -191,7 +191,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var cashBefore = currencies.Get("cash");
             var fansBefore = currencies.Get("fans");
 
-            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash"),
+            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash"),
                 ModifierOperation.Multiply, ContentScope.Run, 2.0);
             system.Tick(10.0);
 
@@ -214,8 +214,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(system.Get("fans_gen"), currencies, 1);
             modifiers.AddDerived(new RecordsIncomeModifier(currencies, "records", 0.02, "cash"));
 
-            var cashTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash");
-            var fansTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "fans");
+            var cashTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
+            var fansTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans");
             Assert.AreEqual(1.0, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "no records, no bonus");
 
             currencies.Add("records", 10);
@@ -245,7 +245,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var modifiers = new ModifierSystem();
             modifiers.AddDerived(new RecordsIncomeModifier(currencies, "records", 0.02, "cash"));
-            var cashTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash");
+            var cashTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
             var gate = new RecordsCumulativeCondition(10);
             var context = TestContent.MakeContext(currencies);
 

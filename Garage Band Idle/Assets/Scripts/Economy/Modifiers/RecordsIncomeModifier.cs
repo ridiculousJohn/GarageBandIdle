@@ -31,7 +31,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _currencies = currencies;
             _recordsCurrencyId = recordsCurrencyId;
             _perRecord = perRecord;
-            _target = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, affectedCurrencyId);
+            _target = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, affectedCurrencyId);
         }
 
         public override ModifierTargetKey Target => _target;

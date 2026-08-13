@@ -335,24 +335,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // the importer refuses to write either of these, so reaching them means
-        // a stale asset from before the payload declared its currencies - the
-        // same belt-and-braces the reward and generator value checks get
+        // A non-positive multiplier is still refused; an EMPTY qualifier list is
+        // not, and that is the rule-11 change: it means every currency in scope
+        // rather than nothing at all, so the payload that used to be reported as
+        // unappliable is now the way "raise every rate" is authored. The reported
+        // case is a qualifier on a target with no id family to resolve it, which
+        // is the one addressing mistake left.
         [Test]
-        public void PerSecMultiplierPayload_UnappliableTuning_IsReported()
+        public void RatePayload_ReportsWhatCannotApply_AndAllowsAnUnqualifiedReachAll()
         {
-            var empty = TestContent.MakeUpgrade("empty_affects", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 1.5, new List<string>()), costAmount: 100);
+            var reachAll = TestContent.MakeUpgrade("reach_all", UpgradeType.Buff, ContentScope.Run,
+                null, new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 1.5, new List<string>()), costAmount: 100);
             var zeroed = TestContent.MakeUpgrade("zeroed", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 0, new List<string> { "cash" }), costAmount: 100);
+                null, new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 0, new List<string> { "cash" }), costAmount: 100);
+            var unresolvable = TestContent.MakeUpgrade("unresolvable", UpgradeType.Buff, ContentScope.Run,
+                null, new GrantModifierEffect(ModifierTarget.IdleRate, ModifierOperation.Multiply, 2, new List<string> { "ch01_garage" }), costAmount: 100);
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
-                upgradeIds: new List<string> { "empty_affects", "zeroed" });
-            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { empty, zeroed });
+                upgradeIds: new List<string> { "reach_all", "zeroed", "unresolvable" });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
+                upgrades: new[] { reachAll, zeroed, unresolvable });
 
             LogAssert.Expect(LogType.Error,
-                "GameEffect: Upgrade 'empty_affects' (payload) targets CurrencyProduction but names nothing to affect - the modifier could never apply.");
-            LogAssert.Expect(LogType.Error,
                 "GameEffect: Upgrade 'zeroed' (payload) has a non-positive multiplier (0).");
+            LogAssert.Expect(LogType.Error,
+                "GameEffect: Upgrade 'unresolvable' (payload) targets IdleRate, which has no id family to resolve a qualifier against, but names 1. Leave the list empty to reach everything in scope.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -363,7 +369,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void BuffWithNoCost_IsReported_AndAFreeContentUnlockIsNot()
         {
             var free = TestContent.MakeUpgrade("free_buff", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1));
+                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }));
             var reveal = TestContent.MakeUpgrade("reveal", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                 null, new SetFlagEffect("fans"));
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
@@ -383,9 +389,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void UpgradeCostCurrency_MustBeNamedAndResolve_WhenTheUpgradeCostsAnything()
         {
             var unnamed = TestContent.MakeUpgrade("unnamed_currency", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costCurrencyId: "", costAmount: 250);
+                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costCurrencyId: "", costAmount: 250);
             var ghost = TestContent.MakeUpgrade("ghost_cost_currency", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1), costCurrencyId: "merch", costAmount: 250);
+                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costCurrencyId: "merch", costAmount: 250);
             var free = TestContent.MakeUpgrade("free_reveal", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, null, new SetFlagEffect("fans"), costCurrencyId: "");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
@@ -702,7 +708,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ActionsOnABoughtBuff_AreAllowed_AndTheirReferencesChecked()
         {
             var upgrade = TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1),
+                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }),
                 costAmount: 250,
                 actions: new List<GameAction> { new GrantCurrencyAction("cash", 100) });
             var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "advance" });
@@ -718,7 +724,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ActionWithAnUnknownCurrency_IsReported()
         {
             var upgrade = TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1),
+                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }),
                 costAmount: 250,
                 actions: new List<GameAction> { new GrantCurrencyAction("merch", 100) });
             var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "advance" });
@@ -793,7 +799,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var jam = TestContent.MakeProducer("jam", new List<ProductionConfig>
             {
-                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
             });
             var beat = TestContent.MakeStoryBeat("beat_open", "It starts in the garage.");
             var section = TestContent.MakeSection("floor", null,
@@ -839,7 +845,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var orphaned = TestContent.MakeProducer("busk", new List<ProductionConfig>
             {
-                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
             });
             var ch1 = TestContent.MakeChapter("ch1", null, producerIds: new List<string> { "busk" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { orphaned });
@@ -856,7 +862,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var band = TestContent.MakeProducer("band", new List<ProductionConfig>
             {
-                new("fans", 0.2, ProductionTrigger.Tick, null, ModifierTarget.FanRate),
+                new("fans", 0.2, ProductionTrigger.Tick, null, ModifierTarget.CurrencyRate),
             });
             var ch1 = TestContent.MakeChapter("ch1", null, producerIds: new List<string> { "band" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { band });
@@ -878,7 +884,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var jam = TestContent.MakeProducer("jam", new List<ProductionConfig>
             {
-                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
             });
             var section = TestContent.MakeSection("floor", null,
                 modules: new List<SectionModule> { new("module/generator-list", "jam") });
@@ -1025,7 +1031,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void PerSecMultiplierPayload_UnknownAffectedCurrency_IsReported()
         {
             var upgrade = TestContent.MakeUpgrade("ghost_currency", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyProduction, ModifierOperation.Multiply, 1.5, new List<string> { "cash", "merch" }), costAmount: 100);
+                null, new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 1.5, new List<string> { "cash", "merch" }), costAmount: 100);
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 upgradeIds: new List<string> { "ghost_currency" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { upgrade });

@@ -25,7 +25,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private const string RecordsId = GameManager.RecordsCurrencyId;
         private const string RoadiesId = GameManager.RoadiesCurrencyId;
 
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
+        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
 
         // the two-pool content set the running game has: a chapter-placed run group
         // holding cash/fans, and a global permanent group holding Records + Roadies
@@ -99,7 +99,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var permanent = EconomyContextFactory.BuildPermanentPool(database);
             using var context = Build(chapter, database, permanent);
             var gate = new RecordsCumulativeCondition(30);
-            var cashProduction = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash");
+            var cashProduction = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
 
             Assert.IsFalse(ConditionEvaluator.IsMet(gate, context.Conditions), "no Records yet");
             Assert.AreEqual(1.0, context.Modifiers.For(cashProduction).Multiply.ToDouble(), 1e-9);
@@ -164,7 +164,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 // ungated, so a single settle applies it immediately
                 TestContent.MakeUpgrade("payday", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
-                    null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4),
+                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }),
                     actions: new List<GameAction> { new GrantCurrencyAction(RoadiesId, 1) }),
             });
             var permanent = EconomyContextFactory.BuildPermanentPool(database);
@@ -189,7 +189,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeUpgrade("gated", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                     new CurrencyBalanceCondition("cash", 1_000_000),
-                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4)),
+                    new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
             });
             using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
 
@@ -269,7 +269,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeUpgrade("buff", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                     new CurrencyBalanceCondition("cash", 1_000_000),
-                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4)),
+                    new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
             });
             using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
 
@@ -476,10 +476,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 {
                     TestContent.MakeUpgrade("permanent_buff", UpgradeType.ContentUnlock,
                         ContentScope.PermanentInChapter, new CurrencyBalanceCondition("cash", 1_000_000),
-                        new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4)),
+                        new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
                     TestContent.MakeUpgrade("run_buff", UpgradeType.ContentUnlock, ContentScope.Run,
                         new CurrencyBalanceCondition("cash", 1_000_000),
-                        new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 7)),
+                        new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 7, new List<string> { "cash" })),
                 },
                 generators: new List<GeneratorDefinition>
                 {
@@ -517,9 +517,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // present and reading the sandbox's OWN band. That band is empty, so it
             // contributes 0.02 x 0: the frontier's two drummers do not leak in
             // through the modifier stack any more than they do through the fleet.
-            Assert.AreEqual(0.0, sandbox.Modifiers.For(ModifierTargetKey.Global(ModifierTarget.FanRate)).Add.ToDouble(),
+            Assert.AreEqual(0.0, sandbox.Modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans")).Add.ToDouble(),
                 1e-9, "the derived add reads the sandbox's own empty band");
-            Assert.AreEqual(0.04, frontier.Modifiers.For(ModifierTargetKey.Global(ModifierTarget.FanRate)).Add.ToDouble(),
+            Assert.AreEqual(0.04, frontier.Modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans")).Add.ToDouble(),
                 1e-9, "while the frontier's two bandmates still read 0.02 x 2 - two economies, two answers");
         }
 
@@ -551,19 +551,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var effects = new EffectContext(currencies, flags, modifiers);
             var payload = new CompoundEffect(new List<GameEffect>
             {
-                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4),
+                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }),
                 new SetFlagEffect("chapter_2_unlocked"),
             });
 
             payload.Apply(effects, ContentScope.PermanentInChapter);
-            Assert.AreEqual(4.0, modifiers.For(ModifierTargetKey.Global(ModifierTarget.TapValue)).Add.ToDouble(), 1e-9);
+            Assert.AreEqual(4.0, modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash")).Add.ToDouble(), 1e-9);
             Assert.IsTrue(flags.IsSet("chapter_2_unlocked"));
 
             // the rebuild pattern (rule 6): clear the store, re-run the payload
             modifiers.ResetGranted();
             payload.Apply(effects, ContentScope.PermanentInChapter);
 
-            Assert.AreEqual(4.0, modifiers.For(ModifierTargetKey.Global(ModifierTarget.TapValue)).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash")).Add.ToDouble(), 1e-9,
                 "re-running rebuilds exactly, never compounds");
             Assert.IsTrue(flags.IsSet("chapter_2_unlocked"), "and the latch re-asserts idempotently");
         }
@@ -606,7 +606,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var capstone = new CapstoneConfig("backyard_party", "Play the Backyard Party",
                 new RecordsCumulativeCondition(1), "chapter_2_unlocked",
-                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4),
+                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }),
                 new List<GameAction>());
             var chapter = TestContent.MakeChapter("garage", null,
                 currencyIds: new List<string> { "cash", "fans" },

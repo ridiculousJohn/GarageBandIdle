@@ -72,7 +72,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             currencies ??= MakeEconomy();
             var producer = MakeProducer("jam", new List<ProductionConfig>
             {
-                new("cash", baseAmount, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
+                new("cash", baseAmount, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
             });
             return new ProductionSystem(new[] { producer }, currencies, modifiers,
                 MakeContext(currencies, flags: flags));
@@ -89,9 +89,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var producer = MakeProducer("band", new List<ProductionConfig>
             {
-                new("fans", baseFansPerSec, ProductionTrigger.Tick, gate, ModifierTarget.FanRate),
+                new("fans", baseFansPerSec, ProductionTrigger.Tick, gate, ModifierTarget.CurrencyRate),
             });
-            modifiers.AddDerived(new BandmateFanRateModifier(generators, perBandmateOwnedBonus));
+            modifiers.AddDerived(new BandmateFanRateModifier(generators, perBandmateOwnedBonus, "fans"));
             return new ProductionSystem(new[] { producer }, currencies, modifiers, conditions);
         }
 
@@ -236,10 +236,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // The named helpers are just the friendly effect vocabulary, same as the
         // importer's - one reward type underneath.
         public static RewardDefinition MakeFanRateReward(string id, double value)
-            => MakeReward(id, new GrantModifierEffect(ModifierTarget.FanRate, ModifierOperation.Multiply, value));
+            => MakeReward(id, new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, value));
 
         public static RewardDefinition MakeTapValueReward(string id, double value)
-            => MakeReward(id, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Multiply, value));
+            => MakeReward(id, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Multiply, value));
 
         public static RewardDefinition MakeSetFlagReward(string id, string flagId)
             => MakeReward(id, new SetFlagEffect(flagId));

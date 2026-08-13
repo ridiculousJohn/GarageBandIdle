@@ -19,14 +19,20 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     {
         private readonly GeneratorSystem _generators;
         private readonly double _perBandmateOwnedBonus;
+        private readonly ModifierTargetKey _target;
 
-        public BandmateFanRateModifier(GeneratorSystem generators, double perBandmateOwnedBonus)
+        // The fans currency is named by the chapter, never known here: this
+        // raises the rate of whichever currency that chapter treats as fans, so
+        // a chapter calling it something else needs no code.
+        public BandmateFanRateModifier(GeneratorSystem generators, double perBandmateOwnedBonus,
+            string fansCurrencyId)
         {
             _generators = generators;
             _perBandmateOwnedBonus = perBandmateOwnedBonus;
+            _target = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, fansCurrencyId);
         }
 
-        public override ModifierTargetKey Target => ModifierTargetKey.Global(ModifierTarget.FanRate);
+        public override ModifierTargetKey Target => _target;
 
         public override ModifierOperation Operation => ModifierOperation.Add;
 

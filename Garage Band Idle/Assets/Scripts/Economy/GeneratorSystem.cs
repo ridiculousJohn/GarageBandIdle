@@ -89,7 +89,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             foreach (var currencyId in _producedCurrencyIds)
             {
                 var composition = _modifiers.For(
-                    ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, currencyId));
+                    ModifierTargetKey.Of(ModifierTarget.CurrencyRate, currencyId));
                 var perSecond = composition.ApplyTo(ProductionCalculator.TotalPerSecond(_generators, currencyId));
                 if (perSecond > BigNumber.Zero)
                     _currencies.Add(currencyId, perSecond * seconds);

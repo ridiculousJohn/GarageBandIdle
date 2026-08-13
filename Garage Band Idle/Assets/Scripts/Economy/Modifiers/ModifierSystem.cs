@@ -142,12 +142,33 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // Everything modifying this target, composed. Derived values are read
         // here on every call, which is why they can never be stale.
+        //
+        // Two buckets, not one: the target's own key, plus the UNQUALIFIED key of
+        // its kind, which by rule 11 reaches every member in scope. Composing
+        // only the exact key would make "double every generator's output" a
+        // modifier that addresses nothing, and composing by walking every stored
+        // key would make an unrelated qualifier's cost proportional to how much
+        // content exists. Asking Covers keeps the rule in one place - the change
+        // notification asks the same question, so a row can never refresh on a
+        // grant the composition ignored, or miss one it counted.
         public ModifierComposition For(ModifierTargetKey target)
         {
             var add = BigNumber.Zero;
             var multiply = BigNumber.One;
 
-            if (_granted.TryGetValue(target, out var grants))
+            Accumulate(target, ref add, ref multiply);
+
+            // a request that is itself unqualified IS that bucket; adding it
+            // again would square every multiplier it holds
+            if (target.IsQualified)
+                Accumulate(ModifierTargetKey.All(target.Kind), ref add, ref multiply);
+
+            return new ModifierComposition(add, multiply);
+        }
+
+        private void Accumulate(ModifierTargetKey key, ref BigNumber add, ref BigNumber multiply)
+        {
+            if (_granted.TryGetValue(key, out var grants))
             {
                 for (var i = 0; i < grants.Count; i++)
                 {
@@ -158,18 +179,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 }
             }
 
-            if (_derived.TryGetValue(target, out var derived))
-            {
-                for (var i = 0; i < derived.Count; i++)
-                {
-                    if (derived[i].Operation == ModifierOperation.Add)
-                        add += derived[i].Value;
-                    else
-                        multiply *= derived[i].Value;
-                }
-            }
+            if (!_derived.TryGetValue(key, out var derived))
+                return;
 
-            return new ModifierComposition(add, multiply);
+            for (var i = 0; i < derived.Count; i++)
+            {
+                if (derived[i].Operation == ModifierOperation.Add)
+                    add += derived[i].Value;
+                else
+                    multiply *= derived[i].Value;
+            }
         }
 
         // Empties the grant store so a projection can rebuild it (design doc
@@ -247,14 +266,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 Debug.LogError($"ModifierSystem: {source} on '{target}' with operation None (uninitialized). Ignoring.");
                 return false;
             }
-            if (ModifierTargetKey.RequiresQualifier(target.Kind) && target.Qualifier.Length == 0)
+            // An ABSENT qualifier is legal on every kind and means "every member
+            // in reach" (rule 11), so there is no refusal for one here - the old
+            // check read an unqualified key as addressing nothing, which is the
+            // opposite of what it now means. A qualifier on a kind with no
+            // definition family is still refused: nothing could resolve it, so it
+            // would file a modifier under a key no reader ever asks for.
+            if (target.IsQualified && !ModifierTargetKey.AcceptsQualifier(target.Kind))
             {
-                Debug.LogError($"ModifierSystem: {source} on '{target}' names no {target.Kind} id. Ignoring - it would address nothing.");
-                return false;
-            }
-            if (!ModifierTargetKey.RequiresQualifier(target.Kind) && target.Qualifier.Length > 0)
-            {
-                Debug.LogError($"ModifierSystem: {source} on '{target.Kind}' carries a qualifier '{target.Qualifier}', which that target has no room for. Ignoring.");
+                Debug.LogError($"ModifierSystem: {source} on '{target.Kind}' carries a qualifier '{target.Qualifier}', which that target has no id family to resolve against. Ignoring.");
                 return false;
             }
             return true;

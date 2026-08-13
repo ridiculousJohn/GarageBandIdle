@@ -20,7 +20,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private const string RecordsId = GameManager.RecordsCurrencyId;
 
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
+        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
 
         // the two-pool content set the running game has: a chapter-placed run
         // group holding cash/fans/rehearsal, and a global group holding Records
@@ -228,7 +228,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var cashProduction = ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash");
+            var cashProduction = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
 
             var frontier = EconomyContextFactory.Build(chapter, database,
                 EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
@@ -261,7 +261,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var upgrade = TestContent.MakeUpgrade("permanent_tap", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, new CurrencyBalanceCondition("cash", 10),
-                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4));
+                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }));
             var chapter = MakeChapter(upgradeIds: new List<string> { "permanent_tap" });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition> { upgrade });
             var context = EconomyContextFactory.Build(chapter, database,
@@ -291,7 +291,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var upgrade = TestContent.MakeUpgrade("open_now", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, null,
-                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4));
+                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }));
             var chapter = MakeChapter(upgradeIds: new List<string> { "open_now" });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition> { upgrade });
 
@@ -443,7 +443,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var epilogue = TestContent.MakeUpgrade("epilogue", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, new FlagSetCondition("chapter_2"),
-                new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4));
+                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }));
             var context = BuildCapstoneEconomy(MakeCapstone(),
                 upgrades: new List<UpgradeDefinition> { epilogue },
                 upgradeIds: new List<string> { "epilogue" });

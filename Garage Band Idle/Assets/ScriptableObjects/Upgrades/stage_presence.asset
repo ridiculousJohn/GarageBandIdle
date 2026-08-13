@@ -19,22 +19,23 @@ MonoBehaviour:
   _costCurrencyId: cash
   _costAmount: 250
   _gate:
-    rid: 1002
+    rid: 1000
   _payload:
-    rid: 1003
+    rid: 1001
   _actions: []
   references:
     version: 2
     RefIds:
-    - rid: 1002
+    - rid: 1000
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
         _value: 250
-    - rid: 1003
+    - rid: 1001
       type: {class: GrantModifierEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        _target: 1
-        _qualifiers: []
+        _target: 5
+        _qualifiers:
+        - cash
         _operation: 1
         _value: 1

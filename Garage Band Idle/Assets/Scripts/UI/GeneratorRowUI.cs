@@ -75,9 +75,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // the old "+X/sec" standing until the next purchase - the same
         // staleness ProductionSystem.TapValueChanged cures for the Jam label. A run reset
         // clearing those grants arrives through here too.
+        // Covers, not Equals: a modifier granted without a qualifier reaches every
+        // generator in scope (rule 11), so it moves this row's output without ever
+        // naming it. Exact-match here would leave the row showing a stale number
+        // that the economy had already changed - and the composition asks the same
+        // question, so the two cannot disagree about which grants apply.
         public void HandleModifierChanged(ModifierTargetKey target)
         {
-            if (gameObject.activeSelf && target.Equals(Generator.OutputTarget))
+            if (gameObject.activeSelf && target.Covers(Generator.OutputTarget))
                 Refresh();
         }
 

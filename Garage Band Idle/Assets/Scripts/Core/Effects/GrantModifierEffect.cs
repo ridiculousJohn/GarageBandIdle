@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine;
 
@@ -20,12 +21,12 @@ namespace RidiculousGaming.GarageBandIdle
     public class GrantModifierEffect : GameEffect
     {
         [SerializeField]
-        [Tooltip("Which stat this modifies. The global kinds (TapValue, FanRate) take no qualifiers.")]
+        [Tooltip("Which stat this modifies.")]
         private ModifierTarget _target;
 
         [SerializeField]
         [ModifierQualifierId(nameof(_target))]
-        [Tooltip("Generator or currency ids the modifier applies to, for the kinds that name one. Anything not listed is untouched.")]
+        [Tooltip("Ids the modifier applies to. LEAVE EMPTY to reach every member of the target's family in scope - listing ids narrows it to exactly those.")]
         private List<string> _qualifiers = new();
 
         [SerializeField]
@@ -52,7 +53,10 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // One grant per declared qualifier, so the effect reaches exactly what it
-        // names; a global kind is a single grant carrying no qualifier.
+        // names; NO qualifiers is a single unqualified grant, which by rule 11
+        // reaches every member of the kind in scope. That is the difference
+        // between "+50% to the amp" and "+50% to everything", authored as the
+        // presence or absence of a list rather than as two effect kinds.
         //
         // This is the effect the rebuild boundaries exist FOR: the store is
         // cleared before every projection (ModifierSystem.ResetGranted), so
@@ -61,9 +65,9 @@ namespace RidiculousGaming.GarageBandIdle
         // exact.
         public override void Apply(EffectContext context, ContentScope scope)
         {
-            if (!ModifierTargetKey.RequiresQualifier(_target))
+            if (_qualifiers.Count == 0)
             {
-                context.Modifiers.Grant(ModifierTargetKey.Global(_target), _operation, scope, _value);
+                context.Modifiers.Grant(ModifierTargetKey.All(_target), _operation, scope, _value);
                 return;
             }
 
@@ -99,27 +103,23 @@ namespace RidiculousGaming.GarageBandIdle
             ValidateQualifiers(context, source);
         }
 
-        // A qualified kind naming nothing addresses nothing, and a qualifier on a
-        // global kind would silently address nothing - ModifierTargetKey draws that
-        // line, so both mistakes report here instead of at grant time.
+        // An empty list is legal and means "every member in scope" (rule 11), so
+        // the only mistakes left are a qualifier the target's family cannot
+        // resolve and a qualifier on a kind with no family at all.
         private void ValidateQualifiers(ConditionContext context, string source)
         {
-            if (!ModifierTargetKey.RequiresQualifier(_target))
-            {
-                if (_qualifiers.Count > 0)
-                    Debug.LogError($"GameEffect: {source} targets {_target}, which takes no qualifiers, but names {_qualifiers.Count}.");
-                return;
-            }
-
             if (_qualifiers.Count == 0)
-            {
-                Debug.LogError($"GameEffect: {source} targets {_target} but names nothing to affect - the modifier could never apply.");
                 return;
-            }
 
             // which registry resolves a qualifier follows from the target's declared
             // definition family, the same mapping the inspector's dropdown reads
             var family = ModifierTargetKey.QualifierDefinitionType(_target);
+            if (family == null)
+            {
+                Debug.LogError($"GameEffect: {source} targets {_target}, which has no id family to resolve a qualifier against, but names {_qualifiers.Count}. Leave the list empty to reach everything in scope.");
+                return;
+            }
+
             foreach (var qualifier in _qualifiers)
             {
                 if (family == typeof(CurrencyDefinition))
@@ -131,6 +131,13 @@ namespace RidiculousGaming.GarageBandIdle
                 // prefer the content registry (it covers ids outside the running
                 // chapter); unit tests have no database and validate against the
                 // live system instead
+                if (family == typeof(BarGroupDefinition))
+                {
+                    if (context.Database != null && !context.Database.BarGroups.Contains(qualifier))
+                        Debug.LogError($"GameEffect: {source} targets unknown bar group id '{qualifier}'.");
+                    continue;
+                }
+
                 var resolves = context.Database != null
                     ? context.Database.Generators.Contains(qualifier)
                     : context.Generators != null && context.Generators.TryGet(qualifier, out _);

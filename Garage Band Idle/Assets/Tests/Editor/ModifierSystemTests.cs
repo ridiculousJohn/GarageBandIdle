@@ -17,8 +17,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
-        private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Global(ModifierTarget.FanRate);
+        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
+        private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans");
 
         // a derived modifier with a fixed value: enough to assert that a store
         // rebuild leaves derived modifiers standing, without dragging in the
@@ -54,11 +54,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant with target kind 99, which no ModifierTarget defines. Ignoring.");
-            modifiers.Grant(ModifierTargetKey.Global((ModifierTarget)99),
+            modifiers.Grant(ModifierTargetKey.All((ModifierTarget)99),
                 ModifierOperation.Multiply, ContentScope.Run, 2);
 
             LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'TapValue' with operation 99, which no ModifierOperation defines. Ignoring.");
+                "ModifierSystem: Grant on 'CurrencyYield:cash' with operation 99, which no ModifierOperation defines. Ignoring.");
             modifiers.Grant(TapValue, (ModifierOperation)99, ContentScope.Run, 0);
 
             Assert.AreEqual(1.0, modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
@@ -94,6 +94,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(3.0, composition.Add.ToDouble(), 1e-9, "1 + 2");
             Assert.AreEqual(6.0, composition.Multiply.ToDouble(), 1e-9, "2 x 3");
             Assert.AreEqual(48.0, composition.ApplyTo(5).ToDouble(), 1e-9, "(5 + 3) x 6");
+        }
+
+        // Rule 11: an absent qualifier means every member of the kind in reach,
+        // so an unqualified grant has to compose into each specific target
+        // WITHOUT reaching a different kind, and a qualified one must stay put.
+        // The double-count guard is the subtle half - an unqualified READ is
+        // that bucket, so unioning it with itself would square its multipliers.
+        [Test]
+        public void UnqualifiedGrant_ReachesEveryMemberOfItsKind_AndOnlyThose()
+        {
+            var modifiers = new ModifierSystem();
+            var everyRate = ModifierTargetKey.All(ModifierTarget.CurrencyRate);
+            var merchRate = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "merch");
+
+            modifiers.Grant(everyRate, ModifierOperation.Multiply, ContentScope.Run, 2);
+            modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 3);
+
+            Assert.AreEqual(6.0, modifiers.For(FanRate).Multiply.ToDouble(), 1e-9,
+                "the named currency composes its own grant and the reach-all one");
+            Assert.AreEqual(2.0, modifiers.For(merchRate).Multiply.ToDouble(), 1e-9,
+                "a currency nothing named still gets the reach-all grant");
+            Assert.AreEqual(1.0, modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+                "and a different KIND is untouched - reach-all is not reach-everything");
+            Assert.AreEqual(2.0, modifiers.For(everyRate).Multiply.ToDouble(), 1e-9,
+                "reading the unqualified key composes it once, not twice");
         }
 
         // The store is rebuilt, never filtered (design doc section 12, rule 6):
@@ -204,20 +229,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant with target kind None (uninitialized). Ignoring.");
-            modifiers.Grant(ModifierTargetKey.Global(ModifierTarget.None), ModifierOperation.Multiply, ContentScope.Run, 2);
+            modifiers.Grant(ModifierTargetKey.All(ModifierTarget.None), ModifierOperation.Multiply, ContentScope.Run, 2);
 
             LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'TapValue' with operation None (uninitialized). Ignoring.");
+                "ModifierSystem: Grant on 'CurrencyYield:cash' with operation None (uninitialized). Ignoring.");
             modifiers.Grant(TapValue, ModifierOperation.None, ContentScope.Run, 2);
 
+            // an ABSENT qualifier is no longer a mistake - it means every member
+            // of the kind in reach (rule 11) - so the only addressing error left
+            // is a qualifier on a kind with nothing to resolve it against
             LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'GeneratorOutput' names no GeneratorOutput id. Ignoring - it would address nothing.");
-            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, ""),
-                ModifierOperation.Multiply, ContentScope.Run, 2);
-
-            LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'TapValue' carries a qualifier 'practice_amp', which that target has no room for. Ignoring.");
-            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.TapValue, "practice_amp"),
+                "ModifierSystem: Grant on 'IdleRate' carries a qualifier 'practice_amp', which that target has no id family to resolve against. Ignoring.");
+            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.IdleRate, "practice_amp"),
                 ModifierOperation.Multiply, ContentScope.Run, 2);
 
             Assert.AreEqual(1.0, modifiers.For(TapValue).Multiply.ToDouble(), 1e-9, "nothing was stored");
@@ -231,7 +254,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
 
             LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'TapValue' with scope None. Ignoring - an unscoped modifier has no lifetime.");
+                "ModifierSystem: Grant on 'CurrencyYield:cash' with scope None. Ignoring - an unscoped modifier has no lifetime.");
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.None, 2);
 
             Assert.AreEqual(1.0, modifiers.For(TapValue).Multiply.ToDouble(), 1e-9);
@@ -245,7 +268,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
 
             LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'TapValue' with a negative Add value '-1'. Ignoring.");
+                "ModifierSystem: Grant on 'CurrencyYield:cash' with a negative Add value '-1'. Ignoring.");
             modifiers.Grant(TapValue, ModifierOperation.Add, ContentScope.Run, -1);
 
             Assert.AreEqual(0.0, modifiers.For(TapValue).Add.ToDouble(), 1e-9);

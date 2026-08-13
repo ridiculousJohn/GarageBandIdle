@@ -18,9 +18,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var family = ResolveFamily(property);
             if (property.propertyType != SerializedPropertyType.String || family == null)
             {
-                // A global target takes no qualifier, and a target that fails to
-                // resolve tells us nothing about which family is legal here. Show the
-                // raw string either way rather than a confidently wrong dropdown.
+                // A target with no id family (IdleRate, IdleCap - per scope, and
+                // scopes are not addressable content yet) has no list to offer, and
+                // a target that fails to resolve tells us nothing about which family
+                // is legal. Show the raw string either way rather than a confidently
+                // wrong dropdown. An EMPTY list is not an error to draw around: it
+                // is how "every member in scope" is authored (rule 11).
                 EditorGUI.PropertyField(position, property, label);
                 return;
             }

@@ -19,29 +19,29 @@ MonoBehaviour:
     _trigger: 2
     _gate:
       rid: -2
-    _composes: 1
+    _composes: 5
   - _currencyId: rehearsal
     _amount: 2
     _trigger: 2
     _gate:
-      rid: 1000
+      rid: 1002
     _composes: 0
   - _currencyId: rehearsal
     _amount: 1
     _trigger: 1
     _gate:
-      rid: 1001
+      rid: 1003
     _composes: 0
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1000
+    - rid: 1002
       type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _flagId: covers
-    - rid: 1001
+    - rid: 1003
       type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _flagId: covers

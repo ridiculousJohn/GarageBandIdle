@@ -140,7 +140,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // band, and an event sandbox's fixed baseline comes from the tier
             // rules rather than from withholding this.
             modifiers.AddDerived(new BandmateFanRateModifier(
-                generators, chapter.Fans.PerBandmateOwnedBonus));
+                generators, chapter.Fans.PerBandmateOwnedBonus, chapter.Fans.CurrencyId));
 
             var context = new EconomyContext(chapter, recipe, router, flags, modifiers, generators, upgrades,
                 production, bars, rewards, capstone, conditions,

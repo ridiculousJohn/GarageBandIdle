@@ -21,10 +21,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private const string RecordsId = GameManager.RecordsCurrencyId;
 
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
-        private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Global(ModifierTarget.FanRate);
+        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
+        private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans");
         private static readonly ModifierTargetKey CashProduction =
-            ModifierTargetKey.Of(ModifierTarget.CurrencyProduction, "cash");
+            ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
 
         // The Chapter 1 shape in miniature: a run-scoped buff (re-bought each
         // demo), a permanent content unlock that latches the album flag on the
@@ -55,11 +55,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 upgrades: new List<UpgradeDefinition>
                 {
                     TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
-                        null, new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Multiply, 2),
+                        null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Multiply, 2, new List<string> { "cash" }),
                         costAmount: 10),
                     TestContent.MakeUpgrade("backstage_pass", UpgradeType.ContentUnlock,
                         ContentScope.PermanentInChapter, null,
-                        new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 4)),
+                        new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
                     TestContent.MakeUpgrade("cut_demo", UpgradeType.ContentUnlock,
                         ContentScope.PermanentInChapter,
                         new CurrencyBalanceCondition("fans", 50), new SetFlagEffect("album")),

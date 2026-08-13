@@ -62,16 +62,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // generalizing ProductionSystem and leaving ContentValidator behind).
         //
         // None is always legal: the config pays its raw amount. Anything else
-        // must be a defined target that composes GLOBALLY, because a config
-        // composes through ModifierTargetKey.Global(kind) - so a qualifier-
-        // requiring target like GeneratorOutput or CurrencyProduction can never
-        // be one. Composed globally it would read an empty bucket and scale by
-        // nothing at all, which is worse than a refusal because it looks like it
-        // worked.
+        // must be a defined target whose qualifier family is CURRENCY, because a
+        // config composes through ModifierTargetKey.Of(kind, its own currency id)
+        // - so a generator- or bar-group-qualified target can never be one. Given
+        // a currency id it would address a key nobody grants against, reading an
+        // empty bucket and scaling by nothing, which is worse than a refusal
+        // because it looks like it worked.
         public static bool IsComposable(ModifierTarget composes)
             => composes == ModifierTarget.None
                 || (Enum.IsDefined(typeof(ModifierTarget), composes)
-                    && !ModifierTargetKey.RequiresQualifier(composes));
+                    && ModifierTargetKey.QualifierDefinitionType(composes) == typeof(CurrencyDefinition));
 
         public ProductionConfig() { }
 

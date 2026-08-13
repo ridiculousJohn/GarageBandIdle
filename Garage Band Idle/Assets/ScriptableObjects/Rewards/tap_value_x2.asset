@@ -15,14 +15,15 @@ MonoBehaviour:
   _id: tap_value_x2
   _displayName: "Tap Value \xD72"
   _effect:
-    rid: 1000
+    rid: 1001
   references:
     version: 2
     RefIds:
-    - rid: 1000
+    - rid: 1001
       type: {class: GrantModifierEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        _target: 1
-        _qualifiers: []
+        _target: 5
+        _qualifiers:
+        - cash
         _operation: 2
         _value: 2

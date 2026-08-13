@@ -1290,12 +1290,15 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 case null:
                 case "":
                     return ModifierTarget.None;
-                case "tapValue":
-                    return ModifierTarget.TapValue;
-                case "fanRate":
-                    return ModifierTarget.FanRate;
+                // which of its currency's two numbers the config feeds - the
+                // config already names the currency, so this says nothing about
+                // WHICH currency and nothing about what fires it
+                case "rate":
+                    return ModifierTarget.CurrencyRate;
+                case "yield":
+                    return ModifierTarget.CurrencyYield;
                 default:
-                    Debug.LogError($"ChapterJsonImporter: {context} has unknown composes '{composes}' - a config composes 'tapValue', 'fanRate' or nothing. Skipping the producer - fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown composes '{composes}' - a config composes 'rate', 'yield' or nothing. Skipping the producer - fix the JSON and re-import.");
                     return null;
             }
         }
@@ -1324,30 +1327,28 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             {
                 case "setFlag":
                     return new SetFlagEffect(flag);
-                case "tapValueAdd":
+                // Every numeric name is <target><operation>, and the ids it reaches
+                // are the authored list - EMPTY meaning every member in scope
+                // (design doc rule 11), which is why an absent `affects` is no
+                // longer refused: it is now the way to author "all of them".
+                case "currencyYieldAdd":
                     // a negative add is left to boot validation: unlike a multiplier
                     // it cannot poison a whole stack, so the asset is worth keeping
                     // around to be reported by name
-                    return new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, value);
-                case "tapValueMultiplier":
-                    return ToMultiplier(ModifierTarget.TapValue, value, context, kind);
-                case "fanRateMultiplier":
-                    return ToMultiplier(ModifierTarget.FanRate, value, context, kind);
+                    return new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add,
+                        value, Qualifiers(affects));
+                case "currencyYieldMultiplier":
+                    return ToMultiplier(ModifierTarget.CurrencyYield, value, context, kind,
+                        Qualifiers(affects));
+                case "currencyRateAdd":
+                    return new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Add,
+                        value, Qualifiers(affects));
+                case "currencyRateMultiplier":
+                    return ToMultiplier(ModifierTarget.CurrencyRate, value, context, kind,
+                        Qualifiers(affects));
                 case "generatorOutputMultiplier":
                     return ToMultiplier(ModifierTarget.GeneratorOutput, value, context, kind,
-                        new List<string> { generator });
-                case "currencyPerSecMultiplier":
-                {
-                    // an empty affects list could never apply, so the effect is never
-                    // written and the content naming it reports instead
-                    if (affects == null || affects.Length == 0)
-                    {
-                        Debug.LogError($"ChapterJsonImporter: {context} currencyPerSecMultiplier names no affected currencies - the multiplier could never apply. Refusing it - fix the JSON and re-import.");
-                        return null;
-                    }
-                    return ToMultiplier(ModifierTarget.CurrencyProduction, value, context, kind,
-                        new List<string>(affects));
-                }
+                        Qualifiers(string.IsNullOrEmpty(generator) ? null : new[] { generator }));
                 case null:
                 case "":
                     Debug.LogError($"ChapterJsonImporter: {context} names no effect.");
@@ -1361,6 +1362,26 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // a reward entry authors its effect name under `type`
         private static GameEffect ToRewardEffect(RewardEntryBlock block, string context)
             => ToEffect(block.type, block.value, block.flag, block.generator, block.affects, context);
+
+        // An authored id list becomes the effect's qualifiers; an absent or empty
+        // one becomes an empty list, which GrantModifierEffect grants unqualified
+        // and rule 11 reads as every member of the target's family in scope. Empty
+        // entries are dropped rather than carried - an id of "" resolves against
+        // nothing, and one blank row would otherwise turn "all of them" into a
+        // grant that reaches a single nonexistent thing.
+        private static List<string> Qualifiers(string[] authored)
+        {
+            var list = new List<string>();
+            if (authored == null)
+                return list;
+
+            foreach (var id in authored)
+            {
+                if (!string.IsNullOrEmpty(id))
+                    list.Add(id);
+            }
+            return list;
+        }
 
         // never write a multiplier that would zero or negate the product it lands
         // in: the effect is refused here and the content naming it reports loudly,

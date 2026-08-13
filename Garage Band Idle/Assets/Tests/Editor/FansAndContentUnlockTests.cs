@@ -18,8 +18,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static GameEffect SetFlag(string flagId) => new SetFlagEffect(flagId);
 
-        private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Global(ModifierTarget.FanRate);
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Global(ModifierTarget.TapValue);
+        private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans");
+        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
 
         [Test]
         public void ContentUnlock_AppliesWhenGateMet_AndSetsTheFlag()
@@ -80,7 +80,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 // met gate (none), but buffs wait for the purchase flow (buff slice)
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff,
                     ContentScope.Run, null,
-                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Add, 1)),
+                    new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" })),
             }, currencies, flags, new ModifierSystem());
             var context = TestContent.MakeContext(currencies, flags: flags);
 
@@ -153,10 +153,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 // no gate = met from the start, so both apply on the first pass
                 TestContent.MakeUpgrade("run_boost", UpgradeType.ContentUnlock, ContentScope.Run, null,
-                    new GrantModifierEffect(ModifierTarget.FanRate, ModifierOperation.Multiply, 1.5)),
+                    new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 1.5, new List<string> { "fans" })),
                 TestContent.MakeUpgrade("permanent_boost", UpgradeType.ContentUnlock,
                     ContentScope.PermanentInChapter, null,
-                    new GrantModifierEffect(ModifierTarget.FanRate, ModifierOperation.Multiply, 2.0)),
+                    new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 2.0, new List<string> { "fans" })),
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
@@ -183,7 +183,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new ConditionContext(currencies, generators, flags), new FlagSetCondition("fans"));
 
             LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'FanRate' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
+                "ModifierSystem: Grant on 'CurrencyRate:fans' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
             modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 0);
 
             Assert.AreEqual(0.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "the rate is untouched");
@@ -202,10 +202,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("run_x2", UpgradeType.ContentUnlock, ContentScope.Run, null,
-                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Multiply, 2.0)),
+                    new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Multiply, 2.0, new List<string> { "cash" })),
                 TestContent.MakeUpgrade("perm_x3", UpgradeType.ContentUnlock,
                     ContentScope.PermanentInChapter, null,
-                    new GrantModifierEffect(ModifierTarget.TapValue, ModifierOperation.Multiply, 3.0)),
+                    new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Multiply, 3.0, new List<string> { "cash" })),
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
@@ -238,7 +238,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tap = TestContent.MakeTapProduction(2, modifiers);
 
             LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
+                "ModifierSystem: Grant on 'CurrencyYield:cash' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 0);
 
             Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9, "the value is untouched");
@@ -270,7 +270,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(12.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 2 x 2 x 3");
 
             LogAssert.Expect(LogType.Error,
-                "ModifierSystem: Grant on 'TapValue' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
+                "ModifierSystem: Grant on 'CurrencyYield:cash' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
             modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 0);
             modifiers.Grant(FanRate, ModifierOperation.Multiply, ContentScope.Run, 5);
             tap.RefreshTapValue();
@@ -296,8 +296,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
             {
-                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.TapValue),
-                new("cash", 4, ProductionTrigger.Tap, new FlagSetCondition("amped"), ModifierTarget.TapValue),
+                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
+                new("cash", 4, ProductionTrigger.Tap, new FlagSetCondition("amped"), ModifierTarget.CurrencyYield),
             });
             var production = new ProductionSystem(new[] { producer }, currencies, modifiers,
                 TestContent.MakeContext(currencies, flags: flags));
