@@ -33,8 +33,8 @@ namespace RidiculousGaming.GarageBandIdle
         public const string RoadiesCurrencyId = "roadies";
 
         // UI display touchpoints only (CurrencyHeaderModule/TapModule name what
-        // they show); the fan SYSTEM takes its ids from the chapter's fans
-        // config, and what a tap PAYS is the jam producer's data. The playable
+        // they show); fan ACCRUAL takes its currency from the chapter's fans
+        // config, and what a press pays is the jam producer's data. The playable
         // pass (slice 10) replaces these with a data-driven currency header.
         public const string CashCurrencyId = "cash";
         public const string FansCurrencyId = "fans";

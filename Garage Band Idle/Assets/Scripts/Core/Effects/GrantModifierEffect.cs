@@ -14,12 +14,9 @@ namespace RidiculousGaming.GarageBandIdle
     // cash's yield authored by the upgrade that pays it (rule 11), not an effect
     // granted against the number, which is why nothing here adds.
     //
-    // It used to carry a ModifierTarget as well: a closed KIND plus a list of ids
-    // within that kind's family. That could not name one of a generator's two
-    // output lines, because the kind named the family and the id named a member of
-    // it, and the number itself was never named at all (design doc rule 11). A
-    // selector names the numbers directly, so what it reaches is decided by what
-    // the numbers say they are.
+    // The selector names the numbers directly (design doc rule 11), so what an
+    // effect reaches is decided by what the numbers say they are - which is what
+    // lets one grant name one of a generator's two output lines.
     //
     // What it reaches is declared data, never implied: a generator producing fans
     // or merch must not inherit a cash income buff just because the buff exists
@@ -67,10 +64,9 @@ namespace RidiculousGaming.GarageBandIdle
         public override void Validate(ConditionContext context, string source)
         {
             // A serialized enum is an int, so a hand-edited or un-migrated asset can
-            // hold a value no member defines. The specialized payload classes this
-            // replaced could not express that - each hardcoded its operation - so
-            // generalizing made two new broken states representable and they have to
-            // be named here rather than only failing closed later.
+            // hold a value no member defines. One class carrying the operation as
+            // data makes that state representable, so it has to be named here rather
+            // than only failing closed later.
             if (!Enum.IsDefined(typeof(ModifierOperation), _operation))
                 Debug.LogError($"GameEffect: {source} has modifier operation {(int)_operation}, which no ModifierOperation defines.");
             else if (_operation == ModifierOperation.None)
@@ -84,9 +80,9 @@ namespace RidiculousGaming.GarageBandIdle
             ValidateTerms(context, source);
         }
 
-        // A term naming nothing is the failure the closed target enum used to
-        // catch by refusing to compile: the modifier is stored, matches no number,
-        // and looks authored rather than broken. So every term must resolve to
+        // A term naming nothing fails silently and looks authored: the modifier is
+        // stored, matches no number, and nothing reports it. So every term must
+        // resolve to
         // something in the content set - a definition id, a tag some definition
         // declares, or a produced number's feed name.
         //

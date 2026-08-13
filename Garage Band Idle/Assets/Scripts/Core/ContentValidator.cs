@@ -155,10 +155,8 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var currencyId in chapter.RecordBuff.AffectsCurrencyIds)
             {
                 context.Currencies.ValidateReference(currencyId, $"Chapter '{chapter.Id}' (recordBuff affects)");
-                // Before 5.7 this was impossible rather than checked: fan accrual
-                // was its own system and only ever composed FanRate, so no income
-                // multiplier could reach it. Fan production is an ordinary config
-                // now, so the only thing keeping Records off the fan rate is this
+                // Fan accrual is ordinary production, reachable by any modifier that
+                // names it, so the only thing keeping Records off the fan rate is this
                 // list - and Records inflating fans would let time away shortcut
                 // the Records payout, the coupling section 11 exists to prevent
                 // and the same failure the reset-on-release check above guards
@@ -245,12 +243,11 @@ namespace RidiculousGaming.GarageBandIdle
             ValidateIds(chapter.BarGroupIds, database.BarGroups, $"Chapter '{chapter.Id}' (barGroups)");
             ValidateIds(chapter.EventIds, database.Events, $"Chapter '{chapter.Id}' (events)");
 
-            // Which producers this chapter's sections actually present. This is the
-            // check that replaces ProducerDefinition.ModuleAddress (retired in 6.5):
-            // "who presents this producer" is derived from the section entries that
-            // name it rather than restated on the producer, so the two can no longer
-            // disagree - and the thing worth reporting was never the missing string
-            // but the consequence, a tap surface the player cannot reach.
+            // Which producers this chapter's sections actually present. "Who
+            // presents this producer" is derived from the section entries that name
+            // it rather than restated on the producer, so the two cannot disagree -
+            // and what is worth reporting is not a missing string but the
+            // consequence, a fireable surface the player cannot reach.
             //
             // Filled by the binding check as it walks each section, because that check
             // is the only place the module's FAMILY is known. An id read off any entry
@@ -416,10 +413,9 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // The capstone (design doc sections 1-2 and 5). Its unlock is now the SOLE
-        // authored source of the chapter gate, so what used to be a check on a
-        // scalar `capstoneRecordsGate > 0` becomes ordinary condition validation
-        // plus one thing ordinary validation cannot cover.
+        // The capstone (design doc sections 1-2 and 5). Its unlock is the SOLE
+        // authored source of the chapter gate, so the gate is ordinary condition
+        // validation plus one thing ordinary validation cannot cover.
         //
         // Non-positive thresholds need nothing bespoke: every threshold condition
         // calls Condition.ValidateThreshold, which reports one, and ThresholdIsMet
@@ -458,9 +454,8 @@ namespace RidiculousGaming.GarageBandIdle
             // An absent onComplete is legal: completing always at least latches the
             // declared completion flag, and the OPERATION sets that flag itself from
             // the declaration above - the payload never carries a copy, so there is
-            // no second statement of the fact to keep in agreement (the check that
-            // used to walk the payload for it is gone because the mistake it caught
-            // is no longer authorable).
+            // no second statement of the fact to keep in agreement, and nothing here
+            // walks the payload looking for one.
             capstone.OnComplete?.Validate(context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (onComplete)");
 
             foreach (var action in capstone.Actions)
@@ -532,17 +527,17 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ContentValidator: Currency '{currency.Id}' has a negative starting value ({currency.StartingValue}) - it would start in debt at boot and after every album release.");
         }
 
-        // A producer IS its production configs (design doc section 12, rule 13):
+        // A producer IS its contributions (design doc section 12, rule 13):
         // every field here is trusted per firing, so broken tuning must report
         // at boot rather than degrade to wrong gameplay - runtime fails closed
-        // on all of it (skipped configs, zeroed compositions), which without
-        // these reports would just look mysteriously dead.
+        // on all of it (skipped contributions, zeroed compositions), which
+        // without these reports would just look mysteriously dead.
         private static void ValidateProducer(ProducerDefinition producer, ConditionContext context)
         {
-            // No module check: a producer names no module any more (6.5). Which
-            // module presents it is the SECTION's declaration, and whether a tap
-            // producer has one at all is checked in ValidateChapter, where the
-            // section list is in hand.
+            // No module check: a producer names no module. Which
+            // module presents it is the SECTION's declaration, and whether a
+            // producer with yield contributions has one at all is checked in
+            // ValidateChapter, where the section list is in hand.
             if (producer.Contributions.Count == 0)
                 Debug.LogError($"ContentValidator: Producer '{producer.Id}' has no contributions - it would produce nothing.");
 
@@ -592,9 +587,9 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // presentedProducers collects the tap producers this section's entries present,
-        // for the chapter-level "nothing presents this tap surface" check. Null for an
-        // orphan, which belongs to no chapter that could ask the question.
+        // presentedProducers collects the fireable producers this section's entries
+        // present, for the chapter-level "nothing presents this surface" check. Null for
+        // an orphan, which belongs to no chapter that could ask the question.
         private static void ValidateSection(SectionDefinition section, ConditionContext context,
             ChapterDefinition chapter, ContentDatabase database, HashSet<string> presentedProducers)
         {
@@ -651,8 +646,8 @@ namespace RidiculousGaming.GarageBandIdle
         // The whole binding check is skipped for an orphan (null chapter), the same
         // allowance the flag checks make: no declaration list governs a section no
         // chapter lists.
-        // Returns the tap producer this entry presents, or null - the family answer the
-        // chapter's "nothing presents this tap surface" check needs. It comes back from
+        // Returns the fireable producer this entry presents, or null - the family answer
+        // the chapter's "nothing presents this surface" check needs. It comes back from
         // here rather than being re-derived because this is where the prefab that knows
         // the family is already in hand; asking again outside would mean loading every
         // module a second time to learn what this call just read.
@@ -915,12 +910,10 @@ namespace RidiculousGaming.GarageBandIdle
         // declaration-membership checks pass instead of false-positiving against
         // an arbitrary chapter - no declaration list governs an orphan.
         //
-        // Nothing here comes from the running economy any more. The currencies a
-        // chapter may reference is a content question, and answering it from the
-        // frontier's pool made every OTHER chapter's currencies unresolvable -
-        // correct only while one chapter exists. Generators and bars were carried
-        // in for the same reason and are unused: both conditions resolve those
-        // ids through the database already.
+        // Nothing here comes from the running economy. Which currencies a chapter
+        // may reference is a content question, and answering it from the frontier's
+        // pool would make every OTHER chapter's currencies unresolvable - correct
+        // only while one chapter exists.
         // Generators and bars are deliberately null. Every Validate that resolves
         // one of those ids prefers the database registry (the branch that exists
         // precisely to cover ids outside the running chapter), so the live

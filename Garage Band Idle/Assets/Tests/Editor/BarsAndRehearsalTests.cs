@@ -14,8 +14,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // thresholds on one counter), the continuous drain is clamped and
     // player-directed, completion applies the pool reward exactly once,
     // barsCompleted conditions read live counts, and fill-currency accrual is
-    // producer-held production configs (design doc section 12, rule 13) -
-    // firing from tick + taps only while each config's own gate holds.
+    // producer-held contributions (design doc section 12, rule 13) - accruing
+    // and firing only while each contribution's own gate holds.
     public class BarsAndRehearsalTests
     {
         [OneTimeTearDown]
@@ -90,7 +90,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void Production_IsDormantUntilTheConfigsGate()
+        public void Production_IsDormantUntilTheContributionsGate()
         {
             var rehearsal = TestContent.MakeCurrency("rehearsal", "run");
             var currencies = new CurrencyManager(new[] { TestContent.MakeGroup("run", true) }, new[] { rehearsal });
@@ -111,14 +111,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             production.Accrue(10);
             Assert.AreEqual(10.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "per-sec amount x seconds");
             production.Fire("jam");
-            Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "+per-tap amount on a Jam tap");
+            Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "+the yield amount on a Jam firing");
         }
 
-        // The readout answers the same question the payout does. A tap config
-        // whose gate is unmet pays nothing when FireTap runs, so advertising
-        // "+2/tap" beside the balance would promise a yield tapping does not
-        // deliver - and unlike a stale number, an authored-looking one gives the
-        // player no reason to doubt it.
+        // The readout answers the same question the payout does. A yield
+        // contribution whose gate is unmet pays nothing when Fire runs, so
+        // advertising "+2/tap" beside the balance would promise a yield a press
+        // does not deliver - and unlike a stale number, an authored-looking one
+        // gives the player no reason to doubt it.
         [Test]
         public void ProductionReadout_HonoursGates_TheSameWayThePayoutDoes()
         {
@@ -132,10 +132,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeContext(currencies, flags: flags));
 
             Assert.IsFalse(production.HasProduction("rehearsal"), "nothing can fill it while the gate is shut");
-            Assert.AreEqual(0.0, production.YieldOf("rehearsal").ToDouble(), 1e-9, "a dormant tap config advertises nothing");
+            Assert.AreEqual(0.0, production.YieldOf("rehearsal").ToDouble(), 1e-9, "a dormant yield contribution advertises nothing");
             Assert.AreEqual(0.0, production.RateOf("rehearsal").ToDouble(), 1e-9);
 
-            // what a tap actually pays while the gate is shut - the number the
+            // what a firing actually pays while the gate is shut - the number the
             // readout has to agree with
             production.Fire("jam");
             Assert.AreEqual(0.0, currencies.Get("rehearsal").ToDouble(), 1e-9);
@@ -147,7 +147,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1.0, production.RateOf("rehearsal").ToDouble(), 1e-9);
 
             production.Fire("jam");
-            Assert.AreEqual(2.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the tap pays what the readout advertised");
+            Assert.AreEqual(2.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the firing pays what the readout advertised");
         }
 
         // a chapter can hold several independently produced fill currencies -
@@ -174,7 +174,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             production.Accrue(10);
             production.Fire("jam");
 
-            Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the gated-open currency earns tick + tap");
+            Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the gated-open currency earns rate + yield");
             Assert.AreEqual(0.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "its own gate governs it, not another's");
             Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "no config = no engagement production");
             Assert.IsFalse(production.HasProduction("cash"));
@@ -528,11 +528,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             => new Dictionary<string, IReadOnlyDictionary<string, BigNumber>> { [groupId] = progressByBarId };
 
         // A selection is player INTENT, not progress, so a restore has to say what it
-        // is - and before 6.5 it said nothing: RestoreProgress cleared a selection
-        // only when its bar had become complete, so an unrelated pre-restore target
-        // survived and the next drain poured the restored fill currency into it. Every
-        // balance and every progress value came from the snapshot; where the currency
-        // went came from a decision made before it.
+        // is. Clearing one only when its bar has become complete leaves an unrelated
+        // pre-restore target standing, and the next drain pours the restored fill
+        // currency into it: every balance and every progress value would come from
+        // the snapshot while where the currency GOES came from a decision made
+        // before it.
         [Test]
         public void RestoreProgress_DropsAnyStandingSelection_AndRestoreActiveBarsPutsBackTheSnapshots()
         {
@@ -610,7 +610,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2, fans.RateOf("fans").ToDouble(), 1e-9, "restore grants no rewards");
 
             // Authoritative in both directions, and REPLACEMENT rather than a merge
-            // (6.5): cover_1 falls below its requirement and un-completes, AND the
+            // cover_1 falls below its requirement and un-completes, AND the
             // bars this snapshot does not name return to zero instead of keeping
             // what they held - so cover_3's completion goes with them. A merge would
             // leave a previous restore's progress standing under a different

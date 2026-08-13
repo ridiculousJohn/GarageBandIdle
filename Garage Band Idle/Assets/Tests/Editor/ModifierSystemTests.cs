@@ -17,8 +17,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
-        // a selector and the number it reaches: one ModifierTargetKey used to be
-        // both, and separating them is the point of rule 11's rewrite
+        // a selector and the number it reaches are separate things (rule 11): one
+        // describes a SET, the other is a member some set may contain
         private static readonly ModifierSelector CashYield = TestContent.Sel("cash_yield");
         private static readonly ModifierSelector FansRate = TestContent.Sel("fans_rate");
         private static readonly ModifierSubject CashYieldNumber = TestContent.YieldOf("cash");
@@ -75,11 +75,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // A composition is a PRODUCT, and that is the whole of it (design doc rule
-        // 11). It used to carry an Add beside the Multiply and define the order the
-        // two applied in - a rule two systems could disagree about only because
-        // there were two kinds of thing to order. A flat bonus is a contribution to
-        // the number now, so the base already IS the sum of the adds and there is no
-        // ordering left to state.
+        // 11). With no Add beside the Multiply there is no application order for two
+        // systems to disagree about: a flat bonus is a contribution to the number,
+        // so the base already IS the sum of the flat parts.
         [Test]
         public void Composition_IsTheProductOfEveryMultiplierReachingTheNumber()
         {
@@ -327,9 +325,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // A subject offers its OWNER's id too, so a coarse buff reaches every line
         // its holder contributes without listing them - and would silently miss any
-        // added later if it had to. This is the case the old closed target could not
-        // express: "double the drummer" and "double the drummer's cash" are now
-        // different selectors rather than the same unanswerable one.
+        // added later if it had to. "Double the drummer" and "double the drummer's
+        // cash" are therefore different selectors, each answerable on its own.
         [Test]
         public void ASelectorNamingTheOwner_ReachesEveryNumberItHolds()
         {

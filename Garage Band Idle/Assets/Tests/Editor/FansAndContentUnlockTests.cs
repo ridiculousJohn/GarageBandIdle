@@ -20,8 +20,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static readonly ModifierSubject FanRate = TestContent.RateOf("fans");
         private static readonly ModifierSelector FanRateSel = TestContent.Sel("fans_rate");
-        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
-        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
+        private static readonly ModifierSubject CashYield = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector CashYieldSel = TestContent.Sel("cash_yield");
 
         [Test]
         public void ContentUnlock_AppliesWhenGateMet_AndSetsTheFlag()
@@ -191,16 +191,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.2, fans.RateOf("fans").ToDouble(), 1e-9, "the rate is untouched");
         }
 
-        // tap-value payloads target TapValue and stack per scope, mirroring
+        // yield payloads target cash's yield and stack per scope, mirroring
         // fan-rate ones: after the release resets the run latch and re-projects,
         // only the permanent stack is rebuilt
         [Test]
-        public void TapValueRewards_StackPerScope_AndRunResetKeepsPermanent()
+        public void CashYieldRewards_StackPerScope_AndRunResetKeepsPermanent()
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(2, modifiers, currencies, flags);
+            var production = TestContent.MakeYieldProduction(2, modifiers, currencies, flags);
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("run_x2", UpgradeType.ContentUnlock, ContentScope.Run, null,
@@ -211,44 +211,44 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(12.0, tap.YieldOf("cash").ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
+            Assert.AreEqual(12.0, production.YieldOf("cash").ToDouble(), 1e-9, "base 2 x run 2 x permanent 3");
 
             TestContent.RunReset(modifiers, upgrades);
-            Assert.AreEqual(6.0, tap.YieldOf("cash").ToDouble(), 1e-9,
+            Assert.AreEqual(6.0, production.YieldOf("cash").ToDouble(), 1e-9,
                 "only the permanent latch was left to re-project");
         }
 
         // fail closed on broken content: a negative amount (invalid data - boot
-        // validation reports it) must never drain cash on a tap, and no
+        // validation reports it) must never drain cash on a firing, and no
         // multiplier can resurrect it
         [Test]
-        public void TapValue_FailsClosedOnANegativeBase()
+        public void CashYield_FailsClosedOnANegativeBase()
         {
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(-5, modifiers);
-            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 2);
+            var production = TestContent.MakeYieldProduction(-5, modifiers);
+            modifiers.Grant(CashYieldSel, ModifierOperation.Multiply, ContentScope.Run, 2);
 
-            Assert.AreEqual(0.0, tap.YieldOf("cash").ToDouble(), 1e-9, "never a draining tap");
+            Assert.AreEqual(0.0, production.YieldOf("cash").ToDouble(), 1e-9, "never a draining firing");
         }
 
         // fail closed on broken content: a non-positive factor (invalid data -
         // boot validation reports it) must never apply
         [Test]
-        public void TapValueMultiplier_FailsClosedOnANonPositiveFactor()
+        public void YieldMultiplier_FailsClosedOnANonPositiveFactor()
         {
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(2, modifiers);
+            var production = TestContent.MakeYieldProduction(2, modifiers);
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant on 'cash_yield' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
-            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 0);
+            modifiers.Grant(CashYieldSel, ModifierOperation.Multiply, ContentScope.Run, 0);
 
-            Assert.AreEqual(2.0, tap.YieldOf("cash").ToDouble(), 1e-9, "the value is untouched");
+            Assert.AreEqual(2.0, production.YieldOf("cash").ToDouble(), 1e-9, "the value is untouched");
         }
 
         // Publishing is post-mutation: nothing notifies the UI from inside an
         // operation - modifier grants and gate flips stay silent until the
-        // orchestrator's RefreshTapValue says the whole mutation has settled -
+        // orchestrator's RefreshYields says the whole mutation has settled -
         // and the refresh publishes only an actual move (one notification for
         // the operation, none for a no-op, a rejected value, or somebody
         // else's target).
@@ -256,42 +256,42 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void YieldChanged_FiresOnRefresh_OnlyWhenTheValueMoved()
         {
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(2, modifiers);
+            var production = TestContent.MakeYieldProduction(2, modifiers);
             var changes = 0;
-            tap.YieldChanged += _ => changes++;
+            production.YieldChanged += _ => changes++;
 
-            tap.RefreshYields();
+            production.RefreshYields();
             Assert.AreEqual(0, changes, "nothing moved, nothing published");
 
-            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 2);
-            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.PermanentInChapter, 3);
+            modifiers.Grant(CashYieldSel, ModifierOperation.Multiply, ContentScope.Run, 2);
+            modifiers.Grant(CashYieldSel, ModifierOperation.Multiply, ContentScope.PermanentInChapter, 3);
             Assert.AreEqual(0, changes, "mid-mutation grants never notify the UI directly");
 
-            tap.RefreshYields();
+            production.RefreshYields();
             Assert.AreEqual(1, changes, "one settled operation, one notification");
-            Assert.AreEqual(12.0, tap.YieldOf("cash").ToDouble(), 1e-9, "base 2 x 2 x 3");
+            Assert.AreEqual(12.0, production.YieldOf("cash").ToDouble(), 1e-9, "base 2 x 2 x 3");
 
             LogAssert.Expect(LogType.Error,
                 "ModifierSystem: Grant on 'cash_yield' with a non-positive Multiply value '0'. Ignoring - it would zero or negate the whole product.");
-            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 0);
+            modifiers.Grant(CashYieldSel, ModifierOperation.Multiply, ContentScope.Run, 0);
             modifiers.Grant(FanRateSel, ModifierOperation.Multiply, ContentScope.Run, 5);
-            tap.RefreshYields();
+            production.RefreshYields();
             Assert.AreEqual(1, changes, "a rejected value and another target's modifier move nothing");
 
             modifiers.ResetGranted();
-            tap.RefreshYields();
+            production.RefreshYields();
             Assert.AreEqual(2, changes, "rebuilding the store moved the value");
-            Assert.AreEqual(2.0, tap.YieldOf("cash").ToDouble(), 1e-9,
+            Assert.AreEqual(2.0, production.YieldOf("cash").ToDouble(), 1e-9,
                 "base 2: an emptied store composes to identity until the projection re-runs");
         }
 
-        // A composing config may carry any gate the data model supports (rule
-        // 13 forbids nothing): the tap pays it only while its gate holds, the
+        // A composing contribution may carry any gate the data model supports (rule
+        // 13 forbids nothing): a firing pays it only while its gate holds, the
         // evaluated value follows the gate immediately, and the post-mutation
         // refresh is what tells the UI - so payout and display can never
         // diverge across a gate transition.
         [Test]
-        public void GatedComposingConfig_PaysAndPublishesOnItsGateTransition()
+        public void GatedComposingContribution_PaysAndPublishesOnItsGateTransition()
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
@@ -306,7 +306,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(1.0, production.YieldOf("cash").ToDouble(), 1e-9, "the gated yield is dormant");
             production.Fire("jam");
-            Assert.AreEqual(1.0, currencies.Get("cash").ToDouble(), 1e-9, "a tap pays only the open config");
+            Assert.AreEqual(1.0, currencies.Get("cash").ToDouble(), 1e-9, "a firing pays only the open contribution");
 
             flags.Set("amped");
             Assert.AreEqual(5.0, production.YieldOf("cash").ToDouble(), 1e-9, "the evaluated value follows the gate");
@@ -321,10 +321,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // A flat bonus SUMS WITH the other lines and the multipliers scale the sum -
-        // the one shape every composed number has (rule 11), and the reason the old
-        // "adds land first" ordering stopped being a rule anything can disagree
-        // about. "+1 Cash per press" is a second contribution to cash's yield here,
-        // exactly as stage_presence authors it.
+        // the one shape every composed number has (rule 11), which leaves no
+        // application order for anything to disagree about. "+1 Cash per press" is a
+        // second contribution to cash's yield here, exactly as stage_presence
+        // authors it.
         [Test]
         public void Yield_SumsItsContributions_ThenScalesThemOnce()
         {
@@ -337,7 +337,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(3.0, production.YieldOf("cash").ToDouble(), 1e-9, "2 + 1, summed");
 
-            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 2);
+            modifiers.Grant(CashYieldSel, ModifierOperation.Multiply, ContentScope.Run, 2);
             Assert.AreEqual(6.0, production.YieldOf("cash").ToDouble(), 1e-9,
                 "(2 + 1) x 2 - applied once over the sum, never once per line");
         }
@@ -383,14 +383,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(flags.IsSet("backroom"), "setFlag rewards run through the same registry");
         }
 
-        // The composed fan rate is (baseFansPerSec + perBandmate x bandmates) x
-        // rewards. Chapter 1's observable number - 0.22/s with one Drummer - is
-        // the anchor, and the multiplier leg proves the reward scales the
-        // COMBINED base-plus-derived value rather than the base alone. Separate
+        // The composed fan rate is (the band's base line + each bandmate's line x
+        // owned) x rewards. Chapter 1's observable number - 0.22/s with one Drummer -
+        // is the anchor, and the multiplier leg proves the reward scales the
+        // COMBINED base-plus-bandmate value rather than the base alone. Separate
         // tests cover each term; this one is the composition, because every term
         // can be individually correct and still compose wrong.
         [Test]
-        public void FanRate_ComposesBasePlusBandmateAdd_ThenRewardMultipliers()
+        public void FanRate_ComposesBasePlusBandmateLines_ThenRewardMultipliers()
         {
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();

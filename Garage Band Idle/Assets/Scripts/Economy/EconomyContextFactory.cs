@@ -136,12 +136,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 }
             }
 
-            // Band size raises the fan rate with no code at all now: each bandmate
+            // Band size raises the fan rate with no code at all: each bandmate
             // generator CONTRIBUTES a fans rate line, so the bonus scales with owned
-            // count because a generator's lines always do. It used to be a derived
-            // modifier reading an isBandmate bool off every generator - a flat Add
-            // onto the fans rate, which is precisely what rule 11 says a bonus is
-            // not, and a tag that never got the concept (rule 10).
+            // count because a generator's lines always do.
 
             var context = new EconomyContext(chapter, recipe, router, flags, modifiers, generators, upgrades,
                 production, bars, rewards, capstone, conditions,

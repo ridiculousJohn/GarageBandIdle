@@ -48,9 +48,9 @@ namespace RidiculousGaming.GarageBandIdle
         public Action<string> FlagSetterReport { get; set; }
 
         // Fired by Drain once evaluation has settled: "conditions have moved,
-        // re-ask." One subscription replaces the per-input set a view used to
-        // hold, and it arrives after the drain rather than during it, so a
-        // subscriber never reads half-applied unlocks.
+        // re-ask." One subscription per view rather than one per condition input,
+        // and it arrives after the drain rather than during it, so a subscriber
+        // never reads half-applied unlocks.
         public event Action Settled;
 
         // a fresh context has never been evaluated, so the first drain performs
@@ -120,8 +120,7 @@ namespace RidiculousGaming.GarageBandIdle
         // dirties - a content unlock's setFlag is the live case - is still
         // pending at the next drain. That is deliberately not a loop to
         // fixpoint: the caller's seam runs every tick, so a second-order chain
-        // (a flag that opens a generator's unlock) resolves on the next tick,
-        // which is exactly when the per-tick poll this replaced resolved it.
+        // (a flag that opens a generator's unlock) resolves on the next tick.
         public void Drain(Action evaluate)
         {
             if (!_dirty)

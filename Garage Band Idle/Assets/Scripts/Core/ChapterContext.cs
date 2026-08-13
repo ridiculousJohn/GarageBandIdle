@@ -9,12 +9,12 @@ namespace RidiculousGaming.GarageBandIdle
     // event sandbox or a replay economy (design doc section 12, rule 12)
     // without knowing there is more than one economy.
     //
-    // Deliberately NO GameManager here. It used to be, so button presses could
-    // route to "whatever has focus" - which meant a module could display one
-    // economy's numbers and mutate another's the moment two contexts existed
-    // (a frontier release button resetting an event sandbox). Displayed and
-    // mutated are the same object now by construction: a module cannot reach
-    // any economy but the one it shows. Focus stays what rule 7 says it is -
+    // Deliberately NO GameManager here. Routing a button press to "whatever has
+    // focus" lets a module display one economy's numbers and mutate another's the
+    // moment two contexts exist (a frontier release button resetting an event
+    // sandbox). Displayed and mutated are the same object by construction: a
+    // module cannot reach any economy but the one it shows. Focus is what rule 7
+    // says it is -
     // who receives the tick - not who receives button presses.
     public class ChapterContext
     {

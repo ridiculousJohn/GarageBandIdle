@@ -161,7 +161,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // the fill currency readout lives here rather than the currency header;
         // the playable pass (slice 10) makes the header data-driven. One line
         // per revealed fill currency; a currency some producer creates carries
-        // its rates (production configs live on producers, design doc section
+        // its rates (contributions live on producers, design doc section
         // 12 rule 13).
         private void RefreshPool()
         {

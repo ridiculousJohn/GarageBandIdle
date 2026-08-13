@@ -10,13 +10,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // keyed by generator id, so adding a generator is a new asset + JSON row with
     // no code change.
     //
-    // It used to declare `produces` + `baseOutput`: one currency, one number, with
-    // the number itself unnamed. A buff could then only address the GENERATOR, so
-    // "double the drummer's cash" and "double the drummer" were the same sentence -
-    // fine while a drummer made cash and nothing else, wrong the moment a bandmate
-    // also drives fans. `isBandmate` went the same way: it was a tag that never got
-    // the concept (rule 10), read by one derived modifier to add a fan rate the
-    // generator could simply CONTRIBUTE.
+    // Each line carrying its own id is what lets a buff address one of them: "double
+    // the drummer's cash" and "double the drummer" are different sentences for a
+    // bandmate who drives cash and fans both. A bandmate is a TAG plus a fans line
+    // (rule 10), not a bool some system branches on.
     [CreateAssetMenu(
         fileName = "NewGenerator",
         menuName = "GarageBandIdle/Generator")]

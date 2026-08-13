@@ -366,9 +366,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // from the band, rehearsal from the trickle - because a rate is a rate
             // whatever declared it (design doc section 12, rule 13). Each producer
             // composes its own modifiers, the Records buff among them, so the tick
-            // passes no multipliers. The generator pass that used to run beside this
-            // is gone: it was the same operation over half the contributions, with
-            // its own composition of the same currency-wide number.
+            // passes no multipliers. One pass covers every contribution, generators
+            // included, so a currency's rate has a single implementation.
             //
             // Then bars drain the pool into the active bar in the same tick, so a
             // selected bar advances with no pool lag. Fans take the fans rate's
@@ -381,8 +380,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
             // the tick has fully settled - production, drains, completions,
             // whatever modifiers or flags they granted - so unlocks evaluate and
-            // the tap value publishes only now (a bar completing mid-tick could
-            // set a flag some config's gate reads, so no earlier point is safe)
+            // the composed yields publish only now (a bar completing mid-tick
+            // could set a flag some contribution's gate reads, so no earlier
+            // point is safe)
             Settle();
         }
 
@@ -443,7 +443,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return false;
 
             // the purchase has settled (buff granted, cost charged), so unlocks
-            // evaluate and the tap value publishes here rather than from a
+            // evaluate and the composed yields publish here rather than from a
             // modifier callback midway through the operation. The spend moved a
             // balance, so the drain has something to do: a content unlock's gate
             // can be satisfied right now, and reveal must not wait for the tick.
@@ -464,9 +464,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // the purchase has settled, so the drain runs here and not a tick
             // later: it can satisfy another generator's ownedCount unlock or a
             // content unlock's gate (play_for_crowd: own 1 Drummer), and buying
-            // a Drummer has to reveal Fans now. The tap value publishes after,
-            // since an unlock just evaluated can have granted a tap buff or set
-            // a flag a config's gate reads.
+            // a Drummer has to reveal Fans now. The composed yields publish
+            // after, since an unlock just evaluated can have granted a yield
+            // buff or set a flag a contribution's gate reads.
             Settle();
             return true;
         }
@@ -537,8 +537,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // these facts, so it resets because the facts did.
             Flags.ResetRunScoped();
 
-            // the rebuild: run-scoped effects are gone because the facts behind
-            // them are gone, never because anything filtered the store. The
+            // the rebuild: run-scoped effects are absent because the facts behind
+            // them are, never because anything filtered the store. The
             // seam is the caller's - ReleaseAlbum settles here, the capstone
             // completion after its own facts land.
             ProjectModifiers();
@@ -597,15 +597,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // The one point at which a completed mutation is declared finished and
         // everything downstream of it runs. Unlock evaluation drains the
         // condition context's dirty signal (which the condition inputs raise,
-        // replacing the per-tick poll), and the tap value republishes. Both used
+        // replacing the per-tick poll), and the composed yields republish. Both used
         // to keep their own list of call sites - the same points, maintained
         // twice - and two such lists drift.
         //
         // Public because a boundary the context does not own yet ends here too:
         // slice 9's restore mutates facts through this context and then declares
         // them settled, rather than growing a second pattern for saying the same
-        // thing (the release, once external for the same reason, is ReleaseAlbum
-        // above now).
+        // thing.
         public void Settle()
         {
             Conditions.Drain(_evaluateUnlocks);

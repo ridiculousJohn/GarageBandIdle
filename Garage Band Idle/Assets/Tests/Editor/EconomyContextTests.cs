@@ -20,8 +20,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private const string RecordsId = GameManager.RecordsCurrencyId;
 
-        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
-        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
+        private static readonly ModifierSubject CashYield = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector CashYieldSel = TestContent.Sel("cash_yield");
 
         // the two-pool content set the running game has: a chapter-placed run
         // group holding cash/fans/rehearsal, and a global group holding Records
@@ -252,10 +252,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // asks for the same rebuild. Here the fact is a latched content unlock,
         // and the rebuild is what puts its buff back.
         //
-        // The gate is deliberately UNMET at construction, which is how "reads
-        // facts, not definitions" is still provable now that construction settles
-        // (6.5: Build seeds, projects and settles as one operation, so an unlock
-        // whose gate already holds latches before Build returns). An unlatched
+        // The gate is deliberately UNMET at construction, which is what makes
+        // "reads facts, not definitions" provable when construction settles: Build
+        // seeds, projects and settles as one operation, so an unlock whose gate
+        // already holds latches before Build returns. An unlatched
         // upgrade is a definition the context can see and a fact it does not have.
         [Test]
         public void ProjectModifiers_RebuildsGrantsFromTheFactsThatExist()
@@ -268,25 +268,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var context = EconomyContextFactory.Build(chapter, database,
                 EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
-            Assert.AreEqual(1.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(1.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the gate does not hold, so there is no latch to project from");
 
             context.Currencies.Add("cash", 10);
             context.Settle();
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the unlock's gate held, so it latched and granted");
 
             // the store is emptied and rebuilt, which is the only mechanism -
             // nothing filters it, so the add returning is proof the LATCH was read
             context.ProjectModifiers();
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "re-projecting from the surviving latch grants exactly once again");
         }
 
-        // The construction sequence 6.5 established: a context comes back seeded,
-        // projected AND settled, so a caller never has to know to settle it. The
-        // ungated unlock below is the shape that used to need an external Settle -
-        // it is latched and granted before Build returns.
+        // The construction sequence: a context comes back seeded, projected AND
+        // settled, so a caller never has to know to settle it. The ungated unlock
+        // below is latched and granted before Build returns.
         [Test]
         public void Build_ReturnsAContextThatHasAlreadySettled()
         {
@@ -301,7 +300,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsTrue(context.Upgrades.Get("open_now").Applied,
                 "an ungated content unlock latched during construction");
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "and its payload is in the store, with no external Settle");
         }
 

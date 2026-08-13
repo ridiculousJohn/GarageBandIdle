@@ -10,21 +10,19 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // these amounts are flat, scaled by no owned count. Discovered by Addressables
     // label like every definition.
     //
-    // It deliberately does NOT name a module. It used to carry a ModuleAddress,
-    // which was validated and read by nothing - the binding ran the other way, from
-    // a section's module entry naming the producer, and 6.5 made that entry the
-    // thing the runtime actually fires. Keeping both would be two declarations of
-    // one relationship, able to disagree with no way to tell which was meant.
-    // "Nothing presents this producer" is now derived: no section entry names it
+    // It deliberately does NOT name a module. The binding runs the other way, from
+    // a section's module entry naming the producer, and that entry is what the
+    // runtime fires; a copy here would be a second declaration of one relationship,
+    // able to disagree with no way to tell which was meant.
+    // "Nothing presents this producer" is derived: no section entry names it
     // (boot validation reports that for one holding a YIELD line, which cannot pay
     // without a surface to fire it, and allows it for a purely passive one like the
     // band).
     //
-    // The name is now a half-truth worth flagging: under rule 13 the PRODUCER is
-    // the per-currency thing (CurrencyProducer), and this is one of its
-    // contributors. Renaming the asset family is a mechanical pass over the
-    // Addressables label, the folder and the chapter's id list, deliberately not
-    // folded into this changeset.
+    // The name is a half-truth worth flagging: under rule 13 the PRODUCER is the
+    // per-currency thing (CurrencyProducer), and this is one of its contributors.
+    // Renaming the asset family is a mechanical pass over the Addressables label,
+    // the folder and the chapter's id list.
     [CreateAssetMenu(
         fileName = "NewProducer",
         menuName = "GarageBandIdle/Producer")]

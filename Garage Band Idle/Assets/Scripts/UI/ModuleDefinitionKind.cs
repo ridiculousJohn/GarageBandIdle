@@ -22,9 +22,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // read it
         None = 0,
 
-        // a producer with tap configs: the surface a tap fires. Not merely
-        // "Producer", because a tap button naming the passive band producer would
-        // resolve and still pay nothing.
+        // a contributor that authors yield lines: the surface a firing pays from.
+        // Not merely "Producer", because a button naming the passive band
+        // producer would resolve and still pay nothing.
         FireableContributor = 1,
 
         // one story beat's text, presented on a card

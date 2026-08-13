@@ -6,7 +6,7 @@ namespace RidiculousGaming.GarageBandIdle
     // content unlocks, the modifier registry for every stat effect, and balances
     // for the effects that pay out. Stat effects go through Modifiers rather than
     // through the system they affect, so an effect needs no reference to
-    // ProductionSystem to change a rate or a tap value.
+    // ProductionSystem to change a producer's rate or yield.
     // Grows as effect kinds need more of the game (roadie pool, catalog, ...).
     public class EffectContext
     {

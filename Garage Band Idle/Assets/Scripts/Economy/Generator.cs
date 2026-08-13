@@ -11,9 +11,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // It is a production contributor (design doc section 12, rule 13): it does not
     // pay a currency, it declares what each owned unit is worth to whichever
     // currency producers its contributions name, and those producers do the paying.
-    // That is what removed the second, weaker production path this class used to
-    // hold - a per-generator per-second number that only GeneratorSystem.Tick knew
-    // how to turn into currency, and that no yield could ever be expressed in.
+    // A generator therefore has no production path of its own, and can feed a
+    // yield as readily as a rate.
     public class Generator : IProductionContributor
     {
         public GeneratorDefinition Definition { get; }
@@ -149,11 +148,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         }
 
         // Whether this generator is on offer right now: a LIVE read of its
-        // unlock condition, never a latch. It was a latch, and a latch is
-        // one-way - after a release zeroed the fleet, every row the player had
-        // ever seen stayed on screen because nothing could un-set it. What a
-        // reveal remembers has to be remembered by the state the condition
-        // reads (an earned total, a scoped flag), not by a bool out here.
+        // unlock condition, never a latch. A latch is one-way, so a release that
+        // zeroed the fleet would leave every row the player had ever seen on
+        // screen with nothing able to un-set it. What a reveal remembers has to
+        // be remembered by the state the condition reads (an earned total, a
+        // scoped flag), not by a bool out here.
         public bool IsUnlocked(ConditionContext context)
             => ConditionEvaluator.IsMet(Definition.Unlock, context);
 

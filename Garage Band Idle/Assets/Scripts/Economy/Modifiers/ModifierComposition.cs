@@ -2,12 +2,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // The composed effect of every modifier reaching one number: their product.
     //
-    // It used to carry an Add beside the Multiply and define the order the two
-    // applied in - (base + adds) x multipliers - which was a rule two systems
-    // could disagree about only because there were two kinds of thing to order.
-    // A flat bonus is now a contribution to the number rather than a modifier on
-    // it (design doc section 12, rule 11), so the base already IS the sum of the
-    // adds and there is no ordering left to state.
+    // There is no Add beside the Multiply, so there is no application order for two
+    // systems to disagree about. A flat bonus is a contribution to the number rather
+    // than a modifier on it (design doc section 12, rule 11), which means the base
+    // already IS the sum of the flat parts.
     public readonly struct ModifierComposition
     {
         public static readonly ModifierComposition Identity = new(BigNumber.One);

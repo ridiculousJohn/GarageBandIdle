@@ -6,8 +6,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // ProductionContribution to the number it raises, authored by whatever fact
     // pays it.
     //
-    // Add used to live here, and removing it removes a question with no correct
-    // answer: what a flat add against a SET means. A multiplier against a set is
+    // There is no Add, because a flat add against a SET has no correct
+    // answer. A multiplier against a set is
     // unambiguous - each number it reaches is scaled - while "+1 to every cash
     // line" and "+1 to cash" are different numbers with one spelling. As a
     // contribution the same bonus is one identified line that sums with the rest,

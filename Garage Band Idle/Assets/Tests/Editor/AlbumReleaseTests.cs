@@ -21,8 +21,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private const string RecordsId = GameManager.RecordsCurrencyId;
 
-        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
-        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
+        private static readonly ModifierSubject CashYield = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector CashYieldSel = TestContent.Sel("cash_yield");
         private static readonly ModifierSubject FanRate = TestContent.RateOf("fans");
         private static readonly ModifierSelector FanRateSel = TestContent.Sel("fans_rate");
         private static readonly ModifierSubject CashProduction = TestContent.RateOf("cash");
@@ -170,13 +170,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var context = BuildChapterEconomy(out _);
             PlayARun(context, fans: 125);
 
-            Assert.AreEqual(8.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(8.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the permanent unlock's x4 and the run buff's x2, composed");
             Assert.AreEqual(1.15, context.Modifiers.For(FanRate).Multiply.ToDouble(), 1e-9, "cover_1's reward");
 
             context.ReleaseAlbum();
 
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "re-projected from the latch that survived - the run buff's fact is gone, "
                 + "so nothing re-granted its effect");
             Assert.AreEqual(1.0, context.Modifiers.For(FanRate).Multiply.ToDouble(), 1e-9,

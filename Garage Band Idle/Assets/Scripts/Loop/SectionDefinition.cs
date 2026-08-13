@@ -13,7 +13,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     // revealed currencies - but a module presenting exactly ONE definition has no
     // other way to be told which: two story-beat cards would share one prefab and
     // one text, and the Jam button had a producer authored on the producer asset
-    // that nothing read, so a tap fired every tap producer in the chapter.
+    // that nothing read, so one press fired every fireable producer in the chapter.
     //
     // Which definition FAMILY the id names is the module's business, not this
     // type's - the tap module reads a producer id, a beat card reads a story-beat

@@ -209,12 +209,10 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     // chapter declares about itself rather than an entry in one of the content id
     // lists.
     //
-    // The unlock Condition is the SOLE authored source of the gate. A scalar
-    // `capstoneRecordsGate` used to sit on the chapter as well, stating the same
-    // threshold in a second place while the authored Condition was never imported at
-    // all - so the two could disagree and the one the designer wrote was the one
-    // being ignored. Nothing re-derives a threshold from anywhere now: slice 7 asks
-    // this Condition through the same evaluator every other gate uses.
+    // The unlock Condition is the SOLE authored source of the gate. Nothing
+    // re-derives a threshold from anywhere else: the capstone asks this Condition
+    // through the same evaluator every other gate uses, so there is no second
+    // statement of the threshold to disagree with the one the designer wrote.
     [Serializable]
     public class CapstoneConfig
     {
@@ -288,12 +286,11 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     // keep fans resetting on release and out of the Records multiplier (section
     // 11).
     //
-    // The per-bandmate bonus used to sit here too, as a chapter-level number a
-    // derived modifier turned into a flat Add on the fan rate. It is now each
-    // bandmate generator's own fans CONTRIBUTION (rule 13), which is what makes
-    // band size raise the rate: a generator's lines always scale with its owned
-    // count. That removed a rate "modifier" that was really a source, and with it
-    // the isBandmate bool the modifier had to read off every generator.
+    // No per-bandmate bonus sits here: that number is each bandmate generator's own
+    // fans CONTRIBUTION (rule 13), which is what makes band size raise the rate,
+    // since a generator's lines always scale with its owned count. A chapter-level
+    // number would be a source dressed as a modifier, and would need a bool on every
+    // generator to say who it applied to.
     [Serializable]
     public class FansConfig
     {

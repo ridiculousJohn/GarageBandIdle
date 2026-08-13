@@ -29,8 +29,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             // the settled signal, not FlagSet: the fans flag can also CLEAR (a
             // run-scoped flag resets with the run), and a reveal that only ever
-            // listened for "set" could never un-reveal - the same collapse
-            // BarListModule made in 5.6
+            // listened for "set" could never un-reveal - the same reason
+            // BarListModule binds to one signal
             context.Economy.Conditions.Settled += HandleConditionsSettled;
 
             _fansLabel.gameObject.SetActive(context.Flags.IsSet(GameManager.FansUnlockFlagId));

@@ -22,8 +22,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // Most modules ignore it, and that asymmetry is the point: a list module
         // asks the chapter what to show, while a module presenting exactly one
         // thing has no other way to be told which - two story-beat cards from one
-        // prefab, or a tap button that fires ITS producer rather than every tap
-        // producer in the chapter.
+        // prefab, or a tap button that fires ITS producer rather than every
+        // fireable producer in the chapter.
         void Initialize(ChapterContext context, string definitionId);
     }
 }

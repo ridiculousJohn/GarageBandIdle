@@ -40,9 +40,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // a lookup key - it describes a SET, and which numbers fall in it is a
         // question about each number, not about a string. Composition therefore
         // walks what was granted, which is bounded by how many modifiers exist
-        // rather than by how much content does; the dictionary it replaced had to
-        // union two buckets by hand to express "reaches everything" and still
-        // could not express a set.
+        // rather than by how much content does. A dictionary keyed by address
+        // would have to union buckets by hand to express "reaches everything" and
+        // still could not express a set.
         private readonly List<Granted> _granted = new();
         private readonly List<DerivedModifier> _derived = new();
 
@@ -182,12 +182,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // scope because their lifetime is their source's, so there is nothing
         // here to rebuild for them.
         //
-        // This is deliberately total rather than selective. The method it
-        // replaced dropped run-scoped grants and left permanent ones sitting in
-        // place, which made a release and a load two different mechanisms for
-        // arriving at one modifier set - written by different slices, exercised
-        // on different days, and able to disagree without anything noticing.
-        // Re-projection is now the only door a modifier enters through, so a
+        // This is deliberately total rather than selective. Dropping only the
+        // run-scoped grants and leaving permanent ones in place would make a release
+        // and a load two different mechanisms for arriving at one modifier set,
+        // able to disagree without anything noticing.
+        // Re-projection is the only door a modifier enters through, so a
         // boundary clears everything and re-runs the projection over the facts
         // that survived it; a store that gets rebuilt cannot hold a stale or
         // double-counted effect. Nothing may call this without projecting

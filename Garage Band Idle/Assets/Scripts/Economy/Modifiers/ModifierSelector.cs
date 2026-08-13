@@ -10,13 +10,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // reference in the game, and nothing finer. Anything narrower than "this
     // thing" is said by giving the narrower thing its own id and naming that.
     //
-    // This replaces ModifierTarget + ModifierTargetKey, a closed KIND plus one
-    // designer id. That shape could not survive one generator feeding two
-    // currencies: "double the drummer's output" had no way to say which output,
-    // because the kind named a family, the id named a member of that family, and
-    // the number itself was never named at all. There is no enum here on purpose
-    // - giving the game a new modifiable number means naming that number, not
-    // adding a member every reader then has to learn.
+    // Naming numbers this way is what survives one generator feeding two currencies:
+    // "double the drummer's output" has to say WHICH output, and it can, because
+    // every modifiable number carries an id of its own. There is no enum here on
+    // purpose - giving the game a new modifiable number means naming that number,
+    // not adding a member every reader then has to learn.
     //
     // AN EMPTY SELECTOR MATCHES EVERYTHING in reach, which is what makes "double
     // all generator output" or "-99% cost for this tier" placement rather than an

@@ -6,7 +6,7 @@ namespace RidiculousGaming.GarageBandIdle
     // keys balances by id and discovers definitions at load, so a new currency
     // is just a new asset with no manager changes. A currency is pure state -
     // a balance, a group, formatting - and never declares how it is earned;
-    // every source is a production config held by its producer (section 12,
+    // every source is a contribution held by its producer (section 12,
     // rule 13).
     [CreateAssetMenu(
         fileName = "NewCurrency",

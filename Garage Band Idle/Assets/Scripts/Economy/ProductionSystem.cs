@@ -10,13 +10,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // has one answer - ask cash's producer - instead of being a scan across
     // generators, producer assets and whatever else might have named it.
     //
-    // What it replaced was two production paths that had grown apart: generators
-    // summed a per-second number GeneratorSystem.Tick turned into currency, and
-    // module-held configs summed a second one here, each with its own composition
-    // and its own idea of what a currency-wide buff reached. A yield was
-    // inexpressible on the first and a trigger enum decided the second, so "per
-    // second" and "per press" were told apart by WHO FIRED rather than by what the
-    // number is.
+    // A rate and a yield are told apart by what the number IS - per second against
+    // per firing - never by who fired it, so nothing here asks whether a button, an
+    // automation or a test made the call.
     //
     // ASSEMBLED, NEVER REGISTERED. Assemble walks the contributors in reach and
     // hands each producer its whole list; a contributor never files itself in, so
@@ -37,8 +33,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // Which currencies a contributor's YIELD lines feed, which is what a firing
         // needs: pressing Jam pays the currencies Jam contributes a yield to, and
-        // nothing else. Flattening this away is what once made a tap fire every tap
-        // config in the chapter - invisible with one surface, wrong with two.
+        // nothing else. Flattening this away would make one press pay every yield
+        // line in the chapter - invisible with one surface, wrong with two.
         private readonly Dictionary<string, List<string>> _yieldCurrenciesByContributor = new();
 
         // declaration order, so RefreshYields publishes deterministically

@@ -126,12 +126,12 @@ namespace RidiculousGaming.GarageBandIdle
         // Whether anything in the content set answers to one selector term (rule
         // 11) - a definition's id, a tag it declares, or a produced number's feed
         // name. This is what turns a typo into a reported error instead of a
-        // modifier filed forever and read by nobody, which is the guard the old
-        // closed ModifierTarget enum gave for free by refusing to compile.
+        // modifier filed forever and read by nobody - an open vocabulary has no
+        // compiler to catch it.
         //
         // Deliberately a question about the whole database: a term does not say
-        // which family it belongs to, and requiring it to would be re-introducing
-        // the kind that could not name one of a generator's two output lines.
+        // which family it belongs to, and requiring it to would leave a buff unable
+        // to name one of a generator's two output lines.
         public bool ResolvesModifierTerm(string term)
         {
             if (string.IsNullOrEmpty(term))

@@ -24,10 +24,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             => BigNumber.Floor(BigNumber.Pow(
                 BigNumber.Max(fansThisRun, BigNumber.Zero) / FansPerRecordsUnit, 0.5));
 
-        // TotalPerSecond is gone with GeneratorSystem.Tick: summing one currency's
-        // generator output was half of a currency's rate, and the other half lived
-        // in ProductionSystem. A currency's rate is now its producer's (rule 13),
-        // summed and composed in one place, so there is nothing left for a helper
-        // over generators alone to mean.
+        // No per-second helper lives here: a currency's rate is its producer's
+        // (rule 13), summed and composed in one place, so a sum over generators
+        // alone would be half of a rate and could only disagree with the whole.
     }
 }

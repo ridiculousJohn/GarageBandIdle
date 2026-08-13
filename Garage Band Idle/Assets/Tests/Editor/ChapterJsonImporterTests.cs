@@ -299,9 +299,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(ChapterJsonImporter.ParseProducerContributions(json));
         }
 
-        // the pre-5.4 schema put engagement earn on the currency; an earn block
-        // is stale JSON that used to mean something, so it refuses rather than
-        // silently dropping it (a bare {id, group} entry imports fine)
+        // a currency never declares how it is earned, so an `earn` block on one is
+        // refused rather than silently dropped (a bare {id, group} entry imports
+        // fine)
         [Test]
         public void CurrencyEntry_WithAnEarnBlock_IsRefused()
         {
@@ -314,10 +314,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 @"{ ""id"": ""rehearsal"", ""group"": ""run"" }"));
         }
 
-        // the pre-5.6 schema revealed a bar group by bare flag id; reveal is a
-        // Condition now, so a leftover revealFlag is refused rather than
-        // silently ignored - ignoring it would import the group with no gate,
-        // showing it from the first frame.
+        // reveal is a Condition, so a `revealFlag` naming a bare flag id is refused
+        // rather than silently ignored - ignoring it would import the group with no
+        // gate, showing it from the first frame.
         //
         // Refused on PRESENCE, like the fans keys below: `""` is a stale key just
         // as much as a filled-in one, and it is the spelling a contents test lets
@@ -366,19 +365,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 ChapterJsonImporter.ParseFlagScope(@"{ ""id"": ""covers"", ""scope"": ""Run"" }"));
         }
 
-        // fan accrual is production since 5.7, so the three keys that used to
-        // describe it on the chapter are stale JSON. Each is refused on PRESENCE,
+        // fan accrual is production, so the three keys that would describe it on
+        // the chapter are refused instead. Each is refused on PRESENCE,
         // which is what these empty spellings prove: a contents test would let
         // `{}` and `""` through silently, and the emptiest form of a stale key is
         // the one least likely to be spotted by eye.
         [TestCase(@"{ ""currency"": ""fans"", ""baseFansPerSec"": 0 }",
-            "ChapterJsonImporter: fans block still carries 'baseFansPerSec' - the base fan rate is a production config on a producer (design doc section 12, rule 13). Fix the JSON and re-import.")]
+            "ChapterJsonImporter: fans block still carries 'baseFansPerSec' - the base fan rate is a contribution on a producer (design doc section 12, rule 13). Fix the JSON and re-import.")]
         [TestCase(@"{ ""currency"": ""fans"", ""revealFlag"": """" }",
-            "ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by the production config's gate (design doc section 12, rules 8, 9 and 13). Fix the JSON and re-import.")]
+            "ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by the contribution's gate (design doc section 12, rules 8, 9 and 13). Fix the JSON and re-import.")]
         [TestCase(@"{ ""currency"": ""fans"", ""activeWhen"": {} }",
-            "ChapterJsonImporter: fans block still carries 'activeWhen' - the accrual gate moved onto the production config's 'gate' (design doc section 12, rule 13). Fix the JSON and re-import.")]
-        // and the fourth, retired in 7.4: the per-bandmate bonus is each bandmate's
-        // own fans contribution now, not a chapter constant added onto the rate
+            "ChapterJsonImporter: fans block still carries 'activeWhen' - the accrual gate moved onto the contribution's 'gate' (design doc section 12, rule 13). Fix the JSON and re-import.")]
+        // and the fourth: the per-bandmate bonus is each bandmate's own fans
+        // contribution, not a chapter constant added onto the rate
         [TestCase(@"{ ""currency"": ""fans"", ""perBandmateOwnedBonus"": 0 }",
             "ChapterJsonImporter: fans block still carries 'perBandmateOwnedBonus' - band size raises the fan rate because each bandmate generator CONTRIBUTES a fans line (design doc section 12, rules 11 and 13), not because a chapter constant is added onto the rate. Fix the JSON and re-import.")]
         public void FansBlock_RefusesEveryStaleKey_EvenItsEmptySpelling(string json, string expectedError)
@@ -387,8 +386,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ChapterJsonImporter.ParseFansBlockStaleKeys(json);
         }
 
-        // the fans block as 7.4 leaves it: which currency is fans, and nothing else
-        // - accrual and the band bonus are both contributions now
+        // the whole fans block: which currency is fans, and nothing else - accrual
+        // and the band bonus are both contributions
         [Test]
         public void FansBlock_WithNoStaleKeys_ReportsNothing()
         {
@@ -460,10 +459,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // One vocabulary, two JSON keys. A reward's `type` and an upgrade's
         // `payload.effect` route through the same translator, so an effect name
-        // authored either way builds the same object - including the names the old
-        // two-family split happened to keep on one side. A reward paying a flat tap
-        // bonus is coherent content, and nothing should have refused it but the
-        // accident of which class family used to own the handler.
+        // authored either way builds the same object. A reward multiplying a rate is
+        // coherent content, and neither site restricts which names it accepts.
         [TestCase(@"{ ""type"": ""multiplier"", ""targets"": [""cash_yield""], ""value"": 3 }",
             @"{ ""effect"": ""multiplier"", ""targets"": [""cash_yield""], ""value"": 3 }")]
         [TestCase(@"{ ""type"": ""multiplier"", ""targets"": [""practice_amp""], ""value"": 2 }",

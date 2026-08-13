@@ -33,11 +33,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // fixture: the same four steps GameManager.Awake takes, so anything it
         // would report at boot fails here first.
         //
-        // This exists because of how slice 5.7's FanRate generalization got
-        // through with a hole in it. ProductionSystem was generalized and
-        // ContentValidator was not, so Chapter 1's own band producer would have
-        // reported an error on every boot - and nothing caught it, because the
-        // importer does not run the validator and every validator test built its
+        // This exists because a rule the runtime enforces and the validator does
+        // not is a boot error nothing catches: the importer does not run the
+        // validator, and every validator test builds its
         // own broken fixture. A rule that shipped content is expected to satisfy
         // has to be exercised against shipped content.
         [Test]
@@ -136,10 +134,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             CollectionAssert.AreEqual(new[] { "cash" }, chapter.RecordBuff.AffectsCurrencyIds,
                 "the Records buff declares exactly the currencies it affects");
 
-            // The chapter gate has ONE authored home now (6.5): the capstone's
-            // unlock Condition. The scalar capstoneRecordsGate that used to state
-            // the same 30 is deleted rather than kept in step - it was the copy
-            // being read while the authored Condition was never imported at all.
+            // The chapter gate has ONE authored home: the capstone's unlock
+            // Condition. No scalar beside it restates the same 30, so there is
+            // nothing to keep in step.
             var capstone = chapter.Capstone;
             Assert.IsTrue(capstone.IsAuthored, "Chapter 1 declares a capstone");
             Assert.AreEqual("backyard_party", capstone.Id);
@@ -173,9 +170,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the flag is the declaration the completion operation latches");
         }
 
-        // Story beats are content: a definition each, listed on the chapter. The
-        // prose used to be two inline strings on the chapter asset, which is why
-        // beats could not be revealed or listed like anything else.
+        // Story beats are content: a definition each, listed on the chapter, which
+        // is what lets them be revealed and listed like every other content kind.
         [Test]
         public void StoryBeats_AreContentTheChapterLists()
         {
@@ -227,7 +223,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(ContentScope.Run, chapter.Flags[2].Scope, "gear re-arms each run");
             Assert.AreEqual(ContentScope.PermanentInChapter, chapter.Flags[3].Scope, "album is knowledge");
 
-            // The capstone's one fact (6.5), and permanent for a sharper reason than
+            // The capstone's one fact, and permanent for a sharper reason than
             // album's: run-scoped, the next demo would clear it and re-open a
             // finished chapter. It is both "this chapter is done" and "chapter 2 may
             // open" - nothing in Ch1 can tell those apart, so it is one flag.
@@ -348,9 +344,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var band = LoadById<ProducerDefinition>(ProducersFolder, "band");
 
-            // passive: nothing presents it, and 6.5 made that a DERIVED fact - no
-            // section module entry names it - rather than a blank field on the asset
-            Assert.IsFalse(band.HasYieldContributions, "a passive producer authors no tap surface");
+            // passive: nothing presents it, which is a DERIVED fact - no section
+            // module entry names it - rather than a blank field on the asset
+            Assert.IsFalse(band.HasYieldContributions, "a passive producer authors no fireable surface");
             Assert.AreEqual(1, band.Contributions.Count);
 
             var accrual = band.Contributions[0];
@@ -384,21 +380,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the jam producer and the passive band producer holding fan accrual - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
 
             var jam = LoadById<ProducerDefinition>(ProducersFolder, "jam");
-            Assert.IsTrue(jam.HasYieldContributions, "the jam producer is a tap surface");
+            Assert.IsTrue(jam.HasYieldContributions, "the jam producer is a fireable surface");
             Assert.AreEqual(2, jam.Contributions.Count,
                 "press lines only - a contributor's id is a promise about what it holds, "
                 + "so ['jam'] must mean 'what a press pays' and reach no passive rate");
 
-            // Which module presents it lives on the SECTION now (6.5): the producer
+            // Which module presents it lives on the SECTION: the producer
             // carries no module of its own, so the binding has exactly one home and
-            // boot validation reports a tap producer no section presents.
+            // boot validation reports a fireable producer no section presents.
             var garageFloor = LoadById<SectionDefinition>(SectionsFolder, "garage_floor");
             Assert.AreEqual("jam", garageFloor.Modules[1].DefinitionId);
 
             var cash = jam.Contributions[0];
-            Assert.AreEqual("jam_cash", cash.Id, "the id the tap-value rewards name");
+            Assert.AreEqual("jam_cash", cash.Id, "the id the yield rewards name");
             Assert.AreEqual("cash", cash.CurrencyId);
-            Assert.AreEqual(1.0, cash.Amount, 1e-9, "replaces the old constants.tapBaseValue");
+            Assert.AreEqual(1.0, cash.Amount, 1e-9, "the base cash a press pays");
             Assert.AreEqual(ProductionFeed.Yield, cash.Feeds, "per firing, not per second");
             Assert.IsNull(cash.Gate, "cash per press is ungated");
 
@@ -467,7 +463,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsNotNull(fans, $"'{id}' contributes to the fan rate");
             Assert.AreEqual($"{id}_fans", fans.Id);
-            Assert.AreEqual(0.02, fans.Amount, 1e-9, "per owned unit - the old perBandmateOwnedBonus");
+            Assert.AreEqual(0.02, fans.Amount, 1e-9, "the per-bandmate fan rate, per owned unit");
             Assert.AreEqual(ProductionFeed.Rate, fans.Feeds);
         }
 
@@ -567,9 +563,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(garageFloor.VisibleWhen, "garage_floor is visible from chapter start");
             CollectionAssert.AreEqual(new[] { "module/currency-header", "module/tap" }, Addresses(garageFloor));
 
-            // The Jam button names the producer it fires (6.5). Before that a tap
-            // fired every tap config in the chapter, so this binding existed in the
-            // JSON and nowhere in the runtime.
+            // The Jam button names the producer it fires, which is what keeps one
+            // press from paying every fireable producer in the chapter.
             var tapEntry = garageFloor.Modules[1];
             Assert.AreEqual("module/tap", tapEntry.Address);
             Assert.AreEqual("jam", tapEntry.DefinitionId, "the tap module presents the jam producer");
@@ -599,8 +594,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             CollectionAssert.AreEqual(new[] { "module/bar-list" }, Addresses(rehearsalSpace));
 
             // the prestige button reveals through its section's visibleWhen like
-            // every other module (5.6 deleted album.revealFlag so slice 6 could
-            // do exactly this) - the flag cut_demo latches at 50 Fans + 1 cover
+            // every other module - no revealFlag of its own sits on the album config
+            // - and the flag cut_demo latches at 50 Fans + 1 cover
             var theRelease = LoadById<SectionDefinition>(SectionsFolder, "the_release");
             var albumGate = theRelease.VisibleWhen as FlagSetCondition;
             Assert.IsNotNull(albumGate, "the_release reveals on a flag condition");

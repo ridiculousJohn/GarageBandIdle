@@ -25,11 +25,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private const string RecordsId = GameManager.RecordsCurrencyId;
 
-        // A tap producer needs some section module presenting it (6.5) or boot
-        // validation reports a tap surface nobody can press - the check that replaced
-        // ProducerDefinition.ModuleAddress. Fixtures about a producer's CONFIGS author
-        // the presenting section so they stay coherent content rather than tripping an
-        // unrelated rule.
+        // A producer with yield contributions needs some section module presenting
+        // it, or boot validation reports a surface nobody can press. Fixtures about
+        // a producer's CONTRIBUTIONS author the presenting section so they stay
+        // coherent content rather than tripping an unrelated rule.
         private static SectionDefinition TapSectionFor(string producerId)
             => TestContent.MakeSection($"presents_{producerId}", null,
                 modules: new List<SectionModule> { new("module/tap", producerId) });
@@ -67,7 +66,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void GroupWithNoPlacement_IsReported()
         {
             var chapter = TestContent.MakeChapter("ch1", new List<string> { "fans" });
-            // replaces the standard 'run' group rather than standing alone: every
+            // stands in for the standard 'run' group rather than beside it: every
             // standard currency still needs its group to resolve, or this fixture
             // reports unknown-group errors it is not about
             var unmigrated = TestContent.MakeGroup("run", true, CurrencyPlacement.None);
@@ -337,12 +336,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // A non-positive multiplier is still refused; an EMPTY qualifier list is
-        // not, and that is the rule-11 change: it means every currency in scope
-        // rather than nothing at all, so the payload that used to be reported as
-        // unappliable is now the way "raise every rate" is authored. The reported
-        // case is a qualifier on a target with no id family to resolve it, which
-        // is the one addressing mistake left.
+        // A non-positive multiplier is refused; an EMPTY term list is not, because
+        // rule 11 makes it mean every number in scope rather than nothing at all,
+        // which is how "raise every rate" is authored. What IS reported is a term
+        // nothing in the content set answers to, the one addressing mistake an open
+        // vocabulary leaves.
         [Test]
         public void RatePayload_ReportsWhatCannotApply_AndAllowsAnUnqualifiedReachAll()
         {
@@ -460,10 +458,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // Before 5.7 this was impossible rather than checked: fan accrual was its
-        // own system and only ever composed FanRate, so no income multiplier could
-        // reach it. Fan production is an ordinary config now, so this list is the
-        // only thing keeping Records off the fan rate - and Records inflating fans
+        // Fan accrual is ordinary production, reachable by any modifier that names
+        // it, so this list is the only thing keeping Records off the fan rate - and
+        // Records inflating fans
         // would let time away shortcut the Records payout (design doc section 11),
         // the same failure the reset-on-release check guards from the other side.
         [Test]
@@ -638,13 +635,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The capstone gate is the primary pacing knob (design doc section 11), and
-        // 6.5 made its authored Condition the only home for it. A NULL unlock is the
+        // its authored Condition is the only home for it. A NULL unlock is the
         // one case ordinary condition validation cannot report: by this codebase's
         // convention a null Condition means "no gate" and is always met, so the
         // chapter would end before it started. A non-positive THRESHOLD needs nothing
         // bespoke - every threshold condition already reports one and ThresholdIsMet
-        // fails closed - which is why the old scalar check has no replacement beyond
-        // this.
+        // fails closed - so this is the only capstone-specific check.
         [Test]
         public void CapstoneWithNoUnlockCondition_IsReported()
         {
@@ -683,9 +679,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // Actions execute on purchase and a content unlock is never bought, so an
         // award authored on one would silently never pay - which reads as a tuning
-        // problem rather than the authoring mistake it is. (The old danger, an
-        // award PAID repeatedly by the auto-apply path, is not validated against
-        // any more because it is not expressible: that path executes no actions.)
+        // problem rather than the authoring mistake it is. (The opposite danger, an
+        // award PAID repeatedly by the auto-apply path, needs no check: that path
+        // executes no actions, so it is not expressible.)
         [TestCase(ContentScope.Run)]
         [TestCase(ContentScope.PermanentInChapter)]
         public void ActionsOnAContentUnlock_AreReported(ContentScope scope)
@@ -811,11 +807,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section },
                 producers: new[] { jam }, storyBeats: new[] { beat });
 
-            // the beat IS declared by the chapter - the old check accepted it on that
-            // basis alone
+            // the beat IS declared by the chapter, which membership alone would
+            // accept
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Section 'floor' module 'module/tap' presents producer 'beat_open', which chapter 'ch1' does not declare - the module would present nothing.");
-            // and the consequence the swap hides: nothing presents the real tap surface
+            // and the consequence the swap hides: nothing presents the real surface
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' producer 'jam' has yield contributions but no section module presents it - firing names one producer, so nothing could ever fire this one.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
@@ -836,12 +832,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // The check that replaced ProducerDefinition.ModuleAddress: who presents a
-        // producer is now DERIVED from the section entries naming it, so the two can
-        // no longer disagree - and what is worth reporting was never a missing string
-        // but the consequence, a tap surface the player cannot reach.
+        // Who presents a producer is DERIVED from the section entries naming it, so
+        // there is no second declaration to disagree with - and what is worth
+        // reporting is not a missing string but the consequence, a fireable surface
+        // the player cannot reach.
         [Test]
-        public void TapProducerNoSectionPresents_IsReported()
+        public void FireableProducerNoSectionPresents_IsReported()
         {
             var orphaned = TestContent.MakeProducer("busk",
                 ("cash", 1, ProductionFeed.Yield, null));
@@ -854,7 +850,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // A passive producer needs no surface at all - that is what fan accrual is -
-        // so the rule keys on having TAP configs rather than on being presented.
+        // so the rule keys on having YIELD contributions rather than on being presented.
         [Test]
         public void PassiveProducerNoSectionPresents_IsAllowed()
         {
@@ -870,7 +866,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // The presented-producer sweep has to ask the same family question the binding
         // check asks. Reading an id off ANY entry counts a module that presents no
         // producer at all as presenting one: the roster entry below is already a
-        // reported mistake, and taking its id as a tap surface forgave the consequence -
+        // reported mistake, and taking its id as a fireable surface forgave the consequence -
         // a Jam button no section renders. Two errors, not one.
         //
         // A roster module rather than a story card because no module declares StoryBeat
@@ -913,9 +909,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // The old bar half of the payout rule needs no check at all now: a reward
-        // holds a GameEffect, awards are GameActions, and no reward can hold one -
-        // a re-completed bar re-paying is unauthorable rather than reported.
+        // The bar half of the payout rule needs no check: a reward holds a
+        // GameEffect, awards are GameActions, and no reward can hold one - a
+        // re-completed bar re-paying is unauthorable rather than reported.
 
         // a group with no bars reveals an empty region and can never satisfy a
         // barsCompleted gate, so cut_demo's leg would wait forever
@@ -956,7 +952,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void IncoherentEventTiers_AreReported()
         {
-            var reward = TestContent.MakeTapValueReward("tap_x2", 2);
+            var reward = TestContent.MakeCashYieldReward("tap_x2", 2);
             var rewards = new RewardManager(new RewardDefinition[] { reward });
             var goal = new CurrencyBalanceCondition("cash", 500);
             var broken = TestContent.MakeEvent("broken", new List<EventTier>
@@ -989,7 +985,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void EventTierWithNoScope_IsReported()
         {
-            var rewards = new RewardManager(new[] { TestContent.MakeTapValueReward("tap_x2", 2) });
+            var rewards = new RewardManager(new[] { TestContent.MakeCashYieldReward("tap_x2", 2) });
             var unscoped = TestContent.MakeEvent("unscoped", new List<EventTier>
             {
                 TestContent.MakeTier(1, "tap_x2", new CurrencyBalanceCondition("cash", 500),
@@ -1032,10 +1028,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // A term is resolved against the WHOLE content set rather than against
             // one family (rule 11), so an unknown one is reported as a term nothing
-            // answers to. It used to go through the currency-reference check, which
-            // could only run because the target kind declared "this qualifier is a
-            // currency id" - the same declaration that could not name one of a
-            // generator's two output lines.
+            // answers to rather than as a bad currency id: a term does not say which
+            // family it belongs to, and requiring it to would leave a buff unable to
+            // name one of a generator's two output lines.
             LogAssert.Expect(LogType.Error,
                 "GameEffect: Upgrade 'ghost_currency' (payload) targets 'merch_rate', which no definition id, tag or produced number answers to.");
             ContentValidator.Validate(database, RecordsId, NoRewards);

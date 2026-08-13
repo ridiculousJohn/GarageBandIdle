@@ -99,8 +99,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // a jam producer whose single line feeds cash's YIELD - the probe for the
-        // per-firing modifier stack (the shape TapSystem was)
-        public static ProductionSystem MakeTapProduction(double baseAmount, ModifierSystem modifiers,
+        // per-firing modifier stack
+        public static ProductionSystem MakeYieldProduction(double baseAmount, ModifierSystem modifiers,
             CurrencyManager currencies = null, FlagSystem flags = null)
         {
             currencies ??= MakeEconomy();
@@ -132,12 +132,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // A generator with ONE rate line, named "<id>_<currency>" - the shape
         // almost every fixture wants, and the convention chapter 1 authors.
         //
-        // isBandmate is no longer a field on the definition: it was a tag that never
-        // got the concept (design doc rule 10), and the fan bonus it drove is now an
-        // ordinary fans line on the generator. The parameter survives as fixture
-        // shorthand for exactly that - the `bandmate` tag plus a fans rate line -
-        // because what the tests using it mean is "a bandmate as the game authors
-        // one", not "a bool is set".
+        // isBandmate is not a field on the definition - a bandmate is the `bandmate`
+        // TAG plus a fans rate line (design doc rule 10). The parameter is fixture
+        // shorthand for authoring exactly those two, because what the tests using it
+        // mean is "a bandmate as the game authors one", not "a bool is set".
         public static GeneratorDefinition MakeGenerator(string id, string produces,
             double baseCost, double costGrowth, double baseOutput, Condition unlock = null,
             bool isBandmate = false, string costCurrency = "cash", double fansPerUnit = 0.02)
@@ -230,8 +228,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // The default is a ROSTER module (the generator list), because those present
         // no single definition - a section entry for one names no id, which is what a
         // fixture wants when it is not about bindings at all. The tap module would
-        // report a missing producer id on every such fixture, since 6.5 made a
-        // module's requirement something boot validation enforces.
+        // report a missing producer id on every such fixture, since boot validation
+        // enforces what a module requires.
         //
         // Addresses are still the fixture's parameter, since almost no test cares
         // which definition a module presents; each becomes a SectionModule with no
@@ -254,9 +252,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // a minimal coherent chapter: declared flags plus the id lists that
-        // form its content closure. Fan accrual itself is a production config on
-        // a producer, so a chapter fixture declares only which currency is fans
-        // and the per-bandmate tuning - see MakeFanProduction for the accrual.
+        // form its content closure. Fan accrual itself is a contribution on a
+        // producer, so a chapter fixture declares only which currency is fans -
+        // see MakeFanProduction for the accrual.
         public static ChapterDefinition MakeChapter(string id, List<string> flagIds,
             List<string> sectionIds = null, List<string> generatorIds = null,
             List<string> upgradeIds = null, List<string> barGroupIds = null,
@@ -320,7 +318,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public static RewardDefinition MakeFanRateReward(string id, double value)
             => MakeReward(id, new GrantModifierEffect(Sel("fans_rate"), ModifierOperation.Multiply, value));
 
-        public static RewardDefinition MakeTapValueReward(string id, double value)
+        public static RewardDefinition MakeCashYieldReward(string id, double value)
             => MakeReward(id, new GrantModifierEffect(Sel("cash_yield"), ModifierOperation.Multiply, value));
 
         public static RewardDefinition MakeSetFlagReward(string id, string flagId)
@@ -338,9 +336,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // which every economy routes to, so it is reachable from every chapter
         // without appearing in any chapter's roster.
         // A modifier's address and a number's identity are two different things
-        // (rule 11): a grant carries a SELECTOR, a reader offers a SUBJECT. They
-        // used to be one ModifierTargetKey, which is why a fixture that granted
-        // and read through the same value now needs both.
+        // (rule 11): a grant carries a SELECTOR, a reader offers a SUBJECT, so a
+        // fixture that grants and then reads needs one of each.
         public static ModifierSelector Sel(params string[] terms) => new(terms);
 
         public static ModifierSubject Num(string id, params string[] tags) => new(id, tags);

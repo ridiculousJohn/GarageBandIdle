@@ -7,7 +7,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 {
     // The condition invalidation signal: ConditionContext listens to the four
     // inputs a Condition can read and answers "has any of them moved since the
-    // last drain?", which is what replaced evaluating every gate on every tick.
+    // last drain?", so a gate is evaluated when an input moves rather than on
+    // every tick.
     // These cover the drain's contract rather than any single condition type -
     // when it evaluates, when it stays silent, and what it does with work the
     // evaluation itself creates.
@@ -122,9 +123,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(new[] { "evaluated", "settled" }, order);
         }
 
-        // The context subscribes to systems that can outlive it (slice 5.5 makes
-        // one per economy, and an unfocused economy's context is discarded), so a
-        // disposed one must stop hearing about inputs it no longer reads.
+        // The context subscribes to systems that can outlive it - there is one per
+        // economy, and an unfocused economy's context is discarded - so a disposed
+        // one must stop hearing about inputs nothing reads.
         [Test]
         public void Dispose_StopsListeningToEveryInput()
         {

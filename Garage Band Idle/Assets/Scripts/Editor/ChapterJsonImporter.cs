@@ -150,8 +150,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
 
             // producers: the module-held production sources (design doc
-            // section 12, rule 13) - what the Jam button yields per tap, plus
-            // Rehearsal's passive trickle. Config gates are ordinary
+            // section 12, rule 13) - what the Jam button yields per press, plus
+            // Rehearsal's passive trickle. Contribution gates are ordinary
             // Conditions; an invalid entry skips the whole producer, because a
             // producer missing one of its yields is not the authored producer.
             var producerIds = new List<string>();
@@ -167,11 +167,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     Debug.LogError($"ChapterJsonImporter: duplicate producer id '{block.id}'. Keeping the first.");
                     continue;
                 }
-                // A stale `module` key is refused rather than ignored (the same
-                // treatment 5.6 gave `revealFlag`): which module presents a producer
-                // is the SECTION's declaration now, so a file still carrying this
-                // states a binding nothing reads, and silently dropping it would
-                // read as accepted.
+                // A `module` key is refused rather than ignored, the same treatment
+                // `revealFlag` gets: which module presents a producer is the
+                // SECTION's declaration, so a file carrying this states a binding
+                // nothing reads, and silently dropping it would read as accepted.
                 if (!string.IsNullOrEmpty(block.module))
                 {
                     Debug.LogError($"ChapterJsonImporter: producer '{block.id}' carries a 'module' key - which module presents a producer is authored on the SECTION's module entry as 'definition' (design doc section 12, rule 13). Skipping it - remove the key and re-import.");
@@ -258,13 +257,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
-                // The retired one-currency schema is refused rather than migrated: a
-                // guess at which contribution `produces` + `baseOutput` meant would
-                // also have to invent the line's id, and every buff naming that id
-                // would then depend on the guess.
+                // These keys are refused rather than migrated: a guess at which
+                // contribution they meant would also have to invent the line's id,
+                // and every buff naming that id would then depend on the guess.
                 if (block.produces != null || block.baseOutput != null || block.isBandmate != null)
                 {
-                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' carries a retired 'produces', 'baseOutput' or 'isBandmate' key - a generator authors 'contributions', each with its own id (design doc section 12, rules 11 and 13), and a bandmate contributes a fans rate rather than declaring a bool. Skipping it - re-author the block and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' carries an unsupported 'produces', 'baseOutput' or 'isBandmate' key - a generator authors 'contributions', each with its own id (design doc section 12, rules 11 and 13), and a bandmate contributes a fans rate rather than declaring a bool. Skipping it - re-author the block and re-import.");
                     continue;
                 }
 
@@ -401,26 +399,26 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 eventIds.Add(block.id);
             }
 
-            // Four retired keys, all now production: the base rate and its gate
-            // are a config on a producer (design doc section 12, rule 13), which
+            // The fans block declares no production: the base rate and its gate are
+            // a contribution on a producer (design doc section 12, rule 13), which
             // is what keeps fan accrual out of the idle payout by construction
-            // (section 9). Refused rather than ignored, the same fail-closed rule
-            // the currency 'earn' block and the bar group's 'revealFlag' get. The
+            // (section 9). Four keys are refused rather than ignored, the same
+            // fail-closed rule the currency 'earn' block and the bar group's
+            // 'revealFlag' get. The
             // chapter still imports - a fans config is not skippable content - and
             // boot validation reports what the missing production leaves behind.
             ReportStaleFansKeys(data.fans);
-            // the pre-5.4 schema put the Jam yield in constants; a leftover
-            // tapBaseValue would silently disagree with the jam producer's
-            // cash config, so its presence is refused rather than dropped
+            // a tapBaseValue in constants would silently disagree with the jam
+            // producer's cash contribution, which owns that number, so its
+            // presence is refused rather than dropped
             if (data.constants?.tapBaseValue != null)
-                Debug.LogError("ChapterJsonImporter: constants block still carries tapBaseValue - the Jam yield lives on the jam producer's cash config (design doc section 12, rule 13). Fix the JSON and re-import.");
+                Debug.LogError("ChapterJsonImporter: constants block still carries tapBaseValue - the Jam yield lives on the jam producer's cash contribution (design doc section 12, rule 13). Fix the JSON and re-import.");
             if ((data.constants?.recordBuff?.perRecord ?? 0) < 0)
                 Debug.LogError("ChapterJsonImporter: recordBuff block has a negative perRecord. Fix the JSON and re-import.");
 
-            // Story beats are ordinary content now (6.5): a definition, an id list on
-            // the chapter, and a section module entry naming which one a card
-            // presents. They were two inline strings on the chapter, which is why
-            // they could not be revealed or listed like anything else.
+            // Story beats are ordinary content: a definition, an id list on the
+            // chapter, and a section module entry naming which one a card presents,
+            // so they reveal and list exactly as every other content kind does.
             var storyBeatIds = new List<string>();
             foreach (var block in data.storyBeats ?? Array.Empty<StoryBeatBlock>())
             {
@@ -456,9 +454,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             AssetDatabase.SaveAssets();
             // Rewrites every generated asset in the CURRENT serialized form, which is
-            // what drops keys whose field no longer exists on the class - Unity leaves
-            // an orphan line (`_moduleAddress:` after 6.5 retired it) in the YAML
-            // until something rewrites the file, and ApplyIfChanged never does,
+            // what drops YAML keys the class does not declare - Unity leaves an
+            // orphan line sitting in the file until something rewrites it, and
+            // ApplyIfChanged never does,
             // because the two serialized forms it compares both already lack the
             // field. Idempotent: an asset already in canonical form is rewritten
             // byte-identically.
@@ -505,12 +503,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             Debug.Log($"ChapterJsonImporter: {count} definition assets marked addressable.");
         }
 
-        // The migration LoadOrCreateReward used to perform silently: a reward file
-        // written by an older schema no longer loads as a RewardDefinition, and the
-        // way forward is deleting it so the next import recreates it from the JSON.
-        // Deletion is destructive and a failed load has more causes than the one
-        // this fixes, so it runs from here - a deliberate action naming what it
-        // does - never as a side effect of importing.
+        // Deletes the reward assets that fail to load as a RewardDefinition, so
+        // the next import recreates them from the JSON. Deletion is destructive and
+        // a failed load has more causes than the one this fixes, so it runs from
+        // here - a deliberate action naming what it does - never as a side effect
+        // of importing.
         [MenuItem("GarageBandIdle/Delete Old-Schema Reward Assets")]
         public static void DeleteOldSchemaRewardAssets()
         {
@@ -524,8 +521,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     // The sweep is recursive and also returns folder objects. Only
                     // top-level asset files are candidates: the import writes every
                     // reward as '{RewardsFolder}/{id}.asset', so that is the whole
-                    // set the old automatic deletion could ever have touched - a
-                    // file in a nested folder is not this action's to take.
+                    // set this action may touch - a file in a nested folder is not
+                    // its to take.
                     if (!path.EndsWith(".asset"))
                         continue;
                     if (Path.GetDirectoryName(path)?.Replace('\\', '/') != RewardsFolder)
@@ -563,7 +560,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
         // Deleted assets leave dangling Addressables entries behind (they show as
         // Missing in the Groups window); drop them, then drop any label no entry
-        // uses and no code loads, so retired content types don't linger.
+        // uses and no code loads, so nothing lingers pointing at content that is gone.
         private static void RemoveStaleEntries(AddressableAssetSettings settings)
         {
             var dangling = new List<AddressableAssetEntry>();
@@ -992,9 +989,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 or "flagSet" or "barsCompleted" or "recordsCumulative";
 
         // one currency entry's import decision: pure state ({id, group}) only -
-        // the pre-5.4 schema put engagement earn on the currency, and an earn
-        // block is stale JSON that used to mean something, so it is refused
-        // loudly rather than silently dropped
+        // a currency never declares how it is earned, so an `earn` block on one
+        // is refused loudly rather than silently dropped
         private static bool IsImportableCurrencyEntry(CurrencyEntryBlock block)
         {
             if (string.IsNullOrEmpty(block.id))
@@ -1010,8 +1006,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return true;
         }
 
-        // The three pre-5.7 fans keys, all now production: the base rate and its
-        // gate are a config on a producer (design doc section 12, rule 13), which
+        // The three fans keys that declare production: the base rate and its
+        // gate belong on a producer's contribution (design doc section 12, rule 13),
+        // which
         // is what keeps fan accrual out of the idle payout by construction
         // (section 9). Refused rather than ignored, the same fail-closed rule the
         // currency 'earn' block and the bar group's 'revealFlag' get. The chapter
@@ -1028,11 +1025,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 return;
 
             if (block.baseFansPerSec != null)
-                Debug.LogError("ChapterJsonImporter: fans block still carries 'baseFansPerSec' - the base fan rate is a production config on a producer (design doc section 12, rule 13). Fix the JSON and re-import.");
+                Debug.LogError("ChapterJsonImporter: fans block still carries 'baseFansPerSec' - the base fan rate is a contribution on a producer (design doc section 12, rule 13). Fix the JSON and re-import.");
             if (block.revealFlag != null)
-                Debug.LogError("ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by the production config's gate (design doc section 12, rules 8, 9 and 13). Fix the JSON and re-import.");
+                Debug.LogError("ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by the contribution's gate (design doc section 12, rules 8, 9 and 13). Fix the JSON and re-import.");
             if (block.activeWhen != null)
-                Debug.LogError("ChapterJsonImporter: fans block still carries 'activeWhen' - the accrual gate moved onto the production config's 'gate' (design doc section 12, rule 13). Fix the JSON and re-import.");
+                Debug.LogError("ChapterJsonImporter: fans block still carries 'activeWhen' - the accrual gate moved onto the contribution's 'gate' (design doc section 12, rule 13). Fix the JSON and re-import.");
             if (block.perBandmateOwnedBonus != null)
                 Debug.LogError("ChapterJsonImporter: fans block still carries 'perBandmateOwnedBonus' - band size raises the fan rate because each bandmate generator CONTRIBUTES a fans line (design doc section 12, rules 11 and 13), not because a chapter constant is added onto the rate. Fix the JSON and re-import.");
         }
@@ -1042,13 +1039,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         internal static void ParseFansBlockStaleKeys(string json)
             => ReportStaleFansKeys(JsonConvert.DeserializeObject<FansBlock>(json, JsonSettings));
 
-        // one bar group's import decision. The pre-5.6 schema revealed a group
-        // by bare flag id; reveal is a Condition now (design doc section 12,
-        // rules 8 and 9), and a stale `revealFlag` is JSON that used to mean
-        // something, so it is refused loudly rather than silently ignored. The
-        // group is skipped rather than imported gateless: a group whose gate
-        // was dropped shows from the first frame, which is the one failure the
-        // reveal registry exists to prevent.
+        // one bar group's import decision. Reveal is a Condition (design doc
+        // section 12, rules 8 and 9), so a `revealFlag` naming a bare flag id is
+        // refused loudly rather than silently ignored. The group is skipped rather
+        // than imported gateless: a group whose gate was dropped shows from the
+        // first frame, which is the one failure the reveal registry exists to
+        // prevent.
         //
         // Tested on PRESENCE, never contents: `"revealFlag": ""` is a stale key
         // just as much as a filled-in one, and a contents test waves through
@@ -1149,13 +1145,13 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return ToContributions(block.contributions, $"producer '{block.id}'", requireAny: true);
         }
 
-        // the currency-entry parse path: tests cover that the pre-5.4 earn
-        // schema is refused rather than silently dropped
+        // the currency-entry parse path: tests cover that an `earn` block on a
+        // currency is refused rather than silently dropped
         internal static bool ParseCurrencyEntryIsImportable(string json)
             => IsImportableCurrencyEntry(JsonConvert.DeserializeObject<CurrencyEntryBlock>(json, JsonSettings));
 
-        // the bar-group parse path, for the same reason: tests cover that the
-        // pre-5.6 revealFlag schema is refused rather than silently ignored
+        // the bar-group parse path, for the same reason: tests cover that a bare
+        // `revealFlag` is refused rather than silently ignored
         internal static bool ParseBarGroupIsImportable(string json)
             => IsImportableBarGroup(JsonConvert.DeserializeObject<BarGroupBlock>(json, JsonSettings));
 
@@ -1346,10 +1342,6 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // accrues over an absence; a yield is per firing and cannot. Null signals a
         // missing or unknown spelling, which skips the holder: a line that never
         // declared which number it is must not be guessed into a rate.
-        //
-        // `trigger` used to sit beside this and named the CALLER (tick, tap), which
-        // put a UI gesture in the economy's vocabulary and left the first
-        // demand-fired producer that is not a button press with nowhere to go.
         private static ProductionFeed? ToFeeds(string feeds, string context)
         {
             switch (feeds)
@@ -1376,11 +1368,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         //
         // Both authoring sites feed this: an upgrade's `payload.effect` and a reward
         // entry's `type` are two JSON keys over ONE vocabulary. Neither restricts
-        // which names it accepts, and that is deliberate - the old split
-        // (multipliers for rewards, flat adds and per-generator targets for payloads)
-        // was a fossil of the two class families rather than a rule. A reward paying
-        // a flat tap bonus and a buff raising fan rate are both coherent content, so
-        // the check worth keeping is whether the family knows the name at all.
+        // which names it accepts, and that is deliberate: a reward multiplying a
+        // yield and a payload multiplying a rate are both coherent content, so the
+        // check worth keeping is whether the family knows the name at all.
         //
         // Returns null on refusal, having reported why; what a refusal MEANS belongs
         // to the caller - a reward entry is skipped, while an upgrade imports with no
@@ -1393,17 +1383,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 case "setFlag":
                     return new SetFlagEffect(flag);
                 // The numeric names are the OPERATION, and `targets` says which
-                // numbers it reaches (design doc rule 11). They used to be
-                // <target><operation> - currencyYieldAdd, generatorOutputMultiplier -
-                // which put a closed stat kind in the vocabulary and so could not
-                // name one of a generator's two output lines. What a modifier hits is
-                // now the same open id-and-tag vocabulary as every other reference.
-                // "add" was here and is gone: a flat bonus is a CONTRIBUTION to the
-                // number it raises (rule 11), authored under the holder's
-                // `contributions` key, not an effect granted against it. An
-                // un-migrated file naming it lands in the unknown-effect refusal
-                // below, which is the loud outcome - importing it as a multiplier
-                // would turn "+1 Cash" into "x1 Cash" and read as tuning.
+                // numbers it reaches (design doc rule 11): a modifier addresses
+                // those in the same open id-and-tag vocabulary as every other
+                // reference. There is no "add" - a flat bonus is a CONTRIBUTION to
+                // the number it raises (rule 11), authored under the holder's
+                // `contributions` key, not an effect granted against it. A file
+                // naming one lands in the unknown-effect refusal below, which is the
+                // loud outcome - importing it as a multiplier would turn "+1 Cash"
+                // into "x1 Cash" and read as tuning.
                 case "multiplier":
                     return ToMultiplier(Selector(targets, context), value, context, kind);
                 case null:
@@ -1621,13 +1608,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             });
         }
 
-        // Like LoadOrCreate, but an asset written by an older schema - back when a
-        // reward kind was its own RewardDefinition subclass - no longer loads as a
-        // RewardDefinition at all. That file used to be deleted and recreated right
-        // here; it is reported and skipped now, because destroying an asset is not
-        // a decision an import may take on a failed LOAD - the same null comes back
-        // for a file that is unreadable in some way nobody has met yet, so deleting
-        // on it turns every future breakage into silent data loss. The deletion is
+        // Like LoadOrCreate, but a reward asset on disk can fail to load as a
+        // RewardDefinition at all. It is reported and skipped, because destroying an
+        // asset is not a decision an import may take on a failed LOAD - the same
+        // null comes back for a file that is unreadable in some way nobody has met
+        // yet, so deleting on it turns every future breakage into silent data loss.
+        // The deletion is
         // the explicit menu action (DeleteOldSchemaRewardAssets), which names what
         // it will do before it does it.
         private static RewardDefinition LoadOrCreateReward(string assetPath)
@@ -1722,9 +1708,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public ConditionBlock unlock = new();
         }
 
-        // The capstone, imported for the first time in 6.5 - the block existed in
-        // the JSON and was skipped entirely, so the authored `unlock` was dead data
-        // while a scalar capstoneRecordsGate stated the same threshold elsewhere.
+        // The capstone. Its authored `unlock` is the chapter gate itself, so this
+        // block importing is what keeps the designer's threshold from being dead
+        // data.
         private class CapstoneBlock
         {
             public string id = "";
@@ -1791,8 +1777,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public RecordBuffBlock recordBuff = new();
 
-            // detection only: the pre-5.4 schema's Jam yield, refused when
-            // present (it lives on the jam producer's cash config now)
+            // detection only: a Jam yield stated here is refused, since that number
+            // lives on the jam producer's cash contribution
             public JToken tapBaseValue;
         }
 
@@ -1825,7 +1811,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private class ConditionBlock
         {
             // Every reference-type field is left WITHOUT an initializer on
-            // purpose, the same rule FansBlock's retired keys follow: null means
+            // purpose, the same rule FansBlock's refused keys follow: null means
             // "the key is absent", so an authored-empty value stays
             // distinguishable from omission. IsAuthored rests on exactly this -
             // `{}` is a legitimate absent gate, while `{"type": ""}`,
@@ -1869,12 +1855,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public ContributionBlock[] contributions;
             public ConditionBlock unlock = new();
 
-            // Retired in 7.4 and kept ONLY to detect them. `produces` + `baseOutput`
-            // were one currency and one unnamed number, so no buff could address one
-            // line of a generator that feeds two; `isBandmate` was a tag that never
-            // got the concept (rule 10), read by a derived modifier to add a fan
-            // rate the generator can simply contribute. A stale file carrying any of
-            // them is refused rather than half-migrated.
+            // Not part of the schema, and declared here ONLY so their presence can
+            // be detected: a generator authors `contributions`, each with its own
+            // id, and a bandmate contributes a fans rate rather than declaring a
+            // bool (rules 10, 11 and 13). A file carrying any of them is refused
+            // rather than half-migrated.
             public JToken produces;
             public JToken baseOutput;
             public JToken isBandmate;
@@ -1926,30 +1911,31 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string id = "";
             public string group = ""; // CurrencyGroupDefinition id, e.g. "run"
 
-            // detection only: the pre-5.4 schema's engagement earn, refused
-            // when present (production lives on producers now)
+            // detection only: an earn block on a currency is refused, since
+            // production lives on producers
             public JToken earn;
         }
 
         // a module-held production source: the module prefab presenting it
-        // plus the production configs it fires (design doc section 12, rule 13)
+        // plus the contributions it holds (design doc section 12, rule 13)
         // No `module` key: which module presents a producer is the SECTION's
-        // declaration (a module entry's `definition`), and 6.5 retired the producer's
-        // own copy of it rather than keep two declarations of one relationship. A
+        // declaration (a module entry's `definition`), and the producer holds no
+        // copy of it, since two declarations of one relationship can disagree. A
         // leftover `module` key is refused below rather than ignored, so a stale JSON
         // does not read as accepted.
         private class ProducerBlock
         {
             public string id = "";
 
-            // Retired in 6.5 and kept ONLY to detect it: a value here is refused at
-            // import rather than dropped, so a stale chapter file fails loudly
-            // instead of appearing to migrate.
+            // Not part of the schema, and declared here ONLY so its presence can be
+            // detected: a value is refused at import rather than dropped, so a
+            // chapter file carrying one fails loudly instead of appearing to
+            // migrate.
             public string module = "";
 
-            // Retired with `production` in 7.4: an entry declared a `trigger`,
-            // which named who fired it rather than what the number IS. Kept only to
-            // detect it, for the same reason `module` is.
+            // Not part of the schema either, and declared for the same reason:
+            // a producer's lines are `contributions`, each declaring the QUANTITY
+            // it feeds rather than who fires it.
             public JToken production;
 
             public ContributionBlock[] contributions;
@@ -1982,9 +1968,9 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public string name = "";
             public ConditionBlock visibleWhen = new();
 
-            // pre-5.6 schema: reveal was a bare flag id. Kept as a field ONLY so
-            // its presence can be refused - see IsImportableBarGroup. Left
-            // WITHOUT an initializer on purpose, the same as FansBlock's retired
+            // a bare flag id, which reveal is not. Declared as a field ONLY so its
+            // presence can be refused - see IsImportableBarGroup. Left WITHOUT an
+            // initializer on purpose, the same as FansBlock's refused
             // keys: null means "the key is absent", so any authored value is
             // detectable including the one that reads as empty ("").
             public string revealFlag;
@@ -2006,13 +1992,13 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public string currency = "";
 
-            // retired in 7.4, kept only to be refused: the bonus is each bandmate
-            // generator's own fans contribution now
+            // declared only to be refused: band size raises the fan rate through
+            // each bandmate generator's own fans contribution
             public JToken perBandmateOwnedBonus;
 
-            // pre-5.7 schema, kept only to be refused - see ReportStaleFansKeys.
-            // All three are production now: the base rate and its gate live on a
-            // producer's config. Every one of them is left WITHOUT an initializer
+            // declared only to be refused - see ReportStaleFansKeys. All three are
+            // production: the base rate and its gate live on a producer's
+            // contribution. Every one of them is left WITHOUT an initializer
             // on purpose, so null means "the key is absent" and any authored value
             // is detectable - including the ones that read as empty: 0, {} and "".
             // A refusal that tests the contents rather than the presence lets the

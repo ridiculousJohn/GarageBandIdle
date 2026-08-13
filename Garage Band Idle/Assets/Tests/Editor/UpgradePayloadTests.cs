@@ -15,30 +15,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
-        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
-        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
+        private static readonly ModifierSubject CashYield = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector CashYieldSel = TestContent.Sel("cash_yield");
 
         private static EffectContext Context(ModifierSystem modifiers)
             => new(TestContent.MakeEconomy(), new FlagSystem(), modifiers);
 
         // A payload naming cash's yield scales what a firing pays, and the
-        // multipliers compose. The flat "+1 Cash per press" this test used to
-        // assert is not a payload at all now: it is a ProductionContribution on the
-        // upgrade (rule 11), which sums with the jam line rather than composing over
-        // it - see UpgradeContributions_AreLiveExactlyWhileTheLatchHolds.
+        // multipliers compose. A flat "+1 Cash per press" is not a payload at all:
+        // it is a ProductionContribution on the upgrade (rule 11), which sums with
+        // the jam line rather than composing over it - see
+        // UpgradeContributions_AreLiveExactlyWhileTheLatchHolds.
         [Test]
         public void AYieldMultiplier_ScalesWhatAFiringPays()
         {
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(1, modifiers);
+            var production = TestContent.MakeYieldProduction(1, modifiers);
 
             new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 2)
                 .Apply(Context(modifiers), ContentScope.Run);
 
-            Assert.AreEqual(2.0, tap.YieldOf("cash").ToDouble(), 1e-9, "base 1 x 2");
+            Assert.AreEqual(2.0, production.YieldOf("cash").ToDouble(), 1e-9, "base 1 x 2");
 
-            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 3);
-            Assert.AreEqual(6.0, tap.YieldOf("cash").ToDouble(), 1e-9, "1 x 2 x 3");
+            modifiers.Grant(CashYieldSel, ModifierOperation.Multiply, ContentScope.Run, 3);
+            Assert.AreEqual(6.0, production.YieldOf("cash").ToDouble(), 1e-9, "1 x 2 x 3");
         }
 
         // The replacement for the flat-add payload: an upgrade CONTRIBUTES its
@@ -71,7 +71,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2.0, production.YieldOf("cash").ToDouble(), 1e-9,
                 "1 + 1, SUMMED with the jam line rather than composed over it");
 
-            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 3);
+            modifiers.Grant(CashYieldSel, ModifierOperation.Multiply, ContentScope.Run, 3);
             Assert.AreEqual(6.0, production.YieldOf("cash").ToDouble(), 1e-9,
                 "(1 + 1) x 3 - the one shape every composed number has");
 
@@ -202,7 +202,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(1, modifiers, currencies, flags);
+            var production = TestContent.MakeYieldProduction(1, modifiers, currencies, flags);
             var upgrades = new UpgradeSystem(new[]
             {
                 // no gate = met from the start, so it latches on the first pass
@@ -211,11 +211,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(2.0, tap.YieldOf("cash").ToDouble(), 1e-9);
+            Assert.AreEqual(2.0, production.YieldOf("cash").ToDouble(), 1e-9);
 
             TestContent.RunReset(modifiers, upgrades);
 
-            Assert.AreEqual(afterReset, tap.YieldOf("cash").ToDouble(), 1e-9);
+            Assert.AreEqual(afterReset, production.YieldOf("cash").ToDouble(), 1e-9);
         }
 
         // UpgradeSystem hands the owning definition's scope to the payload. The
@@ -227,7 +227,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(1, modifiers, currencies, flags);
+            var production = TestContent.MakeYieldProduction(1, modifiers, currencies, flags);
             var upgrades = new UpgradeSystem(new[]
             {
                 // no gate = met from the start, so it applies on the first pass
@@ -236,10 +236,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(4.0, tap.YieldOf("cash").ToDouble(), 1e-9, "base 1 x 4");
+            Assert.AreEqual(4.0, production.YieldOf("cash").ToDouble(), 1e-9, "base 1 x 4");
 
             TestContent.RunReset(modifiers, upgrades);
-            Assert.AreEqual(4.0, tap.YieldOf("cash").ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, production.YieldOf("cash").ToDouble(), 1e-9,
                 "the definition's permanent-in-chapter scope kept the latch, and the projection rebuilt the grant from it");
         }
 
@@ -252,7 +252,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var flags = new FlagSystem();
             var modifiers = new ModifierSystem();
-            var tap = TestContent.MakeTapProduction(1, modifiers, currencies, flags);
+            var production = TestContent.MakeYieldProduction(1, modifiers, currencies, flags);
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
@@ -267,18 +267,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             currencies.Add("cash", 249);
             Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "still short of the gate");
 
-            var tapDuringSpend = 0.0;
+            var yieldDuringSpend = 0.0;
             currencies.BalanceChanged += (id, _) =>
             {
                 if (id == "cash")
-                    tapDuringSpend = tap.YieldOf("cash").ToDouble();
+                    yieldDuringSpend = production.YieldOf("cash").ToDouble();
             };
             currencies.Add("cash", 1);
 
             Assert.IsTrue(upgrades.TryBuy(stagePresence, context), "gate met and affordable");
             Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "the declared currency is charged");
-            Assert.AreEqual(2.0, tap.YieldOf("cash").ToDouble(), 1e-9, "base 1 x the granted multiplier");
-            Assert.AreEqual(2.0, tapDuringSpend, 1e-9, "the buff was already granted when the spend fired");
+            Assert.AreEqual(2.0, production.YieldOf("cash").ToDouble(), 1e-9, "base 1 x the granted multiplier");
+            Assert.AreEqual(2.0, yieldDuringSpend, 1e-9, "the buff was already granted when the spend fired");
 
             Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "an applied buff is never bought twice");
         }
@@ -583,9 +583,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var context = TestContent.MakeContext(TestContent.MakeEconomy());
 
             // a negative multiplier negates the whole product it lands in, which is
-            // the same failure a zero one is - the negative-ADD report that used to
-            // sit here is gone with Add itself (rule 11): a flat bonus is a
-            // contribution, and a negative one is refused where it is authored
+            // the same failure a zero one is. There is no negative-bonus report
+            // beside it (rule 11): a flat bonus is a contribution, and a negative
+            // one is refused where it is authored
             LogAssert.Expect(LogType.Error,
                 "GameEffect: Upgrade 'drain_tap' (payload) has a non-positive multiplier (-1).");
             new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, -1).Validate(context, "Upgrade 'drain_tap' (payload)");
@@ -621,10 +621,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 .Validate(context, "Upgrade 'x' (payload)");
         }
 
-        // The guard the closed enum used to give for free: a term that answers to
-        // nothing stores a modifier no number ever asks about, which looks authored
-        // rather than broken. It is resolved against the whole content set, since a
-        // term does not say which family it belongs to.
+        // An open vocabulary has no compiler behind it, so this is the guard: a term
+        // that answers to nothing stores a modifier no number ever asks about, which
+        // looks authored rather than broken. It is resolved against the whole
+        // content set, since a term does not say which family it belongs to.
         [Test]
         public void Validate_ReportsATermNothingAnswersTo()
         {

@@ -25,8 +25,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private const string RecordsId = GameManager.RecordsCurrencyId;
         private const string RoadiesId = GameManager.RoadiesCurrencyId;
 
-        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
-        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
+        private static readonly ModifierSubject CashYield = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector CashYieldSel = TestContent.Sel("cash_yield");
 
         // the two-pool content set the running game has: a chapter-placed run group
         // holding cash/fans, and a global permanent group holding Records + Roadies
@@ -207,7 +207,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(40.0, context.Pool.GetEarned("cash").ToDouble(), 1e-9);
             Assert.IsTrue(context.Upgrades.Get("gated").Applied);
             Assert.IsTrue(context.Flags.IsSet("fans"));
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the store is rebuilt each time, never accumulated");
         }
 
@@ -259,7 +259,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // Nothing may observe a half-restored economy, and the modifier channel is
-        // the one that used to leak: a projection clears the store and re-grants, so
+        // the one that can leak: a projection clears the store and re-grants, so
         // an undeferred rebuild fires Changed once per cleared target and once per
         // re-grant, each read against a store missing everything not yet re-applied.
         [Test]
@@ -275,22 +275,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
 
             // every observation any subscriber makes during the restore, in order
-            var observedTapAdds = new List<double>();
+            var observedYields = new List<double>();
             var observedCash = new List<double>();
-            context.Modifiers.Changed += _ => observedTapAdds.Add(context.Modifiers.For(TapValue).Multiply.ToDouble());
+            context.Modifiers.Changed += _ => observedYields.Add(context.Modifiers.For(CashYield).Multiply.ToDouble());
             context.Currencies.BalanceChanged += (id, _) =>
             {
                 if (id == "cash")
-                    observedCash.Add(context.Modifiers.For(TapValue).Multiply.ToDouble());
+                    observedCash.Add(context.Modifiers.For(CashYield).Multiply.ToDouble());
             };
 
             context.Restore(new EconomyLocalSnapshot(
                 currencies: new Dictionary<string, CurrencyState> { ["cash"] = new CurrencyState(25, 25) },
                 appliedUpgradeIds: new List<string> { "buff" }));
 
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the latch projected its buff");
-            CollectionAssert.DoesNotContain(observedTapAdds, 0.0,
+            CollectionAssert.DoesNotContain(observedYields, 0.0,
                 "no subscriber saw the store mid-rebuild - the projection's notifications are deferred");
             CollectionAssert.DoesNotContain(observedCash, 0.0,
                 "and a balance notification never arrived before the buff was in place");
@@ -496,7 +496,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 generatorsOwned: new Dictionary<string, int> { ["drummer"] = 2 },
                 appliedUpgradeIds: new List<string> { "permanent_buff", "run_buff" },
                 setFlagIds: new List<string> { "fans", "covers" }));
-            Assert.AreEqual(28.0, frontier.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9, "4 x 7 while running");
+            Assert.AreEqual(28.0, frontier.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9, "4 x 7 while running");
 
             var seed = frontier.CaptureSeedFor(EconomyRecipe.EventSandbox);
             using var sandbox = Build(chapter, database, permanent, EconomyRecipe.EventSandbox, seed);
@@ -510,15 +510,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.0, sandbox.Currencies.Get("cash").ToDouble(), 1e-9,
                 "a run currency's balance is a run fact");
 
-            Assert.AreEqual(4.0, sandbox.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, sandbox.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the granted store rebuilt from exactly the latches that carried in");
 
             // The per-bandmate bonus is each bandmate's own fans CONTRIBUTION now
             // (rule 13), so it is read off the producer rather than the modifier
             // stack - and it scales with the owned count because a generator's lines
             // always do. The sandbox's band is empty, so its fans rate is zero: the
-            // frontier's two drummers do not leak in through production any more
-            // than they do through the fleet.
+            // frontier's two drummers leak in through production no more than they
+            // do through the fleet.
             Assert.AreEqual(0.0, sandbox.Production.RateOf("fans").ToDouble(),
                 1e-9, "the sandbox's own band is empty, so nothing contributes");
             Assert.AreEqual(0.04, frontier.Production.RateOf("fans").ToDouble(),
@@ -542,8 +542,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // A compound re-applies safely at every boundary because everything in it
-        // is re-applicable by construction - the payout that used to need
-        // filtering here is a GameAction now, unauthorable inside a payload.
+        // is re-applicable by construction: a payout is a GameAction, unauthorable
+        // inside a payload, so nothing here has to filter for one.
         [Test]
         public void Compound_ReappliesExactly_AtTheRebuildBoundary()
         {
@@ -621,17 +621,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             context.Currencies.Add(RecordsId, 1);
             Assert.IsTrue(context.CompleteCapstone());
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the operation applied OnComplete once");
 
             context.ReleaseAlbum();
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the release rebuilt the store, and the flag latch re-applied OnComplete exactly once");
 
             var seed = context.CaptureLocalState();
             using var loaded = Build(chapter, database, permanent, seed: seed);
             Assert.IsTrue(loaded.Flags.IsSet("chapter_2_unlocked"), "the flag rode the snapshot");
-            Assert.AreEqual(4.0, loaded.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, loaded.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "and a load rebuilds the capstone's state from the flag alone");
         }
     }

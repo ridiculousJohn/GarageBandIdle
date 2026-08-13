@@ -5,13 +5,11 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     // One story beat: a piece of authored narrative shown to the player at a
     // progression moment (design doc section 2).
     //
-    // This is content, and being content is the whole point. Beats used to be two
-    // inline string fields on ChapterDefinition - the only content kind with no
-    // definition type - which is why they could not be revealed, listed, or
-    // referenced the way everything else can. Generators, upgrades and bars each
-    // have a definition, a chapter id list, and a module that renders them; a beat
-    // now has the same three, so "any number of beats, each unlocked by a
-    // milestone" needs no new mechanism.
+    // This is content, and being content is the whole point. Generators, upgrades
+    // and bars each have a definition, a chapter id list, and a module that renders
+    // them; a beat has the same three, so "any number of beats, each unlocked by a
+    // milestone" needs no new mechanism. Inline strings on the chapter could not be
+    // revealed, listed or referenced the way every other content kind can.
     //
     // It carries NO unlock condition and NO scope, deliberately:
     //
