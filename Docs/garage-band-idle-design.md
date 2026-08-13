@@ -195,8 +195,10 @@ teardown and scope reset are different events (§5).
   reference it by id.
 - **Learn-songs bars** — generic *fillable bars* that pace a chapter (learn covers, rehearse). Each bar
   declares a `fillCurrency` (Rehearsal in Ch. 1), a fill requirement, and a reward granted on
-  completion; the fill logic reads `fillCurrency` and is not covers-specific. Fed by a fill currency
-  rather than being their own opaque mechanic. Separate from the Catalog (§7).
+  completion; its group's fill behavior declares the rate that currency is consumed at (§6), so a bar
+  never completes faster than that rate allows however much fill currency is banked. The fill logic
+  reads `fillCurrency` and is not covers-specific — bars are fed by a fill currency rather than being
+  their own opaque mechanic. Separate from the Catalog (§7).
 - **Fans** — the run's performance meter; determines the album's Records payout on release.
 - **Catalog (Ch. 6+)** — songs written during the run; a global income multiplier that converts to
   Records on album release (§7).
@@ -232,8 +234,9 @@ currencies as they become affordable.
   which upgrade defines the order in which the player develops each currency, and gives each chapter a
   distinct shape. A gate is expressed as a single `Condition` (§12), so gating on Fans instead of Cash
   is the same shape with a different currency id — no special case.
-- **Payloads.** An upgrade can grant a flat bonus, a multiplier, a new generator, a new currency, an
-  automation step, a new sub-loop, or a new mechanic.
+- **Effects.** An upgrade can grant a flat bonus, a multiplier, a new generator, a new currency, an
+  automation step, a new sub-loop, or a new mechanic — all through the one `GameEffect`/`GameAction`
+  family (§12), never a per-kind class.
 - **Reveal.** A content-unlock upgrade reveals its content by **setting a flag** in the single flag
   registry (§12); the revealed content (a currency, a section, a bar group, a button) gates its own
   visibility on that flag. Rewards (§6.1) can set flags too. There is one reveal mechanism, not one per
@@ -338,6 +341,16 @@ Moment-to-moment play draws on the systems defined elsewhere:
   (accrued currency streams into the active bar; selecting a bar IS the interaction); tap-a-chunk or
   dump-the-pool variants are sibling behavior classes, and their JSON vocabulary exists only once the
   class does.
+
+  **Continuous delivery carries a consumption rate** — the fill currency it can absorb per second —
+  rather than transferring whatever the pool holds. Without one, a pool that accumulated while nothing
+  was selected empties into a bar in a single tick, which is most of a bar's progress arriving in one
+  frame and is the difference between rehearsing and collecting. The rate is a §12 rule 11 target
+  (`BarFillRate`, qualified by bar or group id, unqualified reaching every bar in scope), so "rehearse
+  twice as fast" is authorable content rather than a special case. The **rate is what takes screen
+  time; the pool is what accrues** — which is why the fill currency may earn while a scope is disabled
+  (§9) while the bar it feeds does not move until the player is back and has chosen where to pour.
+  A dump-the-pool sibling is exactly the behavior that declines to have one.
 - **Fans** — accrue passively once revealed. The fans producer's rate composes a base contribution
   plus one from each bandmate generator (§12 rule 13), so it is a function of band size and time only
   — never Cash or income, because nothing contributing to it reads either. It is tuned loosely
@@ -523,21 +536,33 @@ purchasable is also earnable in-game.
 
 **Idle earnings (per scope).** There is no app-level "offline": each **scope** (§12 rule 12)
 tracks when it was last interacted with, and a **disabled** scope accrues nothing live — instead it
-pays `generatorProduction × min(idleSeconds, cap) × rate` at the moment it is **enabled**, with
-**rate = 50%**, **cap = 4 hours** per scope (raisable via the Backstage Pass), and no payout below a
-minimum idle threshold (a too-quick re-enable earns nothing). Closing the app is just the state where
+pays `rate × min(idleSeconds, cap) × idleRate` for each of its currencies at the moment it is
+**enabled**, where `rate` is that currency's composed production rate (rule 13), with
+**idleRate = 50%**, **cap = 4 hours** per scope (raisable via the Backstage Pass), and no payout below
+a minimum idle threshold (a too-quick re-enable earns nothing). Both `idleRate` and `cap` are rule-11
+targets composed from the registry rather than constants — the Backstage Pass raises one and the
+"Double it" buff below multiplies the other, and a number the game modifies that the registry cannot
+name is a gap in rule 11 rather than a feature request. Closing the app is just the state where
 every scope is disabled; launching enables the scopes you return to — so in-game chapter switching
 (Ch. 2+) and time away are one mechanic, not two. Note this is per *scope*, not per economy: several
 scopes are enabled at once (rule 7), and an outer scope's generators keep producing live while the
 player works inside a tier, so only the scopes actually disabled accrue idle time.
-**Generator production only:** fans, rehearsal, and bar progress pause while their scope is disabled — engagement
-currencies never earn while the player is not engaging, and idle fan accrual would let time away
-shortcut the Records payout (§11). Under §12 rule 13 the boundary is the contribution, by
-construction: an idle payout composes a currency's rate from **idle-eligible contributions only**,
-which today is the generators. A **yield** can never idle-pay, because nothing fires it while the
-player is away; and Rehearsal's passive trickle is a module contribution, not a generator's, so it
-pauses too. There is no per-contribution idle flag to author or get wrong. The base rate is set at 50% so that the doubled value is a full
-100%. Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
+**What accrues is settled by structure, not by a list.** Every currency's **rate** accrues, including
+Fans and the fill currency: progress while away is what an idle game is, and a chapter whose
+progression currency alone stood still would pay the returning player in a number they cannot advance
+on. A **yield** never accrues, because nothing fires a producer while the player is gone. And **bar
+progress never accrues** — filling is a tick-driven consumption of the fill currency (§6), not
+production, so a disabled scope's bars do not move for the same reason its taps do not. There is no
+idle flag on a currency or a contribution, and no list of exempt currencies: an earlier draft of this
+section carried one, and it was three Chapter 1 nouns standing in for a rule.
+
+The result is the intended shape rather than a compromise: **time away fills the pool, presence spends
+it.** A player returns to banked Rehearsal, chooses a bar, and watches it fill at the group's
+consumption rate (§6) — so the act of rehearsing still costs screen time, while the resource it costs
+accumulated in their absence. The old worry, that idle Fans would let time away shortcut the Records
+payout (§11), is a balance question with balance answers: `idleRate` and `cap` are exactly the levers,
+and both are now composable. The base rate is set at 50% so that the doubled value is a full 100%.
+Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
 Doubling is a **timed buff**, not a per-collect choice: the "Double it" ad grants a fact
 with an expiry — every idle payout collected while it is active is doubled — rather than doubling
@@ -635,7 +660,7 @@ Assets/Scripts/
     ChapterDefinition.cs / Chapter.cs   // mechanic, capstone, Records gate, story beat
     ChapterManager.cs     // forward-only advancement + unlocks
   Economy/
-    GeneratorDefinition.cs / Generator.cs   // a purchasable contributor: owned count x its rate contributions, one per currency it feeds (rule 13); no isBandmate flag - a bandmate contributes to fans too
+    GeneratorDefinition.cs / Generator.cs   // a purchasable contributor: owned count x its rate contributions, one per currency it feeds (rule 13) - a bandmate is simply one that also contributes to fans
     UpgradeDefinition.cs / Upgrade.cs   // payload = buff | setFlag (reveal via flag); gate = any Condition; NO scope field - lifetime is the scope it is filed in; one-shot awards are GameActions, executed by the purchase alone
     BarDefinition.cs / BarGroupDefinition.cs / BarSystem.cs   // generic fillable bars (fillCurrency-driven); replaces LearnSongBar
     RewardDefinition.cs / RewardManager.cs   // shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
@@ -722,9 +747,12 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     every referenced id resolves on load.
 11. Compose every stat modifier through one registry — no system keeps its own multiplier or
     bonus stack. Each asks for the composition on its target and applies it, where a target is a closed
-    kind (a currency's **rate**, a currency's **yield**, a generator's output, a generator's cost) plus
-    the designer id it names — every kind acts on one named thing, since a target with nothing to name
-    is a target named after whatever Chapter 1 happened to have one of (rule 13). The rule is
+    kind plus the designer id it names: a currency's **rate**, a currency's **yield**, a generator's
+    **output**, a generator's **cost**, a bar group's **fill rate** (§6), and the **idle rate** and
+    **idle cap** (§9). Every kind names the family it acts on, so a target is never named after
+    whatever Chapter 1 happened to have one of (rule 13) — but **the qualifier is optional, and
+    unqualified means every member in reach**, which is what makes "-99% cost for this tier" or "double
+    all idle payouts" pure placement rather than an authored id list. The rule is
     `(base + adds) × multipliers`, expressed in exactly one place, so two systems cannot disagree about
     the order their modifiers apply in — with **cost taking multipliers only**, because a flat reduction
     needs a floor and a cost at or below zero is a free generator. The list is closed and code-defined,
@@ -852,8 +880,9 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     button's cash) or a rate (Rehearsal's trickle). Neither creates currency of its own — both move one
     producer's numbers, which is why several generators can raise a single currency's rate without any
     of them owning it. One contributor may feed **more than one** producer: a bandmate raises cash's
-    rate and fans' rate, which is what an `isBandmate` flag branched on before, and which is the tell
-    that a contributor holding exactly one output was the mistake. Each contribution carries its own
+    rate and fans' rate, two contributions on one generator. A contributor restricted to a single
+    output cannot express that, and forces a boolean beside it that some system has to branch on.
+    Each contribution carries its own
     gate, an ordinary rule-8 Condition, checked per composition; a contribution's durability is its
     contributor's, so it declares no lifetime of its own.
 
@@ -864,16 +893,15 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     applies however the yield is fired. The economy holding a concept named after a gesture is the
     error this rule exists to forbid.
 
-    **Idle eligibility is a property of the contribution** (§9), not of a holder kind: an idle payout
-    composes a rate from idle-eligible contributions only, which today is the generators. A yield can
-    never idle-pay, because nothing fires it while the player is away — by construction rather than by
-    flag.
+    **Idle needs no eligibility concept** (§9). A rate accrues while a scope is disabled and a yield
+    does not, because nothing fires a producer in the player's absence. That falls out of the rate/yield
+    split rather than being authored, so there is no flag on a contribution, no field on a currency, and
+    no exempt list.
 
     **Modifier targets follow** (rule 11): a currency's **rate** and a currency's **yield**, each
-    qualified by currency id. The chapter-named targets retire into them — `tapValue` is cash's yield,
-    `fanRate` is fans' rate — and with them goes the separate `composes` declaration a config carried,
-    since which number a contribution feeds is what the contribution *is*. Rewards and grants remain
-    rule-11 facts, not production.
+    qualified by currency id, and no target named after a surface. A contribution needs no separate
+    declaration of which composition scales it, since the number it feeds is what the contribution *is*.
+    Rewards and grants remain rule-11 facts, not production.
     **Production direction.** A contributor may only feed a producer in **its own scope or further
     out** — never inward. An outer generator feeding an inner scope's currency would outlive its own
     target, and after the inner scope resets it would be raising a rate on a balance that no longer has
@@ -956,9 +984,10 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   bars are generic fillables driven by a `fillCurrency` (Rehearsal in Ch. 1); every content
   ScriptableObject is discovered via Addressables; **lifetime is placement** — a currency, flag, upgrade,
   bar or generator lives in the scope that resets it, ids are unique tree-wide, and there is no lifetime
-  enum, no placement enum and no projection recipe; every flat-rate currency source is a production
-  config held by its producer (a currency never declares its own earn, only generator-held production
-  idle-pays, and a producer may only target its own scope or further out); saves store facts, never
+  enum, no placement enum and no projection recipe; **each currency has exactly one producer** owning a
+  rate and a yield, both composed from contributions that generators and modules declare (a currency
+  never declares its own earn, a contributor may feed several currencies but only its own scope or
+  further out, and "tap" is a UI gesture the economy never names); saves store facts, never
   grants, one block per scope instance, and each scope re-projects its modifiers from those facts at
   construction.
 - **Monetization:** opt-in ads only (no forced interstitials); idle earnings are per scope (50% of

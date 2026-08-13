@@ -344,6 +344,11 @@ shape. Do it as one slice, then confirm slices 1–5 still play identically.
 > are the only idle-eligible holder (§9): slice 9 reads generator production per second only, so
 > module-held configs never idle-pay by construction — do not add an idle flag to the config.
 >
+> **[rev]** The conclusion survives 7.4 and the "no idle flag" instruction still stands, but the reason
+> changed: idle-eligibility is not a holder kind at all. Every currency's *rate* accrues while a scope is
+> disabled, a *yield* cannot because nothing fires it, and bar progress cannot because filling is a tick
+> drain rather than production (§9). Build slice 9 against that, not against this paragraph.
+>
 > **4. `ProductionSystem` replaces `EngagementEarnSystem` and `TapSystem`.** On tick, fire the
 > tick-triggered module-held configs whose gates hold; on Jam, fire the tap-triggered ones. It keeps
 > what the UI reads today: the composed tap value and its change event, and the per-second/per-tap
@@ -894,66 +899,107 @@ pattern the `.5` slices have been paying for since 5.4.
 > Read `/docs/garage-band-idle-design.md` — §3, §6, §9 and §12 rules 11 and 13. This is a refactor.
 > **Do not change observable gameplay.** Every number Chapter 1 shows must be identical afterward.
 >
-> **1. `CurrencyProducer`, one per currency.** It owns two numbers: `Rate` (units per second) and
+> **The steps below are in build order and land as three commits — A (step 1), B (steps 2-3), C (steps
+> 4-8).** Each commit compiles and passes the suite on its own. Do not reorder them by topic; the
+> grouping is what can be built when, and step 1 is deliberately first because it is the only piece
+> that touches nothing else.
+>
+> ### Commit A — the target vocabulary
+>
+> **1. `ModifierTarget` stops naming Chapter 1's surfaces, and gains the targets already designed but
+> never added.** `TapValue` retires into **`CurrencyYield`** qualified by currency id; `FanRate` into
+> **`CurrencyRate`**; and `CurrencyProduction` *is* `CurrencyRate` — it already meant "the summed
+> production of one currency" and is already qualified, so that one is a rename. Add, at the same time,
+> the three targets §12 rule 11 now names with nothing behind them: **`BarFillRate`** (§6),
+> **`IdleRate`** and **`IdleCap`** (§9). They are observably inert — nothing authors one — and adding
+> them here is one enum edit instead of three later, the same argument 7.5 makes for `GeneratorCost`.
+> **The qualifier is optional and unqualified means every member in reach**, which is what lets "double
+> all idle payouts" be placement rather than an id list; `ModifierTargetKey.RequiresQualifier` must
+> stop forcing one.
+>
+> This is independent of everything below — `ProductionConfig` already carries `CurrencyId`, so
+> `Of(CurrencyYield, config.CurrencyId)` composes exactly the set `Global(TapValue)` composed today.
+> It is **not** content-free, though: a `tapValueMultiplier` reward names no currency, so the effect
+> vocabulary gains a currency qualifier and the JSON, the importer's string maps, `GrantModifierEffect`
+> and `ContentValidator` all move with it, then a reimport. Every number is unchanged.
+>
+> ### Commit B — the new model, additive
+>
+> **2. `CurrencyProducer`, one per currency.** It owns two numbers: `Rate` (units per second) and
 > `Yield` (units per firing). Each is composed from **contributions that stay individually
-> addressable** — not a running scalar. Two live requirements depend on that: a generator row shows
-> what *that* generator makes, and idle pays only some contributions (step 6). This is the same shape
-> `ModifierSystem` already has, one composed value over many contributors, so production stops being a
-> second, weaker pattern beside it.
+> addressable** — not a running scalar, because a generator row has to show what *that* generator
+> makes. Same shape `ModifierSystem` already has, so production stops being a second, weaker pattern
+> beside it.
 >
-> **2. `ProductionContribution` replaces `ProductionConfig`** — `{currency id, amount, feeds: rate |
-> yield, gate: Condition}`. `feeds` is what the contribution *is*, which retires both `trigger` (a
-> caller) and the separate `composes` declaration (which number it scales is now the same fact). The
-> gate stays an ordinary rule-8 Condition, checked per composition. No lifetime field: durability is
-> its contributor's.
+> **How the producer gets its contributions: declared forward, assembled backward.** A contribution
+> names the currency it feeds, so the producer never knows contributor *kinds* and a new kind touches
+> nothing. Something then enumerates the reachable contributions naming that currency and hands the
+> producer the list. **Assembled, never registered** — a contributor that assigns itself in must also
+> remove itself, and every teardown bug in this repo is that shape (`CurrencyRouter` and
+> `ConditionContext` are both `IDisposable` for exactly this reason). The list is rebuilt at the
+> boundary that already re-composes, so enable, disable and reset need no bookkeeping. In this slice
+> "reachable" is simply the economy's contributors; 7.5 swaps in the scope-subtree walk and nothing
+> else about the shape changes.
 >
-> **3. A contributor holds a LIST of contributions.** A **generator** holds contributions scaled by
-> owned count — the Chapter 1 amp authors one cash contribution; a bandmate authors cash *and* fans.
-> Delete `isBandmate` and whatever reads it: bandmate-ness is now two rows of data, and the fan rate's
-> per-bandmate amount moves onto the bandmate generators themselves at the same value. A **module**
-> holds contributions too, which is where Jam's cash yield and Rehearsal's trickle live.
+> A contribution's *value* is derived, not stored — `owned × amount × modifiers`, read live — so buying
+> a generator changes no structure, and gates stay evaluated per composition. Only a change in the
+> *set* of reachable contributors needs a rebuild.
 >
-> **4. Firing is external and unnamed.** `producer.Fire()` pays the composed yield. The producer never
+> **3. `ProductionContribution`** — `{currency id, amount, feeds: rate | yield, gate: Condition}`.
+> `feeds` is what the contribution *is*, which retires both `trigger` (a caller) and the separate
+> `composes` declaration (which number it scales is now the same fact). No lifetime field: durability is
+> its contributor's. **No idle-eligibility field either** — §9 settles that structurally, since a rate
+> accrues while a scope is disabled and a yield cannot, nothing having fired it.
+>
+> Both types are new and nothing constructs them yet, so this commit is additive and compiles alone.
+>
+> ### Commit C — the switchover
+>
+> Steps 4 through 8 are one commit whether or not that is convenient: changing the definitions' serialized
+> fields forces the importer and a reimport in the same breath, and removing `ProductionSystem`'s
+> tap-named members breaks its callers at compile time.
+>
+> **4. A contributor holds a LIST of contributions.** A **generator** holds contributions scaled by owned
+> count — the Chapter 1 amp authors one cash contribution; a bandmate authors cash *and* fans, at the
+> per-bandmate value `ChapterDefinition.perBandmate` carries today. A **module** holds contributions too,
+> which is where Jam's cash yield and Rehearsal's trickle live.
+>
+> **5. Firing is external and unnamed.** `producer.Fire()` pays the composed yield. The producer never
 > records what fired it — a button, an automation and a test are indistinguishable below this line.
 > `TapModule` names the currency producer it fires, calls `Fire()`, and labels itself from `Yield`.
 > **"Tap" survives only in that module.** If the word appears in `Economy/`, `Core/`, the JSON schema
 > or a `ModifierTarget`, the slice is not done.
 >
-> **5. `ModifierTarget` becomes `CurrencyRate` and `CurrencyYield`, both qualified by currency id.**
-> `TapValue` retires into `CurrencyYield:cash`, `FanRate` into `CurrencyRate:fans`, and
-> `CurrencyProduction` *is* `CurrencyRate` — it already meant this. Append new values per the enum's own
-> rule and reimport rather than renumbering. `GeneratorOutput` is unchanged. After this every target
-> names one thing, which is the property rule 11 now states.
+> **6. `ProductionSystem` becomes the collection of the economy's currency producers.** It integrates
+> rates over elapsed time and resolves a producer by currency id. `HasProduction` and `RatePerSecond`
+> stop being scans and become properties of the producer the caller already has.
 >
-> **6. Idle eligibility is a property of the contribution, not a holder kind** (§9). An idle payout asks
-> a producer for its rate **composed from idle-eligible contributions only** — today, the generators'.
-> A yield can never idle-pay because nothing fires it while the player is away, so that half needs no
-> flag at all. Rehearsal's trickle is a module contribution and keeps pausing, exactly as now.
+> **7. Re-author the chapter JSON and the importer to match**, then reimport. Every generator row grows a
+> contributions list; the Jam producer's entries declare `feeds`; the bandmate bonus becomes fans
+> contributions at the same per-unit value. `ContentValidator` gains what this makes checkable — a
+> contribution's currency resolves, and a yield contribution belongs to a producer some module can fire.
 >
-> **7. `ProductionSystem` becomes the collection of a scope's currency producers.** It integrates rates
-> over elapsed time and resolves a producer by currency id. `HasProduction` and `RatePerSecond` stop
-> being scans and become properties of the producer the caller already has.
->
-> **8. Re-author the chapter JSON and the importer to match**, then reimport. Every generator row grows
-> a contributions list; the Jam producer's entries declare `feeds`; the bandmate bonus becomes fans
-> contributions at the same per-unit value. `ContentValidator` checks what step 5 makes checkable — a
-> contribution's currency resolves, its target producer is not strictly inward (§12 rule 13), and a
-> yield contribution belongs to a producer some module can fire.
->
-> **9. Delete, don't deprecate.** `ProductionTrigger`, `ProductionConfig`, `ProducerDefinition`'s
-> `HasTapConfigs`, `GeneratorDefinition.isBandmate`, `ModifierTarget.TapValue`, `ModifierTarget.FanRate`,
-> and every tap-named member of `ProductionSystem`.
+> **8. Delete, don't deprecate.** `ProductionTrigger`, `ProductionConfig`, `ProducerDefinition`'s
+> `HasTapConfigs`, `GeneratorDefinition.isBandmate`, **`BandmateFanRateModifier`**, **`ChapterDefinition`'s
+> per-bandmate bonus field** (the fan bonus is a derived modifier today, not production at all — it
+> becomes contributions on the bandmates), and every tap-named member of `ProductionSystem`.
 >
 > Goal: Chapter 1 plays identically, and the economy contains no concept named after a gesture. Stop
 > here.
 
-✅ **Test & commit:** every Chapter 1 number is unchanged — tap payout, fan rate, generator costs, the
-first-demo pacing; a bandmate generator raises cash's rate *and* fans' rate with no flag anywhere; a
-yield buff moves the yield and leaves the rate alone, and vice versa; a buff on one currency's yield
-does not reach another's; idle pays a rate composed of generator contributions only, while a yield and
-a module trickle pay nothing; a contribution whose gate is unmet contributes zero to the composition
-its readout displays, so the readout and the payout cannot disagree; and `grep -ri tap` over
-`Assets/Scripts/Economy`, `Assets/Scripts/Core` and the chapter JSON returns nothing.
+✅ **Test & commit (three times — A, B, then C).** For each: the project compiles and the suite passes.
+For A, every Chapter 1 number is unchanged with the targets renamed, and an unqualified target reaches
+every member in its family while a qualified one reaches exactly the member it names. For B, nothing
+observable moves at all — the types exist and nothing constructs them.
+
+For C, the slice's real gate: every Chapter 1 number is unchanged — press payout, fan rate, generator
+costs, the first-demo pacing; a bandmate generator raises cash's rate *and* fans' rate with no flag
+anywhere; a yield buff moves the yield and leaves the rate alone, and vice versa; a buff on one
+currency's yield does not reach another's; a contribution whose gate is unmet contributes zero to the
+composition its readout displays, so the readout and the payout cannot disagree; a producer's list is
+rebuilt rather than registered, so nothing needs unhooking when a contributor goes away; and
+`grep -ri tap` over `Assets/Scripts/Economy`, `Assets/Scripts/Core` and the chapter JSON returns
+nothing.
 
 ---
 
@@ -1208,10 +1254,10 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > reads flags that carry their own placement. (7.4 built the contribution; this slice only gives the
 > check a tree to resolve against.)
 >
-> **6. Cost composes modifiers, the way production already does.** After 7.4 `ModifierTarget` has three
-> values — currency rate, currency yield, generator output — and none is cost, so a cost buff cannot be
-> authored; and `Generator.NextCost` is a parameterless property over a static formula, so nothing would
-> compose one if it could. The ladder above is designed around spending an intermediate currency on cost
+> **6. Cost composes modifiers, the way production already does.** After 7.4 `ModifierTarget` names
+> currency rate, currency yield, generator output, bar fill rate, idle rate and idle cap — and still not
+> cost, so a cost buff cannot be authored; and `Generator.NextCost` is a parameterless property over a
+> static formula, so nothing would compose one if it could. The ladder above is designed around spending an intermediate currency on cost
 > reduction (Ctrl C's Syntax Highlighting is the reference shape), and rule 11 claims to be the one place
 > any number is modified — cost sitting outside it makes that claim false. 7.4 fixed the targets that
 > were named after Chapter 1's surfaces; this fixes the one that was never added at all.
@@ -1420,26 +1466,49 @@ never from any rebuild, and a failing `CanExecute` refuses the clear before the 
 >   with the fact that produced it.
 > - **[rev]** `IdleEarnings` (design §9, **per scope**): each scope stores a last-interaction timestamp
 >   in its own save block. When a scope is **enabled** — an app launch just enables the scopes you return
->   to — pay `generatorProductionPerSecond × min(idleSeconds, cap) × rate` using `DateTime` deltas,
->   rate = 0.5, cap = 4 hours, and nothing below a minimum idle threshold. Generator production only:
->   fans, rehearsal, and bars pause while their scope is disabled. Note this is per *scope*, not per
->   economy, and several scopes are enabled at once (rule 7) — so only the scopes actually disabled accrue
->   idle time, and an outer scope that stayed enabled has already produced live and must not be paid
->   twice. Test that explicitly; it is the case the old exactly-one-focused rule made impossible for
->   free. Show a collect screen with the amount and a placeholder "Double it" button — a timed
->   double-idle buff (an expiry fact modifiers derive from, §12 rule 11), not a per-collect double; wire
->   the actual ad later.
+>   to — pay, for each of its currency producers, `rate × min(idleSeconds, cap) × idleRate` using
+>   `DateTime` deltas, where `rate` is that producer's composed rate (7.4). **Every currency's rate
+>   accrues, Fans and Rehearsal included**; there is no exempt list and no eligibility flag anywhere.
+>   What does not accrue falls out of structure instead: a **yield** pays nothing because nothing fired
+>   the producer, and **bar progress** does not move because filling is a tick-driven consumption (§6),
+>   not production. Read `idleRate` (0.5) and `cap` (4h) **through the modifier registry** as the
+>   `IdleRate`/`IdleCap` targets 7.4 added — not as constants — because the Backstage Pass raises one and
+>   the "Double it" buff multiplies the other, and a hardcoded constant is exactly the corner those
+>   features would have to be special-cased around. Nothing below a minimum idle threshold. Note this is
+>   per *scope*, not per economy, and several scopes are enabled at once (rule 7) — so only the scopes
+>   actually disabled accrue idle time, and an outer scope that stayed enabled has already produced live
+>   and must not be paid twice. Test that explicitly; it is the case the old exactly-one-focused rule made
+>   impossible for free. Show a collect screen with the amount and a placeholder "Double it" button — a
+>   timed double-idle buff (an expiry fact modifiers derive from, §12 rule 11), not a per-collect double;
+>   wire the actual ad later.
+> - **[rev] The fill behavior gains a consumption rate** (design §6), and this is the slice that needs it:
+>   with Rehearsal now accruing while away, a returning player's banked pool would otherwise empty into
+>   the selected bar in a single tick — most of a bar's progress in one frame, which is collecting rather
+>   than rehearsing. `PerBarContinuousFill` gains a rate field (it has no authored fields today) and the
+>   drain becomes `min(pool, bar.Remaining, rate × seconds)`. That needs **elapsed time threaded through
+>   the bar tick** — `BarSystem.Tick()` and `BarGroupRuntime.Tick()` are parameterless today and
+>   `EconomyContext` calls `Bars.Tick()` with nothing. Compose the rate from the `BarFillRate` target
+>   (7.4) so "rehearse twice as fast" is authorable. A dump-the-pool sibling behavior is the one that
+>   declines to have a rate; do not add a switch inside this class.
+>   Tune the Chapter 1 value against the *measured* first-demo pacing recorded in slice 10 (12–18 min at
+>   human press rates, not the 300s `balanceTargets` asserts), since a fill rate slower than Rehearsal
+>   accrues makes the bars the binding constraint instead of the currency.
 >
-> Goal: closing and reopening restores state (including flags and bar progress); time away grants
-> idle Cash at 50% capped at 4h, and a below-threshold absence pays nothing; a tampered save is
-> rejected. Stop here.
+> Goal: closing and reopening restores state (including flags and bar progress); time away grants idle
+> earnings on every currency's rate at 50% capped at 4h, and a below-threshold absence pays nothing; the
+> banked fill currency then pours into a chosen bar at its consumption rate rather than instantly; a
+> tampered save is rejected. Stop here.
 
 ✅ **Test & commit:** state persists across restart; flags/bars restore; **[rev]** every scope instance
 round-trips into its own block and a tier whose contents were cleared by a reset is recognized as the same
 scope; a timed event in progress survives a restart with its remaining time intact and its host paid no
 idle for the absence, while an untimed event's host is paid normally; idle payout
-correct, capped, and zero below the threshold; a scope that stayed enabled is NOT paid idle on top of
-what it produced live; checksum rejects edits.
+correct, capped, and zero below the threshold; **[rev]** Fans and Rehearsal accrue over an absence exactly
+as Cash does, a yield pays nothing for it, and a bar's progress is unchanged by time away even with its
+group selected; a bar fills at its consumption rate rather than absorbing a banked pool in one tick, and
+an authored `BarFillRate` multiplier measurably changes how long it takes; raising `IdleRate` through the
+registry doubles a payout with no code path of its own; a scope that stayed enabled is NOT paid idle on top
+of what it produced live; checksum rejects edits.
 
 ---
 
