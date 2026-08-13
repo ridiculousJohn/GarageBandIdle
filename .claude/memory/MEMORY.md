@@ -6,7 +6,7 @@
 - [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when editor closed (check UnityLockfile first, one level down); exit code 0 proves nothing, grep for `error CS`; the file carries the current test count and its commit
 - [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) - merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
 - [Bug reports are verify-only](bug-reports-are-verify-only.md) - a finding means verdict + evidence, never edits or reverts; freeze after a denied tool call
-- [Quote directive before editing](quote-directive-before-editing.md) - standing protocol: first edit of a task is preceded by Acting on: "<John's words>"; nothing quotable = no edit
+- [Quote directive before editing](quote-directive-before-editing.md) - standing protocol: any repo change (edit, commit, add, reset, push) is preceded by Acting on: "<John's words>"; nothing quotable = no change, and last turn's approval never carries forward
 - [No inaction epilogues](no-inaction-epilogues.md) - never close a response with what you didn't do ("nothing edited"); repo state is a fact, restraint is not news
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
 - [Economy context as built](economy-context-as-built.md) - slice 5.5 landed `f12ba3e`; re-projection is the only door a modifier enters; multi-context focus is the one guarantee still test-only
