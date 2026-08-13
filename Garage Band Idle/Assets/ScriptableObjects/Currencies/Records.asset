@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Records
   m_EditorClassIdentifier:
   _id: records
+  _tags: []
   _displayName: Records
   _groupId: permanent
   _symbol:

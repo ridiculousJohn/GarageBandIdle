@@ -21,10 +21,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private const string RecordsId = GameManager.RecordsCurrencyId;
 
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
-        private static readonly ModifierTargetKey FanRate = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans");
-        private static readonly ModifierTargetKey CashProduction =
-            ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
+        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
+        private static readonly ModifierSubject FanRate = TestContent.RateOf("fans");
+        private static readonly ModifierSelector FanRateSel = TestContent.Sel("fans_rate");
+        private static readonly ModifierSubject CashProduction = TestContent.RateOf("cash");
+        private static readonly ModifierSelector CashProductionSel = TestContent.Sel("cash_rate");
 
         // The Chapter 1 shape in miniature: a run-scoped buff (re-bought each
         // demo), a permanent content unlock that latches the album flag on the
@@ -55,11 +57,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 upgrades: new List<UpgradeDefinition>
                 {
                     TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
-                        null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Multiply, 2, new List<string> { "cash" }),
+                        null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 2),
                         costAmount: 10),
                     TestContent.MakeUpgrade("backstage_pass", UpgradeType.ContentUnlock,
                         ContentScope.PermanentInChapter, null,
-                        new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
+                        new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4)),
                     TestContent.MakeUpgrade("cut_demo", UpgradeType.ContentUnlock,
                         ContentScope.PermanentInChapter,
                         new CurrencyBalanceCondition("fans", 50), new SetFlagEffect("album")),
@@ -157,27 +159,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the Release button stays through every demo after the first");
         }
 
-        // The store is rebuilt, never filtered: the run buff's multiplier is
-        // gone because its latch is gone, the permanent unlock's add is back
-        // because its latch survived, and the bar reward followed its bar. This
-        // is re-projection over a NON-EMPTY store running as the production
-        // operation it was built for.
+        // The store is rebuilt, never filtered: the run buff's multiplier is gone
+        // because its latch is gone, the permanent unlock's is back because its
+        // latch survived, and the bar reward followed its bar. This is
+        // re-projection over a NON-EMPTY store running as the production operation
+        // it was built for.
         [Test]
         public void ReleaseAlbum_RebuildsTheModifierStore_FromTheSurvivingFacts()
         {
             var context = BuildChapterEconomy(out _);
             PlayARun(context, fans: 125);
 
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9, "the permanent unlock's add");
-            Assert.AreEqual(2.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9, "the run buff's multiplier");
+            Assert.AreEqual(8.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+                "the permanent unlock's x4 and the run buff's x2, composed");
             Assert.AreEqual(1.15, context.Modifiers.For(FanRate).Multiply.ToDouble(), 1e-9, "cover_1's reward");
 
             context.ReleaseAlbum();
 
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
-                "re-projected from the latch that survived");
-            Assert.AreEqual(1.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
-                "the run buff's fact is gone, so nothing re-granted its effect");
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
+                "re-projected from the latch that survived - the run buff's fact is gone, "
+                + "so nothing re-granted its effect");
             Assert.AreEqual(1.0, context.Modifiers.For(FanRate).Multiply.ToDouble(), 1e-9,
                 "the reward's lifetime is its bar's");
         }
@@ -315,10 +316,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var section = TestContent.MakeSection("rehearsal_space", new FlagSetCondition("covers"));
             var unlock = TestContent.MakeUpgrade("learn_covers", UpgradeType.ContentUnlock,
                 ContentScope.Run, new CurrencyBalanceCondition("fans", 25), new SetFlagEffect("covers"));
-            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
-            {
-                new("rehearsal", 1, ProductionTrigger.Tick, new FlagSetCondition("covers"), ModifierTarget.None),
-            });
+            var producer = TestContent.MakeProducer("jam",
+                ("rehearsal", 1, ProductionFeed.Rate, new FlagSetCondition("covers")));
 
             var chapter = TestContent.MakeChapter("garage",
                 flagIds: null,

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: the_backyard
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: the_backyard
+  _tags: []
   _displayName: The Backyard
   _modules:
   - _address: module/capstone

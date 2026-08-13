@@ -9,7 +9,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // declares it does not reset).
     public abstract class DerivedModifier
     {
-        public abstract ModifierTargetKey Target { get; }
+        public abstract ModifierSelector Selector { get; }
         public abstract ModifierOperation Operation { get; }
 
         // read every time the target composes, never cached, so it cannot go

@@ -13,19 +13,35 @@ MonoBehaviour:
   m_Name: drummer
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.GeneratorDefinition
   _id: drummer
+  _tags:
+  - bandmate
   _displayName: Drummer
-  _producesCurrencyId: cash
-  _isBandmate: 1
   _costCurrencyId: cash
   _baseCost: 500
   _costGrowth: 1.15
-  _baseOutput: 3
+  _contributions:
+  - _id: drummer_cash
+    _tags: []
+    _currencyId: cash
+    _amount: 3
+    _feeds: 1
+    _gate:
+      rid: -2
+  - _id: drummer_fans
+    _tags: []
+    _currencyId: fans
+    _amount: 0.02
+    _feeds: 1
+    _gate:
+      rid: -2
   _unlock:
-    rid: 1000
+    rid: 1001
   references:
     version: 2
     RefIds:
-    - rid: 1000
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 1001
       type: {class: OwnedCountCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _generatorId: practice_amp

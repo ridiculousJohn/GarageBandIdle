@@ -26,12 +26,8 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     [CreateAssetMenu(
         fileName = "NewStoryBeat",
         menuName = "GarageBandIdle/Story Beat")]
-    public class StoryBeatDefinition : ScriptableObject
+    public class StoryBeatDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id, named by a section's module entry. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         [TextArea]
         [Tooltip("The narrative text shown on the card.")]
@@ -42,7 +38,6 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             "having read it. Must be declared in the chapter's flags list. Empty means nothing records the read.")]
         private string _readFlagId;
 
-        public string Id => _id;
         public string Text => _text;
         public string ReadFlagId => _readFlagId;
 
@@ -50,7 +45,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         // importer-only: story beat assets are generated from chapter JSON
         public void EditorInitialize(string id, string text, string readFlagId)
         {
-            _id = id;
+            SetIdentity(id);
             _text = text;
             _readFlagId = readFlagId;
         }

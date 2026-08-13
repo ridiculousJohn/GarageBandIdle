@@ -285,6 +285,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - module
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eb58ff5bae3d20f448be789713cc91a5
+    m_Address: producer/practice
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - producer
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f1a7795fdd6886e488430f6abfe35c19
     m_Address: chapter/ch01_garage
     m_ReadOnly: 0

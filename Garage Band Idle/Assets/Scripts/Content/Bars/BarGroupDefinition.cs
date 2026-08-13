@@ -13,12 +13,8 @@ namespace RidiculousGaming.GarageBandIdle.Content
     [CreateAssetMenu(
         fileName = "NewBarGroup",
         menuName = "GarageBandIdle/Bar Group")]
-    public class BarGroupDefinition : ScriptableObject
+    public class BarGroupDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         private string _displayName;
 
@@ -41,7 +37,6 @@ namespace RidiculousGaming.GarageBandIdle.Content
         [Tooltip("Bar ids in display order.")]
         private List<string> _barIds = new();
 
-        public string Id => _id;
         public string DisplayName => _displayName;
         public Condition VisibleWhen => _visibleWhen;
         public BarFillBehavior FillBehavior => _fillBehavior;
@@ -53,7 +48,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public void EditorInitialize(string id, string displayName, Condition visibleWhen,
             BarFillBehavior fillBehavior, ContentScope scope, List<string> barIds)
         {
-            _id = id;
+            SetIdentity(id);
             _displayName = displayName;
             _visibleWhen = visibleWhen;
             _fillBehavior = fillBehavior;

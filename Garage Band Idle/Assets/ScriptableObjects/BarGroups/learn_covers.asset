@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: learn_covers
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.BarGroupDefinition
   _id: learn_covers
+  _tags: []
   _displayName: Learn Covers
   _visibleWhen:
     rid: 1000

@@ -248,9 +248,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var generator = LoadById<GeneratorDefinition>(GeneratorsFolder, id);
             Assert.AreEqual(baseCost, generator.BaseCost, 1e-9);
             Assert.AreEqual(1.15, generator.CostGrowth, 1e-9);
-            Assert.AreEqual(baseOutput, generator.BaseOutput, 1e-9);
-            Assert.AreEqual("cash", generator.ProducesCurrencyId);
             Assert.AreEqual("cash", generator.CostCurrencyId);
+
+            // the cash LINE, named "<generator>_cash": a generator declares a list of
+            // contributions now (design doc rule 13), and the id is what a buff names
+            // when it means this line rather than everything the generator holds
+            var cash = generator.Contributions[0];
+            Assert.AreEqual($"{id}_cash", cash.Id);
+            Assert.AreEqual("cash", cash.CurrencyId);
+            Assert.AreEqual(baseOutput, cash.Amount, 1e-9);
+            Assert.AreEqual(ProductionFeed.Rate, cash.Feeds, "generator output is per second");
         }
 
         [Test]
@@ -329,7 +336,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
 
             Assert.AreEqual("fans", chapter.Fans.CurrencyId, "which currency is fans comes from the JSON fans block");
-            Assert.AreEqual(0.02, chapter.Fans.PerBandmateOwnedBonus, 1e-9);
         }
 
         // Fan accrual is production like every other flat-rate source (design
@@ -344,15 +350,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // passive: nothing presents it, and 6.5 made that a DERIVED fact - no
             // section module entry names it - rather than a blank field on the asset
-            Assert.IsFalse(band.HasTapConfigs, "a passive producer authors no tap surface");
-            Assert.AreEqual(1, band.Production.Count);
+            Assert.IsFalse(band.HasYieldContributions, "a passive producer authors no tap surface");
+            Assert.AreEqual(1, band.Contributions.Count);
 
-            var accrual = band.Production[0];
+            var accrual = band.Contributions[0];
+            Assert.AreEqual("band_fans", accrual.Id);
             Assert.AreEqual("fans", accrual.CurrencyId);
-            Assert.AreEqual(0.2, accrual.Amount, 1e-9, "the base fan rate comes from the JSON config");
-            Assert.AreEqual(ProductionTrigger.Tick, accrual.Trigger);
-            Assert.AreEqual(ModifierTarget.CurrencyRate, accrual.Composes,
-                "so cover-bar rewards and the per-bandmate bonus compose through one stack");
+            Assert.AreEqual(0.2, accrual.Amount, 1e-9, "the BASE fan rate comes from the JSON contribution");
+            Assert.AreEqual(ProductionFeed.Rate, accrual.Feeds,
+                "a rate, so it accrues over an absence and the cover-bar rewards scale it - "
+                + "and nothing here says what fires it, because nothing does");
 
             var gate = accrual.Gate as OwnedCountCondition;
             Assert.IsNotNull(gate, "fans accrue only once a bandmate is owned");
@@ -360,7 +367,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // production lives on the producer (design doc section 12, rule 13):
-        // the jam producer authors what a tap yields and Rehearsal's trickle,
+        // the jam producer authors what a press pays and nothing else,
         // and the chapter lists the producer so production is chapter-owned
         [Test]
         public void JamProducer_MatchesJson()
@@ -373,12 +380,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // on purpose: it is placed Global and lives in the startup pool.
             CollectionAssert.AreEqual(new[] { "cash", "fans", "rehearsal" }, chapter.CurrencyIds,
                 "if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the roster");
-            CollectionAssert.AreEqual(new[] { "jam", "band" }, chapter.ProducerIds,
+            CollectionAssert.AreEqual(new[] { "jam", "practice", "band" }, chapter.ProducerIds,
                 "the jam producer and the passive band producer holding fan accrual - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON' for the restructured JSON");
 
             var jam = LoadById<ProducerDefinition>(ProducersFolder, "jam");
-            Assert.IsTrue(jam.HasTapConfigs, "the jam producer is a tap surface");
-            Assert.AreEqual(3, jam.Production.Count);
+            Assert.IsTrue(jam.HasYieldContributions, "the jam producer is a tap surface");
+            Assert.AreEqual(2, jam.Contributions.Count,
+                "press lines only - a contributor's id is a promise about what it holds, "
+                + "so ['jam'] must mean 'what a press pays' and reach no passive rate");
 
             // Which module presents it lives on the SECTION now (6.5): the producer
             // carries no module of its own, so the binding has exactly one home and
@@ -386,41 +395,80 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var garageFloor = LoadById<SectionDefinition>(SectionsFolder, "garage_floor");
             Assert.AreEqual("jam", garageFloor.Modules[1].DefinitionId);
 
-            var cash = jam.Production[0];
+            var cash = jam.Contributions[0];
+            Assert.AreEqual("jam_cash", cash.Id, "the id the tap-value rewards name");
             Assert.AreEqual("cash", cash.CurrencyId);
             Assert.AreEqual(1.0, cash.Amount, 1e-9, "replaces the old constants.tapBaseValue");
-            Assert.AreEqual(ProductionTrigger.Tap, cash.Trigger);
-            Assert.AreEqual(ModifierTarget.CurrencyYield, cash.Composes, "tap buffs land on the cash yield");
-            Assert.IsNull(cash.Gate, "cash per tap is ungated");
+            Assert.AreEqual(ProductionFeed.Yield, cash.Feeds, "per firing, not per second");
+            Assert.IsNull(cash.Gate, "cash per press is ungated");
 
-            var rehearsalTap = jam.Production[1];
-            Assert.AreEqual("rehearsal", rehearsalTap.CurrencyId);
-            Assert.AreEqual(2.0, rehearsalTap.Amount, 1e-9);
-            Assert.AreEqual(ProductionTrigger.Tap, rehearsalTap.Trigger);
-            Assert.AreEqual(ModifierTarget.None, rehearsalTap.Composes, "tap buffs never inflate rehearsal");
-            var tapGate = rehearsalTap.Gate as FlagSetCondition;
-            Assert.IsNotNull(tapGate, "the rehearsal yield gates on an ordinary Condition");
-            Assert.AreEqual("covers", tapGate.FlagId);
+            var rehearsalPress = jam.Contributions[1];
+            Assert.AreEqual("jam_rehearsal_press", rehearsalPress.Id);
+            Assert.AreEqual("rehearsal", rehearsalPress.CurrencyId);
+            Assert.AreEqual(2.0, rehearsalPress.Amount, 1e-9);
+            Assert.AreEqual(ProductionFeed.Yield, rehearsalPress.Feeds);
+            var pressGate = rehearsalPress.Gate as FlagSetCondition;
+            Assert.IsNotNull(pressGate, "the rehearsal yield gates on an ordinary Condition");
+            Assert.AreEqual("covers", pressGate.FlagId);
 
-            var trickle = jam.Production[2];
+        }
+
+        // The passive Rehearsal trickle is its own contributor, not a line on the
+        // button's. Sharing `jam` would make a buff reading "100x tap contributions"
+        // - the single term ["jam"], which reaches every line that contributor owns
+        // - silently multiply a rate nobody presses for. Reaching both is something
+        // an author has to say by naming both.
+        [Test]
+        public void PracticeProducer_HoldsTheRehearsalTrickle_SeparatelyFromTheButton()
+        {
+            var practice = LoadById<ProducerDefinition>(ProducersFolder, "practice");
+
+            Assert.IsFalse(practice.HasYieldContributions, "nothing fires a trickle");
+            Assert.AreEqual(1, practice.Contributions.Count);
+
+            var trickle = practice.Contributions[0];
+            Assert.AreEqual("practice_rehearsal", trickle.Id);
             Assert.AreEqual("rehearsal", trickle.CurrencyId);
             Assert.AreEqual(1.0, trickle.Amount, 1e-9);
-            Assert.AreEqual(ProductionTrigger.Tick, trickle.Trigger,
-                "the passive trickle is module-held, never an innate generator (it must not idle-pay)");
+            Assert.AreEqual(ProductionFeed.Rate, trickle.Feeds,
+                "a rate accrues over an absence; the press yields on jam cannot (section 9)");
             var trickleGate = trickle.Gate as FlagSetCondition;
             Assert.IsNotNull(trickleGate);
             Assert.AreEqual("covers", trickleGate.FlagId);
         }
 
+        // What made a generator a bandmate was a BOOL the fan system read off it,
+        // which is a tag that never got the concept (design doc rule 10). It is a
+        // tag now, and the bonus it drove is an ordinary fans contribution - so the
+        // claim worth testing is not "the flag is set" but "the fans line exists and
+        // is worth what the JSON says".
         [TestCase("practice_amp", false)]
         [TestCase("drummer", true)]
         [TestCase("bassist", true)]
         [TestCase("guitarist", true)]
-        public void BandmateFlags_MatchJson(string id, bool isBandmate)
+        public void Bandmates_CarryTheTagAndAFansLine(string id, bool isBandmate)
         {
             var generator = LoadById<GeneratorDefinition>(GeneratorsFolder, id);
 
-            Assert.AreEqual(isBandmate, generator.IsBandmate, $"'{id}' bandmate flag");
+            Assert.AreEqual(isBandmate, generator.HasTag("bandmate"), $"'{id}' bandmate tag");
+
+            ProductionContribution fans = null;
+            foreach (var contribution in generator.Contributions)
+            {
+                if (contribution.CurrencyId == "fans")
+                    fans = contribution;
+            }
+
+            if (!isBandmate)
+            {
+                Assert.IsNull(fans, "gear never contributes to the fan rate");
+                return;
+            }
+
+            Assert.IsNotNull(fans, $"'{id}' contributes to the fan rate");
+            Assert.AreEqual($"{id}_fans", fans.Id);
+            Assert.AreEqual(0.02, fans.Amount, 1e-9, "per owned unit - the old perBandmateOwnedBonus");
+            Assert.AreEqual(ProductionFeed.Rate, fans.Feeds);
         }
 
         [Test]
@@ -491,12 +539,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var payload = tightSet.Payload as GrantModifierEffect;
             Assert.IsNotNull(payload,
                 "tight_set payload grants a modifier - if this fails, re-run 'GarageBandIdle > Import Chapter 1 JSON'");
-            Assert.AreEqual(ModifierTarget.CurrencyRate, payload.Target,
-                "the friendly currencyPerSecMultiplier maps onto currency production");
             Assert.AreEqual(ModifierOperation.Multiply, payload.Operation);
             Assert.AreEqual(1.5, payload.Value, 1e-9);
-            CollectionAssert.AreEqual(new[] { "cash" }, payload.Qualifiers,
-                "the buff multiplies only the currencies the JSON names");
+            Assert.IsTrue(payload.Selector.Matches(TestContent.RateOf("cash")),
+                "the buff reaches cash's rate, which is what the JSON names");
+            Assert.IsFalse(payload.Selector.Matches(TestContent.YieldOf("cash")),
+                "and not its yield - the terms narrow, so naming the rate excludes the other number");
+            Assert.IsFalse(payload.Selector.Matches(TestContent.RateOf("merch")),
+                "nor a currency the JSON does not name");
 
             // the gate is this upgrade's whole point in Ch1: the same Condition
             // shape as the Cash-gated buffs, just a different currency id
@@ -672,7 +722,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 // with the bars it came from
                 var effect = reward.Effect as GrantModifierEffect;
                 Assert.IsNotNull(effect, $"reward '{rewardId}' grants a modifier");
-                Assert.AreEqual(ModifierTarget.CurrencyRate, effect.Target);
+                Assert.IsTrue(effect.Selector.Matches(TestContent.RateOf("fans")),
+                    "a cover's reward raises the fan RATE");
             }
         }
 
@@ -691,7 +742,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var reward = LoadById<RewardDefinition>(RewardsFolder, rewardId);
             var effect = reward.Effect as GrantModifierEffect;
             Assert.IsNotNull(effect, $"reward '{rewardId}' grants a modifier");
-            Assert.AreEqual(ModifierTarget.CurrencyYield, effect.Target);
+            Assert.IsTrue(effect.Selector.Matches(TestContent.YieldOf("cash")),
+                "a tier reward raises what a press pays, not the rate");
             Assert.AreEqual(value, effect.Value, 1e-9);
 
             // the tier's own clear state is what carries a lifetime; the grant

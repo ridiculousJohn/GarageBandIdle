@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: browse_gear
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: browse_gear
+  _tags: []
   _displayName: Browse the Gear
   _type: 2
   _scope: 1
@@ -23,6 +24,7 @@ MonoBehaviour:
   _payload:
     rid: 1001
   _actions: []
+  _contributions: []
   references:
     version: 2
     RefIds:

@@ -8,12 +8,8 @@ namespace RidiculousGaming.GarageBandIdle
     [CreateAssetMenu(
         fileName = "NewCurrencyGroup",
         menuName = "GarageBandIdle/Currency Group")]
-    public class CurrencyGroupDefinition : ScriptableObject
+    public class CurrencyGroupDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id referenced by a currency's Group Id. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         private string _displayName;
 
@@ -27,7 +23,6 @@ namespace RidiculousGaming.GarageBandIdle
             "Global (the startup pool, never reset by a run operation).")]
         private CurrencyPlacement _placement;
 
-        public string Id => _id;
         public string DisplayName => _displayName;
         public bool ResetsOnAlbumRelease => _resetsOnAlbumRelease;
 

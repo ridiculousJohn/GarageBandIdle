@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: rehearsal_space
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: rehearsal_space
+  _tags: []
   _displayName: The Rehearsal Space
   _modules:
   - _address: module/bar-list

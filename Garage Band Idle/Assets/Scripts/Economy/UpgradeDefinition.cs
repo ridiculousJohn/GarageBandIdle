@@ -27,12 +27,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [CreateAssetMenu(
         fileName = "NewUpgrade",
         menuName = "GarageBandIdle/Upgrade")]
-    public class UpgradeDefinition : ScriptableObject
+    public class UpgradeDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         private string _displayName;
 
@@ -76,7 +72,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         [Tooltip("One-shot awards the PURCHASE pays (buffs only - content unlocks are never bought, so theirs would never run).")]
         private List<GameAction> _actions = new();
 
-        public string Id => _id;
+        // A flat bonus is a CONTRIBUTION, not a modifier (design doc section 12,
+        // rule 11): "+1 Cash per press" is a line feeding cash's yield, authored by
+        // the upgrade that pays it, and it sums with every other line rather than
+        // being an Add composed over their total. That distinction is what makes it
+        // addressable - the line has an id, so a later buff can double THIS bonus -
+        // and what removes the question a flat add against a set could not answer,
+        // +1 to the total or +1 to each.
+        //
+        // These are live exactly while the upgrade is applied, which is why nothing
+        // here declares a lifetime: the latch is the fact, Scope says how long the
+        // latch lasts, and production re-assembles when it changes.
+        [SerializeField]
+        [Tooltip("Flat production this upgrade adds while applied. A bonus is a contribution, never an Add modifier.")]
+        private List<ProductionContribution> _contributions = new();
+
         public string DisplayName => _displayName;
         public UpgradeType Type => _type;
         public ContentScope Scope => _scope;
@@ -85,14 +95,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public Condition Gate => _gate;
         public GameEffect Payload => _payload;
         public IReadOnlyList<GameAction> Actions => _actions;
+        public IReadOnlyList<ProductionContribution> Contributions => _contributions;
+
+        // Whether buying this would grant anything at all. Asked by TryBuy, which
+        // refuses to charge for nothing: a buff may coherently be all-payload,
+        // all-contributions, all-actions or any mix, and the one broken state is
+        // none of them.
+        public bool GrantsAnything => _payload != null || _contributions.Count > 0;
 
 #if UNITY_EDITOR
         // importer-only: upgrade assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, UpgradeType type, ContentScope scope,
             string costCurrencyId, double costAmount, Condition gate, GameEffect payload,
-            List<GameAction> actions = null)
+            List<GameAction> actions = null, List<ProductionContribution> contributions = null)
         {
-            _id = id;
+            SetIdentity(id);
             _displayName = displayName;
             _type = type;
             _scope = scope;
@@ -101,6 +118,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _gate = gate;
             _payload = payload;
             _actions = actions ?? new List<GameAction>();
+            _contributions = contributions ?? new List<ProductionContribution>();
         }
 #endif
     }

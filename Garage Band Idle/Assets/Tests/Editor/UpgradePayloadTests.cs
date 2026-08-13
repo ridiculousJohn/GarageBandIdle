@@ -15,25 +15,101 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
+        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
 
         private static EffectContext Context(ModifierSystem modifiers)
             => new(TestContent.MakeEconomy(), new FlagSystem(), modifiers);
 
-        // a flat tap add lands before the multipliers, which is what makes
-        // stage_presence worth more later in a run than at the start
+        // A payload naming cash's yield scales what a firing pays, and the
+        // multipliers compose. The flat "+1 Cash per press" this test used to
+        // assert is not a payload at all now: it is a ProductionContribution on the
+        // upgrade (rule 11), which sums with the jam line rather than composing over
+        // it - see UpgradeContributions_AreLiveExactlyWhileTheLatchHolds.
         [Test]
-        public void TapValueAdd_GrantsAnAddOnTapValue()
+        public void AYieldMultiplier_ScalesWhatAFiringPays()
         {
             var modifiers = new ModifierSystem();
             var tap = TestContent.MakeTapProduction(1, modifiers);
 
-            new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }).Apply(Context(modifiers), ContentScope.Run);
+            new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 2)
+                .Apply(Context(modifiers), ContentScope.Run);
 
-            Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 1 + 1");
+            Assert.AreEqual(2.0, tap.YieldOf("cash").ToDouble(), 1e-9, "base 1 x 2");
 
-            modifiers.Grant(TapValue, ModifierOperation.Multiply, ContentScope.Run, 3);
-            Assert.AreEqual(6.0, tap.TapValue("jam").ToDouble(), 1e-9, "(1 + 1) x 3");
+            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 3);
+            Assert.AreEqual(6.0, tap.YieldOf("cash").ToDouble(), 1e-9, "1 x 2 x 3");
+        }
+
+        // The replacement for the flat-add payload: an upgrade CONTRIBUTES its
+        // bonus, and the latch is the lifetime. Buying it adds a line to cash's
+        // yield; a run reset clears the latch and the line goes with it, with
+        // nothing having to remember to withdraw the bonus.
+        [Test]
+        public void UpgradeContributions_AreLiveExactlyWhileTheLatchHolds()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
+            var jam = TestContent.MakeProducer("jam", ("cash", 1, ProductionFeed.Yield, null));
+            var stagePresence = TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff,
+                ContentScope.Run, null, null, costAmount: 250,
+                contributions: new List<ProductionContribution>
+                {
+                    TestContent.Line("stage_presence", "cash", 1, ProductionFeed.Yield),
+                });
+            var upgrades = new UpgradeSystem(new[] { stagePresence }, currencies, flags, modifiers);
+            var context = TestContent.MakeContext(currencies, flags: flags);
+            var production = new ProductionSystem(new[] { jam }, null, upgrades, currencies, modifiers, context);
+
+            Assert.AreEqual(1.0, production.YieldOf("cash").ToDouble(), 1e-9, "the jam line alone");
+
+            currencies.Add("cash", 250);
+            Assert.IsTrue(upgrades.TryBuy(upgrades.Get("stage_presence"), context),
+                "contributions alone are a complete grant - an upgrade needs no payload beside them");
+
+            Assert.AreEqual(2.0, production.YieldOf("cash").ToDouble(), 1e-9,
+                "1 + 1, SUMMED with the jam line rather than composed over it");
+
+            modifiers.Grant(TapValueSel, ModifierOperation.Multiply, ContentScope.Run, 3);
+            Assert.AreEqual(6.0, production.YieldOf("cash").ToDouble(), 1e-9,
+                "(1 + 1) x 3 - the one shape every composed number has");
+
+            upgrades.ResetRunScoped();
+            Assert.AreEqual(3.0, production.YieldOf("cash").ToDouble(), 1e-9,
+                "the latch is gone, so the line is gone - 1 x 3");
+        }
+
+        // A bonus is not a button. Fireability is a rule about what a MODULE may
+        // name - an authored producer - never something derived from holding a
+        // yield line, which made an applied upgrade fireable purely because
+        // stage_presence contributes to cash's yield.
+        [Test]
+        public void AnUpgradeContributingAYield_IsNotFireable()
+        {
+            var currencies = TestContent.MakeEconomy();
+            var flags = new FlagSystem();
+            var modifiers = new ModifierSystem();
+            var jam = TestContent.MakeProducer("jam", ("cash", 1, ProductionFeed.Yield, null));
+            var stagePresence = TestContent.MakeUpgrade("stage_presence", UpgradeType.ContentUnlock,
+                ContentScope.Run, null, null,
+                contributions: new List<ProductionContribution>
+                {
+                    TestContent.Line("stage_presence", "cash", 1, ProductionFeed.Yield),
+                });
+            var upgrades = new UpgradeSystem(new[] { stagePresence }, currencies, flags, modifiers);
+            var context = TestContent.MakeContext(currencies, flags: flags);
+            var production = new ProductionSystem(new[] { jam }, null, upgrades, currencies, modifiers, context);
+
+            // no gate, so it latches on the first pass and its line goes live
+            upgrades.EvaluateContentUnlocks(context);
+            Assert.AreEqual(2.0, production.YieldOf("cash").ToDouble(), 1e-9, "the bonus is in cash's yield");
+
+            Assert.IsTrue(production.CanFire("jam"));
+            Assert.IsFalse(production.CanFire("stage_presence"),
+                "an upgrade is a contributor, not a surface");
+            CollectionAssert.AreEqual(new[] { "cash" }, production.FiredCurrencies("jam"));
+            CollectionAssert.IsEmpty(production.FiredCurrencies("stage_presence"));
         }
 
         [Test]
@@ -49,10 +125,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(system.Get("practice_amp"), currencies, 1);
             TestContent.BuyTimes(system.Get("drummer"), currencies, 1);
 
-            new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 2, new List<string> { "practice_amp" }).Apply(Context(modifiers), ContentScope.Run);
+            new GrantModifierEffect(TestContent.Sel("practice_amp"), ModifierOperation.Multiply, 2).Apply(Context(modifiers), ContentScope.Run);
 
-            Assert.AreEqual(0.8, system.Get("practice_amp").ProductionPerSecond.ToDouble(), 1e-9, "0.4 x 2");
-            Assert.AreEqual(3.0, system.Get("drummer").ProductionPerSecond.ToDouble(), 1e-9,
+            Assert.AreEqual(0.8, system.Get("practice_amp").LineValue().ToDouble(), 1e-9, "0.4 x 2");
+            Assert.AreEqual(3.0, system.Get("drummer").LineValue().ToDouble(), 1e-9,
                 "the drummer produces the same currency and is untouched");
         }
 
@@ -71,27 +147,47 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var cashBefore = currencies.Get("cash");
             var fansBefore = currencies.Get("fans");
 
-            new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 1.5, new List<string> { "cash" })
+            new GrantModifierEffect(TestContent.Sel("cash_rate"), ModifierOperation.Multiply, 1.5)
                 .Apply(Context(modifiers), ContentScope.Run);
-            system.Tick(10);
+            TestContent.AccrueGenerators(system, currencies, modifiers, 10);
 
             Assert.AreEqual(45.0, (currencies.Get("cash") - cashBefore).ToDouble(), 1e-9, "3 x 1.5 x 10s");
             Assert.AreEqual(50.0, (currencies.Get("fans") - fansBefore).ToDouble(), 1e-9,
                 "an undeclared currency takes no multiplier");
         }
 
+        // ONE grant, whatever it reaches - not one per named id. Granting per id
+        // would silently miss whatever is added to the set later, and it is a
+        // selector reaching several numbers rather than several modifiers.
+        //
+        // Terms are NAMES and any one matching is enough (rule 11), so naming two
+        // number ids reaches both - which is what makes "double both rates" a
+        // sayable thing rather than a selector that quietly reaches neither.
         [Test]
-        public void CurrencyPerSecMultiplier_GrantsOncePerCurrencyItNames()
+        public void OneEffectGrantsOneModifier_ThatEveryNamedNumberAsksAbout()
         {
             var modifiers = new ModifierSystem();
 
-            new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 2, new List<string> { "cash", "fans" })
+            new GrantModifierEffect(TestContent.Sel("cash_rate", "fans_rate"), ModifierOperation.Multiply, 2)
                 .Apply(Context(modifiers), ContentScope.Run);
 
             Assert.AreEqual(2.0,
-                modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash")).Multiply.ToDouble(), 1e-9);
+                modifiers.For(TestContent.RateOf("cash")).Multiply.ToDouble(), 1e-9);
             Assert.AreEqual(2.0,
-                modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans")).Multiply.ToDouble(), 1e-9);
+                modifiers.For(TestContent.RateOf("fans")).Multiply.ToDouble(), 1e-9,
+                "one grant, two numbers asking about it - not one grant per name");
+            Assert.AreEqual(1.0,
+                modifiers.For(TestContent.YieldOf("cash")).Multiply.ToDouble(), 1e-9,
+                "and nothing it did not name");
+
+            // the same set, named once instead of listed - which is what survives a
+            // third currency being added
+            new GrantModifierEffect(TestContent.Sel("run_currency_rate"), ModifierOperation.Multiply, 3)
+                .Apply(Context(modifiers), ContentScope.Run);
+
+            Assert.AreEqual(3.0,
+                modifiers.For(new ModifierSubject("merch_rate", new[] { "run_currency_rate" })).Multiply.ToDouble(),
+                1e-9, "a tag is how a set gets a name");
         }
 
         // The upgrade's declaration is the only place a payload's lifetime is
@@ -110,16 +206,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 // no gate = met from the start, so it latches on the first pass
-                TestContent.MakeUpgrade("tap_add", UpgradeType.ContentUnlock, scope, null,
-                    new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" })),
+                TestContent.MakeUpgrade("tap_boost", UpgradeType.ContentUnlock, scope, null,
+                    new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 2)),
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9);
+            Assert.AreEqual(2.0, tap.YieldOf("cash").ToDouble(), 1e-9);
 
             TestContent.RunReset(modifiers, upgrades);
 
-            Assert.AreEqual(afterReset, tap.TapValue("jam").ToDouble(), 1e-9);
+            Assert.AreEqual(afterReset, tap.YieldOf("cash").ToDouble(), 1e-9);
         }
 
         // UpgradeSystem hands the owning definition's scope to the payload. The
@@ -136,14 +232,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 // no gate = met from the start, so it applies on the first pass
                 TestContent.MakeUpgrade("permanent_tap", UpgradeType.ContentUnlock,
-                    ContentScope.PermanentInChapter, null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
+                    ContentScope.PermanentInChapter, null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4)),
             }, currencies, flags, modifiers);
 
             upgrades.EvaluateContentUnlocks(TestContent.MakeContext(currencies, flags: flags));
-            Assert.AreEqual(5.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 1 + 4");
+            Assert.AreEqual(4.0, tap.YieldOf("cash").ToDouble(), 1e-9, "base 1 x 4");
 
             TestContent.RunReset(modifiers, upgrades);
-            Assert.AreEqual(5.0, tap.TapValue("jam").ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, tap.YieldOf("cash").ToDouble(), 1e-9,
                 "the definition's permanent-in-chapter scope kept the latch, and the projection rebuilt the grant from it");
         }
 
@@ -160,7 +256,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
-                    new CurrencyBalanceCondition("cash", 250), new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costAmount: 250),
+                    new CurrencyBalanceCondition("cash", 250), new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 2), costAmount: 250),
             }, currencies, flags, modifiers);
             var context = TestContent.MakeContext(currencies, flags: flags);
             var stagePresence = upgrades.Get("stage_presence");
@@ -175,13 +271,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             currencies.BalanceChanged += (id, _) =>
             {
                 if (id == "cash")
-                    tapDuringSpend = tap.TapValue("jam").ToDouble();
+                    tapDuringSpend = tap.YieldOf("cash").ToDouble();
             };
             currencies.Add("cash", 1);
 
             Assert.IsTrue(upgrades.TryBuy(stagePresence, context), "gate met and affordable");
             Assert.AreEqual(0.0, currencies.Get("cash").ToDouble(), 1e-9, "the declared currency is charged");
-            Assert.AreEqual(2.0, tap.TapValue("jam").ToDouble(), 1e-9, "base 1 + the granted add");
+            Assert.AreEqual(2.0, tap.YieldOf("cash").ToDouble(), 1e-9, "base 1 x the granted multiplier");
             Assert.AreEqual(2.0, tapDuringSpend, 1e-9, "the buff was already granted when the spend fired");
 
             Assert.IsFalse(upgrades.TryBuy(stagePresence, context), "an applied buff is never bought twice");
@@ -199,7 +295,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
-                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }),
+                    null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1),
                     costAmount: 250,
                     actions: new List<GameAction> { new GrantCurrencyAction("fans", 10) }),
             }, currencies, flags, modifiers);
@@ -272,7 +368,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("amp_strings", UpgradeType.Buff, ContentScope.Run,
-                    null, new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 2, new List<string> { "practice_amp" }), costAmount: 500),
+                    null, new GrantModifierEffect(TestContent.Sel("practice_amp"), ModifierOperation.Multiply, 2), costAmount: 500),
             }, currencies, new FlagSystem(), modifiers);
             var context = TestContent.MakeContext(currencies);
             var applied = 0;
@@ -284,7 +380,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(1, applied, "one notification for the one purchase");
             Assert.AreEqual(2.0,
-                modifiers.For(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "practice_amp")).Multiply.ToDouble(),
+                modifiers.For(TestContent.Num("practice_amp")).Multiply.ToDouble(),
                 1e-9);
         }
 
@@ -299,7 +395,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeUpgrade("tight_set", UpgradeType.Buff, ContentScope.Run,
                     new CurrencyBalanceCondition("fans", 30),
-                    new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 1.5, new List<string> { "cash" }), costAmount: 20000),
+                    new GrantModifierEffect(TestContent.Sel("cash_rate"), ModifierOperation.Multiply, 1.5), costAmount: 20000),
             }, currencies, new FlagSystem(), modifiers);
             var context = TestContent.MakeContext(currencies);
             var tightSet = upgrades.Get("tight_set");
@@ -328,9 +424,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeUpgrade("no_payload", UpgradeType.Buff, ContentScope.Run, null, null, costAmount: 100),
                 TestContent.MakeUpgrade("free_buff", UpgradeType.Buff, ContentScope.Run,
-                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" })),
+                    null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1)),
                 TestContent.MakeUpgrade("no_currency", UpgradeType.Buff, ContentScope.Run,
-                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costCurrencyId: "", costAmount: 100),
+                    null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1), costCurrencyId: "", costAmount: 100),
                 TestContent.MakeUpgrade("reveal", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                     null, new SetFlagEffect("fans")),
             }, currencies, new FlagSystem(), modifiers);
@@ -365,7 +461,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
-                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costAmount: 250),
+                    null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1), costAmount: 250),
                 TestContent.MakeUpgrade("play_for_crowd", UpgradeType.ContentUnlock,
                     ContentScope.PermanentInChapter, null, new SetFlagEffect("fans")),
             }, currencies, flags, modifiers);
@@ -398,9 +494,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("first", UpgradeType.Buff, ContentScope.Run,
-                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costAmount: 100),
+                    null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1), costAmount: 100),
                 TestContent.MakeUpgrade("second", UpgradeType.Buff, ContentScope.Run,
-                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costAmount: 100),
+                    null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1), costAmount: 100),
             }, currencies, new FlagSystem(), modifiers);
             var context = TestContent.MakeContext(currencies);
             currencies.Add("cash", 200);
@@ -469,7 +565,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var upgrades = new UpgradeSystem(new[]
             {
                 TestContent.MakeUpgrade("stage_presence", UpgradeType.Buff, ContentScope.Run,
-                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costAmount: 250),
+                    null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1), costAmount: 250),
             }, currencies, new FlagSystem(), new ModifierSystem());
             var notified = false;
             upgrades.UpgradeCleared += _ => notified = true;
@@ -486,15 +582,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var context = TestContent.MakeContext(TestContent.MakeEconomy());
 
+            // a negative multiplier negates the whole product it lands in, which is
+            // the same failure a zero one is - the negative-ADD report that used to
+            // sit here is gone with Add itself (rule 11): a flat bonus is a
+            // contribution, and a negative one is refused where it is authored
             LogAssert.Expect(LogType.Error,
-                "GameEffect: Upgrade 'drain_tap' (payload) adds a negative amount (-1) to CurrencyYield.");
-            new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, -1, new List<string> { "cash" }).Validate(context, "Upgrade 'drain_tap' (payload)");
+                "GameEffect: Upgrade 'drain_tap' (payload) has a non-positive multiplier (-1).");
+            new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, -1).Validate(context, "Upgrade 'drain_tap' (payload)");
 
+            // no term report here: this fixture has no ContentDatabase, so there is
+            // no content set to resolve against and reporting every term as unknown
+            // would drown what the test is asserting. The term check has its own
+            // test with a database - Validate_ReportsATermNothingAnswersTo.
             LogAssert.Expect(LogType.Error,
                 "GameEffect: Upgrade 'zero_amp' (payload) has a non-positive multiplier (0).");
-            LogAssert.Expect(LogType.Error,
-                "GameEffect: Upgrade 'zero_amp' (payload) targets unknown generator id 'practice_amp'.");
-            new GrantModifierEffect(ModifierTarget.GeneratorOutput, ModifierOperation.Multiply, 0, new List<string> { "practice_amp" }).Validate(context, "Upgrade 'zero_amp' (payload)");
+            new GrantModifierEffect(TestContent.Sel("practice_amp"), ModifierOperation.Multiply, 0).Validate(context, "Upgrade 'zero_amp' (payload)");
         }
 
         // Now that one class carries the target and the operation as serialized
@@ -502,19 +604,47 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // payload classes could not represent, because each hardcoded both. Reported
         // as undefined rather than as the uninitialized zero, which is a different
         // mistake with a different cause.
-        // 1 and 2 are the retired TapValue and FanRate, deliberately left vacant
-        // rather than reused, so a stale asset holding one is reported here
-        // instead of resolving to whichever target was added later
-        [TestCase(99, 2, "GameEffect: Upgrade 'x' (payload) has modifier target 99, which no ModifierTarget defines.")]
-        [TestCase(1, 2, "GameEffect: Upgrade 'x' (payload) has modifier target 1, which no ModifierTarget defines.")]
-        [TestCase(4, 99, "GameEffect: Upgrade 'x' (payload) has modifier operation 99, which no ModifierOperation defines.")]
-        public void Validate_ReportsAnEnumValueNoMemberDefines(int target, int operation, string expected)
+        //
+        // Only the OPERATION is an enum now: what a modifier reaches is a selector
+        // over open content, so there is no stat kind left that a serialized int
+        // could hold an undefined value of. A term naming nothing is the analogous
+        // failure and is reported against the content set instead - see
+        // Validate_ReportsATermNothingAnswersTo.
+        [TestCase(99, "GameEffect: Upgrade 'x' (payload) has modifier operation 99, which no ModifierOperation defines.")]
+        [TestCase(0, "GameEffect: Upgrade 'x' (payload) names no modifier operation (uninitialized).")]
+        public void Validate_ReportsAnEnumValueNoMemberDefines(int operation, string expected)
         {
             var context = TestContent.MakeContext(TestContent.MakeEconomy());
 
             LogAssert.Expect(LogType.Error, expected);
-            new GrantModifierEffect((ModifierTarget)target, (ModifierOperation)operation, 1)
+            new GrantModifierEffect(TestContent.Sel("cash_yield"), (ModifierOperation)operation, 1)
                 .Validate(context, "Upgrade 'x' (payload)");
+        }
+
+        // The guard the closed enum used to give for free: a term that answers to
+        // nothing stores a modifier no number ever asks about, which looks authored
+        // rather than broken. It is resolved against the whole content set, since a
+        // term does not say which family it belongs to.
+        [Test]
+        public void Validate_ReportsATermNothingAnswersTo()
+        {
+            var database = TestContent.MakeDatabase(
+                generators: new[] { TestContent.MakeGenerator("practice_amp", "cash", 60, 1.15, 0.4) });
+            var currencies = TestContent.MakeEconomy();
+            var context = new ConditionContext(currencies, null, null, database: database);
+
+            LogAssert.Expect(LogType.Error,
+                "GameEffect: Upgrade 'x' (payload) targets 'drummer_csah', which no definition id, tag or produced number answers to.");
+            new GrantModifierEffect(TestContent.Sel("drummer_csah"), ModifierOperation.Multiply, 2)
+                .Validate(context, "Upgrade 'x' (payload)");
+
+            // every kind of term that DOES resolve, reported by nothing: a
+            // definition id, a contribution's own id, and a produced number's
+            // derived id (which no asset carries, so it has to be recognised
+            // separately)
+            new GrantModifierEffect(TestContent.Sel("practice_amp", "practice_amp_cash", "cash_rate"),
+                    ModifierOperation.Multiply, 2)
+                .Validate(context, "Upgrade 'y' (payload)");
         }
     }
 }

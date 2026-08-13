@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: cut_demo
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: cut_demo
+  _tags: []
   _displayName: Cut a Demo
   _type: 2
   _scope: 2
@@ -23,6 +24,7 @@ MonoBehaviour:
   _payload:
     rid: 1005
   _actions: []
+  _contributions: []
   references:
     version: 2
     RefIds:

@@ -12,12 +12,8 @@ namespace RidiculousGaming.GarageBandIdle.Content
     [CreateAssetMenu(
         fileName = "NewReward",
         menuName = "GarageBandIdle/Reward")]
-    public class RewardDefinition : ScriptableObject
+    public class RewardDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id, referenced by the chapter JSON's rewards list.")]
-        private string _id;
-
         [SerializeField]
         private string _displayName;
 
@@ -26,7 +22,6 @@ namespace RidiculousGaming.GarageBandIdle.Content
         [Tooltip("What this reward grants. It inherits the durability of the fact that applied it - a bar completion, a tier clear - and declares no lifetime of its own.")]
         private GameEffect _effect;
 
-        public string Id => _id;
         public string DisplayName => _displayName;
         public GameEffect Effect => _effect;
 
@@ -53,7 +48,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
             if (_effect != null)
                 return true;
 
-            Debug.LogError($"RewardDefinition: reward '{_id}' has no effect. Nothing granted.");
+            Debug.LogError($"RewardDefinition: reward '{Id}' has no effect. Nothing granted.");
             return false;
         }
 
@@ -61,7 +56,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         // importer-only: reward assets are generated from chapter JSON
         public void EditorInitialize(string id, string displayName, GameEffect effect)
         {
-            _id = id;
+            SetIdentity(id);
             _displayName = displayName;
             _effect = effect;
         }

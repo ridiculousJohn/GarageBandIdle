@@ -13,19 +13,27 @@ MonoBehaviour:
   m_Name: practice_amp
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.GeneratorDefinition
   _id: practice_amp
+  _tags: []
   _displayName: Practice Amp
-  _producesCurrencyId: cash
-  _isBandmate: 0
   _costCurrencyId: cash
   _baseCost: 60
   _costGrowth: 1.15
-  _baseOutput: 0.4
+  _contributions:
+  - _id: practice_amp_cash
+    _tags: []
+    _currencyId: cash
+    _amount: 0.4
+    _feeds: 1
+    _gate:
+      rid: -2
   _unlock:
-    rid: 1000
+    rid: 1001
   references:
     version: 2
     RefIds:
-    - rid: 1000
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 1001
       type: {class: CurrencyEarnedTotalCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash

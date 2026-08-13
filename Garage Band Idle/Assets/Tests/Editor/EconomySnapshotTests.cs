@@ -25,7 +25,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private const string RecordsId = GameManager.RecordsCurrencyId;
         private const string RoadiesId = GameManager.RoadiesCurrencyId;
 
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
+        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
 
         // the two-pool content set the running game has: a chapter-placed run group
         // holding cash/fans, and a global permanent group holding Records + Roadies
@@ -99,7 +100,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var permanent = EconomyContextFactory.BuildPermanentPool(database);
             using var context = Build(chapter, database, permanent);
             var gate = new RecordsCumulativeCondition(30);
-            var cashProduction = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
+            var cashProduction = TestContent.RateOf("cash");
 
             Assert.IsFalse(ConditionEvaluator.IsMet(gate, context.Conditions), "no Records yet");
             Assert.AreEqual(1.0, context.Modifiers.For(cashProduction).Multiply.ToDouble(), 1e-9);
@@ -164,7 +165,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 // ungated, so a single settle applies it immediately
                 TestContent.MakeUpgrade("payday", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
-                    null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }),
+                    null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4),
                     actions: new List<GameAction> { new GrantCurrencyAction(RoadiesId, 1) }),
             });
             var permanent = EconomyContextFactory.BuildPermanentPool(database);
@@ -189,7 +190,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeUpgrade("gated", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                     new CurrencyBalanceCondition("cash", 1_000_000),
-                    new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
+                    new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4)),
             });
             using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
 
@@ -206,7 +207,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(40.0, context.Pool.GetEarned("cash").ToDouble(), 1e-9);
             Assert.IsTrue(context.Upgrades.Get("gated").Applied);
             Assert.IsTrue(context.Flags.IsSet("fans"));
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "the store is rebuilt each time, never accumulated");
         }
 
@@ -269,25 +270,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 TestContent.MakeUpgrade("buff", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                     new CurrencyBalanceCondition("cash", 1_000_000),
-                    new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
+                    new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4)),
             });
             using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
 
             // every observation any subscriber makes during the restore, in order
             var observedTapAdds = new List<double>();
             var observedCash = new List<double>();
-            context.Modifiers.Changed += _ => observedTapAdds.Add(context.Modifiers.For(TapValue).Add.ToDouble());
+            context.Modifiers.Changed += _ => observedTapAdds.Add(context.Modifiers.For(TapValue).Multiply.ToDouble());
             context.Currencies.BalanceChanged += (id, _) =>
             {
                 if (id == "cash")
-                    observedCash.Add(context.Modifiers.For(TapValue).Add.ToDouble());
+                    observedCash.Add(context.Modifiers.For(TapValue).Multiply.ToDouble());
             };
 
             context.Restore(new EconomyLocalSnapshot(
                 currencies: new Dictionary<string, CurrencyState> { ["cash"] = new CurrencyState(25, 25) },
                 appliedUpgradeIds: new List<string> { "buff" }));
 
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "the latch projected its buff");
             CollectionAssert.DoesNotContain(observedTapAdds, 0.0,
                 "no subscriber saw the store mid-rebuild - the projection's notifications are deferred");
@@ -476,10 +477,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 {
                     TestContent.MakeUpgrade("permanent_buff", UpgradeType.ContentUnlock,
                         ContentScope.PermanentInChapter, new CurrencyBalanceCondition("cash", 1_000_000),
-                        new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" })),
+                        new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4)),
                     TestContent.MakeUpgrade("run_buff", UpgradeType.ContentUnlock, ContentScope.Run,
                         new CurrencyBalanceCondition("cash", 1_000_000),
-                        new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 7, new List<string> { "cash" })),
+                        new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 7)),
                 },
                 generators: new List<GeneratorDefinition>
                 {
@@ -495,7 +496,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 generatorsOwned: new Dictionary<string, int> { ["drummer"] = 2 },
                 appliedUpgradeIds: new List<string> { "permanent_buff", "run_buff" },
                 setFlagIds: new List<string> { "fans", "covers" }));
-            Assert.AreEqual(11.0, frontier.Modifiers.For(TapValue).Add.ToDouble(), 1e-9, "4 + 7 while running");
+            Assert.AreEqual(28.0, frontier.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9, "4 x 7 while running");
 
             var seed = frontier.CaptureSeedFor(EconomyRecipe.EventSandbox);
             using var sandbox = Build(chapter, database, permanent, EconomyRecipe.EventSandbox, seed);
@@ -509,18 +510,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.0, sandbox.Currencies.Get("cash").ToDouble(), 1e-9,
                 "a run currency's balance is a run fact");
 
-            Assert.AreEqual(4.0, sandbox.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, sandbox.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "the granted store rebuilt from exactly the latches that carried in");
 
-            // The derived per-bandmate add is registered in the sandbox too - derived
-            // modifiers carry no scope and are never projected (rule 11), so it is
-            // present and reading the sandbox's OWN band. That band is empty, so it
-            // contributes 0.02 x 0: the frontier's two drummers do not leak in
-            // through the modifier stack any more than they do through the fleet.
-            Assert.AreEqual(0.0, sandbox.Modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans")).Add.ToDouble(),
-                1e-9, "the derived add reads the sandbox's own empty band");
-            Assert.AreEqual(0.04, frontier.Modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans")).Add.ToDouble(),
-                1e-9, "while the frontier's two bandmates still read 0.02 x 2 - two economies, two answers");
+            // The per-bandmate bonus is each bandmate's own fans CONTRIBUTION now
+            // (rule 13), so it is read off the producer rather than the modifier
+            // stack - and it scales with the owned count because a generator's lines
+            // always do. The sandbox's band is empty, so its fans rate is zero: the
+            // frontier's two drummers do not leak in through production any more
+            // than they do through the fleet.
+            Assert.AreEqual(0.0, sandbox.Production.RateOf("fans").ToDouble(),
+                1e-9, "the sandbox's own band is empty, so nothing contributes");
+            Assert.AreEqual(0.04, frontier.Production.RateOf("fans").ToDouble(),
+                1e-9, "while the frontier's two bandmates contribute 0.02 x 2 - two economies, two answers");
         }
 
         // ---- effect replay ---------------------------------------------------
@@ -551,19 +553,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var effects = new EffectContext(currencies, flags, modifiers);
             var payload = new CompoundEffect(new List<GameEffect>
             {
-                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }),
+                new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4),
                 new SetFlagEffect("chapter_2_unlocked"),
             });
 
             payload.Apply(effects, ContentScope.PermanentInChapter);
-            Assert.AreEqual(4.0, modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash")).Add.ToDouble(), 1e-9);
+            Assert.AreEqual(4.0, modifiers.For(TestContent.YieldOf("cash")).Multiply.ToDouble(), 1e-9);
             Assert.IsTrue(flags.IsSet("chapter_2_unlocked"));
 
             // the rebuild pattern (rule 6): clear the store, re-run the payload
             modifiers.ResetGranted();
             payload.Apply(effects, ContentScope.PermanentInChapter);
 
-            Assert.AreEqual(4.0, modifiers.For(ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash")).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, modifiers.For(TestContent.YieldOf("cash")).Multiply.ToDouble(), 1e-9,
                 "re-running rebuilds exactly, never compounds");
             Assert.IsTrue(flags.IsSet("chapter_2_unlocked"), "and the latch re-asserts idempotently");
         }
@@ -606,7 +608,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var capstone = new CapstoneConfig("backyard_party", "Play the Backyard Party",
                 new RecordsCumulativeCondition(1), "chapter_2_unlocked",
-                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }),
+                new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4),
                 new List<GameAction>());
             var chapter = TestContent.MakeChapter("garage", null,
                 currencyIds: new List<string> { "cash", "fans" },
@@ -619,17 +621,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             context.Currencies.Add(RecordsId, 1);
             Assert.IsTrue(context.CompleteCapstone());
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "the operation applied OnComplete once");
 
             context.ReleaseAlbum();
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "the release rebuilt the store, and the flag latch re-applied OnComplete exactly once");
 
             var seed = context.CaptureLocalState();
             using var loaded = Build(chapter, database, permanent, seed: seed);
             Assert.IsTrue(loaded.Flags.IsSet("chapter_2_unlocked"), "the flag rode the snapshot");
-            Assert.AreEqual(4.0, loaded.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, loaded.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "and a load rebuilds the capstone's state from the flag alone");
         }
     }

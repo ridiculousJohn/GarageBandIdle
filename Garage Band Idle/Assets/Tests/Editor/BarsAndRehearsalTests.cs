@@ -95,24 +95,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var rehearsal = TestContent.MakeCurrency("rehearsal", "run");
             var currencies = new CurrencyManager(new[] { TestContent.MakeGroup("run", true) }, new[] { rehearsal });
             var flags = new FlagSystem();
-            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
-            {
-                new("rehearsal", 1, ProductionTrigger.Tick, new FlagSetCondition("covers"), ModifierTarget.None),
-                new("rehearsal", 2, ProductionTrigger.Tap, new FlagSetCondition("covers"), ModifierTarget.None),
-            });
-            var production = new ProductionSystem(new[] { producer }, currencies, new ModifierSystem(),
+            var producer = TestContent.MakeProducer("jam",
+                ("rehearsal", 1, ProductionFeed.Rate, new FlagSetCondition("covers")),
+                ("rehearsal", 2, ProductionFeed.Yield, new FlagSetCondition("covers")));
+            var production = new ProductionSystem(new[] { producer }, null, null, currencies, new ModifierSystem(),
                 TestContent.MakeContext(currencies, flags: flags));
 
-            production.Tick(10);
-            production.FireTap("jam");
+            production.Accrue(10);
+            production.Fire("jam");
             Assert.AreEqual(0.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "no accrual before the gate");
-            Assert.AreEqual(0.0, production.RatePerSecond("rehearsal").ToDouble(), 1e-9);
+            Assert.AreEqual(0.0, production.RateOf("rehearsal").ToDouble(), 1e-9);
 
             flags.Set("covers");
 
-            production.Tick(10);
+            production.Accrue(10);
             Assert.AreEqual(10.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "per-sec amount x seconds");
-            production.FireTap("jam");
+            production.Fire("jam");
             Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "+per-tap amount on a Jam tap");
         }
 
@@ -127,30 +125,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var rehearsal = TestContent.MakeCurrency("rehearsal", "run");
             var currencies = new CurrencyManager(new[] { TestContent.MakeGroup("run", true) }, new[] { rehearsal });
             var flags = new FlagSystem();
-            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
-            {
-                new("rehearsal", 1, ProductionTrigger.Tick, new FlagSetCondition("covers"), ModifierTarget.None),
-                new("rehearsal", 2, ProductionTrigger.Tap, new FlagSetCondition("covers"), ModifierTarget.None),
-            });
-            var production = new ProductionSystem(new[] { producer }, currencies, new ModifierSystem(),
+            var producer = TestContent.MakeProducer("jam",
+                ("rehearsal", 1, ProductionFeed.Rate, new FlagSetCondition("covers")),
+                ("rehearsal", 2, ProductionFeed.Yield, new FlagSetCondition("covers")));
+            var production = new ProductionSystem(new[] { producer }, null, null, currencies, new ModifierSystem(),
                 TestContent.MakeContext(currencies, flags: flags));
 
             Assert.IsFalse(production.HasProduction("rehearsal"), "nothing can fill it while the gate is shut");
-            Assert.AreEqual(0.0, production.PerTap("rehearsal").ToDouble(), 1e-9, "a dormant tap config advertises nothing");
-            Assert.AreEqual(0.0, production.RatePerSecond("rehearsal").ToDouble(), 1e-9);
+            Assert.AreEqual(0.0, production.YieldOf("rehearsal").ToDouble(), 1e-9, "a dormant tap config advertises nothing");
+            Assert.AreEqual(0.0, production.RateOf("rehearsal").ToDouble(), 1e-9);
 
             // what a tap actually pays while the gate is shut - the number the
             // readout has to agree with
-            production.FireTap("jam");
+            production.Fire("jam");
             Assert.AreEqual(0.0, currencies.Get("rehearsal").ToDouble(), 1e-9);
 
             flags.Set("covers");
 
             Assert.IsTrue(production.HasProduction("rehearsal"));
-            Assert.AreEqual(2.0, production.PerTap("rehearsal").ToDouble(), 1e-9);
-            Assert.AreEqual(1.0, production.RatePerSecond("rehearsal").ToDouble(), 1e-9);
+            Assert.AreEqual(2.0, production.YieldOf("rehearsal").ToDouble(), 1e-9);
+            Assert.AreEqual(1.0, production.RateOf("rehearsal").ToDouble(), 1e-9);
 
-            production.FireTap("jam");
+            production.Fire("jam");
             Assert.AreEqual(2.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the tap pays what the readout advertised");
         }
 
@@ -167,18 +163,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = new CurrencyManager(new[] { TestContent.MakeGroup("run", true) },
                 new[] { rehearsal, stagecraft, cash });
             var flags = new FlagSystem();
-            var producer = TestContent.MakeProducer("jam", new List<ProductionConfig>
-            {
-                new("rehearsal", 1, ProductionTrigger.Tick, new FlagSetCondition("covers"), ModifierTarget.None),
-                new("rehearsal", 2, ProductionTrigger.Tap, new FlagSetCondition("covers"), ModifierTarget.None),
-                new("stagecraft", 3, ProductionTrigger.Tick, new FlagSetCondition("openmic"), ModifierTarget.None),
-            });
-            var production = new ProductionSystem(new[] { producer }, currencies, new ModifierSystem(),
+            var producer = TestContent.MakeProducer("jam",
+                ("rehearsal", 1, ProductionFeed.Rate, new FlagSetCondition("covers")),
+                ("rehearsal", 2, ProductionFeed.Yield, new FlagSetCondition("covers")),
+                ("stagecraft", 3, ProductionFeed.Rate, new FlagSetCondition("openmic")));
+            var production = new ProductionSystem(new[] { producer }, null, null, currencies, new ModifierSystem(),
                 TestContent.MakeContext(currencies, flags: flags));
 
             flags.Set("covers");
-            production.Tick(10);
-            production.FireTap("jam");
+            production.Accrue(10);
+            production.Fire("jam");
 
             Assert.AreEqual(12.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "the gated-open currency earns tick + tap");
             Assert.AreEqual(0.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "its own gate governs it, not another's");
@@ -186,7 +180,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(production.HasProduction("cash"));
 
             flags.Set("openmic");
-            production.Tick(10);
+            production.Accrue(10);
             Assert.AreEqual(30.0, currencies.Get("stagecraft").ToDouble(), 1e-9, "amount x seconds once its gate holds");
             Assert.AreEqual(22.0, currencies.Get("rehearsal").ToDouble(), 1e-9, "both produce once both gates hold");
         }
@@ -251,7 +245,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bars.Tick();
 
             Assert.AreEqual(1, completions);
-            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9, "fan-rate reward applied on completion");
+            Assert.AreEqual(0.2 * 1.15, fans.RateOf("fans").ToDouble(), 1e-9, "fan-rate reward applied on completion");
             Assert.IsNull(covers.ActiveBar, "completion clears the target");
 
             // further ticks and reselection attempts must not re-apply
@@ -261,7 +255,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bars.Tick();
             Assert.AreEqual(1, completions, "a completed bar never re-completes");
             Assert.IsNull(covers.ActiveBar, "a completed bar cannot be re-selected");
-            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9);
+            Assert.AreEqual(0.2 * 1.15, fans.RateOf("fans").ToDouble(), 1e-9);
         }
 
         [Test]
@@ -278,7 +272,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             covers.SetActiveBar("cover_2");
 
             Assert.AreEqual(2, bars.CompletedCount("learn_covers"));
-            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9);
+            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RateOf("fans").ToDouble(), 1e-9);
         }
 
         [Test]
@@ -352,7 +346,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(0, system.GetBars("learn_covers").Count, "the rejected bar has no state");
             Assert.AreEqual(0, system.CompletedCount("learn_covers"), "it never satisfies a barsCompleted gate");
-            Assert.AreEqual(0.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "no reward granted");
+            Assert.AreEqual(0.2, fans.RateOf("fans").ToDouble(), 1e-9, "no reward granted");
         }
 
         // state-then-notify: the drain's BalanceChanged is a synchronous signal
@@ -413,7 +407,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsTrue(bars.GetBars("setlist")[0].Completed, "permanent-in-chapter survives the run reset");
             Assert.AreEqual(1, bars.CompletedCount("setlist"));
-            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "the reset re-applies no rewards");
+            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RateOf("fans").ToDouble(), 1e-9, "the reset re-applies no rewards");
         }
 
         // One reward ASSET, two lifetimes - the property a scope field on the reward
@@ -448,12 +442,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ((PerBarContinuousRuntime)system.GetRuntime("learn_covers")).SetActiveBar("cover_1");
             currencies.Add("rehearsal", 100);
             ((PerBarContinuousRuntime)system.GetRuntime("setlist")).SetActiveBar("song_1");
-            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 1.15 * 1.15, fans.RateOf("fans").ToDouble(), 1e-9,
                 "the one asset granted once per completion");
 
             TestContent.RunReset(modifiers, bars: system);
 
-            Assert.AreEqual(0.2 * 1.15, fans.RatePerSecond("fans").ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 1.15, fans.RateOf("fans").ToDouble(), 1e-9,
                 "the run group's completion is gone so its grant did not come back; the permanent group's completion survived and re-granted the same asset");
         }
 
@@ -484,12 +478,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             coversRuntime.SetActiveBar("cover_1"); // run group, grants x1.15
             currencies.Add("rehearsal", 100);
             setlistRuntime.SetActiveBar("song_1"); // permanent-in-chapter group, grants x1.2
-            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RatePerSecond("fans").ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 1.15 * 1.2, fans.RateOf("fans").ToDouble(), 1e-9,
                 "both grants stack while the run lives");
 
             TestContent.RunReset(modifiers, bars: bars);
 
-            Assert.AreEqual(0.2 * 1.2, fans.RatePerSecond("fans").ToDouble(), 1e-9,
+            Assert.AreEqual(0.2 * 1.2, fans.RateOf("fans").ToDouble(), 1e-9,
                 "the run group's completion reset so its grant is not re-projected; the permanent group's survived and is");
         }
 
@@ -613,7 +607,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(list[2].Completed);
             Assert.AreEqual(2, bars.CompletedCount("learn_covers"));
             Assert.AreEqual(0, completions, "a restored completion is fact, not an occurrence");
-            Assert.AreEqual(0.2, fans.RatePerSecond("fans").ToDouble(), 1e-9, "restore grants no rewards");
+            Assert.AreEqual(0.2, fans.RateOf("fans").ToDouble(), 1e-9, "restore grants no rewards");
 
             // Authoritative in both directions, and REPLACEMENT rather than a merge
             // (6.5): cover_1 falls below its requirement and un-completes, AND the

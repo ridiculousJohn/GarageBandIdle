@@ -13,17 +13,19 @@ MonoBehaviour:
   m_Name: band
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ProducerDefinition
   _id: band
-  _production:
-  - _currencyId: fans
+  _tags: []
+  _contributions:
+  - _id: band_fans
+    _tags: []
+    _currencyId: fans
     _amount: 0.2
-    _trigger: 1
+    _feeds: 1
     _gate:
-      rid: 1001
-    _composes: 4
+      rid: 1000
   references:
     version: 2
     RefIds:
-    - rid: 1001
+    - rid: 1000
       type: {class: OwnedCountCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _generatorId: drummer

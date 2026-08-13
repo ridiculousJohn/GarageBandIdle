@@ -20,7 +20,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private const string RecordsId = GameManager.RecordsCurrencyId;
 
-        private static readonly ModifierTargetKey TapValue = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
+        private static readonly ModifierSubject TapValue = TestContent.YieldOf("cash");
+        private static readonly ModifierSelector TapValueSel = TestContent.Sel("cash_yield");
 
         // the two-pool content set the running game has: a chapter-placed run
         // group holding cash/fans/rehearsal, and a global group holding Records
@@ -228,7 +229,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var cashProduction = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
+            var cashProduction = TestContent.RateOf("cash");
 
             var frontier = EconomyContextFactory.Build(chapter, database,
                 EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
@@ -261,24 +262,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var upgrade = TestContent.MakeUpgrade("permanent_tap", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, new CurrencyBalanceCondition("cash", 10),
-                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }));
+                new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4));
             var chapter = MakeChapter(upgradeIds: new List<string> { "permanent_tap" });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition> { upgrade });
             var context = EconomyContextFactory.Build(chapter, database,
                 EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
-            Assert.AreEqual(0.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(1.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "the gate does not hold, so there is no latch to project from");
 
             context.Currencies.Add("cash", 10);
             context.Settle();
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "the unlock's gate held, so it latched and granted");
 
             // the store is emptied and rebuilt, which is the only mechanism -
             // nothing filters it, so the add returning is proof the LATCH was read
             context.ProjectModifiers();
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "re-projecting from the surviving latch grants exactly once again");
         }
 
@@ -291,7 +292,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var upgrade = TestContent.MakeUpgrade("open_now", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, null,
-                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }));
+                new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4));
             var chapter = MakeChapter(upgradeIds: new List<string> { "open_now" });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition> { upgrade });
 
@@ -300,7 +301,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsTrue(context.Upgrades.Get("open_now").Applied,
                 "an ungated content unlock latched during construction");
-            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Add.ToDouble(), 1e-9,
+            Assert.AreEqual(4.0, context.Modifiers.For(TapValue).Multiply.ToDouble(), 1e-9,
                 "and its payload is in the store, with no external Settle");
         }
 
@@ -443,7 +444,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var epilogue = TestContent.MakeUpgrade("epilogue", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, new FlagSetCondition("chapter_2"),
-                new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 4, new List<string> { "cash" }));
+                new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4));
             var context = BuildCapstoneEconomy(MakeCapstone(),
                 upgrades: new List<UpgradeDefinition> { epilogue },
                 upgradeIds: new List<string> { "epilogue" });
@@ -553,10 +554,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             // a producer that trickles cash on the tick, so "nothing accrued" is
             // an actual claim about the tick rather than about an empty chapter
-            var trickle = TestContent.MakeProducer("jam", new List<ProductionConfig>
-            {
-                new("cash", 10, ProductionTrigger.Tick, null, ModifierTarget.None),
-            });
+            var trickle = TestContent.MakeProducer("jam",
+                ("cash", 10, ProductionFeed.Rate, null));
             var chapter = MakeChapter(producerIds: new List<string> { "jam" });
             var database = MakeDatabase(chapter, producers: new List<ProducerDefinition> { trickle });
             var context = EconomyContextFactory.Build(chapter, database,

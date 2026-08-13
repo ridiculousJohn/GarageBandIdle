@@ -12,12 +12,8 @@ namespace RidiculousGaming.GarageBandIdle.Events
     [CreateAssetMenu(
         fileName = "NewEvent",
         menuName = "GarageBandIdle/Event")]
-    public class EventDefinition : ScriptableObject
+    public class EventDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         private string _displayName;
 
@@ -33,7 +29,6 @@ namespace RidiculousGaming.GarageBandIdle.Events
         [SerializeField]
         private List<EventTier> _tiers = new();
 
-        public string Id => _id;
         public string DisplayName => _displayName;
         public Condition AvailableWhen => _availableWhen;
         public bool BaselineReset => _baselineReset;
@@ -44,7 +39,7 @@ namespace RidiculousGaming.GarageBandIdle.Events
         public void EditorInitialize(string id, string displayName,
             Condition availableWhen, bool baselineReset, List<EventTier> tiers)
         {
-            _id = id;
+            SetIdentity(id);
             _displayName = displayName;
             _availableWhen = availableWhen;
             _baselineReset = baselineReset;

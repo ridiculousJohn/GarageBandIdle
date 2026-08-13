@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // Income math per the design doc sections 3 and 5. This is formula only:
@@ -26,17 +24,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             => BigNumber.Floor(BigNumber.Pow(
                 BigNumber.Max(fansThisRun, BigNumber.Zero) / FansPerRecordsUnit, 0.5));
 
-        // sum of one produced currency's generator output, each generator
-        // already composed with the modifiers targeting it
-        public static BigNumber TotalPerSecond(IReadOnlyList<Generator> generators, string currencyId)
-        {
-            var sum = BigNumber.Zero;
-            foreach (var generator in generators)
-            {
-                if (generator.Definition.ProducesCurrencyId == currencyId)
-                    sum += generator.ProductionPerSecond;
-            }
-            return sum;
-        }
+        // TotalPerSecond is gone with GeneratorSystem.Tick: summing one currency's
+        // generator output was half of a currency's rate, and the other half lived
+        // in ProductionSystem. A currency's rate is now its producer's (rule 13),
+        // summed and composed in one place, so there is nothing left for a helper
+        // over generators alone to mean.
     }
 }

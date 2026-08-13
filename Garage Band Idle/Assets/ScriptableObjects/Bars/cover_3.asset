@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: cover_3
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.BarDefinition
   _id: cover_3
+  _tags: []
   _displayName: The Crowd-Pleaser
   _fillCurrencyId: rehearsal
   _fillRequirement: 600

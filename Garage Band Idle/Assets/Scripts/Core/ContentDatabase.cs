@@ -30,20 +30,27 @@ namespace RidiculousGaming.GarageBandIdle
         public Registry<RewardDefinition> Rewards { get; }
         public Registry<StoryBeatDefinition> StoryBeats { get; }
 
+        // Every family, for the questions that are about the DATABASE rather than
+        // about one registry - a modifier selector's terms are open content across
+        // all of them (rule 11), so resolving one cannot start by picking a family.
+        // IReadOnlyList<T> is covariant, so each registry's All lands here as-is.
+        private readonly List<IEnumerable<Definition>> _families = new();
+
         public ContentDatabase()
         {
-            CurrencyGroups = Load<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup, d => d.Id);
-            Currencies = Load<CurrencyDefinition>(ContentLabels.Currency, d => d.Id);
-            Producers = Load<ProducerDefinition>(ContentLabels.Producer, d => d.Id);
-            Chapters = Load<ChapterDefinition>(ContentLabels.Chapter, d => d.Id);
-            Sections = Load<SectionDefinition>(ContentLabels.Section, d => d.Id);
-            Generators = Load<GeneratorDefinition>(ContentLabels.Generator, d => d.Id);
-            Upgrades = Load<UpgradeDefinition>(ContentLabels.Upgrade, d => d.Id);
-            Bars = Load<BarDefinition>(ContentLabels.Bar, d => d.Id);
-            BarGroups = Load<BarGroupDefinition>(ContentLabels.BarGroup, d => d.Id);
-            Events = Load<EventDefinition>(ContentLabels.Event, d => d.Id);
-            Rewards = Load<RewardDefinition>(ContentLabels.Reward, d => d.Id);
-            StoryBeats = Load<StoryBeatDefinition>(ContentLabels.StoryBeat, d => d.Id);
+            CurrencyGroups = Load<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup);
+            Currencies = Load<CurrencyDefinition>(ContentLabels.Currency);
+            Producers = Load<ProducerDefinition>(ContentLabels.Producer);
+            Chapters = Load<ChapterDefinition>(ContentLabels.Chapter);
+            Sections = Load<SectionDefinition>(ContentLabels.Section);
+            Generators = Load<GeneratorDefinition>(ContentLabels.Generator);
+            Upgrades = Load<UpgradeDefinition>(ContentLabels.Upgrade);
+            Bars = Load<BarDefinition>(ContentLabels.Bar);
+            BarGroups = Load<BarGroupDefinition>(ContentLabels.BarGroup);
+            Events = Load<EventDefinition>(ContentLabels.Event);
+            Rewards = Load<RewardDefinition>(ContentLabels.Reward);
+            StoryBeats = Load<StoryBeatDefinition>(ContentLabels.StoryBeat);
+            CollectFamilies();
         }
 
         // direct-injection alternative to Addressables discovery: tests (and
@@ -62,25 +69,26 @@ namespace RidiculousGaming.GarageBandIdle
             IEnumerable<ProducerDefinition> producers = null,
             IEnumerable<StoryBeatDefinition> storyBeats = null)
         {
-            CurrencyGroups = new Registry<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup, currencyGroups ?? Array.Empty<CurrencyGroupDefinition>(), d => d.Id);
-            Currencies = new Registry<CurrencyDefinition>(ContentLabels.Currency, currencies ?? Array.Empty<CurrencyDefinition>(), d => d.Id);
-            Producers = new Registry<ProducerDefinition>(ContentLabels.Producer, producers ?? Array.Empty<ProducerDefinition>(), d => d.Id);
-            Chapters = new Registry<ChapterDefinition>(ContentLabels.Chapter, chapters ?? Array.Empty<ChapterDefinition>(), d => d.Id);
-            Sections = new Registry<SectionDefinition>(ContentLabels.Section, sections ?? Array.Empty<SectionDefinition>(), d => d.Id);
-            Generators = new Registry<GeneratorDefinition>(ContentLabels.Generator, generators ?? Array.Empty<GeneratorDefinition>(), d => d.Id);
-            Upgrades = new Registry<UpgradeDefinition>(ContentLabels.Upgrade, upgrades ?? Array.Empty<UpgradeDefinition>(), d => d.Id);
-            Bars = new Registry<BarDefinition>(ContentLabels.Bar, bars ?? Array.Empty<BarDefinition>(), d => d.Id);
-            BarGroups = new Registry<BarGroupDefinition>(ContentLabels.BarGroup, barGroups ?? Array.Empty<BarGroupDefinition>(), d => d.Id);
-            Events = new Registry<EventDefinition>(ContentLabels.Event, events ?? Array.Empty<EventDefinition>(), d => d.Id);
-            Rewards = new Registry<RewardDefinition>(ContentLabels.Reward, rewards ?? Array.Empty<RewardDefinition>(), d => d.Id);
-            StoryBeats = new Registry<StoryBeatDefinition>(ContentLabels.StoryBeat, storyBeats ?? Array.Empty<StoryBeatDefinition>(), d => d.Id);
+            CurrencyGroups = new Registry<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup, currencyGroups ?? Array.Empty<CurrencyGroupDefinition>());
+            Currencies = new Registry<CurrencyDefinition>(ContentLabels.Currency, currencies ?? Array.Empty<CurrencyDefinition>());
+            Producers = new Registry<ProducerDefinition>(ContentLabels.Producer, producers ?? Array.Empty<ProducerDefinition>());
+            Chapters = new Registry<ChapterDefinition>(ContentLabels.Chapter, chapters ?? Array.Empty<ChapterDefinition>());
+            Sections = new Registry<SectionDefinition>(ContentLabels.Section, sections ?? Array.Empty<SectionDefinition>());
+            Generators = new Registry<GeneratorDefinition>(ContentLabels.Generator, generators ?? Array.Empty<GeneratorDefinition>());
+            Upgrades = new Registry<UpgradeDefinition>(ContentLabels.Upgrade, upgrades ?? Array.Empty<UpgradeDefinition>());
+            Bars = new Registry<BarDefinition>(ContentLabels.Bar, bars ?? Array.Empty<BarDefinition>());
+            BarGroups = new Registry<BarGroupDefinition>(ContentLabels.BarGroup, barGroups ?? Array.Empty<BarGroupDefinition>());
+            Events = new Registry<EventDefinition>(ContentLabels.Event, events ?? Array.Empty<EventDefinition>());
+            Rewards = new Registry<RewardDefinition>(ContentLabels.Reward, rewards ?? Array.Empty<RewardDefinition>());
+            StoryBeats = new Registry<StoryBeatDefinition>(ContentLabels.StoryBeat, storyBeats ?? Array.Empty<StoryBeatDefinition>());
+            CollectFamilies();
         }
 
         // Synchronous label load, held for the app's lifetime (definitions are
         // needed as long as the game runs, so handles are never released).
         // WaitForCompletion keeps bootstrap simple; this becomes async behind a
         // loading screen in a later slice.
-        private static Registry<T> Load<T>(string label, Func<T, string> idSelector) where T : ScriptableObject
+        private static Registry<T> Load<T>(string label) where T : Definition
         {
             IList<T> assets;
             try
@@ -96,12 +104,104 @@ namespace RidiculousGaming.GarageBandIdle
                 assets = Array.Empty<T>();
             }
 
-            return new Registry<T>(label, assets, idSelector);
+            return new Registry<T>(label, assets);
+        }
+
+        private void CollectFamilies()
+        {
+            _families.Add(CurrencyGroups.All);
+            _families.Add(Currencies.All);
+            _families.Add(Producers.All);
+            _families.Add(Chapters.All);
+            _families.Add(Sections.All);
+            _families.Add(Generators.All);
+            _families.Add(Upgrades.All);
+            _families.Add(Bars.All);
+            _families.Add(BarGroups.All);
+            _families.Add(Events.All);
+            _families.Add(Rewards.All);
+            _families.Add(StoryBeats.All);
+        }
+
+        // Whether anything in the content set answers to one selector term (rule
+        // 11) - a definition's id, a tag it declares, or a produced number's feed
+        // name. This is what turns a typo into a reported error instead of a
+        // modifier filed forever and read by nobody, which is the guard the old
+        // closed ModifierTarget enum gave for free by refusing to compile.
+        //
+        // Deliberately a question about the whole database: a term does not say
+        // which family it belongs to, and requiring it to would be re-introducing
+        // the kind that could not name one of a generator's two output lines.
+        public bool ResolvesModifierTerm(string term)
+        {
+            if (string.IsNullOrEmpty(term))
+                return false;
+
+            foreach (var family in _families)
+            {
+                foreach (var definition in family)
+                {
+                    if (definition.Id == term || definition.HasTag(term))
+                        return true;
+                }
+            }
+
+            // A producer's two numbers are named but not authored: their ids are
+            // derived from the currency, so nothing in a family carries them
+            // (CurrencyProducer.NumberId). `cash_rate` is what a currency-wide
+            // income buff selects, and it must not be reported as a typo.
+            foreach (var currency in Currencies.All)
+            {
+                if (term == CurrencyProducer.NumberId(currency.Id, ProductionFeed.Rate)
+                    || term == CurrencyProducer.NumberId(currency.Id, ProductionFeed.Yield))
+                    return true;
+            }
+
+            // Contribution lines are modifiable numbers with their own ids and tags
+            // (rule 11), and they live INSIDE the definitions holding them rather
+            // than in a family of their own - so `drummer_cash` resolves here or
+            // nowhere. This is the term form the whole addressing change exists for:
+            // one line of a contributor that holds several.
+            foreach (var generator in Generators.All)
+            {
+                if (ResolvesContribution(generator.Contributions, term))
+                    return true;
+            }
+            foreach (var producer in Producers.All)
+            {
+                if (ResolvesContribution(producer.Contributions, term))
+                    return true;
+            }
+            foreach (var upgrade in Upgrades.All)
+            {
+                if (ResolvesContribution(upgrade.Contributions, term))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool ResolvesContribution(IReadOnlyList<ProductionContribution> contributions, string term)
+        {
+            foreach (var contribution in contributions)
+            {
+                if (contribution == null)
+                    continue;
+                if (contribution.Id == term)
+                    return true;
+
+                foreach (var tag in contribution.Tags)
+                {
+                    if (tag == term)
+                        return true;
+                }
+            }
+            return false;
         }
 
         // Id-keyed lookup for one definition type. Content errors (empty or
         // duplicate ids) are reported at load so they surface immediately.
-        public class Registry<T> where T : ScriptableObject
+        public class Registry<T> where T : Definition
         {
             private readonly string _label;
             private readonly List<T> _all = new();
@@ -110,7 +210,10 @@ namespace RidiculousGaming.GarageBandIdle
             public IReadOnlyList<T> All => _all;
             public int Count => _all.Count;
 
-            public Registry(string label, IEnumerable<T> assets, Func<T, string> idSelector)
+            // The id comes off the definition base rather than a per-type accessor
+            // the caller supplies (rule 10): twelve `d => d.Id` lambdas were twelve
+            // chances to hand this the wrong one.
+            public Registry(string label, IEnumerable<T> assets)
             {
                 _label = label;
 
@@ -119,7 +222,7 @@ namespace RidiculousGaming.GarageBandIdle
                     if (asset == null)
                         continue;
 
-                    var id = idSelector(asset);
+                    var id = asset.Id;
                     if (string.IsNullOrEmpty(id))
                     {
                         Debug.LogError($"ContentDatabase: {typeof(T).Name} asset '{asset.name}' has an empty id. Skipping it.");

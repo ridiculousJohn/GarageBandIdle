@@ -18,7 +18,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     {
         private readonly List<Generator> _generators = new();
         private readonly Dictionary<string, Generator> _byId = new();
-        private readonly List<string> _producedCurrencyIds = new();
         private readonly ICurrencies _currencies;
         private readonly ModifierSystem _modifiers;
 
@@ -55,15 +54,17 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     continue;
                 }
 
-                _currencies.ValidateReference(definition.ProducesCurrencyId, $"Generator '{definition.Id}' (produces)");
+                foreach (var contribution in definition.Contributions)
+                {
+                    if (contribution != null)
+                        _currencies.ValidateReference(contribution.CurrencyId, $"Generator '{definition.Id}' (contribution '{contribution.Id}')");
+                }
                 _currencies.ValidateReference(definition.CostCurrencyId, $"Generator '{definition.Id}' (cost)");
 
                 var generator = new Generator(definition, _modifiers);
                 generator.OwnedChanged += () => GeneratorOwnedChanged?.Invoke(generator);
                 _generators.Add(generator);
                 _byId.Add(definition.Id, generator);
-                if (!_producedCurrencyIds.Contains(definition.ProducesCurrencyId))
-                    _producedCurrencyIds.Add(definition.ProducesCurrencyId);
             }
         }
 
@@ -79,22 +80,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // silent lookup for gate evaluation, which may probe ids repeatedly
         public bool TryGet(string id, out Generator generator) => _byId.TryGetValue(id, out generator);
 
-        // One economy tick: each produced currency gets its generators' summed
-        // output, composed with the modifiers targeting that currency's
-        // production. A currency nothing targets composes to identity, so a
-        // multiplier only ever reaches the currencies it was granted against -
-        // a fans or merch producer never inherits a cash buff.
-        public void Tick(double seconds)
-        {
-            foreach (var currencyId in _producedCurrencyIds)
-            {
-                var composition = _modifiers.For(
-                    ModifierTargetKey.Of(ModifierTarget.CurrencyRate, currencyId));
-                var perSecond = composition.ApplyTo(ProductionCalculator.TotalPerSecond(_generators, currencyId));
-                if (perSecond > BigNumber.Zero)
-                    _currencies.Add(currencyId, perSecond * seconds);
-            }
-        }
+        // There is deliberately no Tick here. A generator does not pay a currency:
+        // it CONTRIBUTES to the producer that does (design doc section 12, rule 13),
+        // and ProductionSystem accrues every currency's rate in one pass. What this
+        // removes is a second production path with its own composition - generators
+        // summed here and composed a currency-wide multiplier over the fleet, while
+        // module-held configs summed elsewhere and composed their own - so "the cash
+        // rate" had two implementations that could disagree, and a generator could
+        // never author a yield at all.
 
         // Run reset (album release, event baseline; design doc section 7):
         // gear and bandmates are re-bought each run, so every owned count

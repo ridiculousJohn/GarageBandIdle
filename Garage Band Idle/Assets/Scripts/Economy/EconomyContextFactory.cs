@@ -110,13 +110,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 GameManager.RecordsCurrencyId, database, bars);
 
 
-            // built after the condition context because config gates are
-            // ordinary Conditions checked per firing. Only THIS chapter's
-            // producers fire: flag ids may legitimately repeat across chapters,
-            // so ownership comes from the chapter's producer list, never from
-            // flags.
+            // Built after the condition context because contribution gates are
+            // ordinary Conditions checked per composition, and after the generator
+            // and upgrade systems because it ASSEMBLES its producers from them
+            // (design doc section 12, rule 13) - generators and applied upgrades
+            // contribute exactly as authored producer lines do. Only THIS chapter's
+            // content contributes: flag ids may legitimately repeat across
+            // chapters, so ownership comes from the chapter's own lists.
             var production = new ProductionSystem(
-                Resolve(database.Producers, chapter.ProducerIds, "producer"), router, modifiers, conditions);
+                Resolve(database.Producers, chapter.ProducerIds, "producer"),
+                generators, upgrades, router, modifiers, conditions);
 
             // the Records buff is derived, not granted: one modifier per currency
             // the chapter's recordBuff declares, each reading the cumulative
@@ -133,14 +136,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 }
             }
 
-            // band size raises the fan rate, derived for the same reason: it is a
-            // function of owned counts, so nothing grants it and nothing has to
-            // re-apply it after a release resets those counts. Unconditional,
-            // unlike the Records buff - every economy that has generators has a
-            // band, and an event sandbox's fixed baseline comes from the tier
-            // rules rather than from withholding this.
-            modifiers.AddDerived(new BandmateFanRateModifier(
-                generators, chapter.Fans.PerBandmateOwnedBonus, chapter.Fans.CurrencyId));
+            // Band size raises the fan rate with no code at all now: each bandmate
+            // generator CONTRIBUTES a fans rate line, so the bonus scales with owned
+            // count because a generator's lines always do. It used to be a derived
+            // modifier reading an isBandmate bool off every generator - a flat Add
+            // onto the fans rate, which is precisely what rule 11 says a bonus is
+            // not, and a tag that never got the concept (rule 10).
 
             var context = new EconomyContext(chapter, recipe, router, flags, modifiers, generators, upgrades,
                 production, bars, rewards, capstone, conditions,
@@ -199,7 +200,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // fails to resolve (the chapter is authored against the same JSON that
         // generated the assets, so a miss means a stale import)
         private static List<T> Resolve<T>(ContentDatabase.Registry<T> registry, IReadOnlyList<string> ids, string kind)
-            where T : ScriptableObject
+            where T : Definition
         {
             var definitions = new List<T>(ids.Count);
             foreach (var id in ids)

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: beat_open
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.StoryBeatDefinition
   _id: beat_open
+  _tags: []
   _text: It starts in the garage. Just you, a beat-up amp, and a handful of songs
     you half-know. Time to make some noise.
   _readFlagId:

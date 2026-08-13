@@ -57,7 +57,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     _currencies.ValidateReference(definition.CostCurrencyId, $"Upgrade '{definition.Id}' (cost)");
                 ValidatePayload(definition);
 
-                var upgrade = new Upgrade(definition);
+                var upgrade = new Upgrade(definition, modifiers);
                 _upgrades.Add(upgrade);
                 _byId.Add(definition.Id, upgrade);
             }
@@ -128,15 +128,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // Fail closed on broken content (boot validation reports all of it):
             // never charge for a purchase that would grant nothing, and never let
             // a missing price or currency become an endless free purchase. A buff
-            // may coherently be all-payload, all-actions, or both - but an action
-            // ENTRY is not a grant: a null slot or an award of nothing must not
-            // become a charged no-op, so each action is asked whether it would
-            // actually execute, before any state moves.
+            // may coherently be all-payload, all-contributions, all-actions or any
+            // mix - but an action ENTRY is not a grant: a null slot or an award of
+            // nothing must not become a charged no-op, so each action is asked
+            // whether it would actually execute, before any state moves.
             var payload = upgrade.Definition.Payload;
             var anyExecutableAction = false;
             foreach (var action in upgrade.Definition.Actions)
                 anyExecutableAction |= action != null && action.CanExecute(_effectContext);
-            if (payload == null && !anyExecutableAction)
+            if (!upgrade.Definition.GrantsAnything && !anyExecutableAction)
             {
                 Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' has no payload and no executable action. Refusing the purchase rather than charging for nothing.");
                 return false;
@@ -316,8 +316,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var payload = upgrade.Definition.Payload;
             if (payload == null)
             {
-                // already latched, so a content mistake reports once, not per tick
-                Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' has no payload. Nothing to apply.");
+                // Already latched, so a content mistake reports once, not per tick.
+                // Contributions alone are a complete grant - the latch is what makes
+                // them live - so only an upgrade granting neither is broken.
+                if (!upgrade.Definition.GrantsAnything)
+                    Debug.LogError($"UpgradeSystem: upgrade '{upgrade.Definition.Id}' has no payload and no contributions. Nothing to apply.");
             }
             else
             {

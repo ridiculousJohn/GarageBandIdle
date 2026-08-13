@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: rehearsal
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.CurrencyDefinition
   _id: rehearsal
+  _tags: []
   _displayName: Rehearsal
   _groupId: run
   _symbol:

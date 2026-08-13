@@ -178,16 +178,27 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
-                // What a producer must have is production, which ToProductionConfigs
+                // A stale `production` key is refused for the same reason `module`
+                // is: its entries declared a `trigger`, which named who fired a
+                // config rather than what the number IS, and the two schemas cannot
+                // be told apart by shape alone.
+                if (block.production != null)
+                {
+                    Debug.LogError($"ChapterJsonImporter: producer '{block.id}' carries a 'production' key - a producer authors 'contributions', each declaring what it feeds ('rate' or 'yield') rather than what fires it (design doc section 12, rule 13). Skipping it - re-author the key and re-import.");
+                    continue;
+                }
+
+                // What a producer must have is contributions, which ToContributions
                 // refuses without. Whether anything PRESENTS it is boot validation's
-                // question: a tap producer needs a surface, a passive one (fan
-                // accrual) does not.
-                var configs = ToProductionConfigs(block);
-                if (configs == null)
+                // question: a producer holding a yield needs a surface, a passive
+                // one (fan accrual) does not.
+                var contributions = ToContributions(block.contributions, $"producer '{block.id}'",
+                    requireAny: true);
+                if (contributions == null)
                     continue;
 
                 var producerAsset = LoadOrCreate<ProducerDefinition>($"{ProducersFolder}/{block.id}.asset");
-                ApplyIfChanged(producerAsset, asset => asset.EditorInitialize(block.id, configs));
+                ApplyIfChanged(producerAsset, asset => asset.EditorInitialize(block.id, contributions));
                 producerIds.Add(block.id);
             }
 
@@ -247,19 +258,30 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
-                // production must never drain; zero output stays legal (a pure
-                // fan-rate bandmate is coherent)
-                if (block.baseOutput < 0)
+                // The retired one-currency schema is refused rather than migrated: a
+                // guess at which contribution `produces` + `baseOutput` meant would
+                // also have to invent the line's id, and every buff naming that id
+                // would then depend on the guess.
+                if (block.produces != null || block.baseOutput != null || block.isBandmate != null)
                 {
-                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' has a negative baseOutput ({block.baseOutput}). Skipping it - fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: generator '{block.id}' carries a retired 'produces', 'baseOutput' or 'isBandmate' key - a generator authors 'contributions', each with its own id (design doc section 12, rules 11 and 13), and a bandmate contributes a fans rate rather than declaring a bool. Skipping it - re-author the block and re-import.");
                     continue;
                 }
 
+                // A generator with no contributions is legal content: gear whose
+                // whole value is what a later buff makes of it is coherent, and
+                // refusing it here would be inventing a rule the runtime does not
+                // need. It contributes nothing until it declares a line.
+                var generatorContributions = ToContributions(block.contributions,
+                    $"generator '{block.id}'", requireAny: false);
+                if (generatorContributions == null)
+                    continue;
+
                 var asset = LoadOrCreate<GeneratorDefinition>($"{GeneratorsFolder}/{block.id}.asset");
                 var unlock = ToCondition(block.unlock, $"generator '{block.id}' (unlock)");
-                ApplyIfChanged(asset, generator => generator.EditorInitialize(block.id, block.name, block.produces,
-                    block.isBandmate, block.cost?.currency, block.cost?.amount ?? 0, block.cost?.growth ?? 0,
-                    block.baseOutput, unlock));
+                ApplyIfChanged(asset, generator => generator.EditorInitialize(block.id, block.name,
+                    block.cost?.currency, block.cost?.amount ?? 0, block.cost?.growth ?? 0,
+                    generatorContributions, unlock, block.tags));
                 generatorIds.Add(block.id);
             }
 
@@ -295,12 +317,32 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                     continue;
                 }
 
+                // An upgrade's lines are optional: most buffs are a payload and
+                // nothing else. The ones that have them author a flat bonus, which
+                // is a contribution rather than an effect (rule 11).
+                var upgradeContributions = ToContributions(block.contributions,
+                    $"upgrade '{block.id}'", requireAny: false);
+                if (upgradeContributions == null)
+                    continue;
+
                 var asset = LoadOrCreate<UpgradeDefinition>($"{UpgradesFolder}/{block.id}.asset");
                 var scope = ToScope(block.scope, $"upgrade '{block.id}'");
                 var gate = ToCondition(block.gate, $"upgrade '{block.id}' (gate)");
-                var payload = ToPayload(block.payload, $"upgrade '{block.id}'");
+
+                // A payload is only parsed when one is authored: an upgrade whose
+                // whole grant is its contributions has no `payload` key, and running
+                // it through ToPayload would report "names no effect" against
+                // content that is complete.
+                var authorsPayload = block.payload != null && !string.IsNullOrEmpty(block.payload.effect);
+                if (!authorsPayload && upgradeContributions.Count == 0)
+                {
+                    Debug.LogError($"ChapterJsonImporter: upgrade '{block.id}' authors neither a payload nor contributions - it would grant nothing. Skipping it - fix the JSON and re-import.");
+                    continue;
+                }
+
+                var payload = authorsPayload ? ToPayload(block.payload, $"upgrade '{block.id}'") : null;
                 ApplyIfChanged(asset, upgrade => upgrade.EditorInitialize(block.id, block.name, type, scope,
-                    block.cost?.currency, block.cost?.amount ?? 0, gate, payload));
+                    block.cost?.currency, block.cost?.amount ?? 0, gate, payload, null, upgradeContributions));
                 upgradeIds.Add(block.id);
             }
 
@@ -359,12 +401,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 eventIds.Add(block.id);
             }
 
-            // negative tuning drains or dead-ends instead of earning; the
-            // chapter still imports (config is not skippable content) - boot
-            // validation reports it too
-            if ((data.fans?.perBandmateOwnedBonus ?? 0) < 0)
-                Debug.LogError("ChapterJsonImporter: fans block has a negative perBandmateOwnedBonus. Fix the JSON and re-import.");
-            // Three pre-5.7 keys, all now production: the base rate and its gate
+            // Four retired keys, all now production: the base rate and its gate
             // are a config on a producer (design doc section 12, rule 13), which
             // is what keeps fan accrual out of the idle payout by construction
             // (section 9). Refused rather than ignored, the same fail-closed rule
@@ -403,7 +440,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var chapterAsset = LoadOrCreate<ChapterDefinition>($"{ChaptersFolder}/{data.chapter.id}.asset");
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
                 new List<string>(data.constants?.recordBuff?.affects ?? Array.Empty<string>()));
-            var fans = new FansConfig(data.fans?.currency, data.fans?.perBandmateOwnedBonus ?? 0);
+            var fans = new FansConfig(data.fans?.currency);
             // the album's unlock is the release OFFER's gate (design doc section
             // 5): the UI enables the release only while it holds. An absent block
             // means no gate - always offered once revealed - like every other
@@ -725,19 +762,26 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             CollectConditionFaults(data.capstone?.unlock, "capstone (unlock)", faults);
 
             foreach (var block in data.generators ?? Array.Empty<GeneratorBlock>())
+            {
                 CollectConditionFaults(block.unlock, $"generator '{block.id}' (unlock)", faults);
+                CollectContributionFaults(block.contributions, $"generator '{block.id}'", faults);
+            }
 
             foreach (var block in data.upgrades ?? Array.Empty<UpgradeBlock>())
+            {
                 CollectConditionFaults(block.gate, $"upgrade '{block.id}' (gate)", faults);
+                CollectContributionFaults(block.contributions, $"upgrade '{block.id}'", faults);
+            }
 
             foreach (var group in data.bars?.groups ?? Array.Empty<BarGroupBlock>())
                 CollectConditionFaults(group.visibleWhen, $"bar group '{group.id}' (visibleWhen)", faults);
 
+            // Every holder of contributions, not just producers: a generator and an
+            // upgrade author the same lines with the same gates now, and a pre-pass
+            // that only knew about producers would wave an unconvertible gate through
+            // on the other two.
             foreach (var block in data.producers ?? Array.Empty<ProducerBlock>())
-            {
-                foreach (var entry in block.production ?? Array.Empty<ProductionEntryBlock>())
-                    CollectConditionFaults(entry.gate, $"producer '{block.id}' production for '{entry.currency}' (gate)", faults);
-            }
+                CollectContributionFaults(block.contributions, $"producer '{block.id}'", faults);
 
             foreach (var block in data.events ?? Array.Empty<EventBlock>())
             {
@@ -747,6 +791,13 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
 
             return faults;
+        }
+
+        private static void CollectContributionFaults(ContributionBlock[] blocks, string holder,
+            List<string> faults)
+        {
+            foreach (var entry in blocks ?? Array.Empty<ContributionBlock>())
+                CollectConditionFaults(entry.gate, $"{holder} contribution '{entry.id}' (gate)", faults);
         }
 
         // One condition block and everything nested under it. An absent block is
@@ -982,6 +1033,8 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 Debug.LogError("ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by the production config's gate (design doc section 12, rules 8, 9 and 13). Fix the JSON and re-import.");
             if (block.activeWhen != null)
                 Debug.LogError("ChapterJsonImporter: fans block still carries 'activeWhen' - the accrual gate moved onto the production config's 'gate' (design doc section 12, rule 13). Fix the JSON and re-import.");
+            if (block.perBandmateOwnedBonus != null)
+                Debug.LogError("ChapterJsonImporter: fans block still carries 'perBandmateOwnedBonus' - band size raises the fan rate because each bandmate generator CONTRIBUTES a fans line (design doc section 12, rules 11 and 13), not because a chapter constant is added onto the rate. Fix the JSON and re-import.");
         }
 
         // the fans-block parse path, exposed like ParseCondition: tests cover that
@@ -1010,42 +1063,66 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return false;
         }
 
-        // Converts a producer's production entries, or null when any entry is
-        // invalid - a producer missing one of its yields is not the authored
-        // producer, so the whole block is skipped rather than half-written.
-        private static List<ProductionConfig> ToProductionConfigs(ProducerBlock block)
+        // Converts one holder's contribution lines, or null when any line is
+        // invalid - a contributor missing one of its lines is not the authored
+        // contributor, so the whole block is skipped rather than half-written.
+        //
+        // One implementation for producers, generators and upgrades: a line is the
+        // same thing whoever holds it (design doc section 12, rule 13), and three
+        // parsers would be three chances for one of them to accept a shape the
+        // others refuse. What differs is only what the AMOUNT means - per owned unit
+        // for a generator, flat for the other two - and that is the holder's rule,
+        // not the line's.
+        //
+        // requireAny distinguishes a producer, which exists only to hold lines and
+        // would produce nothing without them, from an upgrade, whose lines are
+        // optional beside its payload.
+        private static List<ProductionContribution> ToContributions(ContributionBlock[] blocks,
+            string holder, bool requireAny)
         {
-            if (block.production.Length == 0)
+            if (blocks == null || blocks.Length == 0)
             {
-                Debug.LogError($"ChapterJsonImporter: producer '{block.id}' has no production entries - it would produce nothing. Skipping it - fix the JSON and re-import.");
+                if (!requireAny)
+                    return new List<ProductionContribution>();
+
+                Debug.LogError($"ChapterJsonImporter: {holder} has no contributions - it would produce nothing. Skipping it - fix the JSON and re-import.");
                 return null;
             }
 
-            var configs = new List<ProductionConfig>();
-            foreach (var entry in block.production)
+            var contributions = new List<ProductionContribution>();
+            foreach (var entry in blocks)
             {
-                var context = $"producer '{block.id}' production for '{entry.currency}'";
+                var context = $"{holder} contribution '{entry.id}'";
+
+                // A modifiable number is named (rule 11), and an unnamed line is
+                // unreachable by any buff - including one that would have been
+                // authored against it later, which would then silently do nothing.
+                if (string.IsNullOrEmpty(entry.id))
+                {
+                    Debug.LogError($"ChapterJsonImporter: {holder} has a contribution with no id - a modifiable number is named (design doc rule 11). Skipping it - fix the JSON and re-import.");
+                    return null;
+                }
                 if (string.IsNullOrEmpty(entry.currency))
                 {
-                    Debug.LogError($"ChapterJsonImporter: producer '{block.id}' has a production entry with no currency. Skipping the producer - fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: {context} names no currency. Skipping it - fix the JSON and re-import.");
                     return null;
                 }
                 // production must never drain - never write that state
                 if (entry.amount < 0)
                 {
-                    Debug.LogError($"ChapterJsonImporter: {context} has a negative amount ({entry.amount}). Skipping the producer - fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: {context} has a negative amount ({entry.amount}). Skipping it - fix the JSON and re-import.");
                     return null;
                 }
 
-                var trigger = ToTrigger(entry.trigger, context);
-                var composes = ToComposes(entry.composes, context);
-                if (trigger == ProductionTrigger.None || composes == null)
+                var feeds = ToFeeds(entry.feeds, context);
+                if (feeds == null)
                     return null;
 
                 var gate = ToCondition(entry.gate, $"{context} (gate)");
-                configs.Add(new ProductionConfig(entry.currency, entry.amount, trigger, gate, composes.Value));
+                contributions.Add(new ProductionContribution(entry.id, entry.currency, entry.amount,
+                    feeds.Value, gate, entry.tags));
             }
-            return configs;
+            return contributions;
         }
 
         // the condition parse path (real DTO shape + conversion), exposed so
@@ -1063,11 +1140,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             return faults;
         }
 
-        // the producer parse path, exposed like ParseCondition: tests cover
-        // the trigger/composes/gate mapping and its refusals without an
+        // the contribution parse path, exposed like ParseCondition: tests cover
+        // the id/currency/feeds/gate mapping and its refusals without an
         // asset-writing import
-        internal static List<ProductionConfig> ParseProducerProduction(string json)
-            => ToProductionConfigs(JsonConvert.DeserializeObject<ProducerBlock>(json, JsonSettings));
+        internal static List<ProductionContribution> ParseProducerContributions(string json)
+        {
+            var block = JsonConvert.DeserializeObject<ProducerBlock>(json, JsonSettings);
+            return ToContributions(block.contributions, $"producer '{block.id}'", requireAny: true);
+        }
 
         // the currency-entry parse path: tests cover that the pre-5.4 earn
         // schema is refused rather than silently dropped
@@ -1261,44 +1341,29 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
         }
 
-        // Trigger is a closed, code-defined set (ProductionTrigger); "tick"
-        // and "tap" are the JSON spellings, and anything else is a content
-        // error that skips the producer - a config that never fires is not
-        // the authored config.
-        private static ProductionTrigger ToTrigger(string trigger, string context)
+        // Which of a producer's two numbers a line feeds - the QUANTITY it is, not
+        // who fires it (design doc section 12, rule 13). A rate is per second and
+        // accrues over an absence; a yield is per firing and cannot. Null signals a
+        // missing or unknown spelling, which skips the holder: a line that never
+        // declared which number it is must not be guessed into a rate.
+        //
+        // `trigger` used to sit beside this and named the CALLER (tick, tap), which
+        // put a UI gesture in the economy's vocabulary and left the first
+        // demand-fired producer that is not a button press with nowhere to go.
+        private static ProductionFeed? ToFeeds(string feeds, string context)
         {
-            switch (trigger)
+            switch (feeds)
             {
-                case "tick":
-                    return ProductionTrigger.Tick;
-                case "tap":
-                    return ProductionTrigger.Tap;
-                default:
-                    Debug.LogError($"ChapterJsonImporter: {context} has unknown trigger '{trigger}' - a production config fires on 'tick' or 'tap'. Skipping the producer - fix the JSON and re-import.");
-                    return ProductionTrigger.None;
-            }
-        }
-
-        // Which modifier target a config's output composes through. Any target
-        // the family defines is authorable - the old tapValue-only restriction
-        // was a fossil of TapValue being the only composing target that existed
-        // in 5.4. Null signals an unknown spelling, which skips the producer.
-        private static ModifierTarget? ToComposes(string composes, string context)
-        {
-            switch (composes)
-            {
+                case "rate":
+                    return ProductionFeed.Rate;
+                case "yield":
+                    return ProductionFeed.Yield;
                 case null:
                 case "":
-                    return ModifierTarget.None;
-                // which of its currency's two numbers the config feeds - the
-                // config already names the currency, so this says nothing about
-                // WHICH currency and nothing about what fires it
-                case "rate":
-                    return ModifierTarget.CurrencyRate;
-                case "yield":
-                    return ModifierTarget.CurrencyYield;
+                    Debug.LogError($"ChapterJsonImporter: {context} declares no feeds - a contribution is a 'rate' (per second) or a 'yield' (per firing). Skipping it - fix the JSON and re-import.");
+                    return null;
                 default:
-                    Debug.LogError($"ChapterJsonImporter: {context} has unknown composes '{composes}' - a config composes 'rate', 'yield' or nothing. Skipping the producer - fix the JSON and re-import.");
+                    Debug.LogError($"ChapterJsonImporter: {context} has unknown feeds '{feeds}' - a contribution is a 'rate' (per second) or a 'yield' (per firing). Skipping it - fix the JSON and re-import.");
                     return null;
             }
         }
@@ -1320,35 +1385,27 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // Returns null on refusal, having reported why; what a refusal MEANS belongs
         // to the caller - a reward entry is skipped, while an upgrade imports with no
         // payload and boot validation reports the gap.
-        private static GameEffect ToEffect(string kind, double value, string flag, string generator,
-            string[] affects, string context)
+        private static GameEffect ToEffect(string kind, double value, string flag, string[] targets,
+            string context)
         {
             switch (kind)
             {
                 case "setFlag":
                     return new SetFlagEffect(flag);
-                // Every numeric name is <target><operation>, and the ids it reaches
-                // are the authored list - EMPTY meaning every member in scope
-                // (design doc rule 11), which is why an absent `affects` is no
-                // longer refused: it is now the way to author "all of them".
-                case "currencyYieldAdd":
-                    // a negative add is left to boot validation: unlike a multiplier
-                    // it cannot poison a whole stack, so the asset is worth keeping
-                    // around to be reported by name
-                    return new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add,
-                        value, Qualifiers(affects));
-                case "currencyYieldMultiplier":
-                    return ToMultiplier(ModifierTarget.CurrencyYield, value, context, kind,
-                        Qualifiers(affects));
-                case "currencyRateAdd":
-                    return new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Add,
-                        value, Qualifiers(affects));
-                case "currencyRateMultiplier":
-                    return ToMultiplier(ModifierTarget.CurrencyRate, value, context, kind,
-                        Qualifiers(affects));
-                case "generatorOutputMultiplier":
-                    return ToMultiplier(ModifierTarget.GeneratorOutput, value, context, kind,
-                        Qualifiers(string.IsNullOrEmpty(generator) ? null : new[] { generator }));
+                // The numeric names are the OPERATION, and `targets` says which
+                // numbers it reaches (design doc rule 11). They used to be
+                // <target><operation> - currencyYieldAdd, generatorOutputMultiplier -
+                // which put a closed stat kind in the vocabulary and so could not
+                // name one of a generator's two output lines. What a modifier hits is
+                // now the same open id-and-tag vocabulary as every other reference.
+                // "add" was here and is gone: a flat bonus is a CONTRIBUTION to the
+                // number it raises (rule 11), authored under the holder's
+                // `contributions` key, not an effect granted against it. An
+                // un-migrated file naming it lands in the unknown-effect refusal
+                // below, which is the loud outcome - importing it as a multiplier
+                // would turn "+1 Cash" into "x1 Cash" and read as tuning.
+                case "multiplier":
+                    return ToMultiplier(Selector(targets, context), value, context, kind);
                 case null:
                 case "":
                     Debug.LogError($"ChapterJsonImporter: {context} names no effect.");
@@ -1361,33 +1418,34 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
         // a reward entry authors its effect name under `type`
         private static GameEffect ToRewardEffect(RewardEntryBlock block, string context)
-            => ToEffect(block.type, block.value, block.flag, block.generator, block.affects, context);
+            => ToEffect(block.type, block.value, block.flag, block.targets, context);
 
-        // An authored id list becomes the effect's qualifiers; an absent or empty
-        // one becomes an empty list, which GrantModifierEffect grants unqualified
-        // and rule 11 reads as every member of the target's family in scope. Empty
-        // entries are dropped rather than carried - an id of "" resolves against
-        // nothing, and one blank row would otherwise turn "all of them" into a
-        // grant that reaches a single nonexistent thing.
-        private static List<string> Qualifiers(string[] authored)
+        // The authored term list becomes the effect's selector. AN EMPTY LIST IS
+        // DELIBERATE and reaches every number in scope (rule 11) - which is why
+        // absent and empty must not be the same thing: `"targets": []` says "all of
+        // them", while omitting the key entirely is a forgotten key that would
+        // otherwise silently buff the whole game. The DTO defaults the field to null
+        // so the two are distinguishable here, and the absent case is refused.
+        //
+        // Empty entries are dropped rather than carried - a term of "" matches
+        // nothing, so one blank row would turn "all of them" into a selector that
+        // reaches nothing at all.
+        private static ModifierSelector Selector(string[] authored, string context)
         {
-            var list = new List<string>();
             if (authored == null)
-                return list;
-
-            foreach (var id in authored)
             {
-                if (!string.IsNullOrEmpty(id))
-                    list.Add(id);
+                Debug.LogError($"ChapterJsonImporter: {context} declares no targets. Author an explicit empty list to reach everything in scope, or name ids and tags.");
+                return ModifierSelector.Everything;
             }
-            return list;
+
+            return new ModifierSelector(authored);
         }
 
         // never write a multiplier that would zero or negate the product it lands
         // in: the effect is refused here and the content naming it reports loudly,
         // rather than importing a value the registry refuses at runtime anyway
-        private static GameEffect ToMultiplier(ModifierTarget target, double value, string context,
-            string effectName, List<string> qualifiers = null)
+        private static GameEffect ToMultiplier(ModifierSelector selector, double value, string context,
+            string effectName)
         {
             if (value <= 0)
             {
@@ -1395,15 +1453,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
                 return null;
             }
 
-            return new GrantModifierEffect(target, ModifierOperation.Multiply, value, qualifiers);
+            return new GrantModifierEffect(selector, ModifierOperation.Multiply, value);
         }
 
         // an upgrade authors its effect name under `payload.effect`; every upgrade
         // must grant something, so an absent payload is a content error the boot
         // validation pass reports against the upgrade
         private static GameEffect ToPayload(PayloadBlock block, string context)
-            => ToEffect(block?.effect, block?.value ?? 0, block?.flag, block?.generator,
-                block?.affects, context);
+            => ToEffect(block?.effect, block?.value ?? 0, block?.flag, block?.targets, context);
 
         // A tier with no debuff block is legal content (the plain loop, design
         // doc section 6.1); an unknown effect is a content error.
@@ -1714,9 +1771,12 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
 
             // a reward authors from the same effect vocabulary an upgrade payload
             // does, so it carries the same parameter fields; which ones matter
-            // depends on the effect named by `type`
-            public string generator = "";
-            public string[] affects = Array.Empty<string>();
+            // depends on the effect named by `type`.
+            //
+            // `targets` defaults to NULL, not an empty array, because absent and
+            // empty mean different things: empty reaches every number in scope
+            // (rule 11), while absent is a forgotten key the importer refuses.
+            public string[] targets;
         }
 
         private class ChapterBlock
@@ -1804,11 +1864,20 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public string id = "";
             public string name = "";
-            public string produces = "";
-            public bool isBandmate;
+            public string[] tags;
             public GeneratorCostBlock cost = new();
-            public double baseOutput;
+            public ContributionBlock[] contributions;
             public ConditionBlock unlock = new();
+
+            // Retired in 7.4 and kept ONLY to detect them. `produces` + `baseOutput`
+            // were one currency and one unnamed number, so no buff could address one
+            // line of a generator that feeds two; `isBandmate` was a tag that never
+            // got the concept (rule 10), read by a derived modifier to add a fan
+            // rate the generator can simply contribute. A stale file carrying any of
+            // them is refused rather than half-migrated.
+            public JToken produces;
+            public JToken baseOutput;
+            public JToken isBandmate;
         }
 
         // a generator's cost declares its currency, independent of `produces`
@@ -1829,9 +1898,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         {
             public string effect = "";
             public double value;
-            public string generator = "";
             public string flag = "";
-            public string[] affects = Array.Empty<string>();
+
+            // null, not empty: see RewardEntryBlock.targets
+            public string[] targets;
         }
 
         private class UpgradeBlock
@@ -1843,6 +1913,11 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public CostBlock cost = new();
             public ConditionBlock gate = new();
             public PayloadBlock payload = new();
+
+            // A flat bonus is a CONTRIBUTION, not an effect (rule 11): "+1 Cash per
+            // press" is a line feeding cash's yield for as long as this upgrade's
+            // latch holds.
+            public ContributionBlock[] contributions;
         }
 
         // one chapter-declared currency: pure state ({id, group})
@@ -1872,18 +1947,26 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             // instead of appearing to migrate.
             public string module = "";
 
-            public ProductionEntryBlock[] production = Array.Empty<ProductionEntryBlock>();
+            // Retired with `production` in 7.4: an entry declared a `trigger`,
+            // which named who fired it rather than what the number IS. Kept only to
+            // detect it, for the same reason `module` is.
+            public JToken production;
+
+            public ContributionBlock[] contributions;
         }
 
-        // one flat-rate source: amount is per second for tick, per tap for
-        // tap; the gate is the discriminated Condition shape like every other
-        // rule, and composes names the modifier target that scales the output
-        private class ProductionEntryBlock
+        // One production line (design doc section 12, rule 13). `feeds` is the
+        // QUANTITY - a rate is per second, a yield is per firing - and there is no
+        // trigger: what fires a producer is external and unnamed. `id` is required
+        // because a modifiable number is named (rule 11), and the gate is the
+        // discriminated Condition shape like every other rule.
+        private class ContributionBlock
         {
+            public string id = "";
+            public string[] tags;
             public string currency = "";
             public double amount;
-            public string trigger = "";
-            public string composes = "";
+            public string feeds = "";
             public ConditionBlock gate = new();
         }
 
@@ -1922,7 +2005,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         private class FansBlock
         {
             public string currency = "";
-            public double perBandmateOwnedBonus;
+
+            // retired in 7.4, kept only to be refused: the bonus is each bandmate
+            // generator's own fans contribution now
+            public JToken perBandmateOwnedBonus;
 
             // pre-5.7 schema, kept only to be refused - see ReportStaleFansKeys.
             // All three are production now: the base rate and its gate live on a

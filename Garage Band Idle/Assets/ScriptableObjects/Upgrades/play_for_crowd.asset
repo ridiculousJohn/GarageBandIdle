@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: play_for_crowd
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: play_for_crowd
+  _tags: []
   _displayName: Play for a Crowd
   _type: 2
   _scope: 1
@@ -23,6 +24,7 @@ MonoBehaviour:
   _payload:
     rid: 1003
   _actions: []
+  _contributions: []
   references:
     version: 2
     RefIds:

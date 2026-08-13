@@ -15,12 +15,8 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     [CreateAssetMenu(
         fileName = "NewChapter",
         menuName = "GarageBandIdle/Chapter")]
-    public class ChapterDefinition : ScriptableObject
+    public class ChapterDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         [Tooltip("1-based chapter order; the lowest index is the starting chapter.")]
         private int _index;
@@ -89,7 +85,6 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             "presents; reveal is that section's visibleWhen, like every other module.")]
         private List<string> _storyBeatIds = new();
 
-        public string Id => _id;
         public int Index => _index;
         public string DisplayName => _displayName;
         public string Theme => _theme;
@@ -129,7 +124,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             List<string> sectionIds, List<string> generatorIds, List<string> upgradeIds,
             List<string> barGroupIds, List<string> eventIds, List<string> storyBeatIds)
         {
-            _id = id;
+            SetIdentity(id);
             _index = index;
             _displayName = displayName;
             _theme = theme;
@@ -288,35 +283,33 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     }
 
     // What the chapter declares about fans that is NOT production (design doc
-    // section 6). The base rate and its gate are an ordinary production config
-    // on a producer (rule 13) like every other flat-rate source; what remains
-    // here is the per-bandmate tuning, which is a rate MODIFIER rather than a
-    // source, and the currency id - which is not a binding for accrual but the
-    // answer to "which currency is this chapter's fans", asked by the checks
-    // that keep fans resetting on release and out of the Records multiplier
-    // (section 11).
+    // section 6): the currency id, which is not a binding for accrual but the
+    // answer to "which currency is this chapter's fans", asked by the checks that
+    // keep fans resetting on release and out of the Records multiplier (section
+    // 11).
+    //
+    // The per-bandmate bonus used to sit here too, as a chapter-level number a
+    // derived modifier turned into a flat Add on the fan rate. It is now each
+    // bandmate generator's own fans CONTRIBUTION (rule 13), which is what makes
+    // band size raise the rate: a generator's lines always scale with its owned
+    // count. That removed a rate "modifier" that was really a source, and with it
+    // the isBandmate bool the modifier had to read off every generator.
     [Serializable]
     public class FansConfig
     {
         [SerializeField]
         [DefinitionId(typeof(CurrencyDefinition))]
-        [Tooltip("Currency id this chapter treats as fans. Accrual itself is a production config on a producer.")]
+        [Tooltip("Currency id this chapter treats as fans. Accrual itself is a contribution on a producer or generator.")]
         private string _currencyId;
 
-        [SerializeField]
-        [Tooltip("Bonus fans/sec per owned bandmate unit (not gear like the practice amp). Applied as a derived Add on the FanRate target.")]
-        private double _perBandmateOwnedBonus;
-
         public string CurrencyId => _currencyId;
-        public double PerBandmateOwnedBonus => _perBandmateOwnedBonus;
 
         public FansConfig() { }
 
 #if UNITY_EDITOR
-        public FansConfig(string currencyId, double perBandmateOwnedBonus)
+        public FansConfig(string currencyId)
         {
             _currencyId = currencyId;
-            _perBandmateOwnedBonus = perBandmateOwnedBonus;
         }
 #endif
     }

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: garage_jam
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Events.EventDefinition
   _id: garage_jam
+  _tags: []
   _displayName: Garage Jam Challenge
   _availableWhen:
     rid: 1007

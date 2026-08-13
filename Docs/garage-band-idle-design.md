@@ -669,6 +669,8 @@ Assets/Scripts/
     RewardDefinition.cs / RewardManager.cs   // shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
     CostCalculator.cs / ProductionCalculator.cs   // formula only; the modifiers that scale production live in the registry
     CurrencyProducer.cs / ProductionSystem.cs   // rule 13: one producer per currency owning rate + yield, each composed from gated contributions that stay individually addressable; the system holds a scope's producers, integrates rates over elapsed time, and fires a producer on request - it never learns what fired it
+    ProductionContribution.cs / IProductionContributor.cs   // one line: the currency it feeds, which of that currency's two numbers (`feeds`), its own id and tags, and a gate. No trigger and no idle flag - what fires a producer is external, and whether a line accrues over an absence follows from the quantity (rule 13)
+    ProducerDefinition.cs / AuthoredContributor.cs   // a bundle of flat lines, scaled by nothing: the Jam button's yields and the band's passive fan rate. Generators and applied upgrades contribute through the same interface, which is what lets a producer be ASSEMBLED without knowing contributor kinds
     Modifiers/ModifierSystem.cs   // one registry per scope: granted (lives where its fact lives, no scope value) + derived (computed from a source); the composition rule lives here, resolution is the ScopeChain walk
     Modifiers/ModifierSelector.cs   // rule 11: what a modifier names - ids and tags, empty = everything in reach. Matches(subject) is asked of the thing being matched, so the registry never compares strings and a later path form (drummer.cash) changes only what parses it. Replaces ModifierTarget + ModifierTargetKey: nothing names a closed stat kind, because every modifiable number has an id
     CapstoneSystem.cs     // the completed-capstone fact source: the declared completion flag is the latch, projection re-applies OnComplete from it; the completion is the chapter's deepest rung (rule 14)
@@ -767,14 +769,24 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     *which* output, because the kind named a family, the id named a member of that family, and the
     number itself was never named at all.
 
-    **A selector matches a subject.** A modifier carries a **selector**; the number asks whether that
-    selector matches it, offering its own id, its tags, and its owner's id and tags — so a buff on a
-    generator reaches every line that generator contributes, while a buff on one of those lines reaches
-    only it. An **empty selector matches everything in reach**, which is what makes "double all
-    generator output" or "-99% cost for this tier" placement rather than an authored id list. Matching
-    is asked of the thing being matched rather than computed inside the registry: one implementation,
-    which the composition and the change notification both ask, so a display can never refresh on a
-    modifier the composition ignored or miss one it counted.
+    **A term is a NAME, never a facet.** A modifier carries a **selector**: a list of terms, each one
+    the id of a thing or the name of a tag. It is not a filter expression over a number's properties.
+    `cash_rate` is the id of cash's rate; `["cash","rate"]` is not a way to say the same thing, and
+    treating a term as a property test is the mistake this rule exists to forbid — it makes one array
+    mean two incompatible things, and it makes a currency-level buff match both an aggregate and the
+    contributions summed into it, applying once per line and again over their sum.
+
+    **Everything with an id is selectable**, at every level: a contribution, a producer's rate or yield,
+    a generator, a bar group. A contribution carries its own id precisely so a buff can name one line of
+    a generator that holds several; the generator's own id still reaches all of them, through the owner
+    the subject offers. An **empty selector reaches everything in reach**, which is what makes "double
+    all generator output" or "-99% cost for this tier" placement rather than an authored id list.
+
+    Matching is asked of the thing being matched rather than computed inside the registry: one
+    implementation, which the composition and the change notification both ask, so a display can never
+    refresh on a modifier the composition ignored or miss one it counted. Keeping it there is also what
+    makes a later term form — a path like `drummer.cash` — a change to what parses a term and to nothing
+    else.
 
     **Tags are how a set gets a name** (rule 10). Any definition may carry tags, and so may a
     contribution — `rhythm_section` on two generators' cash lines reaches both without either buff or

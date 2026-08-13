@@ -57,61 +57,143 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
-        public static ProducerDefinition MakeProducer(string id, List<ProductionConfig> production)
+        public static ProducerDefinition MakeProducer(string id, List<ProductionContribution> contributions)
         {
             var definition = Track(ScriptableObject.CreateInstance<ProducerDefinition>());
-            definition.EditorInitialize(id, production);
+            definition.EditorInitialize(id, contributions);
             return definition;
         }
 
-        // a jam producer whose single tap config composes TapValue - the probe
-        // for the tap-value modifier stack (the shape TapSystem was)
+        // One production line. The id defaults to "<holder>_<currency>", the
+        // convention chapter 1 authors, so a fixture only spells one out when the
+        // test is about the id itself.
+        public static ProductionContribution Line(string holderId, string currencyId, double amount,
+            ProductionFeed feeds, Condition gate = null, string id = null, string[] tags = null)
+            => new(id ?? $"{holderId}_{currencyId}", currencyId, amount, feeds, gate, tags);
+
+        // A producer straight from its lines, which is how almost every fixture
+        // wants to say it. Ids are derived here rather than authored per line -
+        // "<producer>_<currency>", falling back to "<producer>_<currency>_<feeds>"
+        // when one producer feeds both of a currency's numbers - so a fixture never
+        // silently gives two numbers one id, which rule 11 forbids and which would
+        // make a selector reach the wrong one.
+        public static ProducerDefinition MakeProducer(string id,
+            params (string currency, double amount, ProductionFeed feeds, Condition gate)[] lines)
+        {
+            // counted first, so BOTH of a doubled currency's lines get the suffix -
+            // one plain and one suffixed would read as if the plain id named the
+            // currency rather than one of its two numbers
+            var perCurrency = new Dictionary<string, int>();
+            foreach (var line in lines)
+                perCurrency[line.currency] = perCurrency.TryGetValue(line.currency, out var n) ? n + 1 : 1;
+
+            var contributions = new List<ProductionContribution>();
+            foreach (var line in lines)
+            {
+                var lineId = perCurrency[line.currency] > 1
+                    ? $"{id}_{line.currency}_{line.feeds}".ToLowerInvariant()
+                    : $"{id}_{line.currency}";
+                contributions.Add(Line(id, line.currency, line.amount, line.feeds, line.gate, lineId));
+            }
+            return MakeProducer(id, contributions);
+        }
+
+        // a jam producer whose single line feeds cash's YIELD - the probe for the
+        // per-firing modifier stack (the shape TapSystem was)
         public static ProductionSystem MakeTapProduction(double baseAmount, ModifierSystem modifiers,
             CurrencyManager currencies = null, FlagSystem flags = null)
         {
             currencies ??= MakeEconomy();
-            var producer = MakeProducer("jam", new List<ProductionConfig>
+            var producer = MakeProducer("jam", new List<ProductionContribution>
             {
-                new("cash", baseAmount, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
+                Line("jam", "cash", baseAmount, ProductionFeed.Yield),
             });
-            return new ProductionSystem(new[] { producer }, currencies, modifiers,
+            return new ProductionSystem(new[] { producer }, null, null, currencies, modifiers,
                 MakeContext(currencies, flags: flags));
         }
 
         // The fan-accrual path as the game authors it: a passive producer (no
-        // module) holding one tick config that composes FanRate, plus the derived
-        // per-bandmate Add registered on the modifier stack. Both halves together,
-        // because either alone is not the fan rate - the composed value is
-        // (base + perBandmate x bandmates) x rewards.
+        // module) holding the BASE fans rate, plus whatever fans lines the
+        // generators carry. Both halves together, because either alone is not the
+        // fan rate - the composed value is (base + each bandmate's line) x rewards,
+        // and the per-bandmate half is now a contribution rather than a derived Add.
         public static ProductionSystem MakeFanProduction(ModifierSystem modifiers,
             GeneratorSystem generators, ICurrencies currencies, ConditionContext conditions,
-            Condition gate = null, double baseFansPerSec = 0.2, double perBandmateOwnedBonus = 0.02)
+            Condition gate = null, double baseFansPerSec = 0.2)
         {
-            var producer = MakeProducer("band", new List<ProductionConfig>
+            var producer = MakeProducer("band", new List<ProductionContribution>
             {
-                new("fans", baseFansPerSec, ProductionTrigger.Tick, gate, ModifierTarget.CurrencyRate),
+                Line("band", "fans", baseFansPerSec, ProductionFeed.Rate, gate),
             });
-            modifiers.AddDerived(new BandmateFanRateModifier(generators, perBandmateOwnedBonus, "fans"));
-            return new ProductionSystem(new[] { producer }, currencies, modifiers, conditions);
+            return new ProductionSystem(new[] { producer }, generators, null, currencies, modifiers,
+                conditions);
         }
 
+        // A generator with ONE rate line, named "<id>_<currency>" - the shape
+        // almost every fixture wants, and the convention chapter 1 authors.
+        //
+        // isBandmate is no longer a field on the definition: it was a tag that never
+        // got the concept (design doc rule 10), and the fan bonus it drove is now an
+        // ordinary fans line on the generator. The parameter survives as fixture
+        // shorthand for exactly that - the `bandmate` tag plus a fans rate line -
+        // because what the tests using it mean is "a bandmate as the game authors
+        // one", not "a bool is set".
         public static GeneratorDefinition MakeGenerator(string id, string produces,
             double baseCost, double costGrowth, double baseOutput, Condition unlock = null,
-            bool isBandmate = false, string costCurrency = "cash")
+            bool isBandmate = false, string costCurrency = "cash", double fansPerUnit = 0.02)
         {
+            var contributions = new List<ProductionContribution>
+            {
+                Line(id, produces, baseOutput, ProductionFeed.Rate),
+            };
+            if (isBandmate)
+                contributions.Add(Line(id, "fans", fansPerUnit, ProductionFeed.Rate));
+
             var definition = Track(ScriptableObject.CreateInstance<GeneratorDefinition>());
-            definition.EditorInitialize(id, id, produces, isBandmate, costCurrency, baseCost, costGrowth, baseOutput, unlock);
+            definition.EditorInitialize(id, id, costCurrency, baseCost, costGrowth, contributions, unlock,
+                isBandmate ? new[] { "bandmate" } : null);
             return definition;
+        }
+
+        // What one generator's line for a currency is worth right now, and what one
+        // unit of it is. A generator has a LIST of lines now, so a fixture names the
+        // currency it means rather than asking for "the" output.
+        public static BigNumber LineValue(Generator generator, string currencyId = "cash")
+            => generator.ValueOf(LineFor(generator, currencyId));
+
+        public static BigNumber PerUnitLineValue(Generator generator, string currencyId = "cash")
+            => generator.PerUnitValueOf(LineFor(generator, currencyId));
+
+        public static ProductionContribution LineFor(Generator generator, string currencyId)
+        {
+            foreach (var contribution in generator.Contributions)
+            {
+                if (contribution != null && contribution.CurrencyId == currencyId)
+                    return contribution;
+            }
+            return null;
+        }
+
+        // The tick as the game runs it: a generator does not pay a currency, it
+        // contributes to the producer that does, so a fixture asserting what a fleet
+        // earns has to go through one. Built per call because these fixtures are
+        // about the numbers, not about the assembly.
+        public static void AccrueGenerators(GeneratorSystem generators, ICurrencies currencies,
+            ModifierSystem modifiers, double seconds, ConditionContext conditions = null)
+        {
+            var production = new ProductionSystem(System.Array.Empty<ProducerDefinition>(), generators, null,
+                currencies, modifiers, conditions ?? MakeContext(currencies, generators));
+            production.Accrue(seconds);
         }
 
         public static UpgradeDefinition MakeUpgrade(string id, UpgradeType type, ContentScope scope,
             Condition gate, GameEffect payload,
             string costCurrencyId = "cash", double costAmount = 0,
-            List<GameAction> actions = null)
+            List<GameAction> actions = null, List<ProductionContribution> contributions = null)
         {
             var definition = Track(ScriptableObject.CreateInstance<UpgradeDefinition>());
             definition.EditorInitialize(id, id, type, scope, costCurrencyId, costAmount,
-                gate, payload, actions);
+                gate, payload, actions, contributions);
             return definition;
         }
 
@@ -180,7 +262,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             List<string> upgradeIds = null, List<string> barGroupIds = null,
             List<string> eventIds = null, List<string> currencyIds = null,
             List<string> producerIds = null,
-            double perBandmateOwnedBonus = 0.02, double recordBuffPerRecord = 0.02,
+            double recordBuffPerRecord = 0.02,
             int index = 1, string fansCurrencyId = "fans",
             List<string> recordBuffAffects = null, Condition albumReleaseWhen = null,
             List<FlagDeclaration> flags = null, CapstoneConfig capstone = null,
@@ -200,7 +282,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var definition = Track(ScriptableObject.CreateInstance<ChapterDefinition>());
             definition.EditorInitialize(id, index, id, "",
                 new RecordBuffConfig(recordBuffPerRecord, recordBuffAffects ?? new List<string> { "cash" }),
-                new FansConfig(fansCurrencyId, perBandmateOwnedBonus),
+                new FansConfig(fansCurrencyId),
                 // null (the default) is a legal album gate: always offered
                 new AlbumConfig(albumReleaseWhen),
                 // an unauthored capstone by default: not every chapter declares one,
@@ -236,10 +318,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // The named helpers are just the friendly effect vocabulary, same as the
         // importer's - one reward type underneath.
         public static RewardDefinition MakeFanRateReward(string id, double value)
-            => MakeReward(id, new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, value));
+            => MakeReward(id, new GrantModifierEffect(Sel("fans_rate"), ModifierOperation.Multiply, value));
 
         public static RewardDefinition MakeTapValueReward(string id, double value)
-            => MakeReward(id, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Multiply, value));
+            => MakeReward(id, new GrantModifierEffect(Sel("cash_yield"), ModifierOperation.Multiply, value));
 
         public static RewardDefinition MakeSetFlagReward(string id, string flagId)
             => MakeReward(id, new SetFlagEffect(flagId));
@@ -255,6 +337,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // is placed Global like the real game's: it lives in the permanent pool,
         // which every economy routes to, so it is reachable from every chapter
         // without appearing in any chapter's roster.
+        // A modifier's address and a number's identity are two different things
+        // (rule 11): a grant carries a SELECTOR, a reader offers a SUBJECT. They
+        // used to be one ModifierTargetKey, which is why a fixture that granted
+        // and read through the same value now needs both.
+        public static ModifierSelector Sel(params string[] terms) => new(terms);
+
+        public static ModifierSubject Num(string id, params string[] tags) => new(id, tags);
+
+        // One of a currency's two producer numbers, by the id the runtime derives:
+        // `cash_rate`, `cash_yield`. Fixtures ask for it rather than spelling the
+        // string, so a change to how the id is formed cannot leave the tests
+        // agreeing with themselves and disagreeing with the game.
+        public static ModifierSubject RateOf(string currencyId)
+            => new(CurrencyProducer.NumberId(currencyId, ProductionFeed.Rate), null, currencyId);
+
+        public static ModifierSubject YieldOf(string currencyId)
+            => new(CurrencyProducer.NumberId(currencyId, ProductionFeed.Yield), null, currencyId);
+
         public static CurrencyGroupDefinition[] StandardGroups()
             => new[] { MakeGroup("run", true), MakeGroup("permanent", false, CurrencyPlacement.Global) };
 
@@ -342,5 +442,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Created.Add(created);
             return created;
         }
+    }
+
+    // The same two reads as extensions, for the call sites whose receiver is an
+    // expression rather than a local (`system.Get("drummer").LineValue()`).
+    internal static class GeneratorTestExtensions
+    {
+        public static BigNumber LineValue(this Generator generator, string currencyId = "cash")
+            => TestContent.LineValue(generator, currencyId);
+
+        public static BigNumber PerUnitLineValue(this Generator generator, string currencyId = "cash")
+            => TestContent.PerUnitLineValue(generator, currencyId);
     }
 }

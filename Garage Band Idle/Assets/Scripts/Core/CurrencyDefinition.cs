@@ -11,12 +11,8 @@ namespace RidiculousGaming.GarageBandIdle
     [CreateAssetMenu(
         fileName = "NewCurrency",
         menuName = "GarageBandIdle/Currency")]
-    public class CurrencyDefinition : ScriptableObject
+    public class CurrencyDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id used as the balance key. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         private string _displayName;
 
@@ -39,7 +35,6 @@ namespace RidiculousGaming.GarageBandIdle
         [SerializeField]
         private double _startingValue;
 
-        public string Id => _id;
         public string DisplayName => _displayName;
         public string GroupId => _groupId;
         public string Symbol => _symbol;
@@ -51,7 +46,7 @@ namespace RidiculousGaming.GarageBandIdle
         // generated like any other content; hand-authored ones are left alone
         public void EditorInitialize(string id, string displayName, string groupId)
         {
-            _id = id;
+            SetIdentity(id);
             _displayName = displayName;
             _groupId = groupId;
         }

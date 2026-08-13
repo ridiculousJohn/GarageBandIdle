@@ -139,6 +139,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public void Dispose()
         {
             Conditions?.Dispose();
+            Production?.Dispose();
             _router?.Dispose();
         }
 
@@ -249,16 +250,24 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Conditions.MarkDirty();
             ProjectModifiers();
 
+            // The restore replaced the upgrade LATCHES silently, and an applied
+            // upgrade's contributions are live exactly while its latch holds - so
+            // the set of things feeding a producer just changed with no event to
+            // hang it on. Assembling here is the counterpart to the projection
+            // above: one rebuilds the modifiers the surviving facts imply, the other
+            // rebuilds the production they imply.
+            Production.Assemble();
+
             // The bound is a diagnostic, not a tuning knob: a chapter's unlock chain
             // is a handful deep, so exhausting this means content whose gates
             // re-trigger each other rather than a legitimately long chain.
             //
-            // The passes are drained INSIDE a Settled deferral and the tap value is
+            // The passes are drained INSIDE a Settled deferral and the yields are
             // refreshed once at the end, so however many passes it takes, subscribers
             // see one settled signal describing finished state. Calling the public
             // Settle() per pass - which is what this did - published every
             // intermediate one: a section visible because pass one latched its flag,
-            // beside a tap value pass two had not yet moved. That is the half-derived
+            // beside a yield pass two had not yet moved. That is the half-derived
             // state the whole method exists to prevent, arriving through the seam
             // meant to guarantee its absence.
             const int maxPasses = 8;
@@ -275,9 +284,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 if (Conditions.IsDirty)
                     Debug.LogError($"EconomyContext: restore of chapter '{Chapter?.Id}' still had condition work pending after {maxPasses} drain passes - content whose unlocks re-trigger each other. Leaving it for the next tick.");
 
-                // inside the deferral, so the composed tap value is final before the
+                // inside the deferral, so the composed yields are final before the
                 // single Settled fires on the way out
-                Production.RefreshTapValue();
+                Production.RefreshYields();
             }
 
             using (Conditions.SuppressInvalidation())
@@ -353,20 +362,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             if (!IsFocused)
                 return;
 
-            // production composes its own modifiers per currency (the Records
-            // buff among them), so the tick passes no multipliers
-            Generators.Tick(seconds);
-
-            // fill currencies and fans accrue, then bars drain the pool into the
-            // active bar in the same tick, so a selected bar advances with no
-            // pool lag. Fan accrual is an ordinary module-held config here, which
-            // is what keeps it out of the idle payout (section 9: only
-            // generator-held configs idle-pay) - and it takes the FanRate
-            // composition, never the income multiplier, which holds as long as
-            // the chapter's fans currency stays out of recordBuff.affects.
-            // ContentValidator refuses it there, because time away must not
-            // shortcut the Records payout (section 11).
-            Production.Tick(seconds);
+            // Every currency's rate accrues in ONE pass - cash from the fleet, fans
+            // from the band, rehearsal from the trickle - because a rate is a rate
+            // whatever declared it (design doc section 12, rule 13). Each producer
+            // composes its own modifiers, the Records buff among them, so the tick
+            // passes no multipliers. The generator pass that used to run beside this
+            // is gone: it was the same operation over half the contributions, with
+            // its own composition of the same currency-wide number.
+            //
+            // Then bars drain the pool into the active bar in the same tick, so a
+            // selected bar advances with no pool lag. Fans take the fans rate's
+            // composition, never the income multiplier, which holds as long as the
+            // chapter's fans currency stays out of recordBuff.affects -
+            // ContentValidator refuses it there, because time away must not shortcut
+            // the Records payout (section 11).
+            Production.Accrue(seconds);
             Bars.Tick();
 
             // the tick has fully settled - production, drains, completions,
@@ -376,15 +386,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Settle();
         }
 
-        // The tap action for ONE producer: every tap-triggered config that producer
-        // holds fires - the cash yield (composed with every modifier targeting tap
-        // value: flat adds like stage_presence, event-tier multipliers) and the fill
-        // currencies alike. Chapter 1 passes "jam", the only tap surface it authors;
-        // the parameter exists so a second one (Merch/Sell) is a module entry and a
-        // producer asset rather than a rewrite of what a tap means.
-        public void Jam(string producerId)
+        // Firing ONE surface: every currency that contributor feeds a yield to pays
+        // out - cash (the base line plus whatever else contributes to cash's yield,
+        // stage_presence among them, all composed by cash's producer) and the fill
+        // currencies alike. Chapter 1 passes "jam", the only surface it authors; the
+        // parameter exists so a second one (Merch/Sell) is a module entry and a
+        // producer asset rather than a rewrite of what firing means.
+        //
+        // Named Fire rather than Jam because a jam is a chapter-1 noun: what the
+        // economy knows is that something fired, never what (rule 13).
+        public void Fire(string contributorId)
         {
-            Production.FireTap(producerId);
+            Production.Fire(contributorId);
 
             // drain immediately so the active bar visibly nudges on the tap, not
             // a tick later
@@ -597,10 +610,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             Conditions.Drain(_evaluateUnlocks);
 
-            // unconditional, unlike the drain: the tap value can move for
-            // reasons no condition input reports (a granted modifier), and
-            // RefreshTapValue already publishes only an actual move
-            Production.RefreshTapValue();
+            // unconditional, unlike the drain: a yield can move for reasons no
+            // condition input reports (a granted modifier), and RefreshYields
+            // already publishes only an actual move
+            Production.RefreshYields();
         }
 
         // What the drain evaluates: content unlocks, the only reveal that is

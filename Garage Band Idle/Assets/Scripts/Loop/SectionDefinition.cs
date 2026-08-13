@@ -55,12 +55,8 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     [CreateAssetMenu(
         fileName = "NewSection",
         menuName = "GarageBandIdle/Section")]
-    public class SectionDefinition : ScriptableObject
+    public class SectionDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         private string _displayName;
 
@@ -76,7 +72,6 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             "and the section inherits that fact's lifetime.")]
         private Condition _visibleWhen;
 
-        public string Id => _id;
         public string DisplayName => _displayName;
         public IReadOnlyList<SectionModule> Modules => _modules;
         public Condition VisibleWhen => _visibleWhen;
@@ -86,7 +81,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         public void EditorInitialize(string id, string displayName, List<SectionModule> modules,
             Condition visibleWhen)
         {
-            _id = id;
+            SetIdentity(id);
             _displayName = displayName;
             _modules = modules;
             _visibleWhen = visibleWhen;

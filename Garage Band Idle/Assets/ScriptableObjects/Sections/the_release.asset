@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: the_release
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: the_release
+  _tags: []
   _displayName: The Release
   _modules:
   - _address: module/release

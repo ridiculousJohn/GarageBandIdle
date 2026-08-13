@@ -35,8 +35,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly ModifierSystem _modifiers;
         private readonly ConditionContext _conditions;
 
-        private readonly ModifierTargetKey _rateTarget;
-        private readonly ModifierTargetKey _yieldTarget;
+        private readonly ModifierSubject _rateSubject;
+        private readonly ModifierSubject _yieldSubject;
 
         public CurrencyProducer(string currencyId, ICurrencies currencies, ModifierSystem modifiers,
             ConditionContext conditions)
@@ -45,18 +45,29 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _currencies = currencies;
             _modifiers = modifiers;
             _conditions = conditions;
-            _rateTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, CurrencyId);
-            _yieldTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyYield, CurrencyId);
+            _rateSubject = new ModifierSubject(NumberId(CurrencyId, ProductionFeed.Rate), null, CurrencyId);
+            _yieldSubject = new ModifierSubject(NumberId(CurrencyId, ProductionFeed.Yield), null, CurrencyId);
         }
 
         public string CurrencyId { get; }
 
-        // The addresses modifiers reach this producer's two numbers at, exposed
-        // for the same reason Generator.OutputTarget is: a display asking
-        // whether a composition change is one of its own must not rebuild the
-        // key and risk a different answer than the composition used.
-        public ModifierTargetKey RateTarget => _rateTarget;
-        public ModifierTargetKey YieldTarget => _yieldTarget;
+        // The id of one of a producer's two numbers (rule 11). Derived from the
+        // currency and the quantity rather than authored, so it cannot drift from
+        // the producer it belongs to and no chapter has to write two ids per
+        // currency. `cash_rate` names the aggregate; a contribution feeding it has
+        // its own id, so no selector reaches both and a multiplier can never apply
+        // once per line and again over their sum.
+        public static string NumberId(string currencyId, ProductionFeed feed)
+            => feed == ProductionFeed.Yield ? $"{currencyId}_yield" : $"{currencyId}_rate";
+
+        // What this producer's two numbers ARE, for a selector to match: each has
+        // its own id and carries the currency as its OWNER, so ["cash_rate"]
+        // reaches one and ["cash"] reaches both. Exposed for the same reason
+        // Generator.Subject is: a display asking whether a composition change is
+        // one of its own must not rebuild the subject and risk a different answer
+        // than the composition used.
+        public ModifierSubject RateSubject => _rateSubject;
+        public ModifierSubject YieldSubject => _yieldSubject;
 
         public IReadOnlyList<ProductionEntry> RateContributions => _rate;
         public IReadOnlyList<ProductionEntry> YieldContributions => _yield;
@@ -115,8 +126,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
-        public BigNumber Rate => Compose(_rate, _rateTarget);
-        public BigNumber Yield => Compose(_yield, _yieldTarget);
+        public BigNumber Rate => Compose(_rate, _rateSubject);
+        public BigNumber Yield => Compose(_yield, _yieldSubject);
 
         // Whether anything can feed this number RIGHT NOW - gates honoured, not
         // a count of authored entries. It answers "is there a rate to show"
@@ -179,7 +190,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // nothing feeding it, or out of one whose every contribution is gated
         // off. Anything landing below zero yields nothing and no multiplier
         // resurrects it, so production can never drain a balance.
-        private BigNumber Compose(List<ProductionEntry> entries, ModifierTargetKey target)
+        private BigNumber Compose(List<ProductionEntry> entries, in ModifierSubject subject)
         {
             var live = false;
             var total = BigNumber.Zero;
@@ -196,7 +207,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             if (!live)
                 return BigNumber.Zero;
 
-            var composed = _modifiers.For(target).ApplyTo(total);
+            var composed = _modifiers.For(subject).ApplyTo(total);
             return composed < BigNumber.Zero ? BigNumber.Zero : composed;
         }
 

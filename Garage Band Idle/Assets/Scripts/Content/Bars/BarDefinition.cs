@@ -10,12 +10,8 @@ namespace RidiculousGaming.GarageBandIdle.Content
     [CreateAssetMenu(
         fileName = "NewBar",
         menuName = "GarageBandIdle/Bar")]
-    public class BarDefinition : ScriptableObject
+    public class BarDefinition : Definition
     {
-        [SerializeField]
-        [Tooltip("Stable string id. Never rename once saves exist.")]
-        private string _id;
-
         [SerializeField]
         private string _displayName;
 
@@ -33,7 +29,6 @@ namespace RidiculousGaming.GarageBandIdle.Content
         [Tooltip("Reward pool id applied on completion (RewardManager).")]
         private string _rewardId;
 
-        public string Id => _id;
         public string DisplayName => _displayName;
         public string FillCurrencyId => _fillCurrencyId;
         public double FillRequirement => _fillRequirement;
@@ -44,7 +39,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         public void EditorInitialize(string id, string displayName, string fillCurrencyId,
             double fillRequirement, string rewardId)
         {
-            _id = id;
+            SetIdentity(id);
             _displayName = displayName;
             _fillCurrencyId = fillCurrencyId;
             _fillRequirement = fillRequirement;

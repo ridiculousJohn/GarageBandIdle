@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: tap_value_x1_25
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.RewardDefinition
   _id: tap_value_x1_25
+  _tags: []
   _displayName: "Tap Value \xD71.25"
   _effect:
     rid: 1001
@@ -22,8 +23,8 @@ MonoBehaviour:
     - rid: 1001
       type: {class: GrantModifierEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        _target: 5
-        _qualifiers:
-        - cash
+        _selector:
+          _terms:
+          - cash_yield
         _operation: 2
         _value: 1.25

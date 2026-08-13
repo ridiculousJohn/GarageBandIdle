@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: garage_floor
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: garage_floor
+  _tags: []
   _displayName: The Garage Floor
   _modules:
   - _address: module/currency-header

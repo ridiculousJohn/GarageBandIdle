@@ -23,7 +23,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly ICurrencies _currencies;
         private readonly string _recordsCurrencyId;
         private readonly double _perRecord;
-        private readonly ModifierTargetKey _target;
+        private readonly ModifierSelector _selector;
 
         public RecordsIncomeModifier(ICurrencies currencies, string recordsCurrencyId,
             double perRecord, string affectedCurrencyId)
@@ -31,10 +31,17 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             _currencies = currencies;
             _recordsCurrencyId = recordsCurrencyId;
             _perRecord = perRecord;
-            _target = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, affectedCurrencyId);
+            // the id of that currency's RATE, not the currency: a permanent income
+            // buff scales what accrues per second and must not also scale what a
+            // press pays. Naming the currency would reach both numbers and every
+            // line feeding them, applying once per line and again over their sum.
+            _selector = new ModifierSelector(new[]
+            {
+                CurrencyProducer.NumberId(affectedCurrencyId, ProductionFeed.Rate),
+            });
         }
 
-        public override ModifierTargetKey Target => _target;
+        public override ModifierSelector Selector => _selector;
 
         public override ModifierOperation Operation => ModifierOperation.Multiply;
 

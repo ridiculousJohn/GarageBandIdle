@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: cover_1
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.BarDefinition
   _id: cover_1
+  _tags: []
   _displayName: Three-Chord Anthem
   _fillCurrencyId: rehearsal
   _fillRequirement: 120

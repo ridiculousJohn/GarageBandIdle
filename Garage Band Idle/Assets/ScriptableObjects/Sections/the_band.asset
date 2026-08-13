@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: the_band
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: the_band
+  _tags: []
   _displayName: The Band
   _modules:
   - _address: module/generator-list

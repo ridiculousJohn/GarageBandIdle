@@ -62,10 +62,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var recordsGen = new Generator(TestContent.MakeGenerator("records_gen", "records", 10, 1.15, 50), modifiers);
             TestContent.BuyTimes(cashGen, currencies, 4);
             TestContent.BuyTimes(recordsGen, currencies, 2);
-            var generators = new[] { cashGen, recordsGen };
-
-            var cashPerSecond = ProductionCalculator.TotalPerSecond(generators, "cash");
-            var recordsPerSecond = ProductionCalculator.TotalPerSecond(generators, "records");
+            // Each generator's LINE for a currency, not a helper that sums the fleet:
+            // summing one currency's generator output was half of that currency's
+            // rate, and the other half lived in ProductionSystem. A currency's rate
+            // is its producer's now, summed and composed in one place.
+            var cashPerSecond = cashGen.LineValue("cash");
+            var recordsPerSecond = recordsGen.LineValue("records");
 
             Assert.AreEqual(12.0, cashPerSecond.ToDouble(), 1e-9);   // 3 x 4 owned
             Assert.AreEqual(100.0, recordsPerSecond.ToDouble(), 1e-9); // 50 x 2 owned
@@ -80,17 +82,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var modifiers = new ModifierSystem();
             var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 5), modifiers);
             TestContent.BuyTimes(generator, currencies, 2);
-            Assert.AreEqual(10.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "5 output x 2 owned");
+            Assert.AreEqual(10.0, TestContent.LineValue(generator).ToDouble(), 1e-9, "5 output x 2 owned");
 
-            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "gen"),
+            modifiers.Grant(TestContent.Sel("gen"),
                 ModifierOperation.Multiply, ContentScope.Run, 1.5);
 
-            Assert.AreEqual(15.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "5 x 2 x 1.5");
+            Assert.AreEqual(15.0, TestContent.LineValue(generator).ToDouble(), 1e-9, "5 x 2 x 1.5");
 
             // a modifier naming another generator never reaches this one
-            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "someone_else"),
+            modifiers.Grant(TestContent.Sel("someone_else"),
                 ModifierOperation.Multiply, ContentScope.Run, 10);
-            Assert.AreEqual(15.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "another generator's buff is not ours");
+            Assert.AreEqual(15.0, TestContent.LineValue(generator).ToDouble(), 1e-9, "another generator's buff is not ours");
         }
 
         // the per-unit figure a row shows beside the total is derived from the
@@ -101,42 +103,46 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var currencies = TestContent.MakeEconomy();
             var modifiers = new ModifierSystem();
-            var target = ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "gen");
+            var target = TestContent.Num("gen");
+            var targetSel = TestContent.Sel("gen");
             var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 0.4), modifiers);
 
-            Assert.AreEqual(0.4, generator.PerUnitProduction.ToDouble(), 1e-9,
+            Assert.AreEqual(0.4, TestContent.PerUnitLineValue(generator).ToDouble(), 1e-9,
                 "unowned, the row previews what the first unit would produce");
 
             TestContent.BuyTimes(generator, currencies, 5);
-            Assert.AreEqual(0.4, generator.PerUnitProduction.ToDouble(), 1e-9);
+            Assert.AreEqual(0.4, TestContent.PerUnitLineValue(generator).ToDouble(), 1e-9);
 
-            modifiers.Grant(target, ModifierOperation.Multiply, ContentScope.Run, 2);
+            modifiers.Grant(targetSel, ModifierOperation.Multiply, ContentScope.Run, 2);
 
-            Assert.AreEqual(0.8, generator.PerUnitProduction.ToDouble(), 1e-9, "0.4 x 2, the buff reaches the per-unit");
-            Assert.AreEqual(4.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "0.4 x 5 x 2");
-            Assert.AreEqual(generator.ProductionPerSecond.ToDouble(),
-                (generator.PerUnitProduction * generator.Owned).ToDouble(), 1e-9,
+            Assert.AreEqual(0.8, TestContent.PerUnitLineValue(generator).ToDouble(), 1e-9, "0.4 x 2, the buff reaches the per-unit");
+            Assert.AreEqual(4.0, TestContent.LineValue(generator).ToDouble(), 1e-9, "0.4 x 5 x 2");
+            Assert.AreEqual(TestContent.LineValue(generator).ToDouble(),
+                (TestContent.PerUnitLineValue(generator) * generator.Owned).ToDouble(), 1e-9,
                 "owned x each == the total the row shows beside it");
         }
 
-        // an Add on the target is a fleet-level lump, so the per-unit spreads it
-        // across the units rather than paying it once per unit - the identity
-        // holds for the operation that could most easily break it
+        // The fleet-level-lump case is gone with Add itself (rule 11): a flat bonus
+        // is a contribution to the number it raises, so "+20 to this generator's
+        // output" is not expressible as a modifier and the question it raised -
+        // +20 to the fleet or +20 to each unit - is unsayable rather than answered
+        // by a division. What remains is the identity, which a multiplier keeps
+        // trivially and which the row still depends on.
         [Test]
-        public void PerUnitProduction_SpreadsAnAddAcrossTheFleet()
+        public void PerUnitProduction_TimesOwned_IsAlwaysTheTotal()
         {
             var currencies = TestContent.MakeEconomy();
             var modifiers = new ModifierSystem();
             var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 5), modifiers);
             TestContent.BuyTimes(generator, currencies, 4);
 
-            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "gen"),
-                ModifierOperation.Add, ContentScope.Run, 20);
+            modifiers.Grant(TestContent.Sel("gen"),
+                ModifierOperation.Multiply, ContentScope.Run, 3);
 
-            Assert.AreEqual(40.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "(5 x 4) + 20");
-            Assert.AreEqual(10.0, generator.PerUnitProduction.ToDouble(), 1e-9, "40 / 4, not 5 + 20");
-            Assert.AreEqual(generator.ProductionPerSecond.ToDouble(),
-                (generator.PerUnitProduction * generator.Owned).ToDouble(), 1e-9);
+            Assert.AreEqual(60.0, TestContent.LineValue(generator).ToDouble(), 1e-9, "5 x 4 x 3");
+            Assert.AreEqual(15.0, TestContent.PerUnitLineValue(generator).ToDouble(), 1e-9, "5 x 3");
+            Assert.AreEqual(TestContent.LineValue(generator).ToDouble(),
+                (TestContent.PerUnitLineValue(generator) * generator.Owned).ToDouble(), 1e-9);
         }
 
         [Test]
@@ -144,21 +150,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, -5), new ModifierSystem());
 
-            Assert.AreEqual(0.0, generator.PerUnitProduction.ToDouble(), 1e-9, "never advertises negative output");
+            Assert.AreEqual(0.0, TestContent.PerUnitLineValue(generator).ToDouble(), 1e-9, "never advertises negative output");
         }
 
-        // an unowned generator produces nothing whatever targets it: a flat add
-        // must never pay out for gear the player never bought
+        // an unowned generator produces nothing whatever reaches it: a multiplier on
+        // gear the player never bought scales zero, which is the only answer that
+        // cannot pay out
         [Test]
-        public void ProductionPerSecond_IsZeroWhileUnowned_EvenWithAnAddModifier()
+        public void ProductionPerSecond_IsZeroWhileUnowned_WhateverReachesIt()
         {
             var modifiers = new ModifierSystem();
             var generator = new Generator(TestContent.MakeGenerator("gen", "cash", 10, 1.15, 5), modifiers);
 
-            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.GeneratorOutput, "gen"),
-                ModifierOperation.Add, ContentScope.Run, 100);
+            modifiers.Grant(TestContent.Sel("gen"),
+                ModifierOperation.Multiply, ContentScope.Run, 100);
 
-            Assert.AreEqual(0.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "nothing owned, nothing produced");
+            Assert.AreEqual(0.0, TestContent.LineValue(generator).ToDouble(), 1e-9, "nothing owned, nothing produced");
         }
 
         [Test]
@@ -170,7 +177,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(system.Get("amp"), currencies, 1);
             var before = currencies.Get("cash");
 
-            system.Tick(10.0);
+            TestContent.AccrueGenerators(system, currencies, new ModifierSystem(), 10.0);
 
             Assert.AreEqual(4.0, (currencies.Get("cash") - before).ToDouble(), 1e-9); // 0.4/sec x 10s
         }
@@ -191,9 +198,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var cashBefore = currencies.Get("cash");
             var fansBefore = currencies.Get("fans");
 
-            modifiers.Grant(ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash"),
+            modifiers.Grant(TestContent.Sel("cash_rate"),
                 ModifierOperation.Multiply, ContentScope.Run, 2.0);
-            system.Tick(10.0);
+            TestContent.AccrueGenerators(system, currencies, modifiers, 10.0);
 
             Assert.AreEqual(60.0, (currencies.Get("cash") - cashBefore).ToDouble(), 1e-9); // 3 x 2 x 10s
             Assert.AreEqual(50.0, (currencies.Get("fans") - fansBefore).ToDouble(), 1e-9,
@@ -214,8 +221,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestContent.BuyTimes(system.Get("fans_gen"), currencies, 1);
             modifiers.AddDerived(new RecordsIncomeModifier(currencies, "records", 0.02, "cash"));
 
-            var cashTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
-            var fansTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "fans");
+            var cashTarget = TestContent.RateOf("cash");
+            var cashTargetSel = TestContent.Sel("cash_rate");
+            var fansTarget = TestContent.RateOf("fans");
             Assert.AreEqual(1.0, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "no records, no bonus");
 
             currencies.Add("records", 10);
@@ -228,7 +236,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // rebuilding the grant store leaves derived modifiers standing: the
             // Records total is what governs this buff's lifetime, and a total in
             // a pool no release touches needs nothing re-applied
-            modifiers.Grant(cashTarget, ModifierOperation.Multiply, ContentScope.Run, 3.0);
+            modifiers.Grant(cashTargetSel, ModifierOperation.Multiply, ContentScope.Run, 3.0);
             Assert.AreEqual(3.6, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "granted x derived");
             modifiers.ResetGranted();
             Assert.AreEqual(1.2, modifiers.For(cashTarget).Multiply.ToDouble(), 1e-9, "the derived buff survives");
@@ -245,7 +253,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currencies = TestContent.MakeEconomy();
             var modifiers = new ModifierSystem();
             modifiers.AddDerived(new RecordsIncomeModifier(currencies, "records", 0.02, "cash"));
-            var cashTarget = ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
+            var cashTarget = TestContent.RateOf("cash");
             var gate = new RecordsCumulativeCondition(10);
             var context = TestContent.MakeContext(currencies);
 
@@ -286,7 +294,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var generator = new Generator(TestContent.MakeGenerator("leak", "cash", 10, 1.15, -5), new ModifierSystem());
             TestContent.BuyTimes(generator, currencies, 1);
 
-            Assert.AreEqual(0.0, generator.ProductionPerSecond.ToDouble(), 1e-9, "never negative production");
+            Assert.AreEqual(0.0, TestContent.LineValue(generator).ToDouble(), 1e-9, "never negative production");
         }
 
         // fail closed on broken content: a non-positive cost (invalid data -

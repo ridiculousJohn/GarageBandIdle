@@ -5,14 +5,21 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // The one home for every stat modifier in the game. Systems do not keep
-    // their own multiplier stacks: each asks for the composition on its target
-    // and applies it, so there is one composition rule, one reset, and one
-    // shape to save. A new effect kind is a handler that grants a modifier -
+    // their own multiplier stacks: each asks for the composition on the number
+    // it owns and applies it, so there is one composition rule, one reset, and
+    // one shape to save. A new effect kind is a handler that grants a modifier -
     // no new state, no new reset call, no new save field.
     //
-    // Two kinds live here. A GRANTED modifier is a fact established at a
-    // moment (a bought buff, a completed bar, a cleared event tier) and carries
-    // a ContentScope because nothing else records how long it lasts. A DERIVED
+    // A modifier says which numbers it reaches with a ModifierSelector, and a
+    // number says what it is with a ModifierSubject (design doc section 12, rule
+    // 11). Nothing here names a stat: there is no enum of modifiable things,
+    // because a modifiable number is identified by its own id and tags like every
+    // other reference in the game. That is what lets one generator's cash line be
+    // buffed without touching its fans line.
+    //
+    // Two kinds live here. A GRANTED modifier is a fact established at a moment
+    // (a bought buff, a completed bar, a cleared event tier) and carries a
+    // ContentScope because nothing else records how long it lasts. A DERIVED
     // modifier computes from a source that has its own lifetime and carries no
     // scope (see DerivedModifier).
     //
@@ -23,56 +30,66 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     {
         private class Granted
         {
+            public ModifierSelector Selector;
             public ModifierOperation Operation;
             public ContentScope Scope;
             public BigNumber Value;
         }
 
-        private readonly Dictionary<ModifierTargetKey, List<Granted>> _granted = new();
-        private readonly Dictionary<ModifierTargetKey, List<DerivedModifier>> _derived = new();
+        // Flat lists rather than a dictionary keyed by address. A selector is not
+        // a lookup key - it describes a SET, and which numbers fall in it is a
+        // question about each number, not about a string. Composition therefore
+        // walks what was granted, which is bounded by how many modifiers exist
+        // rather than by how much content does; the dictionary it replaced had to
+        // union two buckets by hand to express "reaches everything" and still
+        // could not express a set.
+        private readonly List<Granted> _granted = new();
+        private readonly List<DerivedModifier> _derived = new();
 
-        // fires after a target's composition changes. Systems that advertise a
-        // composed value re-broadcast it (ProductionSystem drives the Jam label
-        // this way, so the button can never show a stale amount).
-        public event Action<ModifierTargetKey> Changed;
+        // fires after the modifiers matching a selector change, carrying that
+        // selector. A subscriber asks it about its own subject, which is the same
+        // question the composition asks, so a display can never refresh on a
+        // modifier the composition ignored or miss one it counted.
+        public event Action<ModifierSelector> Changed;
 
-        // nesting depth of deferral scopes, and the targets touched while deferring
+        // nesting depth of deferral scopes, and the selectors touched while deferring
         private int _deferDepth;
-        private List<ModifierTargetKey> _deferred;
+        private List<ModifierSelector> _deferred;
 
-        public void Grant(ModifierTargetKey target, ModifierOperation operation, ContentScope scope, BigNumber value)
+        public void Grant(ModifierSelector selector, ModifierOperation operation, ContentScope scope,
+            BigNumber value)
         {
-            if (!IsAddressable(target, operation, "Grant"))
+            if (!IsWellFormed(operation, selector, "Grant"))
                 return;
 
             // fail closed on broken content: a modifier with no scope has no
             // lifetime, so nothing could ever reset it correctly
             if (scope == ContentScope.None)
             {
-                Debug.LogError($"ModifierSystem: Grant on '{target}' with scope None. Ignoring - an unscoped modifier has no lifetime.");
+                Debug.LogError($"ModifierSystem: Grant on '{selector}' with scope None. Ignoring - an unscoped modifier has no lifetime.");
                 return;
             }
 
-            if (!IsApplicable(target, operation, value, "Grant"))
+            if (!IsApplicable(selector, operation, value, "Grant"))
                 return;
 
-            if (!_granted.TryGetValue(target, out var grants))
+            _granted.Add(new Granted
             {
-                grants = new List<Granted>();
-                _granted.Add(target, grants);
-            }
-
-            grants.Add(new Granted { Operation = operation, Scope = scope, Value = value });
-            Raise(target);
+                Selector = selector,
+                Operation = operation,
+                Scope = scope,
+                Value = value,
+            });
+            Raise(selector);
         }
 
         // Defers Changed for the duration of a rebuild (design doc section 12, rule
         // 6). A projection CLEARS the store and then re-grants from the surviving
-        // facts, so it necessarily passes through a state where a target's
+        // facts, so it necessarily passes through a state where a number's
         // composition is wrong - every grant not yet re-applied is missing. Nothing
         // may observe that: GeneratorListModule refreshes a row's rate off this
         // event, so an undeferred projection redraws the fleet once per cleared
-        // target and once per re-grant, each read against a half-rebuilt store.
+        // selector and once per re-grant, each read against a half-rebuilt store.
         //
         // Silencing the restore's FACT primitives is not enough on its own, which is
         // the whole reason this exists - the projection between them is the loudest
@@ -97,24 +114,24 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
             var pending = _deferred;
             _deferred = null;
-            foreach (var target in pending)
-                Changed?.Invoke(target);
+            foreach (var selector in pending)
+                Changed?.Invoke(selector);
         }
 
-        // One target, once, in the order it was first touched: a projection grants
-        // several modifiers per target, and a subscriber only needs to know the
-        // composition moved.
-        private void Raise(ModifierTargetKey target)
+        // One selector, once, in the order it was first touched: a projection
+        // grants several modifiers against the same set, and a subscriber only
+        // needs to know its composition moved.
+        private void Raise(ModifierSelector selector)
         {
             if (_deferDepth == 0)
             {
-                Changed?.Invoke(target);
+                Changed?.Invoke(selector);
                 return;
             }
 
-            _deferred ??= new List<ModifierTargetKey>();
-            if (!_deferred.Contains(target))
-                _deferred.Add(target);
+            _deferred ??= new List<ModifierSelector>();
+            if (!_deferred.Contains(selector))
+                _deferred.Add(selector);
         }
 
         // boot-time registration for a modifier that computes its own value;
@@ -127,68 +144,37 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 Debug.LogError("ModifierSystem: AddDerived with no modifier. Ignoring.");
                 return;
             }
-            if (!IsAddressable(modifier.Target, modifier.Operation, "AddDerived"))
+            if (!IsWellFormed(modifier.Operation, modifier.Selector, "AddDerived"))
                 return;
 
-            if (!_derived.TryGetValue(modifier.Target, out var derived))
-            {
-                derived = new List<DerivedModifier>();
-                _derived.Add(modifier.Target, derived);
-            }
-
-            derived.Add(modifier);
-            Raise(modifier.Target);
+            _derived.Add(modifier);
+            Raise(modifier.Selector);
         }
 
-        // Everything modifying this target, composed. Derived values are read
+        // Everything modifying this number, composed. Derived values are read
         // here on every call, which is why they can never be stale.
         //
-        // Two buckets, not one: the target's own key, plus the UNQUALIFIED key of
-        // its kind, which by rule 11 reaches every member in scope. Composing
-        // only the exact key would make "double every generator's output" a
-        // modifier that addresses nothing, and composing by walking every stored
-        // key would make an unrelated qualifier's cost proportional to how much
-        // content exists. Asking Covers keeps the rule in one place - the change
-        // notification asks the same question, so a row can never refresh on a
-        // grant the composition ignored, or miss one it counted.
-        public ModifierComposition For(ModifierTargetKey target)
+        // Each modifier is asked whether its selector reaches this subject, and
+        // the subject answers per term. One rule, asked in one place - the change
+        // notification asks the same one, so a row can never refresh on a grant
+        // the composition ignored, or miss one it counted.
+        public ModifierComposition For(in ModifierSubject subject)
         {
-            var add = BigNumber.Zero;
             var multiply = BigNumber.One;
 
-            Accumulate(target, ref add, ref multiply);
-
-            // a request that is itself unqualified IS that bucket; adding it
-            // again would square every multiplier it holds
-            if (target.IsQualified)
-                Accumulate(ModifierTargetKey.All(target.Kind), ref add, ref multiply);
-
-            return new ModifierComposition(add, multiply);
-        }
-
-        private void Accumulate(ModifierTargetKey key, ref BigNumber add, ref BigNumber multiply)
-        {
-            if (_granted.TryGetValue(key, out var grants))
+            foreach (var granted in _granted)
             {
-                for (var i = 0; i < grants.Count; i++)
-                {
-                    if (grants[i].Operation == ModifierOperation.Add)
-                        add += grants[i].Value;
-                    else
-                        multiply *= grants[i].Value;
-                }
+                if (granted.Selector.Matches(subject))
+                    multiply *= granted.Value;
             }
 
-            if (!_derived.TryGetValue(key, out var derived))
-                return;
-
-            for (var i = 0; i < derived.Count; i++)
+            foreach (var derived in _derived)
             {
-                if (derived[i].Operation == ModifierOperation.Add)
-                    add += derived[i].Value;
-                else
-                    multiply *= derived[i].Value;
+                if (derived.Selector.Matches(subject))
+                    multiply *= derived.Value;
             }
+
+            return new ModifierComposition(multiply);
         }
 
         // Empties the grant store so a projection can rebuild it (design doc
@@ -208,89 +194,63 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // afterwards - EconomyContext.ProjectModifiers is the only caller, and
         // it does both halves.
         //
-        // Every target settles before any notification fires, so no subscriber
-        // observes one target cleared while another still holds its grants
-        // (state, then notify). Returns whether anything changed, so a no-op
-        // stays silent.
+        // Every grant settles before any notification fires, so no subscriber
+        // observes one set cleared while another still holds its grants (state,
+        // then notify). Returns whether anything changed, so a no-op stays silent.
         public bool ResetGranted()
         {
             if (_granted.Count == 0)
                 return false;
 
-            List<ModifierTargetKey> cleared = null;
-            foreach (var entry in _granted)
+            var cleared = new List<ModifierSelector>();
+            foreach (var granted in _granted)
             {
-                if (entry.Value.Count == 0)
-                    continue;
-
-                entry.Value.Clear();
-                cleared ??= new List<ModifierTargetKey>();
-                cleared.Add(entry.Key);
+                if (!cleared.Contains(granted.Selector))
+                    cleared.Add(granted.Selector);
             }
 
-            if (cleared == null)
-                return false;
+            _granted.Clear();
 
-            foreach (var target in cleared)
-                Raise(target);
+            foreach (var selector in cleared)
+                Raise(selector);
             return true;
         }
 
-        // a target that names nothing, or names something its kind has no room
-        // for, would silently modify a value nobody reads
-        private static bool IsAddressable(ModifierTargetKey target, ModifierOperation operation, string source)
+        // A serialized enum is an int, so an asset can hold a value no member
+        // defines. Both writers (Grant, AddDerived) come through here, which is
+        // what keeps such a value out of the store entirely: an undefined
+        // operation is the dangerous one, because IsApplicable's value guard tests
+        // for Multiply by name, so it would skip the guard and then compose as a
+        // multiply anyway - a zero there wipes the whole product for the rest of
+        // the run.
+        //
+        // There is no check on the selector's SHAPE, because every shape is legal:
+        // an empty selector reaches everything by rule 11, and a term naming
+        // nothing reachable is a content error boot validation reports against the
+        // asset that authored it, where the id can be named. Refusing it here
+        // would mean this class knowing what content exists.
+        private static bool IsWellFormed(ModifierOperation operation, ModifierSelector selector, string source)
         {
-            // A serialized enum is an int, so an asset can hold a value no member
-            // defines. Both writers (Grant, AddDerived) come through here, which is
-            // what keeps such a value out of the store entirely: an undefined target
-            // would be filed as global and read by nobody, and an undefined
-            // operation is worse - IsApplicable's value guards test for Multiply and
-            // Add by name, so it would skip them all and then compose as a multiply.
-            if (!Enum.IsDefined(typeof(ModifierTarget), target.Kind))
-            {
-                Debug.LogError($"ModifierSystem: {source} with target kind {(int)target.Kind}, which no ModifierTarget defines. Ignoring.");
-                return false;
-            }
-            if (target.Kind == ModifierTarget.None)
-            {
-                Debug.LogError($"ModifierSystem: {source} with target kind None (uninitialized). Ignoring.");
-                return false;
-            }
             if (!Enum.IsDefined(typeof(ModifierOperation), operation))
             {
-                Debug.LogError($"ModifierSystem: {source} on '{target}' with operation {(int)operation}, which no ModifierOperation defines. Ignoring.");
+                Debug.LogError($"ModifierSystem: {source} on '{selector}' with operation {(int)operation}, which no ModifierOperation defines. Ignoring.");
                 return false;
             }
             if (operation == ModifierOperation.None)
             {
-                Debug.LogError($"ModifierSystem: {source} on '{target}' with operation None (uninitialized). Ignoring.");
-                return false;
-            }
-            // An ABSENT qualifier is legal on every kind and means "every member
-            // in reach" (rule 11), so there is no refusal for one here - the old
-            // check read an unqualified key as addressing nothing, which is the
-            // opposite of what it now means. A qualifier on a kind with no
-            // definition family is still refused: nothing could resolve it, so it
-            // would file a modifier under a key no reader ever asks for.
-            if (target.IsQualified && !ModifierTargetKey.AcceptsQualifier(target.Kind))
-            {
-                Debug.LogError($"ModifierSystem: {source} on '{target.Kind}' carries a qualifier '{target.Qualifier}', which that target has no id family to resolve against. Ignoring.");
+                Debug.LogError($"ModifierSystem: {source} on '{selector}' with operation None (uninitialized). Ignoring.");
                 return false;
             }
             return true;
         }
 
         // fail closed on tuning that would break the composition it lands in
-        private static bool IsApplicable(ModifierTargetKey target, ModifierOperation operation, BigNumber value, string source)
+        private static bool IsApplicable(ModifierSelector selector, ModifierOperation operation,
+            BigNumber value, string source)
         {
             if (operation == ModifierOperation.Multiply && value <= BigNumber.Zero)
             {
-                Debug.LogError($"ModifierSystem: {source} on '{target}' with a non-positive Multiply value '{value.ToDouble()}'. Ignoring - it would zero or negate the whole product.");
-                return false;
-            }
-            if (operation == ModifierOperation.Add && value < BigNumber.Zero)
-            {
-                Debug.LogError($"ModifierSystem: {source} on '{target}' with a negative Add value '{value.ToDouble()}'. Ignoring.");
+                Debug.LogError($"ModifierSystem: {source} on '{selector}' with a non-positive Multiply value '{value.ToDouble()}'. Ignoring - it would zero or negate the whole product.");
                 return false;
             }
             return true;

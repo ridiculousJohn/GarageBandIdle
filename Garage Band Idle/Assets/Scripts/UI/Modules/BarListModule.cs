@@ -180,7 +180,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
                 var line = $"{definition.DisplayName}: {NumberFormatter.Format(_context.Economy.Currencies.Get(pool.CurrencyId))}";
                 if (production.HasProduction(pool.CurrencyId))
-                    line += $" (+{NumberFormatter.Format(production.RatePerSecond(pool.CurrencyId))}/sec, +{NumberFormatter.Format(production.PerTap(pool.CurrencyId))}/tap)";
+                    line += $" (+{NumberFormatter.Format(production.RateOf(pool.CurrencyId))}/sec, +{NumberFormatter.Format(production.YieldOf(pool.CurrencyId))}/tap)";
                 lines.Add(line);
             }
             _poolLabel.text = string.Join("\n", lines);

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Content;
 using RidiculousGaming.GarageBandIdle.Economy;
@@ -181,12 +182,11 @@ namespace RidiculousGaming.GarageBandIdle
             ConditionEvaluator.Validate(chapter.Album.ReleaseWhen, context, $"Chapter '{chapter.Id}' album (unlock)");
 
             // negative tuning drains or dead-ends instead of earning; runtime
-            // fails closed on all of it (guarded ticks, zeroed tap), so
-            // without these reports the systems would just look mysteriously
-            // dead. The base rate is a production config now and is checked as
-            // one, with every other config.
-            if (chapter.Fans.PerBandmateOwnedBonus < 0)
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative fans perBandmateOwnedBonus ({chapter.Fans.PerBandmateOwnedBonus}).");
+            // fails closed on all of it (zeroed contributions, zeroed
+            // compositions), so without these reports the systems would just look
+            // mysteriously dead. The fan rate is entirely contributions now - the
+            // base line and the per-bandmate bonus alike - and each is checked
+            // where it is authored, with every other contribution.
             if (chapter.RecordBuff.PerRecord < 0)
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' has a negative recordBuff perRecord ({chapter.RecordBuff.PerRecord}).");
             // Who sets each declared flag, collected from the loaded ASSETS as
@@ -269,10 +269,10 @@ namespace RidiculousGaming.GarageBandIdle
 
             foreach (var id in chapter.ProducerIds)
             {
-                if (!database.Producers.TryGet(id, out var producer) || !producer.HasTapConfigs)
+                if (!database.Producers.TryGet(id, out var producer) || !producer.HasYieldContributions)
                     continue; // a passive producer (fan accrual) needs no surface
                 if (!presentedProducers.Contains(id))
-                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' producer '{id}' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' producer '{id}' has yield contributions but no section module presents it - firing names one producer, so nothing could ever fire this one.");
             }
 
             foreach (var id in chapter.GeneratorIds)
@@ -543,25 +543,52 @@ namespace RidiculousGaming.GarageBandIdle
             // module presents it is the SECTION's declaration, and whether a tap
             // producer has one at all is checked in ValidateChapter, where the
             // section list is in hand.
-            if (producer.Production.Count == 0)
-                Debug.LogError($"ContentValidator: Producer '{producer.Id}' has no production configs - it would produce nothing.");
+            if (producer.Contributions.Count == 0)
+                Debug.LogError($"ContentValidator: Producer '{producer.Id}' has no contributions - it would produce nothing.");
 
-            foreach (var config in producer.Production)
+            ValidateContributions(producer.Contributions, $"Producer '{producer.Id}'", context);
+        }
+
+        // One holder's production lines (design doc section 12, rule 13). Shared by
+        // producers, generators and upgrades, because a line is the same thing
+        // whoever holds it: three copies of these rules would be three chances for
+        // one holder to accept what the others report.
+        private static void ValidateContributions(IReadOnlyList<ProductionContribution> contributions,
+            string holder, ConditionContext context)
+        {
+            foreach (var contribution in contributions)
             {
-                var source = $"Producer '{producer.Id}' (config for '{config.CurrencyId}')";
-                context.Currencies.ValidateReference(config.CurrencyId, source);
+                if (contribution == null)
+                {
+                    Debug.LogError($"ContentValidator: {holder} has a null contribution entry.");
+                    continue;
+                }
+
+                var source = $"{holder} (contribution '{contribution.Id}' for '{contribution.CurrencyId}')";
+
+                // A modifiable number is named (rule 11). An unnamed line is
+                // unreachable by any selector naming it - including one authored
+                // later against the id it was supposed to have, which would then
+                // silently do nothing.
+                if (string.IsNullOrEmpty(contribution.Id))
+                    Debug.LogError($"ContentValidator: {holder} has a contribution with no id - a modifiable number is named.");
+
+                context.Currencies.ValidateReference(contribution.CurrencyId, source);
+
                 // production must never drain (runtime fails closed on it)
-                if (config.Amount < 0)
-                    Debug.LogError($"ContentValidator: {source} has a negative amount ({config.Amount}).");
-                if (config.Trigger == ProductionTrigger.None)
-                    Debug.LogError($"ContentValidator: {source} has trigger None (uninitialized) - it would never fire.");
-                // a config composes through Global(target), so the target has to
-                // be one that composes globally - ProductionConfig.IsComposable
-                // owns that rule and ProductionSystem asks the same question, so
-                // boot validation and the runtime guard cannot disagree
-                if (!ProductionConfig.IsComposable(config.Composes))
-                    Debug.LogError($"ContentValidator: {source} declares composition '{config.Composes}', which a config cannot compose - it must be a defined target that composes globally (a qualified target like GeneratorOutput would read an empty bucket).");
-                ConditionEvaluator.Validate(config.Gate, context, $"{source} (gate)");
+                if (contribution.Amount < 0)
+                    Debug.LogError($"ContentValidator: {source} has a negative amount ({contribution.Amount}).");
+
+                // A serialized enum is an int, so a stale asset can hold a value no
+                // member defines, and None is the uninitialized state. Either way
+                // the line names neither of a producer's two numbers, and
+                // CurrencyProducer drops it - asking the same question here is what
+                // keeps boot validation and the runtime guard from disagreeing.
+                if (!Enum.IsDefined(typeof(ProductionFeed), contribution.Feeds)
+                    || contribution.Feeds == ProductionFeed.None)
+                    Debug.LogError($"ContentValidator: {source} feeds '{(int)contribution.Feeds}', which names neither of a producer's two numbers - a contribution is a rate (per second) or a yield (per firing).");
+
+                ConditionEvaluator.Validate(contribution.Gate, context, $"{source} (gate)");
             }
         }
 
@@ -674,11 +701,11 @@ namespace RidiculousGaming.GarageBandIdle
 
                 switch (required)
                 {
-                    case ModuleDefinitionKind.TapProducer:
+                    case ModuleDefinitionKind.FireableContributor:
                         if (!Names(chapter.ProducerIds, entry.DefinitionId))
                             Debug.LogError($"ContentValidator: {source} presents producer '{entry.DefinitionId}', which chapter '{chapter.Id}' does not declare - the module would present nothing.");
-                        else if (database.Producers.TryGet(entry.DefinitionId, out var producer) && !producer.HasTapConfigs)
-                            Debug.LogError($"ContentValidator: {source} presents producer '{entry.DefinitionId}', which authors no tap configs - pressing it would pay nothing.");
+                        else if (database.Producers.TryGet(entry.DefinitionId, out var producer) && !producer.HasYieldContributions)
+                            Debug.LogError($"ContentValidator: {source} presents producer '{entry.DefinitionId}', which authors no yield contributions - pressing it would pay nothing.");
                         // presented whether or not the id resolved: an undeclared id is
                         // not in the chapter's producer list for the surface check to
                         // look up, so withholding it would only say the same thing twice
@@ -716,20 +743,17 @@ namespace RidiculousGaming.GarageBandIdle
             // loudly here, not degrade to wrong gameplay. Growth < 1
             // (shrinking costs) is legal.
             context.Currencies.ValidateReference(generator.CostCurrencyId, $"Generator '{generator.Id}' (cost currency)");
-            // What it pays into, checked here rather than only in GeneratorSystem:
-            // that constructor sees one chapter's generators, so an orphan or a
-            // later chapter's generator producing into a nonexistent currency had
-            // nothing looking at it. Only checkable for every chapter once the
-            // resolver is the declaring chapter's rather than the frontier's.
-            context.Currencies.ValidateReference(generator.ProducesCurrencyId, $"Generator '{generator.Id}' (produces)");
             if (generator.BaseCost <= 0)
                 Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive base cost ({generator.BaseCost}) - it would be free to buy.");
             if (generator.CostGrowth <= 0)
                 Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a non-positive cost growth ({generator.CostGrowth}).");
-            // production must never drain (runtime fails closed on it);
-            // zero output stays legal - a pure fan-rate bandmate is coherent
-            if (generator.BaseOutput < 0)
-                Debug.LogError($"ContentValidator: Generator '{generator.Id}' has a negative base output ({generator.BaseOutput}).");
+
+            // What it pays into, checked here rather than only in GeneratorSystem:
+            // that constructor sees one chapter's generators, so an orphan or a
+            // later chapter's generator contributing to a nonexistent currency had
+            // nothing looking at it. No contributions at all stays legal - gear
+            // whose whole value is what a buff makes of it is coherent content.
+            ValidateContributions(generator.Contributions, $"Generator '{generator.Id}'", context);
             ConditionEvaluator.Validate(generator.Unlock, context, $"Generator '{generator.Id}' (unlock)");
         }
 
@@ -758,9 +782,14 @@ namespace RidiculousGaming.GarageBandIdle
             else if (!string.IsNullOrEmpty(upgrade.CostCurrencyId))
                 context.Currencies.ValidateReference(upgrade.CostCurrencyId, $"Upgrade '{upgrade.Id}' (cost currency)");
             ConditionEvaluator.Validate(upgrade.Gate, context, $"Upgrade '{upgrade.Id}' (gate)");
-            if (upgrade.Payload == null && upgrade.Actions.Count == 0)
-                Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload and no actions - it would grant nothing.");
+
+            // Contributions count as a grant: a flat bonus is a line feeding the
+            // number it raises (rule 11), so an upgrade whose whole effect is
+            // "+1 Cash per press" is complete content with no payload at all.
+            if (!upgrade.GrantsAnything && upgrade.Actions.Count == 0)
+                Debug.LogError($"ContentValidator: Upgrade '{upgrade.Id}' has no payload, no contributions and no actions - it would grant nothing.");
             upgrade.Payload?.Validate(context, $"Upgrade '{upgrade.Id}' (payload)");
+            ValidateContributions(upgrade.Contributions, $"Upgrade '{upgrade.Id}'", context);
 
             foreach (var action in upgrade.Actions)
             {
@@ -926,7 +955,7 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         private static void ValidateIds<T>(IReadOnlyList<string> ids, ContentDatabase.Registry<T> registry, string source)
-            where T : ScriptableObject
+            where T : Definition
         {
             foreach (var id in ids)
             {

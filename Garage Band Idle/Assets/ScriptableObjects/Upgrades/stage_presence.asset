@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: stage_presence
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: stage_presence
+  _tags: []
   _displayName: Stage Presence
   _type: 1
   _scope: 1
@@ -21,21 +22,23 @@ MonoBehaviour:
   _gate:
     rid: 1000
   _payload:
-    rid: 1001
+    rid: -2
   _actions: []
+  _contributions:
+  - _id: stage_presence_cash
+    _tags: []
+    _currencyId: cash
+    _amount: 1
+    _feeds: 2
+    _gate:
+      rid: -2
   references:
     version: 2
     RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
     - rid: 1000
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: cash
         _value: 250
-    - rid: 1001
-      type: {class: GrantModifierEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        _target: 5
-        _qualifiers:
-        - cash
-        _operation: 1
-        _value: 1

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Economy;
 using TMPro;
 using UnityEngine;
@@ -15,8 +16,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
         [SerializeField] private TextMeshProUGUI _buyLabel;
 
         private ChapterContext _context;
-        private CurrencyDefinition _producesDefinition;
         private CurrencyDefinition _costDefinition;
+
+        // one per contribution, in the definition's order: a generator holds a LIST
+        // of production lines now (design doc section 12, rule 13), so the row shows
+        // one line per currency it feeds rather than a single "produces" figure that
+        // could only ever describe the first
+        private readonly List<CurrencyDefinition> _lineCurrencies = new();
 
         public Generator Generator { get; private set; }
 
@@ -24,8 +30,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             _context = context;
             Generator = generator;
-            _producesDefinition = context.Economy.Currencies.GetDefinition(generator.Definition.ProducesCurrencyId);
             _costDefinition = context.Economy.Currencies.GetDefinition(generator.Definition.CostCurrencyId);
+
+            _lineCurrencies.Clear();
+            foreach (var contribution in generator.Contributions)
+                _lineCurrencies.Add(context.Economy.Currencies.GetDefinition(contribution?.CurrencyId));
 
             _buyButton.onClick.AddListener(HandleBuyClicked);
             Generator.OwnedChanged += Refresh;
@@ -69,30 +78,44 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 RefreshAffordability();
         }
 
-        // A modifier on this generator changes the rate the row advertises, and
+        // A modifier on this generator changes the numbers the row advertises, and
         // nothing else would repaint it: Refresh is otherwise driven by
-        // OwnedChanged alone, so a bought buff (amp_strings, kit_upgrade) left
-        // the old "+X/sec" standing until the next purchase - the same
-        // staleness ProductionSystem.TapValueChanged cures for the Jam label. A run reset
+        // OwnedChanged alone, so a bought buff (amp_strings, kit_upgrade) left the
+        // old "+X/sec" standing until the next purchase - the same staleness
+        // ProductionSystem.YieldChanged cures for the Jam label. A run reset
         // clearing those grants arrives through here too.
-        // Covers, not Equals: a modifier granted without a qualifier reaches every
-        // generator in scope (rule 11), so it moves this row's output without ever
-        // naming it. Exact-match here would leave the row showing a stale number
-        // that the economy had already changed - and the composition asks the same
-        // question, so the two cannot disagree about which grants apply.
-        public void HandleModifierChanged(ModifierTargetKey target)
+        //
+        // Asked of the generator AND of every line it holds: kit_upgrade names
+        // `drummer_cash`, which is not the generator's own id, so a row testing only
+        // its generator subject would go stale on exactly the buff this addressing
+        // exists to express. The composition asks the same question of the same
+        // subjects, so the two cannot disagree about which grants apply.
+        public void HandleModifierChanged(ModifierSelector selector)
         {
-            if (gameObject.activeSelf && target.Covers(Generator.OutputTarget))
+            if (gameObject.activeSelf && Generator.IsReachedBy(selector))
                 Refresh();
         }
 
         private void Refresh()
         {
-            // both figures come from the composed output, never the raw
-            // BaseOutput: a buffed total beside an unbuffed "each" reads as a
-            // bug even when each number is defensible on its own
-            _info.text = $"{Generator.Definition.DisplayName} x{Generator.Owned}\n" +
-                $"+{NumberFormatter.Format(Generator.ProductionPerSecond)} {_producesDefinition.DisplayName}/sec ({NumberFormatter.Format(Generator.PerUnitProduction)} each)";
+            // every figure comes from the composed value, never the raw authored
+            // amount: a buffed total beside an unbuffed "each" reads as a bug even
+            // when each number is defensible on its own
+            var text = $"{Generator.Definition.DisplayName} x{Generator.Owned}";
+            var contributions = Generator.Contributions;
+            for (var i = 0; i < contributions.Count; i++)
+            {
+                var contribution = contributions[i];
+                if (contribution == null)
+                    continue;
+
+                var currency = i < _lineCurrencies.Count ? _lineCurrencies[i] : null;
+                var per = contribution.Feeds == ProductionFeed.Yield ? " per firing" : "/sec";
+                text += $"\n+{NumberFormatter.Format(Generator.ValueOf(contribution))} {currency?.DisplayName}{per}" +
+                    $" ({NumberFormatter.Format(Generator.PerUnitValueOf(contribution))} each)";
+            }
+
+            _info.text = text;
             _buyLabel.text = $"Buy {NumberFormatter.Format(Generator.NextCost, _costDefinition)}";
             RefreshAffordability();
         }

@@ -61,10 +61,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 row.HandleBalanceChanged(currencyId);
         }
 
-        private void HandleModifierChanged(ModifierTargetKey target)
+        private void HandleModifierChanged(ModifierSelector selector)
         {
             foreach (var row in _rows)
-                row.HandleModifierChanged(target);
+                row.HandleModifierChanged(selector);
         }
 
         private void RefreshVisibility()

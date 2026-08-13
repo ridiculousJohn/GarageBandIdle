@@ -222,7 +222,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, generators: new[] { orphan });
 
             LogAssert.Expect(LogType.Error,
-                "ChapterCurrencies: Generator 'ghost_output' (produces) references currency id 'merch', which resolves to no CurrencyDefinition asset.");
+                "ChapterCurrencies: Generator 'ghost_output' (contribution 'ghost_output_merch' for 'merch') references currency id 'merch', which resolves to no CurrencyDefinition asset.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -232,10 +232,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void ProducerGateFlag_ValidatesAgainstTheOwningChapter()
         {
-            var poached = TestContent.MakeProducer("busk", new List<ProductionConfig>
-            {
-                new("cash", 1, ProductionTrigger.Tap, new FlagSetCondition("two"), ModifierTarget.None),
-            });
+            var poached = TestContent.MakeProducer("busk",
+                ("cash", 1, ProductionFeed.Yield, new FlagSetCondition("two")));
             var section = TapSectionFor("busk");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans", "one" },
                 producerIds: new List<string> { "busk" },
@@ -245,7 +243,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 sections: new[] { section });
 
             LogAssert.Expect(LogType.Error,
-                "Condition: Producer 'busk' (config for 'cash') (gate) references flag 'two', which the chapter does not declare.");
+                "Condition: Producer 'busk' (contribution 'busk_cash' for 'cash') (gate) references flag 'two', which the chapter does not declare.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -263,25 +261,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // A producer IS its production configs, and every field is trusted per
-        // firing: broken tuning must say why the runtime (which fails closed -
-        // skipped configs, zeroed compositions) looks mysteriously dead. The
+        // A producer IS its contributions, and every field is trusted per
+        // composition: broken tuning must say why the runtime (which fails closed -
+        // dropped lines, zeroed compositions) looks mysteriously dead. The
         // importer refuses to write any of these, so reaching them means a
         // stale or hand-built asset.
         [Test]
-        public void BrokenProducerConfigs_AreReported()
+        public void BrokenProducerContributions_AreReported()
         {
-            var broken = TestContent.MakeProducer("broken", new List<ProductionConfig>
+            var broken = TestContent.MakeProducer("broken", new List<ProductionContribution>
             {
-                new("cash", -1, ProductionTrigger.Tap, null, ModifierTarget.None),
-                new("merch", 1, ProductionTrigger.None, null, ModifierTarget.None),
-                // FanRate is authorable since 5.7 (fan accrual is a config); what
-                // a config still cannot compose is a QUALIFIED target - composed
-                // through Global(...) it would read an empty bucket and scale by
-                // nothing, which looks like it worked
-                new("cash", 1, ProductionTrigger.Tick, null, ModifierTarget.GeneratorOutput),
+                TestContent.Line("broken", "cash", -1, ProductionFeed.Yield),
+                // an unnamed line is unreachable by any selector naming it, which
+                // is what rule 11 makes reportable rather than merely odd
+                TestContent.Line("broken", "merch", 1, ProductionFeed.Rate, id: ""),
+                // Feeds is the one enum left on a line, so the two states a
+                // serialized int can reach - uninitialized and undefined - are
+                // still worth naming
+                TestContent.Line("broken", "fans", 1, ProductionFeed.None),
+                TestContent.Line("broken", "records", 1, (ProductionFeed)99),
             });
-            var hollow = TestContent.MakeProducer("hollow", new List<ProductionConfig>());
+            var hollow = TestContent.MakeProducer("hollow", new List<ProductionContribution>());
             var section = TapSectionFor("broken");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 producerIds: new List<string> { "broken", "hollow" },
@@ -290,15 +290,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 sections: new[] { section });
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Producer 'broken' (config for 'cash') has a negative amount (-1).");
+                "ContentValidator: Producer 'broken' (contribution 'broken_cash' for 'cash') has a negative amount (-1).");
             LogAssert.Expect(LogType.Error,
-                "ChapterCurrencies: Producer 'broken' (config for 'merch') references currency id 'merch', which resolves to no CurrencyDefinition asset.");
+                "ContentValidator: Producer 'broken' has a contribution with no id - a modifiable number is named.");
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Producer 'broken' (config for 'merch') has trigger None (uninitialized) - it would never fire.");
+                "ChapterCurrencies: Producer 'broken' (contribution '' for 'merch') references currency id 'merch', which resolves to no CurrencyDefinition asset.");
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Producer 'broken' (config for 'cash') declares composition 'GeneratorOutput', which a config cannot compose - it must be a defined target that composes globally (a qualified target like GeneratorOutput would read an empty bucket).");
+                "ContentValidator: Producer 'broken' (contribution 'broken_fans' for 'fans') feeds '0', which names neither of a producer's two numbers - a contribution is a rate (per second) or a yield (per firing).");
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Producer 'hollow' has no production configs - it would produce nothing.");
+                "ContentValidator: Producer 'broken' (contribution 'broken_records' for 'records') feeds '99', which names neither of a producer's two numbers - a contribution is a rate (per second) or a yield (per firing).");
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Producer 'hollow' has no contributions - it would produce nothing.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -345,11 +347,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void RatePayload_ReportsWhatCannotApply_AndAllowsAnUnqualifiedReachAll()
         {
             var reachAll = TestContent.MakeUpgrade("reach_all", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 1.5, new List<string>()), costAmount: 100);
+                null, new GrantModifierEffect(ModifierSelector.Everything, ModifierOperation.Multiply, 1.5), costAmount: 100);
             var zeroed = TestContent.MakeUpgrade("zeroed", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 0, new List<string> { "cash" }), costAmount: 100);
+                null, new GrantModifierEffect(TestContent.Sel("cash_rate"), ModifierOperation.Multiply, 0), costAmount: 100);
             var unresolvable = TestContent.MakeUpgrade("unresolvable", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.IdleRate, ModifierOperation.Multiply, 2, new List<string> { "ch01_garage" }), costAmount: 100);
+                null, new GrantModifierEffect(TestContent.Sel("ch01_garage"), ModifierOperation.Multiply, 2), costAmount: 100);
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 upgradeIds: new List<string> { "reach_all", "zeroed", "unresolvable" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 },
@@ -358,7 +360,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Error,
                 "GameEffect: Upgrade 'zeroed' (payload) has a non-positive multiplier (0).");
             LogAssert.Expect(LogType.Error,
-                "GameEffect: Upgrade 'unresolvable' (payload) targets IdleRate, which has no id family to resolve a qualifier against, but names 1. Leave the list empty to reach everything in scope.");
+                "GameEffect: Upgrade 'unresolvable' (payload) targets 'ch01_garage', which no definition id, tag or produced number answers to.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -369,7 +371,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void BuffWithNoCost_IsReported_AndAFreeContentUnlockIsNot()
         {
             var free = TestContent.MakeUpgrade("free_buff", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }));
+                null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1));
             var reveal = TestContent.MakeUpgrade("reveal", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                 null, new SetFlagEffect("fans"));
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
@@ -389,9 +391,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void UpgradeCostCurrency_MustBeNamedAndResolve_WhenTheUpgradeCostsAnything()
         {
             var unnamed = TestContent.MakeUpgrade("unnamed_currency", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costCurrencyId: "", costAmount: 250);
+                null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1), costCurrencyId: "", costAmount: 250);
             var ghost = TestContent.MakeUpgrade("ghost_cost_currency", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }), costCurrencyId: "merch", costAmount: 250);
+                null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1), costCurrencyId: "merch", costAmount: 250);
             var free = TestContent.MakeUpgrade("free_reveal", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, null, new SetFlagEffect("fans"), costCurrencyId: "");
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
@@ -708,7 +710,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ActionsOnABoughtBuff_AreAllowed_AndTheirReferencesChecked()
         {
             var upgrade = TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }),
+                null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1),
                 costAmount: 250,
                 actions: new List<GameAction> { new GrantCurrencyAction("cash", 100) });
             var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "advance" });
@@ -724,7 +726,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ActionWithAnUnknownCurrency_IsReported()
         {
             var upgrade = TestContent.MakeUpgrade("advance", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyYield, ModifierOperation.Add, 1, new List<string> { "cash" }),
+                null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 1),
                 costAmount: 250,
                 actions: new List<GameAction> { new GrantCurrencyAction("merch", 100) });
             var ch1 = TestContent.MakeChapter("ch1", null, upgradeIds: new List<string> { "advance" });
@@ -797,10 +799,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void TapModulePresentingSomethingThatIsNotAProducer_IsReported()
         {
-            var jam = TestContent.MakeProducer("jam", new List<ProductionConfig>
-            {
-                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
-            });
+            var jam = TestContent.MakeProducer("jam",
+                ("cash", 1, ProductionFeed.Yield, null));
             var beat = TestContent.MakeStoryBeat("beat_open", "It starts in the garage.");
             var section = TestContent.MakeSection("floor", null,
                 modules: new List<SectionModule> { new("module/tap", "beat_open") });
@@ -817,7 +817,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "ContentValidator: Section 'floor' module 'module/tap' presents producer 'beat_open', which chapter 'ch1' does not declare - the module would present nothing.");
             // and the consequence the swap hides: nothing presents the real tap surface
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' producer 'jam' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
+                "ContentValidator: Chapter 'ch1' producer 'jam' has yield contributions but no section module presents it - firing names one producer, so nothing could ever fire this one.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -843,15 +843,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void TapProducerNoSectionPresents_IsReported()
         {
-            var orphaned = TestContent.MakeProducer("busk", new List<ProductionConfig>
-            {
-                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
-            });
+            var orphaned = TestContent.MakeProducer("busk",
+                ("cash", 1, ProductionFeed.Yield, null));
             var ch1 = TestContent.MakeChapter("ch1", null, producerIds: new List<string> { "busk" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { orphaned });
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' producer 'busk' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
+                "ContentValidator: Chapter 'ch1' producer 'busk' has yield contributions but no section module presents it - firing names one producer, so nothing could ever fire this one.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -860,10 +858,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void PassiveProducerNoSectionPresents_IsAllowed()
         {
-            var band = TestContent.MakeProducer("band", new List<ProductionConfig>
-            {
-                new("fans", 0.2, ProductionTrigger.Tick, null, ModifierTarget.CurrencyRate),
-            });
+            var band = TestContent.MakeProducer("band",
+                ("fans", 0.2, ProductionFeed.Rate, null));
             var ch1 = TestContent.MakeChapter("ch1", null, producerIds: new List<string> { "band" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, producers: new[] { band });
 
@@ -882,10 +878,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void ProducerIdOnAModuleThatPresentsNoProducer_DoesNotCountAsPresented()
         {
-            var jam = TestContent.MakeProducer("jam", new List<ProductionConfig>
-            {
-                new("cash", 1, ProductionTrigger.Tap, null, ModifierTarget.CurrencyYield),
-            });
+            var jam = TestContent.MakeProducer("jam",
+                ("cash", 1, ProductionFeed.Yield, null));
             var section = TestContent.MakeSection("floor", null,
                 modules: new List<SectionModule> { new("module/generator-list", "jam") });
             var ch1 = TestContent.MakeChapter("ch1", null,
@@ -898,7 +892,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "ContentValidator: Section 'floor' module 'module/generator-list' names definition 'jam', but that module presents a whole roster and reads no definition id.");
             // the consequence a family-blind sweep swallowed
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' producer 'jam' has tap configs but no section module presents it - a tap fires one named producer, so nothing could ever fire this one.");
+                "ContentValidator: Chapter 'ch1' producer 'jam' has yield contributions but no section module presents it - firing names one producer, so nothing could ever fire this one.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -1031,13 +1025,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void PerSecMultiplierPayload_UnknownAffectedCurrency_IsReported()
         {
             var upgrade = TestContent.MakeUpgrade("ghost_currency", UpgradeType.Buff, ContentScope.Run,
-                null, new GrantModifierEffect(ModifierTarget.CurrencyRate, ModifierOperation.Multiply, 1.5, new List<string> { "cash", "merch" }), costAmount: 100);
+                null, new GrantModifierEffect(TestContent.Sel("cash_rate", "merch_rate"), ModifierOperation.Multiply, 1.5), costAmount: 100);
             var ch1 = TestContent.MakeChapter("ch1", new List<string> { "fans" },
                 upgradeIds: new List<string> { "ghost_currency" });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, upgrades: new[] { upgrade });
 
+            // A term is resolved against the WHOLE content set rather than against
+            // one family (rule 11), so an unknown one is reported as a term nothing
+            // answers to. It used to go through the currency-reference check, which
+            // could only run because the target kind declared "this qualifier is a
+            // currency id" - the same declaration that could not name one of a
+            // generator's two output lines.
             LogAssert.Expect(LogType.Error,
-                "ChapterCurrencies: Upgrade 'ghost_currency' (payload) references currency id 'merch', which resolves to no CurrencyDefinition asset.");
+                "GameEffect: Upgrade 'ghost_currency' (payload) targets 'merch_rate', which no definition id, tag or produced number answers to.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
     }

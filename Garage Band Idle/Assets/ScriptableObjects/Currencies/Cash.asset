@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Cash
   m_EditorClassIdentifier:
   _id: cash
+  _tags: []
   _displayName: Cash
   _groupId: run
   _symbol: $

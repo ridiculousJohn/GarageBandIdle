@@ -1,30 +1,29 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // One generator (gear or bandmate). Produces is a currency string id routed
-    // through CurrencyManager, and runtime state is keyed by generator id, so
-    // adding a generator is a new asset + JSON row with no code change.
+    // One generator (gear or bandmate). What it makes is a LIST of production
+    // contributions (design doc section 12, rule 13), each naming the currency it
+    // feeds and carrying its own id, so a generator that pays two currencies is
+    // ordinary content rather than a shape the model cannot hold. Runtime state is
+    // keyed by generator id, so adding a generator is a new asset + JSON row with
+    // no code change.
+    //
+    // It used to declare `produces` + `baseOutput`: one currency, one number, with
+    // the number itself unnamed. A buff could then only address the GENERATOR, so
+    // "double the drummer's cash" and "double the drummer" were the same sentence -
+    // fine while a drummer made cash and nothing else, wrong the moment a bandmate
+    // also drives fans. `isBandmate` went the same way: it was a tag that never got
+    // the concept (rule 10), read by one derived modifier to add a fan rate the
+    // generator could simply CONTRIBUTE.
     [CreateAssetMenu(
         fileName = "NewGenerator",
         menuName = "GarageBandIdle/Generator")]
-    public class GeneratorDefinition : ScriptableObject
+    public class GeneratorDefinition : Definition
     {
         [SerializeField]
-        [Tooltip("Stable string id used as the state key. Never rename once saves exist.")]
-        private string _id;
-
-        [SerializeField]
         private string _displayName;
-
-        [SerializeField]
-        [DefinitionId(typeof(CurrencyDefinition))]
-        [Tooltip("Currency id this generator produces.")]
-        private string _producesCurrencyId;
-
-        [SerializeField]
-        [Tooltip("Bandmates (not gear) drive the fan rate: each owned unit adds the chapter's per-bandmate bonus to fans/sec.")]
-        private bool _isBandmate;
 
         [Header("Economy")]
         [SerializeField]
@@ -40,37 +39,32 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private double _costGrowth;
 
         [SerializeField]
-        [Tooltip("Production per second per owned unit.")]
-        private double _baseOutput;
+        [Tooltip("What each owned unit contributes, per currency. Amounts are PER UNIT: the runtime scales by the owned count.")]
+        private List<ProductionContribution> _contributions = new();
 
         [SerializeReference]
         [SubclassPicker]
         [Tooltip("Must hold for the generator to reveal; none = visible from start.")]
         private Condition _unlock;
 
-        public string Id => _id;
         public string DisplayName => _displayName;
-        public string ProducesCurrencyId => _producesCurrencyId;
-        public bool IsBandmate => _isBandmate;
         public string CostCurrencyId => _costCurrencyId;
         public double BaseCost => _baseCost;
         public double CostGrowth => _costGrowth;
-        public double BaseOutput => _baseOutput;
+        public IReadOnlyList<ProductionContribution> Contributions => _contributions;
         public Condition Unlock => _unlock;
 
 #if UNITY_EDITOR
         // importer-only: generator assets are generated from chapter JSON
-        public void EditorInitialize(string id, string displayName, string producesCurrencyId, bool isBandmate,
-            string costCurrencyId, double baseCost, double costGrowth, double baseOutput, Condition unlock)
+        public void EditorInitialize(string id, string displayName, string costCurrencyId, double baseCost,
+            double costGrowth, List<ProductionContribution> contributions, Condition unlock, string[] tags = null)
         {
-            _id = id;
+            SetIdentity(id, tags);
             _displayName = displayName;
-            _producesCurrencyId = producesCurrencyId;
-            _isBandmate = isBandmate;
             _costCurrencyId = costCurrencyId;
             _baseCost = baseCost;
             _costGrowth = costGrowth;
-            _baseOutput = baseOutput;
+            _contributions = contributions ?? new List<ProductionContribution>();
             _unlock = unlock;
         }
 #endif

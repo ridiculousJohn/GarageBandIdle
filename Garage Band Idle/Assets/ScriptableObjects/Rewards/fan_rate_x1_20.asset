@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: fan_rate_x1_20
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.RewardDefinition
   _id: fan_rate_x1_20
+  _tags: []
   _displayName: "Fan Rate \xD71.20"
   _effect:
     rid: 1001
@@ -22,8 +23,8 @@ MonoBehaviour:
     - rid: 1001
       type: {class: GrantModifierEffect, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        _target: 4
-        _qualifiers:
-        - fans
+        _selector:
+          _terms:
+          - fans_rate
         _operation: 2
         _value: 1.2

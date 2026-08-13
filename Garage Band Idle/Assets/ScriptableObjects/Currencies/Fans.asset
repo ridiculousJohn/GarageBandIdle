@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Fans
   m_EditorClassIdentifier:
   _id: fans
+  _tags: []
   _displayName: Fans
   _groupId: run
   _symbol:

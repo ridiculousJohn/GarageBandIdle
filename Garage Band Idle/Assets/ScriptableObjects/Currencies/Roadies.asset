@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Roadies
   m_EditorClassIdentifier:
   _id: roadies
+  _tags: []
   _displayName: Roadies
   _groupId: permanent
   _symbol:

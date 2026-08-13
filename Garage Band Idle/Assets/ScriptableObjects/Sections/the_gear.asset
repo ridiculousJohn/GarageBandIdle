@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: the_gear
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.SectionDefinition
   _id: the_gear
+  _tags: []
   _displayName: The Gear
   _modules:
   - _address: module/upgrade-list

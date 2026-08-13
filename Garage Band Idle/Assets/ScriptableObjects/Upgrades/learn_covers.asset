@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: learn_covers
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   _id: learn_covers
+  _tags: []
   _displayName: Learn Some Covers
   _type: 2
   _scope: 1
@@ -23,6 +24,7 @@ MonoBehaviour:
   _payload:
     rid: 1001
   _actions: []
+  _contributions: []
   references:
     version: 2
     RefIds:

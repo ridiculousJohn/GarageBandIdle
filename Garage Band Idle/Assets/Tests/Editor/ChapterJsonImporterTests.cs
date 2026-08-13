@@ -241,56 +241,62 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 @"{ ""type"": ""flagSet"", ""flag"": ""fans"" }", "section 's' (visibleWhen)"));
         }
 
-        // the producer parse path (design doc section 12, rule 13): trigger and
-        // composes vocabularies map onto their closed enums, the gate onto the
-        // Condition family, and an absent gate means always-on
+        // the contribution parse path (design doc section 12, rule 13): `feeds`
+        // maps onto the quantity enum, the gate onto the Condition family, an
+        // absent gate means always-on, and the id is carried through because a
+        // modifiable number is named (rule 11)
         [Test]
-        public void Producer_ProductionEntries_MapOntoConfigs()
+        public void Producer_Contributions_MapOntoLines()
         {
-            var configs = ChapterJsonImporter.ParseProducerProduction(@"{
-                ""id"": ""jam"", ""module"": ""module/tap"",
-                ""production"": [
-                    { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""yield"" },
-                    { ""currency"": ""rehearsal"", ""amount"": 2, ""trigger"": ""tap"", ""gate"": { ""type"": ""flagSet"", ""flag"": ""covers"" } },
-                    { ""currency"": ""rehearsal"", ""amount"": 1, ""trigger"": ""tick"", ""gate"": { ""type"": ""flagSet"", ""flag"": ""covers"" } }
+            var lines = ChapterJsonImporter.ParseProducerContributions(@"{
+                ""id"": ""jam"",
+                ""contributions"": [
+                    { ""id"": ""jam_cash"", ""currency"": ""cash"", ""amount"": 1, ""feeds"": ""yield"" },
+                    { ""id"": ""jam_rehearsal_press"", ""currency"": ""rehearsal"", ""amount"": 2, ""feeds"": ""yield"", ""gate"": { ""type"": ""flagSet"", ""flag"": ""covers"" } },
+                    { ""id"": ""jam_rehearsal_trickle"", ""currency"": ""rehearsal"", ""amount"": 1, ""feeds"": ""rate"", ""tags"": [ ""trickle"" ], ""gate"": { ""type"": ""flagSet"", ""flag"": ""covers"" } }
                 ]
             }");
 
-            Assert.AreEqual(3, configs.Count);
+            Assert.AreEqual(3, lines.Count);
 
-            Assert.AreEqual("cash", configs[0].CurrencyId);
-            Assert.AreEqual(1.0, configs[0].Amount, 1e-9);
-            Assert.AreEqual(ProductionTrigger.Tap, configs[0].Trigger);
-            Assert.AreEqual(ModifierTarget.CurrencyYield, configs[0].Composes);
-            Assert.IsNull(configs[0].Gate, "no gate = always on");
+            Assert.AreEqual("jam_cash", lines[0].Id);
+            Assert.AreEqual("cash", lines[0].CurrencyId);
+            Assert.AreEqual(1.0, lines[0].Amount, 1e-9);
+            Assert.AreEqual(ProductionFeed.Yield, lines[0].Feeds);
+            Assert.IsNull(lines[0].Gate, "no gate = always on");
 
-            Assert.AreEqual(ModifierTarget.None, configs[1].Composes, "absent composes = the raw amount");
-            var gate = configs[1].Gate as FlagSetCondition;
+            var gate = lines[1].Gate as FlagSetCondition;
             Assert.IsNotNull(gate, "the gate is an ordinary Condition");
             Assert.AreEqual("covers", gate.FlagId);
 
-            Assert.AreEqual(ProductionTrigger.Tick, configs[2].Trigger);
+            Assert.AreEqual(ProductionFeed.Rate, lines[2].Feeds);
+            CollectionAssert.AreEqual(new[] { "trickle" }, lines[2].Tags,
+                "a line carries tags like any other definition, so a buff can name a set of them");
         }
 
-        // an invalid entry skips the whole producer - a producer missing one of
-        // its yields is not the authored producer - and each refusal says why
-        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""hold"" } ] }",
-            "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown trigger 'hold' - a production config fires on 'tick' or 'tap'. Skipping the producer - fix the JSON and re-import.")]
-        // 'fanRate' is authorable since 5.7 (fan accrual is a config); what stays
-        // refused is a spelling the family does not define, casing included
-        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": 1, ""trigger"": ""tap"", ""composes"": ""fanrate"" } ] }",
-            "ChapterJsonImporter: producer 'jam' production for 'cash' has unknown composes 'fanrate' - a config composes 'rate', 'yield' or nothing. Skipping the producer - fix the JSON and re-import.")]
-        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""currency"": ""cash"", ""amount"": -1, ""trigger"": ""tap"" } ] }",
-            "ChapterJsonImporter: producer 'jam' production for 'cash' has a negative amount (-1). Skipping the producer - fix the JSON and re-import.")]
-        [TestCase(@"{ ""id"": ""jam"", ""production"": [ { ""amount"": 1, ""trigger"": ""tap"" } ] }",
-            "ChapterJsonImporter: producer 'jam' has a production entry with no currency. Skipping the producer - fix the JSON and re-import.")]
-        [TestCase(@"{ ""id"": ""jam"", ""production"": [] }",
-            "ChapterJsonImporter: producer 'jam' has no production entries - it would produce nothing. Skipping it - fix the JSON and re-import.")]
-        public void Producer_RefusesWhatCouldNeverFireAsAuthored(string json, string expectedError)
+        // an invalid line skips the whole producer - a producer missing one of its
+        // lines is not the authored producer - and each refusal says why
+        [TestCase(@"{ ""id"": ""jam"", ""contributions"": [ { ""id"": ""jam_cash"", ""currency"": ""cash"", ""amount"": 1, ""feeds"": ""tap"" } ] }",
+            "ChapterJsonImporter: producer 'jam' contribution 'jam_cash' has unknown feeds 'tap' - a contribution is a 'rate' (per second) or a 'yield' (per firing). Skipping it - fix the JSON and re-import.")]
+        // an absent `feeds` is refused rather than guessed into a rate: the two
+        // quantities are not defaults of each other
+        [TestCase(@"{ ""id"": ""jam"", ""contributions"": [ { ""id"": ""jam_cash"", ""currency"": ""cash"", ""amount"": 1 } ] }",
+            "ChapterJsonImporter: producer 'jam' contribution 'jam_cash' declares no feeds - a contribution is a 'rate' (per second) or a 'yield' (per firing). Skipping it - fix the JSON and re-import.")]
+        [TestCase(@"{ ""id"": ""jam"", ""contributions"": [ { ""id"": ""jam_cash"", ""currency"": ""cash"", ""amount"": -1, ""feeds"": ""yield"" } ] }",
+            "ChapterJsonImporter: producer 'jam' contribution 'jam_cash' has a negative amount (-1). Skipping it - fix the JSON and re-import.")]
+        [TestCase(@"{ ""id"": ""jam"", ""contributions"": [ { ""id"": ""jam_cash"", ""amount"": 1, ""feeds"": ""yield"" } ] }",
+            "ChapterJsonImporter: producer 'jam' contribution 'jam_cash' names no currency. Skipping it - fix the JSON and re-import.")]
+        // an unnamed line is unreachable by any buff naming it, including one
+        // authored later against the id it was meant to have
+        [TestCase(@"{ ""id"": ""jam"", ""contributions"": [ { ""currency"": ""cash"", ""amount"": 1, ""feeds"": ""yield"" } ] }",
+            "ChapterJsonImporter: producer 'jam' has a contribution with no id - a modifiable number is named (design doc rule 11). Skipping it - fix the JSON and re-import.")]
+        [TestCase(@"{ ""id"": ""jam"", ""contributions"": [] }",
+            "ChapterJsonImporter: producer 'jam' has no contributions - it would produce nothing. Skipping it - fix the JSON and re-import.")]
+        public void Producer_RefusesWhatCouldNeverPayAsAuthored(string json, string expectedError)
         {
             LogAssert.Expect(LogType.Error, expectedError);
 
-            Assert.IsNull(ChapterJsonImporter.ParseProducerProduction(json));
+            Assert.IsNull(ChapterJsonImporter.ParseProducerContributions(json));
         }
 
         // the pre-5.4 schema put engagement earn on the currency; an earn block
@@ -371,51 +377,85 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             "ChapterJsonImporter: fans block still carries a 'revealFlag' key - accrual is gated by the production config's gate (design doc section 12, rules 8, 9 and 13). Fix the JSON and re-import.")]
         [TestCase(@"{ ""currency"": ""fans"", ""activeWhen"": {} }",
             "ChapterJsonImporter: fans block still carries 'activeWhen' - the accrual gate moved onto the production config's 'gate' (design doc section 12, rule 13). Fix the JSON and re-import.")]
+        // and the fourth, retired in 7.4: the per-bandmate bonus is each bandmate's
+        // own fans contribution now, not a chapter constant added onto the rate
+        [TestCase(@"{ ""currency"": ""fans"", ""perBandmateOwnedBonus"": 0 }",
+            "ChapterJsonImporter: fans block still carries 'perBandmateOwnedBonus' - band size raises the fan rate because each bandmate generator CONTRIBUTES a fans line (design doc section 12, rules 11 and 13), not because a chapter constant is added onto the rate. Fix the JSON and re-import.")]
         public void FansBlock_RefusesEveryStaleKey_EvenItsEmptySpelling(string json, string expectedError)
         {
             LogAssert.Expect(LogType.Error, expectedError);
             ChapterJsonImporter.ParseFansBlockStaleKeys(json);
         }
 
-        // the fans block as 5.7 leaves it: currency plus the per-bandmate tuning,
-        // nothing about production
+        // the fans block as 7.4 leaves it: which currency is fans, and nothing else
+        // - accrual and the band bonus are both contributions now
         [Test]
         public void FansBlock_WithNoStaleKeys_ReportsNothing()
         {
-            ChapterJsonImporter.ParseFansBlockStaleKeys(
-                @"{ ""currency"": ""fans"", ""perBandmateOwnedBonus"": 0.02 }");
+            ChapterJsonImporter.ParseFansBlockStaleKeys(@"{ ""currency"": ""fans"" }");
         }
 
-        // the other half of making fanRate authorable: it has to MAP, not merely
-        // stop being refused
+        // fan accrual is an ordinary rate line on a passive producer, and it has to
+        // MAP, not merely stop being refused
         [Test]
-        public void ProductionConfig_ComposesFanRate_MapsToTheFanRateTarget()
+        public void BandProducer_FanAccrual_MapsToARateLine()
         {
-            var configs = ChapterJsonImporter.ParseProducerProduction(
-                @"{ ""id"": ""band"", ""production"": [ { ""currency"": ""fans"", ""amount"": 0.2, ""trigger"": ""tick"", ""composes"": ""rate"" } ] }");
+            var lines = ChapterJsonImporter.ParseProducerContributions(
+                @"{ ""id"": ""band"", ""contributions"": [ { ""id"": ""band_fans"", ""currency"": ""fans"", ""amount"": 0.2, ""feeds"": ""rate"" } ] }");
 
-            Assert.IsNotNull(configs);
-            Assert.AreEqual(1, configs.Count);
-            Assert.AreEqual(ModifierTarget.CurrencyRate, configs[0].Composes);
-            Assert.AreEqual(ProductionTrigger.Tick, configs[0].Trigger);
-            Assert.AreEqual("fans", configs[0].CurrencyId);
+            Assert.IsNotNull(lines);
+            Assert.AreEqual(1, lines.Count);
+            Assert.AreEqual("band_fans", lines[0].Id);
+            Assert.AreEqual(ProductionFeed.Rate, lines[0].Feeds);
+            Assert.AreEqual("fans", lines[0].CurrencyId);
         }
 
-        // a per-sec multiplier carries the currencies it affects as data, so the
-        // payload can name any number of them without a code change - the same
-        // contract constants.recordBuff.affects follows
+        // A multiplier carries the terms it reaches as data, so the payload can
+        // name any number of them without a code change. The effect name is the
+        // OPERATION now - which numbers it hits is entirely `targets`.
         [Test]
-        public void Payload_CurrencyPerSecMultiplier_CarriesItsAffectedCurrencies()
+        public void Payload_Multiplier_CarriesTheTermsItReaches()
         {
             var payload = ChapterJsonImporter.ParsePayload(
-                @"{ ""effect"": ""currencyRateMultiplier"", ""affects"": [""cash"", ""merch""], ""value"": 1.5 }",
+                @"{ ""effect"": ""multiplier"", ""targets"": [""cash_rate""], ""value"": 1.5 }",
                 "upgrade 'tight_set'") as GrantModifierEffect;
 
-            Assert.IsNotNull(payload, "the effect maps onto a currency-production modifier");
-            Assert.AreEqual(ModifierTarget.CurrencyRate, payload.Target);
+            Assert.IsNotNull(payload, "the effect maps onto a modifier");
             Assert.AreEqual(ModifierOperation.Multiply, payload.Operation);
             Assert.AreEqual(1.5, payload.Value, 1e-9);
-            CollectionAssert.AreEqual(new[] { "cash", "merch" }, payload.Qualifiers);
+            Assert.IsTrue(payload.Selector.Matches(TestContent.RateOf("cash")));
+            Assert.IsFalse(payload.Selector.Matches(TestContent.YieldOf("cash")),
+                "cash_rate is the id of ONE number - the yield is a different number with a different id");
+            Assert.IsFalse(payload.Selector.Matches(new ModifierSubject("cash")),
+                "and naming the number does not name the currency");
+        }
+
+        // Absent and empty are different: an empty list is the deliberate way to
+        // reach every number in scope (rule 11), while a forgotten key would
+        // otherwise silently buff the whole game, so it is refused.
+        [Test]
+        public void Payload_RefusesAnEffectThatDeclaresNoTargets()
+        {
+            LogAssert.Expect(LogType.Error,
+                "ChapterJsonImporter: upgrade 'oops' declares no targets. Author an explicit empty list to reach everything in scope, or name ids and tags.");
+
+            var payload = ChapterJsonImporter.ParsePayload(
+                @"{ ""effect"": ""multiplier"", ""value"": 1.5 }", "upgrade 'oops'") as GrantModifierEffect;
+
+            Assert.IsNotNull(payload, "the effect still imports - the refusal is reported, not fatal");
+            Assert.IsTrue(payload.Selector.ReachesEverything);
+        }
+
+        [Test]
+        public void Payload_AnEmptyTargetList_ReachesEverything()
+        {
+            var payload = ChapterJsonImporter.ParsePayload(
+                @"{ ""effect"": ""multiplier"", ""targets"": [], ""value"": 1.5 }",
+                "upgrade 'everything'") as GrantModifierEffect;
+
+            Assert.IsNotNull(payload);
+            Assert.IsTrue(payload.Selector.ReachesEverything);
+            Assert.IsTrue(payload.Selector.Matches(TestContent.Num("anything")));
         }
 
         // One vocabulary, two JSON keys. A reward's `type` and an upgrade's
@@ -424,22 +464,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // two-family split happened to keep on one side. A reward paying a flat tap
         // bonus is coherent content, and nothing should have refused it but the
         // accident of which class family used to own the handler.
-        [TestCase(@"{ ""type"": ""currencyYieldAdd"", ""value"": 3 }",
-            @"{ ""effect"": ""currencyYieldAdd"", ""value"": 3 }")]
-        [TestCase(@"{ ""type"": ""generatorOutputMultiplier"", ""generator"": ""practice_amp"", ""value"": 2 }",
-            @"{ ""effect"": ""generatorOutputMultiplier"", ""generator"": ""practice_amp"", ""value"": 2 }")]
-        [TestCase(@"{ ""type"": ""currencyRateMultiplier"", ""value"": 1.15 }",
-            @"{ ""effect"": ""currencyRateMultiplier"", ""value"": 1.15 }")]
+        [TestCase(@"{ ""type"": ""multiplier"", ""targets"": [""cash_yield""], ""value"": 3 }",
+            @"{ ""effect"": ""multiplier"", ""targets"": [""cash_yield""], ""value"": 3 }")]
+        [TestCase(@"{ ""type"": ""multiplier"", ""targets"": [""practice_amp""], ""value"": 2 }",
+            @"{ ""effect"": ""multiplier"", ""targets"": [""practice_amp""], ""value"": 2 }")]
+        [TestCase(@"{ ""type"": ""multiplier"", ""targets"": [], ""value"": 1.15 }",
+            @"{ ""effect"": ""multiplier"", ""targets"": [], ""value"": 1.15 }")]
         public void RewardAndPayload_AuthorTheSameEffectVocabulary(string rewardJson, string payloadJson)
         {
             var asReward = (GrantModifierEffect)ChapterJsonImporter.ParseRewardEffect(rewardJson, "reward 'r'");
             var asPayload = (GrantModifierEffect)ChapterJsonImporter.ParsePayload(payloadJson, "upgrade 'u'");
 
             Assert.IsNotNull(asReward, "the reward site accepts the name");
-            Assert.AreEqual(asPayload.Target, asReward.Target);
+            Assert.AreEqual(asPayload.Selector, asReward.Selector);
             Assert.AreEqual(asPayload.Operation, asReward.Operation);
             Assert.AreEqual(asPayload.Value, asReward.Value, 1e-9);
-            CollectionAssert.AreEqual(asPayload.Qualifiers, asReward.Qualifiers);
         }
 
         // a name the family does not know is the one check either site still makes
@@ -456,8 +495,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // a non-positive multiplier would zero or negate the production stack it
         // lands in, so it is never written and the upgrade's absent payload is
         // what boot validation then reports
-        [TestCase(@"{ ""effect"": ""currencyRateMultiplier"", ""affects"": [""cash""], ""value"": 0 }",
-            "ChapterJsonImporter: upgrade 'x' has a non-positive currencyRateMultiplier (0). Refusing it - fix the JSON and re-import.")]
+        [TestCase(@"{ ""effect"": ""multiplier"", ""targets"": [""cash"", ""rate""], ""value"": 0 }",
+            "ChapterJsonImporter: upgrade 'x' has a non-positive multiplier (0). Refusing it - fix the JSON and re-import.")]
         public void Payload_CurrencyRateMultiplier_RefusesWhatCouldNeverApply(string json, string expectedError)
         {
             LogAssert.Expect(LogType.Error, expectedError);

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: beat_capstone
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Loop.StoryBeatDefinition
   _id: beat_capstone
+  _tags: []
   _text: "The backyard's packed. You plug in, count off, and for three minutes the
     whole neighborhood is yours. Someone's already asking when the next one is \u2014
     and a guy named Dave offers to haul your gear. You've got your first roadie."

@@ -22,11 +22,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
 
-        private static readonly ModifierTargetKey CashRate =
-            ModifierTargetKey.Of(ModifierTarget.CurrencyRate, "cash");
+        // the ids of cash's two numbers, derived the same way the producer derives
+        // them - a fixture spelling the strings could agree with itself and disagree
+        // with the game
+        private static readonly ModifierSelector CashRate =
+            TestContent.Sel(CurrencyProducer.NumberId("cash", ProductionFeed.Rate));
 
-        private static readonly ModifierTargetKey CashYield =
-            ModifierTargetKey.Of(ModifierTarget.CurrencyYield, "cash");
+        private static readonly ModifierSelector CashYield =
+            TestContent.Sel(CurrencyProducer.NumberId("cash", ProductionFeed.Yield));
 
         // A contributor with no purchase mechanics behind it: Scale stands in
         // for whatever the real kind folds in on its side (a generator's owned
@@ -56,27 +59,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // which is the reachable path to a composed total below zero.
         private class FixedDerived : DerivedModifier
         {
-            private readonly ModifierTargetKey _target;
+            private readonly ModifierSelector _selector;
             private readonly ModifierOperation _operation;
             private readonly BigNumber _value;
 
-            public FixedDerived(ModifierTargetKey target, ModifierOperation operation, double value)
+            public FixedDerived(ModifierSelector selector, ModifierOperation operation, double value)
             {
-                _target = target;
+                _selector = selector;
                 _operation = operation;
                 _value = value;
             }
 
-            public override ModifierTargetKey Target => _target;
+            public override ModifierSelector Selector => _selector;
             public override ModifierOperation Operation => _operation;
             public override BigNumber Value => _value;
         }
 
-        private static ProductionContribution Rate(string currencyId, double amount, Condition gate = null)
-            => new(currencyId, amount, ProductionFeed.Rate, gate);
+        // ids are per (contributor, currency) here, the convention chapter 1
+        // authors; the fixtures that care about the id pass one explicitly
+        private static ProductionContribution Rate(string currencyId, double amount, Condition gate = null,
+            string id = "line")
+            => new(id, currencyId, amount, ProductionFeed.Rate, gate);
 
-        private static ProductionContribution Yield(string currencyId, double amount, Condition gate = null)
-            => new(currencyId, amount, ProductionFeed.Yield, gate);
+        private static ProductionContribution Yield(string currencyId, double amount, Condition gate = null,
+            string id = "line")
+            => new(id, currencyId, amount, ProductionFeed.Yield, gate);
 
         // what an assembler hands over: every contribution these contributors
         // declare, paired with whoever holds it
@@ -111,11 +118,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new FakeContributor("amp", Rate("cash", 2)),
                 new FakeContributor("drummer", Rate("cash", 3))));
 
-            modifiers.Grant(CashRate, ModifierOperation.Add, ContentScope.Run, 5);
             modifiers.Grant(CashRate, ModifierOperation.Multiply, ContentScope.Run, 2);
 
-            Assert.AreEqual(20.0, producer.Rate.ToDouble(), 1e-9,
-                "(2 + 3 + 5) x 2 - the add landed once, not once per contributor");
+            Assert.AreEqual(10.0, producer.Rate.ToDouble(), 1e-9,
+                "(2 + 3) x 2 - the multiplier landed once over the sum, not once per contributor");
         }
 
         // Contributions stay individually addressable so a generator row can
@@ -198,18 +204,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // A modifier scales what contributions MAKE. With nothing contributing
         // there is nothing to scale, so the composition is skipped rather than
-        // applied to zero - otherwise a flat add would conjure a rate out of a
-        // producer that nothing feeds, and the readout would advertise income
-        // for a currency with no source.
+        // applied to zero. A multiplier scales what contributions make, and a
+        // producer nothing feeds - or whose every line is gated off - makes
+        // nothing, so no multiplier may make the readout advertise income for a
+        // currency with no live source.
         [Test]
-        public void AProducerWithNothingLive_ComposesToZeroRatherThanTheBareAdd()
+        public void AProducerWithNothingLive_ComposesToZero()
         {
             var currencies = TestContent.MakeEconomy();
             var modifiers = new ModifierSystem();
             var flags = new FlagSystem();
             var producer = MakeProducer("cash", modifiers, currencies, flags);
 
-            modifiers.Grant(CashRate, ModifierOperation.Add, ContentScope.Run, 100);
+            modifiers.Grant(CashRate, ModifierOperation.Multiply, ContentScope.Run, 100);
 
             Assert.AreEqual(0.0, producer.Rate.ToDouble(), 1e-9, "nothing was ever handed to this producer");
             Assert.IsFalse(producer.HasRate);
@@ -222,7 +229,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             flags.Set("covers");
 
-            Assert.AreEqual(104.0, producer.Rate.ToDouble(), 1e-9);
+            Assert.AreEqual(400.0, producer.Rate.ToDouble(), 1e-9);
             Assert.IsTrue(producer.HasRate);
         }
 
@@ -295,7 +302,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             producer.Rebuild(EntriesOf(
                 new FakeContributor("amp", Rate("cash", 2)),
                 new FakeContributor("poster", Rate("fans", 7)),
-                new FakeContributor("stray", new ProductionContribution("cash", 9, ProductionFeed.None, null))));
+                new FakeContributor("stray", new ProductionContribution("stray_cash", "cash", 9, ProductionFeed.None))));
 
             Assert.AreEqual(1, producer.RateContributions.Count);
             Assert.AreEqual(0, producer.YieldContributions.Count);
@@ -319,7 +326,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2.0, producer.Rate.ToDouble(), 1e-9,
                 "the negative contribution took nothing off the amp's");
 
-            modifiers.AddDerived(new FixedDerived(CashRate, ModifierOperation.Add, -100));
+            // a derived modifier is not asked whether its value is sane the way a
+            // grant is, so a negative one can still reach the composition - the
+            // producer's own floor is what keeps it from taking currency back
+            modifiers.AddDerived(new FixedDerived(CashRate, ModifierOperation.Multiply, -100));
 
             Assert.AreEqual(0.0, producer.Rate.ToDouble(), 1e-9,
                 "and a composed total below zero pays nothing rather than taking currency back");

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: cover_2
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Content.BarDefinition
   _id: cover_2
+  _tags: []
   _displayName: Parking-Lot Standard
   _fillCurrencyId: rehearsal
   _fillRequirement: 300

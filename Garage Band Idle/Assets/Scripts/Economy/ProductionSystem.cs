@@ -4,57 +4,69 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // Fires the module-held production configs (design doc section 12, rule
-    // 13): tick-triggered configs accrue on the real-time tick, tap-triggered
-    // ones fire on the Jam tap. Gates are ordinary Conditions checked per
-    // firing, and a config's output composes exactly the modifier target it
-    // declares - the Jam cash config declares TapValue, so flat adds
-    // (stage_presence) and multipliers (event-tier rewards) land exactly as
-    // they did before; an undeclared config pays its raw amount. Generators
-    // keep their own production path and are the only idle-eligible holder
-    // (section 9). No producers leaves the system inert.
+    // The chapter's currency producers (design doc section 12, rule 13): ONE per
+    // currency anything feeds, each owning that currency's rate and yield. This is
+    // the only thing in the game that creates currency. "What makes cash" therefore
+    // has one answer - ask cash's producer - instead of being a scan across
+    // generators, producer assets and whatever else might have named it.
     //
-    // TapValue can move for two reasons - a modifier changed, or a config's
-    // gate transitioned (any Condition input: a flag, a balance, an owned
-    // count) - and neither may notify the UI mid-mutation: a tick's
-    // production has bars still to drain, a purchase has unlocks still to
-    // evaluate. So nothing here pushes. GameManager calls RefreshTapValue
-    // after each complete operation settles (tick, Jam, purchase - the same
-    // boundary every unlock evaluation uses), and the event fires only when
-    // the evaluated value actually moved.
-    public class ProductionSystem
+    // What it replaced was two production paths that had grown apart: generators
+    // summed a per-second number GeneratorSystem.Tick turned into currency, and
+    // module-held configs summed a second one here, each with its own composition
+    // and its own idea of what a currency-wide buff reached. A yield was
+    // inexpressible on the first and a trigger enum decided the second, so "per
+    // second" and "per press" were told apart by WHO FIRED rather than by what the
+    // number is.
+    //
+    // ASSEMBLED, NEVER REGISTERED. Assemble walks the contributors in reach and
+    // hands each producer its whole list; a contributor never files itself in, so
+    // nothing has to remember to file itself out. Only a change in the SET needs
+    // the call - buying a generator, granting a buff and a gate transitioning all
+    // change what the existing lines are WORTH, and that is read live.
+    //
+    // Nothing here pushes a notification mid-mutation: a tick has bars still to
+    // drain and a purchase has unlocks still to evaluate. EconomyContext calls
+    // RefreshYields once each operation has settled, and the event fires only when
+    // a value actually moved.
+    public class ProductionSystem : IDisposable
     {
-        private readonly List<ProductionConfig> _tick = new();
+        private readonly Dictionary<string, CurrencyProducer> _byCurrency = new();
 
-        // every tap config, for the currency-scoped readouts, which ask "what can
-        // fill this currency" across the whole chapter
-        private readonly List<ProductionConfig> _tap = new();
+        // first-seen order, so accrual and publication are deterministic
+        private readonly List<string> _currencyOrder = new();
 
-        // Tap configs BY PRODUCER, which is what a firing needs. Flattening these
-        // into one list is what made a tap fire every producer in the chapter:
-        // harmless while Jam is the only tap surface, and wrong the moment a
-        // Merch/Sell module exists, since pressing Jam would sell merch too. Which
-        // producer a module presents was always authored - only the runtime
-        // ignored it.
-        private readonly Dictionary<string, List<ProductionConfig>> _tapByProducer = new();
+        // Which currencies a contributor's YIELD lines feed, which is what a firing
+        // needs: pressing Jam pays the currencies Jam contributes a yield to, and
+        // nothing else. Flattening this away is what once made a tap fire every tap
+        // config in the chapter - invisible with one surface, wrong with two.
+        private readonly Dictionary<string, List<string>> _yieldCurrenciesByContributor = new();
 
-        // declaration order, so RefreshTapValue publishes deterministically
-        private readonly List<string> _tapProducerOrder = new();
-        private readonly Dictionary<string, BigNumber> _lastTapValue = new();
+        // declaration order, so RefreshYields publishes deterministically
+        private readonly List<string> _firingOrder = new();
+        private readonly Dictionary<string, BigNumber> _lastYield = new();
 
+        private readonly List<AuthoredContributor> _authored = new();
+        private readonly GeneratorSystem _generators;
+        private readonly UpgradeSystem _upgrades;
         private readonly ICurrencies _currencies;
         private readonly ModifierSystem _modifiers;
         private readonly ConditionContext _conditions;
 
-        // Fires from RefreshTapValue when a producer's composed tap value moved
-        // (buff bought, run reset, a config's gate transitioned), carrying WHICH
-        // producer - the same shape as BalanceChanged, so a module showing one tap
-        // surface ignores another's movement instead of redrawing on it.
-        public event Action<string> TapValueChanged;
+        // reused across assemblies so a re-assemble allocates nothing per entry
+        private readonly Dictionary<string, List<ProductionEntry>> _staging = new();
 
-        public ProductionSystem(IEnumerable<ProducerDefinition> producers, ICurrencies currencies,
-            ModifierSystem modifiers, ConditionContext conditions)
+        // Fires from RefreshYields when a currency's composed yield moved (buff
+        // bought, run reset, a gate transitioned), carrying WHICH currency - the
+        // same shape as BalanceChanged, so a surface advertising one currency
+        // ignores another's movement instead of redrawing on it.
+        public event Action<string> YieldChanged;
+
+        public ProductionSystem(IEnumerable<ProducerDefinition> producers, GeneratorSystem generators,
+            UpgradeSystem upgrades, ICurrencies currencies, ModifierSystem modifiers,
+            ConditionContext conditions)
         {
+            _generators = generators;
+            _upgrades = upgrades;
             _currencies = currencies;
             _modifiers = modifiers;
             _conditions = conditions;
@@ -64,190 +76,245 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 if (producer == null)
                     continue;
 
-                foreach (var config in producer.Production)
-                {
-                    // fail closed on broken content - the importer refuses
-                    // these states and boot validation reports stale assets;
-                    // a config that slipped through must not silently fire.
-                    // ProductionConfig.IsComposable owns the rule, so this and
-                    // boot validation cannot disagree about what is authorable.
-                    if (!ProductionConfig.IsComposable(config.Composes))
-                    {
-                        Debug.LogError($"ProductionSystem: producer '{producer.Id}' config for '{config.CurrencyId}' declares composition '{config.Composes}', which a config cannot compose - it must be a defined target that composes globally. Ignoring the config.");
-                        continue;
-                    }
+                _authored.Add(new AuthoredContributor(producer, modifiers));
+            }
 
-                    switch (config.Trigger)
-                    {
-                        case ProductionTrigger.Tick:
-                            _tick.Add(config);
-                            break;
-                        case ProductionTrigger.Tap:
-                            _tap.Add(config);
-                            if (!_tapByProducer.TryGetValue(producer.Id, out var configs))
-                            {
-                                _tapByProducer.Add(producer.Id, configs = new List<ProductionConfig>());
-                                _tapProducerOrder.Add(producer.Id);
-                            }
-                            configs.Add(config);
-                            break;
-                        default:
-                            Debug.LogError($"ProductionSystem: producer '{producer.Id}' config for '{config.CurrencyId}' has trigger None (uninitialized). Ignoring the config.");
-                            break;
-                    }
+            // An upgrade's contributions are live exactly while its latch holds, so
+            // the SET changes when a latch does. Subscribing here rather than having
+            // UpgradeSystem push contributions in keeps the direction one way: this
+            // asks who is applied, nothing announces itself into a producer.
+            if (_upgrades != null)
+            {
+                _upgrades.UpgradeApplied += HandleUpgradeLatchChanged;
+                _upgrades.UpgradeCleared += HandleUpgradeLatchChanged;
+            }
+
+            Assemble();
+
+            foreach (var currencyId in _firingOrder)
+                _lastYield[currencyId] = YieldOf(currencyId);
+        }
+
+        public void Dispose()
+        {
+            if (_upgrades == null)
+                return;
+
+            _upgrades.UpgradeApplied -= HandleUpgradeLatchChanged;
+            _upgrades.UpgradeCleared -= HandleUpgradeLatchChanged;
+        }
+
+        // Rebuilds every producer's contribution list from the contributors in
+        // reach. Public because a restore replaces the upgrade latches silently -
+        // deliberately, so no subscriber reads a half-restored economy - which means
+        // the set can change with no event to hang this on.
+        public void Assemble()
+        {
+            foreach (var entries in _staging.Values)
+                entries.Clear();
+            _yieldCurrenciesByContributor.Clear();
+            _firingOrder.Clear();
+
+            foreach (var contributor in _authored)
+                Stage(contributor);
+
+            // Generators are always in the set: an unowned one contributes zero
+            // rather than being absent, so buying the first unit moves a value
+            // instead of changing the shape of the economy.
+            if (_generators != null)
+            {
+                foreach (var generator in _generators.All)
+                    Stage(generator);
+            }
+
+            if (_upgrades != null)
+            {
+                foreach (var upgrade in _upgrades.All)
+                {
+                    if (upgrade.Applied)
+                        Stage(upgrade);
                 }
             }
 
-            foreach (var producerId in _tapProducerOrder)
-                _lastTapValue[producerId] = TapValue(producerId);
+            // Only an AUTHORED contributor is fireable, and that is a rule about
+            // what a module may name rather than about what a contributor holds -
+            // so it is recorded by walking the list that defines it, and nothing
+            // has to be told which kind it is. Derived from "holds a yield line",
+            // it made an applied upgrade fireable, because stage_presence
+            // contributes to cash's yield. A bonus is not a button.
+            foreach (var contributor in _authored)
+                RecordFireable(contributor);
+
+            // Every currency ever staged is rebuilt, including one nothing feeds
+            // anymore - its list was cleared above, so it rebuilds EMPTY rather than
+            // being dropped. Its rate is then zero by composition instead of by
+            // absence, so a readout asking about it gets the same answer either way.
+            foreach (var entry in _staging)
+                ProducerFor(entry.Key).Rebuild(entry.Value);
         }
 
-        // Whether this chapter authors a tap surface under this id. Asked by the
-        // module that presents one, so a stale definitionId is reported where it
-        // can name the module rather than failing silently on the first press.
-        public bool HasTapProducer(string producerId)
-            => !string.IsNullOrEmpty(producerId) && _tapByProducer.ContainsKey(producerId);
+        // Whether a module may fire under this id: an authored contributor holding
+        // at least one yield line. Asked by the surface naming it, so a stale
+        // definitionId is reported where it can name the module rather than failing
+        // silently on the first press.
+        public bool CanFire(string contributorId)
+            => !string.IsNullOrEmpty(contributorId)
+               && _yieldCurrenciesByContributor.ContainsKey(contributorId);
 
-        // The composed yield ONE tap surface advertises: that producer's tap
-        // configs that compose TapValue, gates honored (Chapter 1: the jam
-        // producer's cash config). Per producer rather than chapter-wide, so a
-        // button's label describes what pressing that button pays.
-        public BigNumber TapValue(string producerId)
+        // Which currencies firing this contributor pays into, in the contributor's
+        // own declaration order. The surface asks so it can advertise what pressing
+        // it is worth WITHOUT assuming a currency - the Jam label read a hardcoded
+        // cash before, which was right only by accident of chapter 1.
+        public IReadOnlyList<string> FiredCurrencies(string contributorId)
+            => _yieldCurrenciesByContributor.TryGetValue(contributorId ?? "", out var currencyIds)
+                ? currencyIds
+                : Array.Empty<string>();
+
+        // One surface firing: every currency that contributor feeds a yield to pays
+        // out its composed yield. Naming the contributor is the whole point - a
+        // press pays what the pressed thing produces, and nothing else.
+        //
+        // The yield paid is the CURRENCY'S, not the contributor's share of it: rule
+        // 13 says a currency has one yield, so a bonus another fact contributes to
+        // cash's yield (stage_presence) is paid by the press exactly as the base
+        // line is, with nothing having to know the bonus exists.
+        public void Fire(string contributorId)
         {
-            if (!_tapByProducer.TryGetValue(producerId ?? "", out var configs))
-                return BigNumber.Zero;
-
-            var total = BigNumber.Zero;
-            foreach (var config in configs)
+            if (!_yieldCurrenciesByContributor.TryGetValue(contributorId ?? "", out var currencyIds))
             {
-                if (config.Composes == ModifierTarget.CurrencyYield && ConditionEvaluator.IsMet(config.Gate, _conditions))
-                    total += Composed(config);
-            }
-            return total;
-        }
-
-        // Every query below reports what production can do RIGHT NOW, gates
-        // included - the same question Tick and FireTap answer when they decide
-        // what to pay. A readout that ignored a gate would advertise a yield the
-        // tap does not deliver, which is worse than showing nothing because the
-        // number looks authored rather than stale.
-
-        // whether any module-held config can currently produce this currency;
-        // drives the rate readout beside a fill currency's balance, so the
-        // readout appears exactly while something can fill it
-        public bool HasProduction(string currencyId)
-            => HasLiveConfig(_tick, currencyId) || HasLiveConfig(_tap, currencyId);
-
-        // zero while every config for the currency is dormant (gate unmet)
-        public BigNumber RatePerSecond(string currencyId)
-            => Sum(_tick, currencyId);
-
-        // the composed per-tap yield, on the same terms: a dormant config pays
-        // nothing when FireTap runs, so it contributes nothing here either
-        public BigNumber PerTap(string currencyId)
-            => Sum(_tap, currencyId);
-
-        public void Tick(double seconds)
-        {
-            foreach (var config in _tick)
-            {
-                if (!ConditionEvaluator.IsMet(config.Gate, _conditions))
-                    continue;
-
-                var rate = Composed(config);
-                if (rate > BigNumber.Zero)
-                    _currencies.Add(config.CurrencyId, rate * seconds);
-            }
-        }
-
-        // One tap surface firing: every tap-triggered config THAT PRODUCER holds
-        // whose gate holds pays out, in the producer's own config order (cash, then
-        // the engagement yields). Naming the producer is the whole point - a press
-        // pays what the pressed thing produces, and nothing else.
-        public void FireTap(string producerId)
-        {
-            if (!_tapByProducer.TryGetValue(producerId ?? "", out var configs))
-            {
-                // A module firing an unknown producer is broken wiring, not a
+                // A surface firing an unknown contributor is broken wiring, not a
                 // no-op worth swallowing: the button would silently pay nothing
                 // forever, which reads as a tuning problem rather than a
                 // mis-authored module entry.
-                Debug.LogError($"ProductionSystem: FireTap for producer '{producerId}', which this chapter authors no tap configs for. Nothing paid.");
+                Debug.LogError($"ProductionSystem: Fire for '{contributorId}', which this chapter authors no yield lines for. Nothing paid.");
                 return;
             }
 
-            foreach (var config in configs)
+            foreach (var currencyId in currencyIds)
+                _byCurrency[currencyId].Fire();
+        }
+
+        // Every currency's rate, over a span of elapsed real time. One call rather
+        // than a generator pass and a config pass: a rate is a rate whatever
+        // declared it, which is what makes the idle payout (section 9) a question
+        // about the quantity instead of about the holder kind.
+        public void Accrue(double seconds)
+        {
+            foreach (var currencyId in _currencyOrder)
+                _byCurrency[currencyId].Accrue(seconds);
+        }
+
+        // Every query below reports what production can do RIGHT NOW, gates
+        // included - the same question Accrue and Fire answer when they decide what
+        // to pay. A readout ignoring a gate would advertise a yield the press does
+        // not deliver, which is worse than showing nothing because the number looks
+        // authored rather than stale.
+
+        // whether anything can currently produce this currency, by either quantity;
+        // drives the rate readout beside a fill currency's balance, so the readout
+        // appears exactly while something can fill it
+        public bool HasProduction(string currencyId)
+            => TryGet(currencyId, out var producer) && (producer.HasRate || producer.HasYield);
+
+        // zero while every line feeding the currency is dormant (gate unmet)
+        public BigNumber RateOf(string currencyId)
+            => TryGet(currencyId, out var producer) ? producer.Rate : BigNumber.Zero;
+
+        // the composed per-firing yield, on the same terms: a dormant line pays
+        // nothing when Fire runs, so it contributes nothing here either
+        public BigNumber YieldOf(string currencyId)
+            => TryGet(currencyId, out var producer) ? producer.Yield : BigNumber.Zero;
+
+        // The post-mutation refresh: re-evaluates each fireable currency's yield and
+        // publishes only an actual move. Called by EconomyContext after each
+        // complete operation settles - never from inside a system, so no subscriber
+        // can observe a half-settled mutation (state, then notify).
+        public void RefreshYields()
+        {
+            foreach (var currencyId in _firingOrder)
             {
-                if (!ConditionEvaluator.IsMet(config.Gate, _conditions))
+                var value = YieldOf(currencyId);
+                if (_lastYield.TryGetValue(currencyId, out var last) && value == last)
                     continue;
 
-                var amount = Composed(config);
-                if (amount > BigNumber.Zero)
-                    _currencies.Add(config.CurrencyId, amount);
+                _lastYield[currencyId] = value;
+                YieldChanged?.Invoke(currencyId);
             }
         }
 
-        // The post-mutation refresh: re-evaluates the tap value and publishes
-        // only an actual move. Called by GameManager after each complete
-        // operation settles (end of tick, end of Jam, a successful purchase,
-        // a future reset/restore) - never from inside a system, so no
-        // subscriber can observe a half-settled mutation (state, then notify).
-        public void RefreshTapValue()
+        private void HandleUpgradeLatchChanged(Upgrade upgrade) => Assemble();
+
+        // Files one contributor's lines under the currencies they name. A line
+        // naming no currency is broken content the importer refuses and boot
+        // validation reports; it is dropped here rather than filed under "" where it
+        // would pay into nothing.
+        //
+        // It knows nothing about surfaces. Every contributor is staged the same way,
+        // whatever kind it is - which is the whole reason a producer can be
+        // assembled without learning what fed it.
+        private void Stage(IProductionContributor contributor)
         {
-            // per producer, in declaration order: each tap surface publishes only
-            // its own movement, so a chapter with two of them never redraws one
-            // because the other changed
-            foreach (var producerId in _tapProducerOrder)
+            foreach (var contribution in contributor.Contributions)
             {
-                var value = TapValue(producerId);
-                if (value == _lastTapValue[producerId])
+                if (contribution == null)
                     continue;
 
-                _lastTapValue[producerId] = value;
-                TapValueChanged?.Invoke(producerId);
+                var currencyId = contribution.CurrencyId;
+                if (string.IsNullOrEmpty(currencyId))
+                {
+                    Debug.LogError($"ProductionSystem: '{contributor.ContributorId}' has a contribution naming no currency. Ignoring it.");
+                    continue;
+                }
+
+                if (!_staging.TryGetValue(currencyId, out var entries))
+                    _staging.Add(currencyId, entries = new List<ProductionEntry>());
+                entries.Add(new ProductionEntry(contributor, contribution));
+
+                // publication order covers every currency with a yield at all,
+                // fireable or not: stage_presence's bonus moves cash's yield, and a
+                // label must repaint for it even though the upgrade is not a surface
+                if (contribution.Feeds == ProductionFeed.Yield && !_firingOrder.Contains(currencyId))
+                    _firingOrder.Add(currencyId);
             }
         }
 
-        // A config composes exactly the target it declares, QUALIFIED BY ITS OWN
-        // CURRENCY - the yield of the currency it pays, or that currency's rate -
-        // with no per-target branch here. Qualifying by the config's own currency
-        // is what keeps a buff on one currency's payout off another's, which a
-        // single global bucket per kind could not express. Anything landing below
-        // zero yields nothing and no multiplier resurrects it, so a firing can
-        // never drain a balance.
-        private BigNumber Composed(ProductionConfig config)
+        // Which currencies firing this contributor pays into, in its own declaration
+        // order. Called only for the authored producers, so being fireable is a fact
+        // about which list a contributor came from rather than a property anything
+        // has to carry.
+        private void RecordFireable(IProductionContributor contributor)
         {
-            var value = config.Composes == ModifierTarget.None
-                ? (BigNumber)config.Amount
-                : _modifiers.For(ModifierTargetKey.Of(config.Composes, config.CurrencyId)).ApplyTo(config.Amount);
-            return value < BigNumber.Zero ? BigNumber.Zero : value;
-        }
-
-        // the one place a query decides which configs count: same currency, gate
-        // holding. Sum and HasLiveConfig share it so a readout and the guard that
-        // decides whether to show the readout can never disagree.
-        private bool Counts(ProductionConfig config, string currencyId)
-            => config.CurrencyId == currencyId && ConditionEvaluator.IsMet(config.Gate, _conditions);
-
-        private BigNumber Sum(List<ProductionConfig> configs, string currencyId)
-        {
-            var total = BigNumber.Zero;
-            foreach (var config in configs)
+            foreach (var contribution in contributor.Contributions)
             {
-                if (Counts(config, currencyId))
-                    total += Composed(config);
+                if (contribution == null || contribution.Feeds != ProductionFeed.Yield)
+                    continue;
+
+                var currencyId = contribution.CurrencyId;
+                if (string.IsNullOrEmpty(currencyId))
+                    continue;
+
+                if (!_yieldCurrenciesByContributor.TryGetValue(contributor.ContributorId, out var fired))
+                    _yieldCurrenciesByContributor.Add(contributor.ContributorId, fired = new List<string>());
+                if (!fired.Contains(currencyId))
+                    fired.Add(currencyId);
             }
-            return total;
         }
 
-        private bool HasLiveConfig(List<ProductionConfig> configs, string currencyId)
+        // Get-or-create, because a currency's producer outlives any one assembly:
+        // an upgrade whose latch cleared must leave cash's producer in place with
+        // one fewer line, not remove cash's producer.
+        private CurrencyProducer ProducerFor(string currencyId)
         {
-            foreach (var config in configs)
-            {
-                if (Counts(config, currencyId))
-                    return true;
-            }
-            return false;
+            if (_byCurrency.TryGetValue(currencyId, out var producer))
+                return producer;
+
+            producer = new CurrencyProducer(currencyId, _currencies, _modifiers, _conditions);
+            _byCurrency.Add(currencyId, producer);
+            _currencyOrder.Add(currencyId);
+            return producer;
         }
+
+        private bool TryGet(string currencyId, out CurrencyProducer producer)
+            => _byCurrency.TryGetValue(currencyId ?? "", out producer);
     }
 }
