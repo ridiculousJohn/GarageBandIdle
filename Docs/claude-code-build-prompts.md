@@ -557,6 +557,12 @@ the one rate no reward, buff or event tier can reach without naming `FanRate` sp
 > passive source that is not a generator can never idle-pay, with no per-config flag to author or get
 > wrong.
 >
+> **[rev] Steps 2 and 3 below were built here and superseded by 7.4**, which deleted the target enum
+> and `ModifierOperation.Add` with it: a flat bonus is a CONTRIBUTION to the number it raises, so the
+> per-bandmate bonus is a fans rate line on each bandmate generator rather than a derived modifier, and
+> a config composes through a selector rather than a target key. Read them as the state 7.4 started
+> from, not as instructions.
+>
 > **2. The per-bandmate bonus becomes a derived modifier.** Add `BandmateFanRateModifier :
 > DerivedModifier` — `Target = ModifierTargetKey.Global(ModifierTarget.FanRate)`, `Operation = Add`,
 > `Value = perBandmateOwnedBonus × bandmateCount`, reading `GeneratorSystem` live. Register it in
@@ -923,6 +929,34 @@ pattern the `.5` slices have been paying for since 5.4.
 > vocabulary gains a currency qualifier and the JSON, the importer's string maps, `GrantModifierEffect`
 > and `ContentValidator` all move with it, then a reimport. Every number is unchanged.
 >
+> **[rev] Step 1 above was built (`75468ad`) and then superseded inside this slice (`0f48965`), before
+> commit C landed. Read the paragraph below as the instruction; the one above records what the enum
+> vocabulary looked like on the way past.** The qualified-target shape does not survive one generator
+> feeding two currencies, which is what commit C's contributions make ordinary: Bigger Kit says "double
+> the drummer's output", the drummer holds a cash line and a fans line, and a closed KIND plus one
+> designer id cannot say which - the kind names a family, the id names a member of that family, and the
+> number itself is never named at all. Reaching both changes Chapter 1's numbers and contradicts the
+> chapter's own note that the fan rate is deliberately not a function of cash.
+>
+> **So there is no target enum.** `ModifierTarget` and `ModifierTargetKey` are both deleted. **Every
+> modifiable number carries an id** - a contribution, a producer's rate or yield, a generator's cost, a
+> bar group's fill rate, a scope's idle rate and cap - and a modifier carries a **`ModifierSelector`**,
+> a list of terms where each term is an id or a tag. A term is a NAME, never a facet: `cash_rate` is the
+> id of cash's rate, and `["cash","rate"]` is not another way to spell it. **An empty selector reaches
+> everything in scope**, which is what the optional qualifier was for - "double all idle payouts" stays
+> placement rather than an authored id list. Matching is asked of the number being matched
+> (`ModifierSubject`), never computed inside the registry, so the composition and the change
+> notification share one implementation and a row can never display a number the economy disagrees
+> with; a subject offers its OWNER's id too, so naming a generator still reaches every line it holds.
+> **Modifiers are multipliers only.** `ModifierOperation.Add` goes with the enum: a flat bonus is a
+> CONTRIBUTION to the number it raises, authored by the fact that pays it, so every composed number has
+> one shape - the sum of its contributions times the product of the multipliers matching it - and there
+> is no application order left for two systems to disagree about. The content vocabulary follows: an
+> effect authors `targets` (a term list, `[]` meaning everything in scope, an absent key refused), the
+> importer's names are the OPERATION alone, and `ContentDatabase.ResolvesModifierTerm` reports a term
+> nothing answers to, since an open vocabulary has no compiler behind it. §12 rule 11 is written to
+> this; the design doc is the authority.
+>
 > ### Commit B — the new model, additive
 >
 > **2. `CurrencyProducer`, one per currency.** It owns two numbers: `Rate` (units per second) and
@@ -968,7 +1002,10 @@ pattern the `.5` slices have been paying for since 5.4.
 > records what fired it — a button, an automation and a test are indistinguishable below this line.
 > `TapModule` names the currency producer it fires, calls `Fire()`, and labels itself from `Yield`.
 > **"Tap" survives only in that module.** If the word appears in `Economy/`, `Core/`, the JSON schema
-> or a `ModifierTarget`, the slice is not done.
+> or a modifier term, the slice is not done. **[rev]** Authored content may say it freely - the
+> `module/tap` address, a `tap_value_x1_25` reward id, a stage note - and so may the importer's refusal
+> keys, which have to keep the exact spelling they detect. What must not survive is an internal name:
+> a type, member, or local naming the gesture, or a comment describing an economy quantity as one.
 >
 > **6. `ProductionSystem` becomes the collection of the economy's currency producers.** It integrates
 > rates over elapsed time and resolves a producer by currency id. `HasProduction` and `RatePerSecond`
@@ -988,9 +1025,11 @@ pattern the `.5` slices have been paying for since 5.4.
 > here.
 
 ✅ **Test & commit (three times — A, B, then C).** For each: the project compiles and the suite passes.
-For A, every Chapter 1 number is unchanged with the targets renamed, and an unqualified target reaches
-every member in its family while a qualified one reaches exactly the member it names. For B, nothing
-observable moves at all — the types exist and nothing constructs them.
+For A, every Chapter 1 number is unchanged with the addressing rewritten: **[rev]** an empty selector
+reaches every number in scope, a term naming an id reaches exactly that number, a term naming a
+contribution's owner reaches every line the owner holds, and a term nothing in the content set answers
+to is reported rather than filed. For B, nothing observable moves at all - the types exist and nothing
+constructs them.
 
 For C, the slice's real gate: every Chapter 1 number is unchanged — press payout, fan rate, generator
 costs, the first-demo pacing; a bandmate generator raises cash's rate *and* fans' rate with no flag
@@ -1254,22 +1293,24 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > reads flags that carry their own placement. (7.4 built the contribution; this slice only gives the
 > check a tree to resolve against.)
 >
-> **6. Cost composes modifiers, the way production already does.** After 7.4 `ModifierTarget` names
-> currency rate, currency yield, generator output, bar fill rate, idle rate and idle cap — and still not
-> cost, so a cost buff cannot be authored; and `Generator.NextCost` is a parameterless property over a
-> static formula, so nothing would compose one if it could. The ladder above is designed around spending an intermediate currency on cost
-> reduction (Ctrl C's Syntax Highlighting is the reference shape), and rule 11 claims to be the one place
-> any number is modified — cost sitting outside it makes that claim false. 7.4 fixed the targets that
-> were named after Chapter 1's surfaces; this fixes the one that was never added at all.
+> **6. Cost composes modifiers, the way production already does.** **[rev]** 7.4 ended with no target
+> enum at all: every modifiable number carries an id and a modifier is a `ModifierSelector` over ids and
+> tags, so this step adds no enum member. What it adds is a cost that HAS an id and a `CostCalculator`
+> that composes over it - today `Generator.NextCost` is a parameterless property over a static formula,
+> so a cost buff is unauthorable and nothing would compose one if it could. The ladder above is designed
+> around spending an intermediate currency on cost reduction (Ctrl C's Syntax Highlighting is the
+> reference shape), and rule 11 claims to be the one place any number is modified - cost sitting outside
+> it makes that claim false.
 >
-> Add `GeneratorCost` to the enum (appended, explicit value, per its own rule), give `CostCalculator.Cost`
-> the composition `ProductionCalculator` already has, and let `NextCost` reach its scope's registry.
-> **Multipliers only** for this target: a flat add needs a floor, since a cost at or below zero is a free
-> generator and `GeneratorRowUI` already tests `NextCost > Zero`. Qualify by generator id exactly as
-> `GeneratorOutput` does — optional, and unqualified means every generator in reach, which is what makes
-> "-99% for tier 1" pure placement rather than an authored id list. Both live call sites already go
-> through `NextCost` (`Generator.TryBuy` and `GeneratorRowUI`), so the displayed cost and the charged cost
-> cannot drift apart.
+> Give a generator's cost an id on the same convention its contributions follow (`<generator>_cost`),
+> give `CostCalculator.Cost` the composition `ProductionCalculator` already has, and let `NextCost`
+> reach its scope's registry. **Multipliers only**, which rule 11 now gives for free: a modifier IS a
+> multiplier, and a flat cost reduction would be a contribution - one that needs a floor, since a cost at
+> or below zero is a free generator and `GeneratorRowUI` already tests `NextCost > Zero`. Naming the
+> generator reaches its cost through the same owner rule a contribution uses, and an empty selector
+> reaches every cost in scope, which is what makes "-99% for tier 1" pure placement rather than an
+> authored id list. Both live call sites already go through `NextCost` (`Generator.TryBuy` and
+> `GeneratorRowUI`), so the displayed cost and the charged cost cannot drift apart.
 >
 > This is observably inert in Chapter 1, and that is the point: nothing authors a cost buff, so every
 > generator composes an empty set and the exact-cost assertions (`amp.NextCost` at 60.0 and 69.0) pass
