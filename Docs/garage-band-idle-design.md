@@ -9,8 +9,10 @@ a bigger venue with a new mechanic. All numbers below are starting values for tu
 > - **One `Condition` type** and one evaluator for every gate, unlock, visibility and activation rule
 >   (§12 rule 8); **one flag registry** for all progressive reveal (rule 9); every content
 >   ScriptableObject discovered via Addressables (rule 10).
-> - **One modifier registry** (rule 11) — systems compose on read instead of holding their own stacks,
->   and a grant lives in the same scope as the fact it projects from.
+> - **One modifier registry** (rule 11) — systems compose on read instead of holding their own stacks.
+>   A modifier **selects what it modifies by id or tag** rather than naming a closed stat kind; modifiers
+>   are **multipliers only** and a flat bonus is a contribution; and a grant lives in the same scope as
+>   the fact it projects from.
 > - **A chapter is a tree of scopes** (rule 12). A scope owns its truth, owns what presents that truth,
 >   and holds an *ordered* list of child scopes, so a fact's lifetime is **where it lives** rather than a
 >   value it declares. Nothing declares a lifetime: the `run` / `permanent-in-chapter` enum, the economy
@@ -345,9 +347,9 @@ Moment-to-moment play draws on the systems defined elsewhere:
   **Continuous delivery carries a consumption rate** — the fill currency it can absorb per second —
   rather than transferring whatever the pool holds. Without one, a pool that accumulated while nothing
   was selected empties into a bar in a single tick, which is most of a bar's progress arriving in one
-  frame and is the difference between rehearsing and collecting. The rate is a §12 rule 11 target
-  (`BarFillRate`, qualified by bar or group id, unqualified reaching every bar in scope), so "rehearse
-  twice as fast" is authorable content rather than a special case. The **rate is what takes screen
+  frame and is the difference between rehearsing and collecting. The rate is an identified number a
+  modifier can select (§12 rule 11) — by the bar's id, its group's, or a tag either one carries — so
+  "rehearse twice as fast" is authorable content rather than a special case. The **rate is what takes screen
   time; the pool is what accrues** — which is why the fill currency may earn while a scope is disabled
   (§9) while the bar it feeds does not move until the player is back and has chosen where to pour.
   A dump-the-pool sibling is exactly the behavior that declines to have one.
@@ -539,10 +541,10 @@ tracks when it was last interacted with, and a **disabled** scope accrues nothin
 pays `rate × min(idleSeconds, cap) × idleRate` for each of its currencies at the moment it is
 **enabled**, where `rate` is that currency's composed production rate (rule 13), with
 **idleRate = 50%**, **cap = 4 hours** per scope (raisable via the Backstage Pass), and no payout below
-a minimum idle threshold (a too-quick re-enable earns nothing). Both `idleRate` and `cap` are rule-11
-targets composed from the registry rather than constants — the Backstage Pass raises one and the
-"Double it" buff below multiplies the other, and a number the game modifies that the registry cannot
-name is a gap in rule 11 rather than a feature request. Closing the app is just the state where
+a minimum idle threshold (a too-quick re-enable earns nothing). Both `idleRate` and `cap` are identified
+numbers composed from the registry rather than constants — the Backstage Pass contributes to one and the
+"Double it" buff below multiplies the other. A number the game modifies that nothing can name is a gap
+in rule 11 rather than a feature request, and closing it means giving that number an id. Closing the app is just the state where
 every scope is disabled; launching enables the scopes you return to — so in-game chapter switching
 (Ch. 2+) and time away are one mechanic, not two. Note this is per *scope*, not per economy: several
 scopes are enabled at once (rule 7), and an outer scope's generators keep producing live while the
@@ -646,6 +648,7 @@ Assets/Scripts/
     GameManager.cs        // bootstrap, save/load + tick orchestration
     TickSystem.cs         // fixed-interval update on real (DateTime) time
     BigNumber.cs          // wraps break_infinity.cs
+    Definition.cs         // rule 10: the base every content definition inherits - id + tags, declared once instead of per class, so registries/validation/the inspector work on any family and every family gets grouping (rule 11)
     CurrencyManager.cs    // one class, one instance per scope that owns balances
     Scopes/ScopeDefinition.cs / Scope.cs   // rule 12: definition + instance (rule 7). A scope owns its truth (pool + systems + modifiers + flags), its sections, and an ORDERED list of child scopes; lifetime is placement, so this replaces EconomyContext, EconomyRecipe and CurrencyPlacement
     Scopes/ScopeChain.cs  // rule 12: the one iterator over "my scope outward to the root, enabled only" - three public resolvers (ResolveCurrency first-owner-wins / ResolveFlag any / ResolveModifiers accumulate) fold it their own way; no mode parameter
@@ -660,13 +663,14 @@ Assets/Scripts/
     ChapterDefinition.cs / Chapter.cs   // mechanic, capstone, Records gate, story beat
     ChapterManager.cs     // forward-only advancement + unlocks
   Economy/
-    GeneratorDefinition.cs / Generator.cs   // a purchasable contributor: owned count x its rate contributions, one per currency it feeds (rule 13) - a bandmate is simply one that also contributes to fans
+    GeneratorDefinition.cs / Generator.cs   // a purchasable contributor: owned count x its rate contributions, one per currency it feeds (rule 13), each with its own id and tags so a buff can name one line - a bandmate is simply one that also contributes to fans, and `bandmate` is a tag (rule 10) rather than a bool a system branches on
     UpgradeDefinition.cs / Upgrade.cs   // payload = buff | setFlag (reveal via flag); gate = any Condition; NO scope field - lifetime is the scope it is filed in; one-shot awards are GameActions, executed by the purchase alone
     BarDefinition.cs / BarGroupDefinition.cs / BarSystem.cs   // generic fillable bars (fillCurrency-driven); replaces LearnSongBar
     RewardDefinition.cs / RewardManager.cs   // shared reward pool; Apply(rewardId) dispatches on type (incl. setFlag)
     CostCalculator.cs / ProductionCalculator.cs   // formula only; the modifiers that scale production live in the registry
     CurrencyProducer.cs / ProductionSystem.cs   // rule 13: one producer per currency owning rate + yield, each composed from gated contributions that stay individually addressable; the system holds a scope's producers, integrates rates over elapsed time, and fires a producer on request - it never learns what fired it
     Modifiers/ModifierSystem.cs   // one registry per scope: granted (lives where its fact lives, no scope value) + derived (computed from a source); the composition rule lives here, resolution is the ScopeChain walk
+    Modifiers/ModifierSelector.cs   // rule 11: what a modifier names - ids and tags, empty = everything in reach. Matches(subject) is asked of the thing being matched, so the registry never compares strings and a later path form (drummer.cash) changes only what parses it. Replaces ModifierTarget + ModifierTargetKey: nothing names a closed stat kind, because every modifiable number has an id
     CapstoneSystem.cs     // the completed-capstone fact source: the declared completion flag is the latch, projection re-applies OnComplete from it; the completion is the chapter's deepest rung (rule 14)
   Events/
     EventDefinition.cs / GameEvent.cs   // optional debuff, optional timer, goal, tier, reward; NO baseline-reset field - entry resets the host scope
@@ -745,26 +749,56 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     upgrades, events, bars, rewards) via Addressables labels; managers build their id→definition
     registries from the labelled assets, not from hardcoded lists or direct references. Validate that
     every referenced id resolves on load.
+    **A definition is one type.** Every content definition carries an **id** and a **tag list**,
+    declared once on a shared base rather than re-declared per class — which is what lets a registry, a
+    validator and an inspector dropdown work on any family without reflecting for a property named `Id`
+    or being handed a per-type accessor for it. Tags are open content on that base, so every family gets
+    grouping at once (rule 11) instead of each one growing its own bool when someone needs a set.
 11. Compose every stat modifier through one registry — no system keeps its own multiplier or
-    bonus stack. Each asks for the composition on its target and applies it, where a target is a closed
-    kind plus the designer id it names: a currency's **rate**, a currency's **yield**, a generator's
-    **output**, a generator's **cost**, a bar group's **fill rate** (§6), and the **idle rate** and
-    **idle cap** (§9). Every kind names the family it acts on, so a target is never named after
-    whatever Chapter 1 happened to have one of (rule 13) — but **the qualifier is optional, and
-    unqualified means every member in reach**, which is what makes "-99% cost for this tier" or "double
-    all idle payouts" pure placement rather than an authored id list. The rule is
-    `(base + adds) × multipliers`, expressed in exactly one place, so two systems cannot disagree about
-    the order their modifiers apply in — with **cost taking multipliers only**, because a flat reduction
-    needs a floor and a cost at or below zero is a free generator. The list is closed and code-defined,
-    but that governs *how* a target is added, not which ones should exist: a number the game modifies and
-    the registry cannot name is a gap in this rule rather than a feature request. A
-    **granted** modifier is a fact established at a moment (a bought buff, a completed bar, a cleared
+    bonus stack. Each asks for the composition on the number it owns and applies it.
+
+    **A modifier names what it modifies by id**, the way everything else in the game names things.
+    There is no closed list of modifiable stats. Every modifiable number is an *identified thing*: a
+    production contribution, a producer's **rate** or **yield** (rule 13), a generator's **cost**, a bar
+    group's **fill rate** (§6), a scope's **idle rate** and **idle cap** (§9). Giving the game a new
+    modifiable number means giving that number an id, not adding a member to an enum every reader then
+    has to learn. The shape this replaces was a closed *kind* plus one designer id, and it broke the
+    first time one generator fed two currencies: "double the drummer's output" had no way to say
+    *which* output, because the kind named a family, the id named a member of that family, and the
+    number itself was never named at all.
+
+    **A selector matches a subject.** A modifier carries a **selector**; the number asks whether that
+    selector matches it, offering its own id, its tags, and its owner's id and tags — so a buff on a
+    generator reaches every line that generator contributes, while a buff on one of those lines reaches
+    only it. An **empty selector matches everything in reach**, which is what makes "double all
+    generator output" or "-99% cost for this tier" placement rather than an authored id list. Matching
+    is asked of the thing being matched rather than computed inside the registry: one implementation,
+    which the composition and the change notification both ask, so a display can never refresh on a
+    modifier the composition ignored or miss one it counted.
+
+    **Tags are how a set gets a name** (rule 10). Any definition may carry tags, and so may a
+    contribution — `rhythm_section` on two generators' cash lines reaches both without either buff or
+    generator listing the other. A set spelled out as ids has to be re-spelled at every buff that means
+    it, and silently omits whatever is added later; a tag is declared once, by the member. A boolean
+    beside a definition (`isBandmate`) is a tag that never got the concept.
+
+    **Modifiers are multipliers.** A flat bonus is *not* a modifier — it is a **contribution** to the
+    number it raises (rule 13), authored by whatever fact pays it. Every composed number in the game then
+    has one shape, **the sum of its contributions × the product of the multipliers matching it**, and
+    the old `(base + adds) × multipliers` ordering stops being a rule anything can disagree about: an add
+    and a base are the same kind of thing. It also removes a question that has no correct answer — what a
+    flat add against a *set* means, +1 to the total or +1 to each — by making it unsayable rather than
+    documented. Cost previously needed a "multipliers only" exemption for a related reason (a flat
+    reduction has no floor, and a cost at or below zero is a free generator); that exemption is now
+    simply the rule everywhere.
+
+    A **granted** modifier is a fact established at a moment (a bought buff, a completed bar, a cleared
     event tier) and is *stored*, in the scope holding that fact; a **derived** modifier is not stored at
     all — it computes from its source on every read, so it has no placement of its own and cannot give a
     second answer to "does this survive a release." Keep grants individually rather than accumulating them into one number:
     that is what makes a run reset exact, and it makes the reset a single call instead of a per-system
-    enumeration that silently misses whichever system was added last. A modifier reaches only the target
-    it names, which is what keeps an income buff off a fans or merch producer.
+    enumeration that silently misses whichever system was added last. A modifier reaches only what its
+    selector matches, which is what keeps an income buff off a fans or merch producer.
     A grant lives in the **same scope as the fact it projects from**, which is the single
     authoritative lifetime: **an effect's durability is exactly the durability of the fact it projects
     from.** That is now structural rather than copied — a grant does not carry a scope value that could
@@ -898,10 +932,12 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
     split rather than being authored, so there is no flag on a contribution, no field on a currency, and
     no exempt list.
 
-    **Modifier targets follow** (rule 11): a currency's **rate** and a currency's **yield**, each
-    qualified by currency id, and no target named after a surface. A contribution needs no separate
-    declaration of which composition scales it, since the number it feeds is what the contribution *is*.
-    Rewards and grants remain rule-11 facts, not production.
+    **A contribution is an identified thing** (rule 11): it carries an id and tags of its own, so a buff
+    can name one line — the drummer's cash — without touching the other line the same generator holds,
+    and a tag can name a set of lines across generators. It needs no separate declaration of which
+    composition scales it, since the number it feeds is what the contribution *is*. A **flat bonus a
+    reward or an upgrade pays is itself a contribution**, authored by that fact rather than by a
+    generator; only multipliers are modifiers.
     **Production direction.** A contributor may only feed a producer in **its own scope or further
     out** — never inward. An outer generator feeding an inner scope's currency would outlive its own
     target, and after the inner scope resets it would be raising a rate on a balance that no longer has
@@ -987,7 +1023,9 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   enum, no placement enum and no projection recipe; **each currency has exactly one producer** owning a
   rate and a yield, both composed from contributions that generators and modules declare (a currency
   never declares its own earn, a contributor may feed several currencies but only its own scope or
-  further out, and "tap" is a UI gesture the economy never names); saves store facts, never
+  further out, and "tap" is a UI gesture the economy never names); **every modifiable number has an id**
+  and a modifier selects by id or tag with empty meaning everything in reach, so there is no closed list
+  of stats — modifiers are multipliers and a flat bonus is a contribution; saves store facts, never
   grants, one block per scope instance, and each scope re-projects its modifiers from those facts at
   construction.
 - **Monetization:** opt-in ads only (no forced interstitials); idle earnings are per scope (50% of
