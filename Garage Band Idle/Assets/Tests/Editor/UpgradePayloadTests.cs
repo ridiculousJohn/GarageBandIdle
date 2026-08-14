@@ -113,7 +113,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void GeneratorOutputMultiplier_ReachesOnlyTheNamedGenerator()
+        public void ATermNamingOneGenerator_ReachesOnlyThatGeneratorsLines()
         {
             var currencies = TestContent.MakeEconomy();
             var modifiers = new ModifierSystem();
