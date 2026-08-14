@@ -21,8 +21,8 @@ a bigger venue with a new mechanic. All numbers below are starting values for tu
 > - **One producer per currency** (rule 13), owning a **rate** (per second) and a **yield** (per
 >   firing), each composed from individually addressable contributions. Generators and modules
 >   *contribute* rather than produce, a contributor may feed several currencies, and it may only feed
->   its own scope or further out. "Tap" is a UI gesture and appears nowhere below the module that
->   presents one.
+>   its own scope or further out. "Tap" is a UI gesture, and no type, member, enum value, field or
+>   local below the module presenting one is named for it (rule 13).
 > - **A reset names a set of scopes**, chosen by a polymorphic reset target selector (rule 14).
 > - **Run currencies are per-chapter ids** and idle accrual is per scope, paid when a scope is enabled
 >   (§2, §9) — there is no app-level "offline" and no single focused economy.
@@ -1035,7 +1035,7 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   enum, no placement enum and no projection recipe; **each currency has exactly one producer** owning a
   rate and a yield, both composed from contributions that generators and modules declare (a currency
   never declares its own earn, a contributor may feed several currencies but only its own scope or
-  further out, and "tap" is a UI gesture the economy never names); **every modifiable number has an id**
+  further out, and "tap" is a UI gesture no economy identifier is named for); **every modifiable number has an id**
   and a modifier selects by id or tag with empty meaning everything in reach, so there is no closed list
   of stats — modifiers are multipliers and a flat bonus is a contribution; saves store facts, never
   grants, one block per scope instance, and each scope re-projects its modifiers from those facts at
