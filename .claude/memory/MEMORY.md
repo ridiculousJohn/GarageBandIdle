@@ -13,3 +13,5 @@
 - [Reveal is a Condition](reveal-is-a-condition.md) - slice 5.6 landed `5b8a917`; the fail-open gap it left, and the two stale-key refusal shapes
 - [Fan accrual is production](fan-accrual-is-production.md) - slice 5.7 landed `1227bab`; no-idle-fans is structural now, `IsComposable` is one rule with two callers, refuse stale keys on presence, and the only test validating shipped content
 - [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) - verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
+- [Composition claims need attribution](composition-claims-need-attribution.md) - slice 7.4 landed `cf1d120`; multipliers-only means "applied once over the sum" cannot fail a total, so check what each line reads back
+- [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - Scripts, then Tests, then both docs and the chapter JSON; grep the rule's phrasing, not its topic
