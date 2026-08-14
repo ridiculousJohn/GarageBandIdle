@@ -1002,10 +1002,19 @@ pattern the `.5` slices have been paying for since 5.4.
 > records what fired it — a button, an automation and a test are indistinguishable below this line.
 > `TapModule` names the currency producer it fires, calls `Fire()`, and labels itself from `Yield`.
 > **"Tap" survives only in that module.** If the word appears in `Economy/`, `Core/`, the JSON schema
-> or a modifier term, the slice is not done. **[rev]** Authored content may say it freely - the
-> `module/tap` address, a `tap_value_x1_25` reward id, a stage note - and so may the importer's refusal
-> keys, which have to keep the exact spelling they detect. What must not survive is an internal name:
-> a type, member, or local naming the gesture, or a comment describing an economy quantity as one.
+> or a modifier term, the slice is not done.
+>
+> **[rev] The rule is about the MODEL, not the word - read this paragraph as the instruction.** A tap is
+> an INPUT operation, and the code beneath the input has no reason to know one happened. What must not
+> survive is the gesture as a modelled concept: a type, member, enum value, field or local named for it
+> (`ProductionTrigger.Tap`, `_tapByProducer`, `HasTapConfigs`, `TapProducer` were each this), or a
+> quantity defined as "what a tap pays" instead of as a yield. **Prose is free.** A comment may say the
+> user taps, that a surface pays on tap, or that the whole tap has settled - that is describing the
+> input, which is exactly what the economy is entitled to be ignorant of. Authored content is free too:
+> the `module/tap` address, a `tap_value_x1_25` reward id, a stage note, and the importer's refusal
+> keys, which have to keep the exact spelling they detect. The sentence above states this as a
+> word-presence test, which is both stricter than the rule and unsatisfiable - `GameManager` names
+> `TapModule`, and the chapter JSON names the address and the reward id. Do not go hunting comments.
 >
 > **6. `ProductionSystem` becomes the collection of the economy's currency producers.** It integrates
 > rates over elapsed time and resolves a producer by currency id. `HasProduction` and `RatePerSecond`
@@ -1037,8 +1046,9 @@ anywhere; a yield buff moves the yield and leaves the rate alone, and vice versa
 currency's yield does not reach another's; a contribution whose gate is unmet contributes zero to the
 composition its readout displays, so the readout and the payout cannot disagree; a producer's list is
 rebuilt rather than registered, so nothing needs unhooking when a contributor goes away; and
-`grep -ri tap` over `Assets/Scripts/Economy`, `Assets/Scripts/Core` and the chapter JSON returns
-nothing.
+**[rev]** no IDENTIFIER under `Assets/Scripts/Economy` or `Assets/Scripts/Core` names the gesture -
+`grep -ri tap` there is a starting point, not the gate, and what it turns up should be prose and the
+`TapModule` the UI owns, never a type, member, enum value, field or local (step 5).
 
 ---
 
