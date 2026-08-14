@@ -304,6 +304,70 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "and its payload is in the store, with no external Settle");
         }
 
+        // ---- the settle fixpoint ---------------------------------------------
+
+        // One settle resolves a second-order unlock chain rather than leaving it
+        // for the next tick, and its phase-two yield refresh publishes before the
+        // terminal Settled. The two content unlocks are authored in REVERSE
+        // dependency order - the dependent (gated on the flag) walks before the
+        // source (which sets the flag) - so EvaluateContentUnlocks cannot resolve
+        // both in a single Drain: pass one skips the dependent because its flag is
+        // unset, then the source latches and sets it, leaving work the loop above
+        // Drain must pick up. A single-pass settle would fire Settled with the
+        // dependent unapplied and the context dirty; a refresh moved after Settled
+        // would reverse the two signals below.
+        [Test]
+        public void Settle_ResolvesASecondOrderUnlockChain_InOneSettle()
+        {
+            // the dependent buffs cash's YIELD, so the producer below recomposes
+            // when it lands - which is what lets a subscriber observe the phase-two
+            // refresh, rather than the modifier registry the unlock wrote directly
+            var dependent = TestContent.MakeUpgrade("dependent", UpgradeType.ContentUnlock,
+                ContentScope.PermanentInChapter, new FlagSetCondition("opened"),
+                new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4));
+            var source = TestContent.MakeUpgrade("source", UpgradeType.ContentUnlock,
+                ContentScope.PermanentInChapter, new CurrencyBalanceCondition("cash", 10),
+                new SetFlagEffect("opened"));
+            var jam = TestContent.MakeProducer("jam", ("cash", 10, ProductionFeed.Yield, null));
+
+            var chapter = TestContent.MakeChapter("garage", new List<string> { "fans" },
+                currencyIds: new List<string> { "cash", "fans", "rehearsal" },
+                upgradeIds: new List<string> { "dependent", "source" },
+                producerIds: new List<string> { "jam" },
+                flags: new List<FlagDeclaration> { new("opened") });
+            var database = MakeDatabase(chapter,
+                upgrades: new List<UpgradeDefinition> { dependent, source },
+                producers: new List<ProducerDefinition> { jam });
+            var context = EconomyContextFactory.Build(chapter, database,
+                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+
+            // neither gate held at construction, so there is nothing latched to
+            // start from - the chain has to resolve inside the settle below
+            Assert.IsFalse(context.Upgrades.Get("source").Applied);
+            Assert.IsFalse(context.Upgrades.Get("dependent").Applied);
+
+            // the phase-two yield refresh must publish YieldChanged BEFORE the
+            // terminal Settled. This is a NOTIFICATION-ordering guarantee, not a
+            // stale-read one: CurrencyProducer.Yield composes live, so a subscriber
+            // re-reading it sees the final value regardless - but one that redraws
+            // on YieldChanged must not receive it after the "everything settled"
+            // signal. Recording both in one list pins the order, and that Settled
+            // fired exactly once.
+            var order = new List<string>();
+            context.Production.YieldChanged += _ => order.Add("yield");
+            context.Conditions.Settled += () => order.Add("settled");
+
+            context.Currencies.Add("cash", 10); // satisfies the source's gate
+            context.Settle();
+
+            Assert.IsTrue(context.Upgrades.Get("dependent").Applied,
+                "the dependent unlock resolved in the same settle, not a tick later");
+            Assert.IsFalse(context.Conditions.IsDirty,
+                "the fixpoint converged: nothing is left pending");
+            Assert.AreEqual(new[] { "yield", "settled" }, order.ToArray(),
+                "one terminal Settled, and the phase-two yield refresh fired before it");
+        }
+
         // ---- SelectBar -------------------------------------------------------
 
         // One cover bar filling from rehearsal, and a content unlock gated on

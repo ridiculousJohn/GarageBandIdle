@@ -220,14 +220,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // just consumed, which keeps this one pass with one terminal Settled rather
         // than a drain, a replay, and a second drain nobody can name the end of.
         //
-        // The settle is a BOUNDED FIXPOINT rather than one pass, and that is the one
-        // place restore deliberately differs from a tick. Drain clears its dirty flag
-        // before evaluating, so a content unlock applied during the drain - setting a
-        // flag that opens something else - leaves work pending. A tick can leave that
-        // for the next tick; a restore cannot, because it is a boundary the player
-        // sees before any tick is guaranteed to run, and a freshly seeded sandbox may
-        // never get one. So this drains until nothing is pending, and reports a cycle
-        // rather than spinning.
+        // The settle it ends at is the ordinary bounded fixpoint every settle is now
+        // (see Settle), not a restore-only loop: a content unlock that sets a flag
+        // opening another resolves before the terminal Settled. What restore adds is
+        // only the wrapper - the silent fact restore and MarkDirty above, the deferred
+        // projection, the Assemble below, and the suppressed replay - none of which the
+        // fixpoint itself has to know about.
         public void Restore(EconomyLocalSnapshot snapshot)
         {
             snapshot ??= EconomyLocalSnapshot.Empty;
@@ -258,36 +256,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // rebuilds the production they imply.
             Production.Assemble();
 
-            // The bound is a diagnostic, not a tuning knob: a chapter's unlock chain
-            // is a handful deep, so exhausting this means content whose gates
-            // re-trigger each other rather than a legitimately long chain.
-            //
-            // The passes are drained INSIDE a Settled deferral and the yields are
-            // refreshed once at the end, so however many passes it takes, subscribers
-            // see one settled signal describing finished state. Calling the public
-            // Settle() per pass - which is what this did - published every
-            // intermediate one: a section visible because pass one latched its flag,
-            // beside a yield pass two had not yet moved. That is the half-derived
-            // state the whole method exists to prevent, arriving through the seam
-            // meant to guarantee its absence.
-            const int maxPasses = 8;
-            var passes = 0;
-            using (Conditions.DeferSettled())
-            {
-                do
-                {
-                    Conditions.Drain(_evaluateUnlocks);
-                    passes++;
-                }
-                while (Conditions.IsDirty && passes < maxPasses);
-
-                if (Conditions.IsDirty)
-                    Debug.LogError($"EconomyContext: restore of chapter '{Chapter?.Id}' still had condition work pending after {maxPasses} drain passes - content whose unlocks re-trigger each other. Leaving it for the next tick.");
-
-                // inside the deferral, so the composed yields are final before the
-                // single Settled fires on the way out
-                Production.RefreshYields();
-            }
+            // The drains, the bound and the single deferred Settled are the ordinary
+            // settle (see Settle); restore keeps no second copy of them. It runs
+            // before the suppressed replay below and while modifier notifications are
+            // still deferred, so the terminal Settled describes fully restored state.
+            Settle();
 
             using (Conditions.SuppressInvalidation())
             {
@@ -595,24 +568,52 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // ---- the settle seam -------------------------------------------------
 
         // The one point at which a completed mutation is declared finished and
-        // everything downstream of it runs. Unlock evaluation drains the
-        // condition context's dirty signal (which the condition inputs raise,
-        // replacing the per-tick poll), and the composed yields republish. Both used
-        // to keep their own list of call sites - the same points, maintained
-        // twice - and two such lists drift.
+        // everything downstream of it runs, in two phases under one deferred
+        // Settled.
+        //
+        // Phase one drains the condition context's dirty signal (the condition
+        // inputs raise it, replacing the per-tick poll) to a BOUNDED FIXPOINT.
+        // Drain clears its flag before evaluating and stays one pass to a call
+        // (ConditionInvalidationTests pins that), so a content unlock applied
+        // during a pass - setting a flag that opens another unlock - leaves work
+        // pending, and the loop here picks it up rather than leaving it for the
+        // next tick. The bound is a diagnostic, not a tuning knob: a chapter's
+        // unlock chain is a handful deep, so exhausting it means gates that
+        // re-trigger each other rather than a legitimately long chain.
+        //
+        // Phase two refreshes the composed yields ONCE, after the drains have
+        // converged - a yield can move for reasons no condition input reports (a
+        // granted modifier), and refreshing per pass would publish an intermediate
+        // composition a row must never see. Both phases sit inside one DeferSettled,
+        // so however many passes it takes, subscribers hear one Settled describing
+        // finished state.
         //
         // Public because a boundary the context does not own yet ends here too:
         // slice 9's restore mutates facts through this context and then declares
-        // them settled, rather than growing a second pattern for saying the same
-        // thing.
+        // them settled through this same seam - rather than growing a second
+        // pattern for saying the same thing, or the second copy of this loop it
+        // used to hold.
         public void Settle()
         {
-            Conditions.Drain(_evaluateUnlocks);
+            const int maxPasses = 8;
+            var passes = 0;
+            using (Conditions.DeferSettled())
+            {
+                do
+                {
+                    Conditions.Drain(_evaluateUnlocks);
+                    passes++;
+                }
+                while (Conditions.IsDirty && passes < maxPasses);
 
-            // unconditional, unlike the drain: a yield can move for reasons no
-            // condition input reports (a granted modifier), and RefreshYields
-            // already publishes only an actual move
-            Production.RefreshYields();
+                if (Conditions.IsDirty)
+                    Debug.LogError($"EconomyContext: settle of chapter '{Chapter?.Id}' still had condition work pending after {maxPasses} drain passes - content whose unlocks re-trigger each other.");
+
+                // unconditional and once, after the drains converge: a yield can
+                // move for reasons no condition input reports (a granted modifier),
+                // and RefreshYields already publishes only an actual move
+                Production.RefreshYields();
+            }
         }
 
         // What the drain evaluates: content unlocks, the only reveal that is

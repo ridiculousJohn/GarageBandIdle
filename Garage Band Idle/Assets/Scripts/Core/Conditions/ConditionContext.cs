@@ -118,9 +118,10 @@ namespace RidiculousGaming.GarageBandIdle
         //
         // The flag clears BEFORE evaluating, so anything the evaluation itself
         // dirties - a content unlock's setFlag is the live case - is still
-        // pending at the next drain. That is deliberately not a loop to
-        // fixpoint: the caller's seam runs every tick, so a second-order chain
-        // (a flag that opens a generator's unlock) resolves on the next tick.
+        // pending at the next drain. Drain stays one pass to a call: the loop to a
+        // fixpoint lives in the caller's settle seam, which drains again while work
+        // is pending, so a second-order chain (a flag that opens a generator's
+        // unlock) resolves inside that settle rather than a tick later.
         public void Drain(Action evaluate)
         {
             if (!_dirty)
@@ -137,12 +138,12 @@ namespace RidiculousGaming.GarageBandIdle
         // property Drain rests on - every drain inside still publishes, the
         // publication is just deferred and merged.
         //
-        // It exists for the restore's bounded fixpoint. That loop drains repeatedly
-        // by design: pass one applies an unlock whose flag opens something else, pass
-        // two picks it up. Publishing each pass would hand subscribers exactly the
-        // half-derived state atomic restore exists to prevent - a section visible
-        // because pass one latched its flag, beside a row still missing the buff pass
-        // two grants.
+        // It exists for the settle's bounded fixpoint, restore's included. That loop
+        // drains repeatedly by design: pass one applies an unlock whose flag opens
+        // something else, pass two picks it up. Publishing each pass would hand
+        // subscribers exactly the half-derived state the fixpoint exists to prevent -
+        // a section visible because pass one latched its flag, beside a row still
+        // missing the buff pass two grants.
         public SettledDeferral DeferSettled() => new(this);
 
         public readonly struct SettledDeferral : IDisposable
@@ -191,9 +192,9 @@ namespace RidiculousGaming.GarageBandIdle
         // the case the guarantee is about.
         public void MarkDirty() => _dirty = true;
 
-        // Whether a drain would evaluate anything. Read by the restore's bounded
+        // Whether a drain would evaluate anything. Read by the settle's bounded
         // fixpoint: Drain clears the flag BEFORE evaluating, so a flag or latch the
-        // evaluation itself applies leaves work pending, and a restore has to be able
+        // evaluation itself applies leaves work pending, and the settle has to be able
         // to ask whether it is finished rather than assume one pass was enough.
         public bool IsDirty => _dirty;
 
