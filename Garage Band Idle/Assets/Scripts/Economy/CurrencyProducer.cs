@@ -142,11 +142,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // "individually addressable" buys - the producer keeps its
         // contributions, so a row can show what its own generator makes.
         //
-        // The currency-level composition is deliberately NOT applied here. An
-        // Add on CurrencyRate is one lump for the whole producer, and folding
-        // it in per contribution would pay it once per contributor. These
-        // values therefore sum to the producer's BASE, and Rate composes over
-        // that sum.
+        // The currency-level composition is deliberately NOT applied here: the
+        // multipliers reaching `cash_rate` are the PRODUCER's number, not any
+        // one line's, so a row folding them in would credit its own generator
+        // with what the whole currency's buffs make of it. These values
+        // therefore sum to the producer's BASE, and Rate composes over that sum.
         public BigNumber ValueOf(ProductionEntry entry)
         {
             if (!IsLive(entry))
@@ -178,18 +178,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 _currencies.Add(CurrencyId, rate * seconds);
         }
 
-        // (sum of the live contributions) composed with the modifiers on this
-        // currency's number, applied ONCE over the sum - which is where
-        // GeneratorSystem already applies a currency-wide multiplier over the
-        // summed fleet. Per contribution, an Add would be paid once per
-        // contributor.
+        // (sum of the live contributions) composed with the modifiers reaching
+        // this currency's number, applied ONCE over the sum. A line's own
+        // multipliers are already inside ValueOf, and the aggregate's id is not
+        // one a line answers to (see NumberId), so no term scales both.
         //
         // Nothing live means nothing to compose, and the composition is skipped
         // rather than applied to zero: a modifier scales what contributions
-        // make, so an Add must never conjure a rate out of a producer with
-        // nothing feeding it, or out of one whose every contribution is gated
-        // off. Anything landing below zero yields nothing and no multiplier
-        // resurrects it, so production can never drain a balance.
+        // make, so it can never be the sole source of a number - a producer with
+        // nothing feeding it, or with every contribution gated off, produces zero
+        // however many multipliers name it. Anything landing below zero yields
+        // nothing and no multiplier resurrects it, so production can never drain
+        // a balance.
         private BigNumber Compose(List<ProductionEntry> entries, in ModifierSubject subject)
         {
             var live = false;

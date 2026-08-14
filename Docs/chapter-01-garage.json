@@ -263,7 +263,7 @@
   "producers": [
     {
       "id": "jam",
-      "moduleNote": "No `module` key: which module presents a producer is authored on the SECTION's module entry (`{ module, definition }`, see garage_floor above), and the runtime fires THAT producer's tap configs. The producer used to restate it here, validated and read by nothing, so a tap fired every tap producer in the chapter - two declarations of one relationship, able to disagree. A leftover `module` key is now refused at import. 'Nothing presents this producer' is derived instead: no section entry names it, which boot validation reports for a TAP producer (a surface nobody can press) and allows for a passive one like `band`.",
+      "moduleNote": "No `module` key: which module presents a producer is authored on the SECTION's module entry (`{ module, definition }`, see garage_floor above), and the module fires THAT producer by id - a press pays every currency the named producer holds a yield line for, and nothing else. A `module` key here would be a second declaration of one relationship, able to disagree with the section's, and is refused at import. 'Nothing presents this producer' is derived instead: no section entry names it, which boot validation reports for a producer holding YIELD lines (a surface nobody can press) and allows for a rate-only one like `practice` or `band`.",
       "contributions": [
         { "id": "jam_cash", "currency": "cash", "amount": 1, "feeds": "yield" },
         { "id": "jam_rehearsal_press", "currency": "rehearsal", "amount": 2, "feeds": "yield", "gate": { "type": "flagSet", "flag": "covers" } }

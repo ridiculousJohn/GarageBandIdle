@@ -18,8 +18,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         IReadOnlyList<ProductionContribution> Contributions { get; }
 
         // The live value of ONE of its contributions, contributor-side scaling
-        // and contributor-targeted modifiers included - a generator's owned
-        // count and its GeneratorOutput composition, a module's flat amount.
+        // and the modifiers reaching that line included - a generator's owned
+        // count times its per-unit amount, a module's flat amount.
         // Derived on every read and never stored, so buying a unit or granting
         // a buff changes no structure and needs no rebuild.
         //
