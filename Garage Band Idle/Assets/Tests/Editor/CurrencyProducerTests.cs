@@ -11,12 +11,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // numbers that move independently, the currency-level composition applies
     // ONCE over the summed contributions rather than per contributor, a gated
     // contribution is worth the same nothing to the readout and to the payout,
-    // an empty or wholly dormant producer composes to zero rather than paying
-    // out a bare Add, and the list is REBUILT rather than registered so
-    // nothing needs unhooking when a contributor goes away.
+    // an empty or wholly dormant producer composes to zero rather than letting
+    // a multiplier be the sole source of a number, and the list is REBUILT
+    // rather than registered so nothing needs unhooking when a contributor
+    // goes away.
     //
-    // Nothing in the game constructs a CurrencyProducer yet - these fixtures
-    // are its only callers, which is what makes this commit additive.
+    // The fixtures hand a producer its list directly, without the
+    // ProductionSystem that assembles one in the game, so a failure here is the
+    // producer's own rather than the assembler's.
     public class CurrencyProducerTests
     {
         [OneTimeTearDown]
@@ -33,7 +35,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // A contributor with no purchase mechanics behind it: Scale stands in
         // for whatever the real kind folds in on its side (a generator's owned
-        // count and its GeneratorOutput composition), so these tests exercise
+        // count and the modifiers reaching that line), so these tests exercise
         // the producer rather than a generator.
         private class FakeContributor : IProductionContributor
         {
@@ -103,10 +105,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             => new(currencyId, currencies, modifiers, TestContent.MakeContext(currencies, flags: flags));
 
         // The composition is a fact about the PRODUCER, not about each
-        // contributor: an Add on the currency's rate is one lump, so folding it
-        // in per contribution would pay it once per generator that happens to
-        // feed the same currency - a number that grows with how much content
-        // exists rather than with what was granted.
+        // contributor: a term reaching `cash_rate` names the summed number, and
+        // no line answers to that id, so the multiplier lands once over the sum
+        // of everything feeding the currency rather than on any one line.
+        //
+        // The total is checked WITH the per-line readouts because the total
+        // alone cannot tell the two apart - multiplication distributes over the
+        // sum, so a currency-level multiplier folded into each line reaches the
+        // same 10. What separates them is attribution: the amp's row must say
+        // what the amp makes, and every buff on the currency reaching every row
+        // is how a row starts claiming credit for the whole economy.
         [Test]
         public void Rate_ComposesTheCurrencyLevelModifiersOnceOverTheSum()
         {
@@ -122,6 +130,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(10.0, producer.Rate.ToDouble(), 1e-9,
                 "(2 + 3) x 2 - the multiplier landed once over the sum, not once per contributor");
+
+            Assert.AreEqual(2.0, producer.ValueOf(producer.RateContributions[0]).ToDouble(), 1e-9,
+                "the amp's line is what the amp makes, with the currency's multiplier not folded in");
+            Assert.AreEqual(3.0, producer.ValueOf(producer.RateContributions[1]).ToDouble(), 1e-9,
+                "and the drummer's line likewise");
         }
 
         // Contributions stay individually addressable so a generator row can
