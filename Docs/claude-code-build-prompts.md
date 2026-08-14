@@ -11,7 +11,7 @@ Build order and why: each slice depends on the ones before it (offline earnings 
 tick; prestige needs the currency block split; the content-unlock upgrades are what reveal
 fans/covers/album). Building bottom-up keeps a break isolated to the slice you just added.
 
-**Progress marker:** slices 0–5, **5.4**, **5.5**, **5.6**, **5.7**, **6**, **6.5** and **7** are already built and tested. Slice **3.5** is a dedicated consolidation pass
+**Progress marker:** slices 0–5, **5.4**, **5.5**, **5.6**, **5.7**, **6**, **6.5**, **7** and **7.4** are already built and tested. Slice **3.5** is a dedicated consolidation pass
 that establishes the cross-cutting foundations — a single `Condition` type + evaluator, one flag
 registry for all progressive reveal, full-Addressables ScriptableObject discovery, the rewards pool,
 data-driven sections/modules, and `isBandmate` — and **retrofits slices 1–3 onto them**. These are
@@ -62,6 +62,26 @@ instead of inventing a gate, and 9's load is that same restore with a wider fact
 observable gameplay. One prediction it made has been overtaken: 6.5 expected slice 8 to build an event
 sandbox by SEEDING a context, and **7.5 deletes that machinery outright** — an event is a component on
 its host scope. Read slice 8 as written, not as 6.5 anticipated.
+Slice **7.4** gave every currency ONE producer (§12 rule 13), owning a rate in units per second and a
+yield in units per firing, each composed from contributions that stay individually addressable so a row
+can still show what its own generator makes. Generators and modules CONTRIBUTE rather than produce, a
+producer's list is assembled from the contributors in reach rather than registered into, and a
+contributor may feed several currencies - which is what retired `isBandmate`, since a bandmate simply
+holds a cash line and a fans line. It also deleted the modifier target enum it had just widened, and
+that reversal is the slice's largest consequence: **every modifiable number carries an id** (§12 rule
+11), and a modifier carries a `ModifierSelector` - a list of terms, each an id or a tag, where an EMPTY
+list reaches everything in scope. Matching is asked of the number being matched, so a composition and
+the change notification that repaints a row share one implementation and cannot disagree. **Modifiers
+are multipliers only**: `ModifierOperation.Add` is gone, a flat bonus is a CONTRIBUTION authored by
+whatever fact pays it, and every composed number in the game has one shape - the sum of its
+contributions times the product of the multipliers matching it. Firing is external and unnamed, so
+nothing below the module presenting a button models the gesture; that rule is about identifiers and not
+about the word, which step 5's `[rev]` states and the C gate defers to. Two things to know before
+reading the body: **step 1 was built (`75468ad`) and superseded inside the slice (`0f48965`)**, so its
+first paragraph records a vocabulary that no longer exists and the `[rev]` beneath it is the
+instruction; and "reachable", for assembling a producer's list, means the economy's contributors here -
+7.5 swaps in the scope-subtree walk and nothing else about the shape changes. It changed no observable
+gameplay. Slices 7.5-10 assume all of it.
 
 ---
 
@@ -866,7 +886,7 @@ from the declaration.
 
 ---
 
-## 7.4 — CONSOLIDATION: one producer per currency (rate and yield)
+## 7.4 — CONSOLIDATION: one producer per currency (rate and yield)  ✅ done
 
 This slice adds no new gameplay. Chapter 1 must play *exactly* as it does after slice 7 — same tap
 value, same fan rate, same costs, same reveal order.
