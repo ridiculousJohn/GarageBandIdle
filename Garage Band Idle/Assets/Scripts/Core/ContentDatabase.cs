@@ -29,6 +29,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Registry<EventDefinition> Events { get; }
         public Registry<RewardDefinition> Rewards { get; }
         public Registry<StoryBeatDefinition> StoryBeats { get; }
+        public Registry<ScopeDefinition> Scopes { get; }
 
         // Every family, for the questions that are about the DATABASE rather than
         // about one registry - a modifier selector's terms are open content across
@@ -50,6 +51,10 @@ namespace RidiculousGaming.GarageBandIdle
             Events = Load<EventDefinition>(ContentLabels.Event);
             Rewards = Load<RewardDefinition>(ContentLabels.Reward);
             StoryBeats = Load<StoryBeatDefinition>(ContentLabels.StoryBeat);
+            // empty rather than loaded: no scope assets are authored until 7.5
+            // step 7 re-authors Chapter 1, and loading a label with no entries
+            // reports a false content error at every boot until then
+            Scopes = new Registry<ScopeDefinition>(ContentLabels.Scope, Array.Empty<ScopeDefinition>());
             CollectFamilies();
         }
 
@@ -67,7 +72,8 @@ namespace RidiculousGaming.GarageBandIdle
             IEnumerable<CurrencyDefinition> currencies = null,
             IEnumerable<CurrencyGroupDefinition> currencyGroups = null,
             IEnumerable<ProducerDefinition> producers = null,
-            IEnumerable<StoryBeatDefinition> storyBeats = null)
+            IEnumerable<StoryBeatDefinition> storyBeats = null,
+            IEnumerable<ScopeDefinition> scopes = null)
         {
             CurrencyGroups = new Registry<CurrencyGroupDefinition>(ContentLabels.CurrencyGroup, currencyGroups ?? Array.Empty<CurrencyGroupDefinition>());
             Currencies = new Registry<CurrencyDefinition>(ContentLabels.Currency, currencies ?? Array.Empty<CurrencyDefinition>());
@@ -81,6 +87,7 @@ namespace RidiculousGaming.GarageBandIdle
             Events = new Registry<EventDefinition>(ContentLabels.Event, events ?? Array.Empty<EventDefinition>());
             Rewards = new Registry<RewardDefinition>(ContentLabels.Reward, rewards ?? Array.Empty<RewardDefinition>());
             StoryBeats = new Registry<StoryBeatDefinition>(ContentLabels.StoryBeat, storyBeats ?? Array.Empty<StoryBeatDefinition>());
+            Scopes = new Registry<ScopeDefinition>(ContentLabels.Scope, scopes ?? Array.Empty<ScopeDefinition>());
             CollectFamilies();
         }
 
@@ -121,6 +128,8 @@ namespace RidiculousGaming.GarageBandIdle
             _families.Add(Events.All);
             _families.Add(Rewards.All);
             _families.Add(StoryBeats.All);
+            // Scopes deliberately absent: a scope is not a contributor, so a
+            // selector term matching a scope id is a typo to report, not a match
         }
 
         // Whether anything in the content set answers to one selector term (rule

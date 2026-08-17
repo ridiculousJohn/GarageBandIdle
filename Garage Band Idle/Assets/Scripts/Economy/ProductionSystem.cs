@@ -21,7 +21,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // change what the existing lines are WORTH, and that is read live.
     //
     // Nothing here pushes a notification mid-mutation: a tick has bars still to
-    // drain and a purchase has unlocks still to evaluate. EconomyContext calls
+    // drain and a purchase has unlocks still to evaluate. Scope calls
     // RefreshYields once each operation has settled, and the event fires only when
     // a value actually moved.
     public class ProductionSystem : IDisposable
@@ -222,7 +222,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             => TryGet(currencyId, out var producer) ? producer.Yield : BigNumber.Zero;
 
         // The post-mutation refresh: re-evaluates each fireable currency's yield and
-        // publishes only an actual move. Called by EconomyContext after each
+        // publishes only an actual move. Called by Scope after each
         // complete operation settles - never from inside a system, so no subscriber
         // can observe a half-settled mutation (state, then notify).
         public void RefreshYields()

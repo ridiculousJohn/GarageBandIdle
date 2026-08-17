@@ -12,7 +12,7 @@ namespace RidiculousGaming.GarageBandIdle
     //
     // What this class deliberately does NOT do is hold the economy's systems
     // (design doc section 12, rule 12). It builds the permanent pool and one
-    // frontier EconomyContext through the factory, and routes the tick to
+    // frontier Scope through the factory, and routes the tick to
     // whichever context has focus. A second economy - an event sandbox (slice
     // 8), a cleared chapter's replay economy (rule 7) - is another Build call
     // and a focus switch, not another set of fields here.
@@ -49,12 +49,12 @@ namespace RidiculousGaming.GarageBandIdle
         // the economy currently receiving the tick. Exactly one context is
         // focused at a time, which is why this is a single field rather than a
         // set: an unfocused economy accrues nothing live (rule 7).
-        public EconomyContext Focused { get; private set; }
+        public Scope Focused { get; private set; }
 
         // the chapter being played forward. Held separately from Focused because
         // focus will move to an event sandbox and back (slice 8) while the
         // frontier economy stays the thing the player is progressing.
-        public EconomyContext Frontier { get; private set; }
+        public Scope Frontier { get; private set; }
 
         public ChapterDefinition CurrentChapter => Frontier?.Chapter;
 
@@ -82,7 +82,7 @@ namespace RidiculousGaming.GarageBandIdle
             // each system's own fail-closed guard.
             ContentValidator.Validate(Database, RecordsCurrencyId, new RewardManager(Database.Rewards.All));
 
-            PermanentCurrencies = EconomyContextFactory.BuildPermanentPool(Database);
+            PermanentCurrencies = ScopeFactory.BuildPermanentPool(Database);
             PermanentCurrencies.ValidateReference(RecordsCurrencyId, "GameManager (income multiplier)");
 
             // the lowest chapter index is the starting chapter; chapter
@@ -100,7 +100,7 @@ namespace RidiculousGaming.GarageBandIdle
             }
             else
             {
-                Frontier = EconomyContextFactory.Build(startingChapter, Database, PermanentCurrencies,
+                Frontier = ScopeFactory.Build(startingChapter, Database, PermanentCurrencies,
                     EconomyRecipe.FrontierChapter);
                 SetFocus(Frontier);
 
@@ -131,7 +131,7 @@ namespace RidiculousGaming.GarageBandIdle
         // Enforced here rather than by the contexts because this is the only
         // thing holding more than one - a context can refuse to tick while
         // unfocused (it does), but it cannot know that another one is focused.
-        public void SetFocus(EconomyContext context)
+        public void SetFocus(Scope context)
         {
             if (Focused == context)
                 return;

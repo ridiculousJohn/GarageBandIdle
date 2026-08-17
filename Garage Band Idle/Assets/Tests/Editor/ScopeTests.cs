@@ -9,11 +9,11 @@ using UnityEngine.TestTools;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
-    // The economy-context boundary (design doc section 12, rule 12): which pool
-    // owns a balance, what a context refuses to be built with, and the two
+    // The scope boundary (design doc section 12, rule 12): which pool
+    // owns a balance, what a scope refuses to be built with, and the two
     // properties the bundle exists to guarantee - one settle seam per operation,
     // and a modifier store that is only ever rebuilt from facts.
-    public class EconomyContextTests
+    public class ScopeTests
     {
         [OneTimeTearDown]
         public void OneTimeTearDown() => TestContent.DestroyAll();
@@ -64,7 +64,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var database = MakeDatabase(MakeChapter());
 
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             Assert.IsTrue(permanent.Contains(RecordsId), "Records is placed Global");
             Assert.IsFalse(permanent.Contains("cash"), "a chapter-placed currency stays out of the startup pool");
@@ -82,7 +82,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var database = MakeDatabase(MakeChapter(), globalPlacement: CurrencyPlacement.None);
 
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             Assert.IsFalse(permanent.Contains(RecordsId),
                 "None is not Global: the currency lands nowhere, which is what validation reports");
@@ -99,12 +99,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter(new List<string> { "cash", "fans", "rehearsal", RecordsId });
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             LogAssert.Expect(LogType.Error, new Regex(
                 $"roster names currency '{RecordsId}', whose group 'permanent' is placed Global"));
 
-            var context = EconomyContextFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
 
             Assert.IsFalse(context.Pool.Contains(RecordsId), "the chapter pool never gets a second Records balance");
             Assert.AreSame(permanent, ((CurrencyRouter)context.Currencies).OwnerOf(RecordsId),
@@ -137,7 +137,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Error, new Regex(
                 "roster names currency 'shared', which the permanent pool already holds"));
 
-            var context = EconomyContextFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
 
             Assert.IsFalse(context.Pool.Contains("shared"), "the shadowing entry is refused, not resolved");
         }
@@ -150,8 +150,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Error, new Regex("roster names unknown currency id 'merch'"));
 
-            var context = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
             Assert.IsFalse(context.Pool.Contains("merch"));
         }
@@ -166,8 +166,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
-            var context = EconomyContextFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
+            var context = ScopeFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
 
             context.Currencies.Add("cash", 5);
             context.Currencies.Add(RecordsId, 3);
@@ -186,8 +186,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
-            var context = EconomyContextFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
+            var context = ScopeFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
 
             var seen = new List<string>();
             context.Currencies.BalanceChanged += (id, _) => seen.Add(id);
@@ -207,8 +207,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
-            var context = EconomyContextFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
+            var context = ScopeFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
 
             var changes = 0;
             context.Currencies.BalanceChanged += (id, balance) => changes++;
@@ -231,14 +231,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var database = MakeDatabase(chapter);
             var cashProduction = TestContent.RateOf("cash");
 
-            var frontier = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var frontier = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
             frontier.Currencies.Add(RecordsId, 10);
             Assert.AreEqual(1.2, frontier.Modifiers.For(cashProduction).Multiply.ToDouble(), 1e-9,
                 "0.02 per record x 10, from the chapter's recordBuff");
 
-            var sandbox = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database),
+            var sandbox = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database),
                 new EconomyRecipe(EconomyRecipeKind.EventSandbox));
             sandbox.Currencies.Add(RecordsId, 10);
             Assert.AreEqual(1.0, sandbox.Modifiers.For(cashProduction).Multiply.ToDouble(), 1e-9,
@@ -265,8 +265,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4));
             var chapter = MakeChapter(upgradeIds: new List<string> { "permanent_tap" });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition> { upgrade });
-            var context = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
             Assert.AreEqual(1.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the gate does not hold, so there is no latch to project from");
@@ -295,8 +295,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var chapter = MakeChapter(upgradeIds: new List<string> { "open_now" });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition> { upgrade });
 
-            var context = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
             Assert.IsTrue(context.Upgrades.Get("open_now").Applied,
                 "an ungated content unlock latched during construction");
@@ -338,8 +338,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var database = MakeDatabase(chapter,
                 upgrades: new List<UpgradeDefinition> { dependent, source },
                 producers: new List<ProducerDefinition> { jam });
-            var context = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
             // neither gate held at construction, so there is nothing latched to
             // start from - the chain has to resolve inside the settle below
@@ -373,7 +373,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // One cover bar filling from rehearsal, and a content unlock gated on
         // completing it: the smallest content where a selection has something
         // to settle.
-        private static EconomyContext BuildBarEconomy()
+        private static Scope BuildBarEconomy()
         {
             var chapter = TestContent.MakeChapter("garage", new List<string> { "gigs" },
                 currencyIds: new List<string> { "cash", "fans", "rehearsal" },
@@ -399,8 +399,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     TestContent.MakeCurrency("rehearsal", "run"),
                     TestContent.MakeCurrency(RecordsId, "permanent"),
                 });
-            return EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            return ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
         }
 
         // Selection is a top-level operation, not a UI detail: retargeting pours
@@ -468,7 +468,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // Roadies joins Records in the global group, like the running game's:
         // the action's CanExecute probe needs a pool that owns the id to answer
         // from, and the award has to land somewhere a release never resets.
-        private static EconomyContext BuildCapstoneEconomy(CapstoneConfig capstone,
+        private static Scope BuildCapstoneEconomy(CapstoneConfig capstone,
             List<UpgradeDefinition> upgrades = null, List<string> upgradeIds = null)
         {
             var chapter = TestContent.MakeChapter("garage", null,
@@ -491,8 +491,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     TestContent.MakeGroup("run", true, CurrencyPlacement.Chapter),
                     TestContent.MakeGroup("permanent", false, CurrencyPlacement.Global),
                 });
-            return EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            return ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
         }
 
         // The completion is one operation ending at one settle: the run banks
@@ -599,8 +599,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var context = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
             LogAssert.Expect(LogType.Error, new Regex("authors no capstone"));
 
@@ -621,8 +621,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 ("cash", 10, ProductionFeed.Rate, null));
             var chapter = MakeChapter(producerIds: new List<string> { "jam" });
             var database = MakeDatabase(chapter, producers: new List<ProducerDefinition> { trickle });
-            var context = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
             Assert.IsFalse(context.IsFocused, "a context starts constructed, not focused");
 
@@ -646,8 +646,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var context = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
             Assert.IsNull(context.LastInteractionUtc,
                 "null until the first time focus is lost: an economy that has never been away has no away-time");

@@ -179,7 +179,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
     // (design doc section 5). ReleaseWhen is the OFFER's gate, not the
     // operation's: the UI presents the release only while it holds (asked
     // through the one evaluator like every gate), re-met each run because its
-    // inputs are run facts - while EconomyContext.ReleaseAlbum stays ungated,
+    // inputs are run facts - while Scope.ReleaseAlbum stays ungated,
     // since the capstone implicitly cuts an album regardless of any offer.
     // None means always offered once revealed, the same null-condition
     // convention every other gate site uses.

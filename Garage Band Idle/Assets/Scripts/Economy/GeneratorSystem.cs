@@ -114,7 +114,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // REPLACEMENT, not a merge: a generator the snapshot omits is restored to
         // zero, not left holding whatever this fleet had. A new run's empty seed
         // and a load are then the same operation with different data, which is
-        // what lets EconomyContext.Restore be the only place the order lives.
+        // what lets Scope.Restore be the only place the order lives.
         //
         // notify: false defers publication to the context-wide restore, which
         // announces one settled state after projection. The default is unchanged,

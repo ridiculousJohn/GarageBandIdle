@@ -19,5 +19,6 @@ namespace RidiculousGaming.GarageBandIdle
         public const string Reward = "reward";
         public const string StoryBeat = "story-beat";
         public const string Module = "module";
+        public const string Scope = "scope";
     }
 }

@@ -12,7 +12,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // facts survived (rule 6). These tests run the release through a real
     // factory-built context because the release is the first production
     // boundary to re-project a non-empty store: the guarantee
-    // EconomyContextTests could only assert in isolation is exercised here as
+    // ScopeTests could only assert in isolation is exercised here as
     // the operation that needed it.
     public class AlbumReleaseTests
     {
@@ -33,7 +33,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // cut_demo gate, a permanent unlock granting a modifier (what "keeps
         // upgrades.contentUnlock" means for the store), gear, and one cover
         // bar paying a run-lifetime fan-rate reward.
-        private static EconomyContext BuildChapterEconomy(out CurrencyManager permanent,
+        private static Scope BuildChapterEconomy(out CurrencyManager permanent,
             string fansCurrencyId = "fans", Condition albumReleaseWhen = null)
         {
             var chapter = TestContent.MakeChapter("garage", new List<string> { "album" },
@@ -86,13 +86,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     TestContent.MakeCurrency(RecordsId, "permanent"),
                 });
 
-            permanent = EconomyContextFactory.BuildPermanentPool(database);
-            return EconomyContextFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
+            permanent = ScopeFactory.BuildPermanentPool(database);
+            return ScopeFactory.Build(chapter, database, permanent, EconomyRecipe.FrontierChapter);
         }
 
         // a run with everything the release walks: bought gear, a bought run
         // buff, a latched permanent unlock, a completed cover, banked fans
-        private static void PlayARun(EconomyContext context, double fans)
+        private static void PlayARun(Scope context, double fans)
         {
             TestContent.BuyTimes(context.Generators.Get("drummer"), context.Pool, 2);
 
@@ -338,8 +338,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     TestContent.MakeCurrency("rehearsal", "run"),
                     TestContent.MakeCurrency(RecordsId, "permanent"),
                 });
-            var context = EconomyContextFactory.Build(chapter, database,
-                EconomyContextFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
+            var context = ScopeFactory.Build(chapter, database,
+                ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
             context.Focus();
 
             // the read ChapterScreen performs each settle: visibility is a pure

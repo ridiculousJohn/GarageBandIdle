@@ -145,7 +145,7 @@ namespace RidiculousGaming.GarageBandIdle.Content
         // all zeroed has a selection to settle just as much as one that was filled.
         //
         // notify: false defers publication to the context-wide restore (see
-        // EconomyContext.Restore); the default is unchanged for every existing
+        // Scope.Restore); the default is unchanged for every existing
         // caller.
         public void RestoreProgress(IReadOnlyDictionary<string, IReadOnlyDictionary<string, BigNumber>> progressByGroupAndBarId,
             bool notify = true)

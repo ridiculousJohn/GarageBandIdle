@@ -50,7 +50,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, GameManager.RecordsCurrencyId,
                 new RewardManager(database.Rewards.All));
 
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             ChapterDefinition starting = null;
             foreach (var chapter in database.Chapters.All)
@@ -60,7 +60,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
             Assert.IsNotNull(starting, "no chapter assets - run 'GarageBandIdle > Import Chapter 1 JSON'");
 
-            using var frontier = EconomyContextFactory.Build(starting, database, permanent,
+            using var frontier = ScopeFactory.Build(starting, database, permanent,
                 EconomyRecipe.FrontierChapter);
             Assert.IsNotNull(frontier, "the frontier economy failed to build from shipped content");
             LogAssert.NoUnexpectedReceived();
@@ -628,7 +628,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Capstone_CompletesOnShippedContent_AtTheAuthoredGate()
         {
             var database = new ContentDatabase();
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             ChapterDefinition starting = null; // the same lowest-index resolution boot uses
             foreach (var chapter in database.Chapters.All)
@@ -638,7 +638,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
             Assert.IsNotNull(starting, "no chapter assets - run 'GarageBandIdle > Import Chapter 1 JSON'");
 
-            using var frontier = EconomyContextFactory.Build(starting, database, permanent,
+            using var frontier = ScopeFactory.Build(starting, database, permanent,
                 EconomyRecipe.FrontierChapter);
 
             frontier.Currencies.Add(GameManager.RecordsCurrencyId, 29);

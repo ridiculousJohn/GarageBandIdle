@@ -180,7 +180,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         //
         // This clears the LATCH only, and the latch is the fact. The effects
         // those purchases granted are rebuilt by re-projecting from the latches
-        // that survive (EconomyContext.ProjectModifiers), never edited in place,
+        // that survive (Scope.ProjectModifiers), never edited in place,
         // so the release still does not have to know what any payload did - it
         // resets facts and asks for the projection again.
         //
@@ -217,7 +217,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // standing under a different snapshot, which is two routes to one state.
         //
         // This restores FACTS only. Nothing here re-applies a payload: the caller
-        // re-projects afterwards (EconomyContext.Restore), which is what turns
+        // re-projects afterwards (Scope.Restore), which is what turns
         // these latches back into effects. A load can never re-pay an award,
         // because awards are GameActions on the purchase moment - no restore or
         // projection path executes one.

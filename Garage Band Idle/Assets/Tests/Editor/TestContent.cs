@@ -295,6 +295,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return definition;
         }
 
+        // One scope of the tree, as a DEFINITION (design doc section 12, rule
+        // 12). Every roster defaults to empty rather than to a standard set,
+        // unlike MakeChapter: a scope that owns nothing and only reads outward is
+        // an ordinary scope, and a fixture about placement has to be able to say
+        // which scope holds what without deleting a default first. The children
+        // are ids like every other roster, resolved against the database's Scopes
+        // registry, so a tree fixture registers the parent and the children
+        // together.
+        public static ScopeDefinition MakeScope(string id, List<string> currencyIds = null,
+            List<string> childScopeIds = null, List<FlagDeclaration> flags = null,
+            Condition activeWhen = null, List<string> producerIds = null,
+            List<string> generatorIds = null, List<string> upgradeIds = null,
+            List<string> barGroupIds = null, List<string> sectionIds = null)
+        {
+            var definition = Track(ScriptableObject.CreateInstance<ScopeDefinition>());
+            // nulls pass straight through: EditorInitialize substitutes an empty
+            // list for each, so "declares none" is one spelling rather than two
+            definition.EditorInitialize(id, activeWhen, childScopeIds, flags, currencyIds,
+                producerIds, generatorIds, upgradeIds, barGroupIds, sectionIds);
+            return definition;
+        }
+
         public static EventDefinition MakeEvent(string id, List<EventTier> tiers,
             Condition availableWhen = null, bool baselineReset = true)
         {
@@ -385,9 +407,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             IEnumerable<CurrencyDefinition> currencies = null,
             IEnumerable<CurrencyGroupDefinition> currencyGroups = null,
             IEnumerable<ProducerDefinition> producers = null,
-            IEnumerable<StoryBeatDefinition> storyBeats = null)
+            IEnumerable<StoryBeatDefinition> storyBeats = null,
+            IEnumerable<ScopeDefinition> scopes = null)
             => new(chapters, sections, generators, upgrades, bars, barGroups, events, rewards,
-                currencies ?? StandardCurrencies(), currencyGroups ?? StandardGroups(), producers, storyBeats);
+                currencies ?? StandardCurrencies(), currencyGroups ?? StandardGroups(), producers, storyBeats, scopes);
 
         // evaluation context over live test systems; no ContentDatabase, which
         // makes Validate fall back to the systems themselves

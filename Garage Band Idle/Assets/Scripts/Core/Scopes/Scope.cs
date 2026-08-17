@@ -1,17 +1,26 @@
 using System;
 using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Content;
+using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEngine;
 
-namespace RidiculousGaming.GarageBandIdle.Economy
+namespace RidiculousGaming.GarageBandIdle
 {
-    // One economy, bundled (design doc section 12, rule 12): a currency pool
-    // plus the systems that read and write it, built together and discarded
-    // together. The frontier chapter is one instance; an event sandbox (slice 8)
-    // and a cleared chapter's replay economy (rule 7) are further instances of
-    // this same class, which is what makes isolation a matter of construction
-    // rather than of scope tags inside shared managers.
+    // One scope of the tree, instantiated (design doc section 12, rule 12): a
+    // currency pool plus the systems that read and write it, built together and
+    // discarded together, under a stable instance identity. The instance half
+    // of ScopeDefinition's definition/instance split: a cleared chapter's
+    // replay economy (rule 7) is a second INSTANCE of the same definition, and
+    // slice 9's save is one block per instance - which is why identity is the
+    // caller's to assign, deterministic, and never minted here.
+    //
+    // Mid-7.5 honesty: this class is EconomyContext reshaped in place. It still
+    // carries the pieces the tree retires - Recipe, Capstone, the
+    // ChapterDefinition reference and the run-scoped resets - each of which
+    // leaves in step 3, 7, or 8. What is already the tree's shape: identity,
+    // the parent link, the ordered children, and disposal that takes the
+    // subtree with it.
     //
     // Two things are the point of the bundle, and neither is the field list.
     //
@@ -29,11 +38,29 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // projection again, and a load restores facts and asks for the projection
     // again. One mechanism, so the two boundaries cannot disagree about what a
     // permanent buff is worth.
-    public class EconomyContext : IDisposable
+    public class Scope : IDisposable
     {
         private readonly CurrencyRouter _router;
         private readonly List<IModifierFactSource> _factSources = new();
         private readonly Action _evaluateUnlocks;
+        private readonly List<Scope> _children = new();
+        private bool _childrenAttached;
+
+        // Identity is three separable facts. The definition is WHAT this scope
+        // is (null until step 7 authors scope assets - a scope built from a
+        // chapter has no definition yet). The instance id is WHICH instantiation
+        // of it this is: assigned by the caller, deterministic, stable across
+        // sessions, because slice 9 rematches save blocks to instances by it and
+        // a fresh GUID each boot would orphan every block. The parent is WHERE
+        // it lives, which rule 12 makes the same thing as how long its facts
+        // last.
+        public ScopeDefinition Definition { get; }
+        public string InstanceId { get; }
+        public Scope Parent { get; }
+
+        // ordered (the ladder of design doc section 1); attached once by the
+        // factory, after which nothing changes the tree's shape
+        public IReadOnlyList<Scope> Children => _children;
 
         public ChapterDefinition Chapter { get; }
         public EconomyRecipe Recipe { get; }
@@ -77,11 +104,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // honest answer for an economy that has never been away.
         public DateTime? LastInteractionUtc { get; private set; }
 
-        public EconomyContext(ChapterDefinition chapter, EconomyRecipe recipe, CurrencyRouter router,
+        public Scope(ScopeDefinition definition, string instanceId, Scope parent,
+            ChapterDefinition chapter, EconomyRecipe recipe, CurrencyRouter router,
             FlagSystem flags, ModifierSystem modifiers, GeneratorSystem generators, UpgradeSystem upgrades,
             ProductionSystem production, BarSystem bars, RewardManager rewards, CapstoneSystem capstone,
             ConditionContext conditions, IReadOnlyList<SectionDefinition> sections)
         {
+            Definition = definition;
+            InstanceId = instanceId;
+            Parent = parent;
             Chapter = chapter;
             Recipe = recipe;
             _router = router;
@@ -111,6 +142,25 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // ---- lifecycle -------------------------------------------------------
 
+        // Wired once by the factory, after the children exist - a child's
+        // construction needs its parent (reads go outward), so the parent
+        // cannot take them in its own constructor. Once, because nothing else
+        // may change the tree's shape: no action, reset, or operation adds or
+        // removes a scope, and a second attach is the factory being run against
+        // a scope that already has a subtree.
+        public void AttachChildren(IReadOnlyList<Scope> children)
+        {
+            if (_childrenAttached)
+            {
+                Debug.LogError($"Scope: AttachChildren on instance '{InstanceId}', whose children are already attached. The tree's shape is fixed at construction; ignoring.");
+                return;
+            }
+
+            _childrenAttached = true;
+            if (children != null)
+                _children.AddRange(children);
+        }
+
         public void Focus()
         {
             if (IsFocused)
@@ -132,12 +182,20 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             LastInteractionUtc = DateTime.UtcNow;
         }
 
-        // A discarded context must stop listening to systems that outlive it:
+        // A discarded scope must stop listening to systems that outlive it:
         // the condition context subscribes to the four condition inputs, and the
-        // router subscribes to the global pool, which every context shares.
-        // Invisible with one economy; a leak the moment there are two.
+        // router subscribes to the outer pool, which outlives every instance.
+        // Invisible with one economy; a leak the moment there are two - and at N
+        // levels that disposal discipline is load-bearing (rule 12), which is
+        // why disposal takes the SUBTREE: a discarded parent whose children kept
+        // listening would feed a dead ladder's subscribers changes for a chapter
+        // nobody is playing. Children first, since theirs subscribe outward into
+        // state this scope holds.
         public void Dispose()
         {
+            foreach (var child in _children)
+                child.Dispose();
+
             Conditions?.Dispose();
             Production?.Dispose();
             _router?.Dispose();
@@ -399,7 +457,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
             if (runtime is not PerBarContinuousRuntime perBar)
             {
-                Debug.LogError($"EconomyContext: SelectBar on bar group '{groupId}', whose fill mode has no bar selection. Ignoring.");
+                Debug.LogError($"Scope: SelectBar on bar group '{groupId}', whose fill mode has no bar selection. Ignoring.");
                 return;
             }
 
@@ -530,7 +588,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             if (Chapter?.Capstone == null || !Chapter.Capstone.IsAuthored)
             {
-                Debug.LogError($"EconomyContext: CompleteCapstone on chapter '{Chapter?.Id}', which authors no capstone. Ignoring.");
+                Debug.LogError($"Scope: CompleteCapstone on chapter '{Chapter?.Id}', which authors no capstone. Ignoring.");
                 return false;
             }
 
@@ -550,7 +608,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // keeps the release below from stranding the run
             if (!Capstone.CanExecuteActions())
             {
-                Debug.LogError($"EconomyContext: capstone '{Chapter.Capstone.Id}' has an action that cannot execute. Refusing the completion rather than releasing the album for nothing.");
+                Debug.LogError($"Scope: capstone '{Chapter.Capstone.Id}' has an action that cannot execute. Refusing the completion rather than releasing the album for nothing.");
                 return false;
             }
 
@@ -607,7 +665,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 while (Conditions.IsDirty && passes < maxPasses);
 
                 if (Conditions.IsDirty)
-                    Debug.LogError($"EconomyContext: settle of chapter '{Chapter?.Id}' still had condition work pending after {maxPasses} drain passes - content whose unlocks re-trigger each other.");
+                    Debug.LogError($"Scope: settle of chapter '{Chapter?.Id}' still had condition work pending after {maxPasses} drain passes - content whose unlocks re-trigger each other.");
 
                 // unconditional and once, after the drains converge: a yield can
                 // move for reasons no condition input reports (a granted modifier),
@@ -643,7 +701,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // missing at the first boundary - reported here rather than
             // discovered as a silently unbuffed run
             if (_factSources.Count == 0 && Recipe?.Kind == EconomyRecipeKind.FrontierChapter)
-                Debug.LogError($"EconomyContext: chapter '{Chapter?.Id}' has no modifier fact sources - a release or restore would rebuild an empty modifier store. Check that the upgrade and bar systems constructed.");
+                Debug.LogError($"Scope: chapter '{Chapter?.Id}' has no modifier fact sources - a release or restore would rebuild an empty modifier store. Check that the upgrade and bar systems constructed.");
         }
     }
 }

@@ -10,7 +10,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // second copy to disagree.
     //
     // The completion itself (ExecuteCompletion) runs only from
-    // EconomyContext.CompleteCapstone, the player-action operation that earned
+    // Scope.CompleteCapstone, the player-action operation that earned
     // it. The projection half (ProjectModifiers) re-applies OnComplete from the
     // latch at every rebuild boundary, which is what lets capstone-authored
     // state survive a release, a load, and a reprojection exactly as the

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Loop;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -29,7 +28,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         }
 
         private GameManager _game;
-        private EconomyContext _economy;
+        private Scope _economy;
         private ChapterContext _context;
         private readonly List<SectionInstance> _sections = new();
 

@@ -56,9 +56,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 upgradeIds: upgradeIds, generatorIds: generatorIds, flags: flags,
                 recordBuffAffects: new List<string> { "cash" });
 
-        private static EconomyContext Build(ChapterDefinition chapter, ContentDatabase database,
+        private static Scope Build(ChapterDefinition chapter, ContentDatabase database,
             CurrencyManager permanent, EconomyRecipe recipe = null, EconomyLocalSnapshot seed = null)
-            => EconomyContextFactory.Build(chapter, database, permanent,
+            => ScopeFactory.Build(chapter, database, permanent,
                 recipe ?? EconomyRecipe.FrontierChapter, seed);
 
         // ---- the earned total is a fact of its own ---------------------------
@@ -97,7 +97,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
             using var context = Build(chapter, database, permanent);
             var gate = new RecordsCumulativeCondition(30);
             var cashProduction = TestContent.RateOf("cash");
@@ -131,7 +131,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeUpgrade("gated_b", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                     new CurrencyBalanceCondition("cash", 1_000_000), new SetFlagEffect("covers")),
             });
-            using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
+            using var context = Build(chapter, database, ScopeFactory.BuildPermanentPool(database));
 
             context.Restore(new EconomyLocalSnapshot(
                 appliedUpgradeIds: new List<string> { "gated_a", "gated_b" },
@@ -168,7 +168,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     null, new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4),
                     actions: new List<GameAction> { new GrantCurrencyAction(RoadiesId, 1) }),
             });
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             using var context = Build(chapter, database, permanent);
 
@@ -192,7 +192,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     new CurrencyBalanceCondition("cash", 1_000_000),
                     new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4)),
             });
-            using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
+            using var context = Build(chapter, database, ScopeFactory.BuildPermanentPool(database));
 
             var snapshot = new EconomyLocalSnapshot(
                 currencies: new Dictionary<string, CurrencyState> { ["cash"] = new CurrencyState(25, 40) },
@@ -229,7 +229,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeUpgrade("reveal", UpgradeType.ContentUnlock, ContentScope.PermanentInChapter,
                     new CurrencyBalanceCondition("cash", 50), new SetFlagEffect("fans")),
             });
-            using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
+            using var context = Build(chapter, database, ScopeFactory.BuildPermanentPool(database));
 
             // settle it dry first, so nothing is pending when the restore arrives
             context.Settle();
@@ -272,7 +272,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     new CurrencyBalanceCondition("cash", 1_000_000),
                     new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4)),
             });
-            using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
+            using var context = Build(chapter, database, ScopeFactory.BuildPermanentPool(database));
 
             // every observation any subscriber makes during the restore, in order
             var observedYields = new List<double>();
@@ -301,7 +301,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter(flags: new List<FlagDeclaration> { new("fans") });
             var database = MakeDatabase(chapter);
-            using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
+            using var context = Build(chapter, database, ScopeFactory.BuildPermanentPool(database));
 
             context.Restore(new EconomyLocalSnapshot(
                 currencies: new Dictionary<string, CurrencyState> { ["cash"] = new CurrencyState(25, 25) },
@@ -325,7 +325,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
             using var context = Build(chapter, database, permanent);
 
             context.Currencies.Add(RecordsId, 30);
@@ -347,7 +347,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             permanent.Add(RecordsId, 30);
             permanent.Add(RecordsId, -12);
@@ -355,7 +355,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var saved = permanent.CaptureAll();
 
-            var reloaded = EconomyContextFactory.BuildPermanentPool(database);
+            var reloaded = ScopeFactory.BuildPermanentPool(database);
             reloaded.RestoreAll(saved);
 
             Assert.AreEqual(18.0, reloaded.Get(RecordsId).ToDouble(), 1e-9);
@@ -371,7 +371,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
             permanent.Add(RecordsId, 30);
             permanent.Add(RoadiesId, 4);
 
@@ -395,7 +395,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             // what a subscriber could see of the OTHER currency at each notification
             var observedRoadiesWhenRecordsMoved = new List<double>();
@@ -420,7 +420,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
 
             // "cash" is the chapter pool's - a permanent block carrying it is stale
             // state or a snapshot restored into the wrong pool, and dropping it
@@ -446,7 +446,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
             permanent.Add(RecordsId, 30);
 
             using var sandbox = Build(chapter, database, permanent, EconomyRecipe.EventSandbox);
@@ -486,7 +486,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 {
                     TestContent.MakeGenerator("drummer", "cash", 10, 1.15, 3, isBandmate: true),
                 });
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
             using var frontier = Build(chapter, database, permanent);
 
             // a run in progress: both buffs latched, both flags set, a band bought,
@@ -587,7 +587,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TestContent.MakeUpgrade("cut_demo", UpgradeType.ContentUnlock,
                     ContentScope.PermanentInChapter, null, new SetFlagEffect("album")),
             });
-            using var context = Build(chapter, database, EconomyContextFactory.BuildPermanentPool(database));
+            using var context = Build(chapter, database, ScopeFactory.BuildPermanentPool(database));
 
             Assert.IsTrue(context.Flags.IsSet("album"), "latched at construction");
 
@@ -616,7 +616,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 capstone: capstone,
                 recordBuffAffects: new List<string> { "cash" });
             var database = MakeDatabase(chapter);
-            var permanent = EconomyContextFactory.BuildPermanentPool(database);
+            var permanent = ScopeFactory.BuildPermanentPool(database);
             using var context = Build(chapter, database, permanent);
 
             context.Currencies.Add(RecordsId, 1);

@@ -6,7 +6,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 {
     // Module: the chapter capstone offer ("Play the Backyard Party"). The label
     // advertises what completing right now would bank - the capstone implicitly
-    // cuts an album, so the preview is EconomyContext.PendingReleaseRecords,
+    // cuts an album, so the preview is Scope.PendingReleaseRecords,
     // the same one pending-payout home the Release button reads, which is what
     // keeps the two offers from ever disagreeing about what the run is worth.
     // Pressability is the capstone's own authored unlock, asked through the one

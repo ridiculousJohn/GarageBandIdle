@@ -190,7 +190,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // boundary clears everything and re-runs the projection over the facts
         // that survived it; a store that gets rebuilt cannot hold a stale or
         // double-counted effect. Nothing may call this without projecting
-        // afterwards - EconomyContext.ProjectModifiers is the only caller, and
+        // afterwards - Scope.ProjectModifiers is the only caller, and
         // it does both halves.
         //
         // Every grant settles before any notification fires, so no subscriber

@@ -5,7 +5,7 @@ using UnityEngine.UI;
 namespace RidiculousGaming.GarageBandIdle.UI
 {
     // Module: the Cut a Demo (album release) button. The label advertises what
-    // releasing right now would bank - EconomyContext.PendingReleaseRecords,
+    // releasing right now would bank - Scope.PendingReleaseRecords,
     // the payout formula over the current fans balance - and refreshes when
     // conditions settle, since fans accrue every tick. Reading the context's
     // one pending-payout home is what keeps this preview and the release

@@ -14,7 +14,7 @@ namespace RidiculousGaming.GarageBandIdle
     // running one's roster.
     //
     // Reachability is the chapter's authored roster plus every global currency,
-    // which is the same rule EconomyContextFactory builds a real pool pair from:
+    // which is the same rule ScopeFactory builds a real pool pair from:
     // the chapter's own CurrencyIds land in its pool, globals live in the
     // permanent pool, and a context reaches both. Derived from the definitions
     // rather than from a constructed pool, so it holds for a chapter that has
@@ -69,7 +69,7 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             }
 
-            // The roster is filtered by the SAME rules EconomyContextFactory
+            // The roster is filtered by the SAME rules ScopeFactory
             // applies when it builds the real pool, and for the same reason: a
             // roster entry the factory refuses never gets a balance in this
             // chapter's pool, so calling it reachable would have validation
@@ -104,7 +104,7 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // The chapter's roster as definitions, already filtered by the content
-        // rules above - what EconomyContextFactory fills the chapter's pool from,
+        // rules above - what ScopeFactory fills the chapter's pool from,
         // so the pool holds exactly what validation called reachable. The one
         // roster rule NOT applied here is shadowing the permanent pool: that is a
         // question about a pool object, not about content, so it stays with the

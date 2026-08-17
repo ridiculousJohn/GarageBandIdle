@@ -187,7 +187,7 @@ namespace RidiculousGaming.GarageBandIdle
         //
         // notify: false is for a context-wide restore, which publishes one settled
         // set of notifications after projection instead of a storm of partial ones
-        // (see EconomyContext.Restore). The default keeps every existing caller's
+        // (see Scope.Restore). The default keeps every existing caller's
         // behavior.
         public void Restore(string id, BigNumber balance, BigNumber earnedTotal, bool notify = true)
         {
