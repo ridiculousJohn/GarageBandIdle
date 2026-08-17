@@ -18,10 +18,6 @@ namespace RidiculousGaming.GarageBandIdle
     // ChapterDefinition and GeneratorDefinition already have; Scope is the
     // instance. A replay economy (rule 7) is a second INSTANCE of one
     // definition, which is why nothing here is runtime state.
-    //
-    // No prestige rung yet: its shape (PrestigeTierDefinition) lands with the
-    // reset operation in 7.5 step 3, and a field without its type is not a
-    // declaration.
     [CreateAssetMenu(
         fileName = "NewScope",
         menuName = "GarageBandIdle/Scope")]
@@ -37,6 +33,11 @@ namespace RidiculousGaming.GarageBandIdle
         [Tooltip("Child scopes in ladder order (design doc section 1). Order is meaningful: it is display " +
             "order and, later, same-depth reset order.")]
         private List<string> _childScopeIds = new();
+
+        [SerializeField]
+        [Tooltip("This scope's prestige rung, if it has one (rule 14) - the ladder files each rung with the " +
+            "state its formulas read. Leave the rung id empty for a scope with none.")]
+        private PrestigeTierDefinition _rung = new();
 
         [Header("Truth")]
         [SerializeField]
@@ -76,6 +77,7 @@ namespace RidiculousGaming.GarageBandIdle
         private List<string> _sectionIds = new();
 
         public Condition ActiveWhen => _activeWhen;
+        public PrestigeTierDefinition Rung => _rung;
         public IReadOnlyList<string> ChildScopeIds => _childScopeIds;
         public IReadOnlyList<FlagDeclaration> Flags => _flags;
         public IReadOnlyList<string> CurrencyIds => _currencyIds;
@@ -90,10 +92,11 @@ namespace RidiculousGaming.GarageBandIdle
         public void EditorInitialize(string id, Condition activeWhen, List<string> childScopeIds,
             List<FlagDeclaration> flags, List<string> currencyIds, List<string> producerIds,
             List<string> generatorIds, List<string> upgradeIds, List<string> barGroupIds,
-            List<string> sectionIds)
+            List<string> sectionIds, PrestigeTierDefinition rung = null)
         {
             SetIdentity(id);
             _activeWhen = activeWhen;
+            _rung = rung ?? new PrestigeTierDefinition();
             _childScopeIds = childScopeIds ?? new List<string>();
             _flags = flags ?? new List<FlagDeclaration>();
             _currencyIds = currencyIds ?? new List<string>();

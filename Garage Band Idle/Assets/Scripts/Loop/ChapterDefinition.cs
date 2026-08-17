@@ -35,11 +35,15 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         [SerializeField]
         private FansConfig _fans = new();
 
+        // The chapter's prestige rungs (design doc rule 14) - the album and the
+        // capstone as two instances of ONE shape, where two bespoke config
+        // classes used to encode the same fixed-depth assumption twice. A LIST
+        // because the pre-step-7 chapter is a single scope filing both; step 7
+        // re-authors them onto the scope tree (the album rung on the tier
+        // scope, the capstone rung on the chapter scope) and this field goes
+        // with the rest of the chapter's content lists.
         [SerializeField]
-        private AlbumConfig _album = new();
-
-        [SerializeField]
-        private CapstoneConfig _capstone = new();
+        private List<PrestigeTierDefinition> _rungs = new();
 
         [Header("Content")]
         [SerializeField]
@@ -90,8 +94,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         public string Theme => _theme;
         public RecordBuffConfig RecordBuff => _recordBuff;
         public FansConfig Fans => _fans;
-        public AlbumConfig Album => _album;
-        public CapstoneConfig Capstone => _capstone;
+        public IReadOnlyList<PrestigeTierDefinition> Rungs => _rungs;
         public IReadOnlyList<FlagDeclaration> Flags => _flags;
 
         // the declared ids alone, for consumers that only resolve or validate
@@ -119,7 +122,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
 #if UNITY_EDITOR
         // importer-only: chapter assets are generated from chapter JSON
         public void EditorInitialize(string id, int index, string displayName, string theme,
-            RecordBuffConfig recordBuff, FansConfig fans, AlbumConfig album, CapstoneConfig capstone,
+            RecordBuffConfig recordBuff, FansConfig fans, List<PrestigeTierDefinition> rungs,
             List<FlagDeclaration> flags, List<string> currencyIds, List<string> producerIds,
             List<string> sectionIds, List<string> generatorIds, List<string> upgradeIds,
             List<string> barGroupIds, List<string> eventIds, List<string> storyBeatIds)
@@ -130,8 +133,7 @@ namespace RidiculousGaming.GarageBandIdle.Loop
             _theme = theme;
             _recordBuff = recordBuff;
             _fans = fans;
-            _album = album ?? new AlbumConfig();
-            _capstone = capstone ?? new CapstoneConfig();
+            _rungs = rungs ?? new List<PrestigeTierDefinition>();
             _flags = flags;
             _currencyIds = currencyIds;
             _producerIds = producerIds;
@@ -171,111 +173,6 @@ namespace RidiculousGaming.GarageBandIdle.Loop
         {
             _perRecord = perRecord;
             _affectsCurrencyIds = affectsCurrencyIds;
-        }
-#endif
-    }
-
-    // What the chapter declares about the album beyond the payout formula
-    // (design doc section 5). ReleaseWhen is the OFFER's gate, not the
-    // operation's: the UI presents the release only while it holds (asked
-    // through the one evaluator like every gate), re-met each run because its
-    // inputs are run facts - while Scope.ReleaseAlbum stays ungated,
-    // since the capstone implicitly cuts an album regardless of any offer.
-    // None means always offered once revealed, the same null-condition
-    // convention every other gate site uses.
-    [Serializable]
-    public class AlbumConfig
-    {
-        [SerializeReference]
-        [SubclassPicker]
-        [Tooltip("Must hold for a release to be offered (the button enabled); none = always offered. " +
-            "Gates the offer only - the release operation itself stays callable (the capstone releases regardless).")]
-        private Condition _releaseWhen;
-
-        public Condition ReleaseWhen => _releaseWhen;
-
-        public AlbumConfig() { }
-
-#if UNITY_EDITOR
-        public AlbumConfig(Condition releaseWhen)
-        {
-            _releaseWhen = releaseWhen;
-        }
-#endif
-    }
-
-    // The chapter capstone (design doc sections 1-2 and 5): the gig that ends the
-    // chapter. Parallel to AlbumConfig, and for the same reason - it is a thing the
-    // chapter declares about itself rather than an entry in one of the content id
-    // lists.
-    //
-    // The unlock Condition is the SOLE authored source of the gate. Nothing
-    // re-derives a threshold from anywhere else: the capstone asks this Condition
-    // through the same evaluator every other gate uses, so there is no second
-    // statement of the threshold to disagree with the one the designer wrote.
-    [Serializable]
-    public class CapstoneConfig
-    {
-        [SerializeField]
-        [Tooltip("Stable string id, e.g. backyard_party.")]
-        private string _id;
-
-        [SerializeField]
-        private string _displayName;
-
-        [SerializeReference]
-        [SubclassPicker]
-        [Tooltip("Must hold for the capstone to be offered - the chapter's primary pacing knob " +
-            "(Ch1: recordsCumulative >= 30). Asked through the one evaluator like every gate.")]
-        private Condition _unlock;
-
-        [SerializeField]
-        [Tooltip("Flag latched when the capstone completes - set by the completion OPERATION itself " +
-            "(slice 7), from this declaration, never authored as a payload effect: one declaration owns " +
-            "the fact, so payload and config cannot disagree. ONE fact, not two: it is both 'this chapter " +
-            "is finished' and 'chapter 2 may open', and nothing in Chapter 1 can tell those apart. " +
-            "Must be declared permanent-in-chapter in the chapter's flags list.")]
-        private string _completionFlagId;
-
-        [SerializeReference]
-        [SubclassPicker]
-        [Tooltip("Re-applicable state completing it grants (modifiers, flags beyond the completion flag). " +
-            "Ch1 authors none - its awards are one-shot Actions below, and the completion flag is the " +
-            "operation's own job.")]
-        private GameEffect _onComplete;
-
-        // the one-shot awards - Ch1: one Roadie. Executed by the completion
-        // operation exactly once; no release, load, or reprojection ever sees an
-        // action, which is what "paid once ever" means by construction.
-        [SerializeReference]
-        [SubclassPicker]
-        [Tooltip("One-shot awards completing it pays - Ch1: one Roadie. Executed once by the completion operation.")]
-        private List<GameAction> _actions = new();
-
-        public string Id => _id;
-        public string DisplayName => _displayName;
-        public Condition Unlock => _unlock;
-        public string CompletionFlagId => _completionFlagId;
-        public GameEffect OnComplete => _onComplete;
-        public IReadOnlyList<GameAction> Actions => _actions;
-
-        // whether the chapter authors a capstone at all. Chapter 1 does; a
-        // hand-made fixture chapter usually does not, and validation must not
-        // demand one of every chapter that exists.
-        public bool IsAuthored => !string.IsNullOrEmpty(_id);
-
-        public CapstoneConfig() { }
-
-#if UNITY_EDITOR
-        public CapstoneConfig(string id, string displayName, Condition unlock, string completionFlagId,
-            GameEffect onComplete, List<GameAction> actions = null)
-        {
-            _id = id;
-            _displayName = displayName;
-            _unlock = unlock;
-            _completionFlagId = completionFlagId;
-            _onComplete = onComplete;
-            _actions = actions ?? new List<GameAction>();
         }
 #endif
     }

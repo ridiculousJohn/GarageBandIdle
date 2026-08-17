@@ -47,7 +47,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1001}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c5dd0b0c85b74c24ba8ec0a3e0478114, type: 3}
+  m_Script: {fileID: 11500000, guid: e04c3d865ea84ca42b337a176b4b7833, type: 3}
   m_Name:
   m_EditorClassIdentifier:
   _completeButton: {fileID: 1010}

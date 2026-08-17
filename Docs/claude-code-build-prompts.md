@@ -1204,6 +1204,17 @@ migration. Slice 9 also builds its restore against whatever the lifetime model i
 > And it sometimes *is* — the album rung's selector is self-and-contained, so without the de-dup an
 > ordinary demo press would run its Fans-to-Records action twice.
 >
+> **[rev] Participation is per rung, and the participant pass takes only latchless rungs.** "Every
+> selected scope runs its rung's actions" assumes one rung per scope, which the final Ch1 shape satisfies
+> and the pre-step-7 chapter path does not (both legacy rungs share the one chapter scope). The press
+> therefore resolves an explicit plan: the selected scopes, de-duplicated; from them, every latchless
+> rung **excluding the initiating rung**; the initiating rung appended exactly once, last. Excluding the
+> initiating rung rather than the initiator's scope keeps that scope eligible to contribute its other
+> latchless rungs — the legacy capstone press banks the album payout filed beside it. Latch-bearing rungs
+> never ride along on another rung's press, and that is general rather than interim: a completion's
+> awards are inseparable from its latch, only the initiator latches, and a one-shot paid as a
+> participant would pay again on every press, unbounded.
+>
 > Then, in order:
 >
 > - **Refuse on the initiator alone, before anything moves.** A rung whose `completionLatch` flag is

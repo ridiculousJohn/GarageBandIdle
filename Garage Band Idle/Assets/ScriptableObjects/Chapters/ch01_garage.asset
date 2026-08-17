@@ -23,19 +23,35 @@ MonoBehaviour:
     - cash
   _fans:
     _currencyId: fans
-  _album:
-    _releaseWhen:
+  _rungs:
+  - _id: cut_demo
+    _displayName: Cut a Demo
+    _offer:
       rid: 1000
-  _capstone:
-    _id: backyard_party
-    _displayName: Play the Backyard Party
-    _unlock:
-      rid: 1001
-    _completionFlagId: chapter_2_unlocked
+    _operationGate:
+      rid: -2
     _onComplete:
       rid: -2
     _actions:
-    - rid: 1002
+    - rid: 1001
+    _completionLatch:
+      _flagId:
+    _resetTargets:
+      rid: 1002
+  - _id: backyard_party
+    _displayName: Play the Backyard Party
+    _offer:
+      rid: 1003
+    _operationGate:
+      rid: 1004
+    _onComplete:
+      rid: -2
+    _actions:
+    - rid: 1005
+    _completionLatch:
+      _flagId: chapter_2_unlocked
+    _resetTargets:
+      rid: 1006
   _flags:
   - _id: fans
     _scope: 1
@@ -92,25 +108,46 @@ MonoBehaviour:
       type: {class: CompoundCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _all:
+        - rid: 1007
         - rid: 1008
-        - rid: 1009
         _any: []
     - rid: 1001
+      type: {class: GrantComputedCurrencyAction, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _currencyId: records
+        _amount:
+          rid: 1009
+    - rid: 1002
+      type: {class: SelfAndContainedSelector, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+    - rid: 1003
       type: {class: RecordsCumulativeCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _value: 30
-    - rid: 1002
+    - rid: 1004
+      type: {class: RecordsCumulativeCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _value: 30
+    - rid: 1005
       type: {class: GrantCurrencyAction, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: roadies
         _amount: 1
-    - rid: 1008
+    - rid: 1006
+      type: {class: SelfAndContainedSelector, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+    - rid: 1007
       type: {class: CurrencyBalanceCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _currencyId: fans
         _value: 50
-    - rid: 1009
+    - rid: 1008
       type: {class: BarsCompletedCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _groupId: learn_covers
         _value: 1
+    - rid: 1009
+      type: {class: RootOfBalanceFormula, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        _currencyId: fans
+        _divisor: 5

@@ -9,7 +9,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // The album release (design doc section 5, slice 6): fans bank as Records
     // in the permanent pool, the run's facts reset by scope and group flags -
     // never a name list - and the modifier store is REBUILT from whatever
-    // facts survived (rule 6). These tests run the release through a real
+    // facts survived (rule 6). The release is a press of the chapter's album
+    // RUNG now (rule 14), so what these tests exercise is the authored curve
+    // and the reset behind one CompleteRung call. They run it through a real
     // factory-built context because the release is the first production
     // boundary to re-project a non-empty store: the guarantee
     // ScopeTests could only assert in isolation is exercised here as
@@ -31,18 +33,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // The Chapter 1 shape in miniature: a run-scoped buff (re-bought each
         // demo), a permanent content unlock that latches the album flag on the
         // cut_demo gate, a permanent unlock granting a modifier (what "keeps
-        // upgrades.contentUnlock" means for the store), gear, and one cover
-        // bar paying a run-lifetime fan-rate reward.
+        // upgrades.contentUnlock" means for the store), gear, one cover bar
+        // paying a run-lifetime fan-rate reward - and the album RUNG itself,
+        // without which there is no press to make.
         private static Scope BuildChapterEconomy(out CurrencyManager permanent,
-            string fansCurrencyId = "fans", Condition albumReleaseWhen = null)
+            Condition albumOffer = null)
         {
             var chapter = TestContent.MakeChapter("garage", new List<string> { "album" },
                 currencyIds: new List<string> { "cash", "fans", "rehearsal" },
                 generatorIds: new List<string> { "practice_amp", "drummer" },
                 upgradeIds: new List<string> { "stage_presence", "backstage_pass", "cut_demo" },
                 barGroupIds: new List<string> { "learn_covers" },
-                fansCurrencyId: fansCurrencyId,
-                albumReleaseWhen: albumReleaseWhen);
+                rungs: new List<PrestigeTierDefinition>
+                {
+                    TestContent.MakeAlbumRung(offer: albumOffer),
+                });
 
             var database = TestContent.MakeDatabase(
                 chapters: new[] { chapter },
@@ -110,34 +115,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void ReleaseAlbum_BanksFansAsRecords_InThePermanentPool()
+        public void PressingTheAlbumRung_BanksFansAsRecords_InThePermanentPool()
         {
             var context = BuildChapterEconomy(out var permanent);
             context.Currencies.Add("fans", 125);
 
-            Assert.AreEqual(5.0, context.PendingReleaseRecords().ToDouble(), 1e-9,
-                "the preview reads the same formula the release banks");
+            Assert.AreEqual(5.0, context.PendingRungGrant("cut_demo", RecordsId).ToDouble(), 1e-9,
+                "the preview reads the same formula the press banks");
 
-            var earned = context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
 
-            Assert.AreEqual(5.0, earned.ToDouble(), 1e-9, "floor((125 / 5) ^ 0.5)");
             Assert.AreEqual(5.0, permanent.Get(RecordsId).ToDouble(), 1e-9,
-                "the award landed in the pool no release resets");
+                "floor((125 / 5) ^ 0.5), landed in the pool no press resets");
             Assert.AreEqual(5.0, permanent.GetEarned(RecordsId).ToDouble(), 1e-9,
                 "banked as earned: the capstone gate and the income buff read this total");
-            Assert.AreEqual(0.0, context.PendingReleaseRecords().ToDouble(), 1e-9,
+            Assert.AreEqual(0.0, context.PendingRungGrant("cut_demo", RecordsId).ToDouble(), 1e-9,
                 "the fans reset, so the next demo starts from nothing");
         }
 
         [Test]
-        public void ReleaseAlbum_ResetsTheRunFacts_AndKeepsThePermanentOnes()
+        public void PressingTheAlbumRung_ResetsTheRunFacts_AndKeepsThePermanentOnes()
         {
             var context = BuildChapterEconomy(out var permanent);
             PlayARun(context, fans: 125);
             Assert.IsTrue(context.Flags.IsSet("album"), "cut_demo latched at 50 fans");
             Assert.AreEqual(1, context.Bars.CompletedCount("learn_covers"));
 
-            context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
 
             // the run block: group-flagged balances, owned counts, run-scoped
             // latches and bar progress all return to their starting state
@@ -165,7 +169,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // re-projection over a NON-EMPTY store running as the production operation
         // it was built for.
         [Test]
-        public void ReleaseAlbum_RebuildsTheModifierStore_FromTheSurvivingFacts()
+        public void PressingTheAlbumRung_RebuildsTheModifierStore_FromTheSurvivingFacts()
         {
             var context = BuildChapterEconomy(out _);
             PlayARun(context, fans: 125);
@@ -174,7 +178,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the permanent unlock's x4 and the run buff's x2, composed");
             Assert.AreEqual(1.15, context.Modifiers.For(FanRate).Multiply.ToDouble(), 1e-9, "cover_1's reward");
 
-            context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
 
             Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "re-projected from the latch that survived - the run buff's fact is gone, "
@@ -187,30 +191,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // the derived income buff - nothing re-applies it, the banked total is
         // simply higher, which is the whole prestige payoff
         [Test]
-        public void ReleaseAlbum_MakesTheNextRunFaster_ThroughTheRecordsBuff()
+        public void PressingTheAlbumRung_MakesTheNextRunFaster_ThroughTheRecordsBuff()
         {
             var context = BuildChapterEconomy(out _);
             Assert.AreEqual(1.0, context.Modifiers.For(CashProduction).Multiply.ToDouble(), 1e-9);
 
             context.Currencies.Add("fans", 125);
-            context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
 
             Assert.AreEqual(1.1, context.Modifiers.For(CashProduction).Multiply.ToDouble(), 1e-9,
                 "1 + 0.02 x 5 banked Records");
         }
 
-        // below the formula's floor a release banks nothing - and "nothing"
+        // below the formula's floor a press banks nothing - and "nothing"
         // must mean no Add at all, so the earned total the capstone gate reads
         // never moves on an empty payout
         [Test]
-        public void ReleaseAlbum_BanksNothingBelowTheFormulaFloor_ButStillResets()
+        public void PressingTheAlbumRung_BanksNothingBelowTheFormulaFloor_ButStillResets()
         {
             var context = BuildChapterEconomy(out var permanent);
             context.Currencies.Add("fans", 4);
 
-            var earned = context.ReleaseAlbum();
+            Assert.AreEqual(0.0, context.PendingRungGrant("cut_demo", RecordsId).ToDouble(), 1e-9);
 
-            Assert.AreEqual(0.0, earned.ToDouble(), 1e-9);
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
+
             Assert.AreEqual(0.0, permanent.GetEarned(RecordsId).ToDouble(), 1e-9,
                 "no zero-amount award ever accrues");
             Assert.AreEqual(0.0, context.Pool.Get("fans").ToDouble(), 1e-9,
@@ -223,7 +228,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // one standing is what kept every earned-total gate met forever after
         // the first demo.
         [Test]
-        public void ReleaseAlbum_ResetsEarnedTotals_OfRunScopedCurrenciesOnly()
+        public void PressingTheAlbumRung_ResetsEarnedTotals_OfRunScopedCurrenciesOnly()
         {
             var context = BuildChapterEconomy(out var permanent);
             context.Currencies.Add("cash", 250);
@@ -232,7 +237,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(250.0, context.Currencies.GetEarned("cash").ToDouble(), 1e-9,
                 "the run earned it");
 
-            context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
 
             Assert.AreEqual(0.0, context.Currencies.GetEarned("cash").ToDouble(), 1e-9,
                 "cash resets on release, so what the run earned resets with it");
@@ -245,7 +250,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // screen after the fleet behind it was zeroed; unlock is now a live
         // read of the condition, and the buy refuses through the same read.
         [Test]
-        public void ReleaseAlbum_RelocksAGenerator_WhoseEarnedGateReset()
+        public void PressingTheAlbumRung_RelocksAGenerator_WhoseEarnedGateReset()
         {
             var context = BuildChapterEconomy(out _);
             var amp = context.Generators.Get("practice_amp");
@@ -254,7 +259,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(amp.IsUnlocked(context.Conditions),
                 "100 earned cash puts the amp on offer");
 
-            context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
 
             Assert.IsFalse(amp.IsUnlocked(context.Conditions),
                 "and the demo takes the offer back - nothing latched it");
@@ -266,40 +271,43 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "a re-locked generator cannot be bought through a stale row");
         }
 
-        // The offer's gate (chapter.Album.ReleaseWhen) re-arms each run: its
-        // inputs are run facts the release itself resets. This is the Chapter 1
-        // authoring - hidden until first met via the flag, then greyed each
-        // demo until 50 fans + a re-learned cover.
+        // The album rung's OFFER re-arms each run: its inputs are run facts the
+        // press itself resets. This is the Chapter 1 authoring - hidden until
+        // first met via the flag, then greyed each demo until 50 fans + a
+        // re-learned cover. Read off the filed rung rather than off the local
+        // condition, because what is claimed is that the chapter's own
+        // declaration re-arms, not that a Condition evaluates.
         [Test]
-        public void AlbumReleaseWhen_HoldsBeforeARelease_AndRearmsOnlyOnTheReclimb()
+        public void TheAlbumRungsOffer_HoldsBeforeAPress_AndRearmsOnlyOnTheReclimb()
         {
             var gate = new CompoundCondition(new List<Condition>
             {
                 new CurrencyBalanceCondition("fans", 50),
                 new BarsCompletedCondition("learn_covers", 1),
             }, null);
-            var context = BuildChapterEconomy(out _, albumReleaseWhen: gate);
+            var context = BuildChapterEconomy(out _, albumOffer: gate);
+            Assert.IsTrue(context.Prestige.TryGet("cut_demo", out var album),
+                "the chapter files the album rung the offer belongs to");
 
-            Assert.IsFalse(ConditionEvaluator.IsMet(context.Chapter.Album.ReleaseWhen, context.Conditions),
-                "nothing earned yet, no offer");
+            bool Offered() => ConditionEvaluator.IsMet(album.Offer, context.Conditions);
+
+            Assert.IsFalse(Offered(), "nothing earned yet, no offer");
 
             PlayARun(context, fans: 125);
-            Assert.IsTrue(ConditionEvaluator.IsMet(context.Chapter.Album.ReleaseWhen, context.Conditions));
+            Assert.IsTrue(Offered());
 
-            context.ReleaseAlbum();
-            Assert.IsFalse(ConditionEvaluator.IsMet(context.Chapter.Album.ReleaseWhen, context.Conditions),
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
+            Assert.IsFalse(Offered(),
                 "fans and cover completions reset, so the offer disarms");
 
             // the re-climb: fans back over the bar AND the cover re-learned -
             // bars are run-scoped, so the barsCompleted leg really re-earns
             context.Currencies.Add("fans", 50);
-            Assert.IsFalse(ConditionEvaluator.IsMet(context.Chapter.Album.ReleaseWhen, context.Conditions),
-                "fans alone are not the gate");
+            Assert.IsFalse(Offered(), "fans alone are not the gate");
             var covers = (PerBarContinuousRuntime)context.Bars.GetRuntime("learn_covers");
             context.Currencies.Add("rehearsal", 120);
             covers.SetActiveBar("cover_1");
-            Assert.IsTrue(ConditionEvaluator.IsMet(context.Chapter.Album.ReleaseWhen, context.Conditions),
-                "both legs re-met, the offer re-arms");
+            Assert.IsTrue(Offered(), "both legs re-met, the offer re-arms");
         }
 
         // The second-run flow as one cascade (design doc section 2): a
@@ -311,7 +319,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // live evaluation the screen performs - a pure read over the flag, so
         // it derives its reset from the flag's rather than owning one.
         [Test]
-        public void ReleaseAlbum_ARunScopedFlag_TakesItsWholeSystemDarkAndRearmsOnTheReclimb()
+        public void PressingTheAlbumRung_ARunScopedFlag_TakesItsWholeSystemDarkAndRearmsOnTheReclimb()
         {
             var section = TestContent.MakeSection("rehearsal_space", new FlagSetCondition("covers"));
             var unlock = TestContent.MakeUpgrade("learn_covers", UpgradeType.ContentUnlock,
@@ -325,7 +333,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 currencyIds: new List<string> { "cash", "fans", "rehearsal" },
                 sectionIds: new List<string> { "rehearsal_space" },
                 upgradeIds: new List<string> { "learn_covers" },
-                producerIds: new List<string> { "jam" });
+                producerIds: new List<string> { "jam" },
+                rungs: new List<PrestigeTierDefinition> { TestContent.MakeAlbumRung() });
             var database = TestContent.MakeDatabase(
                 chapters: new[] { chapter },
                 sections: new List<SectionDefinition> { section },
@@ -360,7 +369,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             context.Tick(10);
             Assert.AreEqual(10.0, context.Pool.Get("rehearsal").ToDouble(), 1e-9, "accrual on once taught");
 
-            context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
 
             // one release, everything gated on the flag goes dark together -
             // and the release's own settle could not re-fire the unlock,
@@ -380,24 +389,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(SectionVisible(), "the section re-shows with its flag");
             context.Tick(10);
             Assert.AreEqual(10.0, context.Pool.Get("rehearsal").ToDouble(), 1e-9, "accrual re-armed");
-        }
-
-        // a chapter that declares no fans currency has nothing to bank; the
-        // release is still a legal reset and reads no empty currency id (which
-        // would report a content error on every preview)
-        [Test]
-        public void ReleaseAlbum_BanksNothingForAChapterWithNoFansCurrency()
-        {
-            var context = BuildChapterEconomy(out var permanent, fansCurrencyId: null);
-            context.Currencies.Add("cash", 40);
-
-            Assert.AreEqual(0.0, context.PendingReleaseRecords().ToDouble(), 1e-9);
-
-            var earned = context.ReleaseAlbum();
-
-            Assert.AreEqual(0.0, earned.ToDouble(), 1e-9);
-            Assert.AreEqual(0.0, permanent.Get(RecordsId).ToDouble(), 1e-9);
-            Assert.AreEqual(0.0, context.Pool.Get("cash").ToDouble(), 1e-9, "the reset still ran");
         }
     }
 }

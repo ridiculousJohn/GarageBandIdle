@@ -6,23 +6,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // parameters here.
     public static class ProductionCalculator
     {
-        // the album payout's tuning divisor (design doc section 5, the JSON's
-        // recordsFormula): 50 fans banks the first meaningful payout (3)
-        private const double FansPerRecordsUnit = 5;
-
         // permanent global buff: 1 + buffPerRecord x records (additive per
         // Record), the value RecordsIncomeModifier reports
         public static BigNumber IncomeMultiplier(BigNumber records, double buffPerRecord)
             => BigNumber.One + records * buffPerRecord;
 
-        // The album payout (design doc section 5): floor((fansThisRun / 5) ^ 0.5),
-        // the early-chapter f(fansThisRun) - the Ch. 6+ variant that reads catalog
-        // quality is a different function, not a parameter of this one. Clamped at
-        // zero so a sub-zero balance (impossible today: production never drains
-        // fans) can never produce a NaN payout.
-        public static BigNumber RecordsEarned(BigNumber fansThisRun)
-            => BigNumber.Floor(BigNumber.Pow(
-                BigNumber.Max(fansThisRun, BigNumber.Zero) / FansPerRecordsUnit, 0.5));
+        // The album payout deliberately does NOT live here: it is authored
+        // content (RootOfBalanceFormula on the album rung, design doc section
+        // 5), and a second copy in code is how a formula ends up with two homes
+        // and one of them stale.
 
         // No per-second helper lives here: a currency's rate is its producer's
         // (rule 13), summed and composed in one place, so a sum over generators

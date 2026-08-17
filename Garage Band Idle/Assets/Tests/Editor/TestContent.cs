@@ -262,8 +262,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             List<string> producerIds = null,
             double recordBuffPerRecord = 0.02,
             int index = 1, string fansCurrencyId = "fans",
-            List<string> recordBuffAffects = null, Condition albumReleaseWhen = null,
-            List<FlagDeclaration> flags = null, CapstoneConfig capstone = null,
+            List<string> recordBuffAffects = null,
+            List<FlagDeclaration> flags = null, List<PrestigeTierDefinition> rungs = null,
             List<string> storyBeatIds = null)
         {
             // string ids remain the fixture-friendly spelling: each becomes a
@@ -281,11 +281,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             definition.EditorInitialize(id, index, id, "",
                 new RecordBuffConfig(recordBuffPerRecord, recordBuffAffects ?? new List<string> { "cash" }),
                 new FansConfig(fansCurrencyId),
-                // null (the default) is a legal album gate: always offered
-                new AlbumConfig(albumReleaseWhen),
-                // an unauthored capstone by default: not every chapter declares one,
-                // and validation asks IsAuthored before demanding any of its parts
-                capstone ?? new CapstoneConfig(),
+                // no rungs by default: a fixture that is not about the press
+                // files none, and every check over them asks what exists before
+                // demanding any of its parts. MakeAlbumRung and MakeCapstoneRung
+                // below are the two Chapter 1 files.
+                rungs,
                 // the chapter-local half of the standard economy; records is
                 // global, so no chapter declares it
                 declarations, currencyIds ?? new List<string> { "cash", "fans" }, producerIds ?? new List<string>(),
@@ -307,15 +307,63 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             List<string> childScopeIds = null, List<FlagDeclaration> flags = null,
             Condition activeWhen = null, List<string> producerIds = null,
             List<string> generatorIds = null, List<string> upgradeIds = null,
-            List<string> barGroupIds = null, List<string> sectionIds = null)
+            List<string> barGroupIds = null, List<string> sectionIds = null,
+            PrestigeTierDefinition rung = null)
         {
             var definition = Track(ScriptableObject.CreateInstance<ScopeDefinition>());
             // nulls pass straight through: EditorInitialize substitutes an empty
-            // list for each, so "declares none" is one spelling rather than two
+            // list for each, so "declares none" is one spelling rather than two -
+            // and an omitted rung becomes the unauthored one, which is what a
+            // scope with no ladder entry files
             definition.EditorInitialize(id, activeWhen, childScopeIds, flags, currencyIds,
-                producerIds, generatorIds, upgradeIds, barGroupIds, sectionIds);
+                producerIds, generatorIds, upgradeIds, barGroupIds, sectionIds, rung);
             return definition;
         }
+
+        // One prestige rung (design doc rule 14), filed on the scope whose ladder
+        // it belongs to via MakeScope's rung parameter. The latch is spelled as a
+        // FLAG ID rather than as a SetFlagAction, because "no latch" is a latch
+        // with no flag id and a fixture saying that twice (a null action and an
+        // empty id) could contradict itself. Everything else defaults to absent:
+        // a rung with no actions, no gates and no selector is legal - it awards
+        // nothing and clears nothing - so a fixture spells out only the part its
+        // claim is about.
+        public static PrestigeTierDefinition MakeRung(string id,
+            ResetTargetSelector resetTargets = null, List<GameAction> actions = null,
+            string latchFlagId = null, Condition offer = null, Condition operationGate = null,
+            GameEffect onComplete = null, string displayName = null)
+            => new(id, displayName ?? id, offer, operationGate, onComplete, actions,
+                string.IsNullOrEmpty(latchFlagId) ? null : new SetFlagAction(latchFlagId),
+                resetTargets);
+
+        // Chapter 1's album, as the rung the importer writes: latchless and
+        // UNGATED, so it is repeatable forever and rides along on any press
+        // that selects its scope; its payout is an ordinary computed-grant
+        // action over the authored curve floor((fans / divisor) ^ 0.5). The
+        // offer is presentation's gate alone - what the release button asks,
+        // never the press.
+        public static PrestigeTierDefinition MakeAlbumRung(string id = "cut_demo",
+            Condition offer = null, string fansCurrencyId = "fans", double divisor = 5)
+            => MakeRung(id, new SelfAndContainedSelector(),
+                new List<GameAction>
+                {
+                    new GrantComputedCurrencyAction(GameManager.RecordsCurrencyId,
+                        new RootOfBalanceFormula(fansCurrencyId, divisor)),
+                },
+                offer: offer);
+
+        // Chapter 1's capstone, as the same shape with the parts that make it a
+        // boundary: the unlock is BOTH the offer and the fail-closed operation
+        // gate (one authored threshold, two readings of it), the award is a
+        // one-shot Roadie, and the completion flag sits in the latch slot rather
+        // than in a payload that could disagree with it.
+        public static PrestigeTierDefinition MakeCapstoneRung(string id = "backyard_party",
+            Condition unlock = null, string completionFlagId = "chapter_2",
+            List<GameAction> actions = null, GameEffect onComplete = null)
+            => MakeRung(id, new SelfAndContainedSelector(),
+                actions ?? new List<GameAction> { new GrantCurrencyAction(GameManager.RoadiesCurrencyId, 1) },
+                latchFlagId: completionFlagId, offer: unlock, operationGate: unlock,
+                onComplete: onComplete);
 
         public static EventDefinition MakeEvent(string id, List<EventTier> tiers,
             Condition availableWhen = null, bool baselineReset = true)

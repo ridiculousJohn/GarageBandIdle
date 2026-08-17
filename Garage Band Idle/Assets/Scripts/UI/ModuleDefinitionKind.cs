@@ -29,5 +29,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         // one story beat's text, presented on a card
         StoryBeat = 2,
+
+        // one prestige rung, named by id among the scope's filed rungs - a
+        // button naming a rung nothing files would be dead, exactly the
+        // producer failure above one family over
+        PrestigeRung = 3,
     }
 }

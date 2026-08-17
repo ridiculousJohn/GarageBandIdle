@@ -98,6 +98,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static T LoadById<T>(string folder, string id) where T : Object
             => LoadRequired<T>($"{folder}/{id}.asset");
 
+        // one filed rung, by the id the JSON names it - the chapter holds them
+        // as an ordered list, so a test asserting one says which
+        private static PrestigeTierDefinition Rung(ChapterDefinition chapter, string id)
+        {
+            foreach (var rung in chapter.Rungs)
+            {
+                if (rung != null && rung.Id == id)
+                    return rung;
+            }
+            Assert.Fail($"Chapter '{chapter.Id}' files no rung '{id}'.");
+            return null;
+        }
+
         private static List<GeneratorDefinition> LoadChapterGenerators(ChapterDefinition chapter)
         {
             var definitions = new List<GeneratorDefinition>();
@@ -134,31 +147,67 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             CollectionAssert.AreEqual(new[] { "cash" }, chapter.RecordBuff.AffectsCurrencyIds,
                 "the Records buff declares exactly the currencies it affects");
 
-            // The chapter gate has ONE authored home: the capstone's unlock
-            // Condition. No scalar beside it restates the same 30, so there is
-            // nothing to keep in step.
-            var capstone = chapter.Capstone;
-            Assert.IsTrue(capstone.IsAuthored, "Chapter 1 declares a capstone");
-            Assert.AreEqual("backyard_party", capstone.Id);
-            var gate = capstone.Unlock as RecordsCumulativeCondition;
+            // The chapter gate has ONE authored home: the capstone rung's
+            // operationGate Condition. No scalar beside it restates the same 30,
+            // so there is nothing to keep in step.
+            var capstone = Rung(chapter, "backyard_party");
+            Assert.IsTrue(capstone.IsAuthored, "Chapter 1 files a capstone rung");
+            var gate = capstone.OperationGate as RecordsCumulativeCondition;
             Assert.IsNotNull(gate, "the capstone gate is the authored recordsCumulative Condition");
             Assert.AreEqual(30, gate.Value, 1e-9);
-            Assert.AreEqual("chapter_2_unlocked", capstone.CompletionFlagId);
+            Assert.AreEqual("chapter_2_unlocked", capstone.CompletionLatch.FlagId);
         }
 
-        // The capstone's completion grants, as data, split by category: the Roadie
-        // is a one-shot ACTION only the completion operation will execute (no
-        // release, load or reprojection path holds it), and the completion flag is
-        // the config's own declaration - never authored as a payload effect, so a
-        // copy able to disagree with the declaration does not exist.
+        // The two chapter-1 rungs as ONE shape parameterized by data (design doc
+        // rule 14), which is the whole point of the album and the capstone no
+        // longer being two config classes: what differs is the gate, the latch
+        // and the award, all of them authored fields. Both clear self-and-
+        // contained, which on the pre-step-7 single scope is the run.
         [Test]
-        public void CapstoneOnComplete_ImportsTheRoadieAsAnAction_AndNoPayloadCopyOfTheFlag()
+        public void ChapterRungs_ImportTheAlbumUngatedAndLatchless_AndTheCapstoneGatedAndLatched()
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
-            var capstone = chapter.Capstone;
+
+            Assert.AreEqual(2, chapter.Rungs.Count, "Chapter 1 files the album and the capstone");
+            Assert.AreEqual("cut_demo", chapter.Rungs[0].Id);
+            Assert.AreEqual("backyard_party", chapter.Rungs[1].Id);
+
+            // the album: repeatable forever, so the press is ungated and nothing
+            // latches - and its payout is the authored curve, not code
+            var album = chapter.Rungs[0];
+            Assert.IsNull(album.OperationGate,
+                "the album press is deliberately ungated: a capstone-shaped press banks it regardless");
+            Assert.IsFalse(album.HasLatch, "and latchless, which is what keeps it offerable every run");
+            Assert.AreEqual(1, album.Actions.Count);
+            var payout = album.Actions[0] as GrantComputedCurrencyAction;
+            Assert.IsNotNull(payout, "the album pays through a computed-grant action");
+            Assert.AreEqual("records", payout.CurrencyId);
+            var formula = payout.Amount as RootOfBalanceFormula;
+            Assert.IsNotNull(formula, "over the JSON's recordsFormula curve");
+            Assert.AreEqual("fans", formula.CurrencyId, "which reads the chapter's fans");
+            Assert.AreEqual(5, formula.Divisor, 1e-9);
+            Assert.IsInstanceOf<SelfAndContainedSelector>(album.ResetTargets);
+
+            // the capstone: the same shape with the parts that make it a boundary
+            var capstone = chapter.Rungs[1];
+            Assert.IsNotNull(capstone.OperationGate, "the capstone press is fail-closed on its gate");
+            Assert.IsTrue(capstone.HasLatch);
+            Assert.IsInstanceOf<SelfAndContainedSelector>(capstone.ResetTargets);
+        }
+
+        // The capstone rung's completion grants, as data, split by category: the
+        // Roadie is a one-shot ACTION only the press will execute (no release,
+        // load or reprojection path holds it), and the completion flag is the
+        // rung's own LATCH slot - never authored as a payload effect, so a copy
+        // able to disagree with the declaration does not exist.
+        [Test]
+        public void CapstoneRungOnComplete_ImportsTheRoadieAsAnAction_AndNoPayloadCopyOfTheFlag()
+        {
+            var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
+            var capstone = Rung(chapter, "backyard_party");
 
             Assert.IsNull(capstone.OnComplete,
-                "Ch1 authors no re-applicable completion state - its grants are the action and the declared flag");
+                "Ch1 authors no re-applicable completion state - its grants are the action and the latched flag");
 
             Assert.AreEqual(1, capstone.Actions.Count);
             var roadies = capstone.Actions[0] as GrantCurrencyAction;
@@ -166,8 +215,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("roadies", roadies.CurrencyId);
             Assert.AreEqual(1.0, roadies.Amount, 1e-9);
 
-            Assert.AreEqual("chapter_2_unlocked", capstone.CompletionFlagId,
-                "the flag is the declaration the completion operation latches");
+            Assert.AreEqual("chapter_2_unlocked", capstone.CompletionLatch.FlagId,
+                "the flag is the declaration the press latches, from the slot and nowhere else");
         }
 
         // Story beats are content: a definition each, listed on the chapter, which
@@ -594,7 +643,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             CollectionAssert.AreEqual(new[] { "module/bar-list" }, Addresses(rehearsalSpace));
 
             // the prestige button reveals through its section's visibleWhen like
-            // every other module - no revealFlag of its own sits on the album config
+            // every other module - no revealFlag of its own sits on the album rung
             // - and the flag cut_demo latches at 50 Fans + 1 cover
             var theRelease = LoadById<SectionDefinition>(SectionsFolder, "the_release");
             var albumGate = theRelease.VisibleWhen as FlagSetCondition;
@@ -603,8 +652,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             CollectionAssert.AreEqual(new[] { "module/release" }, Addresses(theRelease));
 
             // the capstone offer: region coarse (the first Record - cumulative,
-            // so it can never strobe), action precise (the button asks
-            // capstone.unlock live). Deliberately NOT the gate's own 30, which
+            // so it can never strobe), action precise (the button asks the
+            // rung's offer live). Deliberately NOT the gate's own 30, which
             // has exactly one authored home
             var theBackyard = LoadById<SectionDefinition>(SectionsFolder, "the_backyard");
             var backyardGate = theBackyard.VisibleWhen as RecordsCumulativeCondition;
@@ -643,10 +692,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             frontier.Currencies.Add(GameManager.RecordsCurrencyId, 29);
             frontier.Currencies.Add("fans", 500);
-            Assert.IsFalse(frontier.CompleteCapstone(), "the authored recordsCumulative 30 refuses at 29");
+            Assert.IsFalse(frontier.CompleteRung("backyard_party"),
+                "the authored recordsCumulative 30 refuses at 29");
 
             frontier.Currencies.Add(GameManager.RecordsCurrencyId, 1);
-            Assert.IsTrue(frontier.CompleteCapstone(), "and completes at 30");
+            Assert.IsTrue(frontier.CompleteRung("backyard_party"), "and completes at 30");
 
             Assert.AreEqual(1.0, frontier.Currencies.Get(GameManager.RoadiesCurrencyId).ToDouble(), 1e-9,
                 "the first Roadie, granted exactly once by the completion");
@@ -658,15 +708,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The release offer's gate (design doc section 5): the JSON album
-        // block's unlock, imported as an ordinary Condition. Its inputs are run
-        // facts - a fans balance and a bar completion - so the offer disarms at
-        // every release and re-arms on the re-climb, cover re-learned included.
+        // block's unlock, imported as the rung's OFFER - an ordinary Condition.
+        // Its inputs are run facts - a fans balance and a bar completion - so
+        // the offer disarms at every release and re-arms on the re-climb, cover
+        // re-learned included.
         [Test]
-        public void AlbumUnlock_MatchesJson()
+        public void AlbumRungOffer_MatchesJson()
         {
             var chapter = LoadRequired<ChapterDefinition>(ChapterPath);
 
-            var unlock = chapter.Album.ReleaseWhen as CompoundCondition;
+            var unlock = Rung(chapter, "cut_demo").Offer as CompoundCondition;
             Assert.IsNotNull(unlock, "the album unlock is the JSON's compound condition");
             Assert.AreEqual(2, unlock.All.Count);
             Assert.AreEqual(0, unlock.Any.Count);

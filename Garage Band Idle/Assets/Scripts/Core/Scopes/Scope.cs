@@ -16,11 +16,11 @@ namespace RidiculousGaming.GarageBandIdle
     // caller's to assign, deterministic, and never minted here.
     //
     // Mid-7.5 honesty: this class is EconomyContext reshaped in place. It still
-    // carries the pieces the tree retires - Recipe, Capstone, the
-    // ChapterDefinition reference and the run-scoped resets - each of which
-    // leaves in step 3, 7, or 8. What is already the tree's shape: identity,
-    // the parent link, the ordered children, and disposal that takes the
-    // subtree with it.
+    // carries the pieces the tree retires - Recipe, the ChapterDefinition
+    // reference and the run-scoped resets - each of which leaves in step 7 or
+    // 8. What is already the tree's shape: identity, the parent link, the
+    // ordered children, the rung press, and disposal that takes the subtree
+    // with it.
     //
     // Two things are the point of the bundle, and neither is the field list.
     //
@@ -87,8 +87,22 @@ namespace RidiculousGaming.GarageBandIdle
         public ProductionSystem Production { get; }
         public BarSystem Bars { get; }
         public RewardManager Rewards { get; }
-        public CapstoneSystem Capstone { get; }
+        public PrestigeSystem Prestige { get; }
         public ConditionContext Conditions { get; }
+
+        // the tree's root, walked live: cheap (a chapter is a handful deep) and
+        // never stale, where a cached root would be one more fact a re-parented
+        // scope could contradict - and the tree's shape is fixed anyway
+        public Scope Root
+        {
+            get
+            {
+                var scope = this;
+                while (scope.Parent != null)
+                    scope = scope.Parent;
+                return scope;
+            }
+        }
 
         // The chapter's sections in layout order, resolved from its id list.
         // Definitions only: section visibility is a pure function of each
@@ -113,8 +127,8 @@ namespace RidiculousGaming.GarageBandIdle
         public Scope(ScopeDefinition definition, string instanceId, Scope parent, ScopeChain chain,
             ChapterDefinition chapter, EconomyRecipe recipe, CurrencyRouter router,
             FlagSystem flags, ModifierSystem modifiers, GeneratorSystem generators, UpgradeSystem upgrades,
-            ProductionSystem production, BarSystem bars, RewardManager rewards, CapstoneSystem capstone,
-            ConditionContext conditions, IReadOnlyList<SectionDefinition> sections)
+            ProductionSystem production, BarSystem bars, RewardManager rewards,
+            PrestigeSystem prestige, ConditionContext conditions, IReadOnlyList<SectionDefinition> sections)
         {
             Definition = definition;
             InstanceId = instanceId;
@@ -130,7 +144,7 @@ namespace RidiculousGaming.GarageBandIdle
             Production = production;
             Bars = bars;
             Rewards = rewards;
-            Capstone = capstone;
+            Prestige = prestige;
             Conditions = conditions;
             Sections = sections ?? Array.Empty<SectionDefinition>();
 
@@ -205,6 +219,7 @@ namespace RidiculousGaming.GarageBandIdle
 
             Conditions?.Dispose();
             Production?.Dispose();
+            Generators?.Dispose();
             _router?.Dispose();
             // last: the chain node cascades its ancestors' signals, and
             // everything above unhooked from it first
@@ -512,125 +527,288 @@ namespace RidiculousGaming.GarageBandIdle
             return true;
         }
 
-        // The Records a release performed right now would bank: the album
-        // payout formula over the current fans balance (design doc section 5).
-        // One home for the read, so the UI's preview and the release itself
-        // cannot disagree about what a demo is worth. A chapter that declares
-        // no fans currency banks nothing - the release is still a legal reset.
-        public BigNumber PendingReleaseRecords()
+        // ---- the prestige press (design doc rule 14) ---------------------------
+
+        // What one press touches, resolved once and consumed by the press and
+        // the preview alike - a button's promise and the payout it banks come
+        // from the SAME plan, or they disagree. A planned entry pairs a rung
+        // with the scope it is filed on, because a rung's actions read and pay
+        // through its own scope's surface.
+        private readonly struct PlannedRung
         {
-            var fansCurrencyId = Chapter?.Fans?.CurrencyId;
-            return string.IsNullOrEmpty(fansCurrencyId)
-                ? BigNumber.Zero
-                : ProductionCalculator.RecordsEarned(Currencies.Get(fansCurrencyId));
+            public readonly Scope Scope;
+            public readonly PrestigeTierDefinition Rung;
+
+            public PlannedRung(Scope scope, PrestigeTierDefinition rung)
+            {
+                Scope = scope;
+                Rung = rung;
+            }
         }
 
-        // The album release (design doc section 5, prestige): bank the run's
-        // fans as Records, then reset the run and rebuild the modifier store
-        // from the facts that survived. Written as an operation on this bundled
-        // context (rule 12) so the same orchestration later runs unchanged
-        // against other instances; returns the Records banked so the caller can
-        // present the payout.
-        public BigNumber ReleaseAlbum()
+        // The rung press: one operation ending at one settle, however many
+        // scopes it touched. Refusals come BEFORE anything irreversible, in
+        // strictness order - silent for the states a double-tap or a stale row
+        // reaches (already completed, gate unmet), loud for broken content
+        // (an action that cannot execute). `offer` is never asked here: it
+        // governs presentation, not legality.
+        public bool CompleteRung(string rungId)
         {
-            var earned = ReleaseAlbumFacts();
-            Settle();
-            return earned;
+            if (Prestige == null || !Prestige.TryGet(rungId, out var rung))
+            {
+                Debug.LogError($"Scope: CompleteRung('{rungId}') on instance '{InstanceId}', which files no such rung. Ignoring.");
+                return false;
+            }
+
+            // a finished rung does not complete twice - silent, because the UI
+            // calls this on a button press and a double-tap is not an error
+            if (Prestige.IsCompleted(rung))
+                return false;
+
+            // fail-closed when authored, asked by the operation and not only by
+            // the button that offered it; a rung with no gate is ungated -
+            // repeatable and harmless at any time
+            if (rung.OperationGate != null && !ConditionEvaluator.IsMet(rung.OperationGate, Conditions))
+                return false;
+
+            var selected = SelectTargets(rung);
+            var plan = BuildActionPlan(rung, selected);
+
+            // preflight EVERY planned rung before anything executes or latches:
+            // one unexecutable action refuses the whole press, because a press
+            // that clears the run and then fails to award would strand it.
+            // Each entry's check covers its own latch too - participants are
+            // latchless by construction, so this is exactly "every planned
+            // action plus the initiator's latch".
+            foreach (var planned in plan)
+            {
+                if (!planned.Scope.Prestige.CanExecuteActions(planned.Rung))
+                {
+                    Debug.LogError($"Scope: rung '{planned.Rung.Id}' on instance '{planned.Scope.InstanceId}' has an action that cannot execute. Refusing the whole press rather than clearing the run for nothing.");
+                    return false;
+                }
+            }
+
+            // actions while the state their formulas read still exists:
+            // deepest scope first, same depth in the tree's authored traversal
+            // order, the initiating rung last (the plan's order); then the
+            // latch, from the slot, as the last fact - so nothing evaluating
+            // mid-press observes a completed rung whose awards have not landed
+            foreach (var planned in plan)
+                planned.Scope.Prestige.ExecuteActions(planned.Rung);
+
+            Prestige.ExecuteLatch(rung);
+
+            // clear the SELECTED set only - a scope that merely initiated is
+            // not cleared, which is what keeps a capstone-shaped rung from
+            // wiping the completion flag it just latched
+            foreach (var scope in selected)
+                scope.ClearForReset();
+
+            // the rebuild (rule 6): cleared facts are gone, the initiator's
+            // latch just moved, so every touched scope re-projects - which is
+            // where onComplete re-applies, from the flag, never from the press
+            foreach (var scope in selected)
+                scope.ProjectModifiers();
+            if (!selected.Contains(this))
+                ProjectModifiers();
+
+            Root.SettleTree();
+            return true;
         }
 
-        // The release's facts without the seam: everything ReleaseAlbum does up
-        // to but not including Settle. Split out because the capstone completion
-        // is ONE operation that ends at ONE Settle - it releases, then applies
-        // its own facts, and only then declares the whole mutation finished. If
-        // it called ReleaseAlbum instead, the mid-operation settle would let an
-        // unlock evaluate between the release and the completion's facts,
-        // observing a banked run whose chapter has not finished banking.
-        private BigNumber ReleaseAlbumFacts()
+        // What a press of this rung would grant, over the SAME resolved plan
+        // the press executes - so a capstone-shaped preview includes the
+        // payouts of the participating rungs, not merely its own actions. Each
+        // formula evaluates over the balances the EARLIER planned grants will
+        // have banked, through a read-only overlay - a later formula measures
+        // what the press has already moved by the time it runs, and a preview
+        // reading original balances would promise a different number than the
+        // press pays. Per-currency totals in plan order, zeros included: a
+        // rung at zero fans still advertises "+0" of what it pays.
+        public List<RungGrant> PendingRungGrants(string rungId)
         {
-            // the award reads the fans balance the reset is about to zero, so it
-            // goes first. Routed through Currencies: the router resolves the
-            // Records id to the pool that owns it (the permanent one), and Add
-            // accrues the earned total the income buff and the capstone gate
-            // both read - a total that outlives every demo because the Records
-            // group is the thing declaring it permanent.
-            var earned = PendingReleaseRecords();
-            if (earned > BigNumber.Zero)
-                Currencies.Add(Conditions.RecordsCurrencyId, earned);
+            var totals = new List<RungGrant>();
+            if (Prestige == null || !Prestige.TryGet(rungId, out var rung))
+            {
+                Debug.LogError($"Scope: PendingRungGrants('{rungId}') on instance '{InstanceId}', which files no such rung. Nothing pending.");
+                return totals;
+            }
 
-            // Facts first, all of them, before the store is touched (rule 6): a
-            // projection over half-reset facts would rebuild effects this release
-            // is in the middle of removing. Each reset is scope/group-driven -
-            // no name list - and each keeps exactly what its own declaration
-            // says survives: permanent-in-chapter upgrade latches, permanent bar
-            // groups, permanent flags. Run-scoped facts go, flags included -
-            // there is no category a release spares wholesale. Balances, and the
-            // earned totals measured off them, reset on THIS scope's own pool
-            // only; nothing outward is a run's to reset.
+            // one delta map across every planned scope: ids are unique
+            // tree-wide, so a grant's shift is the same fact whichever chain
+            // reads it back
+            var deltas = new Dictionary<string, BigNumber>();
+            foreach (var planned in BuildActionPlan(rung, SelectTargets(rung)))
+            {
+                var overlay = new PreviewCurrencies(planned.Scope.Currencies, deltas);
+                foreach (var action in planned.Rung.Actions)
+                {
+                    if (!planned.Scope.Prestige.TryPendingGrant(action, overlay, out var currencyId, out var amount))
+                        continue;
+
+                    deltas[currencyId] = (deltas.TryGetValue(currencyId, out var standing) ? standing : BigNumber.Zero) + amount;
+
+                    var index = totals.FindIndex(total => total.CurrencyId == currencyId);
+                    if (index < 0)
+                        totals.Add(new RungGrant(currencyId, amount));
+                    else
+                        totals[index] = new RungGrant(currencyId, totals[index].Amount + amount);
+                }
+            }
+            return totals;
+        }
+
+        // one currency's slice of the same walk, for callers that already know
+        // what they are asking about
+        public BigNumber PendingRungGrant(string rungId, string currencyId)
+        {
+            foreach (var grant in PendingRungGrants(rungId))
+            {
+                if (grant.CurrencyId == currencyId)
+                    return grant.Amount;
+            }
+            return BigNumber.Zero;
+        }
+
+        // The preview's read surface: the real balances of one planned scope's
+        // chain, shifted by the grants planned so far - and nothing else. Reads
+        // only; a preview that could write would be a press with worse manners,
+        // so the mutators report and refuse. Earned totals pass through
+        // unshifted: no authored formula reads them, and inventing how a
+        // pending grant moves an earned total is the press's business to
+        // demonstrate, not this overlay's to guess.
+        private sealed class PreviewCurrencies : ICurrencies
+        {
+            private readonly ICurrencies _inner;
+            private readonly Dictionary<string, BigNumber> _deltas;
+
+            public PreviewCurrencies(ICurrencies inner, Dictionary<string, BigNumber> deltas)
+            {
+                _inner = inner;
+                _deltas = deltas;
+            }
+
+            public event Action<string, BigNumber> BalanceChanged { add { } remove { } }
+
+            public BigNumber Get(string id)
+                => _inner.Get(id) + (_deltas.TryGetValue(id, out var delta) ? delta : BigNumber.Zero);
+
+            public bool Contains(string id) => _inner.Contains(id);
+
+            public void Add(string id, BigNumber amount)
+                => Debug.LogError($"Scope: a preview tried to WRITE currency '{id}' - the overlay is read-only. Ignoring.");
+
+            public void Set(string id, BigNumber value)
+                => Debug.LogError($"Scope: a preview tried to WRITE currency '{id}' - the overlay is read-only. Ignoring.");
+
+            public BigNumber GetEarned(string id) => _inner.GetEarned(id);
+
+            public CurrencyDefinition GetDefinition(string id) => _inner.GetDefinition(id);
+
+            public bool ValidateReference(string id, string context) => _inner.ValidateReference(id, context);
+
+            public bool ResetsOnAlbumRelease(string currencyId) => _inner.ResetsOnAlbumRelease(currencyId);
+        }
+
+        // the selected set: the rung's authored targets, downward-closed by the
+        // selector family. No selector selects nothing - a pure award rung is
+        // expressible, and whether every rung must clear something is boot
+        // validation's question, not the press's.
+        private HashSet<Scope> SelectTargets(PrestigeTierDefinition rung)
+        {
+            var selected = new HashSet<Scope>();
+            rung.ResetTargets?.Select(this, selected);
+            return selected;
+        }
+
+        // The press's whole plan, in execution order. The participant pass is
+        // PER RUNG: from the selected scopes, every latchless rung except the
+        // initiating rung itself - excluding the initiating RUNG rather than
+        // the initiating scope, so that scope's other latchless rungs stay
+        // eligible (a capstone-shaped press banks the album payout filed
+        // beside it). Latch-bearing rungs never ride along on another rung's
+        // press, and that is general rather than a tie-break: a completion's
+        // awards are inseparable from its latch, only the initiator latches,
+        // and a one-shot paid as a participant would pay again on every press.
+        // The initiating rung is appended exactly once, last, so it measures
+        // what the participants have already banked (a capstone awarding on
+        // cumulative Records runs after the demo it implicitly cuts).
+        private List<PlannedRung> BuildActionPlan(PrestigeTierDefinition rung, HashSet<Scope> selected)
+        {
+            // deepest first, because reads go outward: an outer rung running
+            // first would write state an inner rung's formula then measures.
+            // Depth is a partial order, so same-depth scopes - across branches
+            // too - run in the tree's authored traversal order, never in a
+            // selector's list order or an incidental enumeration's.
+            var ordered = new List<Scope>(selected);
+            var traversal = new Dictionary<Scope, int>();
+            var depths = new Dictionary<Scope, int>();
+            IndexTree(Root, 0, traversal, depths);
+            ordered.Sort((a, b) =>
+            {
+                var byDepth = depths[b].CompareTo(depths[a]);
+                return byDepth != 0 ? byDepth : traversal[a].CompareTo(traversal[b]);
+            });
+
+            var plan = new List<PlannedRung>();
+            foreach (var scope in ordered)
+            {
+                if (scope.Prestige == null)
+                    continue;
+
+                foreach (var participant in scope.Prestige.Rungs)
+                {
+                    if (participant != rung && !participant.HasLatch)
+                        plan.Add(new PlannedRung(scope, participant));
+                }
+            }
+
+            plan.Add(new PlannedRung(this, rung));
+            return plan;
+        }
+
+        // preorder over the whole tree: one authored ordering answers every
+        // same-depth question, instead of two that can disagree
+        private static int IndexTree(Scope scope, int next, Dictionary<Scope, int> traversal, Dictionary<Scope, int> depths)
+        {
+            traversal[scope] = next++;
+            depths[scope] = scope.Parent == null ? 0 : depths[scope.Parent] + 1;
+            foreach (var child in scope.Children)
+                next = IndexTree(child, next, traversal, depths);
+            return next;
+        }
+
+        // Clears this scope's contents IN PLACE: the instance and every
+        // subscription on it survive, each system resets what it owns. Three
+        // things rest on the in-place rule - stable save identity, live UI
+        // bindings, and the surviving dirty flag (step 0).
+        //
+        // INTERIM: while lifetime is still a declaration (ContentScope, until
+        // 7.5 steps 7-8), clearing means the run-scoped resets - exactly the
+        // block today's release runs, so the chapter path is unchanged through
+        // this step. When placement replaces lifetime, this becomes "reset
+        // everything the scope owns" and the per-system run-scoped walks die.
+        // One method, so that replacement lands in one place.
+        public void ClearForReset()
+        {
             Pool.ResetCurrenciesOnAlbumRelease();
             Generators.ResetOwned();
             Upgrades.ResetRunScoped();
             Bars.ResetRunScopedGroups();
-            // flags too: a run-scoped flag clears here and comes back only when
-            // a setter whose own fact survives or re-fires asserts it again -
-            // the projection below re-sets every flag whose setter's latch
-            // survived, which is exactly rule 6's rebuild applied to reveals.
-            // Sections need no walk of their own: their visibility derives from
-            // these facts, so it resets because the facts did.
             Flags.ResetRunScoped();
-
-            // the rebuild: run-scoped effects are absent because the facts behind
-            // them are, never because anything filtered the store. The
-            // seam is the caller's - ReleaseAlbum settles here, the capstone
-            // completion after its own facts land.
-            ProjectModifiers();
-            return earned;
         }
 
-        // The capstone completion (design doc sections 1-2 and 5): one atomic
-        // operation ending at a single Settle. Every refusal comes BEFORE the
-        // irreversible release below - the same charged-for-nothing rule TryBuy
-        // applies, because a completion that banks the run and then fails to
-        // award would strand it. The refusal set is fail-closed like TryBuy's,
-        // not offer-gated like ReleaseAlbum's: a release is repeatable and
-        // harmless anytime, while a completion latches a permanent flag, so the
-        // gate is asked here and not only by the button that offered it.
-        public bool CompleteCapstone()
+        // Settles this scope, then its subtree, parent before child - reads go
+        // outward, so an inner evaluation must see final outer state. The
+        // step-3 stand-in for step 4's root settle (per-scope dirty flags,
+        // drained outermost-first under one bound): one method on the root, so
+        // the real boundary replaces one body. Call on Root.
+        public void SettleTree()
         {
-            if (Chapter?.Capstone == null || !Chapter.Capstone.IsAuthored)
-            {
-                Debug.LogError($"Scope: CompleteCapstone on chapter '{Chapter?.Id}', which authors no capstone. Ignoring.");
-                return false;
-            }
-
-            // a finished chapter does not complete twice - silent, because the
-            // UI calls this on a button press and a double-tap is not an error
-            if (Capstone.IsCompleted)
-                return false;
-
-            // availability is the authored unlock, asked through the one
-            // evaluator like every other gate - silent for the same reason a
-            // TryBuy under the gate is silent
-            if (!ConditionEvaluator.IsMet(Chapter.Capstone.Unlock, Conditions))
-                return false;
-
-            // loud: an action that cannot execute means broken content (boot
-            // validation reports the specifics), and refusing here is what
-            // keeps the release below from stranding the run
-            if (!Capstone.CanExecuteActions())
-            {
-                Debug.LogError($"Scope: capstone '{Chapter.Capstone.Id}' has an action that cannot execute. Refusing the completion rather than releasing the album for nothing.");
-                return false;
-            }
-
-            // the capstone implicitly cuts an album (design doc sections 1-2):
-            // the run's fans bank as Records first, so no run value is stranded
-            // at the chapter boundary. Then the completion's own facts - the
-            // re-applicable OnComplete, the one-shot actions, the declared flag
-            // - and one settle for the whole mutation.
-            ReleaseAlbumFacts();
-            Capstone.ExecuteCompletion();
             Settle();
-            return true;
+            foreach (var child in _children)
+                child.SettleTree();
         }
 
         // ---- the settle seam -------------------------------------------------
@@ -700,7 +878,7 @@ namespace RidiculousGaming.GarageBandIdle
         // parameter list, so it cannot fall out of step with what exists.
         private void CollectFactSources()
         {
-            foreach (var system in new object[] { Generators, Upgrades, Production, Bars, Rewards, Capstone, Flags, Modifiers })
+            foreach (var system in new object[] { Generators, Upgrades, Production, Bars, Rewards, Prestige, Flags, Modifiers })
             {
                 if (system is IModifierFactSource source)
                     _factSources.Add(source);
@@ -712,6 +890,21 @@ namespace RidiculousGaming.GarageBandIdle
             // discovered as a silently unbuffed run
             if (_factSources.Count == 0 && Recipe?.Kind == EconomyRecipeKind.FrontierChapter)
                 Debug.LogError($"Scope: chapter '{Chapter?.Id}' has no modifier fact sources - a release or restore would rebuild an empty modifier store. Check that the upgrade and bar systems constructed.");
+        }
+    }
+
+    // One currency's share of a rung press, as the preview reports it: what
+    // the press would pay into this id, earlier planned grants included. A
+    // value type because it is an answer, not a thing with identity.
+    public readonly struct RungGrant
+    {
+        public readonly string CurrencyId;
+        public readonly BigNumber Amount;
+
+        public RungGrant(string currencyId, BigNumber amount)
+        {
+            CurrencyId = currencyId;
+            Amount = amount;
         }
     }
 }

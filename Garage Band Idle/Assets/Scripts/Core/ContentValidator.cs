@@ -174,11 +174,6 @@ namespace RidiculousGaming.GarageBandIdle
                 && !context.Currencies.ResetsOnAlbumRelease(chapter.Fans.CurrencyId))
                 Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' fans currency '{chapter.Fans.CurrencyId}' is in a currency group that survives an album release - fans would compound across runs and inflate the Records payout.");
 
-            // the release offer's gate, checked like every other authored
-            // condition (unresolvable ids, undeclared flags); null is legal -
-            // always offered once revealed
-            ConditionEvaluator.Validate(chapter.Album.ReleaseWhen, context, $"Chapter '{chapter.Id}' album (unlock)");
-
             // negative tuning drains or dead-ends instead of earning; runtime
             // fails closed on all of it (zeroed contributions, zeroed
             // compositions), so without these reports the systems would just look
@@ -197,11 +192,13 @@ namespace RidiculousGaming.GarageBandIdle
             // so no code outside the family walks a payload.
             var flagSetters = new Dictionary<string, List<ContentScope>>();
 
-            // the capstone's own grants are chapter-boundary facts: whatever its
-            // OnComplete sets is permanent, exactly like the declared completion
-            // flag recorded further down
+            // A rung's own grants are chapter-boundary facts: whatever its
+            // onComplete sets is permanent, and its completion LATCH discloses
+            // itself here too, through SetFlagAction's own Validate - the
+            // setter sweep finds it with no special case, which is the point
+            // of the latch being an action in a slot rather than a bare id.
             context.FlagSetterReport = flagId => RecordSetter(flagSetters, flagId, ContentScope.PermanentInChapter);
-            ValidateCapstone(chapter, context);
+            ValidateRungs(chapter, context);
             context.FlagSetterReport = null;
 
             ValidateFlagDeclarations(chapter, database, rewards);
@@ -360,14 +357,6 @@ namespace RidiculousGaming.GarageBandIdle
                     RecordSetter(flagSetters, flagId, scope);
             }
 
-            // The capstone's completion flag is set by the completion OPERATION,
-            // from the declaration - recorded as a permanent setter, which is what
-            // a chapter boundary is: completing the capstone is not a fact a
-            // release takes back.
-            if (chapter.Capstone != null && chapter.Capstone.IsAuthored
-                && !string.IsNullOrEmpty(chapter.Capstone.CompletionFlagId))
-                RecordSetter(flagSetters, chapter.Capstone.CompletionFlagId, ContentScope.PermanentInChapter);
-
             ValidateFlagLifetimes(chapter, flagSetters);
         }
 
@@ -413,58 +402,110 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // The capstone (design doc sections 1-2 and 5). Its unlock is the SOLE
-        // authored source of the chapter gate, so the gate is ordinary condition
-        // validation plus one thing ordinary validation cannot cover.
+        // The chapter's prestige rungs (design doc rule 14): the checks the album
+        // and capstone used to get as hardcoded specials, once per rung. The gates
+        // are ordinary condition validation plus the one thing it cannot cover - a
+        // NULL gate means "always met" by this codebase's convention, which for a
+        // latch-bearing rung means the chapter boundary is pressable at boot.
         //
-        // Non-positive thresholds need nothing bespoke: every threshold condition
-        // calls Condition.ValidateThreshold, which reports one, and ThresholdIsMet
-        // fails closed so the gate is never met rather than always met. An empty
-        // compound is likewise already refused. What none of that catches is a NULL
-        // unlock, because by this codebase's convention a null Condition means "no
-        // gate" and is always met - which for a capstone means the chapter ends
-        // before it starts.
-        private static void ValidateCapstone(ChapterDefinition chapter, ConditionContext context)
+        // The spatial rules are asked through the same currency surface the press
+        // pays through. INTERIM: the clear is still the run reset (ContentScope,
+        // until 7.5 steps 7-8), so "a scope the reset clears" reads here as
+        // resets-on-album-release - validation checks what the interim clear
+        // actually destroys. The tree form of these rules (selector output plus
+        // placement, and "a rung is filed with the state its formulas read") lands
+        // when scopes carry the content.
+        private static void ValidateRungs(ChapterDefinition chapter, ConditionContext context)
         {
-            var capstone = chapter.Capstone;
-            if (capstone == null || !capstone.IsAuthored)
-                return; // a chapter need not declare one
-
-            if (capstone.Unlock == null)
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' has no unlock condition - a null gate is always met, so the capstone would be offered at boot.");
-            else
-                ConditionEvaluator.Validate(capstone.Unlock, context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (unlock)");
-
-            // The completion flag is the chapter boundary, so it has to outlive a
-            // release: anything other than permanent-in-chapter clears at the next
-            // demo and re-opens a finished chapter. Compared for EQUALITY rather than
-            // against Run alone - None is the un-migrated value a hand-edited
-            // declaration can hold, and it is no more a lifetime than Run is.
-            if (string.IsNullOrEmpty(capstone.CompletionFlagId))
-                Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' names no completion flag - nothing would record that the chapter finished.");
-            else
+            var seenIds = new HashSet<string>();
+            foreach (var rung in chapter.Rungs)
             {
-                var declaration = FindFlag(chapter, capstone.CompletionFlagId);
-                if (declaration == null)
-                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' names completion flag '{capstone.CompletionFlagId}', which the chapter does not declare.");
-                else if (declaration.Scope != ContentScope.PermanentInChapter)
-                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone completion flag '{capstone.CompletionFlagId}' is declared {declaration.Scope} - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
-            }
+                if (rung == null || !rung.IsAuthored)
+                {
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' files a rung with no id - nothing could press it.");
+                    continue;
+                }
+                if (!seenIds.Add(rung.Id))
+                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' files rung id '{rung.Id}' twice - a press resolves by id, and two claimants make it ambiguous.");
 
-            // An absent onComplete is legal: completing always at least latches the
-            // declared completion flag, and the OPERATION sets that flag itself from
-            // the declaration above - the payload never carries a copy, so there is
-            // no second statement of the fact to keep in agreement, and nothing here
-            // walks the payload looking for one.
-            capstone.OnComplete?.Validate(context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (onComplete)");
+                var source = $"Chapter '{chapter.Id}' rung '{rung.Id}'";
 
-            foreach (var action in capstone.Actions)
-            {
-                if (action == null)
-                    Debug.LogError($"ContentValidator: Chapter '{chapter.Id}' capstone '{capstone.Id}' has a null action entry.");
-                else
-                    action.Validate(context, $"Chapter '{chapter.Id}' capstone '{capstone.Id}' (actions)");
+                // offer: presentation's gate; null is legal - always offered
+                // once revealed
+                ConditionEvaluator.Validate(rung.Offer, context, $"{source} (offer)");
+
+                if (rung.OperationGate != null)
+                    ConditionEvaluator.Validate(rung.OperationGate, context, $"{source} (operationGate)");
+                else if (rung.HasLatch)
+                    Debug.LogError($"ContentValidator: {source} latches a completion but authors no operationGate - a null gate is always met, so the chapter boundary would be pressable at boot.");
+
+                // The latch: its flag must be declared, and permanent - anything
+                // else clears at the next press and re-opens a finished rung.
+                // Compared for EQUALITY rather than against Run alone: None is
+                // the un-migrated value a hand-edited declaration can hold, and
+                // it is no more a lifetime than Run is. The latch also validates
+                // as the action it is, which is what discloses it to the
+                // flag-setter sweep.
+                if (rung.HasLatch)
+                {
+                    rung.CompletionLatch.Validate(context, $"{source} (completionLatch)");
+
+                    var declaration = FindFlag(chapter, rung.CompletionLatch.FlagId);
+                    if (declaration == null)
+                        Debug.LogError($"ContentValidator: {source} latches flag '{rung.CompletionLatch.FlagId}', which the chapter does not declare.");
+                    else if (declaration.Scope != ContentScope.PermanentInChapter)
+                        Debug.LogError($"ContentValidator: {source} completion flag '{rung.CompletionLatch.FlagId}' is declared {declaration.Scope} - a completion must be permanent-in-chapter, or the next press clears it and re-opens a finished rung.");
+                }
+                else if (rung.OnComplete != null)
+                {
+                    // the projection re-applies onComplete FROM the latched flag;
+                    // with no latch there is nothing to project from, and the
+                    // authored effect would silently never exist
+                    Debug.LogError($"ContentValidator: {source} authors onComplete but no completionLatch - onComplete re-applies from the latched flag, so without one the effect would silently never exist.");
+                }
+
+                rung.OnComplete?.Validate(context, $"{source} (onComplete)");
+
+                foreach (var action in rung.Actions)
+                {
+                    if (action == null)
+                    {
+                        Debug.LogError($"ContentValidator: {source} has a null action entry.");
+                        continue;
+                    }
+
+                    action.Validate(context, $"{source} (actions)");
+
+                    // rule 14's spatial rules, per award. An INPUT the clear does
+                    // not reset banks the same value on every press, unbounded -
+                    // and the album press is deliberately ungated, so nothing
+                    // else stops it. A TARGET the clear resets is an award the
+                    // press destroys in the same operation that paid it.
+                    switch (action)
+                    {
+                        case GrantComputedCurrencyAction computed:
+                            foreach (var input in computed.Amount?.InputCurrencyIds ?? System.Array.Empty<string>())
+                            {
+                                if (!string.IsNullOrEmpty(input) && context.Currencies.Contains(input)
+                                    && !context.Currencies.ResetsOnAlbumRelease(input))
+                                    Debug.LogError($"ContentValidator: {source} award reads '{input}', which the press's clear does not reset - the same value would bank on every press, unbounded.");
+                            }
+                            ValidateAwardTarget(computed.CurrencyId, source, context);
+                            break;
+
+                        case GrantCurrencyAction flat:
+                            ValidateAwardTarget(flat.CurrencyId, source, context);
+                            break;
+                    }
+                }
             }
+        }
+
+        private static void ValidateAwardTarget(string currencyId, string source, ConditionContext context)
+        {
+            if (!string.IsNullOrEmpty(currencyId) && context.Currencies.Contains(currencyId)
+                && context.Currencies.ResetsOnAlbumRelease(currencyId))
+                Debug.LogError($"ContentValidator: {source} pays into '{currencyId}', which the press's own clear resets - the reset would destroy the award that produced it.");
         }
 
         // A beat is content that a card presents; its reveal is its SECTION's
@@ -710,6 +751,11 @@ namespace RidiculousGaming.GarageBandIdle
                         if (!Names(chapter.StoryBeatIds, entry.DefinitionId))
                             Debug.LogError($"ContentValidator: {source} presents story beat '{entry.DefinitionId}', which chapter '{chapter.Id}' does not declare - the card would show nothing.");
                         return null;
+
+                    case ModuleDefinitionKind.PrestigeRung:
+                        if (!NamesRung(chapter.Rungs, entry.DefinitionId))
+                            Debug.LogError($"ContentValidator: {source} presents rung '{entry.DefinitionId}', which chapter '{chapter.Id}' does not file - the button would be dead.");
+                        return null;
                 }
 
                 return null;
@@ -725,6 +771,16 @@ namespace RidiculousGaming.GarageBandIdle
             for (var i = 0; i < ids.Count; i++)
             {
                 if (ids[i] == id)
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool NamesRung(IReadOnlyList<PrestigeTierDefinition> rungs, string id)
+        {
+            for (var i = 0; i < rungs.Count; i++)
+            {
+                if (rungs[i] != null && rungs[i].Id == id)
                     return true;
             }
             return false;

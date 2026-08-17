@@ -17,13 +17,13 @@ MonoBehaviour:
   _displayName: The Release
   _modules:
   - _address: module/release
-    _definitionId:
+    _definitionId: cut_demo
   _visibleWhen:
-    rid: 1001
+    rid: 1000
   references:
     version: 2
     RefIds:
-    - rid: 1001
+    - rid: 1000
       type: {class: FlagSetCondition, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         _flagId: album

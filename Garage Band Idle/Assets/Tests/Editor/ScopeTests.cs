@@ -454,28 +454,38 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             context.SelectBar("setlist", "cover_1");
         }
 
-        // ---- CompleteCapstone --------------------------------------------------
+        // ---- the capstone rung's press -----------------------------------------
 
         private const string RoadiesId = GameManager.RoadiesCurrencyId;
 
-        // the real capstone's shape: gated on cumulative Records, declaring its
-        // completion flag, awarding one Roadie as a one-shot action
-        private static CapstoneConfig MakeCapstone(List<GameAction> actions = null, GameEffect onComplete = null)
-            => new("backyard_party", "Play the Backyard Party",
-                new RecordsCumulativeCondition(30), "chapter_2", onComplete,
-                actions ?? new List<GameAction> { new GrantCurrencyAction(RoadiesId, 1) });
+        // the real capstone's shape as a rung: gated on cumulative Records,
+        // latching its completion flag, awarding one Roadie as a one-shot action
+        private static PrestigeTierDefinition MakeCapstone(List<GameAction> actions = null,
+            GameEffect onComplete = null)
+            => TestContent.MakeCapstoneRung(unlock: new RecordsCumulativeCondition(30),
+                completionFlagId: "chapter_2", actions: actions, onComplete: onComplete);
 
         // Roadies joins Records in the global group, like the running game's:
         // the action's CanExecute probe needs a pool that owns the id to answer
         // from, and the award has to land somewhere a release never resets.
-        private static Scope BuildCapstoneEconomy(CapstoneConfig capstone,
-            List<UpgradeDefinition> upgrades = null, List<string> upgradeIds = null)
+        //
+        // The album rung is optional because only the tests whose claim involves
+        // the run BANKING need it - the chapter files whichever rungs the claim
+        // is about, album first, like the importer writes them.
+        private static Scope BuildCapstoneEconomy(PrestigeTierDefinition capstone,
+            List<UpgradeDefinition> upgrades = null, List<string> upgradeIds = null,
+            PrestigeTierDefinition album = null)
         {
+            var rungs = new List<PrestigeTierDefinition>();
+            if (album != null)
+                rungs.Add(album);
+            rungs.Add(capstone);
+
             var chapter = TestContent.MakeChapter("garage", null,
                 currencyIds: new List<string> { "cash", "fans" },
                 upgradeIds: upgradeIds,
                 flags: new List<FlagDeclaration> { new("chapter_2") },
-                capstone: capstone);
+                rungs: rungs);
             var database = new ContentDatabase(
                 chapters: new[] { chapter },
                 upgrades: upgrades,
@@ -496,35 +506,66 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The completion is one operation ending at one settle: the run banks
-        // through the release's own path (the payout formula has exactly one
-        // home), the declared flag latches, and an unlock gated on that flag is
-        // applied by the time the call returns - no tick, no second settle. The
-        // latched unlock is the proof the settle ran once, after ALL the facts:
-        // had the mid-operation release settled on its own, the unlock would
-        // have evaluated against a banked run whose chapter had not finished.
+        // through the album rung filed beside it (the payout formula has exactly
+        // one home), the declared flag latches, and an unlock gated on that flag
+        // is applied by the time the call returns - no tick, no second settle.
+        // The latched unlock is the proof the settle ran once, after ALL the
+        // facts: had the mid-operation banking settled on its own, the unlock
+        // would have evaluated against a banked run whose chapter had not
+        // finished.
         [Test]
-        public void CompleteCapstone_BanksTheRunAndLatchesTheFlag_InOneSettle()
+        public void PressingTheCapstoneRung_BanksTheRunAndLatchesTheFlag_InOneSettle()
         {
             var epilogue = TestContent.MakeUpgrade("epilogue", UpgradeType.ContentUnlock,
                 ContentScope.PermanentInChapter, new FlagSetCondition("chapter_2"),
                 new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4));
             var context = BuildCapstoneEconomy(MakeCapstone(),
                 upgrades: new List<UpgradeDefinition> { epilogue },
-                upgradeIds: new List<string> { "epilogue" });
+                upgradeIds: new List<string> { "epilogue" },
+                album: TestContent.MakeAlbumRung());
 
             context.Currencies.Add(RecordsId, 30); // the gate reads the earned total
             context.Currencies.Add("fans", 500);   // floor((500/5)^0.5) = 10 Records
 
-            Assert.IsTrue(context.CompleteCapstone());
+            Assert.IsTrue(context.CompleteRung("backyard_party"));
 
             Assert.AreEqual(0.0, context.Currencies.Get("fans").ToDouble(), 1e-9,
                 "the capstone implicitly cut an album: the run reset");
             Assert.AreEqual(40.0, context.Currencies.Get(RecordsId).ToDouble(), 1e-9,
-                "and the fans banked through the release's own formula");
+                "and the fans banked through the album rung's own formula");
             Assert.IsTrue(context.Flags.IsSet("chapter_2"),
                 "the operation set its declared flag - no payload carried a copy");
             Assert.IsTrue(context.Upgrades.Get("epilogue").Applied,
                 "an unlock gated on the flag latched with no tick: the operation settled itself");
+        }
+
+        // The chapter path's own shape of participation (design doc rule 14):
+        // both rungs are filed on ONE scope, so the album rung is not reached
+        // through a selected CHILD but through the initiating scope itself -
+        // the initiating RUNG is excluded from the plan, not the scope it sits
+        // on. All three effects land in the single press: the Roadie the
+        // capstone awards, the Records the album banks, and the latch.
+        [Test]
+        public void ACapstoneShapedPress_BanksTheAlbumRungFiledOnItsOwnScope()
+        {
+            var context = BuildCapstoneEconomy(MakeCapstone(),
+                album: TestContent.MakeAlbumRung());
+
+            context.Currencies.Add(RecordsId, 30); // the gate reads the earned total
+            context.Currencies.Add("fans", 125);
+
+            Assert.AreEqual(5.0, context.PendingRungGrant("backyard_party", RecordsId).ToDouble(), 1e-9,
+                "the preview promises the participating album payout, not only the capstone's own actions");
+
+            Assert.IsTrue(context.CompleteRung("backyard_party"));
+
+            Assert.AreEqual(35.0, context.Currencies.Get(RecordsId).ToDouble(), 1e-9,
+                "floor((125 / 5) ^ 0.5) on top of the 30 already banked: the latchless rung beside it ran");
+            Assert.AreEqual(1.0, context.Currencies.Get(RoadiesId).ToDouble(), 1e-9,
+                "the capstone's own one-shot paid in the same press");
+            Assert.IsTrue(context.Flags.IsSet("chapter_2"), "and only the initiator latched");
+            Assert.AreEqual(0.0, context.Currencies.Get("fans").ToDouble(), 1e-9,
+                "with the run the album measured cleared behind it");
         }
 
         // One-shot means once EVER, not once per path: the refusal, the release
@@ -532,17 +573,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // holds a GameAction to run - the operation that earned it is the only
         // line in the system that executes it.
         [Test]
-        public void CompleteCapstone_PaysActionsOnce_AndNoRebuildPaysThemAgain()
+        public void PressingTheCapstoneRung_PaysActionsOnce_AndNoRebuildPaysThemAgain()
         {
-            var context = BuildCapstoneEconomy(MakeCapstone());
+            var context = BuildCapstoneEconomy(MakeCapstone(), album: TestContent.MakeAlbumRung());
             context.Currencies.Add(RecordsId, 30);
             context.Currencies.Add("fans", 125);
 
-            Assert.IsTrue(context.CompleteCapstone());
+            Assert.IsTrue(context.CompleteRung("backyard_party"));
             Assert.AreEqual(1.0, context.Currencies.Get(RoadiesId).ToDouble(), 1e-9, "the one-shot paid");
 
-            Assert.IsFalse(context.CompleteCapstone(), "a finished chapter does not complete twice");
-            context.ReleaseAlbum();
+            Assert.IsFalse(context.CompleteRung("backyard_party"), "a finished chapter does not complete twice");
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
             context.Restore(context.CaptureLocalState());
 
             Assert.AreEqual(1.0, context.Currencies.Get(RoadiesId).ToDouble(), 1e-9,
@@ -552,17 +593,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The gate is asked by the operation, not only by the button that offered
-        // it (fail-closed like TryBuy, unlike the deliberately ungated release):
-        // a completion latches a permanent flag, so a UI bug must not be able to
-        // finish a chapter early.
+        // it (fail-closed like TryBuy, unlike the deliberately ungated album
+        // rung): a completion latches a permanent flag, so a UI bug must not be
+        // able to finish a chapter early.
         [Test]
-        public void CompleteCapstone_RefusesWhileTheGateIsUnmet()
+        public void PressingTheCapstoneRung_RefusesWhileTheOperationGateIsUnmet()
         {
             var context = BuildCapstoneEconomy(MakeCapstone());
             context.Currencies.Add(RecordsId, 29);
             context.Currencies.Add("fans", 500);
 
-            Assert.IsFalse(context.CompleteCapstone());
+            Assert.IsFalse(context.CompleteRung("backyard_party"));
 
             Assert.AreEqual(500.0, context.Currencies.Get("fans").ToDouble(), 1e-9,
                 "a refused completion releases nothing");
@@ -570,41 +611,45 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0.0, context.Currencies.Get(RoadiesId).ToDouble(), 1e-9);
         }
 
-        // The preflight runs BEFORE the irreversible release - the same
+        // The preflight runs BEFORE the irreversible clear - the same
         // charged-for-nothing rule TryBuy applies. A completion that banked the
         // run and then failed to award would strand it: the run's fans are gone
         // and the chapter can never pay what it promised.
         [Test]
-        public void CompleteCapstone_RefusesWhenAnActionCannotExecute_BeforeTheRelease()
+        public void PressingTheCapstoneRung_RefusesWhenAnActionCannotExecute_BeforeTheRunIsCleared()
         {
-            var context = BuildCapstoneEconomy(MakeCapstone(
-                actions: new List<GameAction> { new GrantCurrencyAction("merch", 1) }));
+            var context = BuildCapstoneEconomy(
+                MakeCapstone(actions: new List<GameAction> { new GrantCurrencyAction("merch", 1) }),
+                album: TestContent.MakeAlbumRung());
             context.Currencies.Add(RecordsId, 30);
             context.Currencies.Add("fans", 500);
 
             LogAssert.Expect(LogType.Error, new Regex(
-                "capstone 'backyard_party' has an action that cannot execute"));
+                "rung 'backyard_party' on instance 'garage' has an action that cannot execute"));
 
-            Assert.IsFalse(context.CompleteCapstone());
+            Assert.IsFalse(context.CompleteRung("backyard_party"));
 
             Assert.AreEqual(500.0, context.Currencies.Get("fans").ToDouble(), 1e-9,
-                "the refusal came before the release: the run was not banked for nothing");
+                "the refusal came before anything cleared: the run was not banked for nothing");
+            Assert.AreEqual(30.0, context.Currencies.Get(RecordsId).ToDouble(), 1e-9,
+                "and the participating album rung never paid on top: one bad action refuses the whole press");
             Assert.IsFalse(context.Flags.IsSet("chapter_2"));
         }
 
-        // a chapter with no capstone has nothing to complete, and a caller
+        // a chapter that files no such rung has nothing to press, and a caller
         // asking anyway is a broken caller - reported, not thrown out of
         [Test]
-        public void CompleteCapstone_OnAChapterAuthoringNone_IsRefusedLoudly()
+        public void PressingARungTheChapterDoesNotFile_IsRefusedLoudly()
         {
             var chapter = MakeChapter();
             var database = MakeDatabase(chapter);
             var context = ScopeFactory.Build(chapter, database,
                 ScopeFactory.BuildPermanentPool(database), EconomyRecipe.FrontierChapter);
 
-            LogAssert.Expect(LogType.Error, new Regex("authors no capstone"));
+            LogAssert.Expect(LogType.Error, new Regex(
+                "CompleteRung\\('backyard_party'\\) on instance 'garage', which files no such rung"));
 
-            Assert.IsFalse(context.CompleteCapstone());
+            Assert.IsFalse(context.CompleteRung("backyard_party"));
         }
 
         // ---- focus lifecycle -------------------------------------------------

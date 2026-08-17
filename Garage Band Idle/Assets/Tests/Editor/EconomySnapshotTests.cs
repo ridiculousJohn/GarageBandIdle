@@ -50,10 +50,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 });
 
         private static ChapterDefinition MakeChapter(List<string> upgradeIds = null,
-            List<string> generatorIds = null, List<FlagDeclaration> flags = null)
+            List<string> generatorIds = null, List<FlagDeclaration> flags = null,
+            List<PrestigeTierDefinition> rungs = null)
             => TestContent.MakeChapter("garage", new List<string> { "fans" },
                 currencyIds: new List<string> { "cash", "fans" },
                 upgradeIds: upgradeIds, generatorIds: generatorIds, flags: flags,
+                rungs: rungs,
                 recordBuffAffects: new List<string> { "cash" });
 
         private static Scope Build(ChapterDefinition chapter, ContentDatabase database,
@@ -579,7 +581,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var chapter = MakeChapter(
                 upgradeIds: new List<string> { "cut_demo" },
-                flags: new List<FlagDeclaration> { new("album") });
+                flags: new List<FlagDeclaration> { new("album") },
+                rungs: new List<PrestigeTierDefinition> { TestContent.MakeAlbumRung() });
             var database = MakeDatabase(chapter, upgrades: new List<UpgradeDefinition>
             {
                 // permanent-in-chapter, like the real cut_demo: its latch survives
@@ -591,40 +594,47 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsTrue(context.Flags.IsSet("album"), "latched at construction");
 
-            context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
 
             Assert.IsTrue(context.Flags.IsSet("album"),
                 "the release cleared run-scoped flags and re-projected; album came back from its surviving latch");
         }
 
-        // The completed capstone is a fact source like any latch, and the
-        // declared completion flag IS the latch: whenever it is set, projection
+        // A completed rung is a fact source like any latch, and the declared
+        // completion flag IS the latch: whenever it is set, projection
         // re-applies OnComplete with permanent scope. Ch1 authors no OnComplete,
         // so this is the wiring that keeps a later chapter's capstone-authored
         // state from vanishing at its first release - and the load half rides
-        // the snapshot's SetFlagIds, so nothing about the capstone is saved.
+        // the snapshot's SetFlagIds, so nothing about the completion is saved.
         [Test]
         public void CapstoneOnComplete_ReprojectsFromTheCompletionFlagLatch()
         {
-            var capstone = new CapstoneConfig("backyard_party", "Play the Backyard Party",
-                new RecordsCumulativeCondition(1), "chapter_2_unlocked",
-                new GrantModifierEffect(TestContent.Sel("cash_yield"), ModifierOperation.Multiply, 4),
-                new List<GameAction>());
             var chapter = TestContent.MakeChapter("garage", null,
                 currencyIds: new List<string> { "cash", "fans" },
                 flags: new List<FlagDeclaration> { new("chapter_2_unlocked") },
-                capstone: capstone,
+                rungs: new List<PrestigeTierDefinition>
+                {
+                    // the album rung beside it, so the release below is a press
+                    // the chapter actually files
+                    TestContent.MakeAlbumRung(),
+                    TestContent.MakeCapstoneRung(
+                        unlock: new RecordsCumulativeCondition(1),
+                        completionFlagId: "chapter_2_unlocked",
+                        actions: new List<GameAction>(),
+                        onComplete: new GrantModifierEffect(TestContent.Sel("cash_yield"),
+                            ModifierOperation.Multiply, 4)),
+                },
                 recordBuffAffects: new List<string> { "cash" });
             var database = MakeDatabase(chapter);
             var permanent = ScopeFactory.BuildPermanentPool(database);
             using var context = Build(chapter, database, permanent);
 
             context.Currencies.Add(RecordsId, 1);
-            Assert.IsTrue(context.CompleteCapstone());
+            Assert.IsTrue(context.CompleteRung("backyard_party"));
             Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
-                "the operation applied OnComplete once");
+                "the press latched, and the projection that followed applied OnComplete once");
 
-            context.ReleaseAlbum();
+            Assert.IsTrue(context.CompleteRung("cut_demo"));
             Assert.AreEqual(4.0, context.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
                 "the release rebuilt the store, and the flag latch re-applied OnComplete exactly once");
 
@@ -632,7 +642,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             using var loaded = Build(chapter, database, permanent, seed: seed);
             Assert.IsTrue(loaded.Flags.IsSet("chapter_2_unlocked"), "the flag rode the snapshot");
             Assert.AreEqual(4.0, loaded.Modifiers.For(CashYield).Multiply.ToDouble(), 1e-9,
-                "and a load rebuilds the capstone's state from the flag alone");
+                "and a load rebuilds the completion's state from the flag alone");
         }
     }
 }

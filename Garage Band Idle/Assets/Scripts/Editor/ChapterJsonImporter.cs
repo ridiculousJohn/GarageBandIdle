@@ -233,6 +233,7 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             {
                 var asset = LoadOrCreate<SectionDefinition>($"{SectionsFolder}/{block.id}.asset");
                 var modules = ToSectionModules(block.modules, $"section '{block.id}'");
+                InjectPrestigeDefinitionIds(modules, data);
                 // a section IS its modules: one with none reveals an empty region
                 // when its visibleWhen holds. Written anyway (an empty region is
                 // inert, not wrong) so the rest of the chapter still imports.
@@ -439,15 +440,10 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             var recordBuff = new RecordBuffConfig(data.constants?.recordBuff?.perRecord ?? 0,
                 new List<string>(data.constants?.recordBuff?.affects ?? Array.Empty<string>()));
             var fans = new FansConfig(data.fans?.currency);
-            // the album's unlock is the release OFFER's gate (design doc section
-            // 5): the UI enables the release only while it holds. An absent block
-            // means no gate - always offered once revealed - like every other
-            // condition site.
-            var album = new AlbumConfig(ToCondition(data.album?.unlock, "album (unlock)"));
-            var capstone = ToCapstone(data.capstone);
+            var rungs = ToRungs(data);
             ApplyIfChanged(chapterAsset, chapter => chapter.EditorInitialize(data.chapter.id, data.chapter.index,
                 data.chapter.name, data.chapter.theme, recordBuff,
-                fans, album, capstone, flags, currencyIds, producerIds, sectionIds, generatorIds, upgradeIds,
+                fans, rungs, flags, currencyIds, producerIds, sectionIds, generatorIds, upgradeIds,
                 barGroupIds, eventIds, storyBeatIds));
 
             MarkAllContentAddressable();
@@ -646,41 +642,74 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
         // cost of the guarantee. Checking at the conversion sites instead is what
         // fell open in the first place: a conversion that answers "no gate" for
         // bad input reads as success at every call site, so no caller could tell
-        // The capstone, built from its authored block. The unlock goes through the
-        // same ToCondition every other gate uses - there is no second reading of the
-        // threshold anywhere, which is the point of deleting capstoneRecordsGate
-        // rather than keeping it in step.
+        // The chapter's two legacy rungs, built from the album and capstone
+        // blocks (design doc rule 14): two instances of one shape, filed on the
+        // chapter's single scope until step 7 re-authors them onto the tree.
+        // Both select self-and-contained - the interim clear still respects
+        // ContentScope, so the capstone's permanent latch survives its own
+        // scope's clearing.
         //
-        // onComplete's friendly keys split by category. grantRoadies is a one-shot
-        // award, so it becomes a GrantCurrencyAction the completion operation will
-        // execute exactly once - no release, load, or reprojection can pay a second
-        // Roadie, because none of those paths execute actions. completionFlag is
-        // the config's own declaration and the OPERATION latches it (slice 7); no
-        // setFlag effect is built from it, so a payload copy able to disagree with
-        // the declaration is not authorable.
+        // The album: its unlock is the OFFER's gate only (the press stays
+        // ungated - a capstone-shaped press banks it regardless), and its
+        // payout is a computed-grant action whose formula is the authored curve
+        // floor((fans/5)^0.5). The divisor 5 is the JSON's documented
+        // recordsFormula constant; it becomes a real authored key when step 7
+        // re-authors the chapter.
         //
-        // An absent capstone block is legal and produces an unauthored config: not
-        // every chapter needs one, and validation asks IsAuthored before demanding
-        // any of its parts.
-        private static CapstoneConfig ToCapstone(CapstoneBlock block)
+        // The capstone: the unlock is both the offer AND the fail-closed
+        // operation gate (two conversions of one authored block - no second
+        // reading of the threshold anywhere). onComplete's friendly keys split
+        // by category: grantRoadies becomes a one-shot GrantCurrencyAction the
+        // press executes exactly once, and completionFlag becomes the LATCH
+        // slot - never a payload effect, so a copy able to disagree with the
+        // declaration is not authorable.
+        //
+        // Absent blocks are legal and author no rung: not every chapter needs
+        // either, and validation asks what exists before demanding its parts.
+        private static List<PrestigeTierDefinition> ToRungs(ChapterFile data)
         {
-            if (block == null || string.IsNullOrEmpty(block.id))
-                return new CapstoneConfig();
+            var rungs = new List<PrestigeTierDefinition>();
 
-            var actions = new List<GameAction>();
+            var album = data.album;
+            if (album != null && !string.IsNullOrEmpty(album.id))
+            {
+                rungs.Add(new PrestigeTierDefinition(album.id, album.displayName,
+                    offer: ToCondition(album.unlock, "album (unlock)"),
+                    operationGate: null,
+                    onComplete: null,
+                    actions: new List<GameAction>
+                    {
+                        new GrantComputedCurrencyAction(GameManager.RecordsCurrencyId,
+                            new RootOfBalanceFormula(data.fans?.currency, 5)),
+                    },
+                    completionLatch: null,
+                    resetTargets: new SelfAndContainedSelector()));
+            }
 
-            if (block.onComplete != null && block.onComplete.grantRoadies > 0)
-                actions.Add(new GrantCurrencyAction(GameManager.RoadiesCurrencyId, block.onComplete.grantRoadies));
-            else if (block.onComplete != null && block.onComplete.grantRoadies < 0)
-                Debug.LogError($"ChapterJsonImporter: capstone '{block.id}' grants {block.onComplete.grantRoadies} roadies - an award is never a charge. Refusing it: fix the JSON and re-import.");
+            var capstone = data.capstone;
+            if (capstone != null && !string.IsNullOrEmpty(capstone.id))
+            {
+                var actions = new List<GameAction>();
 
-            var completionFlag = block.onComplete?.completionFlag;
-            if (string.IsNullOrEmpty(completionFlag))
-                Debug.LogError($"ChapterJsonImporter: capstone '{block.id}' names no onComplete.completionFlag - nothing would record that the chapter finished.");
+                if (capstone.onComplete != null && capstone.onComplete.grantRoadies > 0)
+                    actions.Add(new GrantCurrencyAction(GameManager.RoadiesCurrencyId, capstone.onComplete.grantRoadies));
+                else if (capstone.onComplete != null && capstone.onComplete.grantRoadies < 0)
+                    Debug.LogError($"ChapterJsonImporter: capstone '{capstone.id}' grants {capstone.onComplete.grantRoadies} roadies - an award is never a charge. Refusing it: fix the JSON and re-import.");
 
-            return new CapstoneConfig(block.id, block.name,
-                ToCondition(block.unlock, $"capstone '{block.id}' (unlock)"), completionFlag,
-                onComplete: null, actions);
+                var completionFlag = capstone.onComplete?.completionFlag;
+                if (string.IsNullOrEmpty(completionFlag))
+                    Debug.LogError($"ChapterJsonImporter: capstone '{capstone.id}' names no onComplete.completionFlag - nothing would record that the chapter finished.");
+
+                rungs.Add(new PrestigeTierDefinition(capstone.id, capstone.name,
+                    offer: ToCondition(capstone.unlock, $"capstone '{capstone.id}' (unlock)"),
+                    operationGate: ToCondition(capstone.unlock, $"capstone '{capstone.id}' (unlock)"),
+                    onComplete: null,
+                    actions: actions,
+                    completionLatch: new SetFlagAction(completionFlag),
+                    resetTargets: new SelfAndContainedSelector()));
+            }
+
+            return rungs;
         }
 
         // A section's module entries, in either authored form. Both produce the same
@@ -745,6 +774,31 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             }
 
             return modules;
+        }
+
+        // The two prestige module addresses get their rung ids injected: the
+        // JSON authors bare addresses ("module/release", "module/capstone")
+        // from before modules were parameterized, and the rung id each presents
+        // is exactly what the album/capstone block already declares - authoring
+        // it twice in the JSON would be a second home for one id. Step 7's
+        // re-authoring moves the pairing into the JSON itself; an entry that
+        // already names a definition is left alone either way.
+        private static void InjectPrestigeDefinitionIds(List<SectionModule> modules, ChapterFile data)
+        {
+            for (var i = 0; i < modules.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(modules[i].DefinitionId))
+                    continue;
+
+                var rungId = modules[i].Address switch
+                {
+                    "module/release" => data.album?.id,
+                    "module/capstone" => data.capstone?.id,
+                    _ => null,
+                };
+                if (!string.IsNullOrEmpty(rungId))
+                    modules[i] = new SectionModule(modules[i].Address, rungId);
+            }
         }
 
         // an absent gate from an unconvertible one.
@@ -1699,12 +1753,14 @@ namespace RidiculousGaming.GarageBandIdle.EditorTools
             public EventBlock[] events = Array.Empty<EventBlock>();
         }
 
-        // the album block's imported half: the unlock is the release OFFER's
-        // gate (the id, displayName, resets/keeps and formula fields stay
-        // documentation - the reset is group/scope-driven and the formula is
-        // code, see ProductionCalculator.RecordsEarned)
+        // the album block's imported half: the rung's identity, and the unlock
+        // as the release OFFER's gate (the resets/keeps fields stay
+        // documentation - the reset is group/scope-driven - while the formula
+        // is now the rung's authored RootOfBalanceFormula, see ToRungs)
         private class AlbumBlock
         {
+            public string id = "";
+            public string displayName = "";
             public ConditionBlock unlock = new();
         }
 

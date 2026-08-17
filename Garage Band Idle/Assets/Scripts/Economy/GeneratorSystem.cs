@@ -14,10 +14,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // read of its unlock condition (Generator.IsUnlocked), asked by whoever
     // renders it, so nothing here has to remember - or fail to forget - that a
     // row was once shown.
-    public class GeneratorSystem
+    public class GeneratorSystem : IDisposable
     {
         private readonly List<Generator> _generators = new();
         private readonly Dictionary<string, Generator> _byId = new();
+        private readonly Dictionary<Generator, Action> _ownedChangedForwards = new();
         private readonly ICurrencies _currencies;
         // the read half only: generators compose their lines against every
         // store in scope (rule 12) and grant into none
@@ -64,10 +65,26 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 _currencies.ValidateReference(definition.CostCurrencyId, $"Generator '{definition.Id}' (cost)");
 
                 var generator = new Generator(definition, _modifiers);
-                generator.OwnedChanged += () => GeneratorOwnedChanged?.Invoke(generator);
+                // kept by generator so the subscription is REMOVABLE: an
+                // anonymous forward with no reference held is a handler nothing
+                // can ever unhook - harmless while generator and system die
+                // together, a leak the moment a reset rebuilds one without the
+                // other
+                Action forward = () => GeneratorOwnedChanged?.Invoke(generator);
+                generator.OwnedChanged += forward;
+                _ownedChangedForwards[generator] = forward;
                 _generators.Add(generator);
                 _byId.Add(definition.Id, generator);
             }
+        }
+
+        // unhooks every per-generator forward registered above, so a discarded
+        // system stops re-broadcasting a generator that outlives it
+        public void Dispose()
+        {
+            foreach (var entry in _ownedChangedForwards)
+                entry.Key.OwnedChanged -= entry.Value;
+            _ownedChangedForwards.Clear();
         }
 
         public Generator Get(string id)

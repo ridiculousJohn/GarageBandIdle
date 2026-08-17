@@ -634,46 +634,91 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // The capstone gate is the primary pacing knob (design doc section 11), and
-        // its authored Condition is the only home for it. A NULL unlock is the
-        // one case ordinary condition validation cannot report: by this codebase's
-        // convention a null Condition means "no gate" and is always met, so the
-        // chapter would end before it started. A non-positive THRESHOLD needs nothing
-        // bespoke - every threshold condition already reports one and ThresholdIsMet
-        // fails closed - so this is the only capstone-specific check.
+        // The chapter gate is the primary pacing knob (design doc section 11), and
+        // the rung's authored operationGate is the only home for it. A NULL gate is
+        // the one case ordinary condition validation cannot report: by this
+        // codebase's convention a null Condition means "no gate" and is always met,
+        // so a rung that LATCHES a completion would end the chapter before it
+        // started. A non-positive THRESHOLD needs nothing bespoke - every threshold
+        // condition already reports one and ThresholdIsMet fails closed - so this is
+        // the only gate-specific check. A latchless rung with no gate is the album,
+        // and legal.
         [Test]
-        public void CapstoneWithNoUnlockCondition_IsReported()
+        public void RungThatLatchesACompletionWithNoOperationGate_IsReported()
         {
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done") },
-                capstone: new CapstoneConfig("backyard", "Backyard Party", null, "done",
-                    onComplete: null));
+                rungs: new List<PrestigeTierDefinition>
+                {
+                    TestContent.MakeRung("backyard", latchFlagId: "done"),
+                });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' capstone 'backyard' has no unlock condition - a null gate is always met, so the capstone would be offered at boot.");
+                "ContentValidator: Chapter 'ch1' rung 'backyard' latches a completion but authors no operationGate - a null gate is always met, so the chapter boundary would be pressable at boot.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
         // The completion flag IS the chapter boundary, so it has to outlive a
-        // release: run-scoped, the next demo clears it and a finished chapter
+        // press: run-scoped, the next demo clears it and a finished rung
         // re-opens. The second error is the lifetime sweep catching the same
-        // declaration from the other side - the capstone counts as a permanent
-        // setter (the operation latches the flag), so a run-scoped flag with
-        // only that setter has a scope that does nothing.
+        // declaration from the other side - the latch counts as a permanent
+        // setter (the press sets the flag), so a run-scoped flag with only that
+        // setter has a scope that does nothing.
         [Test]
-        public void RunScopedCapstoneCompletionFlag_IsReported()
+        public void RunScopedRungCompletionFlag_IsReported()
         {
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done", ContentScope.Run) },
-                capstone: new CapstoneConfig("backyard", "Backyard Party",
-                    new RecordsCumulativeCondition(30), "done", onComplete: null));
+                rungs: new List<PrestigeTierDefinition>
+                {
+                    TestContent.MakeRung("backyard", latchFlagId: "done",
+                        operationGate: new RecordsCumulativeCondition(30)),
+                });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' capstone completion flag 'done' is declared Run - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
+                "ContentValidator: Chapter 'ch1' rung 'backyard' completion flag 'done' is declared Run - a completion must be permanent-in-chapter, or the next press clears it and re-opens a finished rung.");
             LogAssert.Expect(LogType.Error,
                 "ContentValidator: Chapter 'ch1' flag 'done' is run-scoped but every setter is permanent - the release clears it and the projection re-asserts it in the same operation, so the scope has no effect.");
+            ContentValidator.Validate(database, RecordsId, NoRewards);
+        }
+
+        // A press resolves by id within the owning scope, so two rungs claiming
+        // one id make every press ambiguous - PrestigeSystem keeps the first at
+        // runtime, and boot names the mistake.
+        [Test]
+        public void DuplicateRungIdsOnOneChapter_AreReported()
+        {
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                rungs: new List<PrestigeTierDefinition>
+                {
+                    TestContent.MakeRung("cut_demo"),
+                    TestContent.MakeRung("cut_demo"),
+                });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Chapter 'ch1' files rung id 'cut_demo' twice - a press resolves by id, and two claimants make it ambiguous.");
+            ContentValidator.Validate(database, RecordsId, NoRewards);
+        }
+
+        // The PrestigeRung module binding: a button naming a rung nothing files
+        // is dead, the same failure a tap button naming an undeclared producer
+        // is one family over. The real release prefab answers the kind, so this
+        // exercises the same address the shipped chapter presents.
+        [Test]
+        public void ModuleEntryNamingARungTheChapterDoesNotFile_IsReported()
+        {
+            var section = TestContent.MakeSection("the_release", null,
+                modules: new List<SectionModule> { new("module/release", "no_such_rung") });
+            var ch1 = TestContent.MakeChapter("ch1", null,
+                sectionIds: new List<string> { "the_release" },
+                rungs: new List<PrestigeTierDefinition> { TestContent.MakeRung("cut_demo") });
+            var database = TestContent.MakeDatabase(chapters: new[] { ch1 }, sections: new[] { section });
+
+            LogAssert.Expect(LogType.Error,
+                "ContentValidator: Section 'the_release' module 'module/release' presents rung 'no_such_rung', which chapter 'ch1' does not file - the button would be dead.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -733,19 +778,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
-        // The capstone's OnComplete effects are setters too, heard by the same
+        // A rung's OnComplete effects are setters too, heard by the same
         // collector and recorded permanent - a chapter boundary's grants are not
-        // facts a release takes back. Silence proves the capstone's payload
+        // facts a release takes back. Silence proves the rung's payload
         // validated with the listener installed; without it, 'stagecraft' would
         // falsely warn as a flag nothing sets.
         [Test]
-        public void FlagSetByTheCapstonesOnComplete_CountsAsAPermanentSetter()
+        public void FlagSetByARungsOnComplete_CountsAsAPermanentSetter()
         {
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done"), new("stagecraft") },
-                capstone: new CapstoneConfig("backyard", "Backyard Party",
-                    new RecordsCumulativeCondition(30), "done",
-                    new SetFlagEffect("stagecraft")));
+                rungs: new List<PrestigeTierDefinition>
+                {
+                    TestContent.MakeRung("backyard", latchFlagId: "done",
+                        operationGate: new RecordsCumulativeCondition(30),
+                        onComplete: new SetFlagEffect("stagecraft")),
+                });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
 
             ContentValidator.Validate(database, RecordsId, NoRewards);
@@ -757,16 +805,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // declaration holds, so the check compares for equality with
         // PermanentInChapter rather than merely excluding Run.
         [Test]
-        public void CapstoneCompletionFlagWithNoScope_IsReported()
+        public void RungCompletionFlagWithNoScope_IsReported()
         {
             var ch1 = TestContent.MakeChapter("ch1", null,
                 flags: new List<FlagDeclaration> { new("done", ContentScope.None) },
-                capstone: new CapstoneConfig("backyard", "Backyard Party",
-                    new RecordsCumulativeCondition(30), "done", onComplete: null));
+                rungs: new List<PrestigeTierDefinition>
+                {
+                    TestContent.MakeRung("backyard", latchFlagId: "done",
+                        operationGate: new RecordsCumulativeCondition(30)),
+                });
             var database = TestContent.MakeDatabase(chapters: new[] { ch1 });
 
             LogAssert.Expect(LogType.Error,
-                "ContentValidator: Chapter 'ch1' capstone completion flag 'done' is declared None - a chapter boundary must be permanent-in-chapter, or the next release clears it and re-opens a finished chapter.");
+                "ContentValidator: Chapter 'ch1' rung 'backyard' completion flag 'done' is declared None - a completion must be permanent-in-chapter, or the next press clears it and re-opens a finished rung.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 

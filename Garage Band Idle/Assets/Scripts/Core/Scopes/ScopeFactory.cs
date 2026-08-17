@@ -265,11 +265,18 @@ namespace RidiculousGaming.GarageBandIdle
             var bars = new BarSystem(Resolve(database.BarGroups, barGroupIds, "bar group"),
                 database.Bars.All, router, rewards, effects);
 
-            // every scope gets one: a scope whose description authors no
-            // capstone holds an inert system (nothing latches, nothing
-            // projects), which is cheaper to reason about than a null another
-            // boundary has to remember to skip
-            var capstone = new CapstoneSystem(chapter?.Capstone, flags, effects);
+            // Every scope gets one, inert when its description files no rung
+            // (nothing latches, nothing projects) - cheaper to reason about
+            // than a null another boundary has to remember to skip. Two
+            // descriptions, two shapes of the same filing: a scope definition
+            // authors at most one rung, while the pre-step-7 chapter files BOTH
+            // legacy rungs (album, capstone) on its single scope.
+            var rungs = new List<PrestigeTierDefinition>();
+            if (definition != null && definition.Rung != null && definition.Rung.IsAuthored)
+                rungs.Add(definition.Rung);
+            if (chapter != null)
+                rungs.AddRange(chapter.Rungs);
+            var prestige = new PrestigeSystem(rungs, flags, effects);
 
             var conditions = new ConditionContext(router, generators, flags,
                 GameManager.RecordsCurrencyId, database, bars, chain);
@@ -305,7 +312,7 @@ namespace RidiculousGaming.GarageBandIdle
             // count because a generator's lines always do.
 
             var scope = new Scope(definition, instanceId, parent, chain, chapter, recipe, router, flags,
-                modifiers, generators, upgrades, production, bars, rewards, capstone, conditions,
+                modifiers, generators, upgrades, production, bars, rewards, prestige, conditions,
                 Resolve(database.Sections, sectionIds, "section"));
 
             // Every scope comes up through the SAME door (design doc section 12,

@@ -38,7 +38,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // the album payout, floor((fans / 5) ^ 0.5) - the four worked examples
         // are the JSON's recordsFormulaExamples, plus the edges: below 5 fans
-        // the floor gives nothing, and zero fans is a legal (empty) release
+        // the floor gives nothing, and zero fans is a legal (empty) release.
+        // The curve is authored content now (rule 14), so the math is asked of
+        // the formula the chapter files, evaluated over a real balance.
         [TestCase(0, 0)]
         [TestCase(4, 0)]
         [TestCase(5, 1)]
@@ -46,9 +48,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [TestCase(125, 5)]
         [TestCase(500, 10)]
         [TestCase(2000, 20)]
-        public void RecordsEarned_FollowsTheAlbumPayoutFormula(double fansThisRun, int expected)
+        public void RootOfBalance_FloorsTheRootOfTheFansBalance(double fansThisRun, int expected)
         {
-            var earned = ProductionCalculator.RecordsEarned(fansThisRun);
+            var currencies = TestContent.MakeEconomy();
+            currencies.Add("fans", fansThisRun);
+
+            var earned = new RootOfBalanceFormula("fans", 5)
+                .Evaluate(new EffectContext(currencies, null, null));
 
             Assert.AreEqual(expected, earned.ToDouble(), 1e-9);
         }
