@@ -62,16 +62,22 @@ namespace RidiculousGaming.GarageBandIdle
         // factory, after which nothing changes the tree's shape
         public IReadOnlyList<Scope> Children => _children;
 
+        // What is in scope from here (rule 12): this scope's link in the one
+        // iteration, outward to the root. The flag and modifier resolutions,
+        // and the inward-flowing aggregate change signals, live on it.
+        public ScopeChain Chain { get; }
+
         public ChapterDefinition Chapter { get; }
         public EconomyRecipe Recipe { get; }
 
-        // the balances this economy can reach: its own pool plus the global one,
-        // behind a single surface that resolves ownership at construction
+        // the balances this scope can reach: every pool in its chain, behind a
+        // single surface that resolves ownership at construction (first owner
+        // outward wins - rule 12's currency resolution)
         public ICurrencies Currencies => _router;
 
-        // this economy's own pool, for the operations that are explicitly about
+        // this scope's own pool, for the operations that are explicitly about
         // it rather than about "whatever holds this id" - a release resets these
-        // balances and never the global pool's
+        // balances and never anything outward
         public CurrencyManager Pool => _router.Local;
 
         public FlagSystem Flags { get; }
@@ -104,7 +110,7 @@ namespace RidiculousGaming.GarageBandIdle
         // honest answer for an economy that has never been away.
         public DateTime? LastInteractionUtc { get; private set; }
 
-        public Scope(ScopeDefinition definition, string instanceId, Scope parent,
+        public Scope(ScopeDefinition definition, string instanceId, Scope parent, ScopeChain chain,
             ChapterDefinition chapter, EconomyRecipe recipe, CurrencyRouter router,
             FlagSystem flags, ModifierSystem modifiers, GeneratorSystem generators, UpgradeSystem upgrades,
             ProductionSystem production, BarSystem bars, RewardManager rewards, CapstoneSystem capstone,
@@ -113,6 +119,7 @@ namespace RidiculousGaming.GarageBandIdle
             Definition = definition;
             InstanceId = instanceId;
             Parent = parent;
+            Chain = chain;
             Chapter = chapter;
             Recipe = recipe;
             _router = router;
@@ -199,6 +206,9 @@ namespace RidiculousGaming.GarageBandIdle
             Conditions?.Dispose();
             Production?.Dispose();
             _router?.Dispose();
+            // last: the chain node cascades its ancestors' signals, and
+            // everything above unhooked from it first
+            Chain?.Dispose();
         }
 
         // ---- the projection --------------------------------------------------
@@ -218,9 +228,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         // ---- capture and restore ---------------------------------------------
 
-        // This economy's own facts (design doc section 12, rule 12). Reads Pool,
-        // never Currencies: the router would reach the permanent pool, and Records
-        // and Roadies are not this context's to claim - one pool, one writer, or an
+        // This scope's own facts (design doc section 12, rule 12). Reads Pool,
+        // never Currencies: the router would reach every pool outward, and Records
+        // and Roadies are not this scope's to claim - one pool, one writer, or an
         // event sandbox's capture becomes a second opinion on permanent progress.
         public EconomyLocalSnapshot CaptureLocalState()
             => new(
@@ -554,8 +564,8 @@ namespace RidiculousGaming.GarageBandIdle
             // says survives: permanent-in-chapter upgrade latches, permanent bar
             // groups, permanent flags. Run-scoped facts go, flags included -
             // there is no category a release spares wholesale. Balances, and the
-            // earned totals measured off them, reset on THIS economy's own pool
-            // only; the global pool is no run's to reset.
+            // earned totals measured off them, reset on THIS scope's own pool
+            // only; nothing outward is a run's to reset.
             Pool.ResetCurrenciesOnAlbumRelease();
             Generators.ResetOwned();
             Upgrades.ResetRunScoped();

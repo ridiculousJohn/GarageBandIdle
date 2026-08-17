@@ -11,10 +11,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     public class AuthoredContributor : IProductionContributor
     {
         private readonly ProducerDefinition _definition;
-        private readonly ModifierSystem _modifiers;
+        private readonly IModifierResolver _modifiers;
         private readonly Dictionary<ProductionContribution, ModifierSubject> _lineSubjects = new();
 
-        public AuthoredContributor(ProducerDefinition definition, ModifierSystem modifiers)
+        public AuthoredContributor(ProducerDefinition definition, IModifierResolver modifiers)
         {
             _definition = definition;
             _modifiers = modifiers;

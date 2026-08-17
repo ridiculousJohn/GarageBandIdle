@@ -10,14 +10,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     //
     // What is deliberately NOT here:
     //
-    // - The PERMANENT pool's currencies. Records and Roadies live in a pool the
-    //   context only routes to, shared with every other context, and owned by
-    //   whoever created it. A context-level capture that reached through the router
-    //   would make an event sandbox a second claimant on the player's permanent
-    //   progress. The permanent block is captured once, by its owner, through
-    //   CurrencyManager.CaptureAll/RestoreAll - the SAME pair this snapshot's own
-    //   currencies use, so "which pool" is a question of who calls it and never of
-    //   which mechanism exists.
+    // - Any pool OUTWARD of the scope's own. A capture reads that one pool and
+    //   never the router (rule 12), so every further pool the chain reaches - an
+    //   ancestor scope's, and the permanent pool the chain ends at - stays with
+    //   whoever created it and is captured once, by that owner. Records and Roadies
+    //   are the case that shows why: a context-level capture reaching through the
+    //   router would make an event sandbox a second claimant on the player's
+    //   permanent progress. Every owner captures through the SAME
+    //   CurrencyManager.CaptureAll/RestoreAll pair this snapshot's own currencies
+    //   use, so "which pool" is a question of who calls it and never of which
+    //   mechanism exists.
     // - Modifiers. They are always projected from the facts above and never stored
     //   (rule 6): a saved modifier is a second answer able to disagree with the
     //   fact that produced it.

@@ -14,11 +14,14 @@ namespace RidiculousGaming.GarageBandIdle
     // running one's roster.
     //
     // Reachability is the chapter's authored roster plus every global currency,
-    // which is the same rule ScopeFactory builds a real pool pair from:
-    // the chapter's own CurrencyIds land in its pool, globals live in the
-    // permanent pool, and a context reaches both. Derived from the definitions
-    // rather than from a constructed pool, so it holds for a chapter that has
-    // never been played and never will be during this session.
+    // which is the same rule ScopeFactory builds a real chain from: the
+    // chapter's own CurrencyIds land in the scope's own pool, globals live in
+    // the permanent pool the chain ends at, and reads resolve outward through
+    // the links between. A chapter authors no child scopes, so on the chapter
+    // path those two links ARE the whole chain, which is why two rosters answer
+    // the whole question here. Derived from the definitions rather than from a
+    // constructed pool, so it holds for a chapter that has never been played
+    // and never will be during this session.
     //
     // Balances are deliberately absent. A currency's balance is a property of a
     // running economy, not of content, so the balance members throw rather than

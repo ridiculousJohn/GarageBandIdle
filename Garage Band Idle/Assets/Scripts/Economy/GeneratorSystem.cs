@@ -19,7 +19,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly List<Generator> _generators = new();
         private readonly Dictionary<string, Generator> _byId = new();
         private readonly ICurrencies _currencies;
-        private readonly ModifierSystem _modifiers;
+        // the read half only: generators compose their lines against every
+        // store in scope (rule 12) and grant into none
+        private readonly IModifierResolver _modifiers;
 
         // fires whenever any generator's owned count changes (purchases, run
         // resets, restores) - the signal behind ownedCount conditions
@@ -31,7 +33,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // are reported at load so they surface immediately instead of as
         // silently-never-producing rows.
         public GeneratorSystem(IEnumerable<GeneratorDefinition> definitions, ICurrencies currencies,
-            ModifierSystem modifiers)
+            IModifierResolver modifiers)
         {
             _currencies = currencies;
             _modifiers = modifiers;

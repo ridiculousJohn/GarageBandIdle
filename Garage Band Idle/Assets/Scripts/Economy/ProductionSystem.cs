@@ -45,7 +45,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly GeneratorSystem _generators;
         private readonly UpgradeSystem _upgrades;
         private readonly ICurrencies _currencies;
-        private readonly ModifierSystem _modifiers;
+        private readonly IModifierResolver _modifiers;
         private readonly ConditionContext _conditions;
 
         // reused across assemblies so a re-assemble allocates nothing per entry
@@ -58,7 +58,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public event Action<string> YieldChanged;
 
         public ProductionSystem(IEnumerable<ProducerDefinition> producers, GeneratorSystem generators,
-            UpgradeSystem upgrades, ICurrencies currencies, ModifierSystem modifiers,
+            UpgradeSystem upgrades, ICurrencies currencies, IModifierResolver modifiers,
             ConditionContext conditions)
         {
             _generators = generators;

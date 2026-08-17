@@ -4,11 +4,13 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // The one home for every stat modifier in the game. Systems do not keep
-    // their own multiplier stacks: each asks for the composition on the number
-    // it owns and applies it, so there is one composition rule, one reset, and
-    // one shape to save. A new effect kind is a handler that grants a modifier -
-    // no new state, no new reset call, no new save field.
+    // The one home for every stat modifier its scope holds (one store per
+    // scope; a composition folds every store in scope through IModifierResolver).
+    // Systems do not keep their own multiplier stacks: each asks for the
+    // composition on the number it owns and applies it, so there is one
+    // composition rule, one reset, and one shape to save. A new effect kind is
+    // a handler that grants a modifier - no new state, no new reset call, no
+    // new save field.
     //
     // A modifier says which numbers it reaches with a ModifierSelector, and a
     // number says what it is with a ModifierSubject (design doc section 12, rule
@@ -26,7 +28,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // Grants are kept individually rather than accumulated into one number,
     // which is what makes a run reset exact: a collapsed product cannot say
     // which of its factors were run-scoped.
-    public class ModifierSystem
+    public class ModifierSystem : IModifierResolver
     {
         private class Granted
         {

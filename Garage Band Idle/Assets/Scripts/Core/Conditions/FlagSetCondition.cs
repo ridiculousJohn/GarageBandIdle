@@ -22,15 +22,17 @@ namespace RidiculousGaming.GarageBandIdle
             _flagId = flagId;
         }
 
+        // through the context's one flag resolution (rule 12): any link in
+        // scope satisfies, so a gate can watch a flag an outer scope latches
         public override bool Evaluate(ConditionContext context)
-            => context.Flags != null && context.Flags.IsSet(_flagId);
+            => context.IsFlagSet(_flagId);
 
         public override void Validate(ConditionContext context, string source)
         {
             if (string.IsNullOrEmpty(_flagId))
                 Debug.LogError($"Condition: {source} has a flagSet condition with an empty flag id.");
-            else if (context.Flags != null && !context.Flags.IsKnown(_flagId))
-                Debug.LogError($"Condition: {source} references flag '{_flagId}', which the chapter does not declare.");
+            else if (!context.IsFlagKnown(_flagId))
+                Debug.LogError($"Condition: {source} references flag '{_flagId}', which no scope in reach declares.");
         }
     }
 }

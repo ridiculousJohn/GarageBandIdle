@@ -110,14 +110,10 @@ namespace RidiculousGaming.GarageBandIdle
         // still rematches after the ladder is re-ordered.
         //
         // outerPool is the pool beyond the tree's root (the permanent pool, for
-        // a real tree; nothing, for a self-contained fixture). It is the root's
-        // read surface past the tree, and it seeds the claim map below, because
-        // "ids are unique tree-wide" includes the pool the tree hangs under.
-        //
-        // Step-1 honesty: each scope's read surface is its own pool plus its
-        // PARENT's only - CurrencyRouter is the N=2 resolver - so at depth 3 a
-        // grandchild cannot yet read the root. Step 2's ScopeChain replaces this
-        // surface with the real outward walk; nothing else here changes.
+        // a real tree; nothing, for a self-contained fixture). It becomes the
+        // chain's outermost, currencies-only link, and it seeds the claim map
+        // below, because "ids are unique tree-wide" includes the pool the tree
+        // hangs under.
         public static Scope Build(ScopeDefinition definition, string instanceId, ContentDatabase database,
             CurrencyManager outerPool = null, Scope parent = null)
         {
@@ -238,8 +234,6 @@ namespace RidiculousGaming.GarageBandIdle
             IReadOnlyList<string> generatorIds, IReadOnlyList<string> upgradeIds,
             IReadOnlyList<string> barGroupIds, EconomyLocalSnapshot seed)
         {
-            var router = new CurrencyRouter(pool, outerPool);
-
             // built before the systems that read it: every stat effect in the
             // game composes through here, so no system holds its own stack
             var modifiers = new ModifierSystem();
@@ -249,10 +243,22 @@ namespace RidiculousGaming.GarageBandIdle
             // carrying the lifetime its declaration states
             var flags = new FlagSystem(flagDeclarations);
 
+            // This scope's link in the ONE iteration (rule 12): its own truth,
+            // chained outward through its parent's link - or, at a tree's root,
+            // the pool the tree hangs under, a currencies-only link. Built
+            // before the router and the systems because they consume it: reads
+            // resolve outward through it, and its aggregated signals carry
+            // outer changes inward.
+            var chain = new ScopeChain(
+                parent != null ? parent.Chain : outerPool != null ? new ScopeChain(outerPool) : null,
+                pool, flags, modifiers);
+
+            var router = new CurrencyRouter(chain);
+
             var generators = new GeneratorSystem(
-                Resolve(database.Generators, generatorIds, "generator"), router, modifiers);
+                Resolve(database.Generators, generatorIds, "generator"), router, chain);
             var upgrades = new UpgradeSystem(
-                Resolve(database.Upgrades, upgradeIds, "upgrade"), router, flags, modifiers);
+                Resolve(database.Upgrades, upgradeIds, "upgrade"), router, flags, modifiers, chain);
 
             var rewards = new RewardManager(database.Rewards.All);
             var effects = new EffectContext(router, flags, modifiers);
@@ -266,7 +272,7 @@ namespace RidiculousGaming.GarageBandIdle
             var capstone = new CapstoneSystem(chapter?.Capstone, flags, effects);
 
             var conditions = new ConditionContext(router, generators, flags,
-                GameManager.RecordsCurrencyId, database, bars);
+                GameManager.RecordsCurrencyId, database, bars, chain);
 
             // Built after the condition context because contribution gates are
             // ordinary Conditions checked per composition, and after the generator
@@ -277,7 +283,7 @@ namespace RidiculousGaming.GarageBandIdle
             // scopes, so ownership comes from the scope's own lists.
             var production = new ProductionSystem(
                 Resolve(database.Producers, producerIds, "producer"),
-                generators, upgrades, router, modifiers, conditions);
+                generators, upgrades, router, chain, conditions);
 
             // the Records buff is derived, not granted: one modifier per currency
             // the chapter's recordBuff declares, each reading the cumulative
@@ -298,7 +304,7 @@ namespace RidiculousGaming.GarageBandIdle
             // generator CONTRIBUTES a fans rate line, so the bonus scales with owned
             // count because a generator's lines always do.
 
-            var scope = new Scope(definition, instanceId, parent, chapter, recipe, router, flags,
+            var scope = new Scope(definition, instanceId, parent, chain, chapter, recipe, router, flags,
                 modifiers, generators, upgrades, production, bars, rewards, capstone, conditions,
                 Resolve(database.Sections, sectionIds, "section"));
 

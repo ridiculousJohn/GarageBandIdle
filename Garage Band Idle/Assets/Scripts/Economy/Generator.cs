@@ -22,7 +22,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // fires after a successful purchase changes Owned; code-only subscribers
         public event Action OwnedChanged;
 
-        private readonly ModifierSystem _modifiers;
+        // the read half only (reads go outward, rule 12): a generator composes
+        // its lines against every store in scope and can grant into none
+        private readonly IModifierResolver _modifiers;
         private readonly ModifierSubject _subject;
 
         // one subject per contribution, built once: the definition's line list is
@@ -30,7 +32,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // one the change notification asked about
         private readonly Dictionary<ProductionContribution, ModifierSubject> _lineSubjects = new();
 
-        public Generator(GeneratorDefinition definition, ModifierSystem modifiers)
+        public Generator(GeneratorDefinition definition, IModifierResolver modifiers)
         {
             Definition = definition;
             _modifiers = modifiers;

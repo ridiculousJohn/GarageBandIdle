@@ -4,14 +4,15 @@ namespace RidiculousGaming.GarageBandIdle
 {
     // The balance surface every system reads and writes through. Extracted from
     // CurrencyManager so that a consumer cannot tell whether it is talking to
-    // one pool or to several: an economy context reaches its own chapter pool
-    // AND the startup pool holding the global currencies (design doc section
-    // 12, rule 12), and a system that produces cash has no business knowing
-    // which of the two owns Records.
+    // one pool or to several: a scope reaches every pool in its chain - its own,
+    // then each ancestor's outward, then the startup pool holding the global
+    // currencies the chain ends at (design doc section 12, rule 12) - and a
+    // system that produces cash has no business knowing which of them owns
+    // Records.
     //
-    // That is the whole reason this exists rather than systems taking two
-    // CurrencyManagers and choosing: the choice would be made per call site,
-    // by whoever wrote it, from the currency's name - exactly the named-currency
+    // That is the whole reason this exists rather than systems holding the pools
+    // themselves and choosing: the choice would be made per call site, by
+    // whoever wrote it, from the currency's name - exactly the named-currency
     // special-casing the design forbids. Here it is made once, at construction,
     // by whoever owns the pools (see CurrencyRouter).
     //

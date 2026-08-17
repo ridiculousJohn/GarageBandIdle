@@ -38,11 +38,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
             context.Economy.Currencies.BalanceChanged += HandleBalanceChanged;
             context.Economy.Conditions.Settled += RefreshVisibility;
 
-            // the third system signal a row's display reads: output modifiers.
-            // Subscribed here rather than per row because Changed is a system
-            // event carrying its target, the same shape as BalanceChanged -
-            // each row decides whether the target is its own.
-            context.Economy.Modifiers.Changed += HandleModifierChanged;
+            // the third system signal a row's display reads: output modifiers,
+            // through the chain's aggregate because a buff granted in an OUTER
+            // scope moves these rows too (rows compose through the chain, so
+            // the refresh must hear what the composition reads). Subscribed
+            // here rather than per row because the event carries its target,
+            // the same shape as BalanceChanged - each row decides whether the
+            // target is its own.
+            context.Economy.Chain.ModifiersChanged += HandleModifierChanged;
         }
 
         private void OnDestroy()
@@ -52,7 +55,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             _context.Economy.Currencies.BalanceChanged -= HandleBalanceChanged;
             _context.Economy.Conditions.Settled -= RefreshVisibility;
-            _context.Economy.Modifiers.Changed -= HandleModifierChanged;
+            _context.Economy.Chain.ModifiersChanged -= HandleModifierChanged;
         }
 
         private void HandleBalanceChanged(string currencyId, BigNumber balance)

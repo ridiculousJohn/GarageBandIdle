@@ -25,6 +25,13 @@ namespace RidiculousGaming.GarageBandIdle
         public GeneratorSystem Generators { get; }
         public FlagSystem Flags { get; }
 
+        // The chain this scope resolves through (rule 12): flag reads go
+        // outward, any link satisfies. Null outside a scope tree - fixtures
+        // standing up bare systems - where the single FlagSystem above is the
+        // whole answer. Conditions ask IsFlagSet/IsFlagKnown below rather than
+        // choosing between the two themselves.
+        public ScopeChain Chain { get; }
+
         // currency id backing recordsCumulative; Records are never spent, so
         // cumulative Records equals the currency's lifetime-earned total
         public string RecordsCurrencyId { get; }
@@ -67,11 +74,13 @@ namespace RidiculousGaming.GarageBandIdle
         private bool _settledPending;
 
         public ConditionContext(ICurrencies currencies, GeneratorSystem generators, FlagSystem flags,
-            string recordsCurrencyId = "records", ContentDatabase database = null, IBarCompletionSource bars = null)
+            string recordsCurrencyId = "records", ContentDatabase database = null, IBarCompletionSource bars = null,
+            ScopeChain chain = null)
         {
             Currencies = currencies;
             Generators = generators;
             Flags = flags;
+            Chain = chain;
             RecordsCurrencyId = recordsCurrencyId;
             Database = database;
             Bars = bars;
@@ -82,12 +91,26 @@ namespace RidiculousGaming.GarageBandIdle
             // GeneratorOwnedChanged, barsCompleted > BarCompleted. Each is
             // null-tolerant because fixtures stand up only the systems their
             // conditions read.
+            //
+            // Two of the inputs already span the chain: BalanceChanged, because
+            // the router aggregates every pool in scope, and the flag events,
+            // because the chain aggregates every registry in scope - an inner
+            // gate on an outer flag must re-evaluate when the outer scope
+            // latches it (reads go outward, notifications come inward, rule
+            // 12). With a chain the subscription is the chain's aggregate ONLY:
+            // its innermost link is the flags system above, so subscribing to
+            // both would dirty twice per latch.
             if (Currencies != null)
                 Currencies.BalanceChanged += HandleBalanceChanged;
-            if (Flags != null)
+            if (Chain != null)
             {
                 // both directions: a cleared flag moves flagSet answers exactly
                 // as a set one does, and a run reset is when it happens
+                Chain.FlagSet += HandleFlagSet;
+                Chain.FlagCleared += HandleFlagSet;
+            }
+            else if (Flags != null)
+            {
                 Flags.FlagSet += HandleFlagSet;
                 Flags.FlagCleared += HandleFlagSet;
             }
@@ -101,7 +124,12 @@ namespace RidiculousGaming.GarageBandIdle
         {
             if (Currencies != null)
                 Currencies.BalanceChanged -= HandleBalanceChanged;
-            if (Flags != null)
+            if (Chain != null)
+            {
+                Chain.FlagSet -= HandleFlagSet;
+                Chain.FlagCleared -= HandleFlagSet;
+            }
+            else if (Flags != null)
             {
                 Flags.FlagSet -= HandleFlagSet;
                 Flags.FlagCleared -= HandleFlagSet;
@@ -111,6 +139,18 @@ namespace RidiculousGaming.GarageBandIdle
             if (Bars != null)
                 Bars.BarCompleted -= HandleBarCompleted;
         }
+
+        // The flag resolution conditions ask (rule 12's table): any link in
+        // scope satisfies. One home for the chain-or-single choice, so a
+        // condition and its validation cannot make it differently.
+        public bool IsFlagSet(string flagId)
+            => Chain != null ? Chain.ResolveFlag(flagId) : Flags != null && Flags.IsSet(flagId);
+
+        // Validation's version of the same walk: whether any registry in scope
+        // declares the id. True when there is nothing to ask, because a fixture
+        // with no flag system is not evidence of a typo.
+        public bool IsFlagKnown(string flagId)
+            => Chain != null ? Chain.IsFlagKnown(flagId) : Flags == null || Flags.IsKnown(flagId);
 
         // The drain: runs the given evaluation exactly once if any input moved
         // since the last drain, then publishes Settled. Both halves live here so

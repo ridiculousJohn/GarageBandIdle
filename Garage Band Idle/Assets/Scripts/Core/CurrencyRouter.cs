@@ -4,63 +4,75 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // Resolves a currency id to the pool that owns it, over an economy's own
-    // pool plus the startup pool holding the global currencies (design doc
-    // section 12, rule 12). The map is built once, at construction, so no call
-    // site ever chooses a pool: a system asks for 'records' and a system asks
-    // for 'cash' through the identical surface, and which instance answers was
-    // decided here by placement data rather than there by a currency name.
+    // Resolves a currency id to the pool that owns it - ResolveCurrency of the
+    // three chain resolutions (design doc section 12, rule 12): first owner
+    // outward wins, one balance. Built over the ScopeChain's walk, and the map
+    // is built once, at construction (a cache of the walk, not a per-read
+    // walk), so no call site ever chooses a pool: a system asks for 'records'
+    // and a system asks for 'cash' through the identical surface, and which
+    // instance answers was decided here by placement rather than there by a
+    // currency name. Step 4 must rebuild this cache when enabling or disabling
+    // a scope changes what the walk yields.
     //
-    // It is IDisposable because it aggregates both pools' BalanceChanged into
-    // one event. The startup pool outlives every context, so a discarded
-    // router that kept listening would keep a dead economy's subscribers alive
-    // and deliver them balance changes for a chapter nobody is playing - the
-    // same failure ConditionContext.Dispose exists to prevent, one layer down.
+    // It is IDisposable because it aggregates every pool's BalanceChanged into
+    // one event. The outer pools outlive every scope under them, so a
+    // discarded router that kept listening would keep a dead scope's
+    // subscribers alive and deliver them balance changes for a ladder nobody
+    // is playing - the same failure ConditionContext.Dispose exists to
+    // prevent, one layer down.
     //
-    // Shadowing is refused rather than resolved. An id in both pools has two
+    // Shadowing is refused rather than resolved. An id in two pools has two
     // balances and every read would silently pick whichever this class happened
     // to check first, which is a coin flip decided by code order: a spend could
-    // charge one balance while the UI reads the other. Boot validation reports
-    // it and the router keeps the local pool, so the failure is loud and the
-    // chapter still plays.
+    // charge one balance while the UI reads the other. ScopeFactory's claim map
+    // refuses it at construction and boot validation reports it; the router
+    // keeps the innermost claim, so the failure is loud and the scope still
+    // plays.
     public class CurrencyRouter : ICurrencies, IDisposable
     {
         private readonly Dictionary<string, CurrencyManager> _owners = new();
+        // what the chain's walk yielded at construction, innermost first -
+        // routing and subscriptions only, and the part step 4's enablement
+        // rebuild legitimately recomputes
+        private readonly List<CurrencyManager> _pools = new();
+        // the owning scope's own pool, captured OFF the walk: enablement
+        // changes what a scope can REACH, never what it OWNS, so a disabled
+        // scope's capture and reset still land in its own truth. Step 4's
+        // rebuild must leave this alone (and its tests must pin that a
+        // disabled scope's Pool is still its own).
         private readonly CurrencyManager _local;
-        private readonly CurrencyManager _global;
 
         // one aggregated signal for every pool reachable here, so a consumer
         // holds one subscription no matter how many pools back it
         public event Action<string, BigNumber> BalanceChanged;
 
-        // the pools behind the map, for the operations that are explicitly
-        // about one of them (a release resets the local pool, never the global)
+        // the owning scope's pool, for the operations that are explicitly
+        // about this scope's own truth (a release resets the local pool,
+        // never anything outward)
         public CurrencyManager Local => _local;
-        public CurrencyManager Global => _global;
 
-        public CurrencyRouter(CurrencyManager local, CurrencyManager global)
+        public CurrencyRouter(ScopeChain chain)
         {
-            _local = local;
-            _global = global;
+            _local = chain?.Pool;
+            chain?.CollectPools(_pools);
 
-            // the global pool is claimed first so that a shadowed id reports
-            // against the local one, naming the pool the chapter authored and
-            // can fix, rather than against the startup pool it collided with
-            Claim(_global);
-            Claim(_local);
+            // claimed outermost first, so on a collision the INNERMOST claim
+            // wins deterministically - the pool the colliding scope's own
+            // content was authored against. The collision itself was already
+            // refused and reported at construction (ScopeFactory) or by boot
+            // validation; silently preferring a pool is not a fix, it just
+            // keeps the choice deterministic.
+            for (var i = _pools.Count - 1; i >= 0; i--)
+                Claim(_pools[i]);
 
-            if (_local != null)
-                _local.BalanceChanged += HandleBalanceChanged;
-            if (_global != null)
-                _global.BalanceChanged += HandleBalanceChanged;
+            foreach (var pool in _pools)
+                pool.BalanceChanged += HandleBalanceChanged;
         }
 
         public void Dispose()
         {
-            if (_local != null)
-                _local.BalanceChanged -= HandleBalanceChanged;
-            if (_global != null)
-                _global.BalanceChanged -= HandleBalanceChanged;
+            foreach (var pool in _pools)
+                pool.BalanceChanged -= HandleBalanceChanged;
         }
 
         // Which pool owns the id, or null if neither does. Public because the
@@ -105,11 +117,9 @@ namespace RidiculousGaming.GarageBandIdle
                 if (string.IsNullOrEmpty(definition.Id))
                     continue;
 
-                // last claim wins, which is why Claim(_local) runs second: a
-                // shadowed id resolves to the chapter's own balance, the one
-                // its producers and bars were authored against. Boot validation
-                // is what reports the collision; silently preferring a pool is
-                // not a fix, it just makes the choice deterministic.
+                // last claim wins, which is why the constructor claims from the
+                // outermost pool inward: a shadowed id resolves to the balance
+                // its own scope's producers and bars were authored against
                 _owners[definition.Id] = pool;
             }
         }

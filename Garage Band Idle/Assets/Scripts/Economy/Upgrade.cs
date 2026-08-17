@@ -23,9 +23,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public bool Applied { get; private set; }
 
         private readonly Dictionary<ProductionContribution, ModifierSubject> _lineSubjects = new();
-        private readonly ModifierSystem _modifiers;
+        private readonly IModifierResolver _modifiers;
 
-        public Upgrade(UpgradeDefinition definition, ModifierSystem modifiers)
+        public Upgrade(UpgradeDefinition definition, IModifierResolver modifiers)
         {
             Definition = definition;
             _modifiers = modifiers;

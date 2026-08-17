@@ -29,11 +29,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public IReadOnlyList<Upgrade> All => _upgrades;
 
+        // The store and the resolver are the two halves of rule 12's asymmetry,
+        // and they genuinely differ here: a payload GRANT lands in this scope's
+        // own store (the buff is this scope's fact, cleared by this scope's
+        // reset), while an upgrade's contribution lines COMPOSE against every
+        // store in scope. resolver defaults to the store itself, which is the
+        // single-scope case every fixture and the pre-tree boot path mean.
         public UpgradeSystem(IEnumerable<UpgradeDefinition> definitions, ICurrencies currencies,
-            FlagSystem flags, ModifierSystem modifiers)
+            FlagSystem flags, ModifierSystem modifiers, IModifierResolver resolver = null)
         {
             _currencies = currencies;
             _effectContext = new EffectContext(currencies, flags, modifiers);
+            resolver ??= modifiers;
 
             foreach (var definition in definitions)
             {
@@ -57,7 +64,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     _currencies.ValidateReference(definition.CostCurrencyId, $"Upgrade '{definition.Id}' (cost)");
                 ValidatePayload(definition);
 
-                var upgrade = new Upgrade(definition, modifiers);
+                var upgrade = new Upgrade(definition, resolver);
                 _upgrades.Add(upgrade);
                 _byId.Add(definition.Id, upgrade);
             }

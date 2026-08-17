@@ -111,7 +111,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // section - a flag another chapter declares can never be set while
             // ch1's FlagSystem is live, so this is a content error
             LogAssert.Expect(LogType.Error,
-                "Condition: Section 'poached' (visibleWhen) references flag 'two', which the chapter does not declare.");
+                "Condition: Section 'poached' (visibleWhen) references flag 'two', which no scope in reach declares.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 
@@ -242,7 +242,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 sections: new[] { section });
 
             LogAssert.Expect(LogType.Error,
-                "Condition: Producer 'busk' (contribution 'busk_cash' for 'cash') (gate) references flag 'two', which the chapter does not declare.");
+                "Condition: Producer 'busk' (contribution 'busk_cash' for 'cash') (gate) references flag 'two', which no scope in reach declares.");
             ContentValidator.Validate(database, RecordsId, NoRewards);
         }
 

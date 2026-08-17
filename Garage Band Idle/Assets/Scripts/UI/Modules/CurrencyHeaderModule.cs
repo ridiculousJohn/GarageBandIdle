@@ -33,7 +33,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // BarListModule binds to one signal
             context.Economy.Conditions.Settled += HandleConditionsSettled;
 
-            _fansLabel.gameObject.SetActive(context.Flags.IsSet(GameManager.FansUnlockFlagId));
+            // through the context's one flag resolution: a reveal is a gate,
+            // and gates resolve outward (rule 12) - a fans flag an outer scope
+            // latched must not leave the meter hidden here
+            _fansLabel.gameObject.SetActive(context.Economy.Conditions.IsFlagSet(GameManager.FansUnlockFlagId));
             RefreshCash();
             RefreshFans();
         }
@@ -57,7 +60,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void HandleConditionsSettled()
         {
-            var revealed = _context.Flags.IsSet(GameManager.FansUnlockFlagId);
+            var revealed = _context.Economy.Conditions.IsFlagSet(GameManager.FansUnlockFlagId);
             if (_fansLabel.gameObject.activeSelf == revealed)
                 return;
 

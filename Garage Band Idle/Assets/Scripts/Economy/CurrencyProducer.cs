@@ -32,13 +32,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private readonly List<ProductionEntry> _yield = new();
 
         private readonly ICurrencies _currencies;
-        private readonly ModifierSystem _modifiers;
+        private readonly IModifierResolver _modifiers;
         private readonly ConditionContext _conditions;
 
         private readonly ModifierSubject _rateSubject;
         private readonly ModifierSubject _yieldSubject;
 
-        public CurrencyProducer(string currencyId, ICurrencies currencies, ModifierSystem modifiers,
+        public CurrencyProducer(string currencyId, ICurrencies currencies, IModifierResolver modifiers,
             ConditionContext conditions)
         {
             CurrencyId = currencyId ?? "";
