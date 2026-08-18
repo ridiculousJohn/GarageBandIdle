@@ -29,8 +29,9 @@ per-chapter authoring decision.
 **The chapter loop (outer).** Records earned within the chapter unlock its capstone gig. Playing
 the capstone **cuts the album as part of the show if the run has earned it** — the run's Fans bank
 as Records only when the album's own gate is met; an unfinished run is discarded — and then
-completes the chapter. Completion facts (the completion flag, clear counts) live at the **root**
-and survive everything; the capstone's reset clears the entire chapter, which is what makes the
+completes the chapter. Completion facts (the completion flag; optionally, counters a chapter's
+reward curves read, §8.1) live at the **root** and survive everything; the capstone's reset clears
+the entire chapter, which is what makes the
 chapter immediately replayable (§8.1). Advancement to the next chapter is forward-only and reacts to
 the completion flag.
 
@@ -69,7 +70,7 @@ Every chapter uses the same rhythm — tap, buy, grow Fans, release an album —
 mechanic, and a higher Records gate.
 
 **Chapter anatomy.** A chapter is a **scope** (§12.3): a state container holding the currencies,
-flags, generators, upgrades, and bars declared to it, plus its tier scopes. The chapter level owns
+flags, producers, generators, upgrades, bars, and triggers declared to it, plus its tier scopes. The chapter level owns
 whatever the whole chapter shares; each tier owns what that tier's release destroys. **Lifetime is
 placement**: a fact survives a reset by being declared further out, and anything two tiers share
 lives in their nearest common ancestor. Moving a declaration up a level is a pure data edit, because
@@ -80,17 +81,24 @@ ids are unique tree-wide and everything references by id.
 should introduce a change in play — a new mechanic, sub-loop, or automation step — rather than only
 increasing a number.
 
-Reveal runs through **one mechanism**: something sets a flag (an upgrade payload, a bar completion, a
-passive threshold unlock), and revealed content gates its visibility on a `FlagSet` condition. A
-section is visible exactly *while* its condition holds — evaluated live, no latch. "Stays once
+Reveal runs through **one mechanism**: revealed content gates its visibility on a `Condition`. A
+reveal tied to a *moment* gates on a flag that moment's actions set (an upgrade payload, a bar
+completion); a reveal tied to a *threshold* gates **directly on the monotonic fact**
+(`EarnedTotalAtLeast`) — pure visibility needs no flag and no moment. A threshold moment that
+carries a **payload** (a grant, a story hint) is a **Trigger** (§12.5): the one sanctioned
+condition-observer, one-shot per scope-life, swept at defined points. Division of labor: direct
+gate for pure reveals, trigger for threshold moments with payloads, moment-set flags for reveals
+hanging off purchases and completions.
+A section is visible exactly *while* its condition holds — evaluated live, no latch. "Stays once
 earned" is authored by gating on a fact with that lifetime: a flag, or a monotonic value like total
 Cash ever earned. Gating a region on a spendable balance is an authoring smell — it strobes with
-every purchase. (Ch. 1's `browse_gear` flag latches at 250 Cash earned via a passive unlock for
-exactly this reason.)
+every purchase. (Ch. 1's gear region gates on `EarnedTotalAtLeast(cash, 250)` for exactly this
+reason — earned total, not balance.)
 
-A flag's lifetime is the scope that declares it (§12.3). Chapter 1 declares `fans`, `covers`, and
-`gear` (and the upgrades that set them) in its tier, so an album release clears them and the second
-run re-walks the progression — band → fans → covers → gear — instead of opening with every system on
+A flag's lifetime is the scope that declares it (§12.3). Chapter 1 declares `fans` and `covers`
+(and the upgrades that set them) in its tier, so an album release clears them — and the tier's Cash
+earned total resets with the run too, re-hiding the threshold-gated gear region — so the second run
+re-walks the progression — band → fans → covers → gear — instead of opening with every system on
 screen. The `album` flag is declared at the chapter level, so the release *region* stays on screen
 across runs; only the button's pressability tracks the live offer condition (§5).
 
@@ -235,8 +243,9 @@ drift.
 Moment-to-moment play:
 
 - **Tap ("Jam")** — early Cash source; its relevance falls off as gear automates income. Jam is a
-  **producer definition** (§12.2) — `tap_producer`: a cash yield, a rehearsal yield gated on the
-  reveal flag, and rehearsal's passive-tick rate. The button is a module whose entire knowledge is
+  **producer definition** (§12.2) — `tap_producer`: a cash yield, plus a rehearsal yield and
+  passive-tick rate both gated on the reveal flag — Rehearsal accrues nothing before its reveal.
+  The button is a module whose entire knowledge is
   `FireProducer(tap_producer)`; every payout, gate, and base number is data on the producer. "Tap"
   is a UI gesture; the economy only knows a producer was fired.
 - **Generators** — exponential cost, `cost = base × growth^owned`, growth ~1.15; 4–6 themed per
@@ -258,7 +267,8 @@ Moment-to-moment play:
   `TryPress` is fail-closed — the operation checks its own gate, so a UI bug cannot complete a
   chapter early. The chapter **advance is not an action**: it is a reaction to the root completion
   flag, performed by `ChapterManager`, which makes it derivable from the save no matter how or when
-  the flag was set. The first-clear story beat is likewise a UI reaction to the flag's transition.
+  the flag was set. The first-clear story beat is likewise gated on state — `complete &&
+  !story_seen`, a root latch set on dismissal (§10) — never on observing a transition.
 
 ### 6.1 Events
 
@@ -274,15 +284,17 @@ An event is **content plus one state record** (§12.8):
 
 ```
 EventDefinition: availableWhen (Condition), goal (Condition), timeLimit (0 = untimed),
-                 handicaps (List<Effect>), onEntry / onComplete (List<Action>), hostScopeId, tiers
-ActiveEvent:     { eventId, tier, remainingSeconds }   — lives in the host scope's state
+                 handicaps (List<Effect>), onEntry / onComplete (List<Action>), hostScopeId
+ActiveEvent:     { eventId, remainingSeconds, goalReached, claimed }   — in host scope state
 ```
 
 - **Lifecycle: three self-guarding operations.** `StartEvent(eventId)`, `CompleteEvent(eventId)`,
   `AbortEvent(eventId)` — Action kinds like any other, invocable from anywhere (a UI module
   forwarding intent, another action list, an automation, a test), each fail-closed against its own
-  gate: start checks `availableWhen`, complete checks the goal on a live record, abort checks a
-  record exists. Nothing below them knows the caller.
+  gate: start checks `availableWhen` **and that the host holds no event record — one event per
+  scope, and an expired-but-undismissed record still counts**, complete checks `goalReached` —
+  latched, or the goal holding live — on an unclaimed record, abort checks a record exists.
+  Nothing below them knows the caller.
 - **On start** (`StartEvent`), the event's `onEntry` actions run in order — typically
   `[ExecuteRung(hostTierPress), ResetScope(host)]` — and the ActiveEvent record is created after
   they finish, so it lives in the fresh state. The rung checks the host press's own gate like every
@@ -297,28 +309,44 @@ ActiveEvent:     { eventId, tier, remainingSeconds }   — lives in the host sco
   player has advanced further — "come back later" is the intended experience.
 - **Goal:** a Condition, usually `CurrencyAtLeast`. Weirder goals are `All[...]` compounds.
 - **Debuff (optional):** the handicaps are ordinary Effects with multipliers below 1 — generation
-  halved is ×0.5, automation disabled or a currency locked is ×0. They apply while the ActiveEvent
-  record exists and vanish with it; nothing is installed or torn down.
+  halved is ×0.5, automation disabled or a currency locked is ×0. They apply while a **live,
+  unexpired** ActiveEvent record exists and vanish with it — an expired record contributes nothing
+  (§12.8); nothing is installed or torn down.
 - **Timer (optional):** `remainingSeconds` decrements on live ticks only, so the attempt pauses when
   the chapter is inactive or the app is closed — a deadline the player cannot attend is not a
   challenge. The exchange: a chapter running a timed event pays **no idle earnings** on switch-in,
-  which closes both the app-close and the switch-away-to-wait-out-the-clock exploits at once. An
-  expired record is **inert by derivation** — handicaps stop contributing, `CompleteEvent` stays
-  disarmed — and is swept when the scope next becomes active. An untimed event at insufficient
-  power is merely unfinishable.
+  which closes both the app-close and the switch-away-to-wait-out-the-clock exploits at once.
+  **Reaching the goal before expiry secures success**: the sweep — which runs inside every
+  transaction, tick and command alike (§12.11) — latches `goalReached` on the record, latch-first
+  like every observer, and a completed attempt is claimable at any time. A command that reaches a
+  spendable-balance goal secures it even if a later command spends back below.
+  The timer matters only until the goal is met, never as a race to the Claim button; evaluation
+  order is completion state first, then the timer, and a sweep observing goal-met and expiry in the
+  same tick counts it — the tie goes to the player. Expiry **ends nothing by itself**: a
+  goal-unreached record stays, inert by derivation — handicaps stop contributing, `CompleteEvent`
+  stays disarmed — until the **player** dismisses the failed attempt
+  (`AbortEvent`) or a reset reaches the host. Because the record still occupies the host,
+  `StartEvent` keeps failing until it is dismissed — enforced in code; the UI simply doesn't offer
+  a new event while one is pending. An untimed event at insufficient power is merely unfinishable.
 - **Completion is claimed, not automatic.** A met goal arms `CompleteEvent` — exactly as 50 Fans
-  arms the release button — and fires nothing by itself. Claiming runs `onComplete` in order:
-  rewards first (reading the dying run where they want to), `ResetScope(host)` last, which clears
-  the ActiveEvent record with the rest of the host state — deletion needs no action. **Abort**
+  arms the release button — and fires nothing by itself. Claiming first marks the record claimed
+  (a lifecycle op invoked again from inside the list is refused), then runs `onComplete` in order —
+  rewards first (reading the dying run where they want to), `ResetScope(host)` last by convention —
+  and finally **removes the record itself if the authored reset didn't already clear it**: record
+  removal is the operation's job, never the author's, so a missing reset can't leave the reward
+  claimable forever. **Abort**
   (`AbortEvent`) deletes the record and touches nothing else; whatever the run accumulated stays to
   be banked by the next reset. And an event **dies with its scope**: any reset that reaches the
   host clears the record — a mid-event release, a capstone resetting the chapter from above.
 - **Reward on success:** `onComplete` actions — a chapter-durable buff (`AddModifier`), a Roadie, a
   Catalog song, local currency. Never Records or any advancement currency.
-- **Tiers:** an event can repeat at higher tiers with a higher requirement, stronger debuff, larger
-  reward. The rising requirement plus the player's power curve throttles tiered events as a
-  repeatable Roadie source. Claim history is ordinary flags: a tier's `onComplete` sets its
-  `event_tierN_done` flag, and the next tier's `availableWhen` gates on it.
+- **Levels:** a harder rerun of an event is simply **another event** — `silent_stage_2` is its own
+  definition whose `availableWhen` gates on `silent_stage_1_done`; there is no level machinery, no
+  selection contract, and `StartEvent(eventId)` is always fully specified. The rising requirement
+  plus the player's power curve throttles level stacks as a repeatable Roadie source. Reward
+  composition is per-chain authoring: each level's modifier is an *increment* that stacks with the
+  previous level's, or the next level's `onComplete` swaps them explicitly
+  (`RemoveModifier` + `AddModifier`).
 
 Authoring guidelines: most events use debuffs; timed events are used sparingly; failure stays cheap;
 larger events include a decision (risk/reward, which song to submit) rather than a single confirm.
@@ -401,9 +429,17 @@ clearing a chapter's goal adds a Roadie to the pool.
 four venues give 1.45 × 1.45 × 1.40 × 1.45 = 4.27×.
 
 Because venue boosts multiply, distributing roadies across more venues beats concentrating them
-(8 roadies: 1.40× on one venue, 1.46× split across four). Each `venueBoost` also sets that chapter's
-replay speed, so allocation balances spreading for total multiplier against concentrating to speed an
-active replay.
+(8 roadies: 1.40× on one venue, 1.46× split across four). **The active chapter double-counts its
+own factor**: `activeProduction = totalBoost × activeVenueBoost` — the played venue's boost applies
+once inside the global product and again locally, which is what makes stationing Roadies speed the
+chapter being worked (8 Roadies stacked: ~1.96× there, 1.40× everywhere else; spread 2/2/2/2:
+1.46× globally and ~1.61× on the chapter being worked). Allocation balances spreading for the total
+against concentrating to sprint an active replay — both are real strategies. **Both factors are
+ordinary effects whose target is authored data** — a tag (Ch. 1: `income`, declared by Cash) — so
+*what* Roadies help with is a per-chapter design decision, never a code decision. **The fan rate
+must never carry a roadie-targeted tag**: the wall-clock throttle of §8.1 stands on Fans being
+unbuffable by Roadies. (Deliberately open: whether reallocating applies retroactively to a dormant
+chapter's idle claim computed at current rates.)
 
 **Per-venue scaling (planned).** Larger venues will use a higher per-roadie rate and cap (e.g. +5%
 up to 5 roadies at the garage; +8% up to 20 at an arena). Values set during tuning.
@@ -417,7 +453,8 @@ purchasable is also earnable in-game.
 
 **Idle earnings (per chapter).** The unit of idle is the **chapter**, and "active" is singular: the
 chapter on screen ticks live; every other chapter is dormant. Each chapter's state carries one
-`lastActiveUtc`, stamped on switch-away and on save. **Switching into a chapter** computes, for each
+`lastActiveUtc`, stamped on switch-away and — **for the foreground chapter only** — on save; a
+global save never touches dormant chapters' stamps, or it would truncate their idle. **Switching into a chapter** computes, for each
 of its currencies, `rate × min(elapsed, cap) × idleRate` — from *current* state, so Records earned
 elsewhere while away correctly boost the payout — and stores it as a **pending claim** in the
 chapter's state, presented as the **idle dialog**: the amount earned, plus "Double it" (a rewarded
@@ -463,7 +500,9 @@ and keeps Encore permanently active at Overdrive (4× speed). Since ads are opt-
 is convenience.
 
 **Buy Roadies** — consumable, repeatable IAP. Bought Roadies are identical to earned ones. No
-purchase cap; throttled by escalating bundle price and by concavity (§8.2). A `bought ≤ earned` cap
+purchase cap; throttled by escalating bundle price and by the planned per-venue caps (§8.2).
+(Allocation concavity punishes stacking one venue but does **not** cap the total: spread Roadies
+compound multiplicatively across venues, so price and caps are the real throttle.) A `bought ≤ earned` cap
 is held in reserve for a competitive leaderboard. A late-game Cash → Roadie sink may be offered.
 
 **Tip Jar** — small one-time purchases with no gated content.
@@ -479,8 +518,10 @@ multiplier for first-clears).
 
 The story is delivered at chapter boundaries. A card at chapter open sets the scene and the goal
 ("Pull 200 people and the Friday slot is yours"); a beat at the capstone resolves it and introduces
-the next chapter — a UI reaction to the completion flag's transition. There are no story
-interruptions during the loop itself.
+the next chapter — gated on state, never on observing a transition: the beat shows while
+`chapterN_complete && !storyN_seen`, and dismissing it sets the root `storyN_seen` latch, so a
+crash between the completion save and the beat cannot skip it. There are no story interruptions
+during the loop itself.
 
 Named Catalog songs (§7) serve as story artifacts — the songs that chart appear in the Discography
 and persist.
@@ -499,7 +540,9 @@ Two structural properties keep pacing stable against players with strong income 
 
 Tuning must hold at both ends: an unbuffed player's pace is doable and never feels impossible, and
 a permanent-Overdrive player (4× game speed, plus Roadie and Catalog multipliers) still takes
-meaningful play time per chapter and breaks nothing.
+meaningful play time per chapter and breaks nothing. Timed events feel Overdrive fully — speed
+scales production but never timers (§9), so a 4× player meets a timed goal in a quarter of the
+clock; author timed goals with that end in mind.
 
 **Per-chapter economy template (to fill in):**
 - 4–6 themed generators (exponential cost, growth ~1.15, Cash in the thousands–millions).
@@ -519,8 +562,10 @@ meaningful play time per chapter and breaks nothing.
    from other state is recomputed whenever asked. (A completion flag a press *sets* is a stored fact,
    not a derivation.) Nothing derived can go stale, double-count, survive a reset it shouldn't, or
    disagree with a save.
-2. **All mutable state lives in the ScopeState tree** (§12.3). Systems are stateless code that reads
-   and writes those containers; no system instance per scope, no state hiding in managers.
+2. **All durable gameplay state lives in the ScopeState tree** (§12.3). Transient orchestration —
+   the foreground chapter selection, the session phase, command guards, derived caches — lives in a
+   never-serialized `GameSession` (§12.9). Systems are stateless code that reads and writes those
+   containers; no system instance per scope, no state hiding in managers.
 3. **Lifetime is placement.** A currency, flag, upgrade latch, or bar lives in the scope that
    declares it; the reset that clears the scope clears the fact. Nothing declares a lifetime.
 4. **Class families for open sets; flat data for closed records.** Conditions, Actions,
@@ -551,20 +596,27 @@ something because a system consumes it — the tick consumes `rate`, `FireProduc
 so a later accumulation concept is a new stat name plus its consumer; no field grows, nothing
 existing is touched. A stat no system consumes warns at load. Rate and yield are modified and
 presented separately ("+12/sec" vs. "+5 per press"). Firing is external and unnamed: a button, an
-automation, and a test are indistinguishable below the module layer.
+automation, and a test are indistinguishable below the module layer. All outputs of one
+`FireProducer` call resolve atomically from pre-fire state — conditions and amounts judged
+together, then deposited — so no output can flip a sibling output's condition mid-fire.
 
 Chapter 1's Jam is a producer, not UI logic:
 
 ```
 tap_producer.produces: [ { cash,      yield, 1 },
-                         { rehearsal, yield, 1, FlagSet(rehearsal_revealed) },
-                         { rehearsal, rate,  0.5 } ]
+                         { rehearsal, yield, 1,   FlagSet(rehearsal_revealed) },
+                         { rehearsal, rate,  0.5, FlagSet(rehearsal_revealed) } ]
+                         // the rate is gated too — Rehearsal accrues nothing before its reveal.
+                         // (An UNconditioned rate entry is how a pre-banking mechanic would be
+                         // authored, if a chapter ever wants one.)
 ```
 
-**Generator** — the purchasable. Definition: `{id, tags, costCurrency, baseCost, growth,
-produces: [...]}` — the same entry shape as a producer, scaled by `ownedCount`; state: `ownedCount`
-in its declaring scope. A bandmate is a generator with two rate entries (cash, fans) and a
-`bandmate` tag. Cost currency is independent of what it produces.
+**Generator** — the purchasable. Definition: `{id, tags, availableWhen, costCurrency, baseCost,
+growth, produces: [...]}` — the same entry shape as a producer, scaled by `ownedCount`; state:
+`ownedCount` in its declaring scope. A bandmate is a generator with two rate entries (cash, fans)
+and a `bandmate` tag. Cost currency is independent of what it produces. `TryBuy` is fail-closed
+against `availableWhen` and affordability — the domain owns the gate, never the UI's visibility.
+(Producers need no equivalent field: their `produces` entries carry their own conditions.)
 
 **Effect** — the modifier atom:
 
@@ -572,16 +624,18 @@ in its declaring scope. A bandmate is a generator with two rate entries (cash, f
 [Serializable] public struct Effect
 {
     public string target;      // a currency id, a producer/generator/bar/group id, or a TAG
-    public string stat;        // optional; e.g. "rate"/"yield" on a producer, a currency id on a
-                               // generator, empty = every number the target has
+    public string currencyId;  // optional — narrow to entries paying this currency
+    public string stat;        // optional — narrow to this stat ("rate"/"yield")
+                               // both empty = every number the target has; both set = one entry
     public double multiplier;
 }
 ```
 
 Sources carry a `List<Effect>` — one factor per number, grouping lives in the list, so "×2 rate and
 ×3 yield" is two entries and no enum ever grows a `Both`. **Modifiers are multipliers only**; a flat
-bonus is a *contribution* to the number it raises, authored as a `produces` entry on whatever fact
-pays it. Every composed number has one shape: sum of matching contributions whose conditions hold ×
+bonus is a *contribution* to the number it raises, authored as a `produces` entry — only producers
+and generators carry entries; another fact (an upgrade, a flag) contributes flatly via an entry
+*conditioned* on it. Every composed number has one shape: sum of matching contributions whose conditions hold ×
 product of matching multipliers. An Effect never carries a count or growth; where a stored count
 scales an effect (fill counts, modifier stacks), the carrying entry declares the growth (§12.7).
 
@@ -597,17 +651,33 @@ stack by declaring the tag.
 **Reserved target ids:** `idle_rate`, `idle_cap`, `game_speed` (§9) — each consumed by exactly one
 system (`game_speed` by the tick, which scales the production dt; wall-clock decrements never scale).
 
-`GetMultiplier(target, stat)` answers one question: *which factors apply to this number?* A number
-is identified by its owner and coordinates — a `produces` entry by (source, currencyId, stat), a
-reserved id by its name. An effect matches when its `target` names the owner (by id or any of its
-tags) and its `stat` is empty (all of the owner's numbers) or names the coordinate it narrows to —
-a stat name (`rate`/`yield`) or a currency id. Gather the matches from every source in §12.6,
-multiply. That is the entire modifier system.
+`GetMultiplier(owner, currencyId, stat)` answers one question: *which factors apply to this
+number?* A number is identified by its owner and coordinates — a `produces` entry by
+(source, currencyId, stat), a reserved id by its name alone. An effect matches when its `target`
+names the owner (by id or any of its tags) and each optional coordinate it sets agrees: both empty
+matches everything the owner has, either one narrows, both name one entry exactly — the Effect
+address mirrors the `produces` entry's coordinates. **Where matches are gathered from is two
+explicit stages**, which is what keeps sibling scopes isolated (§12.3):
+
+```
+sourceContribution = base × source-targeted effects   gathered from the SOURCE's scope → root
+currencyTotal      = Σ sourceContributions
+                     × currency-targeted effects      gathered from the CURRENCY's home → root
+```
+
+A currency-targeted effect must therefore be declared at the currency's home scope or an ancestor
+(validated, §12.12); a descendant scope wanting a local boost targets its producer, generator, or a
+source tag instead. That is the entire modifier system.
 
 ### 12.3 Scopes: state containers
 
 A **scope** is a plain state container. Content declares, per scope: its currencies, flags, bar
-groups, generators, upgrades, and (for tiers) its press. Runtime state per scope:
+groups, **producers**, generators, upgrades, triggers (§12.5), and (for tiers) its press. A producer's `produces`
+entries are live exactly while its declaring scope belongs to the foreground chapter's **live
+subtree** — activation is placement, several sibling or nested scopes participate in the same tick,
+and each contribution resolves its facts and effects outward from its own declaring scope to root,
+never crossing into siblings. The tick enumerates rates from that subtree's declared producers and
+generators, never from what the UI happens to show. Runtime state per scope:
 
 ```csharp
 class ScopeState   // the COMPLETE mutable state — nothing lives outside these fields (§12.10)
@@ -617,6 +687,7 @@ class ScopeState   // the COMPLETE mutable state — nothing lives outside these
     Dictionary<string, int>       generatorCounts;
     HashSet<string>               flags;
     HashSet<string>               purchasedUpgrades;
+    HashSet<string>               firedTriggers;    // one-shot trigger latches — a reset re-arms (§12.5)
     Dictionary<string, BigDouble> barProgress;      // uncapped — overfill is allowed
     Dictionary<string, int>       fillCounts;       // repeating bars
     Dictionary<string, HashSet<string>> activeBars; // per group
@@ -661,9 +732,19 @@ public abstract class Condition
 }
 ```
 
-Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, `BarsCompleted`,
-`All`, `Any`, plus a formula-threshold kind (threshold computed from state — e.g. a scaling goal or
-reward curve reading a per-clear counter, §8.1). Records need no special kind: they are a currency.
+Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, `UpgradePurchased`,
+`BarsCompleted`, `All`, `Any`, `Not` (the story gate `chapterN_complete && !storyN_seen` is
+`All[FlagSet, Not[FlagSet]]`), plus a formula-threshold kind (threshold computed from state — e.g.
+a scaling goal or reward curve reading a per-clear counter, §8.1). Records need no special kind:
+they are a currency.
+
+**Every condition evaluates — and every action list executes — in an explicit scope**, supplied by
+`GameContext`, never inferred and never inherited from a caller: a press, upgrade, bar, or trigger
+in its declaring scope; an event in its host scope; a `produces` entry in its producer's declaring
+scope; a UI section or module in its authored `scopeId` (§12.11). Nested invocations **rebase** the
+context to the owning object's scope — `ExecuteRung` runs the referenced press in *that press's*
+declaring scope, which is how the capstone's rung legally reads tier-owned Fans. Reads walk outward
+from there (§12.12).
 
 Authoring guidance: gate persistent UI on monotonic facts (flags, earned totals), never on spendable
 balances (§2). Serialized via `[SerializeReference]` in assets, or a `"type"` field mapped to the
@@ -682,7 +763,7 @@ public abstract class Action
 ```
 
 Kinds: `AddCurrency` (one or more target currencies paid from a single evaluation; amount constant
-or from a `PayoutFormula`), `AddModifier(scopeId, modifierId)`,
+or from a `PayoutFormula`), `AddModifier(scopeId, modifierId)`, `RemoveModifier(scopeId, modifierId)`,
 `SetFlag(flagId)`, `AddSong`, `ResetScope(scopeId)`, `ExecuteRung(tierId)`, and the event lifecycle
 operations `StartEvent(eventId)` / `CompleteEvent(eventId)` / `AbortEvent(eventId)` (§6.1), each
 fail-closed against its own gate. Authored inline via
@@ -694,14 +775,20 @@ they mutated is what gets saved.
 **`ResetScope`** clears the named scope and everything inside it (downward-closed). It only clears —
 it never executes nested lists — so no recursion exists via resets.
 
-**`AddModifier`** appends a pointer-fact `{modifierId}` to the target scope's `activeModifiers`. The
-numbers stay in the `ModifierDefinition` (a named `List<Effect>` with an explicit **stack vs.
-replace** field); the entry is the fact, saved and cleared with its scope. Reserved for grants from
+**`AddModifier`** appends a pointer-fact `{modifierId, count}` to the target scope's
+`activeModifiers`. The numbers stay in the `ModifierDefinition` — a named `List<Effect>` with a
+**`stacking` enum: `Replace | Linear | Multiply`**. `Replace`: a re-grant keeps count at 1;
+`Linear` / `Multiply`: a re-grant increments count, and the name picks the count-scaling formula
+(`1 + (m−1)·n` vs. `m^n`) — duplicate-grant policy and growth are one closed choice. The entry is
+the fact, saved and cleared with its scope. Reserved for grants from
 *moments that leave no other trace* (an event reward); when a count already exists as state, derive
-from it instead (§12.6).
+from it instead (§12.6). **`RemoveModifier`** is its exact inverse: decrements one stack, deletes
+the entry at zero, no-ops when absent.
 
 **A press** is `{offerCondition, List<Action>}` — the one shape behind the album release (declared
-on its tier), the capstone (declared on the chapter), and event entry/completion. Every invocation
+on its tier) and the capstone (declared on the chapter). Event lifecycle operations are **not**
+presses — they execute authored `onEntry`/`onComplete` lists through the same action machinery
+(§6.1). Every invocation
 is **fail-closed against the press's own gate**: `TryPress` (the UI entry point) checks the offer
 condition before executing, and **`ExecuteRung` runs another press's action list through the same
 check — gate met, it executes; gate unmet, it no-ops.** There is no bypass: a payout is only
@@ -712,9 +799,28 @@ banked. References are validated acyclic at load. No press may be authored on th
 (`floor((fans/5)^0.5)`, piecewise diminishing-returns curves). Pure functions, so UI previews call
 the same code the press runs.
 
+**Trigger** — the one sanctioned condition-observer: `TriggerDefinition {id, condition, actions}`,
+declared per scope. A trigger firing is a *moment*: when its condition holds and its id is not in
+the scope's `firedTriggers`, it **latches the id first, then executes its actions** — the same
+discipline as `CompleteEvent`, and it makes self-resetting triggers correct for free: an action
+list that resets the declaring scope clears the just-written latch, re-arming the trigger for the
+new life. The latch is a stored fact, so nothing derived is stored. **One-shot per scope-life,
+never repeating**: the reset that clears the declaring scope re-arms it (a tier trigger fires once
+per run; a root trigger once ever) — lifetime is placement. Repeating behavior is a producer or a
+bar, never a trigger. Swept at the two refresh moments (§12.9) in a single pass, in
+**deterministic order — scopes in tree order (parent before child), triggers within a scope in
+declaration order** — whose **eligibility is a sweep-start snapshot**: conditions are evaluated
+against the state as the sweep
+began, so a trigger armed by an earlier trigger in the same pass fires at the *next* sweep, never
+this one — no fixpoint — and a trigger whose declaring scope was reset during the sweep does not
+execute against the replacement scope-life. Never evaluated while its scope is dormant: a threshold
+crossed during idle fires on the first live sweep after switch-in, reading present state — nothing
+is replayed or backdated. Trigger action lists pass every list validation (§12.12). An invisible
+auto-finishing challenge is a trigger, not an event — events keep claimed completion.
+
 ### 12.6 Where effects come from
 
-`GetMultiplier(target, stat)` gathers, from every scope on the chain outward:
+`GetMultiplier(owner, currencyId, stat)` gathers, from every scope on the chain outward:
 
 | Source | The fact (stored) | The effects (derived on read) |
 |---|---|---|
@@ -722,7 +828,7 @@ the same code the press runs.
 | Owned generators | `generatorCounts` | `produces` entries scaled by count (contributions, not effects) |
 | Timed buffs (Encore) | `{buffId, expiresAt}` list | the buff definition's effects while unexpired |
 | Active events | live (unexpired) `ActiveEvent` record | the event definition's handicaps |
-| Granted modifiers | `activeModifiers` entries | the `ModifierDefinition`'s effects, per stack rule |
+| Granted modifiers | `activeModifiers` entries | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times |
 | Career facts | Records balance, Roadie allocation, songs this run, entitlements | the formula-shaped effects of §3/§7/§8 |
 
@@ -738,17 +844,17 @@ Generic fillable bars: pacing bars (learn covers), repeating currency bars, casc
 class BarDefinition : Definition
 {
     BigDouble    fillAmount;
-    double       fillRate;        // this bar's own max fill speed (units/sec)
+    BigDouble    fillRate;        // this bar's own max fill speed (units/sec)
     bool         repeating;       // fill → fire onComplete → reset to 0 → go again
     Condition    availableWhen;
     List<Action> onComplete;      // fires at each threshold crossing
-    List<Effect> perFill;         // cascade: applied fillCount times, on read
+    List<PerFillEntry> perFill;   // cascade: {effect, growth}, applied fillCount times on read
 }
 
 class BarGroupDefinition : Definition
 {
     string          fillCurrencyId;  // the shared pool (ContinuousDelivery)
-    double          pipeRate;        // total throughput the group can spend per second
+    BigDouble       pipeRate;        // total throughput the group can spend per second
     int             maxActive;
     BarFillBehavior behavior;        // class family
 }
@@ -761,48 +867,111 @@ from time alone (no pool). Future variants (tap-a-chunk, dump-the-pool) are sibl
 balance) covers total demand, every bar fills at its rate; otherwise all throttle proportionally.
 Buffing the pipe (`{target: groupId, ×2}`) eventually lets multiple bars run at their caps in
 parallel — rehearsal speed becomes parallel learning. Per-bar speed is buffable by bar id or tag.
+A pool (`fillCurrencyId`) shared by several live groups arbitrates the same way, one level up: when
+the pool can't cover the groups' combined demand, **every live bar drawing it throttles
+proportionally, across groups** — the pipe is per-group, the pool is shared, and processing order
+never picks a winner.
 
 **Selection is state**: `activeBars` per group; empty = pool accrues, nothing drains.
 `SetActiveBars` is **fail-closed** like every entry point (§12.11): it rejects a set that exceeds
 `maxActive`, names a bar outside the group, names an unavailable bar (`availableWhen` false), or
 names a completed non-repeating bar. On completion the stream **stops** (choosing is the mechanic
-in Ch. 1); auto-advance is a `ContinuousDelivery` field a later chapter's automation can grant.
+in Ch. 1); auto-advance is a field on `ContinuousDelivery` (behavior classes carry their own config
+beyond the snippet shown) that a later chapter's automation can grant.
 
 **Completion is derived**: complete ⇔ `progress ≥ fillAmount`. For a non-repeating bar, progress is
 monotonic until reset and **uncapped** — overfill is allowed and readable — so the crossing happens
 once, and that is when `onComplete` fires. No completed-set is stored; `BarsCompleted(n)` counts
-bars at full. **Repeating bars settle a tick arithmetically, not iteratively**: with delivered
-progress Δ, `fires = floor((progress + Δ) / fillAmount)`; `fillCount += fires`; `onComplete`
-executes once per fire; the residual `progress + Δ − fires × fillAmount` is retained. A buffed rate
-that crosses several thresholds in one tick pays every crossing and loses no overflow.
+bars at full. **Repeating bars settle a tick iteratively**: while `progress ≥ fillAmount` and the
+bar is still active and available, subtract `fillAmount`, increment `fillCount`, execute
+`onComplete` — re-reading state each iteration, so a completion action that resets the host or
+flips availability stops the loop honestly instead of executing precomputed fires against a changed
+world. Residual progress is retained; a buffed rate crossing several thresholds in one tick pays
+every crossing. (The arithmetic shortcut `fires = floor((progress + Δ)/fillAmount)` is a valid
+optimization only when `onComplete` cannot affect the bar's environment.) When several bars
+complete in the same tick, settlement order is deterministic — scopes in tree order (parent before
+child), then groups, then bars within a group, in declaration order — and a reset during
+settlement invalidates the remaining completions from the old scope-life, exactly as the trigger
+sweep rule (§12.5).
 
 **Cascades** (bar B buffs bar A per fill): B declares `perFill: [{effect, growth}]` — e.g.
 `{{target: barA, ×1.05}, multiply}`; the applied count is B's `fillCount` — the same pattern as
 generator contributions scaling by `ownedCount`. Growth lives on the carrying entry, never on the
-Effect atom: `multiply` (m^n) or `linear` (1 + (m−1)·n), the same choice `ModifierDefinition`'s
-stack field makes (§12.5).
+Effect atom: `multiply` (m^n) or `linear` (1 + (m−1)·n) — the same growth vocabulary
+`ModifierDefinition`'s `stacking` enum uses for granted stacks (§12.5).
 
 ### 12.8 Events (runtime)
 
-Defined in §6.1. Runtime is one record in the host scope. The tick's only job is decrementing
-`remainingSeconds` on live ticks — it evaluates nothing and fires nothing; completion is claimed.
-`StartEvent` / `CompleteEvent` / `AbortEvent` are the three self-guarding operations: start runs
-`onEntry` then creates the record; complete is armed by the goal and runs `onComplete`, whose
-ending `ResetScope(host)` clears the record with the rest of the host state; abort deletes the
-record and touches nothing else. Any reset that reaches the host kills the event — lifetime is
-placement. An expired record is inert by derivation and swept when the scope next becomes active.
-Handicaps apply purely by a live record's existence (§12.6). Nothing installs, so nothing tears
-down.
+Defined in §6.1. Runtime is one record per host scope — **at most one**: `StartEvent` rejects a
+host that already holds a record, live or expired-but-undismissed. The tick's only job is
+decrementing `remainingSeconds` on live ticks — it evaluates nothing and fires nothing; the
+**sweep** (inside every transaction — tick and command alike) latches `goalReached` the moment a
+timed goal holds before expiry — judged on the sweep-start snapshot, latched before any trigger
+actions execute (goal-met and expiry observed together counts — the tie goes to the player) — and
+completion is claimed.
+`StartEvent` / `CompleteEvent` / `AbortEvent` are the three self-guarding operations: start checks
+`availableWhen` and the empty host, runs `onEntry`, then creates the record; complete is armed by
+`goalReached` (or the goal holding live, for untimed events), marks the record claimed (refusing
+reentry), runs `onComplete`, and removes the record whether or not the authored reset already
+cleared it; abort deletes the record and touches nothing else. Any reset that reaches the host
+kills the event — lifetime is placement. An expired, goal-unreached record is inert by derivation
+and **persists until the player dismisses it** (`AbortEvent`) or a reset reaches the host — nothing
+expires it away automatically, and while it sits there the host stays occupied. Handicaps apply
+purely by a live record's existence (§12.6). Nothing installs, so nothing tears down.
 
 ### 12.9 Idle (runtime)
 
-Per §9: one active chapter ticks — on scaled time, `effective dt = real dt ×
-GetMultiplier(game_speed)`, with wall-clock decrements (event timers, buff expiries) on real dt.
-`lastActiveUtc` stamped on switch-away and save. Switch-in computes
+Per §9: the foreground chapter's live subtree ticks (§12.3) — on scaled time, `effective dt = real dt ×
+GetMultiplier(game_speed)`, with wall-clock decrements (event timers, buff expiries) on real dt. A
+tick that crosses an expiry timestamp (buff or event) is **segmented at it** — each segment
+resolves with the multipliers live in that segment, so update order can never hand a whole tick the
+wrong multiplier. Within each segment the economy phases are **fixed**, resolved from a **start-of-segment snapshot
+of effects and entry conditions** — every rate entry is judged and sized against pre-deposit state
+before any deposit lands, so definition order never changes production: rate production deposits
+(pool currencies included) → bar
+consumption (proportional throttle, §12.7) → iterative bar completion — production before
+consumption, so an empty pool fed at +1/sec serves a 1/sec bar demand in the same tick — then wall
+clocks advance to the segment boundary **for the timer set snapshotted at segment start**: a timer
+born mid-segment (a bar action's `StartEvent`) is never charged for a segment it didn't live
+through, and a handicap or buff live at segment start governs the whole segment, expiring only at
+its edge. After the last segment: the sweep, commit, and refresh
+(§12.11).
+`lastActiveUtc` stamped on switch-away and, for the foreground chapter only, on
+save. Switch-in computes
 `rate × min(elapsed, cap) × idleRate` per currency at current rates — skipped below the minimum-away
 threshold and skipped entirely while a timed event runs in that chapter — and stores it as the
 chapter's pending claim for the idle dialog; deposit on dismissal, ad-doubling at claim time.
-`idle_rate`, `idle_cap`, and `game_speed` resolve through `GetMultiplier` like everything else.
+The claim is an exactly-once transaction — `{claimId, amounts, doubled, settled}`: the ad callback
+marks `doubled`, deposit flips `settled`, and replaying either after an app kill is idempotent by
+`claimId`. `idle_rate`, `idle_cap`, and `game_speed` resolve through `GetMultiplier` like
+everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
+commit — for ticks and commands alike; live scopes only, single pass. The same sweep observes
+timed-event goals **from the sweep-start snapshot and latches `goalReached` before any trigger
+actions execute** — success is judged on the transaction's own mutation, never on trigger
+payloads; a trigger that spends the goal currency changes nothing already secured, and its effect
+on goals is seen next sweep (§12.8).
+
+**GameSession** — the transient execution context, never serialized:
+`{foregroundChapterId, phase: NoChapter | AwaitingIdleClaim | Live, commandInProgress}` — launch
+and backgrounding are `NoChapter`, so no-foreground states are explicit rather than a null id.
+Durable facts live in the tree; the session holds only orchestration. The chapter to reopen at launch is a
+**non-authoritative UI preference**, never inferred from economy timestamps — `lastActiveUtc`
+records idle-settlement boundaries, not UI history. While `phase == AwaitingIdleClaim`, only claim
+and switch commands are legal — mutating commands are refused, so a press or automation can never
+reset away an unsettled claim; settling flips the session to `Live`. Authenticated ad/store
+callbacks are always **phase-eligible, never reentrant**: a callback is a serialized mutation
+transaction — queued behind `commandInProgress`, then mutation → sweep → commit → one refresh like
+any command — so marking the pending claim `doubled` repaints the dialog even while no ticks run.
+Callbacks are not UI commands (§12.11). **The session also draws the
+command boundary**: **every chapter-local mutation** — `TryBuy`, `FireProducer`, `TryPress`,
+`SetActiveBars`, the event operations, the song operations, and any future mechanic command — is
+rejected when its owning scope lies outside the foreground chapter's live subtree; ids are unique
+tree-wide, but reachable is not the same as mutable. Root-owned commands
+(`SetRoadieAllocation`, `AcknowledgeStory`) and the session commands (`SwitchChapter`, `ClaimIdle`)
+are the exceptions. This guard is orchestration — it lives here, never in chapters or scopes.
+**Switching away settles first**: the switch transaction deposits the outgoing chapter's unsettled
+claim at its undoubled value (switching is an exit path, §9) before stamping out, so pending
+dialogs never accumulate across chapters.
 
 ### 12.10 Save
 
@@ -821,36 +990,70 @@ delta (device clock moved backwards) clamps elapsed time to zero — rollback ca
 ### 12.11 UI
 
 **Authored layout**: a chapter's screen is an ordered list of `SectionDefinition {visibleWhen,
-modules}`; a `ModuleDefinition {prefabId, contentId, visibleWhen?}` binds a widget prefab to content
-by id. A `ModuleRegistry` maps prefab ids via Addressables — a new widget type is a prefab plus an
-entry. Sections live on the `ChapterDefinition`.
+scopeId, modules}`; a `ModuleDefinition {prefabId, contentId, visibleWhen?, scopeId?}` binds a
+widget prefab to content by id. A section's `scopeId` is its **evaluation scope** — the context its
+conditions read from, which is how a chapter-owned section legally gates on a tier-declared flag; a
+module defaults to the home scope of its bound content **when that home lies within the chapter's
+subtree, else to the chapter itself** (root-owned content like Records is readable from any
+context — root is on every chain). Validated at load: the chapter itself or one of its descendants. A `ModuleRegistry` maps prefab ids via Addressables — a new widget type is
+a prefab plus an entry. Sections live on the `ChapterDefinition`.
 
-**Refresh** is coarse, on two triggers: after each tick of the active chapter, and after an action
-list finishes executing (never mid-list — a press's payout, flag, and reset render as one change).
+**Refresh** is coarse, on two triggers: after each tick of the foreground chapter, and after every
+**completed command transaction** (nested Actions never refresh individually — the outer
+transaction publishes one final state change, so a press's payout, flag, and reset render as one).
+The full pipeline is fixed: **mutation → one trigger sweep → trigger actions → transaction commit →
+one refresh** — the sweep runs inside the transaction, so a trigger's payload renders atomically
+with the command that armed it.
 Visible sections re-evaluate `visibleWhen`; visible modules re-read what they show. Event-driven,
 never per-render-frame; fine-graining is a mechanical optimization if profiling ever asks.
 
 **Entry points** — the only ways the UI touches the game: `TryPress(press)`, `TryBuy(generator |
-upgrade)`, `FireProducer(producerId)`, `SetActiveBars(group, set)`, and the event operations
-`StartEvent / CompleteEvent / AbortEvent (eventId)`. All fail-closed — each checks its own gate.
+upgrade)`, `FireProducer(producerId)`, `SetActiveBars(group, set)`, the event operations
+`StartEvent / CompleteEvent / AbortEvent (eventId)`, `SwitchChapter(chapterId)` (stamps
+`lastActiveUtc`, computes the pending claim, §12.9), `ClaimIdle(chapterId)` (settle the pending
+claim, §9 — the dialog's double button only *requests* the rewarded ad; marking the claim `doubled`
+is AdManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked venues only,
+per-venue caps), the Ch. 6 song operations (write / name), and
+`AcknowledgeStory(storyId)` (sets the root `storyN_seen` latch, §10). All fail-closed — each checks
+its own gate. Ad and store
+callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations (extend
+a buff, mark an idle claim doubled, write an entitlement, grant Roadies) — they are not UI paths.
 
 **Widgets interpolate** displayed numbers and bar fills between ticks; presentation only.
 
 ### 12.12 Validation at content load
 
 - Every referenced id resolves (currencies, flags, generators, modifiers, scopes, tags in targets).
-- Declarations are unique tree-wide (currency, flag, bar ids).
-- A tag may not collide with any id; an Effect target matching nothing warns.
+- Every Definition id is unique tree-wide — currencies, flags, bars, groups, producers, generators,
+  upgrades, events, triggers, modifiers, scopes, songs; a declaration in two scopes is refused.
+- A tag may not collide with any id; an Effect target matching nothing reachable warns.
 - A `SetFlag` naming an undeclared flag is an error; a flag with no setter warns; a flag whose
   setters all live in scopes more durable than the flag warns (§2).
 - A press that resets a scope containing tier presses with unreferenced payout actions warns
   (stranded value); a formula-driven grant placed after a `ResetScope` that clears its inputs warns
-  (reads zeros); `ExecuteRung` reference cycles are errors; a press on the root scope is an error.
+  (reads zeros); reference cycles across ALL nested action references — `ExecuteRung`, the event
+  lifecycle operations, and trigger lists — are errors; a press on the root scope is an error.
 - Scope references are checked for reach: `ResetScope` may target the acting scope, a scope it
   encloses, or a sibling — never the root, an ancestor, or an unrelated subtree. `ExecuteRung` may
-  only reference a press declared within the acting scope. `AddModifier` may target the acting scope
-  or an ancestor (grants live outward), never an unrelated subtree.
+  only reference a press declared within the acting scope. `AddModifier` and `RemoveModifier` may
+  target the acting scope or an ancestor (grants live outward), never an unrelated subtree; a
+  `RemoveModifier` naming a modifier nothing reachable grants warns.
+- Ordinary reads and writes (`AddCurrency`, `SetFlag`, `AddSong`, Condition reads, `produces`
+  targets) may address only the acting scope's chain — itself or an ancestor. The runtime state
+  walk cannot reach siblings, so a cross-tree reference is a load-time error rather than a silent
+  runtime miss.
+- Effect reach is validated for every target kind (§12.2): a currency-total effect must be declared
+  at the currency's home scope or an ancestor; an exact source target (producer, generator, bar,
+  group) must be declared at the target's scope or an ancestor — a sibling-declared effect resolves
+  at load but the target's outward walk never visits it, so it is an error, not a warning; a tag
+  target must match at least one member within the effect's declaring scope's subtree.
+- An action list that sets a fact and later resets the scope declaring it errors (set-then-wiped —
+  e.g. an event's `event_tierN_done` flag must be declared outside the scope its own `onComplete`
+  resets).
 - A balance goal on an event whose `onEntry` never resets the host scope warns.
+- An event's `onEntry` / `onComplete` may not invoke lifecycle operations targeting its own host —
+  acyclic nesting could otherwise create a second record between the empty-host check and record
+  creation.
 - A polymorphic kind in data with no class behind it is an import error.
 
 ### 12.13 File layout
@@ -858,20 +1061,21 @@ upgrade)`, `FireProducer(producerId)`, `SetActiveBars(group, set)`, and the even
 ```
 Assets/Scripts/
   Core/
-    GameManager.cs          // bootstrap, save/load, active-chapter switching
+    GameManager.cs          // bootstrap, save/load, chapter switching
+    GameSession.cs          // transient orchestration: foreground chapter, phase, command guard — never serialized
     TickSystem.cs           // fixed-interval tick on real (DateTime) time
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // Addressables discovery by label; id→def; the §12.12 validation pass
     ScopeDefinition.cs / ScopeState.cs
-    Condition.cs  Action.cs  PayoutFormula.cs   // the class families (+ kind classes)
+    Condition.cs  Action.cs  PayoutFormula.cs  Trigger.cs   // the class families (+ kind classes)
     Effect.cs               // the flat struct
     GameContext.cs          // read access for Evaluate/Execute: state chain + defs
   Economy/
     CurrencyDefinition.cs  ProducerDefinition.cs
     Producer.cs             // stateless resolution: Σ matching produces entries × Π multipliers + GetMultiplier
     GeneratorDefinition.cs  UpgradeDefinition.cs
-    ModifierDefinition.cs   // named List<Effect> + stack/replace
+    ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply)
     BarDefinition.cs  BarGroupDefinition.cs  BarFillBehavior.cs  BarSystem.cs
   Loop/
     ChapterDefinition.cs  TierDefinition.cs   // presses declared here
@@ -916,8 +1120,8 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 - **Records:** the single permanent progression currency; each Record raises global income ~+2%; the
   capstone gates on Records earned within its chapter — a chapter-declared counter fed by the album
   payout and zeroed by the capstone's own reset.
-- **Presses:** every prestige operation — album release, capstone, event entry — is
-  `{offerCondition, List<Action>}`. Payout-before-clear is list order; `ResetScope` is a bare
+- **Presses:** the album release and the capstone are `{offerCondition, List<Action>}`; events are
+  lifecycle operations executing authored lists (§6.1). Payout-before-clear is list order; `ResetScope` is a bare
   downward-closed clear; every invocation — `TryPress` from the UI, `ExecuteRung` from another
   press — is fail-closed against the press's own gate (an unmet gate no-ops; unfinished runs
   discard, never bank). The capstone resets the **entire chapter**; completion facts live at root; replays are the same
@@ -926,7 +1130,7 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 - **Economy:** producers are named definitions owning base contributions —
   `produces: [{currencyId, stat, value, condition?}]`, stats (`rate`, `yield`) named and extensible;
   generators contribute the same entry shape, scaled by owned count; **Effect** =
-  `{target: id-or-tag, stat, multiplier}`, gathered on read from
+  `{target: id-or-tag, currencyId?, stat?, multiplier}`, gathered on read from
   facts (purchases, timed buffs, events, modifier grants, fill counts, career totals) and never
   stored; flat bonuses are contributions; tags name sets from the member side.
 - **Bars:** generic fillables — own fill rate per bar, group pipe rate (proportional throttle),
@@ -937,8 +1141,12 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   host press's own gate is met, discarding it otherwise) then creates the record; handicaps are ×<1
   effects that exist while a live record does; timers tick live only and suppress idle; completion
   is claimed, not automatic — `onComplete` ends in the reset that clears the record; abort deletes
-  it; any reset reaching the host kills it; expired records are inert and swept on activation;
-  rewards lateral, never Records.
+  it; any reset reaching the host kills it; expired records are inert and persist, occupying the
+  host, until dismissed or reset; rewards lateral, never Records.
+- **Triggers:** `{condition, actions}` per scope — the one sanctioned condition-observer; one-shot
+  per scope-life (`firedTriggers` latch, a reset re-arms), swept after ticks and command
+  transactions in live scopes only, never during idle; repeating behavior is a producer or a bar,
+  never a trigger.
 - **Idle:** per chapter — one active chapter ticks; switch-in computes `rate × min(t, cap) ×
   idleRate` (base 50%/4 h; `idle_rate`/`idle_cap` are effect targets) into a pending claim presented
   as the idle dialog — the ad doubles the claim, deposit on dismissal; app close is not special;
