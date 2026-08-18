@@ -36,3 +36,11 @@ of a task: Acting on: "<his words>". Multi-turn tasks carry the original
 quote forward for the WORK it authorized, never to a new kind of action. If
 the quote would have to be paraphrased or inferred, stop and ask instead -
 including when the next step seems obviously implied by the last one.
+
+**The quoted words must be an IMPERATIVE.** A question is not a directive no
+matter how actionable it sounds - "how about a separate build plan doc, plus
+a memory?" (2026-08-18) was a proposal inviting a yes/and-here's-how answer,
+and I wrote the doc off it; quoting a question in the Acting-on line
+satisfies the letter while violating the point. Question forms ("how about
+X?", "could we X?", "shouldn't those be Y?") get an answer and a wait - the
+directive is whatever John says next.

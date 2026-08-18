@@ -12,3 +12,4 @@
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
 - [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) - verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - Scripts, then Tests, then both docs and the chapter JSON; grep the rule's phrasing, not its topic
+- [Currency values are BigNumber](currency-values-are-bignumber.md) - authored fields included (thresholds, amounts, fill rates); never default them to double; exceptions: Effect.multiplier, counts, Pow's power

@@ -2,20 +2,18 @@ using System.Globalization;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // Idle display formatting: plain numbers with a fixed two-digit fraction below
-    // 10000, scientific notation (1.23e45) above.
+    // Idle display formatting: below 1000 the plain number to at most two
+    // decimals with trailing fractional zeros dropped (5, 5.5, 999.99); 1000 and
+    // up scientific notation with a fixed two-decimal mantissa (1.00e3).
     public static class NumberFormatter
     {
-        // every non-scientific value shows a fixed two-digit fraction
         public static string Format(BigNumber value)
         {
             if (value < BigNumber.Zero)
                 return "-" + Format(-value);
 
-            // below 10000 (exponent < 4) the value reads fine in full; fixed digits
-            // rather than optional ones so a ticking number doesn't jitter in width
-            if (value.Exponent < 4)
-                return value.ToDouble().ToString("0.00", CultureInfo.InvariantCulture);
+            if (value < 1000)
+                return value.ToDouble().ToString("0.##", CultureInfo.InvariantCulture);
 
             return value.Mantissa.ToString("0.00", CultureInfo.InvariantCulture) + "e" + value.Exponent;
         }
