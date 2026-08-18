@@ -733,10 +733,24 @@ public abstract class Condition
 ```
 
 Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, `UpgradePurchased`,
-`BarsCompleted`, `All`, `Any`, `Not` (the story gate `chapterN_complete && !storyN_seen` is
+`BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `All`, `Any`, `Not` (the story gate
+`chapterN_complete && !storyN_seen` is
 `All[FlagSet, Not[FlagSet]]`), plus a formula-threshold kind (threshold computed from state — e.g.
 a scaling goal or reward curve reading a per-clear counter, §8.1). Records need no special kind:
 they are a currency.
+
+The two event kinds read a named host's record state: `EventRecordExists(scopeId)` — any record
+(running, expired-undismissed, or completed-unclaimed); `EventRewardPending(scopeId)` — an
+unclaimed record that is **armed** (latched `goalReached`, or the goal holding live for an untimed
+event). Unlike ordinary reads they may name the acting scope **or a scope it encloses** — their
+guard use is a press refusing to reset over a pending reward (§12.12), and a guard must see the
+hosts its own reset closure contains. Composed with `Not`, they are how a press disarms while an
+event runs or a reward waits; the player is never wedged, because claim and abort stay one tap
+away and always legal.
+
+A condition may carry an optional **`uiText`** label ("Needs 50 fans", "Claim your event reward
+first") — pure presentation data, never read by evaluation, rendered by the press feedback
+contract (§12.11).
 
 **Every condition evaluates — and every action list executes — in an explicit scope**, supplied by
 `GameContext`, never inferred and never inherited from a caller: a press, upgrade, bar, or trigger
@@ -1019,6 +1033,13 @@ its own gate. Ad and store
 callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations (extend
 a buff, mark an idle claim doubled, write an entitlement, grant Roadies) — they are not UI paths.
 
+**A disarmed press explains itself**: the press-button widget evaluates its gate's top-level legs
+individually at the two refresh moments and lists the unmet legs' `uiText` (§12.4); threshold
+kinds additionally expose current/target so a leg can render as progress ("37/50 fans"). The
+widget reads the same condition objects the operation enforces — one implementation, no drift,
+exactly as payout previews call the press's own formula (§5). Feedback is per-condition, never
+per-feature: any kind an author gates with explains itself for free.
+
 **Widgets interpolate** displayed numbers and bar fills between ticks; presentation only.
 
 ### 12.12 Validation at content load
@@ -1033,6 +1054,11 @@ a buff, mark an idle claim doubled, write an entitlement, grant Roadies) — the
   (stranded value); a formula-driven grant placed after a `ResetScope` that clears its inputs warns
   (reads zeros); reference cycles across ALL nested action references — `ExecuteRung`, the event
   lifecycle operations, and trigger lists — are errors; a press on the root scope is an error.
+- A press whose reset closure contains an event host, and whose offer condition carries no
+  `EventRewardPending` guard on that host, warns (stranded reward — an armed, unclaimed reward
+  would die with the record). A warn, not an error: resetting over cheap disposable events is
+  authorable on purpose. `EventRewardPending` / `EventRecordExists` reach is validated like every
+  scope reference: the acting scope or a scope it encloses.
 - Scope references are checked for reach: `ResetScope` may target the acting scope, a scope it
   encloses, or a sibling — never the root, an ancestor, or an unrelated subtree. `ExecuteRung` may
   only reference a press declared within the acting scope. `AddModifier` and `RemoveModifier` may
