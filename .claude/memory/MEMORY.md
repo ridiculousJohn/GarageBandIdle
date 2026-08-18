@@ -1,6 +1,7 @@
 # Memory index
 
 - [Project layout and workflow](project-layout-and-workflow.md) - Unity project one level down (not doubly nested); RESTARTED 2026-08-17: build prompts and old code abandoned, the rewritten design doc is the sole source of truth (§12 = new compute-on-read architecture)
+- [Design review revisions](design-review-revisions.md) - 2026-08-17/18: doc revised through an accepted review; regression guards (no gate bypass, named producers, flat per-chapter records gate, event ops, Encore=game_speed, claim dialog, save-is-the-tree) + deliberately deferred decisions
 - [Closed sets are enums](closed-sets-are-enums.md) - code-defined vocabularies are C# enums, never strings; strings only for open designer ids
 - [No AI attribution in commits](no-ai-attribution-in-commits.md) - never add Co-Authored-By/Generated-with trailers; disabled in settings 2026-07-21
 - [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when editor closed (check UnityLockfile first, one level down); exit code 0 proves nothing, grep for `error CS`; its test counts and import method predate the restart
