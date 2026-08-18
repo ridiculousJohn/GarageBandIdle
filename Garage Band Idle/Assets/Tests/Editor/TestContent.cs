@@ -44,6 +44,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Tier1Def = MakeScope("tier1");
             Tier1Def.declaredCurrencyIds.AddRange(new[] { "cash", "fans", "rehearsal" });
             Tier1Def.declaredFlags.AddRange(new[] { "fans_revealed", "rehearsal_revealed" });
+            Tier1Def.triggers.Add(MakeDefinition<TriggerDefinition>("tier1_trigger"));
 
             Ch1Def = MakeScope("ch1");
             Ch1Def.declaredCurrencyIds.Add("ch1_records");

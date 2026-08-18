@@ -26,6 +26,11 @@ namespace RidiculousGaming.GarageBandIdle
         // only valid when the magnitude fits in a double; formatting guards the range
         public double ToDouble() => _value.ToDouble();
 
+        // Reconstruction from serialized parts (SaveSystem) - the only way to
+        // build a value beyond double range from stored data.
+        public static BigNumber FromMantissaExponent(double mantissa, long exponent) =>
+            new BigNumber(new BigDouble(mantissa, exponent));
+
         public static implicit operator BigNumber(double value) => new BigNumber(value);
         public static implicit operator BigNumber(int value) => new BigNumber(value);
         public static implicit operator BigNumber(long value) => new BigNumber(value);

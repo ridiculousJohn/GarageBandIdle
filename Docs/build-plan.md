@@ -8,7 +8,7 @@ step's tests need only what came before it.
 | # | Step | Status |
 |---|---|---|
 | 1 | Core class families + state | **DONE 2026-08-18** — 51/51 green (50 project-authored + Addressables' TestStub) |
-| 2 | Save system | not started |
+| 2 | Save system | **DONE 2026-08-18** — 66/66 green (65 project-authored + Addressables' TestStub) |
 | 3 | ContentDatabase + validation | not started |
 | 4 | Producers, generators, upgrades + resolution | not started |
 | 5 | Bars | not started |
@@ -31,8 +31,13 @@ step's tests need only what came before it.
    `BarFillBehavior`), NumberFormatter display rules. All currency/production values are
    `BigNumber`, authored fields included.
 2. **Save system** (§12.10) — serialize the ScopeState tree and nothing else; schemaVersion +
-   explicit migrations; atomic write + backup; checksum with fallback; negative-clock clamp;
-   unknown-id drop with warning.
+   explicit migrations (missing path or newer version = refused); checksum bound over version AND
+   payload; atomic write whose backup only ever receives verified content; load falls back to the
+   backup on any read or verification failure. Unknown-id drops cover the families knowable today
+   (currencies, flags, trigger latches, roadie scope ids, pending-claim currencies); later
+   definition families extend the filter with their steps — the same incremental contract as the
+   validation pass. The negative-clock clamp lives in step 7: §12.10 files it under save
+   hardening, but it guards elapsed-time computation, which doesn't exist until idle does.
 3. **ContentDatabase + validation** (§12.12, §12.14.5–6) — Addressables discovery by label,
    id-to-definition lookup (implements `IDefinitionSource`), and the validation-pass *framework*
    plus every §12.12 check whose inputs exist by this step (id uniqueness, tag/id collision,
@@ -59,8 +64,9 @@ step's tests need only what came before it.
    guard, event kinds' reach.
 7. **Tick + GameSession** (§12.9) — dt segmentation at expiry timestamps, fixed economy phases per
    segment, `game_speed` scaled production vs real wall clocks, idle switch-in/pending
-   claim/exactly-once settlement, phase machine + command boundary, the fail-closed entry points,
-   refresh pipeline hooks.
+   claim/exactly-once settlement (including the §12.10 negative-clock clamp: a backwards device
+   clock clamps elapsed to zero, never mints currency), phase machine + command boundary, the
+   fail-closed entry points, refresh pipeline hooks.
 8. **Chapter 1 JSON + importer + walkthrough tests** (§12.14.5) — the chapter JSON schema, the
    editor importer (materializes SO assets; re-import overwrites; mine the old
    `ChapterJsonImporter` at `c446613^` for type-field mapping and import lints), author
