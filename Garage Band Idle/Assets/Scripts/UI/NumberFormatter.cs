@@ -6,13 +6,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // 10000, scientific notation (1.23e45) above.
     public static class NumberFormatter
     {
-        // adds the currency's symbol prefix
-        public static string Format(BigNumber value, CurrencyDefinition definition)
-            => definition.Symbol + Format(value);
-
-        // every non-scientific value shows a fixed two-digit fraction for now; the
-        // per-currency decimals hint (CurrencyDefinition.MaxDecimals) comes back
-        // when a currency actually needs different precision
+        // every non-scientific value shows a fixed two-digit fraction
         public static string Format(BigNumber value)
         {
             if (value < BigNumber.Zero)
