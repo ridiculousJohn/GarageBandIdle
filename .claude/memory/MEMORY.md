@@ -1,17 +1,13 @@
 # Memory index
 
-- [Project layout and workflow](project-layout-and-workflow.md) - Unity project one level down (not doubly nested), docs-driven slice plan (0-10 plus consolidations) whose current position is derived not recorded, design doc is source of truth
+- [Project layout and workflow](project-layout-and-workflow.md) - Unity project one level down (not doubly nested); RESTARTED 2026-08-17: build prompts and old code abandoned, the rewritten design doc is the sole source of truth (§12 = new compute-on-read architecture)
 - [Closed sets are enums](closed-sets-are-enums.md) - code-defined vocabularies are C# enums, never strings; strings only for open designer ids
 - [No AI attribution in commits](no-ai-attribution-in-commits.md) - never add Co-Authored-By/Generated-with trailers; disabled in settings 2026-07-21
-- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when editor closed (check UnityLockfile first, one level down); exit code 0 proves nothing, grep for `error CS`; the file carries the current test count and its commit
+- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when editor closed (check UnityLockfile first, one level down); exit code 0 proves nothing, grep for `error CS`; its test counts and import method predate the restart
 - [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) - merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
 - [Bug reports are verify-only](bug-reports-are-verify-only.md) - a finding means verdict + evidence, never edits or reverts; freeze after a denied tool call
 - [Quote directive before editing](quote-directive-before-editing.md) - standing protocol: any repo change (edit, commit, add, reset, push) is preceded by Acting on: "<John's words>"; nothing quotable = no change, and last turn's approval never carries forward
 - [No inaction epilogues](no-inaction-epilogues.md) - never close a response with what you didn't do ("nothing edited"); repo state is a fact, restraint is not news
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
-- [Economy context as built](economy-context-as-built.md) - slice 5.5 landed `f12ba3e`; re-projection is the only door a modifier enters; multi-context focus is the one guarantee still test-only
-- [Reveal is a Condition](reveal-is-a-condition.md) - slice 5.6 landed `5b8a917`; the fail-open gap it left, and the two stale-key refusal shapes
-- [Fan accrual is production](fan-accrual-is-production.md) - slice 5.7 landed `1227bab`; no-idle-fans is structural now, `IsComposable` is one rule with two callers, refuse stale keys on presence, and the only test validating shipped content
 - [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) - verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
-- [Composition claims need attribution](composition-claims-need-attribution.md) - slice 7.4 landed `cf1d120`; multipliers-only means "applied once over the sum" cannot fail a total, so check what each line reads back
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - Scripts, then Tests, then both docs and the chapter JSON; grep the rule's phrasing, not its topic
