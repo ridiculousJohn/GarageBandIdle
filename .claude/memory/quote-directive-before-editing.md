@@ -37,6 +37,15 @@ quote forward for the WORK it authorized, never to a new kind of action. If
 the quote would have to be paraphrased or inferred, stop and ask instead -
 including when the next step seems obviously implied by the last one.
 
+**An answer to a question I asked is not a directive either.** 2026-08-19: I
+asked which fix shape he wanted, he answered "just throw a fucking error", and
+I started implementing off it - he stopped the call with "who the fuck said
+write any code?". Same failure with "Yes I like that" and "ok whatever, take
+your recommendation": those settle a DESIGN QUESTION, they do not authorize
+touching the tree. When I asked the question, the answer closes the question
+and nothing more; the directive is whatever he says after that. Ask once,
+briefly ("say go"), and wait.
+
 **The quoted words must be an IMPERATIVE.** A question is not a directive no
 matter how actionable it sounds - "how about a separate build plan doc, plus
 a memory?" (2026-08-18) was a proposal inviting a yes/and-here's-how answer,

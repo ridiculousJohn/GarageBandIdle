@@ -25,3 +25,9 @@ the implicit double/int conversions keep authoring and tests ergonomic. The know
 (`int` — generator/bar counts), and `BigDouble.Pow`'s power parameter (double by the library's
 signature). See [[unity-headless-verify-loop]] for the re-verify loop after type changes — and
 re-run the import, since serialized assets hold stale field data after a schema change.
+
+Amended 2026-08-19 (step 4): the wrapper now REFUSES NaN and infinity in its
+constructors, so the invariant is the type's, not a caller's - never add a
+finiteness check at a consumer. Design doc 12.14 requirement 1 states it. The
+corollary that bit twice: a mixed expression computing in raw `double` before
+converting can overflow on the way in, so convert first.

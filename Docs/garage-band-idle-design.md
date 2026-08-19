@@ -858,6 +858,14 @@ auto-finishing challenge is a trigger, not an event — events keep claimed comp
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times |
 | Career facts | Records balance, Roadie allocation, songs this run, entitlements | a `CareerEffectDefinition`'s `MultiplierFormula`, computed on read (§3/§7/§8) |
 
+A `MultiplierFormula` computes against the **gather-origin** context - the source's scope in stage 1,
+the currency's home in stage 2 - never one rebased to where the effect is declared. This is a
+deliberate asymmetry with §12.4, where conditions and action lists evaluate in their declaring scope:
+a multiplier is addressed to a NUMBER, and the number's identity includes the chain it resolves on.
+A root-declared formula that reads chapter state is unimplementable any other way. Reads stay
+chain-only either way, so no sibling reach opens up - and it is why an effect whose formula depends
+on the producing chapter must target the SOURCES rather than the currency total (§8.2).
+
 Every row is the same pattern: a fact in state, effects computed from it. All of these exist from the
 first minute of the game and contribute 1× until their facts exist. Nothing in this table is ever
 serialized except the facts column.
@@ -1097,6 +1105,9 @@ per-feature: any kind an author gates with explains itself for free.
 - An event's `onEntry` / `onComplete` may not invoke lifecycle operations targeting its own host —
   acyclic nesting could otherwise create a second record between the empty-host check and record
   creation.
+- Every definition a scope DECLARES must also resolve from the content database to that same asset.
+  A declaration is a direct reference but every runtime lookup is by id, so an asset missing its
+  Addressables label validates clean, still accrues rate, and can never be bought or fired.
 - A polymorphic kind in data with no class behind it is an import error.
 
 ### 12.13 File layout
@@ -1146,7 +1157,14 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 
 ### 12.14 Requirements
 
-1. `break_infinity.cs` (BigDouble) for all currency and production values.
+1. `break_infinity.cs` (BigDouble) for all currency and production values, wrapped in `BigNumber`.
+   **The wrapper refuses NaN and infinity at construction** - every literal, conversion, arithmetic
+   result, and value read back from a save passes through one constructor, so a poisoned number
+   throws where it is born rather than spreading. The library deliberately PRESERVES both and every
+   comparison answers false against a NaN operand, so no downstream sign check could catch one; that
+   is why the invariant lives in the type and consumers never test for it. A corollary: arithmetic
+   in raw `double` that then converts (a count times a multiplier, say) can overflow before the
+   wrapper sees it, so mixed expressions convert FIRST.
 2. Tick on real elapsed time (`DateTime.UtcNow` deltas), not frame time.
 3. UI refresh on the two triggers of §12.11; no per-frame polling of balances.
 4. Versioned, checksummed saves (explicit migrations, atomic write + backup), validate on load, cap
