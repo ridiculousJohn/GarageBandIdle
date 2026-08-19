@@ -1,5 +1,7 @@
 # Memory index
 
+- [Step 4 plan doc](step-04-plan-doc.md) - approved plan at Docs/step-04-plan.md (2026-08-19); read before step 4 work; implementation go-ahead NOT yet given as of that date
+
 - [Project layout and workflow](project-layout-and-workflow.md) - Unity project one level down (not doubly nested); RESTARTED 2026-08-17: build prompts and old code abandoned, the rewritten design doc is the sole source of truth (§12 = new compute-on-read architecture); dead pre-restart files deleted 2026-08-18 on John's call, salvage utilities kept and compile-clean (details inside)
 - [Design review revisions](design-review-revisions.md) - 2026-08-17/18: doc revised through TWELVE accepted review passes; pass 12 found ZERO defects — architecture implementation-ready; regression guards (session command boundary, fixed tick phases, goal-latch-before-triggers, RemoveModifier, no gate bypass, named producers, flat per-chapter gate, event ops + one-per-scope + goalReached latch + no auto-expiry + levels-are-separate-events, Encore=game_speed, claim dialog, save-is-the-tree, two-coordinate Effects + two-stage gathering, Triggers latch-first + deterministic order, GameSession, explicit evaluation scopes + context rebasing) + deferred decisions + next steps
 - [Closed sets are enums](closed-sets-are-enums.md) - code-defined vocabularies are C# enums, never strings; strings only for open designer ids

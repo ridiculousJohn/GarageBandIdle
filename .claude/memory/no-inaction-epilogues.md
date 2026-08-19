@@ -5,10 +5,10 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: facbda27-5ff8-43e7-8f5f-aef0a5155adc
-  modified: 2026-08-07T22:23:11.754Z
+  modified: 2026-08-19T17:04:06.691Z
 ---
 
-Do not end a response with a statement of what you did not do - "nothing edited", "no commits made", "I will make no changes until you say so". John called these wasted text on 2026-07-24.
+Do not state what you did not do or will not do, at either end of a response - "nothing edited", "no commits made", "Orienting only - no edits". John called the closing form wasted text on 2026-07-24; on 2026-08-19 he tore into the opening form: announcing compliance with an instruction is as bad as narrating restraint after the fact. If you are doing what you were told, doing it is the whole message.
 
 **Why:** The authorization protocol ([[quote-directive-before-editing]]) is satisfied by acting correctly, not by narrating restraint. Repeating it every turn adds length without information, and after a correction it reads as defensive rather than reassuring.
 
