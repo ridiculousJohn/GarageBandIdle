@@ -131,20 +131,20 @@ with tier1 like every run fact.
 Cover bonuses are three distinct ids, so all three stack multiplicatively (×1.587 total). The
 `gj_tap` chain swaps explicitly (`RemoveModifier` + `AddModifier`, §6.1) — one live at a time.
 
-## 9. Presses
+## 9. Rungs
 
 ```
 tier1.release ("Cut a Demo"):
   offerCondition: All[ CurrencyAtLeast(fans, 50),             # uiText "50 fans"
                        BarsCompleted(learn_covers, 1),        # uiText "Learn a cover"
                        Not(EventRewardPending(tier1)) ]       # uiText "Claim your Garage Jam reward first"
-  pressActions:   [ AddCurrency([records, ch1_records], floor((fans/5)^0.5)),   # one evaluation, both targets
+  rungActions:    [ AddCurrency([records, ch1_records], floor((fans/5)^0.5)),   # one evaluation, both targets
                     ResetScope(tier1) ]
 
 ch1.capstone ("Play the Backyard Party"):
   offerCondition: All[ CurrencyAtLeast(ch1_records, 30),      # same gate, first clear and every replay
                        Not(EventRewardPending(tier1)) ]       # uiText "Claim your Garage Jam reward first"
-  pressActions:   [ ExecuteRung(tier1),                   # cut the album if its own gate holds
+  rungActions:    [ ExecuteRung(tier1),                   # cut the album if its own gate holds
                     AddCurrency(roadies, 1),              # Ch. 1's reward formula: the constant 1
                     SetFlag(ch1_complete),                # root
                     ResetScope(ch1) ]
@@ -173,7 +173,7 @@ release would, an unfinished one is discarded.
 `onComplete` ends with `ResetScope(tier1)` (§6.1's rewards-first, reset-last convention): claiming
 pays the bonus, clears the sprint's leavings, and the next run starts fresh with the bonus live.
 `gj*_done` flags and the reward modifiers live at **ch1** — they survive tier resets, die at the
-capstone (§12.12's set-then-wiped check holds: nothing in these lists resets ch1). Both presses
+capstone (§12.12's set-then-wiped check holds: nothing in these lists resets ch1). Both rungs
 guard with `Not(EventRewardPending(tier1))` (§9), so no reset can destroy an armed, unclaimed
 reward. Goals scale with banked Records (tap yield rides the `income` multiplier); feasibility
 math in Walkthrough 2.
@@ -201,9 +201,9 @@ capstone beat while `All[FlagSet(ch1_complete), Not(FlagSet(story_ch1_end_seen))
 | `the_band` | `EarnedTotalAtLeast(cash, 100)` | tier1 | generator list |
 | `the_gear` | `EarnedTotalAtLeast(cash, 250)` | tier1 | upgrade list |
 | `rehearsal_space` | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
-| `the_release` | `FlagSet(album)` | ch1 | release press button (+ "would bank: N" preview via the same formula) |
+| `the_release` | `FlagSet(album)` | ch1 | release rung button (+ "would bank: N" preview via the same formula) |
 | `garage_jam` | `CurrencyAtLeast(records, 1)` | tier1 | event module (start/claim/abort) |
-| `backyard_party` | `FlagSet(album)` | ch1 | capstone press button + `ch1_records`/30 readout |
+| `backyard_party` | `FlagSet(album)` | ch1 | capstone rung button + `ch1_records`/30 readout |
 
 Every gate above is a flag or a monotonic fact — nothing strobes with spending (§2).
 

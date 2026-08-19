@@ -9,7 +9,7 @@ step's tests need only what came before it.
 |---|---|---|
 | 1 | Core class families + state | **DONE 2026-08-18** — 51/51 green (50 project-authored + Addressables' TestStub) |
 | 2 | Save system | **DONE 2026-08-18** — 66/66 green (65 project-authored + Addressables' TestStub) |
-| 3 | ContentDatabase + validation | not started |
+| 3 | ContentDatabase + validation | **DONE 2026-08-18** — 123/123 green (122 project-authored + Addressables' TestStub) |
 | 4 | Producers, generators, upgrades + resolution | not started |
 | 5 | Bars | not started |
 | 6 | Events + trigger sweep | not started |
@@ -22,9 +22,9 @@ step's tests need only what came before it.
 
 1. **Core class families + state** — `Definition`, `Effect`, `Condition` + 9 kinds, `GameAction` +
    6 kinds (`Action` renamed for the `System.Action` collision), `PayoutFormula` + 2 kinds,
-   `Press`, `TriggerDefinition` (shape only), `ScopeState` (complete §12.3 *state* schema; reset
+   `Rung` (renamed from `Press` in step 3), `TriggerDefinition` (shape only), `ScopeState` (complete §12.3 *state* schema; reset
    swaps the `ScopeFacts` payload, so new fields clear by construction; the root is structurally
-   unresettable), `ScopeDefinition` (currencies, flags, triggers, press — the remaining
+   unresettable), `ScopeDefinition` (currencies, flags, triggers, rung — the remaining
    declaration lists land with their families in steps 4–6, since their types don't exist yet),
    `GameContext` (outward chain walks, rebasing), `IDefinitionSource` seam, Economy data shapes
    (`CurrencyDefinition`, `ModifierDefinition` + stacking, `BarDefinition`/`BarGroupDefinition`/
@@ -41,17 +41,18 @@ step's tests need only what came before it.
 3. **ContentDatabase + validation** (§12.12, §12.14.5–6) — Addressables discovery by label,
    id-to-definition lookup (implements `IDefinitionSource`), and the validation-pass *framework*
    plus every §12.12 check whose inputs exist by this step (id uniqueness, tag/id collision,
-   scope-reference reach, effect reach per target kind, flag setter rules, set-then-wiped). The
-   pass is incremental by design: each later step is REQUIRED to extend it with the checks its
-   own shapes introduce — a "full §12.12" claim is only true once step 6 lands. Fail loudly at
-   boot in dev builds.
+   scope-reference reach, effect reach per target kind, flag setter rules, set-then-wiped,
+   stranded value). The pass is incremental by design: each later step is REQUIRED to extend it
+   with the checks its own shapes introduce — a "full §12.12" claim is only true once step 6
+   lands. Fail loudly at boot in dev builds: validation runs on the production load path itself.
 4. **Producers, generators, upgrades + resolution** (§12.2, §12.6) — `ProducerDefinition` +
    produces entries, `GeneratorDefinition` (`availableWhen`, cost curve, ownedCount scaling),
    `UpgradeDefinition` (gate, effects, actions), `GetMultiplier` two-stage gathering (source
    scope-to-root, currency home-to-root), `FireProducer` (atomic pre-fire resolution), `TryBuy`
    (fail-closed). Effects-from-facts covers the rows whose sources exist here (upgrades,
    generator contributions, granted modifier stacks, career facts); later rows join with their
-   steps. Extends validation: produces-entry targets, stranded-value warning.
+   steps. Extends validation: produces-entry targets, generator/upgrade reference resolution,
+   tag membership extending to producers and generators.
 5. **Bars** (§12.7) — fill behaviors (`ContinuousDelivery`, `TimedFill`), proportional pipe/pool
    throttling across groups, iterative completion settlement in deterministic order, cascades
    (`perFill` × `fillCount` — the fill-count row of effects-from-facts), `SetActiveBars`
@@ -73,7 +74,7 @@ step's tests need only what came before it.
    `chapter-01.json` from the content doc, then the four walkthroughs as tests: normal release,
    event entry, replay clear, 4-hour idle claim.
 9. **UI layer** (§12.11) — `SectionDefinition`/`ModuleDefinition`/`ModuleRegistry`, widgets, the
-   press feedback contract (`uiText` legs, progress rendering), two-trigger refresh, interpolation.
+   rung feedback contract (`uiText` legs, progress rendering), two-trigger refresh, interpolation.
 10. **Meta & monetization** (§8, §9) — Roadie allocation + venue boosts, Encore/game-speed buffs,
     AdManager (rewarded: Encore top-up, Double It), IAPManager (Backstage Pass, Roadie bundles,
     Tip Jar), story beat cards + `AcknowledgeStory`.

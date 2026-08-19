@@ -12,7 +12,12 @@ namespace RidiculousGaming.GarageBandIdle
     public abstract class GameAction
     {
         public abstract void Execute(GameContext ctx);
-        public virtual void Validate(IDefinitionSource defs) { }
+
+        // Load-time reference and reach checks (design doc 12.12), driven by
+        // ContentValidator: each kind validates its own references against the
+        // acting scope and records into the context's ledgers what the
+        // cross-container checks need (fact writes, resets, grants, rungs).
+        public virtual void Validate(ValidationContext ctx) { }
     }
 
     // Pays one or more target currencies from a SINGLE evaluation - the album
@@ -33,7 +38,16 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.Deposit(currencyId, value);
         }
 
-        public override void Validate(IDefinitionSource defs) => formula?.Validate(defs);
+        public override void Validate(ValidationContext ctx)
+        {
+            foreach (var currencyId in currencyIds)
+            {
+                var home = ctx.RequireChainCurrency(currencyId, "AddCurrency");
+                if (home != null)
+                    ctx.RecordFactWrite($"currency '{currencyId}'", home);
+            }
+            formula?.Validate(ctx);
+        }
     }
 
     [Serializable]
@@ -42,6 +56,23 @@ namespace RidiculousGaming.GarageBandIdle
         public string flagId;
 
         public override void Execute(GameContext ctx) => ctx.SetFlag(flagId);
+
+        public override void Validate(ValidationContext ctx)
+        {
+            var home = ctx.FlagHome(flagId);
+            if (home == null)
+            {
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"SetFlag names flag '{flagId}', which no scope declares (12.12).");
+                return;
+            }
+            ctx.RecordFlagSetter(flagId);
+            if (ctx.OnActingChain(home))
+                ctx.RecordFactWrite($"flag '{flagId}'", home);
+            else if (!ctx.IsProperAncestor(ctx.ActingScope, home))
+                ctx.AddError(ValidationCheck.ChainReach, $"SetFlag writes flag '{flagId}' homed at '{home.Id}', which is not on the chain from '{ctx.ActingScope.Id}' (12.12).");
+            // A setter acting from an ancestor of the home surfaces through the
+            // per-flag setters-more-durable warn (12.12), not a per-site error.
+        }
     }
 
     // Appends/increments a pointer-fact {modifierId, count} on the target scope.
@@ -75,6 +106,28 @@ namespace RidiculousGaming.GarageBandIdle
                 return;                       // re-grant keeps count at 1
             entry.count++;                    // Linear / Multiply: the name picks the growth formula on read
         }
+
+        public override void Validate(ValidationContext ctx)
+        {
+            var resolved = ctx.Defs.Get<Economy.ModifierDefinition>(modifierId) != null;
+            if (!resolved)
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"AddModifier references unknown modifier '{modifierId}'.");
+            var target = ctx.FindScope(scopeId);
+            if (target == null)
+            {
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"AddModifier targets unknown scope '{scopeId}'.");
+                return;
+            }
+            if (!ctx.OnActingChain(target))
+            {
+                ctx.AddError(ValidationCheck.ScopeReach, $"AddModifier may target the acting scope or an ancestor (grants live outward, 12.12); '{scopeId}' is neither from '{ctx.ActingScope.Id}'.");
+                return;
+            }
+            if (!resolved)
+                return;
+            ctx.RecordModifierGrant(modifierId, target);
+            ctx.RecordFactWrite($"modifier '{modifierId}' stack", target);
+        }
     }
 
     // The exact inverse of AddModifier: one stack down, entry deleted at zero,
@@ -100,6 +153,26 @@ namespace RidiculousGaming.GarageBandIdle
             entry.count--;
             if (entry.count <= 0)
                 target.activeModifiers.Remove(entry);
+        }
+
+        public override void Validate(ValidationContext ctx)
+        {
+            var resolved = ctx.Defs.Get<Economy.ModifierDefinition>(modifierId) != null;
+            if (!resolved)
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"RemoveModifier references unknown modifier '{modifierId}'.");
+            var target = ctx.FindScope(scopeId);
+            if (target == null)
+            {
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"RemoveModifier targets unknown scope '{scopeId}'.");
+                return;
+            }
+            if (!ctx.OnActingChain(target))
+            {
+                ctx.AddError(ValidationCheck.ScopeReach, $"RemoveModifier may target the acting scope or an ancestor (grants live outward, 12.12); '{scopeId}' is neither from '{ctx.ActingScope.Id}'.");
+                return;
+            }
+            if (resolved)
+                ctx.RecordModifierRemove(modifierId, target);
         }
     }
 
@@ -149,12 +222,33 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var child in scope.Children)
                 ClearRecursive(child, nowUtc);
         }
+
+        public override void Validate(ValidationContext ctx)
+        {
+            var target = ctx.FindScope(scopeId);
+            if (target == null)
+            {
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"ResetScope targets unknown scope '{scopeId}'.");
+                return;
+            }
+            if (target == ctx.RootScope)
+            {
+                ctx.AddError(ValidationCheck.ScopeReach, "ResetScope targets the root - the root is never resettable (12.12).");
+                return;
+            }
+            if (!ctx.InActingSubtree(target) && !ctx.IsSiblingOfActing(target))
+            {
+                ctx.AddError(ValidationCheck.ScopeReach, $"ResetScope may target the acting scope, a scope it encloses, or a sibling (12.12); '{scopeId}' is none of these from '{ctx.ActingScope.Id}'.");
+                return;
+            }
+            ctx.RecordReset(target);
+        }
     }
 
-    // Runs another press's action list through the same gate check every
+    // Runs another rung's action list through the same gate check every
     // invocation gets: gate met, it executes; gate unmet, it no-ops. The context
-    // REBASES to the referenced press's declaring scope (design doc 12.4/12.5).
-    // Reach: a press declared within the acting scope (12.12).
+    // REBASES to the referenced rung's declaring scope (design doc 12.4/12.5).
+    // Reach: a rung declared within the acting scope (12.12).
     [Serializable]
     public class ExecuteRung : GameAction
     {
@@ -168,12 +262,33 @@ namespace RidiculousGaming.GarageBandIdle
                 Debug.LogError($"ExecuteRung: scope '{tierId}' is not within '{ctx.Scope.ScopeId}'.");
                 return;
             }
-            if (target.Definition.press == null)
+            if (target.Definition.rung == null)
             {
-                Debug.LogError($"ExecuteRung: scope '{tierId}' declares no press.");
+                Debug.LogError($"ExecuteRung: scope '{tierId}' declares no rung.");
                 return;
             }
-            target.Definition.press.TryExecute(ctx.Rebase(target));
+            target.Definition.rung.TryExecute(ctx.Rebase(target));
+        }
+
+        public override void Validate(ValidationContext ctx)
+        {
+            var target = ctx.FindScope(tierId);
+            if (target == null)
+            {
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"ExecuteRung targets unknown scope '{tierId}'.");
+                return;
+            }
+            if (!ctx.InActingSubtree(target))
+            {
+                ctx.AddError(ValidationCheck.ScopeReach, $"ExecuteRung may only reference a rung declared within the acting scope (12.12); '{tierId}' is outside '{ctx.ActingScope.Id}'.");
+                return;
+            }
+            if (target.rung == null)
+            {
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"ExecuteRung targets scope '{tierId}', which declares no rung.");
+                return;
+            }
+            ctx.RecordRungInvocation(target);
         }
     }
 }

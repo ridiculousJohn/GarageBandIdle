@@ -197,12 +197,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void ExecuteRung_rebases_to_the_target_press_scope()
+        public void ExecuteRung_rebases_to_the_target_rung_scope()
         {
             var tree = new TestTree();
             // The release reads tier-owned fans; the capstone acts in ch1, where
             // fans is unreachable - only the rebase makes this legal (12.4).
-            tree.Tier1Def.press = new Press
+            tree.Tier1Def.rung = new Rung
             {
                 offerCondition = new CurrencyAtLeast { currencyId = "fans", threshold = 50 },
                 actions =
@@ -228,7 +228,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ExecuteRung_noops_on_an_unmet_gate_and_the_run_is_kept_for_its_reset()
         {
             var tree = new TestTree();
-            tree.Tier1Def.press = new Press
+            tree.Tier1Def.rung = new Rung
             {
                 offerCondition = new CurrencyAtLeast { currencyId = "fans", threshold = 50 },
                 actions = { new AddCurrency { currencyIds = { "records" }, amount = 99 } }
@@ -242,13 +242,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void Press_with_no_authored_gate_never_offers()
+        public void Rung_with_no_authored_gate_never_offers()
         {
             var tree = new TestTree();
-            var press = new Press { actions = { new AddCurrency { currencyIds = { "records" }, amount = 1 } } };
+            var rung = new Rung { actions = { new AddCurrency { currencyIds = { "records" }, amount = 1 } } };
 
-            Assert.IsFalse(press.IsOffered(tree.Ctx(tree.Tier1)));
-            Assert.IsFalse(press.TryExecute(tree.Ctx(tree.Tier1)));
+            Assert.IsFalse(rung.IsOffered(tree.Ctx(tree.Tier1)));
+            Assert.IsFalse(rung.TryExecute(tree.Ctx(tree.Tier1)));
             Assert.AreEqual(BigNumber.Zero, tree.Root.balances["records"]);
         }
 
@@ -256,7 +256,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Capstone_sequence_banks_the_run_pays_the_roadie_flags_and_resets()
         {
             var tree = new TestTree();
-            tree.Tier1Def.press = new Press
+            tree.Tier1Def.rung = new Rung
             {
                 offerCondition = new CurrencyAtLeast { currencyId = "fans", threshold = 50 },
                 actions =
@@ -269,7 +269,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     new ResetScope { scopeId = "tier1" }
                 }
             };
-            var capstone = new Press
+            var capstone = new Rung
             {
                 offerCondition = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 30 },
                 actions =

@@ -7,8 +7,9 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
-    // Dictionary-backed IDefinitionSource; ContentDatabase replaces it in the
-    // content-load step.
+    // List-backed IDefinitionSource test double. ContentDatabase is the
+    // production implementation (Addressables discovery); this stays for tests
+    // that want incremental Add chaining and no asset pipeline.
     public class FakeDefs : IDefinitionSource
     {
         private readonly List<Definition> definitions = new();

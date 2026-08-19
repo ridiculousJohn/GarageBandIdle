@@ -187,13 +187,13 @@ currencies as they become affordable.
 Releasing an album is the run reset. Its name escalates thematically across chapters (demo, EP,
 record).
 
-Mechanically a release is a **press**: `{offerCondition, List<Action>}` declared on the tier
+Mechanically a release is a **rung**: `{offerCondition, List<Action>}` declared on the tier
 (§12.5). Chapter 1's:
 
 ```
 tier1.release:
   offerCondition: All[ CurrencyAtLeast(fans, 50), BarsCompleted(1) ]
-  pressActions:   [ AddCurrency([records, ch1_records], PayoutFormula),  // one evaluation, both targets
+  rungActions:    [ AddCurrency([records, ch1_records], PayoutFormula),  // one evaluation, both targets
                     ResetScope(tier1) ]
 ```
 
@@ -224,8 +224,8 @@ values the release itself resets, so the offer disarms at every release and re-a
 The release *region* stays visible because the `album` flag it gates on lives at the chapter level.
 Region coarse, action precise.
 
-The offer condition is checked on **every** invocation — when the player presses (`TryPress`) and
-when another press invokes this one (`ExecuteRung`, §12.5). There is no bypass: a rung whose gate is
+The offer condition is checked on **every** invocation — when the player presses the button
+(`TryRung`) and when another rung invokes this one (`ExecuteRung`, §12.5). There is no bypass: a rung whose gate is
 unmet no-ops, so the payout is only reachable through its own gate, and an unfinished run is
 discarded by whatever reset follows — never banked.
 
@@ -255,16 +255,16 @@ Moment-to-moment play:
 - **Learn-songs bars** — see below.
 - **Fans** — passive accrual, band-size driven (§3), tuned loosely relative to Cash so income alone
   does not determine the album payout.
-- **Capstone gig** — the chapter's press (§12.5), declared on the chapter:
+- **Capstone gig** — the chapter's rung (§12.5), declared on the chapter:
   ```
   chapter.capstone:
     offerCondition: CurrencyAtLeast(chapterN_records, gate)  // same gate, first clear and every replay
-    pressActions:   [ ExecuteRung(tier1),          // cut the album if its own gate holds; else no-op
+    rungActions:    [ ExecuteRung(tier1),          // cut the album if its own gate holds; else no-op
                       AddCurrency(roadies, RewardFormula),    // Ch. 1: the constant 1 (§8.1)
                       SetFlag(chapterN_complete),   // declared at ROOT
                       ResetScope(chapterN) ]        // the ENTIRE chapter, downward-closed
   ```
-  `TryPress` is fail-closed — the operation checks its own gate, so a UI bug cannot complete a
+  `TryRung` is fail-closed — the operation checks its own gate, so a UI bug cannot complete a
   chapter early. The chapter **advance is not an action**: it is a reaction to the root completion
   flag, performed by `ChapterManager`, which makes it derivable from the save no matter how or when
   the flag was set. The first-clear story beat is likewise gated on state — `complete &&
@@ -296,8 +296,8 @@ ActiveEvent:     { eventId, remainingSeconds, goalReached, claimed }   — in ho
   latched, or the goal holding live — on an unclaimed record, abort checks a record exists.
   Nothing below them knows the caller.
 - **On start** (`StartEvent`), the event's `onEntry` actions run in order — typically
-  `[ExecuteRung(hostTierPress), ResetScope(host)]` — and the ActiveEvent record is created after
-  they finish, so it lives in the fresh state. The rung checks the host press's own gate like every
+  `[ExecuteRung(hostTierRung), ResetScope(host)]` — and the ActiveEvent record is created after
+  they finish, so it lives in the fresh state. The rung checks the host rung's own gate like every
   invocation does (§12.5), banking a gate-met run exactly as a release would and discarding an
   unfinished one. Nothing is lost that could have been kept — a run the gate refuses could not have
   been released manually either — so there is no bank-it-first ritual. And a rerun tier cannot be
@@ -370,7 +370,7 @@ Songwriting unlocks at the Studio chapter.
   working Catalog resets with the run. Routing catalog value into Records keeps permanent progression
   consolidated in one currency.
 - **Discography** is a persistent root-level list of the player's best songs, kept for display.
-  Songs reach it by **promotion: an action in the release press, ordered before the `ResetScope`**,
+  Songs reach it by **promotion: an action in the release rung, ordered before the `ResetScope`**,
   reading the dying run's Catalog and writing the chosen songs to the root list (`AddSong`). The
   selection rule is a Ch. 6 authoring decision, deferred (candidates we considered: auto-by-quality —
   Classics always chart, Hits at a threshold; best-N-of-run; player picks a song to immortalize at
@@ -411,7 +411,7 @@ concave roadie-spread multiplier (§8.2) favors rotating chapters over parking o
 **Rewards and goals are formulas over stored facts.** The Roadie payout is an ordinary
 `AddCurrency(roadies, PayoutFormula)`; Chapter 1's formula is the constant 1 and its goal is the
 flat authored gate. A chapter that wants scaling reads a fact through the same families: a
-per-clear counter (a root currency its own press increments) feeding a reward or goal curve, or a
+per-clear counter (a root currency its own rung increments) feeding a reward or goal curve, or a
 player-chosen difficulty whose handicaps derive from the choice exactly as event handicaps do
 (§6.1) and whose reward formula pays more for the harder clear. Only the chosen-difficulty variant
 needs anything new — an action recording the choice as a fact — and it is deferred until a chapter
@@ -559,7 +559,7 @@ clock; author timed goals with that end in mind.
 
 1. **State is stored; everything else is computed on read.** Multipliers, rates, yields, condition
    results, and derived completion (a bar at full, a goal met) are never stored — anything computable
-   from other state is recomputed whenever asked. (A completion flag a press *sets* is a stored fact,
+   from other state is recomputed whenever asked. (A completion flag a rung *sets* is a stored fact,
    not a derivation.) Nothing derived can go stale, double-count, survive a reset it shouldn't, or
    disagree with a save.
 2. **All durable gameplay state lives in the ScopeState tree** (§12.3). Transient orchestration —
@@ -672,7 +672,7 @@ source tag instead. That is the entire modifier system.
 ### 12.3 Scopes: state containers
 
 A **scope** is a plain state container. Content declares, per scope: its currencies, flags, bar
-groups, **producers**, generators, upgrades, triggers (§12.5), and (for tiers) its press. A producer's `produces`
+groups, **producers**, generators, upgrades, triggers (§12.5), and (for tiers) its rung. A producer's `produces`
 entries are live exactly while its declaring scope belongs to the foreground chapter's **live
 subtree** — activation is placement, several sibling or nested scopes participate in the same tick,
 and each contribution resolves its facts and effects outward from its own declaring scope to root,
@@ -709,13 +709,13 @@ writes to the flag's declared home.
 
 **Structure encodes reset relationships:**
 - **Nest** tier A inside tier B when "resetting B always resets A" is definitionally true (a ladder).
-  An intermediate currency banked by A's press is declared in B — exactly where B's reset claims it.
+  An intermediate currency banked by A's rung is declared in B — exactly where B's reset claims it.
 - **Siblings** when tiers reset independently.
-- A press that occasionally resets several siblings lists several `ResetScope` actions.
+- A rung that occasionally resets several siblings lists several `ResetScope` actions.
 - Resetting an outer scope while keeping an inner one alive is unrepresentable (`ResetScope` is
   downward-closed) — wanting it means the scopes should be siblings.
 
-Reset = execute the press's actions in order (payouts read the dying state), then clear the selected
+Reset = execute the rung's actions in order (payouts read the dying state), then clear the selected
 containers. Clearing is complete by construction — a field added to ScopeState next month is cleared
 because it is in the struct. Nothing re-projects, settles, or rebuilds, because nothing derived was
 stored. `lastActiveUtc` is re-stamped, not cleared, so a fresh chapter owes no idle.
@@ -743,20 +743,20 @@ The two event kinds read a named host's record state: `EventRecordExists(scopeId
 (running, expired-undismissed, or completed-unclaimed); `EventRewardPending(scopeId)` — an
 unclaimed record that is **armed** (latched `goalReached`, or the goal holding live for an untimed
 event). Unlike ordinary reads they may name the acting scope **or a scope it encloses** — their
-guard use is a press refusing to reset over a pending reward (§12.12), and a guard must see the
-hosts its own reset closure contains. Composed with `Not`, they are how a press disarms while an
+guard use is a rung refusing to reset over a pending reward (§12.12), and a guard must see the
+hosts its own reset closure contains. Composed with `Not`, they are how a rung disarms while an
 event runs or a reward waits; the player is never wedged, because claim and abort stay one tap
 away and always legal.
 
 A condition may carry an optional **`uiText`** label ("Needs 50 fans", "Claim your event reward
-first") — pure presentation data, never read by evaluation, rendered by the press feedback
+first") — pure presentation data, never read by evaluation, rendered by the rung feedback
 contract (§12.11).
 
 **Every condition evaluates — and every action list executes — in an explicit scope**, supplied by
-`GameContext`, never inferred and never inherited from a caller: a press, upgrade, bar, or trigger
+`GameContext`, never inferred and never inherited from a caller: a rung, upgrade, bar, or trigger
 in its declaring scope; an event in its host scope; a `produces` entry in its producer's declaring
 scope; a UI section or module in its authored `scopeId` (§12.11). Nested invocations **rebase** the
-context to the owning object's scope — `ExecuteRung` runs the referenced press in *that press's*
+context to the owning object's scope — `ExecuteRung` runs the referenced rung in *that rung's*
 declaring scope, which is how the capstone's rung legally reads tier-owned Fans. Reads walk outward
 from there (§12.12).
 
@@ -764,7 +764,7 @@ Authoring guidance: gate persistent UI on monotonic facts (flags, earned totals)
 balances (§2). Serialized via `[SerializeReference]` in assets, or a `"type"` field mapped to the
 class at import — a kind can never be authored without code behind it.
 
-### 12.5 Actions, presses, and formulas
+### 12.5 Actions, rungs, and formulas
 
 **Action** — one polymorphic family for "something happens at a moment":
 
@@ -781,7 +781,7 @@ or from a `PayoutFormula`), `AddModifier(scopeId, modifierId)`, `RemoveModifier(
 `SetFlag(flagId)`, `AddSong`, `ResetScope(scopeId)`, `ExecuteRung(tierId)`, and the event lifecycle
 operations `StartEvent(eventId)` / `CompleteEvent(eventId)` / `AbortEvent(eventId)` (§6.1), each
 fail-closed against its own gate. Authored inline via
-`[SerializeReference]` wherever needed — upgrade payloads, bar completions, event rewards, presses.
+`[SerializeReference]` wherever needed — upgrade payloads, bar completions, event rewards, rungs.
 No shared reward pool; a reused reward can be promoted to a shared asset later if duplication ever
 hurts. Actions are one-shot: they run at their moment and are never replayed on load — the state
 they mutated is what gets saved.
@@ -799,19 +799,20 @@ the fact, saved and cleared with its scope. Reserved for grants from
 from it instead (§12.6). **`RemoveModifier`** is its exact inverse: decrements one stack, deletes
 the entry at zero, no-ops when absent.
 
-**A press** is `{offerCondition, List<Action>}` — the one shape behind the album release (declared
-on its tier) and the capstone (declared on the chapter). Event lifecycle operations are **not**
-presses — they execute authored `onEntry`/`onComplete` lists through the same action machinery
+**A rung** is `{offerCondition, List<Action>}` — the one shape behind the album release (declared
+on its tier) and the capstone (declared on the chapter): a rung of the prestige ladder. Event
+lifecycle operations are **not**
+rungs — they execute authored `onEntry`/`onComplete` lists through the same action machinery
 (§6.1). Every invocation
-is **fail-closed against the press's own gate**: `TryPress` (the UI entry point) checks the offer
-condition before executing, and **`ExecuteRung` runs another press's action list through the same
+is **fail-closed against the rung's own gate**: `TryRung` (the UI entry point) checks the offer
+condition before executing, and **`ExecuteRung` runs another rung's action list through the same
 check — gate met, it executes; gate unmet, it no-ops.** There is no bypass: a payout is only
 reachable through its own gate, so an unfinished run is discarded by whatever reset follows, never
-banked. References are validated acyclic at load. No press may be authored on the root scope.
+banked. References are validated acyclic at load. No rung may be authored on the root scope.
 
 **PayoutFormula** — a polymorphic family computing an amount from readable state
 (`floor((fans/5)^0.5)`, piecewise diminishing-returns curves). Pure functions, so UI previews call
-the same code the press runs.
+the same code the rung runs.
 
 **Trigger** — the one sanctioned condition-observer: `TriggerDefinition {id, condition, actions}`,
 declared per scope. A trigger firing is a *moment*: when its condition holds and its id is not in
@@ -971,13 +972,13 @@ and backgrounding are `NoChapter`, so no-foreground states are explicit rather t
 Durable facts live in the tree; the session holds only orchestration. The chapter to reopen at launch is a
 **non-authoritative UI preference**, never inferred from economy timestamps — `lastActiveUtc`
 records idle-settlement boundaries, not UI history. While `phase == AwaitingIdleClaim`, only claim
-and switch commands are legal — mutating commands are refused, so a press or automation can never
+and switch commands are legal — mutating commands are refused, so a rung or automation can never
 reset away an unsettled claim; settling flips the session to `Live`. Authenticated ad/store
 callbacks are always **phase-eligible, never reentrant**: a callback is a serialized mutation
 transaction — queued behind `commandInProgress`, then mutation → sweep → commit → one refresh like
 any command — so marking the pending claim `doubled` repaints the dialog even while no ticks run.
 Callbacks are not UI commands (§12.11). **The session also draws the
-command boundary**: **every chapter-local mutation** — `TryBuy`, `FireProducer`, `TryPress`,
+command boundary**: **every chapter-local mutation** — `TryBuy`, `FireProducer`, `TryRung`,
 `SetActiveBars`, the event operations, the song operations, and any future mechanic command — is
 rejected when its owning scope lies outside the foreground chapter's live subtree; ids are unique
 tree-wide, but reachable is not the same as mutable. Root-owned commands
@@ -1014,14 +1015,14 @@ a prefab plus an entry. Sections live on the `ChapterDefinition`.
 
 **Refresh** is coarse, on two triggers: after each tick of the foreground chapter, and after every
 **completed command transaction** (nested Actions never refresh individually — the outer
-transaction publishes one final state change, so a press's payout, flag, and reset render as one).
+transaction publishes one final state change, so a rung's payout, flag, and reset render as one).
 The full pipeline is fixed: **mutation → one trigger sweep → trigger actions → transaction commit →
 one refresh** — the sweep runs inside the transaction, so a trigger's payload renders atomically
 with the command that armed it.
 Visible sections re-evaluate `visibleWhen`; visible modules re-read what they show. Event-driven,
 never per-render-frame; fine-graining is a mechanical optimization if profiling ever asks.
 
-**Entry points** — the only ways the UI touches the game: `TryPress(press)`, `TryBuy(generator |
+**Entry points** — the only ways the UI touches the game: `TryRung(rung)`, `TryBuy(generator |
 upgrade)`, `FireProducer(producerId)`, `SetActiveBars(group, set)`, the event operations
 `StartEvent / CompleteEvent / AbortEvent (eventId)`, `SwitchChapter(chapterId)` (stamps
 `lastActiveUtc`, computes the pending claim, §12.9), `ClaimIdle(chapterId)` (settle the pending
@@ -1033,11 +1034,11 @@ its own gate. Ad and store
 callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations (extend
 a buff, mark an idle claim doubled, write an entitlement, grant Roadies) — they are not UI paths.
 
-**A disarmed press explains itself**: the press-button widget evaluates its gate's top-level legs
+**A disarmed rung explains itself**: the rung-button widget evaluates its gate's top-level legs
 individually at the two refresh moments and lists the unmet legs' `uiText` (§12.4); threshold
 kinds additionally expose current/target so a leg can render as progress ("37/50 fans"). The
 widget reads the same condition objects the operation enforces — one implementation, no drift,
-exactly as payout previews call the press's own formula (§5). Feedback is per-condition, never
+exactly as payout previews call the rung's own formula (§5). Feedback is per-condition, never
 per-feature: any kind an author gates with explains itself for free.
 
 **Widgets interpolate** displayed numbers and bar fills between ticks; presentation only.
@@ -1050,18 +1051,18 @@ per-feature: any kind an author gates with explains itself for free.
 - A tag may not collide with any id; an Effect target matching nothing reachable warns.
 - A `SetFlag` naming an undeclared flag is an error; a flag with no setter warns; a flag whose
   setters all live in scopes more durable than the flag warns (§2).
-- A press that resets a scope containing tier presses with unreferenced payout actions warns
+- A rung that resets a scope containing tier rungs with unreferenced payout actions warns
   (stranded value); a formula-driven grant placed after a `ResetScope` that clears its inputs warns
   (reads zeros); reference cycles across ALL nested action references — `ExecuteRung`, the event
-  lifecycle operations, and trigger lists — are errors; a press on the root scope is an error.
-- A press whose reset closure contains an event host, and whose offer condition carries no
+  lifecycle operations, and trigger lists — are errors; a rung on the root scope is an error.
+- A rung whose reset closure contains an event host, and whose offer condition carries no
   `EventRewardPending` guard on that host, warns (stranded reward — an armed, unclaimed reward
   would die with the record). A warn, not an error: resetting over cheap disposable events is
   authorable on purpose. `EventRewardPending` / `EventRecordExists` reach is validated like every
   scope reference: the acting scope or a scope it encloses.
 - Scope references are checked for reach: `ResetScope` may target the acting scope, a scope it
   encloses, or a sibling — never the root, an ancestor, or an unrelated subtree. `ExecuteRung` may
-  only reference a press declared within the acting scope. `AddModifier` and `RemoveModifier` may
+  only reference a rung declared within the acting scope. `AddModifier` and `RemoveModifier` may
   target the acting scope or an ancestor (grants live outward), never an unrelated subtree; a
   `RemoveModifier` naming a modifier nothing reachable grants warns.
 - Ordinary reads and writes (`AddCurrency`, `SetFlag`, `AddSong`, Condition reads, `produces`
@@ -1104,7 +1105,7 @@ Assets/Scripts/
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply)
     BarDefinition.cs  BarGroupDefinition.cs  BarFillBehavior.cs  BarSystem.cs
   Loop/
-    ChapterDefinition.cs  TierDefinition.cs   // presses declared here
+    ChapterDefinition.cs  TierDefinition.cs   // rungs declared here
     ChapterManager.cs      // forward-only advance, reacting to root completion flags
   Events/
     EventDefinition.cs  EventSystem.cs
@@ -1119,7 +1120,7 @@ Assets/Scripts/
     IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar
   UI/
     SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs
-    Widgets/ (GeneratorRowUI, BarGroupUI, PressButtonUI, CurrencyHeaderUI, JamButtonUI, ...)
+    Widgets/ (GeneratorRowUI, BarGroupUI, RungButtonUI, CurrencyHeaderUI, JamButtonUI, ...)
     NumberFormatter.cs  StoryBeatUI.cs  CollectScreenUI.cs  RoadieAllocationUI.cs
 ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bars/  Modifiers/  Songs/
 ```
@@ -1152,10 +1153,10 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 - **Records:** the single permanent progression currency; each Record raises global income ~+2%; the
   capstone gates on Records earned within its chapter — a chapter-declared counter fed by the album
   payout and zeroed by the capstone's own reset.
-- **Presses:** the album release and the capstone are `{offerCondition, List<Action>}`; events are
+- **Rungs:** the album release and the capstone are `{offerCondition, List<Action>}`; events are
   lifecycle operations executing authored lists (§6.1). Payout-before-clear is list order; `ResetScope` is a bare
-  downward-closed clear; every invocation — `TryPress` from the UI, `ExecuteRung` from another
-  press — is fail-closed against the press's own gate (an unmet gate no-ops; unfinished runs
+  downward-closed clear; every invocation — `TryRung` from the UI, `ExecuteRung` from another
+  rung — is fail-closed against the rung's own gate (an unmet gate no-ops; unfinished runs
   discard, never bank). The capstone resets the **entire chapter**; completion facts live at root; replays are the same
   chapter played again against the same gate — Records earned within the chapter, zeroed by the
   capstone's own reset; rewards and goals are formulas over stored facts (§8.1).
@@ -1170,7 +1171,7 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   uncapped overfill, completion derived from progress.
 - **Events:** data + one ActiveEvent record; `StartEvent`/`CompleteEvent`/`AbortEvent` are
   self-guarding operations callable from anywhere; entry runs `onEntry` (banking the run if the
-  host press's own gate is met, discarding it otherwise) then creates the record; handicaps are ×<1
+  host rung's own gate is met, discarding it otherwise) then creates the record; handicaps are ×<1
   effects that exist while a live record does; timers tick live only and suppress idle; completion
   is claimed, not automatic — `onComplete` ends in the reset that clears the record; abort deletes
   it; any reset reaching the host kills it; expired records are inert and persist, occupying the
