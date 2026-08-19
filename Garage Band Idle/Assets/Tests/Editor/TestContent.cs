@@ -50,6 +50,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly UpgradeDefinition AmpStrings;
         public readonly UpgradeDefinition TightSet;
         public readonly CareerEffectDefinition RecordsIncome;
+        public readonly CareerEffectDefinition RoadieTotal;
+        public readonly CareerEffectDefinition RoadieActive;
         public readonly RoadieVenueDefinition Garage;
         public readonly ModifierDefinition GjTap1;
         public readonly TriggerDefinition Tier1Trigger;
@@ -74,23 +76,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The Jam: two cash yield entries (the second reads the upgrade
             // latch) plus the reveal-gated rehearsal pair.
-            TapProducer = MakeDefinition<ProducerDefinition>("tap_producer");
+            TapProducer = MakeDefinition<ProducerDefinition>("tap_producer", "production");
             TapProducer.produces.Add(Entry("cash", Stat.Yield, 1));
             TapProducer.produces.Add(Entry("cash", Stat.Yield, 1, new UpgradePurchased { upgradeId = "stage_presence" }));
             TapProducer.produces.Add(Entry("rehearsal", Stat.Yield, 1, new FlagSet { flagId = "rehearsal_revealed" }));
             TapProducer.produces.Add(Entry("rehearsal", Stat.Rate, 0.5, new FlagSet { flagId = "rehearsal_revealed" }));
 
-            Band = MakeDefinition<ProducerDefinition>("band");
+            Band = MakeDefinition<ProducerDefinition>("band", "production");
             Band.produces.Add(Entry("fans", Stat.Rate, 0.35, new FlagSet { flagId = "fans_revealed" }));
 
-            PracticeAmp = MakeDefinition<GeneratorDefinition>("practice_amp", "gear");
+            PracticeAmp = MakeDefinition<GeneratorDefinition>("practice_amp", "gear", "production");
             PracticeAmp.availableWhen = new EarnedTotalAtLeast { currencyId = "cash", threshold = 100 };
             PracticeAmp.costCurrencyId = "cash";
             PracticeAmp.baseCost = 60;
             PracticeAmp.growth = 1.15;
             PracticeAmp.produces.Add(Entry("cash", Stat.Rate, 0.5));
 
-            Drummer = MakeDefinition<GeneratorDefinition>("drummer", "gear", "bandmate");
+            Drummer = MakeDefinition<GeneratorDefinition>("drummer", "gear", "bandmate", "production");
             Drummer.availableWhen = new OwnedCountAtLeast { generatorId = "practice_amp", count = 3 };
             Drummer.costCurrencyId = "cash";
             Drummer.baseCost = 250;
@@ -127,6 +129,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             RecordsIncome.formula = new LinearOnBalance { currencyId = "records", coefficient = 0.02 };
             RootDef.careerEffects.Add(RecordsIncome);
 
+            // The two roadie effects, composed at different levels: the global
+            // product on the income currency, the per-chapter factor on the
+            // SOURCES, narrowed to income so a bandmate's fans line stays out.
+            RoadieTotal = MakeDefinition<CareerEffectDefinition>("roadie_total");
+            RoadieTotal.target = "income";
+            RoadieTotal.stat = Stat.Rate;
+            RoadieTotal.formula = new RoadieTotalBoost();
+            RootDef.careerEffects.Add(RoadieTotal);
+
+            RoadieActive = MakeDefinition<CareerEffectDefinition>("roadie_active");
+            RoadieActive.target = "production";
+            RoadieActive.currencyId = "income";
+            RoadieActive.stat = Stat.Rate;
+            RoadieActive.formula = new RoadieActiveBoost();
+            RootDef.careerEffects.Add(RoadieActive);
+
             Garage = MakeDefinition<RoadieVenueDefinition>("garage_venue");
             Garage.chapterScopeId = "ch1";
             Garage.perRoadie = 0.05;
@@ -147,7 +165,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 .Add(TapProducer).Add(Band)
                 .Add(PracticeAmp).Add(Drummer)
                 .Add(StagePresence).Add(AmpStrings).Add(TightSet)
-                .Add(RecordsIncome).Add(Garage).Add(GjTap1)
+                .Add(RecordsIncome).Add(RoadieTotal).Add(RoadieActive).Add(Garage).Add(GjTap1)
                 .Add(Tier1Trigger);
 
             Root = ScopeState.Build(RootDef);

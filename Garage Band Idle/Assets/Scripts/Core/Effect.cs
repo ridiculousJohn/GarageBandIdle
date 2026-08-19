@@ -9,7 +9,7 @@ namespace RidiculousGaming.GarageBandIdle
     public struct Effect
     {
         public string target;      // a currency id, a producer/generator/bar/group id, or a tag
-        public string currencyId;  // optional - narrow to entries paying this currency
+        public string currencyId;  // optional - narrow to entries paying this currency, by id OR tag
         public string stat;        // optional - narrow to this stat ("rate"/"yield")
                                    // both empty = every number the target has; both set = one entry
         public double multiplier;

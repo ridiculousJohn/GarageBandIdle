@@ -148,6 +148,34 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(boost > (BigNumber)double.MaxValue, $"expected a value past double range, got {boost}");
         }
 
+        // The roadie buff aims at the sources, so a bandmate that pays Cash AND
+        // Fans from one definition would carry it into the fans line - which
+        // 8.1's wall-clock farm throttle forbids. The currencyId: income
+        // narrowing is what keeps it out, and fans stays out by not declaring
+        // the tag.
+        [Test]
+        public void The_roadie_buff_lifts_income_rates_and_never_the_fan_rate()
+        {
+            var tree = new TestTree();
+            tree.Tier1.flags.Add("fans_revealed");
+            tree.Tier1.generatorCounts["drummer"] = 1;
+            tree.Root.roadieAllocation["ch1"] = 2;              // 1 + 0.05 x 2 on both roadie factors
+
+            AssertClose(3 * 1.1 * 1.1, Producer.GetRate(tree.Tier1, tree.Defs, Now, "cash"), "cash rate");
+            AssertClose(0.35 + 0.02, Producer.GetRate(tree.Tier1, tree.Defs, Now, "fans"), "fan rate");
+        }
+
+        [Test]
+        public void The_roadie_buff_lifts_no_yield()
+        {
+            var tree = new TestTree();
+            tree.Root.roadieAllocation["ch1"] = 2;
+
+            // stat: rate on both, so a tap is the player's own contribution.
+            Producer.FireProducer(tree.Ctx(tree.Tier1), "tap_producer");
+            AssertClose(1, tree.Tier1.balances["cash"], "tap yield");
+        }
+
         // ---- the two stages ----
 
         [Test]
@@ -335,9 +363,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 chapterADef.children.Add(tierADef);
                 chapterBDef.children.Add(tierBDef);
 
-                var genA = MakeGenerator("gen_a", "coin_a");
-                var genB = MakeGenerator("gen_b", "coin_b");
-                var genRoot = MakeGenerator("gen_root", "prestige");
+                var genA = MakeGenerator("gen_a", "coin_a", "production");
+                var genB = MakeGenerator("gen_b", "coin_b", "production");
+                var genRoot = MakeGenerator("gen_root", "prestige", "production");
                 tierADef.generators.Add(genA);
                 tierBDef.generators.Add(genB);
                 rootDef.generators.Add(genRoot);
@@ -346,7 +374,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 total.target = "income";
                 total.formula = new RoadieTotalBoost();
                 var active = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_active");
-                active.target = "income";
+                active.target = "production";          // the SOURCE knows its chapter; a currency total does not
+                active.currencyId = "income";
                 active.formula = new RoadieActiveBoost();
                 rootDef.careerEffects.Add(total);
                 rootDef.careerEffects.Add(active);
@@ -378,9 +407,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // A generator paying one unit per second, so a test reads the multiplier
         // stack straight off the rate.
-        private static GeneratorDefinition MakeGenerator(string id, string currencyId)
+        private static GeneratorDefinition MakeGenerator(string id, string currencyId, params string[] tags)
         {
-            var generator = TestTree.MakeDefinition<GeneratorDefinition>(id);
+            var generator = TestTree.MakeDefinition<GeneratorDefinition>(id, tags);
             generator.availableWhen = new CurrencyAtLeast { currencyId = currencyId, threshold = 0 };
             generator.costCurrencyId = currencyId;
             generator.baseCost = 10;

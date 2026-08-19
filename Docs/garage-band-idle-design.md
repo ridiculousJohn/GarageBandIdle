@@ -436,9 +436,15 @@ chapter being worked (8 Roadies stacked: ~1.96× there, 1.40× everywhere else; 
 1.46× globally and ~1.61× on the chapter being worked). Allocation balances spreading for the total
 against concentrating to sprint an active replay — both are real strategies. **Both factors are
 ordinary effects whose target is authored data** — a tag (Ch. 1: `income`, declared by Cash) — so
-*what* Roadies help with is a per-chapter design decision, never a code decision. **The fan rate
-must never carry a roadie-targeted tag**: the wall-clock throttle of §8.1 stands on Fans being
-unbuffable by Roadies. (Deliberately open: whether reallocating applies retroactively to a dormant
+*what* Roadies help with is a per-chapter design decision, never a code decision. Both carry
+`stat: rate`: Roadies are the passive-crew lever and scale production, never a tap's yield. They are
+composed at different LEVELS, though. `roadie_total` is a currency-total effect - it is the same
+product everywhere, so the currency is where it belongs. `roadie_active` targets the production
+SOURCES (`{target: production, currencyId: income, stat: rate}`), because which chapter a number is
+produced in is a property of its source; a currency total has already summed across sources and can
+no longer name one chapter. **The fan rate must never carry a roadie-targeted tag**: the wall-clock
+throttle of §8.1 stands on Fans being unbuffable by Roadies, and the `currencyId: income` narrowing
+is what enforces it even on a bandmate that pays Cash and Fans from one definition. (Deliberately open: whether reallocating applies retroactively to a dormant
 chapter's idle claim computed at current rates.)
 
 **Per-venue scaling.** The rate and the cap are authored per venue on a `RoadieVenueDefinition`
@@ -627,7 +633,7 @@ against `availableWhen` and affordability — the domain owns the gate, never th
 [Serializable] public struct Effect
 {
     public string target;      // a currency id, a producer/generator/bar/group id, or a TAG
-    public string currencyId;  // optional — narrow to entries paying this currency
+    public string currencyId;  // optional — narrow to entries paying this currency (id or TAG)
     public string stat;        // optional — narrow to this stat ("rate"/"yield")
                                // both empty = every number the target has; both set = one entry
     public double multiplier;
@@ -659,7 +665,9 @@ number?* A number is identified by its owner and coordinates — a `produces` en
 (source, currencyId, stat), a reserved id by its name alone. An effect matches when its `target`
 names the owner (by id or any of its tags) and each optional coordinate it sets agrees: both empty
 matches everything the owner has, either one narrows, both name one entry exactly — the Effect
-address mirrors the `produces` entry's coordinates. **Where matches are gathered from is two
+address mirrors the `produces` entry's coordinates. `currencyId` matches an id or a tag, exactly as
+`target` does, so "every rate entry paying an income currency" is one effect rather than one per
+currency — and a currency stays out of it by not declaring the tag (§8.2's fans rule). **Where matches are gathered from is two
 explicit stages**, which is what keeps sibling scopes isolated (§12.3):
 
 ```

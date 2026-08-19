@@ -436,6 +436,13 @@ namespace RidiculousGaming.GarageBandIdle
 
         public bool TagExists(string tag) => allDefinitions.Any(d => d.HasTag(tag));
 
+        // A currency coordinate matches an entry's CURRENCY, so the tag has to
+        // live on a currency. A tag that exists only on producers narrows to
+        // nothing at runtime, which would otherwise validate clean and leave the
+        // effect permanently inert.
+        public bool CurrencyTagExists(string tag) =>
+            Defs.All<Economy.CurrencyDefinition>().Any(c => c != null && c.HasTag(tag));
+
         // A tag target must match a TARGETABLE member within the effect's
         // declaring scope's subtree (12.12) - something whose numbers a
         // multiplier can apply to. That is the currencies homed there plus the
@@ -1142,10 +1149,13 @@ namespace RidiculousGaming.GarageBandIdle
                 // ValidateEffectTargetReach.
             }
 
+            // The currency coordinate is a currency id or a tag CARRIED BY a
+            // currency; anything else narrows to nothing at all.
             if (!string.IsNullOrEmpty(currencyId) &&
-                ctx.Defs.Get<Economy.CurrencyDefinition>(currencyId) == null)
+                ctx.Defs.Get<Economy.CurrencyDefinition>(currencyId) == null &&
+                !ctx.CurrencyTagExists(currencyId))
                 ctx.AddError(ValidationCheck.UnresolvedReference,
-                    $"{site}: narrows to unknown currency '{currencyId}'.");
+                    $"{site}: narrows to '{currencyId}', which is no currency id and no tag any currency carries.");
 
             // An empty stat is the legal "every stat" address; a non-empty one no
             // system consumes narrows to nothing.

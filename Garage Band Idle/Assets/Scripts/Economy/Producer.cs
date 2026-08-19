@@ -42,7 +42,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     if (upgrade == null || !node.purchasedUpgrades.Contains(upgrade.Id))
                         continue;
                     foreach (var effect in upgrade.effects)
-                        if (Matches(effect.target, effect.currencyId, effect.stat, owner, currencyId, stat))
+                        if (Matches(origin.Defs, effect.target, effect.currencyId, effect.stat, owner, currencyId, stat))
                             product *= effect.multiplier;
                 }
 
@@ -56,7 +56,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     if (modifier == null)
                         continue;
                     foreach (var effect in modifier.effects)
-                        if (Matches(effect.target, effect.currencyId, effect.stat, owner, currencyId, stat))
+                        if (Matches(origin.Defs, effect.target, effect.currencyId, effect.stat, owner, currencyId, stat))
                             product *= Stacked(effect.multiplier, entry.count, modifier.stacking);
                 }
 
@@ -66,7 +66,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 {
                     if (career == null || career.formula == null)
                         continue;
-                    if (Matches(career.target, career.currencyId, career.stat, owner, currencyId, stat))
+                    if (Matches(origin.Defs, career.target, career.currencyId, career.stat, owner, currencyId, stat))
                         product *= career.formula.Compute(origin);
                 }
             }
@@ -79,7 +79,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // narrows, both name one entry exactly (design doc 12.2). A currency-
         // stage effect with no stat is what lets records_income reach the tap
         // yield while a stat: rate narrowing leaves it alone.
-        private static bool Matches(string target, string effectCurrencyId, string effectStat,
+        //
+        // The currency coordinate matches by id OR tag, exactly as target does:
+        // "every rate entry paying an income currency" is one effect rather than
+        // one per currency, and a currency stays out by not carrying the tag -
+        // which is how 8.2 already states the fans rule ("the fan rate must
+        // never carry a roadie-targeted tag").
+        private static bool Matches(IDefinitionSource defs, string target, string effectCurrencyId, string effectStat,
                                     Definition owner, string currencyId, string stat)
         {
             if (string.IsNullOrEmpty(target))
@@ -87,7 +93,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             if (target != owner.Id && !owner.HasTag(target))
                 return false;
             if (!string.IsNullOrEmpty(effectCurrencyId) && effectCurrencyId != currencyId)
-                return false;
+            {
+                var currency = defs.Get<CurrencyDefinition>(currencyId);
+                if (currency == null || !currency.HasTag(effectCurrencyId))
+                    return false;
+            }
             if (!string.IsNullOrEmpty(effectStat) && effectStat != stat)
                 return false;
             return true;

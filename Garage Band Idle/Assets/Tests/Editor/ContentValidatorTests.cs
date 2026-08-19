@@ -609,7 +609,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Boost.effects.Add(new Effect { target = "cash", currencyId = "ghost", multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "narrows to unknown currency 'ghost'");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "narrows to 'ghost', which is no currency id and no tag any currency carries");
         }
 
         // Reference resolution is unconditional - a modifier nothing grants
@@ -624,7 +624,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Defs.Add(orphan);
             var report = f.Run();
             AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "modifier 'orphan' effects[0]");
-            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "narrows to unknown currency 'ghost'");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "narrows to 'ghost', which is no currency id and no tag any currency carries");
+        }
+
+        // The currency coordinate matches an entry's CURRENCY, so a tag only a
+        // producer carries narrows to nothing at runtime - it must not validate.
+        [Test]
+        public void Effect_NarrowingByACurrencyTag_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "practice_amp", currencyId = "income", multiplier = 2 });
+            AssertNoFinding(f.Run(), ValidationCheck.UnresolvedReference);
+        }
+
+        [Test]
+        public void Effect_NarrowingByANonCurrencyTag_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "practice_amp", currencyId = "gear", multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "narrows to 'gear', which is no currency id and no tag any currency carries");
         }
 
         // ---- producers, generators, upgrades ----

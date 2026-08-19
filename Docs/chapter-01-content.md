@@ -32,9 +32,12 @@ root
 - Currencies: `records`, `roadies` (both accumulate, never spent in Ch. 1), `discography` (list, Ch. 6+).
 - Career effects (§12.6 — formula-shaped, exist from minute one):
   - `records_income`: `{target: income, × (1 + 0.02 × records.balance)}` — additive within the term.
-  - `roadie_total`: `{target: income, × Π over venues (1 + 0.05 × stationed)}` (§8.2).
-  - `roadie_active`: `{target: income, × (1 + 0.05 × stationed at foreground chapter)}` — the
-    active chapter's double-count (§8.2).
+  - `roadie_total`: `{target: income, stat: rate, × Π over venues (1 + 0.05 × stationed)}` (§8.2).
+  - `roadie_active`: `{target: production, currencyId: income, stat: rate,
+    × (1 + 0.05 × stationed at the chapter on the resolution chain)}` — the active chapter's
+    double-count (§8.2), aimed at the SOURCES because only a source knows which chapter it produces
+    in. Every producer and generator declares the `production` tag; the `currencyId: income`
+    narrowing is what keeps a bandmate's Fans line out of it.
 - Reserved-target base values: `idle_rate` 0.5, `idle_cap` 14400s (4h), `game_speed` 1; Encore buff
   `{target: game_speed, ×2}`, Overdrive `×4` (§9). Minimum-away threshold: 180s.
 - Venue cap: the Garage takes at most **5** stationed Roadies at +5% each (§8.2).
@@ -57,14 +60,14 @@ as `fans_revealed` / `rehearsal_revealed` because a flag id may not collide with
 ## 4. Producers (all tier1)
 
 ```
-tap_producer ("Jam"):                                    # fired by the Jam button module
+tap_producer ("Jam")  [production]:                      # fired by the Jam button module
   { cash,      yield, 1 }
   { cash,      yield, 1,   UpgradePurchased(stage_presence) }   # the upgrade is a latch; the flat
                                                                 # bonus is this conditioned entry (§12.2)
   { rehearsal, yield, 1,   FlagSet(rehearsal_revealed) }
   { rehearsal, rate,  0.5, FlagSet(rehearsal_revealed) }        # no pre-banking: rate gated too
 
-band ("Local Buzz"):                                     # nothing presents it; pure rate
+band ("Local Buzz")  [production]:                       # nothing presents it; pure rate
   { fans, rate, 0.35, FlagSet(fans_revealed) }           # base fan accrual — band-size adds below
 ```
 
@@ -72,12 +75,14 @@ band ("Local Buzz"):                                     # nothing presents it; 
 
 | Id | Tags | Base cost | Produces (rate) | availableWhen |
 |---|---|---|---|---|
-| `practice_amp` | `gear` | 60 | cash 0.5 | `EarnedTotalAtLeast(cash, 100)` |
-| `drummer` | `gear`, `bandmate` | 250 | cash 3, fans 0.02 | `OwnedCountAtLeast(practice_amp, 3)` |
-| `bassist` | `gear`, `bandmate` | 4,000 | cash 20, fans 0.02 | `OwnedCountAtLeast(drummer, 5)` |
-| `guitarist` | `gear`, `bandmate` | 30,000 | cash 130, fans 0.02 | `OwnedCountAtLeast(bassist, 5)` |
+| `practice_amp` | `gear`, `production` | 60 | cash 0.5 | `EarnedTotalAtLeast(cash, 100)` |
+| `drummer` | `gear`, `bandmate`, `production` | 250 | cash 3, fans 0.02 | `OwnedCountAtLeast(practice_amp, 3)` |
+| `bassist` | `gear`, `bandmate`, `production` | 4,000 | cash 20, fans 0.02 | `OwnedCountAtLeast(drummer, 5)` |
+| `guitarist` | `gear`, `bandmate`, `production` | 30,000 | cash 130, fans 0.02 | `OwnedCountAtLeast(bassist, 5)` |
 
-The `gear` tag exists for the event handicap (×0 = "generators paused"); `bandmate` is the §3 set.
+The `gear` tag exists for the event handicap (×0 = "generators paused"); `bandmate` is the §3 set;
+`production` is what the roadie active boost targets (§2), carried by every source so nothing is
+silently left out of it - the `currencyId: income` narrowing is what decides which lines it lifts.
 Band size drives the fan rate because each bandmate's fans entry scales with `ownedCount` — no
 per-bandmate constant anywhere.
 

@@ -10,7 +10,7 @@ step's tests need only what came before it.
 | 1 | Core class families + state | **DONE 2026-08-18** — 51/51 green (50 project-authored + Addressables' TestStub) |
 | 2 | Save system | **DONE 2026-08-18** — 66/66 green (65 project-authored + Addressables' TestStub) |
 | 3 | ContentDatabase + validation | **DONE 2026-08-18** — 123/123 green (122 project-authored + Addressables' TestStub) |
-| 4 | Producers, generators, upgrades + resolution | **DONE 2026-08-19** - 204/204 green (203 project-authored + Addressables' TestStub) |
+| 4 | Producers, generators, upgrades + resolution | **DONE 2026-08-19** - 208/208 green (207 project-authored + Addressables' TestStub) |
 | 5 | Bars | not started |
 | 6 | Events + trigger sweep | not started |
 | 7 | Tick + GameSession | not started |
