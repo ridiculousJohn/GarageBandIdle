@@ -80,8 +80,8 @@ namespace RidiculousGaming.GarageBandIdle
         // ---- writes: each lands at the fact's home ----
 
         // Deposits at the currency's home: balance and earned total together.
-        // AddCurrency is a grant; spending belongs to TryBuy, which never comes
-        // through here.
+        // A deposit is a grant; spending is TrySpend below, which moves the
+        // balance alone.
         public void Deposit(string currencyId, BigNumber amount)
         {
             for (var node = Scope; node != null; node = node.Parent)
@@ -94,6 +94,33 @@ namespace RidiculousGaming.GarageBandIdle
                 }
             }
             Debug.LogError($"Deposit: no scope on the chain from '{Scope.ScopeId}' holds currency '{currencyId}'.");
+        }
+
+        // Decrements at the currency's home iff the balance covers the amount.
+        // NEVER touches earnedTotals: spending is not earning, and section 2's
+        // strobe-proofing - a threshold met once stays met - stands on that.
+        public bool TrySpend(string currencyId, BigNumber amount)
+        {
+            // A negative amount would pass the affordability check and then ADD
+            // through the subtraction, minting currency. Refused before anything
+            // is located or touched; zero stays legal, since cut_demo costs 0.
+            if (amount < BigNumber.Zero)
+            {
+                Debug.LogError($"TrySpend: refused a negative amount ({amount}) for currency '{currencyId}'.");
+                return false;
+            }
+
+            for (var node = Scope; node != null; node = node.Parent)
+            {
+                if (!node.balances.TryGetValue(currencyId, out var balance))
+                    continue;
+                if (balance < amount)
+                    return false;
+                node.balances[currencyId] = balance - amount;
+                return true;
+            }
+            Debug.LogError($"TrySpend: no scope on the chain from '{Scope.ScopeId}' holds currency '{currencyId}'.");
+            return false;
         }
 
         // Writes to the flag's declared home (design doc 12.3). Setting a flag no

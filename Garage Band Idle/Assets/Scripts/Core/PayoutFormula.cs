@@ -40,6 +40,10 @@ namespace RidiculousGaming.GarageBandIdle
             var home = ctx.RequireChainCurrency(currencyId, "RootCurveFormula");
             if (home != null)
                 ctx.RecordFormulaRead(currencyId, home); // input for the reads-zeros warn (12.12)
+            ctx.RequireFiniteDouble(exponent, "RootCurveFormula exponent");
+            if (divisor <= BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"RootCurveFormula divisor is {divisor} - a nonpositive divisor makes the payout infinite or undefined.");
         }
     }
 }

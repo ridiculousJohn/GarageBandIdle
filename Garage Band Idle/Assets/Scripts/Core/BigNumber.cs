@@ -15,8 +15,23 @@ namespace RidiculousGaming.GarageBandIdle
         public static readonly BigNumber Zero = new BigNumber(0);
         public static readonly BigNumber One = new BigNumber(1);
 
-        public BigNumber(double value) { _value = value; }
-        private BigNumber(BigDouble value) { _value = value; }
+        public BigNumber(double value) : this((BigDouble)value) { }
+
+        // The one door: every literal, every conversion, every arithmetic result,
+        // and every value read back from a save arrives here. NaN and infinity
+        // are refused at birth rather than checked by consumers - the library
+        // deliberately PRESERVES both (BigDouble's own constructor calls that
+        // "somewhat meaningful"), and every comparison operator answers false to
+        // a NaN operand, so a poisoned value spreads silently and no downstream
+        // sign check can catch it. A currency, a rate, and a cost are always
+        // real numbers; a division by zero or a root of a negative in economy
+        // math is a bug, and this is where it surfaces.
+        private BigNumber(BigDouble value)
+        {
+            if (double.IsNaN(value.Mantissa) || double.IsInfinity(value.Mantissa))
+                throw new ArgumentException($"BigNumber cannot hold {value} - game values are finite.", nameof(value));
+            _value = value;
+        }
 
         // mantissa/exponent are exposed for display formatting (NumberFormatter);
         // game logic should stick to arithmetic and comparisons

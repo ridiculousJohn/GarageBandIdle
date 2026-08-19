@@ -19,6 +19,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly Rung Capstone;
         public readonly TriggerDefinition Trigger;
         public readonly ModifierDefinition Boost;
+        public readonly ProducerDefinition Tap;
+        public readonly GeneratorDefinition Amp;
+        public readonly UpgradeDefinition StagePresence;
+        public readonly UpgradeDefinition AmpStrings;
+        public readonly CareerEffectDefinition RecordsIncome;
+        public readonly RoadieVenueDefinition Venue;
 
         public ValidatorFixture()
         {
@@ -82,6 +88,46 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Trigger.actions.Add(new RemoveModifier { scopeId = "tier1", modifierId = "boost" });
             Tier1.triggers.Add(Trigger);
 
+            // The economy declarations: a producer reading an upgrade latch, a
+            // tagged generator with a cost curve, an upgrade whose effect targets
+            // that generator, the career effect on the income tag, and the
+            // chapter's venue.
+            Tap = TestTree.MakeDefinition<ProducerDefinition>("tap_producer");
+            Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, 1));
+            Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, 1, new UpgradePurchased { upgradeId = "stage_presence" }));
+            Tier1.producers.Add(Tap);
+
+            Amp = TestTree.MakeDefinition<GeneratorDefinition>("practice_amp", "gear");
+            Amp.availableWhen = new EarnedTotalAtLeast { currencyId = "cash", threshold = 100 };
+            Amp.costCurrencyId = "cash";
+            Amp.baseCost = 60;
+            Amp.growth = 1.15;
+            Amp.produces.Add(TestTree.Entry("cash", Stat.Rate, 0.5));
+            Tier1.generators.Add(Amp);
+
+            StagePresence = TestTree.MakeDefinition<UpgradeDefinition>("stage_presence");
+            StagePresence.gate = new EarnedTotalAtLeast { currencyId = "cash", threshold = 250 };
+            StagePresence.costCurrencyId = "cash";
+            StagePresence.cost = 250;
+
+            AmpStrings = TestTree.MakeDefinition<UpgradeDefinition>("amp_strings");
+            AmpStrings.gate = new EarnedTotalAtLeast { currencyId = "cash", threshold = 500 };
+            AmpStrings.costCurrencyId = "cash";
+            AmpStrings.cost = 500;
+            AmpStrings.effects.Add(new Effect { target = "practice_amp", multiplier = 2 });
+            Tier1.upgrades.Add(StagePresence);
+            Tier1.upgrades.Add(AmpStrings);
+
+            RecordsIncome = TestTree.MakeDefinition<CareerEffectDefinition>("records_income");
+            RecordsIncome.target = "income";
+            RecordsIncome.formula = new LinearOnBalance { currencyId = "records", coefficient = 0.02 };
+            Root.careerEffects.Add(RecordsIncome);
+
+            Venue = TestTree.MakeDefinition<RoadieVenueDefinition>("garage_venue");
+            Venue.chapterScopeId = "ch1";
+            Venue.perRoadie = 0.05;
+            Venue.cap = 5;
+
             Defs.Add(Root).Add(Ch1).Add(Tier1).Add(Tier1b)
                 .Add(TestTree.MakeDefinition<CurrencyDefinition>("records"))
                 .Add(TestTree.MakeDefinition<CurrencyDefinition>("ch1_records"))
@@ -89,7 +135,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 .Add(TestTree.MakeDefinition<CurrencyDefinition>("fans"))
                 .Add(TestTree.MakeDefinition<BarGroupDefinition>("covers"))
                 .Add(Boost)
-                .Add(Trigger);
+                .Add(Trigger)
+                .Add(Tap).Add(Amp).Add(StagePresence).Add(AmpStrings)
+                .Add(RecordsIncome).Add(Venue);
         }
 
         public ValidationReport Run() => ContentValidator.Validate(Defs);
@@ -513,10 +561,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void EffectTag_NoMemberInGrantSubtree_Warning()
         {
             var f = new ValidatorFixture();
-            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("merch", "gear"));
+            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("merch", "collectible"));
             f.Root.declaredCurrencyIds.Add("merch");
-            f.Boost.effects.Add(new Effect { target = "gear", multiplier = 2 });
+            f.Boost.effects.Add(new Effect { target = "collectible", multiplier = 2 });
             AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "matches no member within 'tier1'");
+        }
+
+        // Tag membership reaches the sources a scope declares, not just its
+        // currencies: the gear tag lives on tier1's generator.
+        [Test]
+        public void EffectTag_MatchedByADeclaredGenerator_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "gear", multiplier = 2 });
+            AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
         }
 
         // A tag living only on a scope or trigger is vocabulary, not a target -
@@ -567,6 +625,351 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var report = f.Run();
             AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "modifier 'orphan' effects[0]");
             AssertFinding(report, ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "narrows to unknown currency 'ghost'");
+        }
+
+        // ---- producers, generators, upgrades ----
+
+        [Test]
+        public void ProducesEntry_CurrencyOffActingChain_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1b.declaredCurrencyIds.Add("merch");
+            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("merch"));
+            f.Tap.produces.Add(TestTree.Entry("merch", Stat.Rate, 1));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "produces entry addresses currency 'merch'");
+        }
+
+        [Test]
+        public void ProducesEntry_UnconsumedStat_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(TestTree.Entry("cash", "Rate", 1));   // no system consumes "Rate"
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.UnconsumedStat, "stat 'Rate'");
+        }
+
+        [Test]
+        public void ProducesEntry_MissingStat_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(TestTree.Entry("cash", null, 1));
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.UnconsumedStat, "names no stat");
+        }
+
+        [Test]
+        public void ProducesEntry_NegativeValue_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, -1));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never subtracts");
+        }
+
+        [Test]
+        public void ProducesEntry_ConditionValidatedInTheDeclaringScope_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, 1,
+                new UpgradePurchased { upgradeId = "ghost_upgrade" }));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown UpgradeDefinition 'ghost_upgrade'");
+        }
+
+        [Test]
+        public void Generator_FreeBaseCost_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.baseCost = 0;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "unbounded rate printer");
+        }
+
+        [Test]
+        public void Generator_NonpositiveGrowth_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.growth = 0;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "positive ratio");
+        }
+
+        [Test]
+        public void Generator_CostCurrencyOffActingChain_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.costCurrencyId = "ch1_records";
+            AssertNoFinding(f.Run(), ValidationCheck.ChainReach);    // an ancestor's currency is on the chain
+
+            f.Tier1b.declaredCurrencyIds.Add("merch");
+            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("merch"));
+            f.Amp.costCurrencyId = "merch";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "generator cost addresses currency 'merch'");
+        }
+
+        // An unauthored gate refuses the buy, so the content is inert rather
+        // than broken - the same species of finding as a flag nothing sets.
+        [Test]
+        public void NullPurchaseGate_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.availableWhen = null;
+            f.AmpStrings.gate = null;
+            var report = f.Run();
+            AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.NullEntry, "generator 'practice_amp': availableWhen is unauthored");
+            AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.NullEntry, "upgrade 'amp_strings': gate is unauthored");
+        }
+
+        [Test]
+        public void Upgrade_NegativeCost_Error()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.cost = -1;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never pays out");
+        }
+
+        [Test]
+        public void Upgrade_ZeroCost_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.cost = 0;                                   // cut_demo is authored at 0
+            AssertNoFinding(f.Run(), ValidationCheck.NumericRange);
+        }
+
+        // The purchase latch is a fact write BEFORE actions[0], so a payload
+        // resetting the latch's own scope would make the upgrade repeatable.
+        [Test]
+        public void Upgrade_PayloadResettingItsOwnScope_SetThenWiped_Error()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.actions.Add(new ResetScope { scopeId = "tier1" });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped, "purchase latch of upgrade 'amp_strings'");
+        }
+
+        [Test]
+        public void Upgrade_ActionListParticipatesInTheSharedLedgers_Error()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.actions.Add(new SetFlag { flagId = "ghost_flag" });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "SetFlag names flag 'ghost_flag'");
+        }
+
+        [Test]
+        public void UpgradeEffect_TargetingASiblingsSource_EffectReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
+            sibling.availableWhen = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 1 };
+            sibling.costCurrencyId = "ch1_records";
+            sibling.baseCost = 5;
+            sibling.produces.Add(TestTree.Entry("ch1_records", Stat.Rate, 1));
+            f.Tier1b.generators.Add(sibling);
+            f.Defs.Add(sibling);
+
+            // tier1's upgrade cannot reach a source declared in tier1b: the
+            // source's own outward walk never visits tier1.
+            f.AmpStrings.effects.Add(new Effect { target = "merch_stand", multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "targets 'merch_stand' declared at 'tier1b'");
+        }
+
+        [Test]
+        public void Effect_NegativeMultiplier_Error()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.effects.Add(new Effect { target = "practice_amp", multiplier = -1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never flips a number's sign");
+        }
+
+        [Test]
+        public void Effect_ZeroMultiplier_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.effects.Add(new Effect { target = "practice_amp", multiplier = 0 });   // an event handicap
+            AssertNoFinding(f.Run(), ValidationCheck.NumericRange);
+        }
+
+        [Test]
+        public void Effect_UnconsumedStatNarrowing_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "cash", stat = "tick", multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.UnconsumedStat, "stat narrowing names stat 'tick'");
+        }
+
+        [Test]
+        public void DeclaringTheSameSourceTwice_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1b.generators.Add(f.Amp);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome, "declaration is ownership");
+        }
+
+        [Test]
+        public void GeneratorReference_OffActingChain_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
+            sibling.availableWhen = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 1 };
+            sibling.costCurrencyId = "ch1_records";
+            sibling.baseCost = 5;
+            f.Tier1b.generators.Add(sibling);
+            f.Defs.Add(sibling);
+
+            // tier1's rung cannot read a count stored in tier1b.
+            ((All)f.Album.offerCondition).conditions.Add(new OwnedCountAtLeast { generatorId = "merch_stand", count = 1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "OwnedCountAtLeast reads 'merch_stand' declared at 'tier1b'");
+        }
+
+        [Test]
+        public void GeneratorReference_Unknown_Error()
+        {
+            var f = new ValidatorFixture();
+            ((All)f.Album.offerCondition).conditions.Add(new OwnedCountAtLeast { generatorId = "ghost", count = 1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown GeneratorDefinition 'ghost'");
+        }
+
+        [Test]
+        public void UpgradeReference_OffActingChain_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = TestTree.MakeDefinition<UpgradeDefinition>("merch_deal");
+            sibling.gate = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 1 };
+            sibling.costCurrencyId = "ch1_records";
+            f.Tier1b.upgrades.Add(sibling);
+            f.Defs.Add(sibling);
+
+            f.Trigger.condition = new UpgradePurchased { upgradeId = "merch_deal" };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "UpgradePurchased reads 'merch_deal' declared at 'tier1b'");
+        }
+
+        // ---- career effects and venues ----
+
+        [Test]
+        public void CareerEffect_NoFormula_Error()
+        {
+            var f = new ValidatorFixture();
+            f.RecordsIncome.formula = null;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "career effect 'records_income': no formula");
+        }
+
+        [Test]
+        public void CareerEffect_TargetOutOfReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var local = TestTree.MakeDefinition<CareerEffectDefinition>("tier_career");
+            local.target = "records";                                // homed at the root, declared at tier1
+            local.formula = new LinearOnBalance { currencyId = "ch1_records", coefficient = 1 };
+            f.Tier1.careerEffects.Add(local);
+            f.Defs.Add(local);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "targets currency 'records' homed at 'root'");
+        }
+
+        [Test]
+        public void CareerFormula_NegativeCoefficient_Error()
+        {
+            var f = new ValidatorFixture();
+            ((LinearOnBalance)f.RecordsIncome.formula).coefficient = -0.02;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never shrinks");
+        }
+
+        [Test]
+        public void RoadieVenue_NotAChapter_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Venue.chapterScopeId = "tier1";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "which is not a chapter");
+        }
+
+        [Test]
+        public void RoadieVenue_UnknownScope_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Venue.chapterScopeId = "ch99";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "names unknown scope 'ch99'");
+        }
+
+        [Test]
+        public void RoadieVenue_TwoForOneChapter_Error()
+        {
+            var f = new ValidatorFixture();
+            var second = TestTree.MakeDefinition<RoadieVenueDefinition>("garage_venue_2");
+            second.chapterScopeId = "ch1";
+            second.perRoadie = 0.05;
+            second.cap = 5;
+            f.Defs.Add(second);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome, "both scale chapter 'ch1'");
+        }
+
+        [Test]
+        public void RoadieVenue_NegativePerRoadie_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Venue.perRoadie = -0.05;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never costs income");
+        }
+
+        // A declaration is a direct reference; every runtime lookup is by id
+        // through the database. An asset missing its Addressables label sits in
+        // exactly that gap.
+        [Test]
+        public void DeclaredButUndiscoverable_Error()
+        {
+            var f = new ValidatorFixture();
+            var unlabeled = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
+            unlabeled.availableWhen = new CurrencyAtLeast { currencyId = "cash", threshold = 1 };
+            unlabeled.costCurrencyId = "cash";
+            unlabeled.baseCost = 5;
+            f.Tier1.generators.Add(unlabeled);        // declared, but never added to Defs
+
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "the content database does not resolve to this asset");
+        }
+
+        [Test]
+        public void DeclaredAndDiscoverable_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            var labeled = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
+            labeled.availableWhen = new CurrencyAtLeast { currencyId = "cash", threshold = 1 };
+            labeled.costCurrencyId = "cash";
+            labeled.baseCost = 5;
+            f.Tier1.generators.Add(labeled);
+            f.Defs.Add(labeled);
+
+            AssertClean(f.Run());
+        }
+
+        // The rule covers every direct-reference declaration, not just the
+        // economy families - a forgotten label is the same slip either way.
+        [Test]
+        public void DeclaredTriggerUndiscoverable_Error()
+        {
+            var f = new ValidatorFixture();
+            var orphan = TestTree.MakeDefinition<TriggerDefinition>("orphan_trigger");
+            f.Tier1.triggers.Add(orphan);
+
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "declares TriggerDefinition 'orphan_trigger'");
+        }
+
+        // ---- numeric range across every authored double ----
+
+        [Test]
+        public void NonFiniteDoubles_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.growth = double.NaN;
+            f.Venue.perRoadie = double.PositiveInfinity;
+            ((LinearOnBalance)f.RecordsIncome.formula).coefficient = double.NaN;
+            ((RootCurveFormula)((AddCurrency)f.Album.actions[0]).formula).exponent = double.PositiveInfinity;
+            f.Boost.effects.Add(new Effect { target = "cash", multiplier = double.NaN });
+
+            var report = f.Run();
+            var findings = report.OfCheck(ValidationCheck.NumericRange).Count();
+            Assert.AreEqual(5, findings, Dump(report));
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NumericRange, "must be finite");
+        }
+
+        [Test]
+        public void RootCurve_NonpositiveDivisor_Error()
+        {
+            var f = new ValidatorFixture();
+            ((RootCurveFormula)((AddCurrency)f.Album.actions[0]).formula).divisor = 0;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "infinite or undefined");
         }
 
         // ---- null slots ----

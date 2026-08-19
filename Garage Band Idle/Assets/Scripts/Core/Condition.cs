@@ -42,14 +42,16 @@ namespace RidiculousGaming.GarageBandIdle
         public override void Validate(ValidationContext ctx) => ctx.RequireChainCurrency(currencyId, "EarnedTotalAtLeast");
     }
 
-    // Reference validation lands with the generator family (build step 4).
     [Serializable]
     public class OwnedCountAtLeast : Condition
     {
-        public string generatorId;
+        [DefinitionId(typeof(Economy.GeneratorDefinition))] public string generatorId;
         public int count;
 
         public override bool Evaluate(GameContext ctx) => ctx.GetOwnedCount(generatorId) >= count;
+
+        public override void Validate(ValidationContext ctx) =>
+            ctx.RequireChainDeclaration<Economy.GeneratorDefinition>(generatorId, "OwnedCountAtLeast");
     }
 
     [Serializable]
@@ -69,13 +71,15 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
-    // Reference validation lands with the upgrade family (build step 4).
     [Serializable]
     public class UpgradePurchased : Condition
     {
-        public string upgradeId;
+        [DefinitionId(typeof(Economy.UpgradeDefinition))] public string upgradeId;
 
         public override bool Evaluate(GameContext ctx) => ctx.IsUpgradePurchased(upgradeId);
+
+        public override void Validate(ValidationContext ctx) =>
+            ctx.RequireChainDeclaration<Economy.UpgradeDefinition>(upgradeId, "UpgradePurchased");
     }
 
     // Counts the group's bars at full: completion is derived, progress >= the

@@ -34,7 +34,9 @@ namespace RidiculousGaming.GarageBandIdle
         FormulaReadsCleared,    // a formula-driven grant after a reset clearing its inputs (warn)
         StrandedValue,          // a rung resets a subtree holding a payout rung it never invokes (warn)
         ReferenceCycle,         // cycles across nested action references
-        RemoveWithoutGrant      // RemoveModifier naming a stack nothing grants there (warn)
+        RemoveWithoutGrant,     // RemoveModifier naming a stack nothing grants there (warn)
+        UnconsumedStat,         // a stat no system consumes (warn) - the typo guard a named vocabulary lacks
+        NumericRange            // an authored number outside its legal range: NaN, infinity, wrong sign
     }
 
     public readonly struct ValidationFinding
@@ -204,6 +206,7 @@ namespace RidiculousGaming.GarageBandIdle
         private readonly Dictionary<string, ScopeDefinition> scopeById;
         private readonly Dictionary<string, ScopeDefinition> currencyHomeById;
         private readonly Dictionary<string, ScopeDefinition> flagHomeById;
+        private readonly Dictionary<Definition, ScopeDefinition> declaringScopeByDefinition;
         private readonly List<ScopeDefinition> treeScopes;
         private readonly List<Definition> allDefinitions;
         private readonly int parentWalkGuard; // bounds chain walks against malformed graphs
@@ -228,6 +231,7 @@ namespace RidiculousGaming.GarageBandIdle
             Dictionary<string, ScopeDefinition> scopeById,
             Dictionary<string, ScopeDefinition> currencyHomeById,
             Dictionary<string, ScopeDefinition> flagHomeById,
+            Dictionary<Definition, ScopeDefinition> declaringScopeByDefinition,
             List<ScopeDefinition> treeScopes,
             List<Definition> allDefinitions)
         {
@@ -238,6 +242,7 @@ namespace RidiculousGaming.GarageBandIdle
             this.scopeById = scopeById;
             this.currencyHomeById = currencyHomeById;
             this.flagHomeById = flagHomeById;
+            this.declaringScopeByDefinition = declaringScopeByDefinition;
             this.treeScopes = treeScopes;
             this.allDefinitions = allDefinitions;
             parentWalkGuard = scopeById.Count + parentByScope.Count + 1;
@@ -282,6 +287,12 @@ namespace RidiculousGaming.GarageBandIdle
 
         public ScopeDefinition CurrencyHome(string currencyId) =>
             currencyId != null && currencyHomeById.TryGetValue(currencyId, out var home) ? home : null;
+
+        // The scope whose declaration list holds this definition - declaration is
+        // ownership (12.3), so this is the home of every fact it creates. Null
+        // when no scope declares it.
+        public ScopeDefinition DeclaringScope(Definition definition) =>
+            definition != null && declaringScopeByDefinition.TryGetValue(definition, out var scope) ? scope : null;
 
         public ScopeDefinition FlagHome(string flagId) =>
             flagId != null && flagHomeById.TryGetValue(flagId, out var home) ? home : null;
@@ -343,6 +354,61 @@ namespace RidiculousGaming.GarageBandIdle
             return home;
         }
 
+        // The same rule for a scope-attached definition's fact (12.12): the id
+        // resolves, some scope declares it, and that scope sits on the acting
+        // chain - the runtime walk reaches nowhere else, so a cross-tree read is
+        // a load-time error rather than a silent runtime miss.
+        public ScopeDefinition RequireChainDeclaration<T>(string id, string use) where T : Definition
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                AddError(ValidationCheck.UnresolvedReference, $"{use} names an empty id.");
+                return null;
+            }
+            var definition = Defs.Get<T>(id);
+            if (definition == null)
+            {
+                AddError(ValidationCheck.UnresolvedReference, $"{use} references unknown {typeof(T).Name} '{id}'.");
+                return null;
+            }
+            var home = DeclaringScope(definition);
+            if (home == null)
+            {
+                AddError(ValidationCheck.UnresolvedReference, $"{use} references '{id}', which no scope declares.");
+                return null;
+            }
+            if (!OnActingChain(home))
+            {
+                AddError(ValidationCheck.ChainReach, $"{use} reads '{id}' declared at '{home.Id}', which is not on the chain from '{ActingScope.Id}' (12.12).");
+                return null;
+            }
+            return home;
+        }
+
+        // NaN and infinity are refused on every authored double: either one
+        // poisons a product silently, and no legal tuning value is either.
+        public bool RequireFiniteDouble(double value, string what)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                AddError(ValidationCheck.NumericRange, $"{what} is {value} - authored numbers must be finite.");
+                return false;
+            }
+            return true;
+        }
+
+        // A stat means something because a system consumes it (12.2), so one
+        // outside the consumed set produces nothing. The warn is what recovers
+        // the typo protection an enum would have given a named vocabulary.
+        public void RequireConsumedStat(string stat, string what)
+        {
+            if (Economy.Stat.IsConsumed(stat))
+                return;
+            AddWarning(ValidationCheck.UnconsumedStat, string.IsNullOrEmpty(stat)
+                ? $"{what} names no stat - no system consumes it."
+                : $"{what} names stat '{stat}', which no system consumes ({Economy.Stat.ConsumedNames}).");
+        }
+
         // ---- ledgers ----
 
         public void RecordFlagSetter(string flagId) =>
@@ -372,8 +438,8 @@ namespace RidiculousGaming.GarageBandIdle
 
         // A tag target must match a TARGETABLE member within the effect's
         // declaring scope's subtree (12.12) - something whose numbers a
-        // multiplier can apply to. Today that is the currencies homed there;
-        // producers/generators (step 4) and bars/groups (step 5) join with
+        // multiplier can apply to. That is the currencies homed there plus the
+        // producers and generators declared there; bars and groups join with
         // their scope attachments. Scope and trigger tags are vocabulary, not
         // targets - a multiplier never resolves against them.
         public bool TagHasMemberInSubtree(ScopeDefinition top, string tag)
@@ -388,6 +454,12 @@ namespace RidiculousGaming.GarageBandIdle
                     if (currency != null && currency.HasTag(tag))
                         return true;
                 }
+                foreach (var producer in scope.producers)
+                    if (producer != null && producer.HasTag(tag))
+                        return true;
+                foreach (var generator in scope.generators)
+                    if (generator != null && generator.HasTag(tag))
+                        return true;
             }
             return false;
         }
@@ -451,19 +523,44 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var definition in defs.All<Definition>())
                 if (definition != null && definitionSeen.Add(definition))
                     allDefinitions.Add(definition);
+            // Scope-attached families are content like any other: their ids join
+            // the tree-wide id space, so they are collected here rather than
+            // discovered separately.
+            void CollectDeclared<T>(ScopeDefinition scope, List<T> list, string label) where T : Definition
+            {
+                for (var i = 0; i < list.Count; i++)
+                {
+                    var definition = list[i];
+                    if (definition == null)
+                    {
+                        report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
+                            $"scope '{scope.Id}' {label}[{i}] is null.");
+                        continue;
+                    }
+                    if (definitionSeen.Add(definition))
+                        allDefinitions.Add(definition);
+
+                    // A declaration is a direct reference, but every runtime
+                    // lookup goes through the database - TryBuy and FireProducer
+                    // resolve by id. An asset missing its Addressables label is
+                    // therefore visible here and to the rate walk, yet cannot be
+                    // bought or fired: half-working content that would otherwise
+                    // validate clean.
+                    if (!string.IsNullOrEmpty(definition.Id) && defs.Get<T>(definition.Id) != definition)
+                        report.Add(ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                            $"scope '{scope.Id}' declares {typeof(T).Name} '{definition.Id}', which the content database does not resolve to this asset - check its Addressables label.");
+                }
+            }
+
             foreach (var scope in allScopes)
             {
                 if (definitionSeen.Add(scope))
                     allDefinitions.Add(scope);
-                for (var i = 0; i < scope.triggers.Count; i++)
-                {
-                    var trigger = scope.triggers[i];
-                    if (trigger == null)
-                        report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
-                            $"scope '{scope.Id}' triggers[{i}] is null.");
-                    else if (definitionSeen.Add(trigger))
-                        allDefinitions.Add(trigger);
-                }
+                CollectDeclared(scope, scope.triggers, "triggers");
+                CollectDeclared(scope, scope.producers, "producers");
+                CollectDeclared(scope, scope.generators, "generators");
+                CollectDeclared(scope, scope.upgrades, "upgrades");
+                CollectDeclared(scope, scope.careerEffects, "careerEffects");
             }
 
             var idOwners = new Dictionary<string, List<(string desc, bool isFlag)>>();
@@ -602,13 +699,38 @@ namespace RidiculousGaming.GarageBandIdle
                 }
             }
 
+            // Declaration is ownership, so a producer, generator, upgrade, or
+            // career effect belongs to exactly one scope - the same rule the
+            // trigger check above enforces.
+            var declaringScopeByDefinition = new Dictionary<Definition, ScopeDefinition>();
+            void RecordHome<T>(ScopeDefinition scope, List<T> list) where T : Definition
+            {
+                foreach (var definition in list)
+                {
+                    if (definition == null)
+                        continue; // flagged during id collection
+                    if (declaringScopeByDefinition.TryGetValue(definition, out var existing))
+                        report.Add(ValidationSeverity.Error, ValidationCheck.DuplicateHome,
+                            $"{definition.GetType().Name} '{definition.Id}' is declared by both '{existing.Id}' and '{scope.Id}' - declaration is ownership.");
+                    else
+                        declaringScopeByDefinition[definition] = scope;
+                }
+            }
+            foreach (var scope in treeScopes)
+            {
+                RecordHome(scope, scope.producers);
+                RecordHome(scope, scope.generators);
+                RecordHome(scope, scope.upgrades);
+                RecordHome(scope, scope.careerEffects);
+            }
+
             var scopeById = new Dictionary<string, ScopeDefinition>();
             foreach (var scope in allScopes)
                 if (!string.IsNullOrEmpty(scope.Id) && !scopeById.ContainsKey(scope.Id))
                     scopeById[scope.Id] = scope;
 
             var ctx = new ValidationContext(defs, report, root, parentByScope, scopeById,
-                currencyHomeById, flagHomeById, treeScopes, allDefinitions);
+                currencyHomeById, flagHomeById, declaringScopeByDefinition, treeScopes, allDefinitions);
 
             // ---- container walk: every rung and trigger, in tree order ----
             foreach (var scope in treeScopes)
@@ -641,7 +763,41 @@ namespace RidiculousGaming.GarageBandIdle
                     }
                     ValidateActionList(ctx, trigger.actions, $"trigger '{trigger.Id}'");
                 }
+
+                foreach (var producer in scope.producers)
+                {
+                    if (producer == null)
+                        continue;
+                    ctx.EnterContainer(scope, "producer:" + producer.Id);
+                    ValidateProducesEntries(ctx, producer.produces, $"producer '{producer.Id}'");
+                }
+
+                foreach (var generator in scope.generators)
+                {
+                    if (generator == null)
+                        continue;
+                    ctx.EnterContainer(scope, "generator:" + generator.Id);
+                    ValidateGenerator(ctx, generator);
+                }
+
+                foreach (var upgrade in scope.upgrades)
+                {
+                    if (upgrade == null)
+                        continue;
+                    ctx.EnterContainer(scope, "upgrade:" + upgrade.Id);
+                    ValidateUpgrade(ctx, upgrade, scope);
+                }
+
+                foreach (var career in scope.careerEffects)
+                {
+                    if (career == null)
+                        continue;
+                    ctx.EnterContainer(scope, "career:" + career.Id);
+                    ValidateCareerEffect(ctx, career, scope);
+                }
             }
+
+            ValidateRoadieVenues(ctx, root);
 
             // ---- cross-container checks over the ledgers ----
             ctx.ClearSite();
@@ -652,6 +808,137 @@ namespace RidiculousGaming.GarageBandIdle
             FinalizeCycles(ctx);
 
             return report;
+        }
+
+        // A produces entry addresses its currency on the declaring chain, its
+        // condition is judged there, and its stat must be one a system consumes.
+        // A null condition is legal authoring: the condition is optional, and an
+        // entry is not a gate (12.2).
+        private static void ValidateProducesEntries(ValidationContext ctx, List<Economy.ProducesEntry> entries, string siteBase)
+        {
+            for (var i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                ctx.SetSite($"{siteBase} produces[{i}]");
+                if (entry == null)
+                {
+                    ctx.AddError(ValidationCheck.NullEntry, "null produces entry.");
+                    continue;
+                }
+                ctx.RequireChainCurrency(entry.currencyId, "a produces entry");
+                ctx.RequireConsumedStat(entry.stat, "a produces entry");
+                if (entry.value < BigNumber.Zero)
+                    ctx.AddError(ValidationCheck.NumericRange,
+                        $"value is {entry.value} - a contribution never subtracts.");
+                entry.condition?.Validate(ctx);
+            }
+        }
+
+        private static void ValidateGenerator(ValidationContext ctx, Economy.GeneratorDefinition generator)
+        {
+            var site = $"generator '{generator.Id}'";
+            ctx.SetSite(site);
+            if (generator.availableWhen == null)
+                ctx.AddWarning(ValidationCheck.NullEntry,
+                    "availableWhen is unauthored, so the buy is always refused - an unauthored gate is closed, not open (permanently inert content).");
+            else
+            {
+                ctx.SetSite($"{site} availableWhen");
+                generator.availableWhen.Validate(ctx);
+            }
+
+            ctx.SetSite(site);
+            ctx.RequireChainCurrency(generator.costCurrencyId, "generator cost");
+            if (generator.baseCost <= BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"baseCost is {generator.baseCost} - generator purchases repeat, so a free one is an unbounded rate printer.");
+            if (ctx.RequireFiniteDouble(generator.growth, $"{site} growth") && generator.growth <= 0)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"growth is {generator.growth} - the cost curve is a positive ratio.");
+            ValidateProducesEntries(ctx, generator.produces, site);
+        }
+
+        private static void ValidateUpgrade(ValidationContext ctx, Economy.UpgradeDefinition upgrade, ScopeDefinition scope)
+        {
+            var site = $"upgrade '{upgrade.Id}'";
+            ctx.SetSite(site);
+            if (upgrade.gate == null)
+                ctx.AddWarning(ValidationCheck.NullEntry,
+                    "gate is unauthored, so the buy is always refused - an unauthored gate is closed, not open (permanently inert content).");
+            else
+            {
+                ctx.SetSite($"{site} gate");
+                upgrade.gate.Validate(ctx);
+            }
+
+            ctx.SetSite(site);
+            ctx.RequireChainCurrency(upgrade.costCurrencyId, "upgrade cost");
+            if (upgrade.cost < BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"cost is {upgrade.cost} - a purchase never pays out.");
+
+            // The effects live where the upgrade is declared, so reach is a
+            // static question here - unlike a modifier's, which is judged per
+            // grant site.
+            for (var i = 0; i < upgrade.effects.Count; i++)
+                ValidateEffect(ctx, upgrade.effects[i], $"{site} effects[{i}]", scope);
+
+            // The purchase latch is a fact write at index -1: it lands before
+            // actions[0], so a payload that resets the latch's own scope trips
+            // set-then-wiped instead of yielding a repeatably-purchasable
+            // upgrade. Only actions record fact writes, so -1 collides with
+            // nothing.
+            ctx.SetSite($"{site} purchase latch");
+            ctx.RecordFactWrite($"the purchase latch of upgrade '{upgrade.Id}'", scope);
+
+            ValidateActionList(ctx, upgrade.actions, site);
+        }
+
+        private static void ValidateCareerEffect(ValidationContext ctx, Economy.CareerEffectDefinition career, ScopeDefinition scope)
+        {
+            var site = $"career effect '{career.Id}'";
+            ctx.SetSite(site);
+            if (career.formula == null)
+                ctx.AddError(ValidationCheck.NullEntry, "no formula - there is no factor to compute.");
+            ValidateEffectCoordinates(ctx, career.target, career.currencyId, career.stat, site);
+            ValidateEffectTargetReach(ctx, career.target, site, scope);
+            career.formula?.Validate(ctx);
+        }
+
+        // Roadie venues are not scope-attached: a venue names its chapter by id
+        // (design doc 8.2). Chapters are structurally the root's children, which
+        // is the reach rule, and a chapter has at most one venue - both roadie
+        // formulas read whatever they find.
+        private static void ValidateRoadieVenues(ValidationContext ctx, ScopeDefinition root)
+        {
+            ctx.ClearSite();
+            var venueByChapter = new Dictionary<string, Economy.RoadieVenueDefinition>();
+            foreach (var venue in ctx.Defs.All<Economy.RoadieVenueDefinition>())
+            {
+                if (venue == null)
+                    continue;
+                var site = $"roadie venue '{venue.Id}'";
+                ctx.SetSite(site);
+
+                var chapter = ctx.FindScope(venue.chapterScopeId);
+                if (chapter == null)
+                    ctx.AddError(ValidationCheck.UnresolvedReference,
+                        $"names unknown scope '{venue.chapterScopeId}'.");
+                else if (ctx.Parent(chapter) != root)
+                    ctx.AddError(ValidationCheck.ScopeReach,
+                        $"names '{chapter.Id}', which is not a chapter - chapters are the root's children (12.3).");
+                else if (venueByChapter.TryGetValue(venue.chapterScopeId, out var existing))
+                    ctx.AddError(ValidationCheck.DuplicateHome,
+                        $"and '{existing.Id}' both scale chapter '{chapter.Id}' - a chapter has one venue.");
+                else
+                    venueByChapter[venue.chapterScopeId] = venue;
+
+                if (ctx.RequireFiniteDouble(venue.perRoadie, $"{site} perRoadie") && venue.perRoadie < 0)
+                    ctx.AddError(ValidationCheck.NumericRange,
+                        $"perRoadie is {venue.perRoadie} - stationing a Roadie never costs income.");
+                if (venue.cap < 0)
+                    ctx.AddError(ValidationCheck.NumericRange, $"cap is {venue.cap}.");
+            }
         }
 
         private static void ValidateActionList(ValidationContext ctx, List<GameAction> actions, string siteBase)
@@ -772,8 +1059,12 @@ namespace RidiculousGaming.GarageBandIdle
             // modifier, granted or not - every authored reference resolves
             // (12.12).
             foreach (var modifier in ctx.Defs.All<Economy.ModifierDefinition>())
-                if (modifier != null)
-                    ValidateEffectReferences(ctx, modifier);
+            {
+                if (modifier == null)
+                    continue;
+                for (var i = 0; i < modifier.effects.Count; i++)
+                    ValidateEffect(ctx, modifier.effects[i], $"modifier '{modifier.Id}' effects[{i}]", null);
+            }
 
             // Reach is judged per grant site: the granted-to scope is where the
             // effect lives, so that is where its target's outward walk must be
@@ -784,80 +1075,112 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!validatedGrants.Add((grant.ModifierId, grant.Target)))
                     continue;
                 var modifier = ctx.Defs.Get<Economy.ModifierDefinition>(grant.ModifierId);
-                if (modifier != null) // grants record only after the id resolved
-                    ValidateEffectReach(ctx, modifier, grant.Target);
-            }
-        }
-
-        private static void ValidateEffectReferences(ValidationContext ctx, Economy.ModifierDefinition modifier)
-        {
-            for (var i = 0; i < modifier.effects.Count; i++)
-            {
-                var effect = modifier.effects[i];
-                var site = $"modifier '{modifier.Id}' effects[{i}]";
-
-                if (string.IsNullOrEmpty(effect.target))
-                {
-                    ctx.AddWarning(ValidationCheck.EffectTargetUnmatched, $"{site}: empty target matches nothing.");
-                }
-                else
-                {
-                    var targetDefinition = ctx.Defs.Get<Definition>(effect.target);
-                    if (targetDefinition is Economy.CurrencyDefinition)
-                    {
-                        if (ctx.CurrencyHome(effect.target) == null)
-                            ctx.AddError(ValidationCheck.UnresolvedReference,
-                                $"{site}: targets currency '{effect.target}', which no scope declares.");
-                    }
-                    else if (targetDefinition is Economy.BarDefinition || targetDefinition is Economy.BarGroupDefinition)
-                    {
-                        // Exact-source reach for bars and groups lands with build
-                        // step 5, when bars gain a scope attachment to measure
-                        // against; today the id resolving is the whole check.
-                    }
-                    else if (targetDefinition != null)
-                    {
-                        ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                            $"{site}: targets '{effect.target}' ({targetDefinition.GetType().Name}), which is not an effect target kind (12.2: currency, producer, generator, bar, group, or tag).");
-                    }
-                    else if (!ctx.TagExists(effect.target))
-                    {
-                        ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                            $"{site}: target '{effect.target}' matches no id and no tag.");
-                    }
-                    // A known tag resolves here; whether it matches a member is
-                    // a per-grant-site question, judged in ValidateEffectReach.
-                }
-
-                if (!string.IsNullOrEmpty(effect.currencyId) &&
-                    ctx.Defs.Get<Economy.CurrencyDefinition>(effect.currencyId) == null)
-                    ctx.AddError(ValidationCheck.UnresolvedReference,
-                        $"{site}: narrows to unknown currency '{effect.currencyId}'.");
-            }
-        }
-
-        private static void ValidateEffectReach(ValidationContext ctx, Economy.ModifierDefinition modifier, ScopeDefinition grantScope)
-        {
-            for (var i = 0; i < modifier.effects.Count; i++)
-            {
-                var effect = modifier.effects[i];
-                if (string.IsNullOrEmpty(effect.target))
+                if (modifier == null) // grants record only after the id resolved
                     continue;
-                var site = $"modifier '{modifier.Id}' (granted at '{grantScope.Id}') effects[{i}]";
-                var targetDefinition = ctx.Defs.Get<Definition>(effect.target);
+                for (var i = 0; i < modifier.effects.Count; i++)
+                    ValidateEffectTargetReach(ctx, modifier.effects[i].target,
+                        $"modifier '{modifier.Id}' (granted at '{grant.Target.Id}') effects[{i}]", grant.Target);
+            }
+        }
+
+        // One Effect atom: its address, its multiplier's range, and - when the
+        // effect's home is statically known (an upgrade or career effect, unlike
+        // a modifier's per-grant-site home) - its reach.
+        private static void ValidateEffect(ValidationContext ctx, Effect effect, string site, ScopeDefinition declaringScope)
+        {
+            ValidateEffectCoordinates(ctx, effect.target, effect.currencyId, effect.stat, site);
+            if (ctx.RequireFiniteDouble(effect.multiplier, $"{site} multiplier") && effect.multiplier < 0)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"{site}: multiplier is {effect.multiplier} - a multiplier never flips a number's sign (zero is legal: an event handicap is x0).");
+            if (declaringScope != null)
+                ValidateEffectTargetReach(ctx, effect.target, site, declaringScope);
+        }
+
+        // Reference resolution for one effect address (12.12). The coordinate
+        // triple IS the address, so modifier effects, upgrade effects, and the
+        // formula-shaped career effects all validate through here - a career
+        // effect carries the same target/currencyId/stat without being an Effect.
+        private static void ValidateEffectCoordinates(ValidationContext ctx, string target, string currencyId, string stat, string site)
+        {
+            if (string.IsNullOrEmpty(target))
+            {
+                ctx.AddWarning(ValidationCheck.EffectTargetUnmatched, $"{site}: empty target matches nothing.");
+            }
+            else
+            {
+                var targetDefinition = ctx.Defs.Get<Definition>(target);
                 if (targetDefinition is Economy.CurrencyDefinition)
                 {
-                    var home = ctx.CurrencyHome(effect.target);
-                    if (home != null && grantScope != home && !ctx.IsProperAncestor(grantScope, home))
-                        ctx.AddError(ValidationCheck.EffectReach,
-                            $"{site}: targets currency '{effect.target}' homed at '{home.Id}', but the grant scope '{grantScope.Id}' is not the home or an ancestor of it - the home-to-root gather never visits this effect (12.12).");
+                    if (ctx.CurrencyHome(target) == null)
+                        ctx.AddError(ValidationCheck.UnresolvedReference,
+                            $"{site}: targets currency '{target}', which no scope declares.");
                 }
-                else if (targetDefinition == null && ctx.TagExists(effect.target))
+                else if (targetDefinition is Economy.ProducerDefinition || targetDefinition is Economy.GeneratorDefinition)
                 {
-                    if (!ctx.TagHasMemberInSubtree(grantScope, effect.target))
-                        ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                            $"{site}: tag '{effect.target}' matches no member within '{grantScope.Id}' (12.12).");
+                    if (ctx.DeclaringScope(targetDefinition) == null)
+                        ctx.AddError(ValidationCheck.UnresolvedReference,
+                            $"{site}: targets '{target}', which no scope declares.");
                 }
+                else if (targetDefinition is Economy.BarDefinition || targetDefinition is Economy.BarGroupDefinition)
+                {
+                    // Exact-source reach for bars and groups lands with build
+                    // step 5, when bars gain a scope attachment to measure
+                    // against; today the id resolving is the whole check.
+                }
+                else if (targetDefinition != null)
+                {
+                    ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
+                        $"{site}: targets '{target}' ({targetDefinition.GetType().Name}), which is not an effect target kind (12.2: currency, producer, generator, bar, group, or tag).");
+                }
+                else if (!ctx.TagExists(target))
+                {
+                    ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
+                        $"{site}: target '{target}' matches no id and no tag.");
+                }
+                // A known tag resolves here; whether it matches a member is a
+                // question about where the effect lives, judged in
+                // ValidateEffectTargetReach.
+            }
+
+            if (!string.IsNullOrEmpty(currencyId) &&
+                ctx.Defs.Get<Economy.CurrencyDefinition>(currencyId) == null)
+                ctx.AddError(ValidationCheck.UnresolvedReference,
+                    $"{site}: narrows to unknown currency '{currencyId}'.");
+
+            // An empty stat is the legal "every stat" address; a non-empty one no
+            // system consumes narrows to nothing.
+            if (!string.IsNullOrEmpty(stat))
+                ctx.RequireConsumedStat(stat, $"{site} stat narrowing");
+        }
+
+        // An effect must sit where its target's outward walk visits it (12.12):
+        // the currency's home or above for a currency total, the source's
+        // declaring scope or above for an exact source, and a tag must match a
+        // member of the subtree the effect lives in.
+        private static void ValidateEffectTargetReach(ValidationContext ctx, string target, string site, ScopeDefinition fromScope)
+        {
+            if (string.IsNullOrEmpty(target))
+                return;
+            var targetDefinition = ctx.Defs.Get<Definition>(target);
+            if (targetDefinition is Economy.CurrencyDefinition)
+            {
+                var home = ctx.CurrencyHome(target);
+                if (home != null && fromScope != home && !ctx.IsProperAncestor(fromScope, home))
+                    ctx.AddError(ValidationCheck.EffectReach,
+                        $"{site}: targets currency '{target}' homed at '{home.Id}', but '{fromScope.Id}' is not the home or an ancestor of it - the home-to-root gather never visits this effect (12.12).");
+            }
+            else if (targetDefinition is Economy.ProducerDefinition || targetDefinition is Economy.GeneratorDefinition)
+            {
+                var home = ctx.DeclaringScope(targetDefinition);
+                if (home != null && fromScope != home && !ctx.IsProperAncestor(fromScope, home))
+                    ctx.AddError(ValidationCheck.EffectReach,
+                        $"{site}: targets '{target}' declared at '{home.Id}', but '{fromScope.Id}' is not that scope or an ancestor of it - the source's outward walk never visits this effect (12.12).");
+            }
+            else if (targetDefinition == null && ctx.TagExists(target))
+            {
+                if (!ctx.TagHasMemberInSubtree(fromScope, target))
+                    ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
+                        $"{site}: tag '{target}' matches no member within '{fromScope.Id}' (12.12).");
             }
         }
 

@@ -441,8 +441,11 @@ must never carry a roadie-targeted tag**: the wall-clock throttle of §8.1 stand
 unbuffable by Roadies. (Deliberately open: whether reallocating applies retroactively to a dormant
 chapter's idle claim computed at current rates.)
 
-**Per-venue scaling (planned).** Larger venues will use a higher per-roadie rate and cap (e.g. +5%
-up to 5 roadies at the garage; +8% up to 20 at an arena). Values set during tuning.
+**Per-venue scaling.** The rate and the cap are authored per venue on a `RoadieVenueDefinition`
+(`{chapterScopeId, perRoadie, cap}`) - one per chapter, and the data home both formulas read, so
+larger venues carry a higher rate and cap (e.g. +5% up to 5 roadies at the garage; +8% up to 20 at
+an arena). Values set during tuning. Both formulas clamp the stored stationing to `[0, cap]`, so a
+cap retuned downward never over-pays.
 
 ---
 
@@ -845,7 +848,7 @@ auto-finishing challenge is a trigger, not an event — events keep claimed comp
 | Active events | live (unexpired) `ActiveEvent` record | the event definition's handicaps |
 | Granted modifiers | `activeModifiers` entries | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times |
-| Career facts | Records balance, Roadie allocation, songs this run, entitlements | the formula-shaped effects of §3/§7/§8 |
+| Career facts | Records balance, Roadie allocation, songs this run, entitlements | a `CareerEffectDefinition`'s `MultiplierFormula`, computed on read (§3/§7/§8) |
 
 Every row is the same pattern: a fact in state, effects computed from it. All of these exist from the
 first minute of the game and contribute 1× until their facts exist. Nothing in this table is ever
@@ -913,7 +916,12 @@ sweep rule (§12.5).
 `{{target: barA, ×1.05}, multiply}`; the applied count is B's `fillCount` — the same pattern as
 generator contributions scaling by `ownedCount`. Growth lives on the carrying entry, never on the
 Effect atom: `multiply` (m^n) or `linear` (1 + (m−1)·n) — the same growth vocabulary
-`ModifierDefinition`'s `stacking` enum uses for granted stacks (§12.5).
+`ModifierDefinition`'s `stacking` enum uses for granted stacks (§12.5). **`linear` saturates at
+zero.** A multiplier below 1 is legal - a debuff that decays linearly is an ordinary thing to author
+- but the formula crosses zero once n > 1/(1-m), and a negative factor would run production
+backwards; a negative yield reaches the deposit path, which would drive an earned total DOWNWARD.
+Reduced to nothing is a semantic; reduced past nothing is not. The rule binds both consumers of the
+vocabulary: cascade entries and granted stacks.
 
 ### 12.8 Events (runtime)
 
@@ -1102,6 +1110,9 @@ Assets/Scripts/
     CurrencyDefinition.cs  ProducerDefinition.cs
     Producer.cs             // stateless resolution: Σ matching produces entries × Π multipliers + GetMultiplier
     GeneratorDefinition.cs  UpgradeDefinition.cs
+    Purchasing.cs           // TryBuy(generator | upgrade): fail-closed gate, spend, count or latch, payload
+    CareerEffectDefinition.cs  // formula-shaped multipliers + the MultiplierFormula family
+    RoadieVenueDefinition.cs   // per-venue roadie rate and cap, read by both roadie formulas
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply)
     BarDefinition.cs  BarGroupDefinition.cs  BarFillBehavior.cs  BarSystem.cs
   Loop/
@@ -1110,7 +1121,7 @@ Assets/Scripts/
   Events/
     EventDefinition.cs  EventSystem.cs
   Meta/
-    RoadieAllocation.cs    // root fact + venue-boost derivation
+    RoadieAllocation.cs    // SetRoadieAllocation + the write-time cap; the boost arithmetic is Economy's
   Content/
     SongDefinition.cs      // Catalog (run) + Discography (root)
   Save/

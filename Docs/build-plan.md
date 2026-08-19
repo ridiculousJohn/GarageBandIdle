@@ -10,7 +10,7 @@ step's tests need only what came before it.
 | 1 | Core class families + state | **DONE 2026-08-18** — 51/51 green (50 project-authored + Addressables' TestStub) |
 | 2 | Save system | **DONE 2026-08-18** — 66/66 green (65 project-authored + Addressables' TestStub) |
 | 3 | ContentDatabase + validation | **DONE 2026-08-18** — 123/123 green (122 project-authored + Addressables' TestStub) |
-| 4 | Producers, generators, upgrades + resolution | not started |
+| 4 | Producers, generators, upgrades + resolution | **DONE 2026-08-19** - 204/204 green (203 project-authored + Addressables' TestStub) |
 | 5 | Bars | not started |
 | 6 | Events + trigger sweep | not started |
 | 7 | Tick + GameSession | not started |
@@ -75,9 +75,10 @@ step's tests need only what came before it.
    event entry, replay clear, 4-hour idle claim.
 9. **UI layer** (§12.11) — `SectionDefinition`/`ModuleDefinition`/`ModuleRegistry`, widgets, the
    rung feedback contract (`uiText` legs, progress rendering), two-trigger refresh, interpolation.
-10. **Meta & monetization** (§8, §9) — Roadie allocation + venue boosts, Encore/game-speed buffs,
-    AdManager (rewarded: Encore top-up, Double It), IAPManager (Backstage Pass, Roadie bundles,
-    Tip Jar), story beat cards + `AcknowledgeStory`.
+10. **Meta & monetization** (§8, §9) — `SetRoadieAllocation` + the write-time cap + the allocation UI
+    (the venue-boost arithmetic is step 4's), Encore/game-speed buffs, AdManager (rewarded: Encore
+    top-up, Double It), IAPManager (Backstage Pass, Roadie bundles, Tip Jar), story beat cards +
+    `AcknowledgeStory`.
 
 Verification per step: the headless loop (compile grep + edit-mode suite; see the repo memory
 `unity-headless-verify-loop`). John reviews and commits per changeset.

@@ -89,9 +89,16 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // onto it. Unknown ids from removed content are dropped with a warning;
         // content added since the save starts fresh. False on any structural
         // failure - malformed json, checksum mismatch, unmigratable version.
-        public static bool TryDeserialize(string json, ScopeDefinition rootDefinition, out ScopeState root)
+        public static bool TryDeserialize(string json, ScopeDefinition rootDefinition, IDefinitionSource defs, out ScopeState root)
         {
             root = null;
+            // A missing definition source is a CODE bug, not a bad save: the
+            // drops that resolve global ids cannot run, and a half-filtered tree
+            // must never reach the game. Thrown ahead of the catch below, so it
+            // never presents as "couldn't read your save" when both files were
+            // perfectly readable.
+            if (defs == null)
+                throw new ArgumentNullException(nameof(defs), "SaveSystem: loading requires a definition source.");
             try
             {
                 var envelope = JObject.Parse(json);
@@ -130,7 +137,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 }
 
                 root = ScopeState.Build(rootDefinition);
-                Apply(rootNode, root);
+                Apply(rootNode, root, defs);
                 return true;
             }
             catch (Exception e)
@@ -141,11 +148,11 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
         }
 
-        private static void Apply(SaveNode node, ScopeState state)
+        private static void Apply(SaveNode node, ScopeState state, IDefinitionSource defs)
         {
             if (node.facts != null)
             {
-                FilterToDeclared(node.facts, state.Definition);
+                FilterToDeclared(node.facts, state.Definition, defs);
                 FilterTreeScopedFacts(node.facts, state);
                 state.facts = node.facts;
             }
@@ -168,7 +175,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     Debug.LogWarning($"SaveSystem: saved scope '{childNode.scopeId}' no longer exists - dropped.");
                     continue;
                 }
-                Apply(childNode, childState);
+                Apply(childNode, childState, defs);
             }
             // A definition child with no saved node keeps its freshly built
             // state - content added since the save simply starts new.
@@ -205,16 +212,21 @@ namespace RidiculousGaming.GarageBandIdle.Save
                                 break;
                             }
                         }
+                        // A nonpositive stationing is not an allocation. The
+                        // formulas clamp to [0, cap] as well, so this is defense
+                        // in depth rather than the only line.
                         if (!isChapterId)
-                            (invalid ??= new List<string>()).Add(key);
+                            Debug.LogWarning($"SaveSystem: roadie allocation key '{key}' is not a chapter - dropped.");
+                        else if (facts.roadieAllocation[key] <= 0)
+                            Debug.LogWarning($"SaveSystem: roadie allocation for '{key}' is {facts.roadieAllocation[key]} - dropped.");
+                        else
+                            continue;
+                        (invalid ??= new List<string>()).Add(key);
                     }
                     if (invalid != null)
                     {
                         foreach (var key in invalid)
-                        {
-                            Debug.LogWarning($"SaveSystem: roadie allocation key '{key}' is not a chapter - dropped.");
                             facts.roadieAllocation.Remove(key);
-                        }
                     }
                 }
             }
@@ -266,14 +278,15 @@ namespace RidiculousGaming.GarageBandIdle.Save
         }
 
         // Unknown ids from removed content are dropped with a warning (12.10).
-        // Only families whose declarations exist TODAY are filtered: currencies,
-        // flags, and triggers live on ScopeDefinition; pending-claim currencies
-        // and roadie allocation validate against the tree (below). Generator
-        // counts, upgrade latches, bar/group ids, modifier ids, event ids, buff
-        // ids, and song ids gain their filters WITH their definition families
-        // (build plan steps 3-7) - the same incremental contract as the
+        // Filtered here: the families a scope DECLARES (currencies, flags,
+        // triggers, generators, upgrades) plus the modifier stacks, whose ids
+        // name global content rather than a scope declaration - which is why the
+        // definition source threads all the way in. Pending-claim currencies and
+        // roadie allocation validate against the tree instead (below). Bar and
+        // group ids, event ids, buff ids, and song ids gain their filters WITH
+        // their definition families - the same incremental contract as the
         // validation pass.
-        private static void FilterToDeclared(ScopeFacts facts, ScopeDefinition definition)
+        private static void FilterToDeclared(ScopeFacts facts, ScopeDefinition definition, IDefinitionSource defs)
         {
             DropUndeclaredKeys(facts.balances, definition, "balance");
             DropUndeclaredKeys(facts.earnedTotals, definition, "earned total");
@@ -292,6 +305,63 @@ namespace RidiculousGaming.GarageBandIdle.Save
                         return false;
                 }
                 Debug.LogWarning($"SaveSystem: trigger latch '{triggerId}' is not declared by scope '{definition.Id}' - dropped.");
+                return true;
+            });
+            facts.purchasedUpgrades.RemoveWhere(upgradeId =>
+            {
+                foreach (var upgrade in definition.upgrades)
+                {
+                    if (upgrade != null && upgrade.Id == upgradeId)
+                        return false;
+                }
+                Debug.LogWarning($"SaveSystem: upgrade latch '{upgradeId}' is not declared by scope '{definition.Id}' - dropped.");
+                return true;
+            });
+
+            // An owned count is positive or absent: zero already reads as absent,
+            // and a negative one would buy the next unit at a discount.
+            List<string> staleCounts = null;
+            foreach (var pair in facts.generatorCounts)
+            {
+                var declared = false;
+                foreach (var generator in definition.generators)
+                {
+                    if (generator != null && generator.Id == pair.Key)
+                    {
+                        declared = true;
+                        break;
+                    }
+                }
+                if (!declared)
+                    Debug.LogWarning($"SaveSystem: generator count '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
+                else if (pair.Value <= 0)
+                    Debug.LogWarning($"SaveSystem: generator count '{pair.Key}' is {pair.Value} - dropped.");
+                else
+                    continue;
+                (staleCounts ??= new List<string>()).Add(pair.Key);
+            }
+            if (staleCounts != null)
+            {
+                foreach (var key in staleCounts)
+                    facts.generatorCounts.Remove(key);
+            }
+
+            // Modifier stacks point at global content, so the definition source
+            // is what resolves them. A nonpositive count is not a stack -
+            // RemoveModifier deletes the entry at zero, so one on disk is
+            // tampering or a stale write.
+            facts.activeModifiers.RemoveAll(entry =>
+            {
+                if (entry == null)
+                    return true;
+                if (entry.count <= 0)
+                {
+                    Debug.LogWarning($"SaveSystem: modifier stack '{entry.modifierId}' has count {entry.count} - dropped.");
+                    return true;
+                }
+                if (defs.Get<Economy.ModifierDefinition>(entry.modifierId) != null)
+                    return false;
+                Debug.LogWarning($"SaveSystem: modifier '{entry.modifierId}' has no ModifierDefinition - dropped.");
                 return true;
             });
         }
@@ -334,7 +404,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // The backup only ever receives content that VERIFIES: a corrupt
         // primary (the recovery case) is deleted, never rotated over a good
         // backup - File.Replace would otherwise install it as the new .bak.
-        public static void WriteAtomic(string path, ScopeState root)
+        public static void WriteAtomic(string path, ScopeState root, IDefinitionSource defs)
         {
             var json = Serialize(root);
             var tmp = path + ".tmp";
@@ -347,7 +417,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 throw new IOException("SaveSystem: written save failed verification - previous save left untouched.");
             }
 
-            if (FileLoadable(path, root.Definition))
+            if (FileLoadable(path, root.Definition, defs))
             {
                 File.Replace(tmp, path, BackupPath(path));
             }
@@ -369,16 +439,16 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // Failed, because "couldn't read your save" must never be answered by
         // starting a new game. (File.Exists returns false for ALL of those, so
         // it decides nothing here.)
-        public static LoadOutcome LoadFromDisk(string path, ScopeDefinition rootDefinition, out ScopeState root)
+        public static LoadOutcome LoadFromDisk(string path, ScopeDefinition rootDefinition, IDefinitionSource defs, out ScopeState root)
         {
             root = null;
 
             var primaryRead = TryRead(path, out var primaryJson);
-            if (primaryRead == ReadResult.Ok && TryDeserialize(primaryJson, rootDefinition, out root))
+            if (primaryRead == ReadResult.Ok && TryDeserialize(primaryJson, rootDefinition, defs, out root))
                 return LoadOutcome.LoadedPrimary;
 
             var backupRead = TryRead(BackupPath(path), out var backupJson);
-            if (backupRead == ReadResult.Ok && TryDeserialize(backupJson, rootDefinition, out root))
+            if (backupRead == ReadResult.Ok && TryDeserialize(backupJson, rootDefinition, defs, out root))
             {
                 Debug.LogWarning("SaveSystem: primary save unusable - loaded the backup.");
                 return LoadOutcome.LoadedBackup;
@@ -416,18 +486,18 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
         }
 
-        private static bool TryLoadFile(string path, ScopeDefinition rootDefinition, out ScopeState root)
+        private static bool TryLoadFile(string path, ScopeDefinition rootDefinition, IDefinitionSource defs, out ScopeState root)
         {
             root = null;
-            return TryRead(path, out var json) == ReadResult.Ok && TryDeserialize(json, rootDefinition, out root);
+            return TryRead(path, out var json) == ReadResult.Ok && TryDeserialize(json, rootDefinition, defs, out root);
         }
 
         // Backup eligibility equals LOADABILITY, not just envelope integrity: a
         // checksum-valid but unusable primary (newer schema, missing migration,
         // wrong root, malformed payload) must never rotate over the known-good
         // backup. Verifying a bad file emits its diagnostics - honest tracing.
-        private static bool FileLoadable(string path, ScopeDefinition rootDefinition) =>
-            TryLoadFile(path, rootDefinition, out _);
+        private static bool FileLoadable(string path, ScopeDefinition rootDefinition, IDefinitionSource defs) =>
+            TryLoadFile(path, rootDefinition, defs, out _);
 
         // Structural check only - parse and checksum, no tree application. Used
         // to verify a write before it replaces the previous save.
