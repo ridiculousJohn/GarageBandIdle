@@ -138,13 +138,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void A_venue_boost_never_overflows_on_its_way_into_BigNumber()
+        public void A_roadie_boost_never_overflows_on_its_way_into_BigNumber()
         {
             var tree = new TestTree();
-            tree.Garage.perRoadie = double.MaxValue;
+            ((RoadieActiveBoost)tree.RoadieActive.formula).perRoadie = double.MaxValue;
             tree.Root.roadieAllocation["ch1"] = 2;
 
-            var boost = tree.Garage.Boost(tree.Ctx(tree.Tier1));
+            var boost = tree.RoadieActive.formula.Compute(tree.Ctx(tree.Tier1));
             Assert.IsTrue(boost > (BigNumber)double.MaxValue, $"expected a value past double range, got {boost}");
         }
 
@@ -251,7 +251,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // chapter-homed currency. The shape that makes isolation visible.
             var rootDef = TestTree.MakeScope("root");
             var chapterDef = TestTree.MakeScope("chapter");
-            chapterDef.declaredCurrencyIds.Add("coin");
+            var coin = TestTree.DeclareCurrency(chapterDef, "coin", "income");
             var tierADef = TestTree.MakeScope("tier_a");
             var tierBDef = TestTree.MakeScope("tier_b");
             rootDef.children.Add(chapterDef);
@@ -306,26 +306,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void Roadie_boosts_multiply_across_venues_and_double_count_the_active_chapter()
+        public void Roadie_boosts_multiply_across_chapters_and_double_count_the_played_one()
         {
             var world = new RoadieWorld();
             world.Root.roadieAllocation["chapter_a"] = 3;
             world.Root.roadieAllocation["chapter_b"] = 1;
 
-            // Across venues the boosts multiply: 1.15 x 1.05. The chapter being
-            // worked applies its own factor a second time (design doc 8.2).
+            // Additive within a chapter, multiplicative across them: 1.15 x 1.05
+            // everywhere, and the chapter being worked applies its own factor a
+            // second time (design doc 8.2).
             AssertClose(1.15 * 1.05 * 1.15, Producer.GetRate(world.TierA, world.Defs, Now, "coin_a"), "chapter a");
             AssertClose(1.15 * 1.05 * 1.05, Producer.GetRate(world.TierB, world.Defs, Now, "coin_b"), "chapter b");
         }
 
         [Test]
-        public void A_stationing_beyond_the_cap_pays_only_up_to_the_cap()
+        public void Spreading_roadies_beats_stacking_them_for_the_global_factor()
         {
-            var world = new RoadieWorld();
-            world.Root.roadieAllocation["chapter_a"] = 99;   // a tampered save, or a cap retuned downward
+            // The concavity section 8.2 stands on: four Roadies split two ways
+            // beat four in one chapter, judged off any chapter's chain so only
+            // the global factor is in play.
+            var stacked = new RoadieWorld();
+            stacked.Root.roadieAllocation["chapter_a"] = 4;
+            var spread = new RoadieWorld();
+            spread.Root.roadieAllocation["chapter_a"] = 2;
+            spread.Root.roadieAllocation["chapter_b"] = 2;
 
-            // Venue A caps at 5: 1 + 0.05 x 5 = 1.25, total and active alike.
-            AssertClose(1.25 * 1.25, Producer.GetRate(world.TierA, world.Defs, Now, "coin_a"), "clamped");
+            AssertClose(1.20, Producer.GetRate(stacked.Root, stacked.Defs, Now, "prestige"), "stacked");
+            AssertClose(1.10 * 1.10, Producer.GetRate(spread.Root, spread.Defs, Now, "prestige"), "spread");
         }
 
         [Test]
@@ -339,25 +346,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1.15, Producer.GetRate(world.Root, world.Defs, Now, "prestige"), "root-homed");
         }
 
-        // Two chapters, each with its own run currency and venue - the shape
-        // section 8.2's example describes.
+        // Two chapters, each with its own run currency - the shape section 8.2's
+        // example describes.
         private class RoadieWorld
         {
             public readonly FakeDefs Defs = new();
-            public readonly ScopeState Root;
+            public readonly RootScopeState Root;
             public readonly ScopeState TierA;
             public readonly ScopeState TierB;
 
             public RoadieWorld()
             {
                 var rootDef = TestTree.MakeScope("root");
-                rootDef.declaredCurrencyIds.Add("prestige");
+                var prestige = TestTree.DeclareCurrency(rootDef, "prestige", "income");
                 var chapterADef = TestTree.MakeScope("chapter_a");
                 var chapterBDef = TestTree.MakeScope("chapter_b");
                 var tierADef = TestTree.MakeScope("tier_a");
                 var tierBDef = TestTree.MakeScope("tier_b");
-                tierADef.declaredCurrencyIds.Add("coin_a");
-                tierBDef.declaredCurrencyIds.Add("coin_b");
+                var coinA = TestTree.DeclareCurrency(tierADef, "coin_a", "income");
+                var coinB = TestTree.DeclareCurrency(tierBDef, "coin_b", "income");
                 rootDef.children.Add(chapterADef);
                 rootDef.children.Add(chapterBDef);
                 chapterADef.children.Add(tierADef);
@@ -372,29 +379,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
                 var total = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_total");
                 total.target = "income";
-                total.formula = new RoadieTotalBoost();
+                total.formula = new RoadieTotalBoost { perRoadie = 0.05 };
                 var active = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_active");
                 active.target = "production";          // the SOURCE knows its chapter; a currency total does not
                 active.currencyId = "income";
-                active.formula = new RoadieActiveBoost();
+                active.formula = new RoadieActiveBoost { perRoadie = 0.05 };
                 rootDef.careerEffects.Add(total);
                 rootDef.careerEffects.Add(active);
 
-                var venueA = TestTree.MakeDefinition<RoadieVenueDefinition>("venue_a");
-                venueA.chapterScopeId = "chapter_a";
-                venueA.perRoadie = 0.05;
-                venueA.cap = 5;
-                var venueB = TestTree.MakeDefinition<RoadieVenueDefinition>("venue_b");
-                venueB.chapterScopeId = "chapter_b";
-                venueB.perRoadie = 0.05;
-                venueB.cap = 20;
-
                 Defs.Add(rootDef).Add(chapterADef).Add(chapterBDef).Add(tierADef).Add(tierBDef)
-                    .Add(TestTree.MakeDefinition<CurrencyDefinition>("coin_a", "income"))
-                    .Add(TestTree.MakeDefinition<CurrencyDefinition>("coin_b", "income"))
-                    .Add(TestTree.MakeDefinition<CurrencyDefinition>("prestige", "income"))
+                    .Add(coinA).Add(coinB).Add(prestige)
                     .Add(genA).Add(genB).Add(genRoot)
-                    .Add(total).Add(active).Add(venueA).Add(venueB);
+                    .Add(total).Add(active);
 
                 Root = ScopeState.Build(rootDef);
                 TierA = Root.FindInSubtree("tier_a");

@@ -21,6 +21,13 @@ namespace RidiculousGaming.GarageBandIdle
         public BigNumber value;
 
         public override BigNumber Compute(GameContext ctx) => value;
+
+        public override void Validate(ValidationContext ctx)
+        {
+            if (value < BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"ConstantFormula value is {value} - a payout never subtracts.");
+        }
     }
 
     // floor((balance / divisor) ^ exponent) - Chapter 1's album payout is
@@ -40,7 +47,12 @@ namespace RidiculousGaming.GarageBandIdle
             var home = ctx.RequireChainCurrency(currencyId, "RootCurveFormula");
             if (home != null)
                 ctx.RecordFormulaRead(currencyId, home); // input for the reads-zeros warn (12.12)
-            ctx.RequireFiniteDouble(exponent, "RootCurveFormula exponent");
+            // A negative exponent makes 0^n infinite, and the balance IS zero on
+            // the first read after a reset - BigNumber refuses infinities at
+            // construction, so this would throw on the first payout.
+            if (ctx.RequireFiniteDouble(exponent, "RootCurveFormula exponent") && exponent < 0)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"RootCurveFormula exponent is {exponent} - a negative exponent is infinite at a zero balance.");
             if (divisor <= BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"RootCurveFormula divisor is {divisor} - a nonpositive divisor makes the payout infinite or undefined.");

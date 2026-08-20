@@ -1,4 +1,4 @@
-using UnityEngine;
+using System;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
@@ -7,77 +7,84 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // fail-closed: the domain owns the gate, never the UI's visibility, and an
     // unauthored gate is closed rather than open. The command boundary
     // (foreground-subtree rejection) layers on with GameSession.
+    //
+    // CanBuy answers the mutable-state question - gate met, affordable, not
+    // already owned - and Buy performs the purchase; TryBuy is the convenience
+    // wrapper for a caller that does not need the reason. Anything CONTENT
+    // derived - an id resolving to nothing, no declaring scope on the chain, a
+    // nonpositive computed cost - throws from either path: static content
+    // cannot legitimately be in that state, and reporting it as "no" hides a
+    // bug behind an answer the player's state could have produced.
     public static class Purchasing
     {
-        public static bool TryBuy(GameContext ctx, string definitionId)
+        public static bool CanBuy(GameContext ctx, string definitionId)
         {
             var generator = ctx.Defs.Get<GeneratorDefinition>(definitionId);
             if (generator != null)
-                return TryBuyGenerator(ctx, generator);
+            {
+                var declaringCtx = ctx.Rebase(Producer.DeclaringScope(ctx.Scope, generator, s => s.generators));
+                return generator.IsAvailable(declaringCtx)
+                    && declaringCtx.CanSpend(generator.costCurrencyId, CostOf(generator, declaringCtx));
+            }
+
+            var upgrade = ctx.Defs.Get<UpgradeDefinition>(definitionId)
+                ?? throw new InvalidOperationException($"CanBuy: '{definitionId}' resolves to no generator or upgrade.");
+            var upgradeCtx = ctx.Rebase(Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades));
+            return upgrade.IsOffered(upgradeCtx)
+                && !upgradeCtx.Scope.purchasedUpgrades.Contains(upgrade.Id)   // the latch IS the one-shot; a reset re-arms it
+                && upgradeCtx.CanSpend(upgrade.costCurrencyId, upgrade.cost);
+        }
+
+        // Performs the purchase. Calling this when CanBuy answers false is a
+        // caller bug, so the guard throws rather than no-oping.
+        public static void Buy(GameContext ctx, string definitionId)
+        {
+            if (!CanBuy(ctx, definitionId))
+                throw new InvalidOperationException($"Buy: '{definitionId}' is not currently buyable - ask CanBuy first.");
+
+            var generator = ctx.Defs.Get<GeneratorDefinition>(definitionId);
+            if (generator != null)
+            {
+                var declaring = Producer.DeclaringScope(ctx.Scope, generator, s => s.generators);
+                var declaringCtx = ctx.Rebase(declaring);
+                declaring.generatorCounts.TryGetValue(generator.Id, out var owned);
+                declaringCtx.Spend(generator.costCurrencyId, CostOf(generator, declaringCtx));
+                declaring.generatorCounts[generator.Id] = owned + 1;
+                return;
+            }
 
             var upgrade = ctx.Defs.Get<UpgradeDefinition>(definitionId);
-            if (upgrade != null)
-                return TryBuyUpgrade(ctx, upgrade);
-
-            Debug.LogError($"TryBuy: '{definitionId}' resolves to no generator or upgrade.");
-            return false;
-        }
-
-        private static bool TryBuyGenerator(GameContext ctx, GeneratorDefinition generator)
-        {
-            var declaring = Producer.DeclaringScope(ctx.Scope, generator, s => s.generators);
-            if (declaring == null)
-            {
-                Debug.LogError($"TryBuy: no scope declares generator '{generator.Id}'.");
-                return false;
-            }
-            var declaringCtx = ctx.Rebase(declaring);
-
-            if (!generator.IsAvailable(declaringCtx))
-                return false;
-
-            declaring.generatorCounts.TryGetValue(generator.Id, out var owned);
-            var cost = generator.CostAt(owned);
-            if (cost <= BigNumber.Zero)
-            {
-                // Runtime backstop. Validation refuses a nonpositive baseCost and
-                // a nonpositive growth, but that pass is dev-only - this check is
-                // what release builds execute, and generator purchases REPEAT, so
-                // a free one is an unbounded rate printer.
-                Debug.LogError($"TryBuy: generator '{generator.Id}' computed cost {cost} at owned={owned} - refused.");
-                return false;
-            }
-            if (!declaringCtx.TrySpend(generator.costCurrencyId, cost))
-                return false;
-
-            declaring.generatorCounts[generator.Id] = owned + 1;
-            return true;
-        }
-
-        private static bool TryBuyUpgrade(GameContext ctx, UpgradeDefinition upgrade)
-        {
-            var declaring = Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades);
-            if (declaring == null)
-            {
-                Debug.LogError($"TryBuy: no scope declares upgrade '{upgrade.Id}'.");
-                return false;
-            }
-            var declaringCtx = ctx.Rebase(declaring);
-
-            if (!upgrade.IsOffered(declaringCtx))
-                return false;
-            if (declaring.purchasedUpgrades.Contains(upgrade.Id))
-                return false;               // the latch IS the one-shot; a reset re-arms it
-            if (!declaringCtx.TrySpend(upgrade.costCurrencyId, upgrade.cost))
-                return false;
+            var upgradeScope = Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades);
+            var upgradeCtx = ctx.Rebase(upgradeScope);
+            upgradeCtx.Spend(upgrade.costCurrencyId, upgrade.cost);
 
             // Latch before payload: the effects are live for anything the actions
             // read, and a payload resetting the latch's own scope is refused at
             // load (set-then-wiped) rather than silently re-armed here.
-            declaring.purchasedUpgrades.Add(upgrade.Id);
+            upgradeScope.purchasedUpgrades.Add(upgrade.Id);
             foreach (var action in upgrade.actions)
-                action?.Execute(declaringCtx);
+                action?.Execute(upgradeCtx);
+        }
+
+        public static bool TryBuy(GameContext ctx, string definitionId)
+        {
+            if (!CanBuy(ctx, definitionId))
+                return false;
+            Buy(ctx, definitionId);
             return true;
+        }
+
+        // Runtime backstop on the cost curve. Validation refuses a nonpositive
+        // baseCost and a nonpositive growth, but that pass is dev-only, and
+        // generator purchases REPEAT - a free one is an unbounded rate printer.
+        private static BigNumber CostOf(GeneratorDefinition generator, GameContext declaringCtx)
+        {
+            declaringCtx.Scope.generatorCounts.TryGetValue(generator.Id, out var owned);
+            var cost = generator.CostAt(owned);
+            if (cost <= BigNumber.Zero)
+                throw new InvalidOperationException(
+                    $"Generator '{generator.Id}' computed cost {cost} at owned={owned}.");
+            return cost;
         }
     }
 }

@@ -29,7 +29,6 @@ namespace RidiculousGaming.GarageBandIdle
         EffectReach,            // an effect sits where its target's outward walk visits it
         EffectTargetUnmatched,  // an effect target matching nothing reachable (warn)
         FlagNoSetter,           // a declared flag nothing sets (warn)
-        FlagSettersMoreDurable, // every setter outlives the flag's home (warn)
         SetThenWiped,           // a list sets a fact, then resets the scope declaring it
         FormulaReadsCleared,    // a formula-driven grant after a reset clearing its inputs (warn)
         StrandedValue,          // a rung resets a subtree holding a payout rung it never invokes (warn)
@@ -455,12 +454,9 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 if (!InSubtree(top, scope))
                     continue;
-                foreach (var currencyId in scope.declaredCurrencyIds)
-                {
-                    var currency = Defs.Get<Economy.CurrencyDefinition>(currencyId);
+                foreach (var currency in scope.declaredCurrencies)
                     if (currency != null && currency.HasTag(tag))
                         return true;
-                }
                 foreach (var producer in scope.producers)
                     if (producer != null && producer.HasTag(tag))
                         return true;
@@ -563,6 +559,7 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 if (definitionSeen.Add(scope))
                     allDefinitions.Add(scope);
+                CollectDeclared(scope, scope.declaredCurrencies, "declaredCurrencies");
                 CollectDeclared(scope, scope.triggers, "triggers");
                 CollectDeclared(scope, scope.producers, "producers");
                 CollectDeclared(scope, scope.generators, "generators");
@@ -660,21 +657,13 @@ namespace RidiculousGaming.GarageBandIdle
             var currencyHomeById = new Dictionary<string, ScopeDefinition>();
             foreach (var scope in treeScopes)
             {
-                for (var i = 0; i < scope.declaredCurrencyIds.Count; i++)
+                foreach (var currency in scope.declaredCurrencies)
                 {
-                    var currencyId = scope.declaredCurrencyIds[i];
-                    if (string.IsNullOrEmpty(currencyId))
-                    {
-                        report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
-                            $"scope '{scope.Id}' declaredCurrencyIds[{i}] is empty.");
+                    // Null slots and undiscoverable assets are reported by the
+                    // declaration collection above; this pass owns homes.
+                    if (currency == null || string.IsNullOrEmpty(currency.Id))
                         continue;
-                    }
-                    if (defs.Get<Economy.CurrencyDefinition>(currencyId) == null)
-                    {
-                        report.Add(ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
-                            $"scope '{scope.Id}' declares currency '{currencyId}', which has no CurrencyDefinition.");
-                        continue;
-                    }
+                    var currencyId = currency.Id;
                     if (currencyHomeById.TryGetValue(currencyId, out var existing))
                     {
                         report.Add(ValidationSeverity.Error, ValidationCheck.DuplicateHome,
@@ -804,8 +793,6 @@ namespace RidiculousGaming.GarageBandIdle
                 }
             }
 
-            ValidateRoadieVenues(ctx, root);
-
             // ---- cross-container checks over the ledgers ----
             ctx.ClearSite();
             FinalizeListChecks(ctx);
@@ -912,42 +899,6 @@ namespace RidiculousGaming.GarageBandIdle
             career.formula?.Validate(ctx);
         }
 
-        // Roadie venues are not scope-attached: a venue names its chapter by id
-        // (design doc 8.2). Chapters are structurally the root's children, which
-        // is the reach rule, and a chapter has at most one venue - both roadie
-        // formulas read whatever they find.
-        private static void ValidateRoadieVenues(ValidationContext ctx, ScopeDefinition root)
-        {
-            ctx.ClearSite();
-            var venueByChapter = new Dictionary<string, Economy.RoadieVenueDefinition>();
-            foreach (var venue in ctx.Defs.All<Economy.RoadieVenueDefinition>())
-            {
-                if (venue == null)
-                    continue;
-                var site = $"roadie venue '{venue.Id}'";
-                ctx.SetSite(site);
-
-                var chapter = ctx.FindScope(venue.chapterScopeId);
-                if (chapter == null)
-                    ctx.AddError(ValidationCheck.UnresolvedReference,
-                        $"names unknown scope '{venue.chapterScopeId}'.");
-                else if (ctx.Parent(chapter) != root)
-                    ctx.AddError(ValidationCheck.ScopeReach,
-                        $"names '{chapter.Id}', which is not a chapter - chapters are the root's children (12.3).");
-                else if (venueByChapter.TryGetValue(venue.chapterScopeId, out var existing))
-                    ctx.AddError(ValidationCheck.DuplicateHome,
-                        $"and '{existing.Id}' both scale chapter '{chapter.Id}' - a chapter has one venue.");
-                else
-                    venueByChapter[venue.chapterScopeId] = venue;
-
-                if (ctx.RequireFiniteDouble(venue.perRoadie, $"{site} perRoadie") && venue.perRoadie < 0)
-                    ctx.AddError(ValidationCheck.NumericRange,
-                        $"perRoadie is {venue.perRoadie} - stationing a Roadie never costs income.");
-                if (venue.cap < 0)
-                    ctx.AddError(ValidationCheck.NumericRange, $"cap is {venue.cap}.");
-            }
-        }
-
         private static void ValidateActionList(ValidationContext ctx, List<GameAction> actions, string siteBase)
         {
             for (var i = 0; i < actions.Count; i++)
@@ -1045,12 +996,6 @@ namespace RidiculousGaming.GarageBandIdle
                     ctx.AddWarning(ValidationCheck.FlagNoSetter,
                         $"flag '{flagId}' (declared at '{home.Id}') has no setter.");
                     continue;
-                }
-                if (setters.All(s => ctx.IsProperAncestor(s.ActingScope, home)))
-                {
-                    var scopes = string.Join(", ", setters.Select(s => $"'{s.ActingScope.Id}'").Distinct());
-                    ctx.AddWarning(ValidationCheck.FlagSettersMoreDurable,
-                        $"flag '{flagId}' (declared at '{home.Id}') is set only from more durable scopes ({scopes}) - an outward write never reaches it (12.12).");
                 }
             }
         }

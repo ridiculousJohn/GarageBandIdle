@@ -86,14 +86,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("AddModifier"));
-            new AddModifier { scopeId = "tier1", modifierId = "m" }.Execute(tree.Ctx(tree.Ch1));
-
-            Assert.IsEmpty(tree.Tier1.activeModifiers);   // grants live outward, never downward
+            // Grants live outward, never downward.
+            Assert.Throws<System.InvalidOperationException>(
+                () => new AddModifier { scopeId = "tier1", modifierId = "m" }.Execute(tree.Ctx(tree.Ch1)));
+            Assert.IsEmpty(tree.Tier1.activeModifiers);
         }
 
         [Test]
-        public void ResetScope_clears_everything_reinitializes_and_restamps()
+        public void ResetScope_clears_everything_and_reinitializes()
         {
             var tree = new TestTree();
             var ctx = tree.Ctx(tree.Tier1);
@@ -102,7 +102,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.firedTriggers.Add("some_trigger");
             tree.Tier1.generatorCounts["drummer"] = 2;
             tree.Tier1.barProgress["cover_1"] = 100;
-            tree.Tier1.lastActiveUtc = System.DateTime.MinValue;
 
             new ResetScope { scopeId = "tier1" }.Execute(ctx);
 
@@ -112,7 +111,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsEmpty(tree.Tier1.firedTriggers);                           // triggers re-arm
             Assert.IsEmpty(tree.Tier1.generatorCounts);
             Assert.IsEmpty(tree.Tier1.barProgress);
-            Assert.AreEqual(tree.Now, tree.Tier1.lastActiveUtc);                // re-stamped, not cleared
         }
 
         [Test]
@@ -135,7 +133,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             var tier2Def = TestTree.MakeScope("tier2");
-            tier2Def.declaredCurrencyIds.Add("merch");
+            tree.Defs.Add(TestTree.DeclareCurrency(tier2Def, "merch"));
             tree.Ch1Def.children.Add(tier2Def);
             var root = ScopeState.Build(tree.RootDef);   // rebuild with the sibling
             var tier1 = root.FindInSubtree("tier1");
@@ -145,8 +143,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             new ResetScope { scopeId = "tier2" }.Execute(new GameContext(tier1, tree.Defs, tree.Now));
             Assert.AreEqual(BigNumber.Zero, tier2.balances["merch"]);
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("ResetScope"));
-            new ResetScope { scopeId = "ch1" }.Execute(new GameContext(tier1, tree.Defs, tree.Now));
+            Assert.Throws<System.InvalidOperationException>(
+                () => new ResetScope { scopeId = "ch1" }.Execute(new GameContext(tier1, tree.Defs, tree.Now)));
         }
 
         [Test]
@@ -158,8 +156,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // A root-declared trigger is a legitimate root acting context; the
             // refusal is structural (12.12: "never the root"), not reach math.
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("ResetScope"));
-            new ResetScope { scopeId = "root" }.Execute(tree.Ctx(tree.Root));
+            Assert.Throws<System.InvalidOperationException>(
+                () => new ResetScope { scopeId = "root" }.Execute(tree.Ctx(tree.Root)));
 
             Assert.AreEqual((BigNumber)30, tree.Root.balances["records"]);
             Assert.IsTrue(tree.Root.flags.Contains("ch1_complete"));

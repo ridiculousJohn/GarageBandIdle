@@ -38,8 +38,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly ScopeDefinition RootDef;
         public readonly ScopeDefinition Ch1Def;
         public readonly ScopeDefinition Tier1Def;
-        public readonly ScopeState Root;
-        public readonly ScopeState Ch1;
+        public readonly RootScopeState Root;
+        public readonly ChapterScopeState Ch1;
         public readonly ScopeState Tier1;
 
         public readonly ProducerDefinition TapProducer;
@@ -52,25 +52,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly CareerEffectDefinition RecordsIncome;
         public readonly CareerEffectDefinition RoadieTotal;
         public readonly CareerEffectDefinition RoadieActive;
-        public readonly RoadieVenueDefinition Garage;
         public readonly ModifierDefinition GjTap1;
         public readonly TriggerDefinition Tier1Trigger;
 
         public TestTree()
         {
             Tier1Def = MakeScope("tier1");
-            Tier1Def.declaredCurrencyIds.AddRange(new[] { "cash", "fans", "rehearsal" });
+            var cash = DeclareCurrency(Tier1Def, "cash", "income");
+            var fans = DeclareCurrency(Tier1Def, "fans");
+            var rehearsal = DeclareCurrency(Tier1Def, "rehearsal");
             Tier1Def.declaredFlags.AddRange(new[] { "fans_revealed", "rehearsal_revealed" });
             Tier1Trigger = MakeDefinition<TriggerDefinition>("tier1_trigger");
             Tier1Def.triggers.Add(Tier1Trigger);
 
             Ch1Def = MakeScope("ch1");
-            Ch1Def.declaredCurrencyIds.Add("ch1_records");
+            var ch1Records = DeclareCurrency(Ch1Def, "ch1_records");
             Ch1Def.declaredFlags.AddRange(new[] { "album", "gj1_done" });
             Ch1Def.children.Add(Tier1Def);
 
             RootDef = MakeScope("root");
-            RootDef.declaredCurrencyIds.AddRange(new[] { "records", "roadies" });
+            var records = DeclareCurrency(RootDef, "records");
+            var roadies = DeclareCurrency(RootDef, "roadies");
             RootDef.declaredFlags.Add("ch1_complete");
             RootDef.children.Add(Ch1Def);
 
@@ -135,20 +137,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             RoadieTotal = MakeDefinition<CareerEffectDefinition>("roadie_total");
             RoadieTotal.target = "income";
             RoadieTotal.stat = Stat.Rate;
-            RoadieTotal.formula = new RoadieTotalBoost();
+            RoadieTotal.formula = new RoadieTotalBoost { perRoadie = 0.05 };
             RootDef.careerEffects.Add(RoadieTotal);
 
             RoadieActive = MakeDefinition<CareerEffectDefinition>("roadie_active");
             RoadieActive.target = "production";
             RoadieActive.currencyId = "income";
             RoadieActive.stat = Stat.Rate;
-            RoadieActive.formula = new RoadieActiveBoost();
+            RoadieActive.formula = new RoadieActiveBoost { perRoadie = 0.05 };
             RootDef.careerEffects.Add(RoadieActive);
-
-            Garage = MakeDefinition<RoadieVenueDefinition>("garage_venue");
-            Garage.chapterScopeId = "ch1";
-            Garage.perRoadie = 0.05;
-            Garage.cap = 5;
 
             // The Garage Jam reward: +25% tap for the rest of the chapter, so
             // it is granted at ch1 and outlives the tier resets.
@@ -156,20 +153,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             GjTap1.effects.Add(new Effect { target = "tap_producer", multiplier = 1.25 });
 
             Defs.Add(RootDef).Add(Ch1Def).Add(Tier1Def)
-                .Add(MakeDefinition<CurrencyDefinition>("cash", "income"))
-                .Add(MakeDefinition<CurrencyDefinition>("fans"))
-                .Add(MakeDefinition<CurrencyDefinition>("rehearsal"))
-                .Add(MakeDefinition<CurrencyDefinition>("ch1_records"))
-                .Add(MakeDefinition<CurrencyDefinition>("records"))
-                .Add(MakeDefinition<CurrencyDefinition>("roadies"))
+                .Add(cash).Add(fans).Add(rehearsal).Add(ch1Records).Add(records).Add(roadies)
                 .Add(TapProducer).Add(Band)
                 .Add(PracticeAmp).Add(Drummer)
                 .Add(StagePresence).Add(AmpStrings).Add(TightSet)
-                .Add(RecordsIncome).Add(RoadieTotal).Add(RoadieActive).Add(Garage).Add(GjTap1)
+                .Add(RecordsIncome).Add(RoadieTotal).Add(RoadieActive).Add(GjTap1)
                 .Add(Tier1Trigger);
 
             Root = ScopeState.Build(RootDef);
-            Ch1 = Root.FindInSubtree("ch1");
+            Ch1 = (ChapterScopeState)Root.FindInSubtree("ch1");
             Tier1 = Root.FindInSubtree("tier1");
         }
 
@@ -183,6 +175,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var def = ScriptableObject.CreateInstance<ScopeDefinition>();
             def.EditorInit(id);
             return def;
+        }
+
+        // Declares a currency at its home and hands back the asset, so the
+        // fixture registers the same instance the scope references.
+        public static CurrencyDefinition DeclareCurrency(ScopeDefinition scope, string id, params string[] tags)
+        {
+            var currency = MakeDefinition<CurrencyDefinition>(id, tags);
+            scope.declaredCurrencies.Add(currency);
+            return currency;
         }
 
         public static T MakeDefinition<T>(string id, params string[] tags) where T : Definition

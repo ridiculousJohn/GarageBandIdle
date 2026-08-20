@@ -156,9 +156,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // is how the income tag carries every career effect (design doc 8.2).
         private static BigNumber CurrencyStage(GameContext atHome, string currencyId, string stat)
         {
-            var currency = atHome.Defs.Get<CurrencyDefinition>(currencyId);
-            if (currency == null)
-                return BigNumber.One;       // an unresolved currency is a load-time error, not a runtime branch
+            var currency = atHome.Defs.Get<CurrencyDefinition>(currencyId)
+                ?? throw new InvalidOperationException($"No CurrencyDefinition with id '{currencyId}'.");
             return GetMultiplier(atHome, currency, currencyId, stat);
         }
 
@@ -170,16 +169,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public static BigNumber GetRate(ScopeState subtreeRoot, IDefinitionSource defs, DateTime nowUtc, string currencyId)
         {
             var sum = BigNumber.Zero;
+            ScopeState home = null;
             Accumulate(subtreeRoot);
             if (sum == BigNumber.Zero)
                 return BigNumber.Zero;
-
-            var home = FindCurrencyHome(subtreeRoot, currencyId);
-            if (home == null)
-            {
-                Debug.LogError($"GetRate: no scope holds currency '{currencyId}'.");
-                return BigNumber.Zero;
-            }
             return sum * CurrencyStage(new GameContext(home, defs, nowUtc), currencyId, Stat.Rate);
 
             void Accumulate(ScopeState node)
@@ -189,7 +182,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 {
                     if (producer == null)
                         continue;
-                    sum += SourceTerm(declaringCtx, producer, producer.produces, 1, currencyId, Stat.Rate);
+                    Add(node, SourceTerm(declaringCtx, producer, producer.produces, 1, currencyId, Stat.Rate));
                 }
                 foreach (var generator in node.Definition.generators)
                 {
@@ -197,10 +190,22 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                         continue;
                     if (!node.generatorCounts.TryGetValue(generator.Id, out var owned) || owned <= 0)
                         continue;
-                    sum += SourceTerm(declaringCtx, generator, generator.produces, owned, currencyId, Stat.Rate);
+                    Add(node, SourceTerm(declaringCtx, generator, generator.produces, owned, currencyId, Stat.Rate));
                 }
                 foreach (var child in node.Children)
                     Accumulate(child);
+            }
+
+            // The home is resolved from a CONTRIBUTING scope, never from the
+            // subtree root: the currency may be homed below where the walk
+            // started (fans at a tier, asked for across the chapter), and every
+            // contributor has it on its own outward chain by validation.
+            void Add(ScopeState node, BigNumber term)
+            {
+                if (term == BigNumber.Zero)
+                    return;
+                sum += term;
+                home ??= FindCurrencyHome(node, currencyId);
             }
         }
 
@@ -210,18 +215,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // condition mid-fire (design doc 12.2).
         public static void FireProducer(GameContext ctx, string producerId)
         {
-            var producer = ctx.Defs.Get<ProducerDefinition>(producerId);
-            if (producer == null)
-            {
-                Debug.LogError($"FireProducer: no ProducerDefinition with id '{producerId}'.");
-                return;
-            }
+            var producer = ctx.Defs.Get<ProducerDefinition>(producerId)
+                ?? throw new InvalidOperationException($"FireProducer: no ProducerDefinition with id '{producerId}'.");
             var declaring = DeclaringScope(ctx.Scope, producer, s => s.producers);
-            if (declaring == null)
-            {
-                Debug.LogError($"FireProducer: no scope declares producer '{producerId}'.");
-                return;
-            }
             var declaringCtx = ctx.Rebase(declaring);
 
             // Every currency this firing pays, in authored order, resolved
@@ -242,9 +238,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     continue;
                 }
                 var home = FindCurrencyHome(declaring, currencyId);
-                amounts.Add(home == null
-                    ? BigNumber.Zero
-                    : term * CurrencyStage(declaringCtx.Rebase(home), currencyId, Stat.Yield));
+                amounts.Add(term * CurrencyStage(declaringCtx.Rebase(home), currencyId, Stat.Yield));
             }
 
             for (var i = 0; i < currencies.Count; i++)
@@ -254,49 +248,35 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // ---- tree lookups ----
 
-        // The currency's home: the scope holding the key. Homes are unique
-        // tree-wide (validated), so the search starts at the root and finds it
-        // wherever the caller's subtree sits relative to it.
-        internal static ScopeState FindCurrencyHome(ScopeState anyNode, string currencyId)
+        // The currency's home: the first scope on the chain OUTWARD from here
+        // that holds the key. Placement is the whole lookup - a currency off
+        // this chain is content the validator refuses, so failing to find one
+        // is a bug, not a branch.
+        internal static ScopeState FindCurrencyHome(ScopeState from, string currencyId)
         {
-            return Search(anyNode.Root);
-
-            ScopeState Search(ScopeState node)
-            {
+            for (var node = from; node != null; node = node.Parent)
                 if (node.balances.ContainsKey(currencyId))
                     return node;
-                foreach (var child in node.Children)
-                {
-                    var found = Search(child);
-                    if (found != null)
-                        return found;
-                }
-                return null;
-            }
+            throw new InvalidOperationException(
+                $"No scope on the chain from '{from.ScopeId}' holds currency '{currencyId}'.");
         }
 
         // Declaration is ownership (design doc 12.3): a definition's declaring
-        // scope is the one whose list holds the reference, and a duplicate
-        // declaration is refused at load.
-        internal static ScopeState DeclaringScope<T>(ScopeState anyNode, T definition,
+        // scope is the one whose list holds the reference, found by walking
+        // OUTWARD from the acting scope. Anything off that chain is unreachable
+        // at runtime and refused at load, so a miss is a bug.
+        internal static ScopeState DeclaringScope<T>(ScopeState from, T definition,
                                                      Func<ScopeDefinition, List<T>> lists) where T : Definition
         {
-            return Search(anyNode.Root);
-
-            ScopeState Search(ScopeState node)
+            for (var node = from; node != null; node = node.Parent)
             {
                 var list = lists(node.Definition);
                 for (var i = 0; i < list.Count; i++)
                     if (list[i] == definition)
                         return node;
-                foreach (var child in node.Children)
-                {
-                    var found = Search(child);
-                    if (found != null)
-                        return found;
-                }
-                return null;
             }
+            throw new InvalidOperationException(
+                $"No scope on the chain from '{from.ScopeId}' declares '{definition.Id}'.");
         }
     }
 }

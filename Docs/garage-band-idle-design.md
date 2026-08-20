@@ -102,9 +102,9 @@ re-walks the progression — band → fans → covers → gear — instead of op
 screen. The `album` flag is declared at the chapter level, so the release *region* stays on screen
 across runs; only the button's pressability tracks the live offer condition (§5).
 
-Boot validation: a flag whose setters all live in scopes more durable than the flag is warned about —
-the reset clears the flag but nothing can ever set it again, and the gated sub-system goes dark for
-good (§12.12).
+Boot validation: a setter that lives OUTSIDE the flag's home is an error, not a warning — the write
+walks outward and can never reach the flag, and the same scope could not read it either, so the
+gated sub-system would go dark for good (§12.12).
 
 Once a chapter is cleared it remains available for replay (§8.1).
 
@@ -150,6 +150,7 @@ income = Σ(generator base × owned × per-generator effects)
          × catalogBoost      (run-scoped fact, §7)
          × recordsMultiplier (root fact, §5)
          × roadieTotalBoost  (root fact, §8)
+         × roadieChapterBoost (the played chapter's own stationing, §8.2)
 ```
 
 Each of those is an **Effect** (§12.2) that declares which target it multiplies; a currency never
@@ -422,20 +423,20 @@ clearing a chapter's goal adds a Roadie to the pool.
 
 ### 8.2 Boost formula
 
-- **Within a venue (additive):** `venueBoost = 1 + 0.05 × roadiesOnVenue`
-- **Across venues (multiplicative):** `totalBoost = venueBoost₁ × venueBoost₂ × …`
+- **Within a chapter (additive):** `chapterBoost = 1 + 0.05 x roadiesStationedThere`
+- **Across chapters (multiplicative):** `totalBoost = chapterBoost_1 x chapterBoost_2 x ...`
 
-`totalBoost` is the permanent multiplier applied to income. Example: 9, 9, 8, and 9 roadies across
-four venues give 1.45 × 1.45 × 1.40 × 1.45 = 4.27×.
+`totalBoost` is the permanent multiplier applied to income. Example: 9, 9, 8, and 9 Roadies across
+four chapters give 1.45 x 1.45 x 1.40 x 1.45 = 4.27x.
 
-Because venue boosts multiply, distributing roadies across more venues beats concentrating them
-(8 roadies: 1.40× on one venue, 1.46× split across four). **The active chapter double-counts its
-own factor**: `activeProduction = totalBoost × activeVenueBoost` — the played venue's boost applies
-once inside the global product and again locally, which is what makes stationing Roadies speed the
-chapter being worked (8 Roadies stacked: ~1.96× there, 1.40× everywhere else; spread 2/2/2/2:
-1.46× globally and ~1.61× on the chapter being worked). Allocation balances spreading for the total
-against concentrating to sprint an active replay — both are real strategies. **Both factors are
-ordinary effects whose target is authored data** — a tag (Ch. 1: `income`, declared by Cash) — so
+Because chapter boosts multiply, distributing Roadies across more chapters beats concentrating them
+(8 Roadies: 1.40x in one chapter, 1.46x split across four). **The chapter being played double-counts
+its own factor**: `activeProduction = totalBoost x chapterBoost(played)` - its boost applies once
+inside the global product and again locally, which is what makes stationing Roadies speed the
+chapter being worked (8 Roadies stacked: ~1.96x there, 1.40x everywhere else; spread 2/2/2/2: 1.46x
+globally and ~1.61x on the chapter being worked). Allocation balances spreading for the total
+against concentrating to sprint an active replay - both are real strategies. **Both
+factors are ordinary effects whose target is authored data** — a tag (Ch. 1: `income`, declared by Cash) — so
 *what* Roadies help with is a per-chapter design decision, never a code decision. Both carry
 `stat: rate`: Roadies are the passive-crew lever and scale production, never a tap's yield. They are
 composed at different LEVELS, though. `roadie_total` is a currency-total effect - it is the same
@@ -447,11 +448,13 @@ throttle of §8.1 stands on Fans being unbuffable by Roadies, and the `currencyI
 is what enforces it even on a bandmate that pays Cash and Fans from one definition. (Deliberately open: whether reallocating applies retroactively to a dormant
 chapter's idle claim computed at current rates.)
 
-**Per-venue scaling.** The rate and the cap are authored per venue on a `RoadieVenueDefinition`
-(`{chapterScopeId, perRoadie, cap}`) - one per chapter, and the data home both formulas read, so
-larger venues carry a higher rate and cap (e.g. +5% up to 5 roadies at the garage; +8% up to 20 at
-an arena). Values set during tuning. Both formulas clamp the stored stationing to `[0, cap]`, so a
-cap retuned downward never over-pays.
+**Where the numbers live.** Each factor is a `CareerEffectDefinition` on the root scope whose
+formula carries its own `perRoadie` (`RoadieTotalBoost`, `RoadieActiveBoost`); both read the root's
+`roadieAllocation` map and nothing else. The global one takes the product over the map's entries -
+one entry per chapter holding Roadies, additive within the entry - and the local one reads the
+entry for the chapter it resolves on. No per-chapter asset, no id pointing back at a chapter. There
+is no stationing cap: if one is ever needed it belongs at the WRITE (`SetRoadieAllocation`), not in
+the read.
 
 ---
 
@@ -509,9 +512,9 @@ and keeps Encore permanently active at Overdrive (4× speed). Since ads are opt-
 is convenience.
 
 **Buy Roadies** — consumable, repeatable IAP. Bought Roadies are identical to earned ones. No
-purchase cap; throttled by escalating bundle price and by the planned per-venue caps (§8.2).
-(Allocation concavity punishes stacking one venue but does **not** cap the total: spread Roadies
-compound multiplicatively across venues, so price and caps are the real throttle.) A `bought ≤ earned` cap
+purchase cap; throttled by escalating bundle price. (Allocation concavity punishes stacking one
+chapter but does **not** cap the total: spread Roadies compound multiplicatively across chapters,
+so price is the real throttle - §8.2 authors no stationing cap.) A `bought ≤ earned` cap
 is held in reserve for a competitive leaderboard. A late-game Cash → Roadie sink may be offered.
 
 **Tip Jar** — small one-time purchases with no gated content.
@@ -691,7 +694,7 @@ never crossing into siblings. The tick enumerates rates from that subtree's decl
 generators, never from what the UI happens to show. Runtime state per scope:
 
 ```csharp
-class ScopeState   // the COMPLETE mutable state — nothing lives outside these fields (§12.10)
+class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these payloads (§12.10)
 {
     Dictionary<string, BigDouble> balances;
     Dictionary<string, BigDouble> earnedTotals;     // per currency, same home as its balance
@@ -706,12 +709,25 @@ class ScopeState   // the COMPLETE mutable state — nothing lives outside these
     List<ActiveEvent>             activeEvents;
     List<TimedBuff>               timedBuffs;       // {buffId, expiresAt} — Encore lives at root
     List<SongEntry>               songs;            // tier = the run's Catalog; root = Discography (§7)
-    Dictionary<string, int>       roadieAllocation; // root only — chapterId → stationed count (§8)
-    HashSet<string>               entitlements;     // root only — store-written (backstage_pass)
-    PendingClaim                  pendingClaim;     // chapters only — the idle dialog's claim (§9)
-    DateTime                      lastActiveUtc;    // chapters only (§12.9)
+}
+
+class RootFacts : ScopeFacts        // the root scope's payload, and no other
+{
+    Dictionary<string, int>       roadieAllocation; // chapterId → stationed count (§8)
+    HashSet<string>               entitlements;     // store-written (backstage_pass)
+}
+
+class ChapterFacts : ScopeFacts     // a chapter's payload
+{
+    PendingClaim                  pendingClaim;     // the idle dialog's claim (§9)
 }
 ```
+
+A scope that cannot use a fact does not carry it: the payload type follows the scope's position in
+the tree (root, its children, everything deeper), so a root fact on a tier is unrepresentable rather
+than filtered at load. `lastActiveUtc` (§12.9) is a chapter field OUTSIDE the payload — the one
+thing a reset re-stamps instead of clearing. `ScopeState.Build` allocates each node's payload, and a
+reset installs a fresh one of the same type.
 
 The tree: **root** (Records, Roadies, entitlements, completion flags, Discography, any counters a
 chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique tree-wide**; a declaration in two
@@ -1046,13 +1062,17 @@ with the command that armed it.
 Visible sections re-evaluate `visibleWhen`; visible modules re-read what they show. Event-driven,
 never per-render-frame; fine-graining is a mechanical optimization if profiling ever asks.
 
-**Entry points** — the only ways the UI touches the game: `TryRung(rung)`, `TryBuy(generator |
+**Entry points** — the only ways the UI touches the game. Each mutation that depends on live state
+is a `Can*` query plus a `Do*` command, with `Try*` as the convenience wrapper over the two: the
+query is what renders pressability and the feedback text, the command performs the mutation and
+refuses to run when the query says no. A reference that cannot resolve is never an answer either
+one returns - static content cannot legitimately be in that state, so those throw. The set:
+`IsOffered(rung)` / `ExecuteRung` / `TryRung(rung)`, `CanBuy` / `Buy` / `TryBuy(generator |
 upgrade)`, `FireProducer(producerId)`, `SetActiveBars(group, set)`, the event operations
 `StartEvent / CompleteEvent / AbortEvent (eventId)`, `SwitchChapter(chapterId)` (stamps
 `lastActiveUtc`, computes the pending claim, §12.9), `ClaimIdle(chapterId)` (settle the pending
 claim, §9 — the dialog's double button only *requests* the rewarded ad; marking the claim `doubled`
-is AdManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked venues only,
-per-venue caps), the Ch. 6 song operations (write / name), and
+is AdManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked chapters only), the Ch. 6 song operations (write / name), and
 `AcknowledgeStory(storyId)` (sets the root `storyN_seen` latch, §10). All fail-closed — each checks
 its own gate. Ad and store
 callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations (extend
@@ -1073,8 +1093,9 @@ per-feature: any kind an author gates with explains itself for free.
 - Every Definition id is unique tree-wide — currencies, flags, bars, groups, producers, generators,
   upgrades, events, triggers, modifiers, scopes, songs; a declaration in two scopes is refused.
 - A tag may not collide with any id; an Effect target matching nothing reachable warns.
-- A `SetFlag` naming an undeclared flag is an error; a flag with no setter warns; a flag whose
-  setters all live in scopes more durable than the flag warns (§2).
+- A `SetFlag` naming an undeclared flag is an error, as is one whose home is off the acting chain -
+  including a home the acting scope encloses, which the outward write can never reach (§2). A
+  declared flag with no setter warns.
 - A rung that resets a scope containing tier rungs with unreferenced payout actions warns
   (stranded value); a formula-driven grant placed after a `ResetScope` that clears its inputs warns
   (reads zeros); reference cycles across ALL nested action references — `ExecuteRung`, the event
@@ -1131,7 +1152,6 @@ Assets/Scripts/
     GeneratorDefinition.cs  UpgradeDefinition.cs
     Purchasing.cs           // TryBuy(generator | upgrade): fail-closed gate, spend, count or latch, payload
     CareerEffectDefinition.cs  // formula-shaped multipliers + the MultiplierFormula family
-    RoadieVenueDefinition.cs   // per-venue roadie rate and cap, read by both roadie formulas
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply)
     BarDefinition.cs  BarGroupDefinition.cs  BarFillBehavior.cs  BarSystem.cs
   Loop/
@@ -1140,7 +1160,7 @@ Assets/Scripts/
   Events/
     EventDefinition.cs  EventSystem.cs
   Meta/
-    RoadieAllocation.cs    // SetRoadieAllocation + the write-time cap; the boost arithmetic is Economy's
+    RoadieAllocation.cs    // SetRoadieAllocation; the boost arithmetic is Economy's
   Content/
     SongDefinition.cs      // Catalog (run) + Discography (root)
   Save/

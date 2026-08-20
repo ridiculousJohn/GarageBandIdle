@@ -75,13 +75,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void SetFlag_with_no_declaring_scope_errors_and_noops()
+        public void SetFlag_with_no_declaring_scope_throws()
         {
             var tree = new TestTree();
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("SetFlag"));
-            tree.Ctx(tree.Tier1).SetFlag("undeclared_flag");
-
+            Assert.Throws<System.InvalidOperationException>(
+                () => tree.Ctx(tree.Tier1).SetFlag("undeclared_flag"));
             Assert.IsFalse(tree.Ctx(tree.Tier1).IsFlagSet("undeclared_flag"));
         }
 

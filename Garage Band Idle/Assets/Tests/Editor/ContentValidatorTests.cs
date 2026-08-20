@@ -24,7 +24,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly UpgradeDefinition StagePresence;
         public readonly UpgradeDefinition AmpStrings;
         public readonly CareerEffectDefinition RecordsIncome;
-        public readonly RoadieVenueDefinition Venue;
+        public readonly CurrencyDefinition Cash;
 
         public ValidatorFixture()
         {
@@ -36,11 +36,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Ch1.children.Add(Tier1);
             Ch1.children.Add(Tier1b);
 
-            Root.declaredCurrencyIds.Add("records");
+            var records = TestTree.DeclareCurrency(Root, "records");
             Root.declaredFlags.Add("ch1_complete");
-            Ch1.declaredCurrencyIds.Add("ch1_records");
+            var ch1Records = TestTree.DeclareCurrency(Ch1, "ch1_records");
             Ch1.declaredFlags.Add("album");
-            Tier1.declaredCurrencyIds.AddRange(new[] { "cash", "fans" });
+            Cash = TestTree.DeclareCurrency(Tier1, "cash", "income");
+            var fans = TestTree.DeclareCurrency(Tier1, "fans");
 
             Album = new Rung
             {
@@ -90,8 +91,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The economy declarations: a producer reading an upgrade latch, a
             // tagged generator with a cost curve, an upgrade whose effect targets
-            // that generator, the career effect on the income tag, and the
-            // chapter's venue.
+            // that generator, and the career effect on the income tag.
             Tap = TestTree.MakeDefinition<ProducerDefinition>("tap_producer");
             Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, 1));
             Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, 1, new UpgradePurchased { upgradeId = "stage_presence" }));
@@ -123,21 +123,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             RecordsIncome.formula = new LinearOnBalance { currencyId = "records", coefficient = 0.02 };
             Root.careerEffects.Add(RecordsIncome);
 
-            Venue = TestTree.MakeDefinition<RoadieVenueDefinition>("garage_venue");
-            Venue.chapterScopeId = "ch1";
-            Venue.perRoadie = 0.05;
-            Venue.cap = 5;
-
             Defs.Add(Root).Add(Ch1).Add(Tier1).Add(Tier1b)
-                .Add(TestTree.MakeDefinition<CurrencyDefinition>("records"))
-                .Add(TestTree.MakeDefinition<CurrencyDefinition>("ch1_records"))
-                .Add(TestTree.MakeDefinition<CurrencyDefinition>("cash", "income"))
-                .Add(TestTree.MakeDefinition<CurrencyDefinition>("fans"))
+                .Add(records).Add(ch1Records).Add(Cash).Add(fans)
                 .Add(TestTree.MakeDefinition<BarGroupDefinition>("covers"))
                 .Add(Boost)
                 .Add(Trigger)
                 .Add(Tap).Add(Amp).Add(StagePresence).Add(AmpStrings)
-                .Add(RecordsIncome).Add(Venue);
+                .Add(RecordsIncome);
         }
 
         public ValidationReport Run() => ContentValidator.Validate(Defs);
@@ -199,7 +191,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void CurrencyDeclaredInTwoScopes_Error()
         {
             var f = new ValidatorFixture();
-            f.Ch1.declaredCurrencyIds.Add("cash");
+            f.Ch1.declaredCurrencies.Add(f.Cash);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome, "a currency has one home");
         }
 
@@ -250,11 +242,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void UnknownDeclaredCurrency_Error()
+        public void UndiscoverableDeclaredCurrency_Error()
         {
             var f = new ValidatorFixture();
-            f.Tier1.declaredCurrencyIds.Add("ghost");
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "has no CurrencyDefinition");
+            f.Tier1.declaredCurrencies.Add(TestTree.MakeDefinition<CurrencyDefinition>("ghost"));   // never registered
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "does not resolve to this asset");
+        }
+
+        [Test]
+        public void NullDeclaredCurrency_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredCurrencies.Add(null);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "declaredCurrencies[");
         }
 
         [Test]
@@ -409,16 +409,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // A setter acting from an ancestor of the flag's home writes outward and
-        // never reaches it - the per-flag warn, not a per-site error (12.12).
+        // never reaches it - and could not read it either, so it is an error
+        // like any other off-chain write (12.12).
         [Test]
-        public void Flag_SettersMoreDurable_Warning()
+        public void Flag_SetterAboveTheHome_Error()
         {
             var f = new ValidatorFixture();
             f.Tier1.declaredFlags.Add("deep");
             f.Capstone.actions.Add(new SetFlag { flagId = "deep" });
-            var report = f.Run();
-            AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.FlagSettersMoreDurable, "flag 'deep'");
-            AssertNoFinding(report, ValidationCheck.ChainReach);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "flag 'deep' homed at 'tier1'");
         }
 
         // ---- ordinary reads and writes address only the acting chain ----
@@ -561,8 +560,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void EffectTag_NoMemberInGrantSubtree_Warning()
         {
             var f = new ValidatorFixture();
-            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("merch", "collectible"));
-            f.Root.declaredCurrencyIds.Add("merch");
+            f.Defs.Add(TestTree.DeclareCurrency(f.Root, "merch", "collectible"));
             f.Boost.effects.Add(new Effect { target = "collectible", multiplier = 2 });
             AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "matches no member within 'tier1'");
         }
@@ -652,8 +650,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ProducesEntry_CurrencyOffActingChain_Error()
         {
             var f = new ValidatorFixture();
-            f.Tier1b.declaredCurrencyIds.Add("merch");
-            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("merch"));
+            f.Defs.Add(TestTree.DeclareCurrency(f.Tier1b, "merch"));
             f.Tap.produces.Add(TestTree.Entry("merch", Stat.Rate, 1));
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "produces entry addresses currency 'merch'");
         }
@@ -714,8 +711,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Amp.costCurrencyId = "ch1_records";
             AssertNoFinding(f.Run(), ValidationCheck.ChainReach);    // an ancestor's currency is on the chain
 
-            f.Tier1b.declaredCurrencyIds.Add("merch");
-            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("merch"));
+            f.Defs.Add(TestTree.DeclareCurrency(f.Tier1b, "merch"));
             f.Amp.costCurrencyId = "merch";
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "generator cost addresses currency 'merch'");
         }
@@ -855,7 +851,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "UpgradePurchased reads 'merch_deal' declared at 'tier1b'");
         }
 
-        // ---- career effects and venues ----
+        // ---- career effects ----
 
         [Test]
         public void CareerEffect_NoFormula_Error()
@@ -886,39 +882,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void RoadieVenue_NotAChapter_Error()
+        public void RoadieBoost_NegativePerRoadie_Error()
         {
             var f = new ValidatorFixture();
-            f.Venue.chapterScopeId = "tier1";
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "which is not a chapter");
-        }
-
-        [Test]
-        public void RoadieVenue_UnknownScope_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Venue.chapterScopeId = "ch99";
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "names unknown scope 'ch99'");
-        }
-
-        [Test]
-        public void RoadieVenue_TwoForOneChapter_Error()
-        {
-            var f = new ValidatorFixture();
-            var second = TestTree.MakeDefinition<RoadieVenueDefinition>("garage_venue_2");
-            second.chapterScopeId = "ch1";
-            second.perRoadie = 0.05;
-            second.cap = 5;
-            f.Defs.Add(second);
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome, "both scale chapter 'ch1'");
-        }
-
-        [Test]
-        public void RoadieVenue_NegativePerRoadie_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Venue.perRoadie = -0.05;
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never costs income");
+            var roadie = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_total");
+            roadie.target = "income";
+            roadie.formula = new RoadieTotalBoost { perRoadie = -0.05 };
+            f.Root.careerEffects.Add(roadie);
+            f.Defs.Add(roadie);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never shrinks");
         }
 
         // A declaration is a direct reference; every runtime lookup is by id
@@ -972,14 +944,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Amp.growth = double.NaN;
-            f.Venue.perRoadie = double.PositiveInfinity;
             ((LinearOnBalance)f.RecordsIncome.formula).coefficient = double.NaN;
             ((RootCurveFormula)((AddCurrency)f.Album.actions[0]).formula).exponent = double.PositiveInfinity;
             f.Boost.effects.Add(new Effect { target = "cash", multiplier = double.NaN });
 
             var report = f.Run();
             var findings = report.OfCheck(ValidationCheck.NumericRange).Count();
-            Assert.AreEqual(5, findings, Dump(report));
+            Assert.AreEqual(4, findings, Dump(report));
             AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NumericRange, "must be finite");
         }
 

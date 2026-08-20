@@ -13,9 +13,9 @@ namespace RidiculousGaming.GarageBandIdle
         public List<ScopeDefinition> children = new();
 
         // Currencies homed here: balance and earned total live and die with this
-        // scope. Ids reference CurrencyDefinition assets.
-        [DefinitionId(typeof(Economy.CurrencyDefinition))]
-        public List<string> declaredCurrencyIds = new();
+        // scope. Direct references like every other declaration - declaration IS
+        // ownership, and the runtime keys are derived from the assets.
+        public List<Economy.CurrencyDefinition> declaredCurrencies = new();
 
         // Flags homed here. Declaration is what gives SetFlag its write target
         // and the flag its lifetime; reads walk the whole chain.
@@ -42,7 +42,26 @@ namespace RidiculousGaming.GarageBandIdle
         // empty instance.
         [SerializeReference] public Rung rung;
 
-        public IReadOnlyList<string> currencyIds => declaredCurrencyIds;
+        // The declared ids, in authored order. Every runtime fact is keyed by
+        // id, so this is what state and the save walk; a null slot is a load
+        // error the validator reports rather than a key nothing can hold.
+        public IEnumerable<string> currencyIds
+        {
+            get
+            {
+                foreach (var currency in declaredCurrencies)
+                    if (currency != null)
+                        yield return currency.Id;
+            }
+        }
+
+        public bool DeclaresCurrency(string currencyId)
+        {
+            foreach (var currency in declaredCurrencies)
+                if (currency != null && currency.Id == currencyId)
+                    return true;
+            return false;
+        }
 
         public bool DeclaresFlag(string flagId) => declaredFlags.Contains(flagId);
     }

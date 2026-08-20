@@ -46,6 +46,11 @@ namespace RidiculousGaming.GarageBandIdle
                 if (home != null)
                     ctx.RecordFactWrite($"currency '{currencyId}'", home);
             }
+            // A grant is never negative: Deposit moves the earned total too, and
+            // section 2's strobe-proofing stands on that only ever rising.
+            if (amount < BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"AddCurrency amount is {amount} - a grant never subtracts.");
             formula?.Validate(ctx);
         }
     }
@@ -66,12 +71,13 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             }
             ctx.RecordFlagSetter(flagId);
-            if (ctx.OnActingChain(home))
-                ctx.RecordFactWrite($"flag '{flagId}'", home);
-            else if (!ctx.IsProperAncestor(ctx.ActingScope, home))
+            // The write walks OUTWARD, so a home off this chain can never be
+            // reached - including one in a scope this action encloses, which is
+            // also a flag the acting scope could never read (12.3).
+            if (!ctx.OnActingChain(home))
                 ctx.AddError(ValidationCheck.ChainReach, $"SetFlag writes flag '{flagId}' homed at '{home.Id}', which is not on the chain from '{ctx.ActingScope.Id}' (12.12).");
-            // A setter acting from an ancestor of the home surfaces through the
-            // per-flag setters-more-durable warn (12.12), not a per-site error.
+            else
+                ctx.RecordFactWrite($"flag '{flagId}'", home);
         }
     }
 
@@ -87,12 +93,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindOnChain(scopeId);
-            if (target == null)
-            {
-                Debug.LogError($"AddModifier: scope '{scopeId}' is not on the chain from '{ctx.Scope.ScopeId}'.");
-                return;
-            }
+            var target = ctx.Scope.FindOnChain(scopeId)
+                ?? throw new InvalidOperationException(
+                    $"AddModifier: scope '{scopeId}' is not on the chain from '{ctx.Scope.ScopeId}'.");
 
             var entry = target.activeModifiers.Find(e => e.modifierId == modifierId);
             if (entry == null)
@@ -140,12 +143,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindOnChain(scopeId);
-            if (target == null)
-            {
-                Debug.LogError($"RemoveModifier: scope '{scopeId}' is not on the chain from '{ctx.Scope.ScopeId}'.");
-                return;
-            }
+            var target = ctx.Scope.FindOnChain(scopeId)
+                ?? throw new InvalidOperationException(
+                    $"RemoveModifier: scope '{scopeId}' is not on the chain from '{ctx.Scope.ScopeId}'.");
 
             var entry = target.activeModifiers.Find(e => e.modifierId == modifierId);
             if (entry == null)
@@ -202,17 +202,12 @@ namespace RidiculousGaming.GarageBandIdle
                 }
             }
             if (target == null)
-            {
-                Debug.LogError($"ResetScope: '{scopeId}' is not the acting scope, enclosed by it, or a sibling of '{ctx.Scope.ScopeId}'.");
-                return;
-            }
+                throw new InvalidOperationException(
+                    $"ResetScope: '{scopeId}' is not the acting scope, enclosed by it, or a sibling of '{ctx.Scope.ScopeId}'.");
             if (target.Parent == null)
-            {
                 // The root is structurally unresettable (12.12: "never the
                 // root") - nothing exists outside it for a fact to survive into.
-                Debug.LogError("ResetScope: the root scope is never resettable.");
-                return;
-            }
+                throw new InvalidOperationException("ResetScope: the root scope is never resettable.");
             ClearRecursive(target, ctx.NowUtc);
         }
 
@@ -256,17 +251,11 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindInSubtree(tierId);
-            if (target == null)
-            {
-                Debug.LogError($"ExecuteRung: scope '{tierId}' is not within '{ctx.Scope.ScopeId}'.");
-                return;
-            }
+            var target = ctx.Scope.FindInSubtree(tierId)
+                ?? throw new InvalidOperationException(
+                    $"ExecuteRung: scope '{tierId}' is not within '{ctx.Scope.ScopeId}'.");
             if (target.Definition.rung == null)
-            {
-                Debug.LogError($"ExecuteRung: scope '{tierId}' declares no rung.");
-                return;
-            }
+                throw new InvalidOperationException($"ExecuteRung: scope '{tierId}' declares no rung.");
             target.Definition.rung.TryExecute(ctx.Rebase(target));
         }
 

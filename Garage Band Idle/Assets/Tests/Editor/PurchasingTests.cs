@@ -101,9 +101,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1Def.generators.Add(free);
             tree.Defs.Add(free);
 
-            // A repeatable free purchase is an unbounded rate printer.
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("computed cost"));
-            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), "free_gear"));
+            // A repeatable free purchase is an unbounded rate printer, and a
+            // malformed cost curve is content, not an answer about state.
+            Assert.Throws<System.InvalidOperationException>(
+                () => Purchasing.TryBuy(tree.Ctx(tree.Tier1), "free_gear"));
             Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("free_gear"));
         }
 
@@ -120,8 +121,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Without the guard the affordability check passes and the
             // subtraction ADDS, minting 500 cash out of malformed content.
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("negative amount"));
-            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), "paying_upgrade"));
+            Assert.Throws<System.InvalidOperationException>(
+                () => Purchasing.TryBuy(tree.Ctx(tree.Tier1), "paying_upgrade"));
             AssertClose(1000, tree.Tier1.balances["cash"], "balance");
             Assert.IsFalse(tree.Tier1.purchasedUpgrades.Contains("paying_upgrade"));
         }
@@ -226,19 +227,45 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), "practice_amp"), "generator");
             Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), "amp_strings"), "upgrade");
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("no generator or upgrade"));
-            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), "cash"), "a currency is not purchasable");
+            Assert.Throws<System.InvalidOperationException>(
+                () => Purchasing.TryBuy(tree.Ctx(tree.Tier1), "cash"), "a currency is not purchasable");
         }
 
         [Test]
-        public void Buying_from_anywhere_on_the_chain_lands_in_the_declaring_scope()
+        public void Buying_lands_in_the_declaring_scope()
         {
             var tree = Ready();
 
-            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Root), "practice_amp"));
+            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), "practice_amp"));
 
             Assert.AreEqual(1, tree.Tier1.generatorCounts["practice_amp"]);
             Assert.IsFalse(tree.Root.generatorCounts.ContainsKey("practice_amp"));
+        }
+
+        // The declaration lookup walks OUTWARD, so a caller above the declaring
+        // scope cannot buy it - the same rule every read and write obeys.
+        [Test]
+        public void Buying_from_above_the_declaring_scope_throws()
+        {
+            var tree = Ready();
+            Assert.Throws<System.InvalidOperationException>(
+                () => Purchasing.TryBuy(tree.Ctx(tree.Root), "practice_amp"));
+        }
+
+        // CanBuy answers the state question the UI needs without mutating; Buy
+        // refuses to run when it says no.
+        [Test]
+        public void CanBuy_answers_without_buying_and_Buy_asserts_it()
+        {
+            var tree = Ready();
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.IsTrue(Purchasing.CanBuy(ctx, "practice_amp"));
+            Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("practice_amp"), "CanBuy mutates nothing");
+
+            tree.Tier1.balances["cash"] = 0;
+            Assert.IsFalse(Purchasing.CanBuy(ctx, "practice_amp"));
+            Assert.Throws<System.InvalidOperationException>(() => Purchasing.Buy(ctx, "practice_amp"));
         }
     }
 }

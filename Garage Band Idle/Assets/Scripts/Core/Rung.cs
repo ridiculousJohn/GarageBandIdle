@@ -21,14 +21,25 @@ namespace RidiculousGaming.GarageBandIdle
         public bool IsOffered(GameContext ctx) =>
             offerCondition != null && offerCondition.Evaluate(ctx);
 
-        // Runs the action list iff the gate holds; returns whether it executed.
+        // Runs the action list. Calling this while the gate is closed is a
+        // caller bug - every path is fail-closed, so ask IsOffered first.
         // ctx must already be rebased to the rung's declaring scope.
+        public void Execute(GameContext ctx)
+        {
+            if (!IsOffered(ctx))
+                throw new InvalidOperationException("Rung.Execute called while the offer condition is unmet - ask IsOffered first.");
+            foreach (var action in actions)
+                action.Execute(ctx);
+        }
+
+        // Convenience over the two: runs the list iff the gate holds, and
+        // reports whether it did. An unmet gate is an ordinary answer here -
+        // ExecuteRung against a closed gate no-ops by design (12.5).
         public bool TryExecute(GameContext ctx)
         {
             if (!IsOffered(ctx))
                 return false;
-            foreach (var action in actions)
-                action.Execute(ctx);
+            Execute(ctx);
             return true;
         }
     }

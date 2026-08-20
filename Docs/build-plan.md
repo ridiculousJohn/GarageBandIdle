@@ -75,8 +75,8 @@ step's tests need only what came before it.
    event entry, replay clear, 4-hour idle claim.
 9. **UI layer** (§12.11) — `SectionDefinition`/`ModuleDefinition`/`ModuleRegistry`, widgets, the
    rung feedback contract (`uiText` legs, progress rendering), two-trigger refresh, interpolation.
-10. **Meta & monetization** (§8, §9) — `SetRoadieAllocation` + the write-time cap + the allocation UI
-    (the venue-boost arithmetic is step 4's), Encore/game-speed buffs, AdManager (rewarded: Encore
+10. **Meta & monetization** (§8, §9) — `SetRoadieAllocation` + the allocation UI
+    (the roadie-boost arithmetic is step 4's), Encore/game-speed buffs, AdManager (rewarded: Encore
     top-up, Double It), IAPManager (Backstage Pass, Roadie bundles, Tip Jar), story beat cards +
     `AcknowledgeStory`.
 

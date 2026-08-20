@@ -91,40 +91,46 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void Firing_from_anywhere_on_the_chain_resolves_in_the_declaring_scope()
+        public void Firing_resolves_in_the_declaring_scope()
         {
             var tree = new TestTree();
 
-            // The caller is the root; the producer is declared at tier1, so the
-            // deposit and the conditions belong to tier1 either way.
+            // The deposit and the conditions belong to tier1, where the producer
+            // is declared, whatever the caller's own scope holds.
             tree.Tier1.purchasedUpgrades.Add("stage_presence");
-            Producer.FireProducer(tree.Ctx(tree.Root), "tap_producer");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), "tap_producer");
 
             AssertClose(2, tree.Tier1.balances["cash"], "cash");
         }
 
+        // The lookup walks OUTWARD, so a caller above the declaring scope cannot
+        // reach the producer - the same rule every read and write obeys.
         [Test]
-        public void An_unknown_producer_refuses_loudly()
+        public void Firing_from_above_the_declaring_scope_throws()
         {
             var tree = new TestTree();
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("no ProducerDefinition"));
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "no_such_producer");
-
-            AssertClose(0, tree.Tier1.balances["cash"], "cash");
+            Assert.Throws<System.InvalidOperationException>(
+                () => Producer.FireProducer(tree.Ctx(tree.Root), "tap_producer"));
         }
 
         [Test]
-        public void An_undeclared_producer_refuses_loudly()
+        public void An_unknown_producer_throws()
+        {
+            var tree = new TestTree();
+            Assert.Throws<System.InvalidOperationException>(
+                () => Producer.FireProducer(tree.Ctx(tree.Tier1), "no_such_producer"));
+        }
+
+        [Test]
+        public void An_undeclared_producer_throws()
         {
             var tree = new TestTree();
             var orphan = TestTree.MakeDefinition<ProducerDefinition>("orphan_producer");
             orphan.produces.Add(TestTree.Entry("cash", Stat.Yield, 5));
             tree.Defs.Add(orphan);                                 // content exists, no scope declares it
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("no scope declares"));
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "orphan_producer");
-
-            AssertClose(0, tree.Tier1.balances["cash"], "cash");
+            Assert.Throws<System.InvalidOperationException>(
+                () => Producer.FireProducer(tree.Ctx(tree.Tier1), "orphan_producer"));
         }
     }
 }

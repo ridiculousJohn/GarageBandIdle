@@ -46,48 +46,59 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         }
     }
 
-    // Product over venues of (1 + perRoadie * stationed): across venues the
-    // boosts multiply, which is what makes spreading Roadies beat concentrating
-    // them (design doc 8.2).
+    // The product over chapters of (1 + perRoadie * stationed there) - additive
+    // within a chapter, multiplicative across them (design doc 8.2). The
+    // concavity is the point: the next Roadie is worth more in a chapter that
+    // holds fewer, so spreading beats stacking for the global factor, and
+    // Roadies on a cleared chapter still help the one being played.
     [Serializable]
     public class RoadieTotalBoost : MultiplierFormula
     {
+        public double perRoadie;
+
+        // perRoadie converts BEFORE the multiplication: done in double
+        // arithmetic the term can overflow to infinity before the wrapper sees
+        // it, and BigNumber refuses infinities at construction.
         public override BigNumber Compute(GameContext ctx)
         {
             var product = BigNumber.One;
-            foreach (var venue in ctx.Defs.All<RoadieVenueDefinition>())
-                product *= venue.Boost(ctx);
+            foreach (var stationed in ctx.Scope.Root().roadieAllocation.Values)
+                product *= BigNumber.One + (BigNumber)perRoadie * stationed;
             return product;
+        }
+
+        public override void Validate(ValidationContext ctx)
+        {
+            if (ctx.RequireFiniteDouble(perRoadie, "RoadieTotalBoost perRoadie") && perRoadie < 0)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"RoadieTotalBoost perRoadie is {perRoadie} - a career multiplier never shrinks with the fact it derives from.");
         }
     }
 
-    // The active chapter's double-count (design doc 8.2): the played venue's
-    // boost applies once inside the global product and again here, which is what
-    // makes stationing Roadies speed the chapter being worked. "Active" means
-    // the chapter on the resolution chain - the gather-origin ruling above is
-    // what makes it derivable at all.
+    // The played chapter's own factor, counted on top of the global one (design
+    // doc 8.2's double-count), which is what makes stationing Roadies speed the
+    // chapter being worked. "Active" means the chapter on the resolution chain -
+    // the gather-origin ruling above is what makes it derivable at all.
     [Serializable]
     public class RoadieActiveBoost : MultiplierFormula
     {
+        public double perRoadie;
+
         public override BigNumber Compute(GameContext ctx)
         {
-            var chapter = ChapterOnChain(ctx.Scope);
+            var chapter = ctx.Scope.Chapter();
             if (chapter == null)
                 return BigNumber.One;           // resolving off any chapter's chain: no local factor
-            foreach (var venue in ctx.Defs.All<RoadieVenueDefinition>())
-                if (venue.chapterScopeId == chapter.ScopeId)
-                    return venue.Boost(ctx);
-            return BigNumber.One;
+            if (!ctx.Scope.Root().roadieAllocation.TryGetValue(chapter.ScopeId, out var stationed))
+                return BigNumber.One;
+            return BigNumber.One + (BigNumber)perRoadie * stationed;
         }
 
-        // Chapters are structurally root's children (design doc 12.3), so the
-        // chapter on a chain is the last node before the root.
-        private static ScopeState ChapterOnChain(ScopeState from)
+        public override void Validate(ValidationContext ctx)
         {
-            for (var node = from; node != null; node = node.Parent)
-                if (node.Parent != null && node.Parent.Parent == null)
-                    return node;
-            return null;
+            if (ctx.RequireFiniteDouble(perRoadie, "RoadieActiveBoost perRoadie") && perRoadie < 0)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"RoadieActiveBoost perRoadie is {perRoadie} - a career multiplier never shrinks with the fact it derives from.");
         }
     }
 

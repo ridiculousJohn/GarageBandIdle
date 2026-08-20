@@ -33,14 +33,17 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // NEWER than current - is refused outright, never best-effort parsed.
         private static readonly Dictionary<int, Func<JObject, JObject>> Migrations = new();
 
-        // One node per scope: identity, the re-stamped-not-cleared timestamp,
-        // and the complete mutable payload (design doc 12.3).
+        // One node per scope: identity, the re-stamped-not-cleared timestamp
+        // (chapters only), and the complete mutable payload (design doc 12.3).
+        // The payload stays a raw token here and is read against the type the
+        // scope's position in the definition tree dictates - a save never names
+        // its own payload type.
         [Serializable]
         private class SaveNode
         {
             public string scopeId;
             public DateTime lastActiveUtc;
-            public ScopeFacts facts;
+            public JObject facts;
             public List<SaveNode> children = new();
         }
 
@@ -52,7 +55,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
 
         // ---- serialization ----
 
-        public static string Serialize(ScopeState root)
+        public static string Serialize(RootScopeState root)
         {
             var payload = JsonConvert.SerializeObject(ToNode(root), MakeSettings());
             var envelope = new JObject
@@ -75,8 +78,8 @@ namespace RidiculousGaming.GarageBandIdle.Save
             var node = new SaveNode
             {
                 scopeId = state.ScopeId,
-                lastActiveUtc = state.lastActiveUtc,
-                facts = state.facts,
+                lastActiveUtc = state is ChapterScopeState chapter ? chapter.lastActiveUtc : default,
+                facts = JObject.FromObject(state.facts, JsonSerializer.Create(MakeSettings())),
             };
             foreach (var child in state.Children)
                 node.children.Add(ToNode(child));
@@ -89,7 +92,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // onto it. Unknown ids from removed content are dropped with a warning;
         // content added since the save starts fresh. False on any structural
         // failure - malformed json, checksum mismatch, unmigratable version.
-        public static bool TryDeserialize(string json, ScopeDefinition rootDefinition, IDefinitionSource defs, out ScopeState root)
+        public static bool TryDeserialize(string json, ScopeDefinition rootDefinition, IDefinitionSource defs, out RootScopeState root)
         {
             root = null;
             // A missing definition source is a CODE bug, not a bad save: the
@@ -152,11 +155,13 @@ namespace RidiculousGaming.GarageBandIdle.Save
         {
             if (node.facts != null)
             {
-                FilterToDeclared(node.facts, state.Definition, defs);
-                FilterTreeScopedFacts(node.facts, state);
-                state.facts = node.facts;
+                var payload = ReadFacts(node.facts, state);
+                FilterToDeclared(payload, state.Definition, defs);
+                FilterTreeScopedFacts(payload, state);
+                state.ApplyLoadedFacts(payload);
             }
-            state.lastActiveUtc = node.lastActiveUtc;
+            if (state is ChapterScopeState chapter)
+                chapter.lastActiveUtc = node.lastActiveUtc;
             EnsureDeclared(state);
 
             foreach (var childNode in node.children)
@@ -181,89 +186,77 @@ namespace RidiculousGaming.GarageBandIdle.Save
             // state - content added since the save simply starts new.
         }
 
-        // Tree-scoped facts carry ownership and reach rules, not just id
-        // existence (12.3): roadie allocation is a ROOT fact keyed by root's
-        // direct children (the chapters); a pending claim is a CHAPTER fact
-        // whose currencies must be homed in that chapter's subtree or on its
-        // ancestor chain - a sibling chapter's currency can never appear in it.
+        // Reads a saved payload against the type the scope's POSITION dictates,
+        // never a type the save names for itself: root facts land on the root,
+        // chapter facts on a chapter, and a tier gets the base payload. Members
+        // the target type does not have are dropped by the read itself.
+        private static ScopeFacts ReadFacts(JObject token, ScopeState state)
+        {
+            var serializer = JsonSerializer.Create(MakeSettings());
+            if (state is RootScopeState)
+                return token.ToObject<RootFacts>(serializer);
+            if (state is ChapterScopeState)
+                return token.ToObject<ChapterFacts>(serializer);
+            return token.ToObject<ScopeFacts>(serializer);
+        }
+
+        // Tree-scoped facts carry reach rules, not just id existence (12.3): the
+        // roadie allocation is keyed by root's direct children (the chapters),
+        // and a pending claim's currencies must be homed in that chapter's
+        // subtree or on its ancestor chain - a sibling chapter's currency can
+        // never appear in it. Placement itself needs no check: the payload types
+        // make a root fact on a tier unrepresentable.
         private static void FilterTreeScopedFacts(ScopeFacts facts, ScopeState state)
         {
-            var isRoot = state.Parent == null;
-            var isChapter = !isRoot && state.Parent.Parent == null;
-
-            if (facts.roadieAllocation.Count > 0)
+            if (facts is RootFacts rootFacts && rootFacts.roadieAllocation.Count > 0)
             {
-                if (!isRoot)
+                List<string> invalid = null;
+                foreach (var key in rootFacts.roadieAllocation.Keys)
                 {
-                    Debug.LogWarning($"SaveSystem: roadie allocation on non-root scope '{state.ScopeId}' - dropped; allocation is a root fact.");
-                    facts.roadieAllocation.Clear();
-                }
-                else
-                {
-                    List<string> invalid = null;
-                    foreach (var key in facts.roadieAllocation.Keys)
+                    var isChapterId = false;
+                    foreach (var child in state.Children)
                     {
-                        var isChapterId = false;
-                        foreach (var child in state.Children)
+                        if (child.ScopeId == key)
                         {
-                            if (child.ScopeId == key)
-                            {
-                                isChapterId = true;
-                                break;
-                            }
+                            isChapterId = true;
+                            break;
                         }
-                        // A nonpositive stationing is not an allocation. The
-                        // formulas clamp to [0, cap] as well, so this is defense
-                        // in depth rather than the only line.
-                        if (!isChapterId)
-                            Debug.LogWarning($"SaveSystem: roadie allocation key '{key}' is not a chapter - dropped.");
-                        else if (facts.roadieAllocation[key] <= 0)
-                            Debug.LogWarning($"SaveSystem: roadie allocation for '{key}' is {facts.roadieAllocation[key]} - dropped.");
-                        else
-                            continue;
-                        (invalid ??= new List<string>()).Add(key);
                     }
-                    if (invalid != null)
-                    {
-                        foreach (var key in invalid)
-                            facts.roadieAllocation.Remove(key);
-                    }
+                    // A nonpositive stationing is not an allocation.
+                    if (!isChapterId)
+                        Debug.LogWarning($"SaveSystem: roadie allocation key '{key}' is not a chapter - dropped.");
+                    else if (rootFacts.roadieAllocation[key] <= 0)
+                        Debug.LogWarning($"SaveSystem: roadie allocation for '{key}' is {rootFacts.roadieAllocation[key]} - dropped.");
+                    else
+                        continue;
+                    (invalid ??= new List<string>()).Add(key);
+                }
+                if (invalid != null)
+                {
+                    foreach (var key in invalid)
+                        rootFacts.roadieAllocation.Remove(key);
                 }
             }
 
-            if (!isRoot && facts.entitlements.Count > 0)
+            if (facts is ChapterFacts chapterFacts && chapterFacts.pendingClaim != null)
             {
-                Debug.LogWarning($"SaveSystem: entitlements on non-root scope '{state.ScopeId}' - dropped; entitlements are root facts.");
-                facts.entitlements.Clear();
-            }
-
-            if (facts.pendingClaim != null)
-            {
-                if (!isChapter)
+                var valid = new HashSet<string>();
+                CollectCurrencyIds(state.Definition, valid);       // this chapter's subtree
+                for (var node = state.Parent; node != null; node = node.Parent)
+                    foreach (var currencyId in node.Definition.currencyIds)
+                        valid.Add(currencyId);                     // the ancestor chain
+                List<string> unknown = null;
+                foreach (var key in chapterFacts.pendingClaim.amounts.Keys)
                 {
-                    Debug.LogWarning($"SaveSystem: pending claim on non-chapter scope '{state.ScopeId}' - dropped; claims are chapter facts.");
-                    facts.pendingClaim = null;
+                    if (!valid.Contains(key))
+                        (unknown ??= new List<string>()).Add(key);
                 }
-                else
+                if (unknown != null)
                 {
-                    var valid = new HashSet<string>();
-                    CollectCurrencyIds(state.Definition, valid);       // this chapter's subtree
-                    for (var node = state.Parent; node != null; node = node.Parent)
-                        foreach (var currencyId in node.Definition.currencyIds)
-                            valid.Add(currencyId);                     // the ancestor chain
-                    List<string> unknown = null;
-                    foreach (var key in facts.pendingClaim.amounts.Keys)
+                    foreach (var key in unknown)
                     {
-                        if (!valid.Contains(key))
-                            (unknown ??= new List<string>()).Add(key);
-                    }
-                    if (unknown != null)
-                    {
-                        foreach (var key in unknown)
-                        {
-                            Debug.LogWarning($"SaveSystem: pending-claim currency '{key}' is not reachable from chapter '{state.ScopeId}' - dropped.");
-                            facts.pendingClaim.amounts.Remove(key);
-                        }
+                        Debug.LogWarning($"SaveSystem: pending-claim currency '{key}' is not reachable from chapter '{state.ScopeId}' - dropped.");
+                        chapterFacts.pendingClaim.amounts.Remove(key);
                     }
                 }
             }
@@ -371,7 +364,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
             List<string> undeclared = null;
             foreach (var key in map.Keys)
             {
-                if (!definition.declaredCurrencyIds.Contains(key))
+                if (!definition.DeclaresCurrency(key))
                     (undeclared ??= new List<string>()).Add(key);
             }
             if (undeclared == null)
@@ -404,7 +397,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // The backup only ever receives content that VERIFIES: a corrupt
         // primary (the recovery case) is deleted, never rotated over a good
         // backup - File.Replace would otherwise install it as the new .bak.
-        public static void WriteAtomic(string path, ScopeState root, IDefinitionSource defs)
+        public static void WriteAtomic(string path, RootScopeState root, IDefinitionSource defs)
         {
             var json = Serialize(root);
             var tmp = path + ".tmp";
@@ -439,7 +432,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // Failed, because "couldn't read your save" must never be answered by
         // starting a new game. (File.Exists returns false for ALL of those, so
         // it decides nothing here.)
-        public static LoadOutcome LoadFromDisk(string path, ScopeDefinition rootDefinition, IDefinitionSource defs, out ScopeState root)
+        public static LoadOutcome LoadFromDisk(string path, ScopeDefinition rootDefinition, IDefinitionSource defs, out RootScopeState root)
         {
             root = null;
 
@@ -486,7 +479,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
         }
 
-        private static bool TryLoadFile(string path, ScopeDefinition rootDefinition, IDefinitionSource defs, out ScopeState root)
+        private static bool TryLoadFile(string path, ScopeDefinition rootDefinition, IDefinitionSource defs, out RootScopeState root)
         {
             root = null;
             return TryRead(path, out var json) == ReadResult.Ok && TryDeserialize(json, rootDefinition, defs, out root);

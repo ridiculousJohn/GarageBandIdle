@@ -4,6 +4,31 @@ Implementation plan for build-plan step 4, approved 2026-08-19 after two externa
 rounds were absorbed. `build-plan.md` owns order and status; this doc owns step 4's design
 decisions and work list. Section references are to `garage-band-idle-design.md`.
 
+**Parts of this plan are SUPERSEDED (2026-08-20); the design doc is authoritative.** What the body
+below still describes and shouldn't:
+
+- **Roadies.** `RoadieVenueDefinition`, its `chapterScopeId`, per-venue `perRoadie`/`cap`, the
+  read-side clamp, and the venue validation pass are deleted. The replacement: two root-declared
+  career effects, each carrying its own `perRoadie` and reading the root's `roadieAllocation` map
+  and nothing else. `RoadieTotalBoost` is the PRODUCT over the map's entries -
+  `Pi (1 + perRoadie x stationed there)`, additive within a chapter and multiplicative across them,
+  so spreading is concave and rewarding (8.2). `RoadieActiveBoost` reads the entry for the
+  chapter it resolves on, counting the played chapter's stationing a second time. No stationing cap
+  exists anywhere, which also makes the "`SetRoadieAllocation` + write-time cap enforcement" line
+  in the deferred-work section wrong: the command keeps the nonnegative and sum-of-pool invariants
+  only.
+- **Purchasing.** The `TryBuy`-only API described below is now `CanBuy` / `Buy` / `TryBuy`: a query
+  for the mutable-state question, a command that performs the purchase and refuses when the query
+  says no, and the wrapper over both. Content-derived faults - an id resolving to neither kind, no
+  declaring scope on the acting chain, a nonpositive computed cost - THROW instead of logging and
+  returning false. The same shape applies to `GameContext.CanSpend` / `Spend` / `TrySpend` and to
+  `Rung.IsOffered` / `Execute` / `TryExecute`.
+- **Lookups.** `Producer.FindCurrencyHome` and `Producer.DeclaringScope` walk outward from the
+  acting scope and throw when the chain does not hold the target; the root-down searches this plan
+  specified are gone.
+- **Currencies.** `declaredCurrencyIds` is gone - a scope declares `List<CurrencyDefinition>` by
+  direct reference, and the ids are derived.
+
 ## Conceptual model
 
 Step 4 is the compute-on-read half of the economy. Steps 1-3 built the facts (balances,

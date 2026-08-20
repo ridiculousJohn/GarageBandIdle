@@ -26,17 +26,15 @@ calls because the phases straddle the production deposits - see the segment sect
 
 ## Shapes
 
-**Ruling - a group owns its bars.** `ScopeDefinition` gains `barGroups: List<BarGroupDefinition>`
-(direct references, declaration is ownership, same as `producers`), and `BarGroupDefinition` gains
-`bars: List<BarDefinition>`. `BarDefinition.groupId` is DELETED. A bar's declaring scope is its
-group's, by construction rather than by validation: the alternative - both lists on the scope, plus
-a check that a bar's scope matches its group's - leaves "bar in tier A, group in tier B"
-representable, and that arrangement gives the progress fact a different lifetime from the
-`activeBars` set that selects it. 12.3 prefers unrepresentable to validated. It also makes 12.7's
-settlement order ("then groups, then bars within a group, in declaration order") literal, and gives
-`SetActiveBars` its membership test for free. Cost: `BarsCompleted` resolves the group and walks
-`group.bars` instead of filtering `defs.All<BarDefinition>()`, and `ConditionTests` updates. This is
-a change to a step-1 shape, so it wants John's nod before the edit.
+**A group owns its bars.** `ScopeDefinition` gains `barGroups: List<BarGroupDefinition>` (direct
+references, declaration is ownership, same as `producers`), and `BarGroupDefinition` gains
+`bars: List<BarDefinition>`. `BarDefinition.groupId` is DELETED - the id indirection is for
+cross-references, and a bar's group is not a cross-reference but its placement. A bar's declaring
+scope IS its group's, which is what nested scopes are for: the progress fact and the `activeBars`
+set that selects it have one lifetime because they have one home. It also makes 12.7's settlement
+order ("then groups, then bars within a group, in declaration order") literal, and gives
+`SetActiveBars` its membership test for free. `BarsCompleted` resolves the group and walks
+`group.bars` instead of filtering `defs.All<BarDefinition>()`; `ConditionTests` fixtures follow.
 
 **`BarFillBehavior` config stands as authored**: `ContinuousDelivery {autoAdvance}` drains a pool,
 `TimedFill {}` fills from time alone.
@@ -44,8 +42,7 @@ a change to a step-1 shape, so it wants John's nod before the edit.
 **Ruling - the pipe governs pool spending only.** `pipeRate` is "total throughput the group can
 spend per second" (12.7) and a `TimedFill` group spends nothing, so the pipe and the pool
 arbitration apply to `ContinuousDelivery` groups alone; `maxActive` is the only throttle a timed
-group has. A `TimedFill` group that authors a `fillCurrencyId` is an error (a pool nothing drains)
-and a nonzero `pipeRate` on one warns.
+group has. A `TimedFill` group that authors a `fillCurrencyId` is an error (a pool nothing drains).
 
 **Ruling - a null `availableWhen` on a bar is OPEN**, the opposite of step 4's null purchase gate.
 The fail-closed rule binds entry points that create value out of a spend; a bar's availability is a
@@ -115,8 +112,7 @@ Fill, using the snapshot's order:
   a malformed bar out of the pool: settlement would refuse to pay it (see the runtime backstop), so
   admitting it to the draw would spend pool currency every segment forever and settle none of it. A
   non-repeating bar fails the progress leg on its own when `fillAmount <= 0`; a repeating one needs
-  the explicit test. The word is deliberately not "eligible": auto-advance below asks a different
-  question, about bars that are NOT selected.
+  the explicit test.
 - **Demand** is the bar's effective rate, never its remaining need. 12.7 says "each active, unfilled
   bar demands its own `fillRate`", and clamping to the remainder would let a nearly-full bar free
   pipe for its neighbors mid-segment, which is exactly the winner-picking the proportional rule
@@ -175,30 +171,9 @@ scope's `ScopeFacts` reference; an entry whose scope no longer holds that payloa
 the repeating loop re-checks it per iteration. Reset is a payload swap (12.3), so reference identity
 is the check - no bookkeeping to keep in sync.
 
-**Runaway guard.** A bar with an empty `onComplete` takes the arithmetic shortcut 12.7 sanctions -
+**The arithmetic shortcut** 12.7 sanctions applies when a bar's `onComplete` is empty -
 `n = Floor(progress / fillAmount)` in one step - because nothing can change between fills. A bar
-with actions iterates, with a backstop of 10,000 fills per bar per settlement: hitting it logs an
-error and LEAVES the residual progress, so the remaining fills settle next tick rather than
-vanishing.
-
-**`fillCounts` saturates, but nothing else does.** The count is an `int` and stays one - counts are
-the standing exception to the BigNumber rule - while the shortcut's quotient is an unbounded
-`BigNumber`, and a hard-buffed repeating bar can walk an existing count toward `Int32.MaxValue` in a
-few hours of pinning the backstop. The split: **progress accounting is exact and never clamped; only
-the stored count stops growing.** Each fill subtracts `fillAmount` and executes `onComplete` whether
-or not the count can still be incremented, and the shortcut subtracts its full quotient's worth of
-progress while adding `min(n, int.MaxValue - existing)` to the count through one bounded conversion
-helper (`BigNumber` offers `Floor` but no integer conversion; `ToDouble` is documented as valid only
-inside double range). A saturated bar therefore keeps working - it still pays its completion
-rewards, and its residual still drains - and the only thing that freezes is the cascade multiplier
-the count feeds. Logged once per bar on saturation.
-
-Clamping the progress subtraction instead would make a saturated bar a permanent resource sink: it
-stays hungry by the drawing test, draws pool currency every segment, settles nothing, and grows a
-residual forever - the same defect as admitting a nonpositive `fillAmount` to the draw, arriving
-through the count instead. Widening the count to `long` was considered and rejected: it moves the
-boundary out of reach without defining behavior at it, and it would change a step-1 state shape and
-the save payload for a case this rule already answers.
+with actions iterates.
 
 `fillAmount > 0` is a validation error, but the validation pass is dev-only, so the release build
 checks it twice. The drawing test above keeps a malformed bar out of the demand snapshot, which is
@@ -208,36 +183,10 @@ comparison - as defense against a malformed snapshot reaching it anyway. This is
 step 4 gave `TryBuy`'s computed cost: the release build executes the check, the validator explains
 it.
 
-**`autoAdvance`**: on a non-repeating completion in a `ContinuousDelivery` group whose behavior sets
-it, the completed bar is removed from `activeBars` and replaced by its **candidate**, defined
-exactly:
-
-- strictly after the completed bar in the group's declaration order - **no wrapping**. The list is
-  an authored progression; wrapping would re-select a bar the player deliberately skipped past.
-- **not already selected** (with `maxActive > 1` the other live selections are skipped over, never
-  counted as candidates - auto-advance fills the slot the completion emptied, and never disturbs a
-  slot the player is using).
-- available in the declaring scope, and **either repeating or below `fillAmount`** - the same test
-  `SetActiveBars` applies, which refuses only a COMPLETED NON-REPEATING bar. A repeating bar at or
-  above `fillAmount` is manually selectable, so auto-advance must not be stricter than the player.
-  Both read LIVE after `onComplete` has run. (Validating groups not to mix repeating and
-  non-repeating bars would make the two tests agree the other way, but 12.7 asks for no such
-  restriction and a pool feeding one repeating drainer alongside one-shot bars is legitimate
-  authoring.)
-- no candidate = the completed bar is simply removed and the group idles on that slot; the pool
-  banks, which is what an unselected `ContinuousDelivery` group does anyway.
-
-The swap happens only if the group's scope still holds the same `ScopeFacts` it held before
-`onComplete`. A completion list that resets the host has destroyed that selection set; writing a
-candidate into the fresh scope-life would re-populate a selection the reset just cleared - the same
-defect the settlement invalidation rule prevents, arriving one step later.
-
-A swapped-in candidate also gains **no settlement entry in the pass that selected it**: the work
-list is the snapshot's, and a mid-settlement selection is exactly the "newly qualified" case the
-entry gate refuses. It draws, and settles, from the next segment.
-
-Without `autoAdvance`, completion does not touch `activeBars` at all - selection is the player's
-fact, and `SetActiveBars` stays its only other writer. A completed bar left selected demands nothing.
+Completion does not touch `activeBars` - selection is the player's fact, and `SetActiveBars` is its
+only writer. A completed bar left selected demands nothing. `ContinuousDelivery.autoAdvance` is not
+implemented here: no chapter grants it yet, and how a chapter grants it is undecided (an Effect
+multiplies numbers; it cannot flip a bool), so its semantics are settled when a chapter wants it.
 
 ## Entry point - `SetActiveBars(ctx, groupId, barIds)`
 
@@ -255,8 +204,7 @@ group's declaring scope. The foreground-subtree guard layers on in step 7.
   bars too. `DuplicateHome` covers a group declared by two scopes and a bar listed by two groups.
 - **Group**: null `behavior` is a `NullEntry` error; `ContinuousDelivery` requires a
   `fillCurrencyId` on the chain from the declaring scope (`RequireChainCurrency`) and
-  `pipeRate > 0`; `TimedFill` errors on a set `fillCurrencyId` and warns on a nonzero `pipeRate`;
-  `maxActive >= 1`; a group with no bars warns (inert content, same species as flag-no-setter).
+  `pipeRate > 0`; `TimedFill` errors on a set `fillCurrencyId`; `maxActive >= 1`.
 - **Bar**: `fillAmount > 0` and `fillRate > 0` are `NumericRange` errors (a nonpositive threshold is
   an unbounded settlement loop; a zero rate is a bar no multiplier can ever move). `availableWhen`
   validates in the declaring scope when present. `onComplete` runs through `ValidateActionList` with
@@ -318,16 +266,9 @@ asserted against a demand that the base `pipeRate` would clamp - a test the clam
 pass even if the implementation read the base value. Snapshot tests: a deposit made between
 `ResolveDemand` and `ConsumeAndSettle` moves the pool but changes no rate and opens no gate, while
 settlement's own re-reads still see live state; and a repeating bar entering the segment gate-closed
-with a full backlog, where the deposits open the gate and settlement still pays NOTHING. Saturation
-tests at both boundaries: a shortcut quotient above `int.MaxValue`, and an existing count one fill
-short of it. A second segment on a saturated repeating bar: the count stays pinned at
-`int.MaxValue`, progress still drains by `fillAmount` per fill, `onComplete` still fires, and the
-residual does not grow across segments. TimedFill selection: an unselected bar, an unavailable bar,
+with a full backlog, where the deposits open the gate and settlement still pays NOTHING. TimedFill selection: an unselected bar, an unavailable bar,
 and a completed non-repeating bar each advance zero while a selected available one advances. A completion-driven `ResetScope` stamping the segment-end boundary rather than anything
-derived from scaled dt. `autoAdvance` tests: candidate skipping a selected bar at `maxActive > 1`, a
-repeating candidate at `fillAmount` accepted, no wrap past the end, no candidate leaving the slot
-empty, a resetting `onComplete` suppressing the swap, and a swapped-in candidate holding a backlog
-settling nothing until the next segment.
+derived from scaled dt.
 `ResolutionTests` extends with the cascade row (both growth kinds, linear saturation, bar-targeted
 effects reaching the fill rate, a currency-total effect NOT reaching it). `ContentValidatorTests`
 and `SaveSystemTests` extend per the two sections above; `TestTree` grows the Chapter 1 cover group.
@@ -337,8 +278,8 @@ No production assets - step 8 authors those.
 
 12.7 records the rulings that are not in it today: the group owns its bars, the pipe governs pool
 spending only, stage-1-only rate resolution, a null bar gate is open, the empty-`onComplete`
-condition for the arithmetic shortcut, auto-advance's candidate rule, the settlement entry gate
-(snapshot admits, live state may only disqualify), and `fillCounts` saturation. 12.6's fill-count row
+condition for the arithmetic shortcut, and the settlement entry gate (snapshot admits, live state
+may only disqualify). 12.6's fill-count row
 names `perFill` gathering through the declaration list and says the cascade is repeating-bars-only.
 12.9 needs no change - it already says what the demand snapshot must obey - but its bar-consumption
 phase gains the note that demand is resolved before the production deposits, since that is the
@@ -362,3 +303,6 @@ sweep and event goal latching that share the transaction (step 6). Bar-completio
 events (they already work through the shared action machinery; the lifecycle ops land in step 6).
 The command boundary (step 7). UI, including bar rendering and the group widget (step 9). Additional
 fill behaviors (tap-a-chunk, dump-the-pool) - sibling classes when a chapter wants one.
+`ContinuousDelivery.autoAdvance`, which waits for the chapter that grants it. A `fillCounts`
+overflow policy: no authored bar repeats, so the boundary is unreachable and the rule that would
+govern it is unwritten on purpose.

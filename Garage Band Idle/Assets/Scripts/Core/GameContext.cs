@@ -79,53 +79,72 @@ namespace RidiculousGaming.GarageBandIdle
 
         // ---- writes: each lands at the fact's home ----
 
+        // The currency's home on this chain. Absent means the content addresses
+        // a currency it cannot reach - refused at load, so reaching it here is a
+        // bug and nothing sensible follows from continuing.
+        private ScopeState HomeOf(string currencyId)
+        {
+            for (var node = Scope; node != null; node = node.Parent)
+                if (node.balances.ContainsKey(currencyId))
+                    return node;
+            throw new InvalidOperationException(
+                $"No scope on the chain from '{Scope.ScopeId}' holds currency '{currencyId}'.");
+        }
+
         // Deposits at the currency's home: balance and earned total together.
-        // A deposit is a grant; spending is TrySpend below, which moves the
-        // balance alone.
+        // A deposit is a grant; spending moves the balance alone. A negative
+        // amount would drive an earned total DOWNWARD, and section 2's
+        // strobe-proofing - a threshold met once stays met - stands on that
+        // never happening; authored negatives are refused at load.
         public void Deposit(string currencyId, BigNumber amount)
         {
-            for (var node = Scope; node != null; node = node.Parent)
-            {
-                if (node.balances.ContainsKey(currencyId))
-                {
-                    node.balances[currencyId] += amount;
-                    node.earnedTotals[currencyId] += amount;
-                    return;
-                }
-            }
-            Debug.LogError($"Deposit: no scope on the chain from '{Scope.ScopeId}' holds currency '{currencyId}'.");
+            if (amount < BigNumber.Zero)
+                throw new InvalidOperationException(
+                    $"Deposit of {amount} for currency '{currencyId}': a grant is never negative.");
+            var home = HomeOf(currencyId);
+            home.balances[currencyId] += amount;
+            home.earnedTotals[currencyId] += amount;
         }
 
-        // Decrements at the currency's home iff the balance covers the amount.
-        // NEVER touches earnedTotals: spending is not earning, and section 2's
-        // strobe-proofing - a threshold met once stays met - stands on that.
+        // Whether the balance covers the amount right now - a question about
+        // mutable state, which is the only kind a bool answers here. A negative
+        // amount would pass this and then ADD through the subtraction, minting
+        // currency, so it throws rather than reporting false; zero stays legal,
+        // since cut_demo costs 0.
+        public bool CanSpend(string currencyId, BigNumber amount)
+        {
+            if (amount < BigNumber.Zero)
+                throw new InvalidOperationException(
+                    $"CanSpend of {amount} for currency '{currencyId}': a cost is never negative.");
+            return HomeOf(currencyId).balances[currencyId] >= amount;
+        }
+
+        // Decrements at the currency's home. NEVER touches earnedTotals:
+        // spending is not earning, and section 2's strobe-proofing stands on
+        // that. Callers ask CanSpend first; calling this when it answers false
+        // is a caller bug.
+        public void Spend(string currencyId, BigNumber amount)
+        {
+            if (!CanSpend(currencyId, amount))
+                throw new InvalidOperationException(
+                    $"Spend of {amount} for currency '{currencyId}': the balance does not cover it - ask CanSpend first.");
+            var home = HomeOf(currencyId);
+            home.balances[currencyId] -= amount;
+        }
+
+        // Convenience over the two: the caller that does not need the reason.
         public bool TrySpend(string currencyId, BigNumber amount)
         {
-            // A negative amount would pass the affordability check and then ADD
-            // through the subtraction, minting currency. Refused before anything
-            // is located or touched; zero stays legal, since cut_demo costs 0.
-            if (amount < BigNumber.Zero)
-            {
-                Debug.LogError($"TrySpend: refused a negative amount ({amount}) for currency '{currencyId}'.");
+            if (!CanSpend(currencyId, amount))
                 return false;
-            }
-
-            for (var node = Scope; node != null; node = node.Parent)
-            {
-                if (!node.balances.TryGetValue(currencyId, out var balance))
-                    continue;
-                if (balance < amount)
-                    return false;
-                node.balances[currencyId] = balance - amount;
-                return true;
-            }
-            Debug.LogError($"TrySpend: no scope on the chain from '{Scope.ScopeId}' holds currency '{currencyId}'.");
-            return false;
+            Spend(currencyId, amount);
+            return true;
         }
 
-        // Writes to the flag's declared home (design doc 12.3). Setting a flag no
-        // scope on the chain declares is a load-time error; at runtime it no-ops
-        // loudly rather than inventing a home.
+        // Writes to the flag's declared home (design doc 12.3). A flag no scope
+        // on the chain declares is refused at load; reaching it here means the
+        // content or the code is broken, and a silently skipped write would be
+        // saved as if it had happened.
         public void SetFlag(string flagId)
         {
             for (var node = Scope; node != null; node = node.Parent)
@@ -136,7 +155,8 @@ namespace RidiculousGaming.GarageBandIdle
                     return;
                 }
             }
-            Debug.LogError($"SetFlag: no scope on the chain from '{Scope.ScopeId}' declares flag '{flagId}'.");
+            throw new InvalidOperationException(
+                $"No scope on the chain from '{Scope.ScopeId}' declares flag '{flagId}'.");
         }
     }
 }

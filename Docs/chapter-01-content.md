@@ -32,7 +32,8 @@ root
 - Currencies: `records`, `roadies` (both accumulate, never spent in Ch. 1), `discography` (list, Ch. 6+).
 - Career effects (§12.6 — formula-shaped, exist from minute one):
   - `records_income`: `{target: income, × (1 + 0.02 × records.balance)}` — additive within the term.
-  - `roadie_total`: `{target: income, stat: rate, × Π over venues (1 + 0.05 × stationed)}` (§8.2).
+  - `roadie_total`: `{target: income, stat: rate, × Π over chapters (1 + 0.05 × stationed there)}`
+    (§8.2) — `perRoadie` lives on the formula.
   - `roadie_active`: `{target: production, currencyId: income, stat: rate,
     × (1 + 0.05 × stationed at the chapter on the resolution chain)}` — the active chapter's
     double-count (§8.2), aimed at the SOURCES because only a source knows which chapter it produces
@@ -40,7 +41,6 @@ root
     narrowing is what keeps a bandmate's Fans line out of it.
 - Reserved-target base values: `idle_rate` 0.5, `idle_cap` 14400s (4h), `game_speed` 1; Encore buff
   `{target: game_speed, ×2}`, Overdrive `×4` (§9). Minimum-away threshold: 180s.
-- Venue cap: the Garage takes at most **5** stationed Roadies at +5% each (§8.2).
 - Flags: `ch1_complete`, `story_ch1_open_seen`, `story_ch1_end_seen`.
 
 ## 3. Currencies
