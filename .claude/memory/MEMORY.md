@@ -13,3 +13,6 @@
 - [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) - verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - Scripts, then Tests, then both docs and the chapter JSON; grep the rule's phrasing, not its topic
 - [Currency values are BigNumber](currency-values-are-bignumber.md) - authored fields included (thresholds, amounts, fill rates); never default them to double; exceptions: Effect.multiplier, counts, Pow's power
+- [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - never invent a second way to express what the architecture already covers (scope placement groups things; ids are for cross-references); a covered case that seems to need something new is a conversation first
+- [No spec accumulation](no-spec-accumulation.md) - answer a review finding by deleting the mechanism, not by adding a paragraph; plan length is a defect signal
+- [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20 corrections: venue asset and stationing cap deleted, scope payloads typed by tree position, currencies by direct reference

@@ -16,4 +16,17 @@ When I justify NOT doing something - deferring work, keeping a constraint, decli
 
 **Why:** a justification is a claim about the code and deserves the same verification. Worse, defending an inherited restriction as if it were a decision is exactly the "this is how it is now" pattern John's normalization work exists to remove - so producing one while doing that work is self-defeating. He notices, and repeating it costs a round trip each time.
 
+**The mirror of this, 2026-08-20: TEST THE FINDING TOO.** An external review handed me a finding
+citing design section 12.11; I confirmed it and offered a fix, and John had to ask "why is that
+actually an issue?" before I checked. It was not one - both fault classes it guarded were already
+load-time validation errors, short-circuiting lost nothing, forcing the check cost a Pow and a chain
+walk per UI row per refresh, and the rule it cited was a sentence I had written into the doc two
+steps earlier. Circular: my own text validating a finding against my own code. Earlier the same day
+I "confirmed" stale-doc findings that existed only because I had broken the roadie formula myself.
+Confirming is cheap and looks diligent; disputing costs reasoning and risks being wrong, which is
+exactly backwards for a verdict. **Every finding gets three questions before it is reported: what
+actually goes wrong in practice, what does the change cost, and does the rule it leans on come from
+John's design or from me.** A finding that fails them is reported as not-an-issue WITH the
+reasoning - that is a verdict too, and John should never have to ask for it.
+
 **How to apply:** when the reason has the shape "X will change this anyway" or "this constraint protects something," name the specific mechanism and go read it. For a restriction, ask whether anything would actually break if it were lifted, or whether it merely reflects how the code used to be organized. Distinguish a constraint someone chose from one that fell out of a structure that no longer exists. Related: [[bug-reports-are-verify-only]] on evidence before verdict.
