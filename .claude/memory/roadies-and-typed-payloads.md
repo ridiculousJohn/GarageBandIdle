@@ -32,6 +32,18 @@ invented. Suite is 205/205 after them.
   derived through the `currencyIds` accessor, and the declaration now gets the same
   "resolves from the database to THIS asset" check as every other family.
 
+**Also 2026-08-20, the same session, on John's call:** the CONTENT DATABASE IS GONE.
+`IDefinitionSource` deleted; `ContentDatabase` loads the root scope (chapters stream as their own
+Addressables entries) and runs validation. Every authored field that named content by id now holds
+the asset itself - condition and action operands, cost currencies, produces entries, scope targets -
+so `DefinitionIdAttribute` and its drawer are deleted too; only flags, tags, and stat names stay
+strings, since none of them is an asset. Ids survive exactly where a FACT needs one (the save is
+ids), and such an id resolves by walking its scope OUTWARD, never by lookup. Consequences: modifiers
+are declared content (`ScopeDefinition.modifiers`) with stacks as `Dictionary<string, int>`; bar
+groups are declared and own their bars; ids are unique per CHAIN rather than tree-wide (scope ids
+stay tree-wide); `ResetScope` reaches self-or-enclosed only, never a peer; and the
+"declared but undiscoverable" check died with the catalogue. Suite: 194 tests.
+
 **Why:** each was a second way to say something the architecture already said - see
 [[reuse-the-existing-mechanism]] - and John found all four by reading, not by being told.
 
