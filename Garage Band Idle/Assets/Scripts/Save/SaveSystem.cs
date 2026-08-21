@@ -235,34 +235,27 @@ namespace RidiculousGaming.GarageBandIdle.Save
 
             if (facts is ChapterFacts chapterFacts && chapterFacts.pendingClaim != null)
             {
-                var valid = new HashSet<string>();
-                CollectCurrencyIds(state.Definition, valid);       // this chapter's subtree
-                for (var node = state.Parent; node != null; node = node.Parent)
-                    foreach (var currencyId in node.Definition.currencyIds)
-                        valid.Add(currencyId);                     // the ancestor chain
-                List<string> unknown = null;
-                foreach (var key in chapterFacts.pendingClaim.amounts.Keys)
+                // Each line names its own home, so validating one is a single
+                // question rather than a union of name sets: the scope is this
+                // chapter, something in its subtree, or something on its chain,
+                // and it declares that currency.
+                var entries = chapterFacts.pendingClaim.amounts;
+                for (var i = entries.Count - 1; i >= 0; i--)
                 {
-                    if (!valid.Contains(key))
-                        (unknown ??= new List<string>()).Add(key);
-                }
-                if (unknown != null)
-                {
-                    foreach (var key in unknown)
+                    var entry = entries[i];
+                    if (entry == null)
                     {
-                        Debug.LogWarning($"SaveSystem: pending-claim currency '{key}' is not reachable from chapter '{state.ScopeId}' - dropped.");
-                        chapterFacts.pendingClaim.amounts.Remove(key);
+                        Debug.LogWarning($"SaveSystem: a null pending-claim entry at chapter '{state.ScopeId}' - dropped.");
+                        entries.RemoveAt(i);
+                        continue;
                     }
+                    var home = state.FindInSubtree(entry.scopeId) ?? state.FindOnChain(entry.scopeId);
+                    if (home != null && home.Definition.DeclaresCurrency(entry.currencyId))
+                        continue;
+                    Debug.LogWarning($"SaveSystem: pending-claim currency '{entry.currencyId}' at scope '{entry.scopeId}' is not reachable from chapter '{state.ScopeId}' - dropped.");
+                    entries.RemoveAt(i);
                 }
             }
-        }
-
-        private static void CollectCurrencyIds(ScopeDefinition definition, HashSet<string> into)
-        {
-            foreach (var currencyId in definition.currencyIds)
-                into.Add(currencyId);
-            foreach (var child in definition.children)
-                CollectCurrencyIds(child, into);
         }
 
         // Unknown ids from removed content are dropped with a warning (12.10).

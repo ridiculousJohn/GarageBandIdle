@@ -31,12 +31,27 @@ namespace RidiculousGaming.GarageBandIdle
         public string name;
     }
 
+    // One line of a claim: an amount, and the HOME it lands in. The claim is
+    // held at the CHAPTER but addresses what the chapter's production paid into,
+    // which includes currencies homed at tiers BELOW it - so this is the one
+    // coordinate in the schema that names a scope instead of resolving outward
+    // from the scope holding the fact. Scope ids are unique tree-wide, so the
+    // name is exact, and settlement reaches the home by one named step
+    // (FindInSubtree, or FindOnChain for a currency homed further out).
+    [Serializable]
+    public class ClaimEntry
+    {
+        public string scopeId;
+        public string currencyId;
+        public BigNumber amount;
+    }
+
     // The idle dialog's exactly-once claim transaction (design doc 12.9).
     [Serializable]
     public class PendingClaim
     {
         public string claimId;
-        public Dictionary<string, BigNumber> amounts = new();
+        public List<ClaimEntry> amounts = new();
         public bool doubled;
         public bool settled;
     }

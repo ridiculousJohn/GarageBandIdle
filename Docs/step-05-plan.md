@@ -207,8 +207,7 @@ group's declaring scope. The foreground-subtree guard layers on in step 7.
 
 - **Collection**: `barGroups` joins the per-scope `CollectDeclared` pass; bars are collected in a
   nested pass that maps each bar to its group's scope in `declaringScopeByDefinition`, so
-  `DeclaringScope(bar)` answers and the "declared but unresolvable from the database" check covers
-  bars too. `DuplicateHome` covers a group declared by two scopes and a bar listed by two groups.
+  `DeclaringScope(bar)` answers for a bar the way it does for a producer. `DuplicateHome` covers a group declared by two scopes and a bar listed by two groups.
 - **Group**: null `behavior` is a `NullEntry` error; `ContinuousDelivery` requires a
   `fillCurrency` the declaring scope can reach outward (`RequireOnChain`, the check every other
   currency operand already gets) and `pipeRate > 0`; `TimedFill` errors on a set `fillCurrency`;

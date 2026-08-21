@@ -11,6 +11,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     public class SaveSystemTests
     {
         private string dir;
+        // A claim line is addressed by home plus currency, so the assertions
+        // read it the way settlement will.
+        private static BigNumber ClaimAmount(PendingClaim claim, string scopeId, string currencyId)
+        {
+            foreach (var entry in claim.amounts)
+                if (entry.scopeId == scopeId && entry.currencyId == currencyId)
+                    return entry.amount;
+            return BigNumber.Zero;
+        }
+
+        private static bool HasClaimFor(PendingClaim claim, string currencyId)
+        {
+            foreach (var entry in claim.amounts)
+                if (entry.currencyId == currencyId)
+                    return true;
+            return false;
+        }
+
         private string SavePath => Path.Combine(dir, "save.json");
 
         [SetUp]
@@ -59,7 +77,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Ch1.balances["ch1_records"] = 17;
             tree.Ch1.flags.Add("album");
             tree.Ch1.pendingClaim = new PendingClaim { claimId = "claim_1", doubled = true };
-            tree.Ch1.pendingClaim.amounts["cash"] = 604800;
+            tree.Ch1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "cash", amount = 604800 });
             tree.Ch1.lastActiveUtc = new DateTime(2026, 8, 18, 9, 0, 0, DateTimeKind.Utc);
             tree.Root.balances["records"] = 20;
             tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = new DateTime(2026, 8, 19, 0, 0, 0, DateTimeKind.Utc) });
@@ -97,7 +115,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)17, ch1.balances["ch1_records"]);
             Assert.IsTrue(ch1.flags.Contains("album"));
             Assert.IsTrue(ch1.pendingClaim.doubled);
-            Assert.AreEqual((BigNumber)604800, ch1.pendingClaim.amounts["cash"]);
+            Assert.AreEqual((BigNumber)604800, ClaimAmount(ch1.pendingClaim, "tier1", "cash"));
             Assert.AreEqual(new DateTime(2026, 8, 18, 9, 0, 0, DateTimeKind.Utc), ch1.lastActiveUtc);
             Assert.AreEqual((BigNumber)20, root.balances["records"]);
             Assert.AreEqual(new DateTime(2026, 8, 19, 0, 0, 0, DateTimeKind.Utc), root.timedBuffs[0].expiresAtUtc);
@@ -302,8 +320,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             savedRoot.roadieAllocation["ghost_chapter"] = 2;
             var ch1 = (ChapterScopeState)savedRoot.FindInSubtree("ch1");
             ch1.pendingClaim = new PendingClaim { claimId = "c1" };
-            ch1.pendingClaim.amounts["cash"] = 100;          // tier-declared - anywhere in the tree is valid
-            ch1.pendingClaim.amounts["ghost_currency"] = 5;
+            ch1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "cash", amount = 100 });
+            ch1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "ghost_currency", amount = 5 });
             var json = SaveSystem.Serialize(savedRoot);
 
             // Load against a tree that still declares t1 so only the ghosts drop.
@@ -322,8 +340,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, root.roadieAllocation["ch1"]);
             Assert.IsFalse(root.roadieAllocation.ContainsKey("ghost_chapter"));
             var loadedCh1 = (ChapterScopeState)root.FindInSubtree("ch1");
-            Assert.AreEqual((BigNumber)100, loadedCh1.pendingClaim.amounts["cash"]);
-            Assert.IsFalse(loadedCh1.pendingClaim.amounts.ContainsKey("ghost_currency"));
+            Assert.AreEqual((BigNumber)100, ClaimAmount(loadedCh1.pendingClaim, "tier1", "cash"));
+            Assert.IsFalse(HasClaimFor(loadedCh1.pendingClaim, "ghost_currency"));
         }
 
         [Test]
@@ -413,9 +431,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             savedRoot.roadieAllocation["tier1"] = 2;    // in the tree, but not a chapter
             var savedCh1 = (ChapterScopeState)savedRoot.FindInSubtree("ch1");
             savedCh1.pendingClaim = new PendingClaim { claimId = "y" };
-            savedCh1.pendingClaim.amounts["cash"] = 10;      // homed in ch1's subtree - valid
-            savedCh1.pendingClaim.amounts["records"] = 5;    // homed on the ancestor chain - valid
-            savedCh1.pendingClaim.amounts["merch2"] = 7;     // homed in a SIBLING chapter - unreachable
+            savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "cash", amount = 10 });    // in ch1's subtree - valid
+            savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "root", currencyId = "records", amount = 5 });   // on the ancestor chain - valid
+            savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "ch2", currencyId = "merch2", amount = 7 });     // a SIBLING chapter - unreachable
             var json = SaveSystem.Serialize(savedRoot);
 
             var newTree = new TestTree();
@@ -425,15 +443,57 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Emission order follows the Apply recursion: root, then ch1.
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'tier1' is not a chapter"));
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'merch2' is not reachable"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'merch2' at scope 'ch2'"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
 
             Assert.AreEqual(1, root.roadieAllocation["ch1"]);
             Assert.IsFalse(root.roadieAllocation.ContainsKey("tier1"));
             var ch1 = (ChapterScopeState)root.FindInSubtree("ch1");
-            Assert.AreEqual((BigNumber)10, ch1.pendingClaim.amounts["cash"]);
-            Assert.AreEqual((BigNumber)5, ch1.pendingClaim.amounts["records"]);
-            Assert.IsFalse(ch1.pendingClaim.amounts.ContainsKey("merch2"));
+            Assert.AreEqual((BigNumber)10, ClaimAmount(ch1.pendingClaim, "tier1", "cash"));
+            Assert.AreEqual((BigNumber)5, ClaimAmount(ch1.pendingClaim, "root", "records"));
+            Assert.IsFalse(HasClaimFor(ch1.pendingClaim, "merch2"));
+        }
+
+        // A claim line is addressed by HOME plus currency, so the same currency
+        // id may legally appear twice: sibling tiers each declaring their own
+        // 'cash'. A name-only key collapses those two lines into one. The third
+        // line is the one that separates the two representations by BEHAVIOUR -
+        // it points at another chapter's 'cash', a name that is perfectly valid
+        // inside ch1, so only asking which home rejects it.
+        [Test]
+        public void Same_currency_id_in_two_homes_stays_two_claim_lines()
+        {
+            var savedTree = new TestTree();
+            var tier1b = TestTree.MakeScope("tier1b");
+            TestTree.DeclareCurrency(tier1b, "cash");     // ch1's second tier, its own asset
+            savedTree.Ch1Def.children.Add(tier1b);
+            var ch2 = TestTree.MakeScope("ch2");
+            TestTree.DeclareCurrency(ch2, "cash");        // a sibling chapter, its own asset
+            savedTree.RootDef.children.Add(ch2);
+            var savedRoot = ScopeState.Build(savedTree.RootDef);
+
+            var savedCh1 = (ChapterScopeState)savedRoot.FindInSubtree("ch1");
+            savedCh1.pendingClaim = new PendingClaim { claimId = "z" };
+            savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "cash", amount = 10 });
+            savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1b", currencyId = "cash", amount = 20 });
+            savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "ch2", currencyId = "cash", amount = 7 });
+            var json = SaveSystem.Serialize(savedRoot);
+
+            var newTree = new TestTree();
+            var tier1bAgain = TestTree.MakeScope("tier1b");
+            TestTree.DeclareCurrency(tier1bAgain, "cash");
+            newTree.Ch1Def.children.Add(tier1bAgain);
+            var ch2Again = TestTree.MakeScope("ch2");
+            TestTree.DeclareCurrency(ch2Again, "cash");
+            newTree.RootDef.children.Add(ch2Again);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cash' at scope 'ch2'"));
+            Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
+
+            var ch1 = (ChapterScopeState)root.FindInSubtree("ch1");
+            Assert.AreEqual(2, ch1.pendingClaim.amounts.Count);
+            Assert.AreEqual((BigNumber)10, ClaimAmount(ch1.pendingClaim, "tier1", "cash"));
+            Assert.AreEqual((BigNumber)20, ClaimAmount(ch1.pendingClaim, "tier1b", "cash"));
         }
 
         [Test]

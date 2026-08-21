@@ -603,7 +603,7 @@ class ProducerDefinition : Definition        // id + tags, like every Definition
 ```
 
 Stats are **named, not enumerated**: `rate` (units/second — accrues idle time) and `yield`
-(units/firing — paid when something calls `FireProducer(producerId)`, never accrues). A stat means
+(units/firing — paid when something calls `FireProducer(producer)`, never accrues). A stat means
 something because a system consumes it — the tick consumes `rate`, `FireProducer` consumes `yield` —
 so a later accumulation concept is a new stat name plus its consumer; no field grows, nothing
 existing is touched. A stat no system consumes warns at load. Rate and yield are modified and
@@ -1017,7 +1017,9 @@ save. Switch-in computes
 `rate × min(elapsed, cap) × idleRate` per currency at current rates — skipped below the minimum-away
 threshold and skipped entirely while a timed event runs in that chapter — and stores it as the
 chapter's pending claim for the idle dialog; deposit on dismissal, ad-doubling at claim time.
-The claim is an exactly-once transaction — `{claimId, amounts, doubled, settled}`: the ad callback
+The claim is an exactly-once transaction — `{claimId, amounts: [{scopeId, currencyId, amount}],
+doubled, settled}`: a line names its HOME, because a claim held at the chapter addresses currencies
+homed at tiers below it, and nothing resolves a name downward. The ad callback
 marks `doubled`, deposit flips `settled`, and replaying either after an app kill is idempotent by
 `claimId`. `idle_rate`, `idle_cap`, and `game_speed` resolve through `GetMultiplier` like
 everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
@@ -1093,7 +1095,7 @@ query is what renders pressability and the feedback text, the command performs t
 refuses to run when the query says no. A reference that cannot resolve is never an answer either
 one returns - static content cannot legitimately be in that state, so those throw. The set:
 `IsOffered(rung)` / `ExecuteRung` / `TryRung(rung)`, `CanBuy` / `Buy` / `TryBuy(generator |
-upgrade)`, `FireProducer(producerId)`, `SetActiveBars(group, set)`, the event operations
+upgrade)`, `FireProducer(producer)`, `SetActiveBars(group, set)`, the event operations
 `StartEvent / CompleteEvent / AbortEvent (eventId)`, `SwitchChapter(chapterId)` (stamps
 `lastActiveUtc`, computes the pending claim, §12.9), `ClaimIdle(chapterId)` (settle the pending
 claim, §9 — the dialog's double button only *requests* the rewarded ad; marking the claim `doubled`
