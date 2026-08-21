@@ -31,15 +31,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [Serializable]
     public class LinearOnBalance : MultiplierFormula
     {
-        [DefinitionId(typeof(CurrencyDefinition))] public string currencyId;
+        public CurrencyDefinition currency;
         public double coefficient;
 
         public override BigNumber Compute(GameContext ctx) =>
-            BigNumber.One + coefficient * ctx.GetBalance(currencyId);
+            BigNumber.One + coefficient * ctx.GetBalance(currency.Id);
 
         public override void Validate(ValidationContext ctx)
         {
-            ctx.RequireChainCurrency(currencyId, "LinearOnBalance");
+            ctx.RequireOnChain(currency, "LinearOnBalance");
             if (ctx.RequireFiniteDouble(coefficient, "LinearOnBalance coefficient") && coefficient < 0)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"LinearOnBalance coefficient is {coefficient} - a career multiplier never shrinks with the fact it derives from.");

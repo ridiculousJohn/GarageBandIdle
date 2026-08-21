@@ -16,7 +16,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Firing_pays_the_yield_entries_whose_conditions_hold()
         {
             var tree = new TestTree();
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "tap_producer");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
 
             // One unconditioned cash entry; the stage_presence entry and both
             // rehearsal entries are gated shut.
@@ -25,7 +25,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             tree.Tier1.flags.Add("rehearsal_revealed");
             tree.Tier1.purchasedUpgrades.Add("stage_presence");
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "tap_producer");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
 
             AssertClose(1 + 2, tree.Tier1.balances["cash"], "cash after the latch");
             AssertClose(1, tree.Tier1.balances["rehearsal"], "rehearsal after the reveal");
@@ -36,7 +36,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Tier1.flags.Add("rehearsal_revealed");
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "tap_producer");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
 
             // The Jam declares rehearsal at yield 1 AND rate 0.5; a firing pays
             // the first and never the second.
@@ -47,7 +47,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_firing_deposits_to_the_earned_total_as_well()
         {
             var tree = new TestTree();
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "tap_producer");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
 
             AssertClose(1, tree.Tier1.earnedTotals["cash"], "earned total");
         }
@@ -57,9 +57,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Root.balances["records"] = 20;                    // records_income: x1.4 on the income tag
-            tree.Ch1.activeModifiers.Add(new ActiveModifierEntry { modifierId = "gj_tap_1", count = 1 });
+            tree.Ch1.modifierStacks["gj_tap_1"] = 1;
 
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "tap_producer");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
 
             // 1 x 1.25 (the chapter's Garage Jam stack, stage 1)
             //   x 1.4 (records, stage 2 through cash's income tag)
@@ -73,20 +73,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // the SAME firing crosses.
             var tree = new TestTree();
             var jam = TestTree.MakeDefinition<ProducerDefinition>("crossing_jam");
-            jam.produces.Add(TestTree.Entry("cash", Stat.Yield, 100));
-            jam.produces.Add(TestTree.Entry("rehearsal", Stat.Yield, 5,
-                new EarnedTotalAtLeast { currencyId = "cash", threshold = 100 }));
+            jam.produces.Add(TestTree.Entry(tree.Cash, Stat.Yield, 100));
+            jam.produces.Add(TestTree.Entry(tree.Rehearsal, Stat.Yield, 5,
+                new EarnedTotalAtLeast { currency = tree.Cash, threshold = 100 }));
             tree.Tier1Def.producers.Add(jam);
-            tree.Defs.Add(jam);
 
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "crossing_jam");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), jam);
 
             // The cash deposit crosses 100, and the sibling output must not see
             // it: no output can flip another output's condition mid-fire.
             AssertClose(100, tree.Tier1.balances["cash"], "cash");
             AssertClose(0, tree.Tier1.balances["rehearsal"], "rehearsal on the crossing fire");
 
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "crossing_jam");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), jam);
             AssertClose(5, tree.Tier1.balances["rehearsal"], "rehearsal on the next fire");
         }
 
@@ -98,27 +97,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The deposit and the conditions belong to tier1, where the producer
             // is declared, whatever the caller's own scope holds.
             tree.Tier1.purchasedUpgrades.Add("stage_presence");
-            Producer.FireProducer(tree.Ctx(tree.Tier1), "tap_producer");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
 
             AssertClose(2, tree.Tier1.balances["cash"], "cash");
-        }
-
-        // The lookup walks OUTWARD, so a caller above the declaring scope cannot
-        // reach the producer - the same rule every read and write obeys.
-        [Test]
-        public void Firing_from_above_the_declaring_scope_throws()
-        {
-            var tree = new TestTree();
-            Assert.Throws<System.InvalidOperationException>(
-                () => Producer.FireProducer(tree.Ctx(tree.Root), "tap_producer"));
-        }
-
-        [Test]
-        public void An_unknown_producer_throws()
-        {
-            var tree = new TestTree();
-            Assert.Throws<System.InvalidOperationException>(
-                () => Producer.FireProducer(tree.Ctx(tree.Tier1), "no_such_producer"));
         }
 
         [Test]
@@ -126,11 +107,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             var orphan = TestTree.MakeDefinition<ProducerDefinition>("orphan_producer");
-            orphan.produces.Add(TestTree.Entry("cash", Stat.Yield, 5));
-            tree.Defs.Add(orphan);                                 // content exists, no scope declares it
+            orphan.produces.Add(TestTree.Entry(tree.Cash, Stat.Yield, 5));   // authored, but no scope declares it
 
             Assert.Throws<System.InvalidOperationException>(
-                () => Producer.FireProducer(tree.Ctx(tree.Tier1), "orphan_producer"));
+                () => Producer.FireProducer(tree.Ctx(tree.Tier1), orphan));
         }
     }
 }

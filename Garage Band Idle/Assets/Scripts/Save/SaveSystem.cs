@@ -92,16 +92,11 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // onto it. Unknown ids from removed content are dropped with a warning;
         // content added since the save starts fresh. False on any structural
         // failure - malformed json, checksum mismatch, unmigratable version.
-        public static bool TryDeserialize(string json, ScopeDefinition rootDefinition, IDefinitionSource defs, out RootScopeState root)
+        public static bool TryDeserialize(string json, ScopeDefinition rootDefinition, out RootScopeState root)
         {
             root = null;
-            // A missing definition source is a CODE bug, not a bad save: the
-            // drops that resolve global ids cannot run, and a half-filtered tree
-            // must never reach the game. Thrown ahead of the catch below, so it
-            // never presents as "couldn't read your save" when both files were
-            // perfectly readable.
-            if (defs == null)
-                throw new ArgumentNullException(nameof(defs), "SaveSystem: loading requires a definition source.");
+            if (rootDefinition == null)
+                throw new ArgumentNullException(nameof(rootDefinition), "SaveSystem: loading requires the content tree.");
             try
             {
                 var envelope = JObject.Parse(json);
@@ -140,7 +135,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 }
 
                 root = ScopeState.Build(rootDefinition);
-                Apply(rootNode, root, defs);
+                Apply(rootNode, root);
                 return true;
             }
             catch (Exception e)
@@ -151,12 +146,12 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
         }
 
-        private static void Apply(SaveNode node, ScopeState state, IDefinitionSource defs)
+        private static void Apply(SaveNode node, ScopeState state)
         {
             if (node.facts != null)
             {
                 var payload = ReadFacts(node.facts, state);
-                FilterToDeclared(payload, state.Definition, defs);
+                FilterToDeclared(payload, state);
                 FilterTreeScopedFacts(payload, state);
                 state.ApplyLoadedFacts(payload);
             }
@@ -180,7 +175,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     Debug.LogWarning($"SaveSystem: saved scope '{childNode.scopeId}' no longer exists - dropped.");
                     continue;
                 }
-                Apply(childNode, childState, defs);
+                Apply(childNode, childState);
             }
             // A definition child with no saved node keeps its freshly built
             // state - content added since the save simply starts new.
@@ -273,14 +268,16 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // Unknown ids from removed content are dropped with a warning (12.10).
         // Filtered here: the families a scope DECLARES (currencies, flags,
         // triggers, generators, upgrades) plus the modifier stacks, whose ids
-        // name global content rather than a scope declaration - which is why the
-        // definition source threads all the way in. Pending-claim currencies and
+        // name declared content too - a modifier is declared on a scope, and a
+        // stack's id resolves by walking outward from the scope holding it.
+        // Pending-claim currencies and
         // roadie allocation validate against the tree instead (below). Bar and
         // group ids, event ids, buff ids, and song ids gain their filters WITH
         // their definition families - the same incremental contract as the
         // validation pass.
-        private static void FilterToDeclared(ScopeFacts facts, ScopeDefinition definition, IDefinitionSource defs)
+        private static void FilterToDeclared(ScopeFacts facts, ScopeState state)
         {
+            var definition = state.Definition;
             DropUndeclaredKeys(facts.balances, definition, "balance");
             DropUndeclaredKeys(facts.earnedTotals, definition, "earned total");
             facts.flags.RemoveWhere(flagId =>
@@ -339,24 +336,35 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     facts.generatorCounts.Remove(key);
             }
 
-            // Modifier stacks point at global content, so the definition source
-            // is what resolves them. A nonpositive count is not a stack -
-            // RemoveModifier deletes the entry at zero, so one on disk is
+            // A stack is a count of a modifier declared at this scope or an
+            // ancestor - the same walk the read does. A nonpositive count is not
+            // a stack: RemoveModifier deletes the key at zero, so one on disk is
             // tampering or a stale write.
-            facts.activeModifiers.RemoveAll(entry =>
+            List<string> staleStacks = null;
+            foreach (var pair in facts.modifierStacks)
             {
-                if (entry == null)
-                    return true;
-                if (entry.count <= 0)
-                {
-                    Debug.LogWarning($"SaveSystem: modifier stack '{entry.modifierId}' has count {entry.count} - dropped.");
-                    return true;
-                }
-                if (defs.Get<Economy.ModifierDefinition>(entry.modifierId) != null)
-                    return false;
-                Debug.LogWarning($"SaveSystem: modifier '{entry.modifierId}' has no ModifierDefinition - dropped.");
-                return true;
-            });
+                if (pair.Value <= 0)
+                    Debug.LogWarning($"SaveSystem: modifier stack '{pair.Key}' has count {pair.Value} - dropped.");
+                else if (!DeclaresModifierOnChain(state, pair.Key))
+                    Debug.LogWarning($"SaveSystem: modifier '{pair.Key}' is not declared on the chain from '{state.ScopeId}' - dropped.");
+                else
+                    continue;
+                (staleStacks ??= new List<string>()).Add(pair.Key);
+            }
+            if (staleStacks != null)
+            {
+                foreach (var key in staleStacks)
+                    facts.modifierStacks.Remove(key);
+            }
+        }
+
+        private static bool DeclaresModifierOnChain(ScopeState state, string modifierId)
+        {
+            for (var node = state; node != null; node = node.Parent)
+                foreach (var modifier in node.Definition.modifiers)
+                    if (modifier != null && modifier.Id == modifierId)
+                        return true;
+            return false;
         }
 
         private static void DropUndeclaredKeys(Dictionary<string, BigNumber> map, ScopeDefinition definition, string label)
@@ -397,7 +405,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // The backup only ever receives content that VERIFIES: a corrupt
         // primary (the recovery case) is deleted, never rotated over a good
         // backup - File.Replace would otherwise install it as the new .bak.
-        public static void WriteAtomic(string path, RootScopeState root, IDefinitionSource defs)
+        public static void WriteAtomic(string path, RootScopeState root)
         {
             var json = Serialize(root);
             var tmp = path + ".tmp";
@@ -410,7 +418,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 throw new IOException("SaveSystem: written save failed verification - previous save left untouched.");
             }
 
-            if (FileLoadable(path, root.Definition, defs))
+            if (FileLoadable(path, root.Definition))
             {
                 File.Replace(tmp, path, BackupPath(path));
             }
@@ -432,16 +440,16 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // Failed, because "couldn't read your save" must never be answered by
         // starting a new game. (File.Exists returns false for ALL of those, so
         // it decides nothing here.)
-        public static LoadOutcome LoadFromDisk(string path, ScopeDefinition rootDefinition, IDefinitionSource defs, out RootScopeState root)
+        public static LoadOutcome LoadFromDisk(string path, ScopeDefinition rootDefinition, out RootScopeState root)
         {
             root = null;
 
             var primaryRead = TryRead(path, out var primaryJson);
-            if (primaryRead == ReadResult.Ok && TryDeserialize(primaryJson, rootDefinition, defs, out root))
+            if (primaryRead == ReadResult.Ok && TryDeserialize(primaryJson, rootDefinition, out root))
                 return LoadOutcome.LoadedPrimary;
 
             var backupRead = TryRead(BackupPath(path), out var backupJson);
-            if (backupRead == ReadResult.Ok && TryDeserialize(backupJson, rootDefinition, defs, out root))
+            if (backupRead == ReadResult.Ok && TryDeserialize(backupJson, rootDefinition, out root))
             {
                 Debug.LogWarning("SaveSystem: primary save unusable - loaded the backup.");
                 return LoadOutcome.LoadedBackup;
@@ -479,18 +487,18 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
         }
 
-        private static bool TryLoadFile(string path, ScopeDefinition rootDefinition, IDefinitionSource defs, out RootScopeState root)
+        private static bool TryLoadFile(string path, ScopeDefinition rootDefinition, out RootScopeState root)
         {
             root = null;
-            return TryRead(path, out var json) == ReadResult.Ok && TryDeserialize(json, rootDefinition, defs, out root);
+            return TryRead(path, out var json) == ReadResult.Ok && TryDeserialize(json, rootDefinition, out root);
         }
 
         // Backup eligibility equals LOADABILITY, not just envelope integrity: a
         // checksum-valid but unusable primary (newer schema, missing migration,
         // wrong root, malformed payload) must never rotate over the known-good
         // backup. Verifying a bad file emits its diagnostics - honest tracing.
-        private static bool FileLoadable(string path, ScopeDefinition rootDefinition, IDefinitionSource defs) =>
-            TryLoadFile(path, rootDefinition, defs, out _);
+        private static bool FileLoadable(string path, ScopeDefinition rootDefinition) =>
+            TryLoadFile(path, rootDefinition, out _);
 
         // Structural check only - parse and checksum, no tree application. Used
         // to verify a write before it replaces the previous save.

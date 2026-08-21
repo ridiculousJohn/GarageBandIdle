@@ -29,7 +29,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [CreateAssetMenu(menuName = "Garage Band Idle/Bar")]
     public class BarDefinition : Definition
     {
-        [DefinitionId(typeof(BarGroupDefinition))] public string groupId;
         public BigNumber fillAmount;
         public BigNumber fillRate;          // this bar's own max fill speed (units/sec)
         public bool repeating;              // fill -> fire onComplete -> reset to 0 -> go again

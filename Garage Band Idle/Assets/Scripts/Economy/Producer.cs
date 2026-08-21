@@ -26,7 +26,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // source's declaring scope for stage 1, the currency's home for stage 2.
         // Career formulas compute against this context, per the ruling on
         // MultiplierFormula.
-        public static BigNumber GetMultiplier(GameContext origin, Definition owner, string currencyId, string stat)
+        public static BigNumber GetMultiplier(GameContext origin, Definition owner, CurrencyDefinition currency, string stat)
         {
             if (owner == null)
                 return BigNumber.One;
@@ -42,22 +42,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     if (upgrade == null || !node.purchasedUpgrades.Contains(upgrade.Id))
                         continue;
                     foreach (var effect in upgrade.effects)
-                        if (Matches(origin.Defs, effect.target, effect.currencyId, effect.stat, owner, currencyId, stat))
+                        if (Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
                             product *= effect.multiplier;
                 }
 
                 // Granted modifier stacks: the stored count scales the effect by
                 // the definition's own stacking kind (design doc 12.5).
-                foreach (var entry in node.activeModifiers)
+                foreach (var pair in node.modifierStacks)
                 {
-                    if (entry == null || entry.count <= 0)
-                        continue;
-                    var modifier = origin.Defs.Get<ModifierDefinition>(entry.modifierId);
-                    if (modifier == null)
-                        continue;
+                    // The stack is a count at this scope; the definition is
+                    // resolved OUTWARD from here, since a chapter's modifier can
+                    // be granted anywhere inside it (design doc 8.2/12.5).
+                    var modifier = FindModifier(node, pair.Key);
                     foreach (var effect in modifier.effects)
-                        if (Matches(origin.Defs, effect.target, effect.currencyId, effect.stat, owner, currencyId, stat))
-                            product *= Stacked(effect.multiplier, entry.count, modifier.stacking);
+                        if (Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
+                            product *= Stacked(effect.multiplier, pair.Value, modifier.stacking);
                 }
 
                 // Career effects declared here, computed against the ORIGIN
@@ -66,7 +65,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 {
                     if (career == null || career.formula == null)
                         continue;
-                    if (Matches(origin.Defs, career.target, career.currencyId, career.stat, owner, currencyId, stat))
+                    if (Matches(career.target, career.currencyId, career.stat, owner, currency, stat))
                         product *= career.formula.Compute(origin);
                 }
             }
@@ -85,19 +84,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // one per currency, and a currency stays out by not carrying the tag -
         // which is how 8.2 already states the fans rule ("the fan rate must
         // never carry a roadie-targeted tag").
-        private static bool Matches(IDefinitionSource defs, string target, string effectCurrencyId, string effectStat,
-                                    Definition owner, string currencyId, string stat)
+        private static bool Matches(string target, string effectCurrencyId, string effectStat,
+                                    Definition owner, CurrencyDefinition currency, string stat)
         {
             if (string.IsNullOrEmpty(target))
                 return false;
             if (target != owner.Id && !owner.HasTag(target))
                 return false;
-            if (!string.IsNullOrEmpty(effectCurrencyId) && effectCurrencyId != currencyId)
-            {
-                var currency = defs.Get<CurrencyDefinition>(currencyId);
-                if (currency == null || !currency.HasTag(effectCurrencyId))
-                    return false;
-            }
+            if (!string.IsNullOrEmpty(effectCurrencyId) && effectCurrencyId != currency.Id
+                && !currency.HasTag(effectCurrencyId))
+                return false;
             if (!string.IsNullOrEmpty(effectStat) && effectStat != stat)
                 return false;
             return true;
@@ -135,12 +131,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // the stage-1 product. Conditions are judged in the declaring scope.
         private static BigNumber SourceTerm(GameContext declaringCtx, Definition source,
                                             List<ProducesEntry> entries, int countScale,
-                                            string currencyId, string stat)
+                                            CurrencyDefinition currency, string stat)
         {
             var baseSum = BigNumber.Zero;
             foreach (var entry in entries)
             {
-                if (entry == null || entry.currencyId != currencyId || entry.stat != stat)
+                if (entry == null || entry.currency != currency || entry.stat != stat)
                     continue;
                 if (!entry.Holds(declaringCtx))
                     continue;
@@ -148,41 +144,37 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
             if (baseSum == BigNumber.Zero)
                 return BigNumber.Zero;      // nothing contributes, and no factor changes that
-            return baseSum * countScale * GetMultiplier(declaringCtx, source, currencyId, stat);
+            return baseSum * countScale * GetMultiplier(declaringCtx, source, currency, stat);
         }
 
         // The stage-2 product for one currency, gathered from its home outward.
         // The currency's own definition is the owner, so its tags match - which
         // is how the income tag carries every career effect (design doc 8.2).
-        private static BigNumber CurrencyStage(GameContext atHome, string currencyId, string stat)
-        {
-            var currency = atHome.Defs.Get<CurrencyDefinition>(currencyId)
-                ?? throw new InvalidOperationException($"No CurrencyDefinition with id '{currencyId}'.");
-            return GetMultiplier(atHome, currency, currencyId, stat);
-        }
+        private static BigNumber CurrencyStage(GameContext atHome, CurrencyDefinition currency, string stat) =>
+            GetMultiplier(atHome, currency, currency, stat);
 
         // The rate one subtree pays into one currency, per second of production
         // time. Enumerates the subtree's declared producers and generators,
         // applies both stages, and sums. The tick and the idle claim consume
         // this; the subtree root is explicit because "the foreground chapter" is
         // a session concept, not an economy one.
-        public static BigNumber GetRate(ScopeState subtreeRoot, IDefinitionSource defs, DateTime nowUtc, string currencyId)
+        public static BigNumber GetRate(ScopeState subtreeRoot, DateTime nowUtc, CurrencyDefinition currency)
         {
             var sum = BigNumber.Zero;
             ScopeState home = null;
             Accumulate(subtreeRoot);
             if (sum == BigNumber.Zero)
                 return BigNumber.Zero;
-            return sum * CurrencyStage(new GameContext(home, defs, nowUtc), currencyId, Stat.Rate);
+            return sum * CurrencyStage(new GameContext(home, nowUtc), currency, Stat.Rate);
 
             void Accumulate(ScopeState node)
             {
-                var declaringCtx = new GameContext(node, defs, nowUtc);
+                var declaringCtx = new GameContext(node, nowUtc);
                 foreach (var producer in node.Definition.producers)
                 {
                     if (producer == null)
                         continue;
-                    Add(node, SourceTerm(declaringCtx, producer, producer.produces, 1, currencyId, Stat.Rate));
+                    Add(node, SourceTerm(declaringCtx, producer, producer.produces, 1, currency, Stat.Rate));
                 }
                 foreach (var generator in node.Definition.generators)
                 {
@@ -190,7 +182,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                         continue;
                     if (!node.generatorCounts.TryGetValue(generator.Id, out var owned) || owned <= 0)
                         continue;
-                    Add(node, SourceTerm(declaringCtx, generator, generator.produces, owned, currencyId, Stat.Rate));
+                    Add(node, SourceTerm(declaringCtx, generator, generator.produces, owned, currency, Stat.Rate));
                 }
                 foreach (var child in node.Children)
                     Accumulate(child);
@@ -205,7 +197,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 if (term == BigNumber.Zero)
                     return;
                 sum += term;
-                home ??= FindCurrencyHome(node, currencyId);
+                home ??= FindCurrencyHome(node, currency);
             }
         }
 
@@ -213,52 +205,58 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // - conditions and amounts judged together, multipliers included - and
         // only then deposited, so no output can flip a sibling output's
         // condition mid-fire (design doc 12.2).
-        public static void FireProducer(GameContext ctx, string producerId)
+        public static void FireProducer(GameContext ctx, ProducerDefinition producer)
         {
-            var producer = ctx.Defs.Get<ProducerDefinition>(producerId)
-                ?? throw new InvalidOperationException($"FireProducer: no ProducerDefinition with id '{producerId}'.");
             var declaring = DeclaringScope(ctx.Scope, producer, s => s.producers);
             var declaringCtx = ctx.Rebase(declaring);
 
             // Every currency this firing pays, in authored order, resolved
             // before any deposit lands.
-            var currencies = new List<string>();
+            var currencies = new List<CurrencyDefinition>();
             foreach (var entry in producer.produces)
-                if (entry != null && entry.stat == Stat.Yield && !string.IsNullOrEmpty(entry.currencyId) &&
-                    !currencies.Contains(entry.currencyId))
-                    currencies.Add(entry.currencyId);
+                if (entry != null && entry.stat == Stat.Yield && entry.currency != null &&
+                    !currencies.Contains(entry.currency))
+                    currencies.Add(entry.currency);
 
             var amounts = new List<BigNumber>(currencies.Count);
-            foreach (var currencyId in currencies)
+            foreach (var currency in currencies)
             {
-                var term = SourceTerm(declaringCtx, producer, producer.produces, 1, currencyId, Stat.Yield);
+                var term = SourceTerm(declaringCtx, producer, producer.produces, 1, currency, Stat.Yield);
                 if (term == BigNumber.Zero)
                 {
                     amounts.Add(BigNumber.Zero);
                     continue;
                 }
-                var home = FindCurrencyHome(declaring, currencyId);
-                amounts.Add(term * CurrencyStage(declaringCtx.Rebase(home), currencyId, Stat.Yield));
+                var home = FindCurrencyHome(declaring, currency);
+                amounts.Add(term * CurrencyStage(declaringCtx.Rebase(home), currency, Stat.Yield));
             }
 
             for (var i = 0; i < currencies.Count; i++)
                 if (amounts[i] != BigNumber.Zero)
-                    declaringCtx.Deposit(currencies[i], amounts[i]);
+                    declaringCtx.Deposit(currencies[i].Id, amounts[i]);
         }
 
         // ---- tree lookups ----
 
-        // The currency's home: the first scope on the chain OUTWARD from here
-        // that holds the key. Placement is the whole lookup - a currency off
-        // this chain is content the validator refuses, so failing to find one
-        // is a bug, not a branch.
-        internal static ScopeState FindCurrencyHome(ScopeState from, string currencyId)
+        // The currency's home: the first scope OUTWARD from here that DECLARES
+        // this exact asset. Placement is the whole lookup - a currency off this
+        // chain is content the validator refuses, so failing to find one is a
+        // bug, not a branch. Matching the id instead would answer with a
+        // same-named currency from another chapter.
+        internal static ScopeState FindCurrencyHome(ScopeState from, CurrencyDefinition currency) =>
+            DeclaringScope(from, currency, d => d.declaredCurrencies);
+
+        // A granted stack names its modifier by id, because the save is ids;
+        // the definition is found by walking outward to the scope declaring it,
+        // which is the same lookup every other reference gets.
+        internal static ModifierDefinition FindModifier(ScopeState from, string modifierId)
         {
             for (var node = from; node != null; node = node.Parent)
-                if (node.balances.ContainsKey(currencyId))
-                    return node;
+                foreach (var modifier in node.Definition.modifiers)
+                    if (modifier != null && modifier.Id == modifierId)
+                        return modifier;
             throw new InvalidOperationException(
-                $"No scope on the chain from '{from.ScopeId}' holds currency '{currencyId}'.");
+                $"No scope on the chain from '{from.ScopeId}' declares modifier '{modifierId}'.");
         }
 
         // Declaration is ownership (design doc 12.3): a definition's declaring

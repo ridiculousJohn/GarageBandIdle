@@ -2,75 +2,80 @@ using System;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // The one buy entry point (design doc 12.11's TryBuy(generator | upgrade)).
-    // Ids are unique tree-wide, so the id itself picks the path. Every leg is
-    // fail-closed: the domain owns the gate, never the UI's visibility, and an
-    // unauthored gate is closed rather than open. The command boundary
-    // (foreground-subtree rejection) layers on with GameSession.
+    // The buy entry points (design doc 12.11). Every leg is fail-closed: the
+    // domain owns the gate, never the UI's visibility, and an unauthored gate is
+    // closed rather than open. The command boundary (foreground-subtree
+    // rejection) layers on with GameSession.
     //
-    // CanBuy answers the mutable-state question - gate met, affordable, not
-    // already owned - and Buy performs the purchase; TryBuy is the convenience
-    // wrapper for a caller that does not need the reason. Anything CONTENT
-    // derived - an id resolving to nothing, no declaring scope on the chain, a
-    // nonpositive computed cost - throws from either path: static content
-    // cannot legitimately be in that state, and reporting it as "no" hides a
-    // bug behind an answer the player's state could have produced.
+    // Can* answers the mutable-state question - gate met, affordable, not
+    // already owned - and Buy performs the purchase; TryBuy is the wrapper for a
+    // caller that does not need the reason. Content-derived faults throw from
+    // either path: static content cannot legitimately be in that state, and
+    // reporting one as "no" hides a bug behind an answer the player's own state
+    // could have produced.
     public static class Purchasing
     {
-        public static bool CanBuy(GameContext ctx, string definitionId)
+        public static bool CanBuy(GameContext ctx, GeneratorDefinition generator)
         {
-            var generator = ctx.Defs.Get<GeneratorDefinition>(definitionId);
-            if (generator != null)
-            {
-                var declaringCtx = ctx.Rebase(Producer.DeclaringScope(ctx.Scope, generator, s => s.generators));
-                return generator.IsAvailable(declaringCtx)
-                    && declaringCtx.CanSpend(generator.costCurrencyId, CostOf(generator, declaringCtx));
-            }
-
-            var upgrade = ctx.Defs.Get<UpgradeDefinition>(definitionId)
-                ?? throw new InvalidOperationException($"CanBuy: '{definitionId}' resolves to no generator or upgrade.");
-            var upgradeCtx = ctx.Rebase(Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades));
-            return upgrade.IsOffered(upgradeCtx)
-                && !upgradeCtx.Scope.purchasedUpgrades.Contains(upgrade.Id)   // the latch IS the one-shot; a reset re-arms it
-                && upgradeCtx.CanSpend(upgrade.costCurrencyId, upgrade.cost);
+            var declaringCtx = ctx.Rebase(Producer.DeclaringScope(ctx.Scope, generator, s => s.generators));
+            return generator.IsAvailable(declaringCtx)
+                && declaringCtx.CanSpend(generator.costCurrency.Id, CostOf(generator, declaringCtx));
         }
 
-        // Performs the purchase. Calling this when CanBuy answers false is a
-        // caller bug, so the guard throws rather than no-oping.
-        public static void Buy(GameContext ctx, string definitionId)
+        public static bool CanBuy(GameContext ctx, UpgradeDefinition upgrade)
         {
-            if (!CanBuy(ctx, definitionId))
-                throw new InvalidOperationException($"Buy: '{definitionId}' is not currently buyable - ask CanBuy first.");
+            var declaringCtx = ctx.Rebase(Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades));
+            return upgrade.IsOffered(declaringCtx)
+                && !declaringCtx.Scope.purchasedUpgrades.Contains(upgrade.Id)   // the latch IS the one-shot; a reset re-arms it
+                && declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost);
+        }
 
-            var generator = ctx.Defs.Get<GeneratorDefinition>(definitionId);
-            if (generator != null)
-            {
-                var declaring = Producer.DeclaringScope(ctx.Scope, generator, s => s.generators);
-                var declaringCtx = ctx.Rebase(declaring);
-                declaring.generatorCounts.TryGetValue(generator.Id, out var owned);
-                declaringCtx.Spend(generator.costCurrencyId, CostOf(generator, declaringCtx));
-                declaring.generatorCounts[generator.Id] = owned + 1;
-                return;
-            }
+        // Performs the purchase. Calling either when Can answers false is a
+        // caller bug, so the guard throws rather than no-oping.
+        public static void Buy(GameContext ctx, GeneratorDefinition generator)
+        {
+            var declaring = Producer.DeclaringScope(ctx.Scope, generator, s => s.generators);
+            var declaringCtx = ctx.Rebase(declaring);
+            var cost = CostOf(generator, declaringCtx);
+            if (!generator.IsAvailable(declaringCtx) || !declaringCtx.CanSpend(generator.costCurrency.Id, cost))
+                throw new InvalidOperationException($"Buy: generator '{generator.Id}' is not currently buyable - ask CanBuy first.");
 
-            var upgrade = ctx.Defs.Get<UpgradeDefinition>(definitionId);
-            var upgradeScope = Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades);
-            var upgradeCtx = ctx.Rebase(upgradeScope);
-            upgradeCtx.Spend(upgrade.costCurrencyId, upgrade.cost);
+            declaring.generatorCounts.TryGetValue(generator.Id, out var owned);
+            declaringCtx.Spend(generator.costCurrency.Id, cost);
+            declaring.generatorCounts[generator.Id] = owned + 1;
+        }
+
+        public static void Buy(GameContext ctx, UpgradeDefinition upgrade)
+        {
+            var declaring = Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades);
+            var declaringCtx = ctx.Rebase(declaring);
+            if (!upgrade.IsOffered(declaringCtx) || declaring.purchasedUpgrades.Contains(upgrade.Id)
+                || !declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost))
+                throw new InvalidOperationException($"Buy: upgrade '{upgrade.Id}' is not currently buyable - ask CanBuy first.");
+
+            declaringCtx.Spend(upgrade.costCurrency.Id, upgrade.cost);
 
             // Latch before payload: the effects are live for anything the actions
             // read, and a payload resetting the latch's own scope is refused at
             // load (set-then-wiped) rather than silently re-armed here.
-            upgradeScope.purchasedUpgrades.Add(upgrade.Id);
+            declaring.purchasedUpgrades.Add(upgrade.Id);
             foreach (var action in upgrade.actions)
-                action?.Execute(upgradeCtx);
+                action?.Execute(declaringCtx);
         }
 
-        public static bool TryBuy(GameContext ctx, string definitionId)
+        public static bool TryBuy(GameContext ctx, GeneratorDefinition generator)
         {
-            if (!CanBuy(ctx, definitionId))
+            if (!CanBuy(ctx, generator))
                 return false;
-            Buy(ctx, definitionId);
+            Buy(ctx, generator);
+            return true;
+        }
+
+        public static bool TryBuy(GameContext ctx, UpgradeDefinition upgrade)
+        {
+            if (!CanBuy(ctx, upgrade))
+                return false;
+            Buy(ctx, upgrade);
             return true;
         }
 

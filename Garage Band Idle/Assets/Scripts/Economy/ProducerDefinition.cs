@@ -27,7 +27,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [Serializable]
     public class ProducesEntry
     {
-        [DefinitionId(typeof(CurrencyDefinition))] public string currencyId;
+        public CurrencyDefinition currency;
         public string stat;
         public BigNumber value;
         [SerializeReference, SubclassPicker] public Condition condition;

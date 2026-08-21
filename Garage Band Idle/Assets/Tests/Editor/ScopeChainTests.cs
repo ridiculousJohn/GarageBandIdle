@@ -31,12 +31,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)42, tree.Ctx(tree.Tier1).GetBalance("records"));
         }
 
+        // Declared currencies get their keys when the tree is built, so a
+        // missing key means the read addressed a currency off this chain - a
+        // wrong number the caller could not tell from a real one.
         [Test]
-        public void Balance_absent_everywhere_reads_zero()
+        public void Balance_of_a_currency_off_the_chain_throws()
         {
             var tree = new TestTree();
 
-            Assert.AreEqual(BigNumber.Zero, tree.Ctx(tree.Tier1).GetBalance("no_such_currency"));
+            Assert.Throws<System.InvalidOperationException>(
+                () => tree.Ctx(tree.Tier1).GetBalance("no_such_currency"));
+            Assert.Throws<System.InvalidOperationException>(
+                () => tree.Ctx(tree.Root).GetEarnedTotal("cash"));   // homed at tier1, below root
         }
 
         [Test]
@@ -95,5 +101,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0, tree.Ctx(tree.Ch1).GetOwnedCount("drummer"));   // counts never leak upward
             Assert.IsTrue(tree.Ctx(tree.Tier1).IsUpgradePurchased("some_chapter_upgrade"));
         }
+
     }
 }

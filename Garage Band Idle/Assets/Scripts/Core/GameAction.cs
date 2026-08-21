@@ -27,24 +27,24 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class AddCurrency : GameAction
     {
-        [DefinitionId(typeof(Economy.CurrencyDefinition))] public List<string> currencyIds = new();
+        public List<Economy.CurrencyDefinition> currencies = new();
         public BigNumber amount;
         [SerializeReference, SubclassPicker] public PayoutFormula formula;
 
         public override void Execute(GameContext ctx)
         {
             BigNumber value = formula != null ? formula.Compute(ctx) : amount;
-            foreach (var currencyId in currencyIds)
-                ctx.Deposit(currencyId, value);
+            foreach (var currency in currencies)
+                ctx.Deposit(currency.Id, value);
         }
 
         public override void Validate(ValidationContext ctx)
         {
-            foreach (var currencyId in currencyIds)
+            foreach (var currency in currencies)
             {
-                var home = ctx.RequireChainCurrency(currencyId, "AddCurrency");
+                var home = ctx.RequireOnChain(currency, "AddCurrency");
                 if (home != null)
-                    ctx.RecordFactWrite($"currency '{currencyId}'", home);
+                    ctx.RecordFactWrite($"currency '{currency.Id}'", home);
             }
             // A grant is never negative: Deposit moves the earned total too, and
             // section 2's strobe-proofing stands on that only ever rising.
@@ -64,20 +64,23 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Validate(ValidationContext ctx)
         {
+            // The write walks OUTWARD, so the home is whatever the acting scope's
+            // own chain declares. A flag of the same name on another chain is a
+            // different flag; finding it would be the tree-wide search the
+            // runtime never performs - including one in a scope this action
+            // encloses, which the acting scope could never read either (12.3).
             var home = ctx.FlagHome(flagId);
             if (home == null)
             {
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"SetFlag names flag '{flagId}', which no scope declares (12.12).");
+                var elsewhere = ctx.AnyScopeDeclaringFlag(flagId);
+                if (elsewhere == null)
+                    ctx.AddError(ValidationCheck.UnresolvedReference, $"SetFlag names flag '{flagId}', which no scope declares (12.12).");
+                else
+                    ctx.AddError(ValidationCheck.ChainReach, $"SetFlag writes flag '{flagId}' homed at '{elsewhere.Id}', which is not on the chain from '{ctx.ActingScope.Id}' (12.12).");
                 return;
             }
             ctx.RecordFlagSetter(flagId);
-            // The write walks OUTWARD, so a home off this chain can never be
-            // reached - including one in a scope this action encloses, which is
-            // also a flag the acting scope could never read (12.3).
-            if (!ctx.OnActingChain(home))
-                ctx.AddError(ValidationCheck.ChainReach, $"SetFlag writes flag '{flagId}' homed at '{home.Id}', which is not on the chain from '{ctx.ActingScope.Id}' (12.12).");
-            else
-                ctx.RecordFactWrite($"flag '{flagId}'", home);
+            ctx.RecordFactWrite($"flag '{flagId}'", home);
         }
     }
 
@@ -88,48 +91,46 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class AddModifier : GameAction
     {
-        public string scopeId;
-        [DefinitionId(typeof(Economy.ModifierDefinition))] public string modifierId;
+        public ScopeDefinition scope;
+        public Economy.ModifierDefinition modifier;
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindOnChain(scopeId)
+            var target = ctx.Scope.FindOnChain(scope.Id)
                 ?? throw new InvalidOperationException(
-                    $"AddModifier: scope '{scopeId}' is not on the chain from '{ctx.Scope.ScopeId}'.");
+                    $"AddModifier: scope '{scope.Id}' is not on the chain from '{ctx.Scope.ScopeId}'.");
 
-            var entry = target.activeModifiers.Find(e => e.modifierId == modifierId);
-            if (entry == null)
-            {
-                target.activeModifiers.Add(new ActiveModifierEntry { modifierId = modifierId, count = 1 });
-                return;
-            }
-
-            var definition = ctx.Defs.Get<Economy.ModifierDefinition>(modifierId);
-            if (definition == null || definition.stacking == Economy.StackingKind.Replace)
-                return;                       // re-grant keeps count at 1
-            entry.count++;                    // Linear / Multiply: the name picks the growth formula on read
+            // Replace holds a re-grant at one; Linear and Multiply count up, and
+            // the name picks the growth formula the read applies.
+            target.modifierStacks.TryGetValue(modifier.Id, out var count);
+            target.modifierStacks[modifier.Id] =
+                modifier.stacking == Economy.StackingKind.Replace ? 1 : count + 1;
         }
 
         public override void Validate(ValidationContext ctx)
         {
-            var resolved = ctx.Defs.Get<Economy.ModifierDefinition>(modifierId) != null;
-            if (!resolved)
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"AddModifier references unknown modifier '{modifierId}'.");
-            var target = ctx.FindScope(scopeId);
+            if (modifier == null)
+            {
+                ctx.AddError(ValidationCheck.NullEntry, "AddModifier names no modifier.");
+                return;
+            }
+            var target = ctx.FindScope(scope);
             if (target == null)
             {
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"AddModifier targets unknown scope '{scopeId}'.");
+                ctx.AddError(ValidationCheck.NullEntry, $"AddModifier granting '{modifier.Id}' names no target scope.");
                 return;
             }
             if (!ctx.OnActingChain(target))
             {
-                ctx.AddError(ValidationCheck.ScopeReach, $"AddModifier may target the acting scope or an ancestor (grants live outward, 12.12); '{scopeId}' is neither from '{ctx.ActingScope.Id}'.");
+                ctx.AddError(ValidationCheck.ScopeReach, $"AddModifier may target the acting scope or an ancestor (grants live outward, 12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
                 return;
             }
-            if (!resolved)
-                return;
-            ctx.RecordModifierGrant(modifierId, target);
-            ctx.RecordFactWrite($"modifier '{modifierId}' stack", target);
+            // The stack lives at the target, and the read resolves it outward
+            // from there - so the modifier must be declared at the target or
+            // above it, or the grant would contribute nothing.
+            ctx.RequireDeclaredFor(target, modifier, "AddModifier");
+            ctx.RecordModifierGrant(modifier, target);
+            ctx.RecordFactWrite($"modifier '{modifier.Id}' stack", target);
         }
     }
 
@@ -138,72 +139,61 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class RemoveModifier : GameAction
     {
-        public string scopeId;
-        [DefinitionId(typeof(Economy.ModifierDefinition))] public string modifierId;
+        public ScopeDefinition scope;
+        public Economy.ModifierDefinition modifier;
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindOnChain(scopeId)
+            var target = ctx.Scope.FindOnChain(scope.Id)
                 ?? throw new InvalidOperationException(
-                    $"RemoveModifier: scope '{scopeId}' is not on the chain from '{ctx.Scope.ScopeId}'.");
+                    $"RemoveModifier: scope '{scope.Id}' is not on the chain from '{ctx.Scope.ScopeId}'.");
 
-            var entry = target.activeModifiers.Find(e => e.modifierId == modifierId);
-            if (entry == null)
-                return;
-            entry.count--;
-            if (entry.count <= 0)
-                target.activeModifiers.Remove(entry);
+            if (!target.modifierStacks.TryGetValue(modifier.Id, out var count))
+                return;                       // nothing granted here: the authored no-op (12.5)
+            if (count <= 1)
+                target.modifierStacks.Remove(modifier.Id);
+            else
+                target.modifierStacks[modifier.Id] = count - 1;
         }
 
         public override void Validate(ValidationContext ctx)
         {
-            var resolved = ctx.Defs.Get<Economy.ModifierDefinition>(modifierId) != null;
-            if (!resolved)
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"RemoveModifier references unknown modifier '{modifierId}'.");
-            var target = ctx.FindScope(scopeId);
+            if (modifier == null)
+            {
+                ctx.AddError(ValidationCheck.NullEntry, "RemoveModifier names no modifier.");
+                return;
+            }
+            var target = ctx.FindScope(scope);
             if (target == null)
             {
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"RemoveModifier targets unknown scope '{scopeId}'.");
+                ctx.AddError(ValidationCheck.NullEntry, $"RemoveModifier removing '{modifier.Id}' names no target scope.");
                 return;
             }
             if (!ctx.OnActingChain(target))
             {
-                ctx.AddError(ValidationCheck.ScopeReach, $"RemoveModifier may target the acting scope or an ancestor (grants live outward, 12.12); '{scopeId}' is neither from '{ctx.ActingScope.Id}'.");
+                ctx.AddError(ValidationCheck.ScopeReach, $"RemoveModifier may target the acting scope or an ancestor (grants live outward, 12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
                 return;
             }
-            if (resolved)
-                ctx.RecordModifierRemove(modifierId, target);
+            ctx.RequireDeclaredFor(target, modifier, "RemoveModifier");
+            ctx.RecordModifierRemove(modifier, target);
         }
     }
 
     // Clears the named scope and everything inside it (downward-closed). It only
     // clears - it never executes nested lists, so no recursion exists via resets
-    // (design doc 12.5). Reach: the acting scope, a scope it encloses, or a
-    // sibling (12.12).
+    // (design doc 12.5). Reach: the acting scope or a scope it encloses. Peers
+    // are cleared by the scope that CONTAINS them, since resetting a parent is
+    // downward-closed - so nothing reaches sideways.
     [Serializable]
     public class ResetScope : GameAction
     {
-        public string scopeId;
+        public ScopeDefinition scope;
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindInSubtree(scopeId);
-            if (target == null && ctx.Scope.Parent != null)
-            {
-                foreach (var sibling in ctx.Scope.Parent.Children)
-                {
-                    if (sibling == ctx.Scope)
-                        continue;
-                    if (sibling.ScopeId == scopeId)
-                    {
-                        target = sibling;
-                        break;
-                    }
-                }
-            }
-            if (target == null)
-                throw new InvalidOperationException(
-                    $"ResetScope: '{scopeId}' is not the acting scope, enclosed by it, or a sibling of '{ctx.Scope.ScopeId}'.");
+            var target = ctx.Scope.FindInSubtree(scope.Id)
+                ?? throw new InvalidOperationException(
+                    $"ResetScope: '{scope.Id}' is not the acting scope or enclosed by '{ctx.Scope.ScopeId}'.");
             if (target.Parent == null)
                 // The root is structurally unresettable (12.12: "never the
                 // root") - nothing exists outside it for a fact to survive into.
@@ -220,10 +210,10 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Validate(ValidationContext ctx)
         {
-            var target = ctx.FindScope(scopeId);
+            var target = ctx.FindScope(scope);
             if (target == null)
             {
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"ResetScope targets unknown scope '{scopeId}'.");
+                ctx.AddError(ValidationCheck.NullEntry, "ResetScope names no scope.");
                 return;
             }
             if (target == ctx.RootScope)
@@ -231,9 +221,9 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.AddError(ValidationCheck.ScopeReach, "ResetScope targets the root - the root is never resettable (12.12).");
                 return;
             }
-            if (!ctx.InActingSubtree(target) && !ctx.IsSiblingOfActing(target))
+            if (!ctx.InActingSubtree(target))
             {
-                ctx.AddError(ValidationCheck.ScopeReach, $"ResetScope may target the acting scope, a scope it encloses, or a sibling (12.12); '{scopeId}' is none of these from '{ctx.ActingScope.Id}'.");
+                ctx.AddError(ValidationCheck.ScopeReach, $"ResetScope may target the acting scope or a scope it encloses (12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
                 return;
             }
             ctx.RecordReset(target);
@@ -247,34 +237,34 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class ExecuteRung : GameAction
     {
-        public string tierId;
+        public ScopeDefinition tier;
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindInSubtree(tierId)
+            var target = ctx.Scope.FindInSubtree(tier.Id)
                 ?? throw new InvalidOperationException(
-                    $"ExecuteRung: scope '{tierId}' is not within '{ctx.Scope.ScopeId}'.");
+                    $"ExecuteRung: scope '{tier.Id}' is not within '{ctx.Scope.ScopeId}'.");
             if (target.Definition.rung == null)
-                throw new InvalidOperationException($"ExecuteRung: scope '{tierId}' declares no rung.");
+                throw new InvalidOperationException($"ExecuteRung: scope '{tier.Id}' declares no rung.");
             target.Definition.rung.TryExecute(ctx.Rebase(target));
         }
 
         public override void Validate(ValidationContext ctx)
         {
-            var target = ctx.FindScope(tierId);
+            var target = ctx.FindScope(tier);
             if (target == null)
             {
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"ExecuteRung targets unknown scope '{tierId}'.");
+                ctx.AddError(ValidationCheck.NullEntry, "ExecuteRung names no scope.");
                 return;
             }
             if (!ctx.InActingSubtree(target))
             {
-                ctx.AddError(ValidationCheck.ScopeReach, $"ExecuteRung may only reference a rung declared within the acting scope (12.12); '{tierId}' is outside '{ctx.ActingScope.Id}'.");
+                ctx.AddError(ValidationCheck.ScopeReach, $"ExecuteRung may only reference a rung declared within the acting scope (12.12); '{target.Id}' is outside '{ctx.ActingScope.Id}'.");
                 return;
             }
             if (target.rung == null)
             {
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"ExecuteRung targets scope '{tierId}', which declares no rung.");
+                ctx.AddError(ValidationCheck.UnresolvedReference, $"ExecuteRung targets scope '{target.Id}', which declares no rung.");
                 return;
             }
             ctx.RecordRungInvocation(target);

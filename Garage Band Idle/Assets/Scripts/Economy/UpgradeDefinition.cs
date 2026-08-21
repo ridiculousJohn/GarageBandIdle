@@ -14,7 +14,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // Null refuses the buy, exactly like a generator's availableWhen.
         [SerializeReference, SubclassPicker] public Condition gate;
 
-        [DefinitionId(typeof(CurrencyDefinition))] public string costCurrencyId;
+        public CurrencyDefinition costCurrency;
         public BigNumber cost;                  // zero is legal - cut_demo is authored at 0
         public List<Effect> effects = new();
         [SerializeReference, SubclassPicker] public List<GameAction> actions = new();

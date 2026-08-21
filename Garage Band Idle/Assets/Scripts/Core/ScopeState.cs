@@ -3,15 +3,6 @@ using System.Collections.Generic;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // Facts a granted modifier leaves in state: a pointer plus a stack count.
-    // The numbers stay on the ModifierDefinition (design doc 12.5).
-    [Serializable]
-    public class ActiveModifierEntry
-    {
-        public string modifierId;
-        public int count;
-    }
-
     // The one record an event leaves in its host scope (design doc 12.8).
     [Serializable]
     public class ActiveEvent
@@ -66,7 +57,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, BigNumber> barProgress = new();      // uncapped - overfill is allowed
         public Dictionary<string, int> fillCounts = new();             // repeating bars
         public Dictionary<string, HashSet<string>> activeBars = new(); // per group
-        public List<ActiveModifierEntry> activeModifiers = new();
+        public Dictionary<string, int> modifierStacks = new();   // granted stacks, keyed like every other count fact
         public List<ActiveEvent> activeEvents = new();
         public List<TimedBuff> timedBuffs = new();
         public List<SongEntry> songs = new();
@@ -115,7 +106,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, BigNumber> barProgress => facts.barProgress;
         public Dictionary<string, int> fillCounts => facts.fillCounts;
         public Dictionary<string, HashSet<string>> activeBars => facts.activeBars;
-        public List<ActiveModifierEntry> activeModifiers => facts.activeModifiers;
+        public Dictionary<string, int> modifierStacks => facts.modifierStacks;
         public List<ActiveEvent> activeEvents => facts.activeEvents;
         public List<TimedBuff> timedBuffs => facts.timedBuffs;
         public List<SongEntry> songs => facts.songs;

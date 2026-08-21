@@ -74,7 +74,7 @@ flags, producers, generators, upgrades, bars, and triggers declared to it, plus 
 whatever the whole chapter shares; each tier owns what that tier's release destroys. **Lifetime is
 placement**: a fact survives a reset by being declared further out, and anything two tiers share
 lives in their nearest common ancestor. Moving a declaration up a level is a pure data edit, because
-ids are unique tree-wide and everything references by id.
+authored content references content DIRECTLY (the asset, not its id), and the ids that remain - in saved facts - are unique along a chain.
 
 **Progressive reveal.** A chapter does not present all its mechanics at once. Content-unlock upgrades
 (§4) introduce new generators, currencies, and mechanics as the player buys them. Each such upgrade
@@ -598,7 +598,7 @@ for the entry to count:
 ```csharp
 class ProducerDefinition : Definition        // id + tags, like every Definition
 {
-    List<ProducesEntry> produces;            // { currencyId, stat, value, condition? }
+    List<ProducesEntry> produces;            // { currency, stat, value, condition? }
 }
 ```
 
@@ -686,7 +686,13 @@ source tag instead. That is the entire modifier system.
 ### 12.3 Scopes: state containers
 
 A **scope** is a plain state container. Content declares, per scope: its currencies, flags, bar
-groups, **producers**, generators, upgrades, triggers (§12.5), and (for tiers) its rung. A producer's `produces`
+groups (which own their bars), **producers**, generators, upgrades, modifiers, career effects,
+triggers (§12.5), and (for tiers) its rung. **Every content family is declared somewhere** — that is
+what makes a reference resolvable by walking outward, and it is why there is no catalogue to look
+anything up in. Events join the list when §12.8 lands, declared on the scope that hosts them, the
+same shape modifiers use: the definition is placed, the record is a fact of the host. Songs are
+undecided until Chapter 6 (§7) — a `SongDefinition` may not exist at all, since a song is written at
+runtime rather than authored. A producer's `produces`
 entries are live exactly while its declaring scope belongs to the foreground chapter's **live
 subtree** — activation is placement, several sibling or nested scopes participate in the same tick,
 and each contribution resolves its facts and effects outward from its own declaring scope to root,
@@ -705,7 +711,7 @@ class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these
     Dictionary<string, BigDouble> barProgress;      // uncapped — overfill is allowed
     Dictionary<string, int>       fillCounts;       // repeating bars
     Dictionary<string, HashSet<string>> activeBars; // per group
-    List<ActiveModifierEntry>     activeModifiers;  // AddModifier grants: {modifierId, count}
+    Dictionary<string, int>       modifierStacks;   // AddModifier grants, keyed like every other count
     List<ActiveEvent>             activeEvents;
     List<TimedBuff>               timedBuffs;       // {buffId, expiresAt} — Encore lives at root
     List<SongEntry>               songs;            // tier = the run's Catalog; root = Discography (§7)
@@ -730,9 +736,20 @@ thing a reset re-stamps instead of clearing. `ScopeState.Build` allocates each n
 reset installs a fresh one of the same type.
 
 The tree: **root** (Records, Roadies, entitlements, completion flags, Discography, any counters a
-chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique tree-wide**; a declaration in two
+chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique along a CHAIN** — a read walks
+outward and stops at the first scope that declares what it names, so two sibling chapters may each
+declare their own `cash`; what must not repeat is an id visible from one scope. Scope ids stay
+unique tree-wide, since subtree searches and root's own maps key by them. A declaration in two
 scopes is refused at load. Flag reads walk the chain outward (set anywhere on it = set); `SetFlag`
 writes to the flag's declared home.
+
+**Flags are strings on purpose.** Everything else a scope declares is an asset, and everything that
+names one holds a direct reference (§12.14) - but a flag has no data beyond its own existence, so
+there would be nothing inside a `FlagDefinition` to author. The cost of that choice is that a flag
+name is the one authored reference a typo can break, which is why `SetFlag` and `FlagSet` are
+validated against the acting chain and `SetFlag` throws at runtime on a name no scope on the chain
+declares. Tags and stat names are strings for the same reason: neither is a thing, both are
+vocabulary.
 
 **Structure encodes reset relationships:**
 - **Nest** tier A inside tier B when "resetting B always resets A" is definitionally true (a ladder).
@@ -804,8 +821,8 @@ public abstract class Action
 ```
 
 Kinds: `AddCurrency` (one or more target currencies paid from a single evaluation; amount constant
-or from a `PayoutFormula`), `AddModifier(scopeId, modifierId)`, `RemoveModifier(scopeId, modifierId)`,
-`SetFlag(flagId)`, `AddSong`, `ResetScope(scopeId)`, `ExecuteRung(tierId)`, and the event lifecycle
+or from a `PayoutFormula`), `AddModifier(scope, modifier)`, `RemoveModifier(scope, modifier)`,
+`SetFlag(flagId)`, `AddSong`, `ResetScope(scope)`, `ExecuteRung(tier)`, and the event lifecycle
 operations `StartEvent(eventId)` / `CompleteEvent(eventId)` / `AbortEvent(eventId)` (§6.1), each
 fail-closed against its own gate. Authored inline via
 `[SerializeReference]` wherever needed — upgrade payloads, bar completions, event rewards, rungs.
@@ -813,11 +830,13 @@ No shared reward pool; a reused reward can be promoted to a shared asset later i
 hurts. Actions are one-shot: they run at their moment and are never replayed on load — the state
 they mutated is what gets saved.
 
-**`ResetScope`** clears the named scope and everything inside it (downward-closed). It only clears —
+**`ResetScope`** clears the referenced scope and everything inside it (downward-closed). It only clears —
 it never executes nested lists — so no recursion exists via resets.
 
-**`AddModifier`** appends a pointer-fact `{modifierId, count}` to the target scope's
-`activeModifiers`. The numbers stay in the `ModifierDefinition` — a named `List<Effect>` with a
+**`AddModifier`** counts a stack under the modifier's id in the target scope's
+`modifierStacks`. A modifier is declared content like everything else — `ScopeDefinition.modifiers` —
+and a grant may only name one the target scope can reach outward, so the read resolves the stored id
+by the same walk every reference gets. The numbers stay in the `ModifierDefinition` — a named `List<Effect>` with a
 **`stacking` enum: `Replace | Linear | Multiply`**. `Replace`: a re-grant keeps count at 1;
 `Linear` / `Multiply`: a re-grant increments count, and the name picks the count-scaling formula
 (`1 + (m−1)·n` vs. `m^n`) — duplicate-grant policy and growth are one closed choice. The entry is
@@ -870,7 +889,7 @@ auto-finishing challenge is a trigger, not an event — events keep claimed comp
 | Owned generators | `generatorCounts` | `produces` entries scaled by count (contributions, not effects) |
 | Timed buffs (Encore) | `{buffId, expiresAt}` list | the buff definition's effects while unexpired |
 | Active events | live (unexpired) `ActiveEvent` record | the event definition's handicaps |
-| Granted modifiers | `activeModifiers` entries | the `ModifierDefinition`'s effects, per its `stacking` enum |
+| Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times |
 | Career facts | Records balance, Roadie allocation, songs this run, entitlements | a `CareerEffectDefinition`'s `MultiplierFormula`, computed on read (§3/§7/§8) |
 
@@ -903,7 +922,7 @@ class BarDefinition : Definition
 
 class BarGroupDefinition : Definition
 {
-    string          fillCurrencyId;  // the shared pool (ContinuousDelivery)
+    CurrencyDefinition fillCurrency; // the shared pool (ContinuousDelivery)
     BigDouble       pipeRate;        // total throughput the group can spend per second
     int             maxActive;
     BarFillBehavior behavior;        // class family
@@ -917,7 +936,7 @@ from time alone (no pool). Future variants (tap-a-chunk, dump-the-pool) are sibl
 balance) covers total demand, every bar fills at its rate; otherwise all throttle proportionally.
 Buffing the pipe (`{target: groupId, ×2}`) eventually lets multiple bars run at their caps in
 parallel — rehearsal speed becomes parallel learning. Per-bar speed is buffable by bar id or tag.
-A pool (`fillCurrencyId`) shared by several live groups arbitrates the same way, one level up: when
+A pool (`fillCurrency`) shared by several live groups arbitrates the same way, one level up: when
 the pool can't cover the groups' combined demand, **every live bar drawing it throttles
 proportionally, across groups** — the pipe is per-group, the pool is shared, and processing order
 never picks a winner.
@@ -957,7 +976,9 @@ vocabulary: cascade entries and granted stacks.
 
 ### 12.8 Events (runtime)
 
-Defined in §6.1. Runtime is one record per host scope — **at most one**: `StartEvent` rejects a
+Defined in §6.1. The definition is declared on its host scope like every other content family, so
+`StartEvent` holds the reference and the stored record's id resolves by walking outward (§12.3).
+Runtime is one record per host scope — **at most one**: `StartEvent` rejects a
 host that already holds a record, live or expired-but-undismissed. The tick's only job is
 decrementing `remainingSeconds` on live ticks — it evaluates nothing and fires nothing; the
 **sweep** (inside every transaction — tick and command alike) latches `goalReached` the moment a
@@ -1036,6 +1057,10 @@ scope's state (§12.3), so principle 2 is literally the save format. JSON + chec
 load (ids resolve; unknown ids from removed content are dropped with a warning). No grants, no
 derived values, no replay of actions. Idle payouts are capped client-side.
 
+A schema version becomes a compatibility contract the moment a build that can write it reaches a
+player. Before that, format changes revise the current version in place and dev saves are deleted
+rather than migrated; after it, every format change bumps the version and registers a migration.
+
 Production hardening: the save carries a `schemaVersion`, and loading an older version runs explicit
 per-version migrations — never silent best-effort parsing. Writes are atomic (write temp, verify,
 swap) and keep the previous save as backup; a checksum failure falls back to it. A negative clock
@@ -1090,8 +1115,9 @@ per-feature: any kind an author gates with explains itself for free.
 ### 12.12 Validation at content load
 
 - Every referenced id resolves (currencies, flags, generators, modifiers, scopes, tags in targets).
-- Every Definition id is unique tree-wide — currencies, flags, bars, groups, producers, generators,
-  upgrades, events, triggers, modifiers, scopes, songs; a declaration in two scopes is refused.
+- Every id is unique along a CHAIN — currencies, flags, bars, groups, producers, generators,
+  upgrades, events, triggers, modifiers, songs; a declaration in two scopes is refused, and sibling
+  subtrees may reuse an id freely because neither can see the other. Scope ids stay unique tree-wide.
 - A tag may not collide with any id; an Effect target matching nothing reachable warns.
 - A `SetFlag` naming an undeclared flag is an error, as is one whose home is off the acting chain -
   including a home the acting scope encloses, which the outward write can never reach (§2). A
@@ -1106,7 +1132,8 @@ per-feature: any kind an author gates with explains itself for free.
   authorable on purpose. `EventRewardPending` / `EventRecordExists` reach is validated like every
   scope reference: the acting scope or a scope it encloses.
 - Scope references are checked for reach: `ResetScope` may target the acting scope, a scope it
-  encloses, or a sibling — never the root, an ancestor, or an unrelated subtree. `ExecuteRung` may
+  encloses — never a peer, the root, an ancestor, or an unrelated subtree. Peers are cleared by the
+  scope that CONTAINS them, since resetting it is downward-closed. `ExecuteRung` may
   only reference a rung declared within the acting scope. `AddModifier` and `RemoveModifier` may
   target the acting scope or an ancestor (grants live outward), never an unrelated subtree; a
   `RemoveModifier` naming a modifier nothing reachable grants warns.
@@ -1126,9 +1153,6 @@ per-feature: any kind an author gates with explains itself for free.
 - An event's `onEntry` / `onComplete` may not invoke lifecycle operations targeting its own host —
   acyclic nesting could otherwise create a second record between the empty-host check and record
   creation.
-- Every definition a scope DECLARES must also resolve from the content database to that same asset.
-  A declaration is a direct reference but every runtime lookup is by id, so an asset missing its
-  Addressables label validates clean, still accrues rate, and can never be bought or fired.
 - A polymorphic kind in data with no class behind it is an import error.
 
 ### 12.13 File layout
@@ -1141,7 +1165,7 @@ Assets/Scripts/
     TickSystem.cs           // fixed-interval tick on real (DateTime) time
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
-    ContentDatabase.cs      // Addressables discovery by label; id→def; the §12.12 validation pass
+    ContentDatabase.cs      // loads the root scope, and with it the whole graph; runs the §12.12 pass
     ScopeDefinition.cs / ScopeState.cs
     Condition.cs  Action.cs  PayoutFormula.cs  Trigger.cs   // the class families (+ kind classes)
     Effect.cs               // the flat struct
@@ -1189,23 +1213,45 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 3. UI refresh on the two triggers of §12.11; no per-frame polling of balances.
 4. Versioned, checksummed saves (explicit migrations, atomic write + backup), validate on load, cap
    idle earnings client-side.
-5. Content in ScriptableObjects discovered via Addressables (a label per type). **Authoring is a
+5. Content in ScriptableObjects, reached by DIRECT REFERENCE from the root scope; Addressables
+   carries the root, and the direct references bring the rest of the tree with it, so the whole
+   graph is resident from boot. Per-chapter streaming would need indirect handles, staged
+   validation, and staged state construction; it is a later architectural change if load time or
+   memory ever argues for it, not a property of today's design. **Authoring is a
    JSON document per chapter, materialized into SO assets by an editor importer**; the assets stay
    fully hand-authorable — `[SerializeReference]` plus the subclass-picker drawer create and edit
-   polymorphic kinds in the inspector, and `[DefinitionId]` string fields render as id dropdowns.
+   polymorphic kinds in the inspector. An authored reference is an object field: it cannot name
+   something that does not exist, so only flags, tags, and stat names stay strings.
    **Re-import overwrites**: the JSON is the source of truth for a chapter it authored; content
    born in the editor is simply never re-imported over. (If round-tripping ever matters, a
    chapter/game exporter back to JSON is a later addition — deliberately not built now.) A
    polymorphic kind in data with no class behind it is an import error (§12.12); regular
    per-chapter gear curves can be generated at import.
 6. Run the §12.12 validation pass at boot in development builds; fail loudly.
+7. **A content fault throws, in every build.** Content is static and validated, so an unresolvable
+   reference, a fact naming something no scope on its chain declares, or a number outside its legal
+   range cannot happen against good content - reaching one means the content or the code is broken,
+   and no sensible play continues from there. Release builds skip the validation pass, so these are
+   the checks that catch it: they throw rather than logging and carrying on, because a skipped
+   deposit or a silently smaller multiplier is saved as if it were real. Refusals ARE different: an
+   unmet gate, an unaffordable cost, an unavailable bar are ordinary answers a `Can*` query reports
+   as false and a `Try*` wrapper passes through (§12.11).
+8. **No runtime lookup searches the tree.** A name is resolved by walking OUTWARD from the acting
+   scope and stopping at the first scope that declares it. There is no catalogue, no id index, and
+   no "find all X" pass. Two walks are legitimate, because both start from a scope the caller
+   already holds: outward along the chain (resolution), and downward through ONE named subtree
+   (aggregation like `GetRate`, and the downward-closed clear of `ResetScope`). What is forbidden is
+   resolving a name from anywhere else - a global map, a scan of every scope, or any search that
+   leaves the acting chain. Validation is the exception and the reason the rule holds: it audits the
+   whole tree at load, once, which is what lets every runtime walk assume its own chain is enough.
+   Content that seems to need a registry is content that has not been placed on a scope yet.
 
 ---
 
 ## Appendix — at a glance
 
 - **Structure:** nested prestige on a tree of **state containers** — root / chapters / tiers (tiers
-  may nest for ladders, sibling for independence). Lifetime is placement; ids unique tree-wide;
+  may nest for ladders, sibling for independence). Lifetime is placement; ids unique per chain;
   everything derived is computed on read from stored facts.
 - **Records:** the single permanent progression currency; each Record raises global income ~+2%; the
   capstone gates on Records earned within its chapter — a chapter-declared counter fed by the album
@@ -1245,4 +1291,5 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   (`game_speed` reserved target, tick-consumed; wall clocks never scale); Backstage Pass (lifetime,
   permanent Overdrive); Buy Roadies (repeatable); Tip Jar; no subscriptions.
 - **Engine:** Unity; break_infinity numbers; DateTime ticks; checksummed JSON save of the state tree;
-  Addressables content discovery; load-time validation of all authored data.
+  one Addressables load of the root scope, which carries the whole directly-referenced content
+  graph; load-time validation of all authored data.

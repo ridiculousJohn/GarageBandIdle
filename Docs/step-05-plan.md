@@ -26,15 +26,13 @@ calls because the phases straddle the production deposits - see the segment sect
 
 ## Shapes
 
-**A group owns its bars.** `ScopeDefinition` gains `barGroups: List<BarGroupDefinition>` (direct
-references, declaration is ownership, same as `producers`), and `BarGroupDefinition` gains
-`bars: List<BarDefinition>`. `BarDefinition.groupId` is DELETED - the id indirection is for
-cross-references, and a bar's group is not a cross-reference but its placement. A bar's declaring
-scope IS its group's, which is what nested scopes are for: the progress fact and the `activeBars`
-set that selects it have one lifetime because they have one home. It also makes 12.7's settlement
-order ("then groups, then bars within a group, in declaration order") literal, and gives
-`SetActiveBars` its membership test for free. `BarsCompleted` resolves the group and walks
-`group.bars` instead of filtering `defs.All<BarDefinition>()`; `ConditionTests` fixtures follow.
+**A group owns its bars.** `ScopeDefinition.barGroups` and `BarGroupDefinition.bars` LANDED with the
+2026-08-20 reference pass, along with `BarsCompleted` holding a group reference rather than an id;
+what remains for step 5 is the fill and settlement behaviour. A bar's declaring scope IS its
+group's, which is what nested scopes are for: the progress fact and the `activeBars` set that
+selects it have one lifetime because they have one home. It also makes 12.7's settlement order
+("then groups, then bars within a group, in declaration order") literal, and gives `SetActiveBars`
+its membership test for free.
 
 **`BarFillBehavior` config stands as authored**: `ContinuousDelivery {autoAdvance}` drains a pool,
 `TimedFill {}` fills from time alone.
@@ -42,7 +40,7 @@ order ("then groups, then bars within a group, in declaration order") literal, a
 **Ruling - the pipe governs pool spending only.** `pipeRate` is "total throughput the group can
 spend per second" (12.7) and a `TimedFill` group spends nothing, so the pipe and the pool
 arbitration apply to `ContinuousDelivery` groups alone; `maxActive` is the only throttle a timed
-group has. A `TimedFill` group that authors a `fillCurrencyId` is an error (a pool nothing drains).
+group has. A `TimedFill` group that authors a `fillCurrency` is an error (a pool nothing drains).
 
 **Ruling - a null `availableWhen` on a bar is OPEN**, the opposite of step 4's null purchase gate.
 The fail-closed rule binds entry points that create value out of a spend; a bar's availability is a
@@ -52,7 +50,7 @@ nothing about a null bar gate.
 ## Resolution
 
 **Ruling - bar and pipe rates resolve stage 1 only.** Both are read as
-`GetMultiplier(declaringScopeCtx, owner, group.fillCurrencyId, Stat.Rate)` with the bar or the group
+`GetMultiplier(declaringScopeCtx, owner, group.fillCurrency, Stat.Rate)` with the bar or the group
 as owner, and the currency stage is NOT applied. Stage 2 is "effects on this currency's total
 production" and a bar consumes rather than produces; letting a currency-total effect through would
 mean `records_income` speeds the drain on Rehearsal as well as its supply, which is not what either
@@ -123,7 +121,7 @@ Fill, using the snapshot's order:
   bar in a group can resolve to a zero rate even though `fillRate > 0` is validated. `BigNumber`
   THROWS on a NaN or infinite result rather than clamping (its constructor is the one door), so an
   unguarded 0/0 aborts the tick.
-- **Pool arbitration**: group draws sharing one `fillCurrencyId` are summed over dt against the
+- **Pool arbitration**: group draws sharing one `fillCurrency` are summed over dt against the
   balance at that currency's home. Short pool means one factor `poolScale = balance / totalDraw`
   applied to every drawing bar across every group on that pool - **guarded the same way**: a pool
   whose groups all draw zero skips the scale entirely.
@@ -188,7 +186,16 @@ only writer. A completed bar left selected demands nothing. `ContinuousDelivery.
 implemented here: no chapter grants it yet, and how a chapter grants it is undecided (an Effect
 multiplies numbers; it cannot flip a bool), so its semantics are settled when a chapter wants it.
 
-## Entry point - `SetActiveBars(ctx, groupId, barIds)`
+## Entry point - `SetActiveBars(ctx, group, bars)`
+
+**An entry point takes the assets its caller already holds; an id appears only where a FACT supplies
+one.** The caller here is a widget bound to the group, so it has the `BarGroupDefinition` and the
+`BarDefinition`s; passing their ids would discard that and make the callee re-derive it, and it
+would make this the only entry point in the codebase taking ids (`CanBuy(ctx, generator)`,
+`Buy(ctx, upgrade)`, `FireProducer(ctx, producer)`, `GetRate(scope, now, currency)` all take the
+asset). The ids in the fact keys below are the other half of the same rule and are CORRECT as ids:
+`activeBars[groupId]`, `fillCounts[barId]`, and the `{target: groupId}` effect coordinate, which is
+a string because an effect target is a filter over names, not a reference.
 
 Fail-closed and all-or-nothing (12.7/12.11): refuses an unknown group, a set larger than
 `maxActive` after de-duplication, any bar outside the group, any bar whose `availableWhen` is false
@@ -203,8 +210,9 @@ group's declaring scope. The foreground-subtree guard layers on in step 7.
   `DeclaringScope(bar)` answers and the "declared but unresolvable from the database" check covers
   bars too. `DuplicateHome` covers a group declared by two scopes and a bar listed by two groups.
 - **Group**: null `behavior` is a `NullEntry` error; `ContinuousDelivery` requires a
-  `fillCurrencyId` on the chain from the declaring scope (`RequireChainCurrency`) and
-  `pipeRate > 0`; `TimedFill` errors on a set `fillCurrencyId`; `maxActive >= 1`.
+  `fillCurrency` the declaring scope can reach outward (`RequireOnChain`, the check every other
+  currency operand already gets) and `pipeRate > 0`; `TimedFill` errors on a set `fillCurrency`;
+  `maxActive >= 1`.
 - **Bar**: `fillAmount > 0` and `fillRate > 0` are `NumericRange` errors (a nonpositive threshold is
   an unbounded settlement loop; a zero rate is a bar no multiplier can ever move). `availableWhen`
   validates in the declaring scope when present. `onComplete` runs through `ValidateActionList` with

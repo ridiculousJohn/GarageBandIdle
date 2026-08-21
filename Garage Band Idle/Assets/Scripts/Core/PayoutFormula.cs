@@ -35,18 +35,18 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class RootCurveFormula : PayoutFormula
     {
-        [DefinitionId(typeof(Economy.CurrencyDefinition))] public string currencyId;
+        public Economy.CurrencyDefinition currency;
         public BigNumber divisor = 1;
         public double exponent = 1;   // BigDouble.Pow's power is a double by the library's own signature
 
         public override BigNumber Compute(GameContext ctx) =>
-            BigNumber.Floor(BigNumber.Pow(ctx.GetBalance(currencyId) / divisor, exponent));
+            BigNumber.Floor(BigNumber.Pow(ctx.GetBalance(currency.Id) / divisor, exponent));
 
         public override void Validate(ValidationContext ctx)
         {
-            var home = ctx.RequireChainCurrency(currencyId, "RootCurveFormula");
+            var home = ctx.RequireOnChain(currency, "RootCurveFormula");
             if (home != null)
-                ctx.RecordFormulaRead(currencyId, home); // input for the reads-zeros warn (12.12)
+                ctx.RecordFormulaRead(currency.Id, home); // input for the reads-zeros warn (12.12)
             // A negative exponent makes 0^n infinite, and the balance IS zero on
             // the first read after a reset - BigNumber refuses infinities at
             // construction, so this would throw on the first payout.

@@ -5,8 +5,7 @@ namespace RidiculousGaming.GarageBandIdle
 {
     // A scope's authored shape: what it declares, its children, and (for tiers
     // and chapters) its rung. Lifetime is placement - a fact survives a reset by
-    // being declared further out (design doc 12.3). Bar groups join these lists
-    // when the bar family lands.
+    // being declared further out (design doc 12.3).
     [CreateAssetMenu(menuName = "Garage Band Idle/Scope")]
     public class ScopeDefinition : Definition
     {
@@ -25,10 +24,19 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Economy declarations: the facts these create live and die with this
         // scope - a generator's ownedCount, an upgrade's purchase latch. Direct
-        // references like triggers, because declaration IS ownership; the
-        // [DefinitionId] indirection is for cross-references.
+        // references like triggers, because declaration IS ownership. Every
+        // authored reference is direct; the only ids left are the ones FACTS
+        // hold, and those resolve by walking their scope outward.
         public List<Economy.ProducerDefinition> producers = new();
+
+        // Modifiers grantable within this scope's subtree. The grant writes a
+        // stack on the target scope; the read resolves it outward to here.
+        public List<Economy.ModifierDefinition> modifiers = new();
         public List<Economy.GeneratorDefinition> generators = new();
+
+        // Bar groups homed here; each group owns its bars (design doc 12.7).
+        // The fill and settlement systems land with build step 5.
+        public List<Economy.BarGroupDefinition> barGroups = new();
         public List<Economy.UpgradeDefinition> upgrades = new();
 
         // Formula-shaped multipliers that exist from minute one and contribute

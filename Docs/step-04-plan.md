@@ -28,6 +28,12 @@ below still describes and shouldn't:
   specified are gone.
 - **Currencies.** `declaredCurrencyIds` is gone - a scope declares `List<CurrencyDefinition>` by
   direct reference, and the ids are derived.
+- **References everywhere.** Every authored field that named content by id now holds the asset:
+  condition operands, action operands, cost currencies, produces entries, scope targets. Flags,
+  tags, and stat names stay strings. `DefinitionIdAttribute` and its drawer are deleted.
+- **No content database.** `IDefinitionSource` is gone; `ContentDatabase` loads the root scope and
+  runs validation, and every id a FACT holds resolves by walking its scope outward. Modifiers are
+  declared content (`ScopeDefinition.modifiers`) and their stacks are a `Dictionary<string, int>`.
 
 ## Conceptual model
 

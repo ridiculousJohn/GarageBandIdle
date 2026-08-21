@@ -1,92 +1,72 @@
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // The production IDefinitionSource (design doc 12.13): every Definition
-    // asset, discovered through Addressables by label (a label per type,
-    // 12.14.5), indexed by id. Indexing is deliberately lenient: duplicate ids
-    // are stored as found and refused by the validation pass (12.12), which
-    // owns all findings - Get returns the first typed match so the validator
-    // can describe a collision instead of an indexing exception hiding it.
-    public class ContentDatabase : IDefinitionSource
+    // Content loading (design doc 12.13). The content IS the scope tree: every
+    // definition the game can reach hangs off the root scope by direct
+    // reference, so loading the root loads the graph, and there is no id index
+    // to keep - a reference is resolved by holding it, and an id stored in a
+    // FACT is resolved by walking its scope outward.
+    //
+    // The whole graph therefore loads at boot, and that is the current policy:
+    // children are direct references, so Addressables pulls every chapter as a
+    // dependency of the root, and the 12.12 pass walks all of it anyway. Making
+    // a chapter arrive when it opens would take an indirect handle per chapter,
+    // staged validation, staged state construction, and handle lifetimes to
+    // manage - a real architectural change, worth doing only if measurements
+    // ever call for it.
+    public class ContentDatabase
     {
-        private readonly List<Definition> definitions = new();
-        private readonly Dictionary<string, List<Definition>> byId = new();
-        private readonly List<AsyncOperationHandle<IList<Definition>>> handles = new();
+        private readonly List<AsyncOperationHandle<ScopeDefinition>> handles = new();
 
-        public IReadOnlyList<Definition> Definitions => definitions;
+        public ScopeDefinition Root { get; private set; }
 
-        public void Add(Definition definition)
-        {
-            if (definition == null)
-                return;
-            definitions.Add(definition);
-            var id = definition.Id ?? string.Empty;
-            if (!byId.TryGetValue(id, out var bucket))
-                byId[id] = bucket = new List<Definition>();
-            bucket.Add(definition);
-        }
-
-        public void AddRange(IEnumerable<Definition> range)
-        {
-            foreach (var definition in range)
-                Add(definition);
-        }
-
-        public T Get<T>(string id) where T : Definition =>
-            id != null && byId.TryGetValue(id, out var bucket) ? bucket.OfType<T>().FirstOrDefault() : null;
-
-        public IEnumerable<T> All<T>() where T : Definition => definitions.OfType<T>();
-
-        public ValidationReport Validate() => ContentValidator.Validate(this);
-
-        // Blocking boot-time discovery: one Addressables load per label, held
-        // for the database's lifetime (releasing a handle releases its assets).
-        // A failed load throws - missing content is a boot failure, not an
-        // empty database (12.14.6). Exercised against real content in build
-        // step 8, when the importer creates the first labeled assets.
+        // Blocking boot-time load of the root scope, held for the database's
+        // lifetime (releasing a handle releases its assets). A failed load
+        // throws - missing content is a boot failure, not an empty tree
+        // (12.14.6).
         //
-        // The 12.12 pass runs HERE in development builds and fails loudly
-        // (12.14.6) - on the one production load path, so no boot code can
-        // forget it. Release builds ship dev-validated content and skip the
-        // cost.
-        public static ContentDatabase LoadFromAddressables(IEnumerable<string> labels)
+        // The 12.12 pass runs HERE in development builds and fails loudly, on
+        // the one production load path, so no boot code can forget it. Release
+        // builds ship dev-validated content and skip the cost.
+        public static ContentDatabase LoadRoot(object rootKey)
         {
             var database = new ContentDatabase();
-            foreach (var label in labels)
+            var handle = Addressables.LoadAssetAsync<ScopeDefinition>(rootKey);
+            var root = handle.WaitForCompletion();
+            database.handles.Add(handle);
+            if (handle.Status != AsyncOperationStatus.Succeeded || root == null)
             {
-                var handle = Addressables.LoadAssetsAsync<Definition>(label, null);
-                var assets = handle.WaitForCompletion();
-                database.handles.Add(handle);
-                if (handle.Status != AsyncOperationStatus.Succeeded)
-                {
-                    database.Release();
-                    throw new System.InvalidOperationException(
-                        $"Addressables load for label '{label}' failed.", handle.OperationException);
-                }
-                database.AddRange(assets);
+                database.Release();
+                throw new InvalidOperationException(
+                    $"Addressables load for the root scope '{rootKey}' failed.", handle.OperationException);
             }
+            database.Root = root;
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             var report = database.Validate();
             report.LogAll();
             if (report.HasErrors)
             {
                 database.Release();
-                throw new System.InvalidOperationException(
+                throw new InvalidOperationException(
                     "content validation failed - see the logged errors (12.12).");
             }
 #endif
             return database;
         }
 
+        public ValidationReport Validate() => ContentValidator.Validate(Root);
+
         public void Release()
         {
             foreach (var handle in handles)
                 Addressables.Release(handle);
             handles.Clear();
+            Root = null;
         }
     }
 }

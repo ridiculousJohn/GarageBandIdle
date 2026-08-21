@@ -10,7 +10,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // every other test breaks exactly one thing and asserts the finding.
     public class ValidatorFixture
     {
-        public readonly FakeDefs Defs = new();
         public readonly ScopeDefinition Root;
         public readonly ScopeDefinition Ch1;
         public readonly ScopeDefinition Tier1;
@@ -25,6 +24,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly UpgradeDefinition AmpStrings;
         public readonly CareerEffectDefinition RecordsIncome;
         public readonly CurrencyDefinition Cash;
+        public readonly CurrencyDefinition Fans;
+        public readonly CurrencyDefinition Records;
+        public readonly CurrencyDefinition Ch1Records;
+        public readonly BarGroupDefinition Covers;
 
         public ValidatorFixture()
         {
@@ -36,12 +39,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Ch1.children.Add(Tier1);
             Ch1.children.Add(Tier1b);
 
-            var records = TestTree.DeclareCurrency(Root, "records");
+            Records = TestTree.DeclareCurrency(Root, "records");
             Root.declaredFlags.Add("ch1_complete");
-            var ch1Records = TestTree.DeclareCurrency(Ch1, "ch1_records");
+            Ch1Records = TestTree.DeclareCurrency(Ch1, "ch1_records");
             Ch1.declaredFlags.Add("album");
             Cash = TestTree.DeclareCurrency(Tier1, "cash", "income");
-            var fans = TestTree.DeclareCurrency(Tier1, "fans");
+            Fans = TestTree.DeclareCurrency(Tier1, "fans");
+
+            Covers = TestTree.MakeDefinition<BarGroupDefinition>("covers");
+            Tier1.barGroups.Add(Covers);
 
             Album = new Rung
             {
@@ -49,32 +55,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 {
                     conditions =
                     {
-                        new CurrencyAtLeast { currencyId = "fans", threshold = 100, uiText = "Need 100 fans" },
-                        new BarsCompleted { groupId = "covers", count = 1 },
+                        new CurrencyAtLeast { currency = Fans, threshold = 100, uiText = "Need 100 fans" },
+                        new BarsCompleted { group = Covers, count = 1 },
                     }
                 },
                 actions =
                 {
                     new AddCurrency
                     {
-                        currencyIds = { "records", "ch1_records" },
-                        formula = new RootCurveFormula { currencyId = "fans", divisor = 5, exponent = 0.5 },
+                        currencies = { Records, Ch1Records },
+                        formula = new RootCurveFormula { currency = Fans, divisor = 5, exponent = 0.5 },
                     },
                     new SetFlag { flagId = "album" },
-                    new ResetScope { scopeId = "tier1" },
+                    new ResetScope { scope = Tier1 },
                 }
             };
             Tier1.rung = Album;
 
             Capstone = new Rung
             {
-                offerCondition = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 30 },
+                offerCondition = new CurrencyAtLeast { currency = Ch1Records, threshold = 30 },
                 actions =
                 {
-                    new ExecuteRung { tierId = "tier1" }, // cash the album before the reset, like the authored capstone
-                    new AddCurrency { currencyIds = { "records" }, amount = 1 },
+                    new ExecuteRung { tier = Tier1 }, // cash the album before the reset, like the authored capstone
+                    new AddCurrency { currencies = { Records }, amount = 1 },
                     new SetFlag { flagId = "ch1_complete" },
-                    new ResetScope { scopeId = "ch1" },
+                    new ResetScope { scope = Ch1 },
                 }
             };
             Ch1.rung = Capstone;
@@ -85,54 +91,68 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Trigger = TestTree.MakeDefinition<TriggerDefinition>("boost_trigger");
             Trigger.condition = new FlagSet { flagId = "album" };
-            Trigger.actions.Add(new AddModifier { scopeId = "tier1", modifierId = "boost" });
-            Trigger.actions.Add(new RemoveModifier { scopeId = "tier1", modifierId = "boost" });
+            Trigger.actions.Add(new AddModifier { scope = Tier1, modifier = Boost });
+            Trigger.actions.Add(new RemoveModifier { scope = Tier1, modifier = Boost });
             Tier1.triggers.Add(Trigger);
 
             // The economy declarations: a producer reading an upgrade latch, a
             // tagged generator with a cost curve, an upgrade whose effect targets
             // that generator, and the career effect on the income tag.
             Tap = TestTree.MakeDefinition<ProducerDefinition>("tap_producer");
-            Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, 1));
-            Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, 1, new UpgradePurchased { upgradeId = "stage_presence" }));
+            Tap.produces.Add(TestTree.Entry(Cash, Stat.Yield, 1));
             Tier1.producers.Add(Tap);
 
             Amp = TestTree.MakeDefinition<GeneratorDefinition>("practice_amp", "gear");
-            Amp.availableWhen = new EarnedTotalAtLeast { currencyId = "cash", threshold = 100 };
-            Amp.costCurrencyId = "cash";
+            Amp.availableWhen = new EarnedTotalAtLeast { currency = Cash, threshold = 100 };
+            Amp.costCurrency = Cash;
             Amp.baseCost = 60;
             Amp.growth = 1.15;
-            Amp.produces.Add(TestTree.Entry("cash", Stat.Rate, 0.5));
+            Amp.produces.Add(TestTree.Entry(Cash, Stat.Rate, 0.5));
             Tier1.generators.Add(Amp);
 
             StagePresence = TestTree.MakeDefinition<UpgradeDefinition>("stage_presence");
-            StagePresence.gate = new EarnedTotalAtLeast { currencyId = "cash", threshold = 250 };
-            StagePresence.costCurrencyId = "cash";
+            StagePresence.gate = new EarnedTotalAtLeast { currency = Cash, threshold = 250 };
+            StagePresence.costCurrency = Cash;
             StagePresence.cost = 250;
 
             AmpStrings = TestTree.MakeDefinition<UpgradeDefinition>("amp_strings");
-            AmpStrings.gate = new EarnedTotalAtLeast { currencyId = "cash", threshold = 500 };
-            AmpStrings.costCurrencyId = "cash";
+            AmpStrings.gate = new EarnedTotalAtLeast { currency = Cash, threshold = 500 };
+            AmpStrings.costCurrency = Cash;
             AmpStrings.cost = 500;
             AmpStrings.effects.Add(new Effect { target = "practice_amp", multiplier = 2 });
             Tier1.upgrades.Add(StagePresence);
             Tier1.upgrades.Add(AmpStrings);
+            Tap.produces.Add(TestTree.Entry(Cash, Stat.Yield, 1, new UpgradePurchased { upgrade = StagePresence }));
 
             RecordsIncome = TestTree.MakeDefinition<CareerEffectDefinition>("records_income");
             RecordsIncome.target = "income";
-            RecordsIncome.formula = new LinearOnBalance { currencyId = "records", coefficient = 0.02 };
+            RecordsIncome.formula = new LinearOnBalance { currency = Records, coefficient = 0.02 };
             Root.careerEffects.Add(RecordsIncome);
 
-            Defs.Add(Root).Add(Ch1).Add(Tier1).Add(Tier1b)
-                .Add(records).Add(ch1Records).Add(Cash).Add(fans)
-                .Add(TestTree.MakeDefinition<BarGroupDefinition>("covers"))
-                .Add(Boost)
-                .Add(Trigger)
-                .Add(Tap).Add(Amp).Add(StagePresence).Add(AmpStrings)
-                .Add(RecordsIncome);
+            Ch1.modifiers.Add(Boost);
         }
 
-        public ValidationReport Run() => ContentValidator.Validate(Defs);
+        public ValidationReport Run() => ContentValidator.Validate(Root);
+
+        // A second chapter under the same root, deliberately reusing chapter
+        // one's ids. Sibling subtrees cannot see each other, so every reuse
+        // here is legal content and the validator has to answer from where the
+        // question is asked rather than from a tree-wide map.
+        public class Sibling
+        {
+            public ScopeDefinition Ch2;
+            public ScopeDefinition Tier2;
+            public CurrencyDefinition Cash;   // tier1's id, a different asset
+        }
+
+        public Sibling AddSiblingChapter()
+        {
+            var sibling = new Sibling { Ch2 = TestTree.MakeScope("ch2"), Tier2 = TestTree.MakeScope("tier2") };
+            Root.children.Add(sibling.Ch2);
+            sibling.Ch2.children.Add(sibling.Tier2);
+            sibling.Cash = TestTree.DeclareCurrency(sibling.Tier2, "cash", "income");
+            return sibling;
+        }
     }
 
     public class ContentValidatorTests
@@ -164,10 +184,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- id space ----
 
         [Test]
-        public void DuplicateDefinitionId_Error()
+        public void DuplicateIdOnAChain_Error()
         {
             var f = new ValidatorFixture();
-            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("cash"));
+            TestTree.DeclareCurrency(f.Ch1, "cash");   // tier1 already declares one, and ch1 is on its chain
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateId, "'cash'");
         }
 
@@ -176,7 +196,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Ch1.declaredFlags.Add("cash");
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateId, "flag declared at scope 'ch1'");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateId, "flag at 'ch1'");
         }
 
         [Test]
@@ -184,7 +204,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Tier1.declaredFlags.Add("album");
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome, "flag 'album'");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome, "'album' is declared twice on the chain");
         }
 
         [Test]
@@ -207,19 +227,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TagCollidingWithId_Error()
         {
             var f = new ValidatorFixture();
-            f.Defs.Add(TestTree.MakeDefinition<CurrencyDefinition>("extra", "cash"));
+            TestTree.DeclareCurrency(f.Tier1, "extra", "cash");
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.TagIdCollision, "tag 'cash'");
         }
 
         // ---- scope graph ----
 
-        [Test]
-        public void TwoRoots_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Defs.Add(TestTree.MakeScope("stray"));
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeGraph, "multiple root scopes");
-        }
 
         [Test]
         public void ScopeUnderTwoParents_Error()
@@ -229,25 +242,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeGraph, "child of both");
         }
 
-        [Test]
-        public void UnreachableScopes_Error()
-        {
-            var f = new ValidatorFixture();
-            var a = TestTree.MakeScope("a");
-            var b = TestTree.MakeScope("b");
-            a.children.Add(b);
-            b.children.Add(a); // a children cycle, detached from the tree
-            f.Defs.Add(a).Add(b);
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeGraph, "not reachable");
-        }
 
-        [Test]
-        public void UndiscoverableDeclaredCurrency_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Tier1.declaredCurrencies.Add(TestTree.MakeDefinition<CurrencyDefinition>("ghost"));   // never registered
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "does not resolve to this asset");
-        }
 
         [Test]
         public void NullDeclaredCurrency_Error()
@@ -271,15 +266,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ResetScope_AncestorTarget_Error()
         {
             var f = new ValidatorFixture();
-            ((ResetScope)f.Album.actions[2]).scopeId = "ch1";
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "none of these from 'tier1'");
+            ((ResetScope)f.Album.actions[2]).scope = f.Ch1;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "is neither from 'tier1'");
         }
 
         [Test]
         public void ResetScope_RootTarget_Error()
         {
             var f = new ValidatorFixture();
-            ((ResetScope)f.Capstone.actions[3]).scopeId = "root";
+            ((ResetScope)f.Capstone.actions[3]).scope = f.Root;
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "never resettable");
         }
 
@@ -291,25 +286,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tier2 = TestTree.MakeScope("tier2");
             ch2.children.Add(tier2);
             f.Root.children.Add(ch2);
-            f.Defs.Add(ch2).Add(tier2);
-            ((ResetScope)f.Album.actions[2]).scopeId = "tier2";
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "none of these from 'tier1'");
+            ((ResetScope)f.Album.actions[2]).scope = tier2;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "is neither from 'tier1'");
         }
 
         [Test]
-        public void ResetScope_SiblingTarget_NoFindings()
+        public void ResetScope_SiblingTarget_Error()
         {
             var f = new ValidatorFixture();
-            f.Album.actions.Add(new ResetScope { scopeId = "tier1b" });
-            AssertClean(f.Run());
+            f.Album.actions.Add(new ResetScope { scope = f.Tier1b });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "is neither from 'tier1'");
         }
 
         [Test]
-        public void ResetScope_UnknownScope_Error()
+        public void ResetScope_NoScope_Error()
         {
             var f = new ValidatorFixture();
-            ((ResetScope)f.Album.actions[2]).scopeId = "ghost";
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown scope 'ghost'");
+            ((ResetScope)f.Album.actions[2]).scope = null;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "ResetScope names no scope");
         }
 
         // ---- ExecuteRung reach and cycles ----
@@ -318,7 +312,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ExecuteRung_OutsideSubtree_Error()
         {
             var f = new ValidatorFixture();
-            f.Trigger.actions.Add(new ExecuteRung { tierId = "ch1" });
+            f.Trigger.actions.Add(new ExecuteRung { tier = f.Ch1 });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "outside 'tier1'");
         }
 
@@ -326,7 +320,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ExecuteRung_TargetWithoutRung_Error()
         {
             var f = new ValidatorFixture();
-            f.Capstone.actions.Add(new ExecuteRung { tierId = "tier1b" });
+            f.Capstone.actions.Add(new ExecuteRung { tier = f.Tier1b });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "declares no rung");
         }
 
@@ -334,7 +328,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ExecuteRung_SelfInvocation_CycleError()
         {
             var f = new ValidatorFixture();
-            f.Album.actions.Add(new ExecuteRung { tierId = "tier1" });
+            f.Album.actions.Add(new ExecuteRung { tier = f.Tier1 });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ReferenceCycle, "rung invocation cycle");
         }
 
@@ -342,25 +336,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ExecuteRung_DownwardChain_NoFindings()
         {
             var f = new ValidatorFixture();
-            f.Capstone.actions.Add(new ExecuteRung { tierId = "tier1" });
+            f.Capstone.actions.Add(new ExecuteRung { tier = f.Tier1 });
             AssertClean(f.Run());
         }
 
         // ---- modifier grants ----
 
         [Test]
-        public void AddModifier_UnknownModifier_Error()
+        public void AddModifier_NoModifier_Error()
         {
             var f = new ValidatorFixture();
-            f.Trigger.actions.Add(new AddModifier { scopeId = "tier1", modifierId = "ghost" });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown modifier 'ghost'");
+            f.Trigger.actions.Add(new AddModifier { scope = f.Tier1, modifier = null });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "AddModifier names no modifier");
         }
 
         [Test]
         public void AddModifier_OffChainTarget_Error()
         {
             var f = new ValidatorFixture();
-            f.Trigger.actions.Add(new AddModifier { scopeId = "tier1b", modifierId = "boost" });
+            f.Trigger.actions.Add(new AddModifier { scope = f.Tier1b, modifier = f.Boost });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "grants live outward");
         }
 
@@ -368,7 +362,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void AddModifier_AncestorTarget_NoFindings()
         {
             var f = new ValidatorFixture();
-            f.Trigger.actions.Add(new AddModifier { scopeId = "ch1", modifierId = "boost" });
+            f.Trigger.actions.Add(new AddModifier { scope = f.Ch1, modifier = f.Boost });
             AssertClean(f.Run());
         }
 
@@ -377,7 +371,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Trigger.actions.Clear();
-            f.Trigger.actions.Add(new RemoveModifier { scopeId = "tier1", modifierId = "boost" });
+            f.Trigger.actions.Add(new RemoveModifier { scope = f.Tier1, modifier = f.Boost });
             AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.RemoveWithoutGrant, "nothing grants it");
         }
 
@@ -426,7 +420,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void AddCurrency_HomeBelowActing_Error()
         {
             var f = new ValidatorFixture();
-            f.Capstone.actions.Add(new AddCurrency { currencyIds = { "cash" }, amount = 5 });
+            f.Capstone.actions.Add(new AddCurrency { currencies = { f.Cash }, amount = 5 });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "AddCurrency");
         }
 
@@ -434,24 +428,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void CurrencyCondition_HomeBelowActing_Error()
         {
             var f = new ValidatorFixture();
-            f.Capstone.offerCondition = new CurrencyAtLeast { currencyId = "cash", threshold = 1 };
+            f.Capstone.offerCondition = new CurrencyAtLeast { currency = f.Cash, threshold = 1 };
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "CurrencyAtLeast");
         }
 
         [Test]
-        public void CurrencyCondition_UnknownCurrency_Error()
+        public void CurrencyCondition_NoCurrency_Error()
         {
             var f = new ValidatorFixture();
-            f.Album.offerCondition = new CurrencyAtLeast { currencyId = "ghost", threshold = 1 };
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown currency 'ghost'");
+            f.Album.offerCondition = new CurrencyAtLeast { currency = null, threshold = 1 };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "CurrencyAtLeast names nothing");
         }
 
         [Test]
-        public void BarsCompleted_UnknownGroup_Error()
+        public void BarsCompleted_NoGroup_Error()
         {
             var f = new ValidatorFixture();
-            ((BarsCompleted)((All)f.Album.offerCondition).conditions[1]).groupId = "ghost";
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown bar group 'ghost'");
+            ((BarsCompleted)((All)f.Album.offerCondition).conditions[1]).group = null;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "BarsCompleted names no bar group");
         }
 
         [Test]
@@ -460,8 +454,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new ValidatorFixture();
             f.Capstone.actions[1] = new AddCurrency
             {
-                currencyIds = { "records" },
-                formula = new RootCurveFormula { currencyId = "cash", divisor = 1, exponent = 1 },
+                currencies = { f.Records },
+                formula = new RootCurveFormula { currency = f.Cash, divisor = 1, exponent = 1 },
             };
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "RootCurveFormula");
         }
@@ -470,8 +464,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void RootCurve_UnknownCurrency_Error()
         {
             var f = new ValidatorFixture();
-            ((RootCurveFormula)((AddCurrency)f.Album.actions[0]).formula).currencyId = "ghost";
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown currency 'ghost'");
+            ((RootCurveFormula)((AddCurrency)f.Album.actions[0]).formula).currency = null;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "RootCurveFormula names nothing");
         }
 
         // ---- list-order checks ----
@@ -489,7 +483,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void SetThenWiped_CurrencyInsideResetClosure_Error()
         {
             var f = new ValidatorFixture();
-            f.Album.actions.Insert(0, new AddCurrency { currencyIds = { "cash" }, amount = 10 });
+            f.Album.actions.Insert(0, new AddCurrency { currencies = { f.Cash }, amount = 10 });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped, "currency 'cash'");
         }
 
@@ -506,7 +500,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Capstone.actions.RemoveAt(0);
-            f.Capstone.actions.Add(new ExecuteRung { tierId = "tier1" }); // after the reset - too late
+            f.Capstone.actions.Add(new ExecuteRung { tier = f.Tier1 }); // after the reset - too late
             AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedValue, "payout rung at 'tier1'");
         }
 
@@ -520,12 +514,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var inner = TestTree.MakeScope("tier_inner");
             inner.rung = new Rung
             {
-                offerCondition = new CurrencyAtLeast { currencyId = "fans", threshold = 1 },
-                actions = { new AddCurrency { currencyIds = { "records" }, amount = 1 } },
+                offerCondition = new CurrencyAtLeast { currency = f.Fans, threshold = 1 },
+                actions = { new AddCurrency { currencies = { f.Records }, amount = 1 } },
             };
             f.Tier1.children.Add(inner);
-            f.Defs.Add(inner);
-            f.Album.actions.Insert(0, new ExecuteRung { tierId = "tier_inner" });
+            f.Album.actions.Insert(0, new ExecuteRung { tier = inner });
             AssertClean(f.Run());
         }
 
@@ -534,11 +527,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Album.actions.Clear();
-            f.Album.actions.Add(new ResetScope { scopeId = "tier1" });
+            f.Album.actions.Add(new ResetScope { scope = f.Tier1 });
             f.Album.actions.Add(new AddCurrency
             {
-                currencyIds = { "records", "ch1_records" },
-                formula = new RootCurveFormula { currencyId = "fans", divisor = 5, exponent = 0.5 },
+                currencies = { f.Records, f.Ch1Records },
+                formula = new RootCurveFormula { currency = f.Fans, divisor = 5, exponent = 0.5 },
             });
             f.Album.actions.Add(new SetFlag { flagId = "album" });
             var report = f.Run();
@@ -560,7 +553,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void EffectTag_NoMemberInGrantSubtree_Warning()
         {
             var f = new ValidatorFixture();
-            f.Defs.Add(TestTree.DeclareCurrency(f.Root, "merch", "collectible"));
+            TestTree.DeclareCurrency(f.Root, "merch", "collectible");   // the tag exists, but not inside tier1
             f.Boost.effects.Add(new Effect { target = "collectible", multiplier = 2 });
             AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "matches no member within 'tier1'");
         }
@@ -619,7 +612,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var orphan = TestTree.MakeDefinition<ModifierDefinition>("orphan");
             orphan.effects.Add(new Effect { target = "nonsense", multiplier = 2 });
             orphan.effects.Add(new Effect { target = "cash", currencyId = "ghost", multiplier = 2 });
-            f.Defs.Add(orphan);
+            f.Ch1.modifiers.Add(orphan);   // declared but never granted
             var report = f.Run();
             AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "modifier 'orphan' effects[0]");
             AssertFinding(report, ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "narrows to 'ghost', which is no currency id and no tag any currency carries");
@@ -650,16 +643,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ProducesEntry_CurrencyOffActingChain_Error()
         {
             var f = new ValidatorFixture();
-            f.Defs.Add(TestTree.DeclareCurrency(f.Tier1b, "merch"));
-            f.Tap.produces.Add(TestTree.Entry("merch", Stat.Rate, 1));
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "produces entry addresses currency 'merch'");
+            var merch = TestTree.DeclareCurrency(f.Tier1b, "merch");
+            f.Tap.produces.Add(TestTree.Entry(merch, Stat.Rate, 1));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "a produces entry addresses 'merch' declared at 'tier1b'");
         }
 
         [Test]
         public void ProducesEntry_UnconsumedStat_Warning()
         {
             var f = new ValidatorFixture();
-            f.Tap.produces.Add(TestTree.Entry("cash", "Rate", 1));   // no system consumes "Rate"
+            f.Tap.produces.Add(TestTree.Entry(f.Cash, "Rate", 1));   // no system consumes "Rate"
             AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.UnconsumedStat, "stat 'Rate'");
         }
 
@@ -667,7 +660,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ProducesEntry_MissingStat_Warning()
         {
             var f = new ValidatorFixture();
-            f.Tap.produces.Add(TestTree.Entry("cash", null, 1));
+            f.Tap.produces.Add(TestTree.Entry(f.Cash, null, 1));
             AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.UnconsumedStat, "names no stat");
         }
 
@@ -675,7 +668,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ProducesEntry_NegativeValue_Error()
         {
             var f = new ValidatorFixture();
-            f.Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, -1));
+            f.Tap.produces.Add(TestTree.Entry(f.Cash, Stat.Yield, -1));
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never subtracts");
         }
 
@@ -683,9 +676,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ProducesEntry_ConditionValidatedInTheDeclaringScope_Error()
         {
             var f = new ValidatorFixture();
-            f.Tap.produces.Add(TestTree.Entry("cash", Stat.Yield, 1,
-                new UpgradePurchased { upgradeId = "ghost_upgrade" }));
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown UpgradeDefinition 'ghost_upgrade'");
+            f.Tap.produces.Add(TestTree.Entry(f.Cash, Stat.Yield, 1, new UpgradePurchased { upgrade = null }));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "UpgradePurchased names nothing");
         }
 
         [Test]
@@ -708,12 +700,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Generator_CostCurrencyOffActingChain_Error()
         {
             var f = new ValidatorFixture();
-            f.Amp.costCurrencyId = "ch1_records";
+            f.Amp.costCurrency = f.Ch1Records;
             AssertNoFinding(f.Run(), ValidationCheck.ChainReach);    // an ancestor's currency is on the chain
 
-            f.Defs.Add(TestTree.DeclareCurrency(f.Tier1b, "merch"));
-            f.Amp.costCurrencyId = "merch";
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "generator cost addresses currency 'merch'");
+            f.Amp.costCurrency = TestTree.DeclareCurrency(f.Tier1b, "merch");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "generator cost addresses 'merch' declared at 'tier1b'");
         }
 
         // An unauthored gate refuses the buy, so the content is inert rather
@@ -751,7 +742,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Upgrade_PayloadResettingItsOwnScope_SetThenWiped_Error()
         {
             var f = new ValidatorFixture();
-            f.AmpStrings.actions.Add(new ResetScope { scopeId = "tier1" });
+            f.AmpStrings.actions.Add(new ResetScope { scope = f.Tier1 });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped, "purchase latch of upgrade 'amp_strings'");
         }
 
@@ -768,12 +759,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             var sibling = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
-            sibling.availableWhen = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 1 };
-            sibling.costCurrencyId = "ch1_records";
+            sibling.availableWhen = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 };
+            sibling.costCurrency = f.Ch1Records;
             sibling.baseCost = 5;
-            sibling.produces.Add(TestTree.Entry("ch1_records", Stat.Rate, 1));
+            sibling.produces.Add(TestTree.Entry(f.Ch1Records, Stat.Rate, 1));
             f.Tier1b.generators.Add(sibling);
-            f.Defs.Add(sibling);
 
             // tier1's upgrade cannot reach a source declared in tier1b: the
             // source's own outward walk never visits tier1.
@@ -818,23 +808,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             var sibling = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
-            sibling.availableWhen = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 1 };
-            sibling.costCurrencyId = "ch1_records";
+            sibling.availableWhen = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 };
+            sibling.costCurrency = f.Ch1Records;
             sibling.baseCost = 5;
             f.Tier1b.generators.Add(sibling);
-            f.Defs.Add(sibling);
 
             // tier1's rung cannot read a count stored in tier1b.
-            ((All)f.Album.offerCondition).conditions.Add(new OwnedCountAtLeast { generatorId = "merch_stand", count = 1 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "OwnedCountAtLeast reads 'merch_stand' declared at 'tier1b'");
+            ((All)f.Album.offerCondition).conditions.Add(new OwnedCountAtLeast { generator = sibling, count = 1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "OwnedCountAtLeast addresses 'merch_stand' declared at 'tier1b'");
         }
 
         [Test]
-        public void GeneratorReference_Unknown_Error()
+        public void GeneratorReference_Missing_Error()
         {
             var f = new ValidatorFixture();
-            ((All)f.Album.offerCondition).conditions.Add(new OwnedCountAtLeast { generatorId = "ghost", count = 1 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "unknown GeneratorDefinition 'ghost'");
+            ((All)f.Album.offerCondition).conditions.Add(new OwnedCountAtLeast { generator = null, count = 1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "OwnedCountAtLeast names nothing");
         }
 
         [Test]
@@ -842,13 +831,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             var sibling = TestTree.MakeDefinition<UpgradeDefinition>("merch_deal");
-            sibling.gate = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 1 };
-            sibling.costCurrencyId = "ch1_records";
+            sibling.gate = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 };
+            sibling.costCurrency = f.Ch1Records;
             f.Tier1b.upgrades.Add(sibling);
-            f.Defs.Add(sibling);
 
-            f.Trigger.condition = new UpgradePurchased { upgradeId = "merch_deal" };
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "UpgradePurchased reads 'merch_deal' declared at 'tier1b'");
+            f.Trigger.condition = new UpgradePurchased { upgrade = sibling };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "UpgradePurchased addresses 'merch_deal' declared at 'tier1b'");
         }
 
         // ---- career effects ----
@@ -867,9 +855,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new ValidatorFixture();
             var local = TestTree.MakeDefinition<CareerEffectDefinition>("tier_career");
             local.target = "records";                                // homed at the root, declared at tier1
-            local.formula = new LinearOnBalance { currencyId = "ch1_records", coefficient = 1 };
+            local.formula = new LinearOnBalance { currency = f.Ch1Records, coefficient = 1 };
             f.Tier1.careerEffects.Add(local);
-            f.Defs.Add(local);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "targets currency 'records' homed at 'root'");
         }
 
@@ -889,53 +876,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             roadie.target = "income";
             roadie.formula = new RoadieTotalBoost { perRoadie = -0.05 };
             f.Root.careerEffects.Add(roadie);
-            f.Defs.Add(roadie);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never shrinks");
         }
 
-        // A declaration is a direct reference; every runtime lookup is by id
-        // through the database. An asset missing its Addressables label sits in
-        // exactly that gap.
-        [Test]
-        public void DeclaredButUndiscoverable_Error()
-        {
-            var f = new ValidatorFixture();
-            var unlabeled = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
-            unlabeled.availableWhen = new CurrencyAtLeast { currencyId = "cash", threshold = 1 };
-            unlabeled.costCurrencyId = "cash";
-            unlabeled.baseCost = 5;
-            f.Tier1.generators.Add(unlabeled);        // declared, but never added to Defs
 
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
-                "the content database does not resolve to this asset");
-        }
 
-        [Test]
-        public void DeclaredAndDiscoverable_NoFindings()
-        {
-            var f = new ValidatorFixture();
-            var labeled = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
-            labeled.availableWhen = new CurrencyAtLeast { currencyId = "cash", threshold = 1 };
-            labeled.costCurrencyId = "cash";
-            labeled.baseCost = 5;
-            f.Tier1.generators.Add(labeled);
-            f.Defs.Add(labeled);
-
-            AssertClean(f.Run());
-        }
-
-        // The rule covers every direct-reference declaration, not just the
-        // economy families - a forgotten label is the same slip either way.
-        [Test]
-        public void DeclaredTriggerUndiscoverable_Error()
-        {
-            var f = new ValidatorFixture();
-            var orphan = TestTree.MakeDefinition<TriggerDefinition>("orphan_trigger");
-            f.Tier1.triggers.Add(orphan);
-
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
-                "declares TriggerDefinition 'orphan_trigger'");
-        }
 
         // ---- numeric range across every authored double ----
 
@@ -985,6 +930,149 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new ValidatorFixture();
             f.Trigger.condition = new Not();
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "Not has no operand");
+        }
+
+        // ---- sibling chains: an id is unique where it is VISIBLE, not globally ----
+
+        [Test]
+        public void SiblingChapters_MayEachDeclareTheSameCurrencyId_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.AddSiblingChapter();          // tier2 declares its own 'cash' asset
+            AssertClean(f.Run());
+        }
+
+        // The setter in each chapter resolves the name outward to its OWN
+        // chapter's declaration: neither is off-chain, and neither declaration
+        // is left without a setter.
+        [Test]
+        public void SiblingChapters_MayEachDeclareTheSameFlag_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            sibling.Ch2.declaredFlags.Add("album");     // ch1 declares one of its own
+            sibling.Tier2.rung = new Rung { actions = { new SetFlag { flagId = "album" } } };
+            AssertClean(f.Run());
+        }
+
+        // A grant names the modifier ASSET, so two chapters may each declare a
+        // 'boost' and each grant its own - the effects are judged at the grant
+        // site, against the currencies that site can reach.
+        [Test]
+        public void SiblingChapters_MayEachDeclareTheSameModifierId_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            var boost2 = TestTree.MakeDefinition<ModifierDefinition>("boost");
+            boost2.effects.Add(new Effect { target = "cash", multiplier = 2 });
+            sibling.Ch2.modifiers.Add(boost2);
+
+            var trigger2 = TestTree.MakeDefinition<TriggerDefinition>("boost_trigger");
+            trigger2.actions.Add(new AddModifier { scope = sibling.Tier2, modifier = boost2 });
+            sibling.Tier2.triggers.Add(trigger2);
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void SiblingChapters_EffectResolvesToItsOwnChaptersCurrency_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            var upgrade = TestTree.MakeDefinition<UpgradeDefinition>("tight_set");
+            upgrade.gate = new EarnedTotalAtLeast { currency = sibling.Cash, threshold = 10 };
+            upgrade.costCurrency = sibling.Cash;
+            upgrade.cost = 10;
+            upgrade.effects.Add(new Effect { target = "cash", multiplier = 1.5 });
+            sibling.Tier2.upgrades.Add(upgrade);
+            AssertClean(f.Run());
+        }
+
+        // Both cycle shapes REPORT rather than recurse: the chain and subtree
+        // walks run only after the graph is known to be a tree, so reaching the
+        // assertion at all is half of what these two prove.
+
+        [Test]
+        public void RootBackEdge_ReportsTheCycle()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.children.Add(f.Root);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeGraph, "children cycle");
+        }
+
+        [Test]
+        public void MidTreeBackEdge_ReportsTheCycle()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.children.Add(f.Ch1);    // ch1 becomes a child of its own descendant
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeGraph, "child of both");
+        }
+
+        // Tags travel down a chain with ids, so a collision is caught where both
+        // are visible even though neither scope declares both halves.
+        [Test]
+        public void AncestorTagCollidingWithADescendantId_Error()
+        {
+            var f = new ValidatorFixture();
+            TestTree.DeclareCurrency(f.Root, "merch", "encore");
+            TestTree.DeclareCurrency(f.Tier1, "encore");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.TagIdCollision, "collides with tag 'encore'");
+        }
+
+        // ---- the coordinates address one entry TOGETHER (12.2) ----
+
+        // The currency stage evaluates with owner == currency, so a currency
+        // target narrowed to a DIFFERENT currency can never match anything.
+        [Test]
+        public void EffectCoordinates_CurrencyTargetNarrowedToAnotherCurrency_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "cash", currencyId = "fans", multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "never select an entry together");
+        }
+
+        [Test]
+        public void EffectCoordinates_SourceNarrowedToACurrencyItNeverProduces_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.effects.Add(new Effect { target = "practice_amp", currencyId = "fans", multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "pairs with currency 'fans'");
+        }
+
+        [Test]
+        public void EffectCoordinates_SourceNarrowedToAStatItNeverProduces_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.effects.Add(new Effect { target = "practice_amp", stat = Stat.Yield, multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "pairs with stat 'yield'");
+        }
+
+        // The currency stage is only ever asked for a stat something pays the
+        // currency with, so nothing paying fans a rate makes the pair inert.
+        [Test]
+        public void EffectCoordinates_CurrencyNarrowedToAStatNothingPaysIt_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "fans", stat = Stat.Rate, multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "pairs with stat 'rate'");
+        }
+
+        [Test]
+        public void EffectCoordinates_CurrencyNarrowedToAStatSomethingPays_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "cash", stat = Stat.Yield, multiplier = 2 });   // the tap pays it
+            AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
+        }
+
+        // A tag names many owners on purpose: the pair holds when ONE of them
+        // can pay it, not when the first one can.
+        [Test]
+        public void EffectCoordinates_TagTargetSatisfiedBySomeOwner_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.EditorInit("tap_producer", "gear");   // the amp already carries it, with rate entries
+            f.AmpStrings.effects.Add(new Effect { target = "gear", stat = Stat.Yield, multiplier = 2 });
+            AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
         }
     }
 }

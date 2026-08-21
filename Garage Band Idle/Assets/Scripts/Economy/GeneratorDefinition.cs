@@ -15,7 +15,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // flag nothing sets.
         [SerializeReference, SubclassPicker] public Condition availableWhen;
 
-        [DefinitionId(typeof(CurrencyDefinition))] public string costCurrencyId;
+        public CurrencyDefinition costCurrency;
         public BigNumber baseCost;
 
         // A curve ratio, so a double - same species as Effect.multiplier and

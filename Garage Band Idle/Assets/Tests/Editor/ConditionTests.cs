@@ -13,8 +13,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.balances["fans"] = 50;
             var ctx = tree.Ctx(tree.Tier1);
 
-            Assert.IsTrue(new CurrencyAtLeast { currencyId = "fans", threshold = 50 }.Evaluate(ctx));
-            Assert.IsFalse(new CurrencyAtLeast { currencyId = "fans", threshold = 51 }.Evaluate(ctx));
+            Assert.IsTrue(new CurrencyAtLeast { currency = tree.Fans, threshold = 50 }.Evaluate(ctx));
+            Assert.IsFalse(new CurrencyAtLeast { currency = tree.Fans, threshold = 51 }.Evaluate(ctx));
         }
 
         [Test]
@@ -25,8 +25,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ctx.Deposit("cash", 300);
             tree.Tier1.balances["cash"] = 10;   // spent down
 
-            Assert.IsTrue(new EarnedTotalAtLeast { currencyId = "cash", threshold = 250 }.Evaluate(ctx));
-            Assert.IsFalse(new CurrencyAtLeast { currencyId = "cash", threshold = 250 }.Evaluate(ctx));
+            Assert.IsTrue(new EarnedTotalAtLeast { currency = tree.Cash, threshold = 250 }.Evaluate(ctx));
+            Assert.IsFalse(new CurrencyAtLeast { currency = tree.Cash, threshold = 250 }.Evaluate(ctx));
         }
 
         [Test]
@@ -36,8 +36,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["practice_amp"] = 3;
             var ctx = tree.Ctx(tree.Tier1);
 
-            Assert.IsTrue(new OwnedCountAtLeast { generatorId = "practice_amp", count = 3 }.Evaluate(ctx));
-            Assert.IsFalse(new OwnedCountAtLeast { generatorId = "practice_amp", count = 4 }.Evaluate(ctx));
+            Assert.IsTrue(new OwnedCountAtLeast { generator = tree.PracticeAmp, count = 3 }.Evaluate(ctx));
+            Assert.IsFalse(new OwnedCountAtLeast { generator = tree.PracticeAmp, count = 4 }.Evaluate(ctx));
         }
 
         [Test]
@@ -45,11 +45,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Ch1.flags.Add("album");
+            var cutDemo = TestTree.MakeDefinition<UpgradeDefinition>("cut_demo");
+            tree.Ch1Def.upgrades.Add(cutDemo);
             tree.Ch1.purchasedUpgrades.Add("cut_demo");
             var ctx = tree.Ctx(tree.Tier1);
 
             Assert.IsTrue(new FlagSet { flagId = "album" }.Evaluate(ctx));
-            Assert.IsTrue(new UpgradePurchased { upgradeId = "cut_demo" }.Evaluate(ctx));
+            Assert.IsTrue(new UpgradePurchased { upgrade = cutDemo }.Evaluate(ctx));
             Assert.IsFalse(new FlagSet { flagId = "fans_revealed" }.Evaluate(ctx));
         }
 
@@ -59,19 +61,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var group = TestTree.MakeDefinition<BarGroupDefinition>("learn_covers");
             var cover1 = TestTree.MakeDefinition<BarDefinition>("cover_1");
-            cover1.groupId = "learn_covers";
             cover1.fillAmount = 100;
             var cover2 = TestTree.MakeDefinition<BarDefinition>("cover_2");
-            cover2.groupId = "learn_covers";
             cover2.fillAmount = 300;
-            tree.Defs.Add(group).Add(cover1).Add(cover2);
+            group.bars.AddRange(new[] { cover1, cover2 });   // the group owns its bars
+            tree.Tier1Def.barGroups.Add(group);
 
             tree.Tier1.barProgress["cover_1"] = 100;   // exactly full
             tree.Tier1.barProgress["cover_2"] = 299;   // just short
             var ctx = tree.Ctx(tree.Tier1);
 
-            Assert.IsTrue(new BarsCompleted { groupId = "learn_covers", count = 1 }.Evaluate(ctx));
-            Assert.IsFalse(new BarsCompleted { groupId = "learn_covers", count = 2 }.Evaluate(ctx));
+            Assert.IsTrue(new BarsCompleted { group = group, count = 1 }.Evaluate(ctx));
+            Assert.IsFalse(new BarsCompleted { group = group, count = 2 }.Evaluate(ctx));
         }
 
         [Test]

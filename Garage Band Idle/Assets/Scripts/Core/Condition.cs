@@ -25,33 +25,32 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class CurrencyAtLeast : Condition
     {
-        [DefinitionId(typeof(Economy.CurrencyDefinition))] public string currencyId;
+        public Economy.CurrencyDefinition currency;
         public BigNumber threshold;
 
-        public override bool Evaluate(GameContext ctx) => ctx.GetBalance(currencyId) >= threshold;
-        public override void Validate(ValidationContext ctx) => ctx.RequireChainCurrency(currencyId, "CurrencyAtLeast");
+        public override bool Evaluate(GameContext ctx) => ctx.GetBalance(currency.Id) >= threshold;
+        public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(currency, "CurrencyAtLeast");
     }
 
     [Serializable]
     public class EarnedTotalAtLeast : Condition
     {
-        [DefinitionId(typeof(Economy.CurrencyDefinition))] public string currencyId;
+        public Economy.CurrencyDefinition currency;
         public BigNumber threshold;
 
-        public override bool Evaluate(GameContext ctx) => ctx.GetEarnedTotal(currencyId) >= threshold;
-        public override void Validate(ValidationContext ctx) => ctx.RequireChainCurrency(currencyId, "EarnedTotalAtLeast");
+        public override bool Evaluate(GameContext ctx) => ctx.GetEarnedTotal(currency.Id) >= threshold;
+        public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(currency, "EarnedTotalAtLeast");
     }
 
     [Serializable]
     public class OwnedCountAtLeast : Condition
     {
-        [DefinitionId(typeof(Economy.GeneratorDefinition))] public string generatorId;
+        public Economy.GeneratorDefinition generator;
         public int count;
 
-        public override bool Evaluate(GameContext ctx) => ctx.GetOwnedCount(generatorId) >= count;
+        public override bool Evaluate(GameContext ctx) => ctx.GetOwnedCount(generator.Id) >= count;
 
-        public override void Validate(ValidationContext ctx) =>
-            ctx.RequireChainDeclaration<Economy.GeneratorDefinition>(generatorId, "OwnedCountAtLeast");
+        public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(generator, "OwnedCountAtLeast");
     }
 
     [Serializable]
@@ -63,23 +62,27 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Validate(ValidationContext ctx)
         {
-            var home = ctx.FlagHome(flagId);
-            if (home == null)
+            // The read walks outward from the acting scope and stops at the
+            // first declaration, so a same-named flag on another chain is simply
+            // a different flag (12.3).
+            if (ctx.FlagHome(flagId) != null)
+                return;
+            var elsewhere = ctx.AnyScopeDeclaringFlag(flagId);
+            if (elsewhere == null)
                 ctx.AddError(ValidationCheck.UnresolvedReference, $"FlagSet references flag '{flagId}', which no scope declares.");
-            else if (!ctx.OnActingChain(home))
-                ctx.AddError(ValidationCheck.ChainReach, $"FlagSet reads flag '{flagId}' homed at '{home.Id}', which is not on the chain from '{ctx.ActingScope.Id}' - the read can never see it set (12.12).");
+            else
+                ctx.AddError(ValidationCheck.ChainReach, $"FlagSet reads flag '{flagId}' homed at '{elsewhere.Id}', which is not on the chain from '{ctx.ActingScope.Id}' - the read can never see it set (12.12).");
         }
     }
 
     [Serializable]
     public class UpgradePurchased : Condition
     {
-        [DefinitionId(typeof(Economy.UpgradeDefinition))] public string upgradeId;
+        public Economy.UpgradeDefinition upgrade;
 
-        public override bool Evaluate(GameContext ctx) => ctx.IsUpgradePurchased(upgradeId);
+        public override bool Evaluate(GameContext ctx) => ctx.IsUpgradePurchased(upgrade.Id);
 
-        public override void Validate(ValidationContext ctx) =>
-            ctx.RequireChainDeclaration<Economy.UpgradeDefinition>(upgradeId, "UpgradePurchased");
+        public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(upgrade, "UpgradePurchased");
     }
 
     // Counts the group's bars at full: completion is derived, progress >= the
@@ -87,29 +90,24 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class BarsCompleted : Condition
     {
-        [DefinitionId(typeof(Economy.BarGroupDefinition))] public string groupId;
+        public Economy.BarGroupDefinition group;
         public int count = 1;
 
         public override bool Evaluate(GameContext ctx)
         {
             var completed = 0;
-            foreach (var bar in ctx.Defs.All<Economy.BarDefinition>())
-            {
-                if (bar.groupId != groupId)
-                    continue;
-                if (ctx.GetBarProgress(bar.Id) >= bar.fillAmount)
+            foreach (var bar in group.bars)
+                if (bar != null && ctx.GetBarProgress(bar.Id) >= bar.fillAmount)
                     completed++;
-            }
             return completed >= count;
         }
 
-        // Group membership and progress reach validate further in build step 5,
-        // when bars gain their scope attachment; today the reference resolving
-        // is the whole check.
+        // Scope attachment for groups lands with build step 5; the reference
+        // itself is what makes the bars reachable without a lookup.
         public override void Validate(ValidationContext ctx)
         {
-            if (ctx.Defs.Get<Economy.BarGroupDefinition>(groupId) == null)
-                ctx.AddError(ValidationCheck.UnresolvedReference, $"BarsCompleted references unknown bar group '{groupId}'.");
+            if (group == null)
+                ctx.AddError(ValidationCheck.NullEntry, "BarsCompleted names no bar group.");
         }
     }
 

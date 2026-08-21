@@ -18,8 +18,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // records 100 after the first deposit doubles fans.
             var action = new AddCurrency
             {
-                currencyIds = { "fans", "records" },
-                formula = new RootCurveFormula { currencyId = "fans", divisor = 1, exponent = 1 }
+                currencies = { tree.Fans, tree.Records },
+                formula = new RootCurveFormula { currency = tree.Fans, divisor = 1, exponent = 1 }
             };
 
             action.Execute(tree.Ctx(tree.Tier1));
@@ -33,7 +33,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
 
-            new AddCurrency { currencyIds = { "roadies" }, amount = 1 }.Execute(tree.Ctx(tree.Ch1));
+            new AddCurrency { currencies = { tree.Roadies }, amount = 1 }.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual(BigNumber.One, tree.Root.balances["roadies"]);
         }
@@ -42,23 +42,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void AddModifier_stacking_semantics_come_from_the_definition()
         {
             var tree = new TestTree();
-            tree.Defs.Add(TestTree.MakeDefinition<ModifierDefinition>("replace_mod"));
+            var replaceMod = TestTree.MakeDefinition<ModifierDefinition>("replace_mod");
             var linear = TestTree.MakeDefinition<ModifierDefinition>("linear_mod");
             linear.stacking = StackingKind.Linear;
-            tree.Defs.Add(linear);
+            tree.Ch1Def.modifiers.AddRange(new[] { replaceMod, linear });
             var ctx = tree.Ctx(tree.Tier1);
 
-            var grantReplace = new AddModifier { scopeId = "ch1", modifierId = "replace_mod" };
+            var grantReplace = new AddModifier { scope = tree.Ch1Def, modifier = replaceMod };
             grantReplace.Execute(ctx);
             grantReplace.Execute(ctx);   // re-grant keeps count at 1
 
-            var grantLinear = new AddModifier { scopeId = "ch1", modifierId = "linear_mod" };
+            var grantLinear = new AddModifier { scope = tree.Ch1Def, modifier = linear };
             grantLinear.Execute(ctx);
             grantLinear.Execute(ctx);    // re-grant increments
 
-            Assert.AreEqual(1, tree.Ch1.activeModifiers.Find(e => e.modifierId == "replace_mod").count);
-            Assert.AreEqual(2, tree.Ch1.activeModifiers.Find(e => e.modifierId == "linear_mod").count);
-            Assert.IsEmpty(tree.Tier1.activeModifiers);   // the grant landed on the named ancestor
+            Assert.AreEqual(1, tree.Ch1.modifierStacks["replace_mod"]);
+            Assert.AreEqual(2, tree.Ch1.modifierStacks["linear_mod"]);
+            Assert.IsEmpty(tree.Tier1.modifierStacks);   // the grant landed on the named ancestor
         }
 
         [Test]
@@ -67,18 +67,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var linear = TestTree.MakeDefinition<ModifierDefinition>("linear_mod");
             linear.stacking = StackingKind.Linear;
-            tree.Defs.Add(linear);
+            tree.Ch1Def.modifiers.Add(linear);
             var ctx = tree.Ctx(tree.Tier1);
-            var grant = new AddModifier { scopeId = "ch1", modifierId = "linear_mod" };
-            var remove = new RemoveModifier { scopeId = "ch1", modifierId = "linear_mod" };
+            var grant = new AddModifier { scope = tree.Ch1Def, modifier = linear };
+            var remove = new RemoveModifier { scope = tree.Ch1Def, modifier = linear };
 
             remove.Execute(ctx);         // absent: no-op, no error
             grant.Execute(ctx);
             grant.Execute(ctx);
             remove.Execute(ctx);         // one stack down
-            Assert.AreEqual(1, tree.Ch1.activeModifiers.Find(e => e.modifierId == "linear_mod").count);
+            Assert.AreEqual(1, tree.Ch1.modifierStacks["linear_mod"]);
             remove.Execute(ctx);         // entry deleted at zero
-            Assert.IsEmpty(tree.Ch1.activeModifiers);
+            Assert.IsEmpty(tree.Ch1.modifierStacks);
         }
 
         [Test]
@@ -88,8 +88,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Grants live outward, never downward.
             Assert.Throws<System.InvalidOperationException>(
-                () => new AddModifier { scopeId = "tier1", modifierId = "m" }.Execute(tree.Ctx(tree.Ch1)));
-            Assert.IsEmpty(tree.Tier1.activeModifiers);
+                () => new AddModifier { scope = tree.Tier1Def, modifier = tree.GjTap1 }.Execute(tree.Ctx(tree.Ch1)));
+            Assert.IsEmpty(tree.Tier1.modifierStacks);
         }
 
         [Test]
@@ -103,7 +103,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["drummer"] = 2;
             tree.Tier1.barProgress["cover_1"] = 100;
 
-            new ResetScope { scopeId = "tier1" }.Execute(ctx);
+            new ResetScope { scope = tree.Tier1Def }.Execute(ctx);
 
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);       // key kept, value zeroed
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.earnedTotals["cash"]);   // gear region re-hides
@@ -121,7 +121,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Ctx(tree.Ch1).Deposit("ch1_records", 30);
             tree.Ctx(tree.Root).Deposit("records", 30);
 
-            new ResetScope { scopeId = "ch1" }.Execute(tree.Ctx(tree.Ch1));
+            new ResetScope { scope = tree.Ch1Def }.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual(BigNumber.Zero, tree.Ch1.balances["ch1_records"]);
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);       // reached downward
@@ -129,22 +129,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void ResetScope_reaches_a_sibling_but_never_an_ancestor()
+        public void ResetScope_reaches_what_it_encloses_but_never_a_peer_or_an_ancestor()
         {
             var tree = new TestTree();
             var tier2Def = TestTree.MakeScope("tier2");
-            tree.Defs.Add(TestTree.DeclareCurrency(tier2Def, "merch"));
             tree.Ch1Def.children.Add(tier2Def);
             var root = ScopeState.Build(tree.RootDef);   // rebuild with the sibling
             var tier1 = root.FindInSubtree("tier1");
             var tier2 = root.FindInSubtree("tier2");
             tier2.balances["merch"] = 5;
 
-            new ResetScope { scopeId = "tier2" }.Execute(new GameContext(tier1, tree.Defs, tree.Now));
-            Assert.AreEqual(BigNumber.Zero, tier2.balances["merch"]);
+            // A peer is the parent's to clear, so tier1 cannot reach tier2.
+            Assert.Throws<System.InvalidOperationException>(
+                () => new ResetScope { scope = tier2Def }.Execute(new GameContext(tier1, tree.Now)));
+            Assert.AreEqual((BigNumber)5, tier2.balances["merch"]);
 
             Assert.Throws<System.InvalidOperationException>(
-                () => new ResetScope { scopeId = "ch1" }.Execute(new GameContext(tier1, tree.Defs, tree.Now)));
+                () => new ResetScope { scope = tree.Ch1Def }.Execute(new GameContext(tier1, tree.Now)));
         }
 
         [Test]
@@ -157,7 +158,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // A root-declared trigger is a legitimate root acting context; the
             // refusal is structural (12.12: "never the root"), not reach math.
             Assert.Throws<System.InvalidOperationException>(
-                () => new ResetScope { scopeId = "root" }.Execute(tree.Ctx(tree.Root)));
+                () => new ResetScope { scope = tree.RootDef }.Execute(tree.Ctx(tree.Root)));
 
             Assert.AreEqual((BigNumber)30, tree.Root.balances["records"]);
             Assert.IsTrue(tree.Root.flags.Contains("ch1_complete"));
@@ -202,20 +203,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // fans is unreachable - only the rebase makes this legal (12.4).
             tree.Tier1Def.rung = new Rung
             {
-                offerCondition = new CurrencyAtLeast { currencyId = "fans", threshold = 50 },
+                offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
                 actions =
                 {
                     new AddCurrency
                     {
-                        currencyIds = { "records", "ch1_records" },
-                        formula = new RootCurveFormula { currencyId = "fans", divisor = 5, exponent = 0.5 }
+                        currencies = { tree.Records, tree.Ch1Records },
+                        formula = new RootCurveFormula { currency = tree.Fans, divisor = 5, exponent = 0.5 }
                     },
-                    new ResetScope { scopeId = "tier1" }
+                    new ResetScope { scope = tree.Tier1Def }
                 }
             };
             tree.Tier1.balances["fans"] = 60;
 
-            new ExecuteRung { tierId = "tier1" }.Execute(tree.Ctx(tree.Ch1));
+            new ExecuteRung { tier = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual((BigNumber)3, tree.Root.balances["records"]);
             Assert.AreEqual((BigNumber)3, tree.Ch1.balances["ch1_records"]);
@@ -228,12 +229,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             tree.Tier1Def.rung = new Rung
             {
-                offerCondition = new CurrencyAtLeast { currencyId = "fans", threshold = 50 },
-                actions = { new AddCurrency { currencyIds = { "records" }, amount = 99 } }
+                offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
+                actions = { new AddCurrency { currencies = { tree.Records }, amount = 99 } }
             };
             tree.Tier1.balances["fans"] = 10;
 
-            new ExecuteRung { tierId = "tier1" }.Execute(tree.Ctx(tree.Ch1));
+            new ExecuteRung { tier = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual(BigNumber.Zero, tree.Root.balances["records"]);     // no payout without the gate
             Assert.AreEqual((BigNumber)10, tree.Tier1.balances["fans"]);        // untouched; a later reset discards
@@ -243,7 +244,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Rung_with_no_authored_gate_never_offers()
         {
             var tree = new TestTree();
-            var rung = new Rung { actions = { new AddCurrency { currencyIds = { "records" }, amount = 1 } } };
+            var rung = new Rung { actions = { new AddCurrency { currencies = { tree.Records }, amount = 1 } } };
 
             Assert.IsFalse(rung.IsOffered(tree.Ctx(tree.Tier1)));
             Assert.IsFalse(rung.TryExecute(tree.Ctx(tree.Tier1)));
@@ -256,26 +257,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             tree.Tier1Def.rung = new Rung
             {
-                offerCondition = new CurrencyAtLeast { currencyId = "fans", threshold = 50 },
+                offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
                 actions =
                 {
                     new AddCurrency
                     {
-                        currencyIds = { "records", "ch1_records" },
-                        formula = new RootCurveFormula { currencyId = "fans", divisor = 5, exponent = 0.5 }
+                        currencies = { tree.Records, tree.Ch1Records },
+                        formula = new RootCurveFormula { currency = tree.Fans, divisor = 5, exponent = 0.5 }
                     },
-                    new ResetScope { scopeId = "tier1" }
+                    new ResetScope { scope = tree.Tier1Def }
                 }
             };
             var capstone = new Rung
             {
-                offerCondition = new CurrencyAtLeast { currencyId = "ch1_records", threshold = 30 },
+                offerCondition = new CurrencyAtLeast { currency = tree.Ch1Records, threshold = 30 },
                 actions =
                 {
-                    new ExecuteRung { tierId = "tier1" },
-                    new AddCurrency { currencyIds = { "roadies" }, amount = 1 },
+                    new ExecuteRung { tier = tree.Tier1Def },
+                    new AddCurrency { currencies = { tree.Roadies }, amount = 1 },
                     new SetFlag { flagId = "ch1_complete" },
-                    new ResetScope { scopeId = "ch1" }
+                    new ResetScope { scope = tree.Ch1Def }
                 }
             };
             tree.Ch1.balances["ch1_records"] = 29;

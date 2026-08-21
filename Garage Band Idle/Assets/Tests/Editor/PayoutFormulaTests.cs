@@ -17,7 +17,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Tier1.balances["fans"] = fans;
-            var formula = new RootCurveFormula { currencyId = "fans", divisor = 5, exponent = 0.5 };
+            var formula = new RootCurveFormula { currency = tree.Fans, divisor = 5, exponent = 0.5 };
 
             Assert.AreEqual((BigNumber)expected, formula.Compute(tree.Ctx(tree.Tier1)));
         }

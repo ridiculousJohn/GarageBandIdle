@@ -10,39 +10,42 @@ namespace RidiculousGaming.GarageBandIdle
     public class GameContext
     {
         public readonly ScopeState Scope;
-        public readonly IDefinitionSource Defs;
         public readonly DateTime NowUtc;
 
-        public GameContext(ScopeState scope, IDefinitionSource defs, DateTime nowUtc)
+        // No definition source: every reference an authored object holds is the
+        // object itself, and every id a FACT holds resolves by walking this
+        // scope outward. Nothing needs a catalogue.
+        public GameContext(ScopeState scope, DateTime nowUtc)
         {
             Scope = scope;
-            Defs = defs;
             NowUtc = nowUtc;
         }
 
         // A nested invocation runs in the owning object's scope (design doc 12.4).
-        public GameContext Rebase(ScopeState scope) => new GameContext(scope, Defs, NowUtc);
+        public GameContext Rebase(ScopeState scope) => new GameContext(scope, NowUtc);
 
         // ---- reads: chain walk outward from the acting scope ----
 
-        // A currency has one home; the holder is the scope whose dictionary
-        // carries the key. Absent everywhere = 0 (undeclared reads are a load-time
-        // validation concern, not a runtime branch).
-        public BigNumber GetBalance(string currencyId)
+        // The currency's home on this chain. Absent means the content addresses
+        // a currency it cannot reach - refused at load, so reaching it here is a
+        // bug and nothing sensible follows from continuing.
+        private ScopeState HomeOf(string currencyId)
         {
             for (var node = Scope; node != null; node = node.Parent)
-                if (node.balances.TryGetValue(currencyId, out var value))
-                    return value;
-            return BigNumber.Zero;
+                if (node.balances.ContainsKey(currencyId))
+                    return node;
+            throw new InvalidOperationException(
+                $"No scope on the chain from '{Scope.ScopeId}' holds currency '{currencyId}'.");
         }
 
-        public BigNumber GetEarnedTotal(string currencyId)
-        {
-            for (var node = Scope; node != null; node = node.Parent)
-                if (node.earnedTotals.TryGetValue(currencyId, out var value))
-                    return value;
-            return BigNumber.Zero;
-        }
+        // A currency has one home; the holder is the scope whose dictionary
+        // carries the key. Every declared currency gets its keys when the tree is
+        // built, so a missing key means the content read a currency off this
+        // chain - a load-time error, and answering 0 would be a wrong number the
+        // caller cannot tell from a real one.
+        public BigNumber GetBalance(string currencyId) => HomeOf(currencyId).balances[currencyId];
+
+        public BigNumber GetEarnedTotal(string currencyId) => HomeOf(currencyId).earnedTotals[currencyId];
 
         public int GetOwnedCount(string generatorId)
         {
@@ -78,18 +81,6 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // ---- writes: each lands at the fact's home ----
-
-        // The currency's home on this chain. Absent means the content addresses
-        // a currency it cannot reach - refused at load, so reaching it here is a
-        // bug and nothing sensible follows from continuing.
-        private ScopeState HomeOf(string currencyId)
-        {
-            for (var node = Scope; node != null; node = node.Parent)
-                if (node.balances.ContainsKey(currencyId))
-                    return node;
-            throw new InvalidOperationException(
-                $"No scope on the chain from '{Scope.ScopeId}' holds currency '{currencyId}'.");
-        }
 
         // Deposits at the currency's home: balance and earned total together.
         // A deposit is a grant; spending moves the balance alone. A negative
