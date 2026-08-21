@@ -16,5 +16,6 @@
 - [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - direct references constrain authoring, not runtime addressing; cross-chain aliasing is the feature; the downward production walk is the one place identity is load-bearing
 - [Currency values are BigNumber](currency-values-are-bignumber.md) - authored fields included (thresholds, amounts, fill rates); never default them to double; exceptions: Effect.multiplier, counts, Pow's power
 - [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - never invent a second way to express what the architecture already covers (scope placement groups things; ids are for cross-references); a covered case that seems to need something new is a conversation first
+- [Problems, not issues](problems-not-issues.md) - a true finding is not automatically work; ask what breaks TODAY, and supply the stopping rule the review loop lacks
 - [No spec accumulation](no-spec-accumulation.md) - answer a review finding by deleting the mechanism, not by adding a paragraph; plan length is a defect signal
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20 corrections: venue asset and stationing cap deleted, scope payloads typed by tree position, currencies by direct reference
