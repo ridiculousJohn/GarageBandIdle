@@ -6,9 +6,7 @@
 - [No AI attribution in commits](no-ai-attribution-in-commits.md) - never add Co-Authored-By/Generated-with trailers; disabled in settings 2026-07-21
 - [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when editor closed (check UnityLockfile first, one level down); exit code 0 proves nothing, grep for `error CS`; its test counts and import method predate the restart
 - [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) - merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
-- [Bug reports are verify-only](bug-reports-are-verify-only.md) - a finding means verdict + evidence, never edits or reverts; freeze after a denied tool call
-- [Quote directive before editing](quote-directive-before-editing.md) - standing protocol: any repo change (edit, commit, add, reset, push) is preceded by Acting on: "<John's words>"; nothing quotable = no change, and last turn's approval never carries forward
-- [Act on the conclusion to ask](act-on-the-conclusion-to-ask.md) - when reasoning says stop and ask, send the question; never keep working, never build a second verification path around a blocked one
+- [Quote directive before editing](quote-directive-before-editing.md) - the write gate now lives in the repo CLAUDE.md ("No write without a live order"); this is the failure record behind it, and it absorbed the verify-only and stop-and-ask rules 2026-08-21
 - [No inaction epilogues](no-inaction-epilogues.md) - never close a response with what you didn't do ("nothing edited"); repo state is a fact, restraint is not news
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
 - [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) - verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
