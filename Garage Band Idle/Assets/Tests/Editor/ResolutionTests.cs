@@ -14,6 +14,43 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static void AssertClose(double expected, BigNumber actual, string what = null) =>
             Assert.AreEqual(expected, actual.ToDouble(), 1e-9, what ?? string.Empty);
 
+        // ---- the cascade row (12.6) ----
+
+        [TestCase(GrowthKind.Multiply, 1.331)]      // 1.1 ^ 3
+        [TestCase(GrowthKind.Linear, 1.3)]          // 1 + 0.1 * 3
+        public void A_cascade_scales_by_the_fill_count_in_its_own_growth_kind(GrowthKind growth, double expected)
+        {
+            var tree = new TestTree();
+            var bar = MakeCascadeBar(tree, 1.1, growth);
+            tree.Tier1.fillCounts[bar.Id] = 3;
+
+            AssertClose(expected, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
+        }
+
+        // Reduced to nothing is a semantic; reduced past nothing is not one, and
+        // the rule binds both consumers of the growth vocabulary.
+        [Test]
+        public void Linear_cascade_growth_saturates_at_zero()
+        {
+            var tree = new TestTree();
+            var bar = MakeCascadeBar(tree, 0.5, GrowthKind.Linear);
+            tree.Tier1.fillCounts[bar.Id] = 5;      // 1 + (-0.5) * 5 = -1.5
+
+            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
+        }
+
+        // Read through the DECLARATION list, like a purchased upgrade: a count
+        // for a bar this scope never declared cannot contribute.
+        [Test]
+        public void A_fill_count_for_an_undeclared_bar_contributes_nothing()
+        {
+            var tree = new TestTree();
+            MakeCascadeBar(tree, 1.1, GrowthKind.Multiply);
+            tree.Tier1.fillCounts["ghost_bar"] = 10;
+
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
+        }
+
         // ---- the match rule ----
 
         [Test]
@@ -398,6 +435,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 TierA.generatorCounts["gen_a"] = 1;
                 TierB.generatorCounts["gen_b"] = 1;
             }
+        }
+
+        // A repeating bar carrying one cascade entry, filed at tier1.
+        private static BarDefinition MakeCascadeBar(TestTree tree, double multiplier, GrowthKind growth)
+        {
+            var group = TestTree.MakeDefinition<BarGroupDefinition>("cascades");
+
+            var bar = TestTree.MakeDefinition<BarDefinition>("cascade_bar");
+            bar.fillCurrency = tree.Rehearsal;
+            bar.fillAmount = 10;
+            bar.fillRate = 1;
+            bar.repeating = true;
+            bar.perFill.Add(new PerFillEntry
+            {
+                effect = new Effect { target = "practice_amp", multiplier = multiplier },
+                growth = growth,
+            });
+            group.bars.Add(bar);
+            tree.Tier1Def.barGroups.Add(group);
+            return bar;
         }
 
         // A generator paying one unit per second, so a test reads the multiplier

@@ -27,7 +27,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly CurrencyDefinition Fans;
         public readonly CurrencyDefinition Records;
         public readonly CurrencyDefinition Ch1Records;
+        public readonly CurrencyDefinition Rehearsal;
         public readonly BarGroupDefinition Covers;
+        public readonly BarDefinition Cover1;
 
         public ValidatorFixture()
         {
@@ -45,8 +47,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Ch1.declaredFlags.Add("album");
             Cash = TestTree.DeclareCurrency(Tier1, "cash", "income");
             Fans = TestTree.DeclareCurrency(Tier1, "fans");
+            Rehearsal = TestTree.DeclareCurrency(Tier1, "rehearsal");
 
             Covers = TestTree.MakeDefinition<BarGroupDefinition>("covers");
+            Covers.maxActive = 1;
+            Cover1 = TestTree.MakeDefinition<BarDefinition>("cover_1");
+            Cover1.fillCurrency = Rehearsal;
+            Cover1.fillAmount = 100;
+            Cover1.fillRate = 2;
+            Covers.bars.Add(Cover1);
             Tier1.barGroups.Add(Covers);
 
             Album = new Rung
@@ -1073,6 +1082,180 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Tap.EditorInit("tap_producer", "gear");   // the amp already carries it, with rate entries
             f.AmpStrings.effects.Add(new Effect { target = "gear", stat = Stat.Yield, multiplier = 2 });
             AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
+        }
+
+        // ---- bars and groups ----
+
+        [Test]
+        public void Bar_FillCurrencyOffTheChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            f.Cover1.fillCurrency = sibling.Cash;      // a sibling chapter's asset
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "fill currency");
+        }
+
+        // A bar that names no currency fills from time alone, which is the whole
+        // of what the deleted behavior classes used to say.
+        [Test]
+        public void Bar_WithNoFillCurrency_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.fillCurrency = null;
+            var report = f.Run();
+            Assert.IsFalse(report.Findings.Any(finding => finding.Message.Contains("cover_1")),
+                $"expected nothing about cover_1; got:\n{Dump(report)}");
+        }
+
+        [Test]
+        public void BarGroup_MaxActiveBelowOne_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Covers.maxActive = 0;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "maxActive is 0");
+        }
+
+        [Test]
+        public void BarGroup_NullBarEntry_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Covers.bars.Add(null);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "null bar entry");
+        }
+
+        [Test]
+        public void Bar_NonpositiveThresholdAndRate_Errors()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.fillAmount = 0;
+            f.Cover1.fillRate = 0;
+            var report = f.Run();
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NumericRange, "fillAmount is 0");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NumericRange, "fillRate is 0");
+        }
+
+        // The opposite of a purchase gate: fail-closed binds entry points that
+        // create value out of a spend, and a bar's availability is a selection
+        // filter - so an unauthored one is not reported at all.
+        [Test]
+        public void Bar_NullGateIsOpenAndReportsNothing()
+        {
+            var f = new ValidatorFixture();
+            Assert.IsNull(f.Cover1.availableWhen);
+            var report = f.Run();
+            Assert.IsFalse(report.Findings.Any(finding => finding.Message.Contains("cover_1")),
+                $"expected nothing about cover_1; got:\n{Dump(report)}");
+        }
+
+        [Test]
+        public void Bar_GateIsJudgedInTheDeclaringScope_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            f.Cover1.availableWhen = new CurrencyAtLeast { currency = sibling.Cash, threshold = 1 };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "CurrencyAtLeast");
+        }
+
+        [Test]
+        public void Bar_PerFillOnANonRepeatingBar_InertOperand_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.perFill.Add(new PerFillEntry { effect = new Effect { target = "fans", multiplier = 1.1 } });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.InertOperand,
+                "perFill entries on a non-repeating bar");
+        }
+
+        [Test]
+        public void Bar_NullPerFillEntry_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.repeating = true;
+            f.Cover1.perFill.Add(null);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "null perFill entry");
+        }
+
+        [Test]
+        public void Bar_PerFillEffectMustReachItsTarget_EffectReach_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.repeating = true;
+            f.Cover1.perFill.Add(new PerFillEntry { effect = new Effect { target = "ch1_records", multiplier = 2 } });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "'ch1_records'");
+        }
+
+        // The implicit fill-count write: a cascade whose own completion list
+        // resets the scope homing the count it reads would never accumulate.
+        [Test]
+        public void Bar_CascadeWhoseCompletionResetsItsOwnCount_SetThenWiped_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.repeating = true;
+            f.Cover1.perFill.Add(new PerFillEntry { effect = new Effect { target = "fans", multiplier = 1.1 } });
+            f.Cover1.onComplete.Add(new ResetScope { scope = f.Tier1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped,
+                "fill count of bar 'cover_1'");
+        }
+
+        // A bar with no cascade records nothing, so ordinary "fill, then reset
+        // the tier" authoring stays clean.
+        [Test]
+        public void Bar_CascadeFreeCompletionMayResetItsOwnScope_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.onComplete.Add(new ResetScope { scope = f.Tier1 });
+            AssertNoFinding(f.Run(), ValidationCheck.SetThenWiped);
+        }
+
+        [Test]
+        public void Bar_CompletionListJoinsTheSharedLedgers_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.onComplete.Add(new SetFlag { flagId = "ghost_flag" });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "SetFlag names flag 'ghost_flag'");
+        }
+
+        [Test]
+        public void BarsCompleted_GroupOffTheActingChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            var theirs = TestTree.MakeDefinition<BarGroupDefinition>("their_covers");
+            sibling.Tier2.barGroups.Add(theirs);
+            f.Trigger.condition = new BarsCompleted { group = theirs, count = 1 };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "BarsCompleted");
+        }
+
+        // A bar's one produced number is its fill rate, read with its OWN fill
+        // currency as the coordinate - so that currency and `rate` are the pair a
+        // narrowing may name.
+        [Test]
+        public void EffectCoordinates_BarNarrowedToItsOwnFillCurrency_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "cover_1", currencyId = "rehearsal", stat = Stat.Rate, multiplier = 2 });
+            AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
+        }
+
+        [Test]
+        public void EffectCoordinates_BarNarrowedToAnotherCurrency_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "cover_1", currencyId = "cash", multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched,
+                "targets 'cover_1'");
+        }
+
+        // A group holds bars and a cap, so it owns no number for a gather to
+        // reach and is not a target kind at all. Buffing a set of bars is a tag
+        // they share.
+        [Test]
+        public void EffectCoordinates_TargetingABarGroup_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "covers", multiplier = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched,
+                "not an effect target kind");
         }
     }
 }

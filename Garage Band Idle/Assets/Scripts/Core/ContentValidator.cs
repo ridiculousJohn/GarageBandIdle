@@ -23,6 +23,7 @@ namespace RidiculousGaming.GarageBandIdle
         TagIdCollision,         // a tag may not collide with any id
         UnresolvedReference,    // a referenced id resolves to nothing
         NullEntry,              // a null slot in an authored list, or a required operand
+        InertOperand,           // an operand authored where the shape's own behavior never reads it
         RungOnRoot,
         ScopeReach,             // ResetScope / ExecuteRung / modifier-grant reach rules
         ChainReach,             // ordinary reads and writes address only the acting chain
@@ -560,7 +561,9 @@ namespace RidiculousGaming.GarageBandIdle
         // The kinds a multiplier can resolve against (12.2): the currencies a
         // scope homes plus the sources and bars it declares. Scope, trigger,
         // upgrade, and modifier tags are vocabulary, not targets - no effect
-        // ever multiplies one of those.
+        // ever multiplies one of those, and neither is a bar GROUP: its only
+        // members are a set of bars and an int cap, so there is no number for a
+        // gather to reach. Buffing a set of bars is a tag they share (12.7).
         internal static IEnumerable<Definition> Targetables(ScopeDefinition scope)
         {
             foreach (var currency in scope.declaredCurrencies) if (currency != null) yield return currency;
@@ -569,7 +572,6 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var group in scope.barGroups)
             {
                 if (group == null) continue;
-                yield return group;
                 foreach (var bar in group.bars) if (bar != null) yield return bar;
             }
         }
@@ -867,6 +869,24 @@ namespace RidiculousGaming.GarageBandIdle
                     ValidateGenerator(ctx, generator);
                 }
 
+                foreach (var group in scope.barGroups)
+                {
+                    if (group == null)
+                        continue;
+                    ctx.EnterContainer(scope, "barGroup:" + group.Id);
+                    ValidateBarGroup(ctx, group);
+                    foreach (var bar in group.bars)
+                    {
+                        if (bar == null)
+                            continue;
+                        // Each bar is its own container: its completion list
+                        // carries the same set-then-wiped, flag-setter and cycle
+                        // bookkeeping every other action list does.
+                        ctx.EnterContainer(scope, "bar:" + bar.Id);
+                        ValidateBar(ctx, bar, scope);
+                    }
+                }
+
                 foreach (var upgrade in scope.upgrades)
                 {
                     if (upgrade == null)
@@ -977,6 +997,91 @@ namespace RidiculousGaming.GarageBandIdle
             ctx.RecordFactWrite($"the purchase latch of upgrade '{upgrade.Id}'", scope);
 
             ValidateActionList(ctx, upgrade.actions, site);
+        }
+
+        // A group holds bars and caps how many run at once. That is the whole
+        // contract - what a bar drinks and how fast is the bar's own business
+        // (12.7).
+        private static void ValidateBarGroup(ValidationContext ctx, Economy.BarGroupDefinition group)
+        {
+            var site = $"bar group '{group.Id}'";
+            ctx.SetSite(site);
+            if (group.maxActive < 1)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"maxActive is {group.maxActive} - a group nothing can be selected in.");
+
+            for (var i = 0; i < group.bars.Count; i++)
+                if (group.bars[i] == null)
+                {
+                    ctx.SetSite($"{site} bars[{i}]");
+                    ctx.AddError(ValidationCheck.NullEntry, "null bar entry.");
+                }
+        }
+
+        private static void ValidateBar(ValidationContext ctx, Economy.BarDefinition bar, ScopeDefinition scope)
+        {
+            var site = $"bar '{bar.Id}'";
+            ctx.SetSite(site);
+
+            // A null fill currency is legal: that bar fills from time alone. A
+            // named one gets the reach check every other currency operand gets.
+            if (bar.fillCurrency != null)
+                ctx.RequireOnChain(bar.fillCurrency, $"{site} fill currency");
+
+            if (bar.fillAmount <= BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"fillAmount is {bar.fillAmount} - a nonpositive threshold is an unbounded settlement loop.");
+            if (bar.fillRate <= BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"fillRate is {bar.fillRate} - a bar no multiplier can ever move.");
+
+            // A null gate on a bar is OPEN (12.7), the opposite of a purchase
+            // gate: fail-closed binds entry points that create value out of a
+            // spend, and a bar's availability is a selection filter. So an
+            // unauthored one is not reported at all.
+            if (bar.availableWhen != null)
+            {
+                ctx.SetSite($"{site} availableWhen");
+                bar.availableWhen.Validate(ctx);
+            }
+
+            ctx.SetSite(site);
+
+            // The cascade count is fillCounts, which only a repeating bar ever
+            // acquires (12.6's row is titled "Repeating bars"). A non-repeating
+            // bar's completion leaves no derivable effect-fact, which is why its
+            // reward is an AddModifier grant instead - so the authored effect
+            // here is unreachable rather than merely inert.
+            if (!bar.repeating && bar.perFill.Count > 0)
+                ctx.AddError(ValidationCheck.InertOperand,
+                    "perFill entries on a non-repeating bar: the cascade scales by fillCount, and only a repeating bar acquires one (12.6).");
+
+            for (var i = 0; i < bar.perFill.Count; i++)
+            {
+                var entry = bar.perFill[i];
+                if (entry == null)
+                {
+                    ctx.SetSite($"{site} perFill[{i}]");
+                    ctx.AddError(ValidationCheck.NullEntry, "null perFill entry.");
+                    continue;
+                }
+                ctx.SetSite(site);
+                ValidateEffect(ctx, entry.effect, $"{site} perFill[{i}]", scope);
+            }
+
+            // The fill count is a fact write at index -1, exactly as the upgrade
+            // latch is: it lands before actions[0], so a completion list that
+            // resets the scope homing the count its own cascade reads trips
+            // set-then-wiped instead of quietly never accumulating. A bar with no
+            // cascade records nothing, so ordinary "fill, then reset the tier"
+            // authoring stays clean.
+            if (bar.repeating && bar.perFill.Count > 0)
+            {
+                ctx.SetSite($"{site} fill count");
+                ctx.RecordFactWrite($"the fill count of bar '{bar.Id}'", scope);
+            }
+
+            ValidateActionList(ctx, bar.onComplete, site);
         }
 
         private static void ValidateCareerEffect(ValidationContext ctx, Economy.CareerEffectDefinition career, ScopeDefinition scope)
@@ -1189,7 +1294,7 @@ namespace RidiculousGaming.GarageBandIdle
         {
             void WrongKind(Definition definition) =>
                 ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                    $"{site}: targets '{target}' ({definition.GetType().Name}), which is not an effect target kind (12.2: currency, producer, generator, bar, group, or tag).");
+                    $"{site}: targets '{target}' ({definition.GetType().Name}), which is not an effect target kind (12.2: currency, producer, generator, bar, or tag).");
 
             var candidates = ctx.MatchTargets(home, target);
             if (candidates.Count > 0)
@@ -1264,8 +1369,18 @@ namespace RidiculousGaming.GarageBandIdle
                     return producer.produces.Any(entry => EntrySatisfies(entry, currencyId, stat));
                 case Economy.GeneratorDefinition generator:
                     return generator.produces.Any(entry => EntrySatisfies(entry, currencyId, stat));
-                // Bars and groups carry no produces entries until step 5 gives
-                // them a production model, so there is nothing to pair against.
+                // A bar's one produced number is its fill rate, read as
+                // GetMultiplier(.., bar.fillCurrency, rate) - stage 1 only, since
+                // a bar consumes rather than produces. So the pair a coordinate
+                // can name is that bar's own currency and `rate`; one that fills
+                // from time has no currency for a coordinate to name.
+                case Economy.BarDefinition bar:
+                    if (!string.IsNullOrEmpty(stat) && stat != Economy.Stat.Rate)
+                        return false;
+                    if (string.IsNullOrEmpty(currencyId))
+                        return true;
+                    return bar.fillCurrency != null
+                        && (bar.fillCurrency.Id == currencyId || bar.fillCurrency.HasTag(currencyId));
                 default:
                     return true;
             }

@@ -58,21 +58,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void BarsCompleted_derives_completion_from_progress_against_fillAmount()
         {
+            // The fixture's own cover group, not a second one with the same ids:
+            // declaring a rival 'learn_covers' at tier1 would break chain
+            // uniqueness, so the test would assert against content that cannot
+            // load. cover_1 fills at 100 and cover_2 at 300.
             var tree = new TestTree();
-            var group = TestTree.MakeDefinition<BarGroupDefinition>("learn_covers");
-            var cover1 = TestTree.MakeDefinition<BarDefinition>("cover_1");
-            cover1.fillAmount = 100;
-            var cover2 = TestTree.MakeDefinition<BarDefinition>("cover_2");
-            cover2.fillAmount = 300;
-            group.bars.AddRange(new[] { cover1, cover2 });   // the group owns its bars
-            tree.Tier1Def.barGroups.Add(group);
-
-            tree.Tier1.barProgress["cover_1"] = 100;   // exactly full
-            tree.Tier1.barProgress["cover_2"] = 299;   // just short
+            tree.Tier1.barProgress[tree.Cover1.Id] = 100;   // exactly full
+            tree.Tier1.barProgress[tree.Cover2.Id] = 299;   // just short
             var ctx = tree.Ctx(tree.Tier1);
 
-            Assert.IsTrue(new BarsCompleted { group = group, count = 1 }.Evaluate(ctx));
-            Assert.IsFalse(new BarsCompleted { group = group, count = 2 }.Evaluate(ctx));
+            Assert.IsTrue(new BarsCompleted { group = tree.LearnCovers, count = 1 }.Evaluate(ctx));
+            Assert.IsFalse(new BarsCompleted { group = tree.LearnCovers, count = 2 }.Evaluate(ctx));
         }
 
         [Test]

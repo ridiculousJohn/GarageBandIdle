@@ -59,6 +59,29 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                             product *= Stacked(effect.multiplier, pair.Value, modifier.stacking);
                 }
 
+                // Repeating-bar cascades: a completed fill applies the
+                // carrying entry's effect again, scaled by the entry's own
+                // growth kind (design doc 12.6/12.7). Read through the
+                // DECLARATION list, like upgrades: a stray fillCount for a bar
+                // this scope never declared cannot contribute.
+                foreach (var group in node.Definition.barGroups)
+                {
+                    if (group == null)
+                        continue;
+                    foreach (var bar in group.bars)
+                    {
+                        if (bar == null || !node.fillCounts.TryGetValue(bar.Id, out var fills) || fills <= 0)
+                            continue;
+                        foreach (var entry in bar.perFill)
+                        {
+                            if (entry == null)
+                                continue;
+                            if (Matches(entry.effect.target, entry.effect.currencyId, entry.effect.stat, owner, currency, stat))
+                                product *= Grown(entry.effect.multiplier, fills, entry.growth);
+                        }
+                    }
+                }
+
                 // Career effects declared here, computed against the ORIGIN
                 // context rather than this scope's.
                 foreach (var career in node.Definition.careerEffects)
@@ -91,16 +114,20 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return false;
             if (target != owner.Id && !owner.HasTag(target))
                 return false;
-            if (!string.IsNullOrEmpty(effectCurrencyId) && effectCurrencyId != currency.Id
-                && !currency.HasTag(effectCurrencyId))
+            // A null currency is "this number has no currency coordinate" - the
+            // rate of a bar that fills from time and is paid by nothing. A
+            // target-only effect still reaches it, since 12.7 has per-bar speed
+            // buffable by id or tag; a narrowing one names a stage that never runs.
+            if (!string.IsNullOrEmpty(effectCurrencyId) && (currency == null
+                || (effectCurrencyId != currency.Id && !currency.HasTag(effectCurrencyId))))
                 return false;
             if (!string.IsNullOrEmpty(effectStat) && effectStat != stat)
                 return false;
             return true;
         }
 
-        // Count scaling by stacking kind (design doc 12.5): Replace holds a
-        // re-grant at count 1, Linear adds the excess per stack, Multiply
+        // Count scaling, the one arithmetic both consumers of the vocabulary
+        // share (design doc 12.7): Linear adds the excess per count, Multiply
         // compounds. Linear SATURATES at zero: a multiplier below 1 is legal
         // authoring (a debuff that decays linearly), but 1 + (m-1)*n crosses
         // zero once n > 1/(1-m), and a negative factor would run production
@@ -111,14 +138,23 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // the count scaling happens IN BigNumber: (m-1)*n in double arithmetic
         // can overflow to infinity before the wrapper ever sees it, which the
         // whole point of the wrapper is to prevent.
+        internal static BigNumber Grown(BigNumber multiplier, int count, GrowthKind growth)
+        {
+            if (growth == GrowthKind.Linear)
+                return BigNumber.Max(BigNumber.Zero, BigNumber.One + (multiplier - 1) * count);
+            return BigNumber.Pow(multiplier, count);
+        }
+
+        // Granted stacks add the one case a cascade has no room for: Replace
+        // holds a re-grant at count 1 rather than scaling it (design doc 12.5).
         private static BigNumber Stacked(BigNumber multiplier, int count, StackingKind stacking)
         {
             switch (stacking)
             {
                 case StackingKind.Linear:
-                    return BigNumber.Max(BigNumber.Zero, BigNumber.One + (multiplier - 1) * count);
+                    return Grown(multiplier, count, GrowthKind.Linear);
                 case StackingKind.Multiply:
-                    return BigNumber.Pow(multiplier, count);
+                    return Grown(multiplier, count, GrowthKind.Multiply);
                 default:
                     return multiplier;
             }

@@ -581,7 +581,7 @@ clock; author timed goals with that end in mind.
 3. **Lifetime is placement.** A currency, flag, upgrade latch, or bar lives in the scope that
    declares it; the reset that clears the scope clears the fact. Nothing declares a lifetime.
 4. **Class families for open sets; flat data for closed records.** Conditions, Actions,
-   PayoutFormulas, and BarFillBehaviors are polymorphic families — adding a kind adds a class and
+   and PayoutFormulas are polymorphic families — adding a kind adds a class and
    touches nothing that exists. An Effect is a flat struct because it has one shape.
 5. **Validate at content load** (§12.12). Ids resolve, homes are unique, authoring mistakes are
    caught at import, not at runtime.
@@ -635,7 +635,7 @@ against `availableWhen` and affordability — the domain owns the gate, never th
 ```csharp
 [Serializable] public struct Effect
 {
-    public string target;      // a currency id, a producer/generator/bar/group id, or a TAG
+    public string target;      // a currency id, a producer/generator/bar id, or a TAG
     public string currencyId;  // optional — narrow to entries paying this currency (id or TAG)
     public string stat;        // optional — narrow to this stat ("rate"/"yield")
                                // both empty = every number the target has; both set = one entry
@@ -890,7 +890,7 @@ auto-finishing challenge is a trigger, not an event — events keep claimed comp
 | Timed buffs (Encore) | `{buffId, expiresAt}` list | the buff definition's effects while unexpired |
 | Active events | live (unexpired) `ActiveEvent` record | the event definition's handicaps |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
-| Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times |
+| Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `barGroups` |
 | Career facts | Records balance, Roadie allocation, songs this run, entitlements | a `CareerEffectDefinition`'s `MultiplierFormula`, computed on read (§3/§7/§8) |
 
 A `MultiplierFormula` computes against the **gather-origin** context - the source's scope in stage 1,
@@ -900,6 +900,11 @@ a multiplier is addressed to a NUMBER, and the number's identity includes the ch
 A root-declared formula that reads chapter state is unimplementable any other way. Reads stay
 chain-only either way, so no sibling reach opens up - and it is why an effect whose formula depends
 on the producing chapter must target the SOURCES rather than the currency total (§8.2).
+
+The fill-count row is REPEATING bars only: a non-repeating bar's completion is a moment that leaves
+no count to scale, so its reward is an `AddModifier` grant and a `perFill` entry on one is an error
+(12.12). Like the upgrade row, the read walks the declaring scope's own list, so a stray count for a
+bar that scope never declared cannot contribute.
 
 Every row is the same pattern: a fact in state, effects computed from it. All of these exist from the
 first minute of the game and contribute 1× until their facts exist. Nothing in this table is ever
@@ -912,8 +917,9 @@ Generic fillable bars: pacing bars (learn covers), repeating currency bars, casc
 ```csharp
 class BarDefinition : Definition
 {
+    CurrencyDefinition fillCurrency; // what it drinks; null = fills from time alone
     BigDouble    fillAmount;
-    BigDouble    fillRate;        // this bar's own max fill speed (units/sec)
+    BigDouble    fillRate;        // this bar's own fill speed (units/sec)
     bool         repeating;       // fill → fire onComplete → reset to 0 → go again
     Condition    availableWhen;
     List<Action> onComplete;      // fires at each threshold crossing
@@ -922,31 +928,49 @@ class BarDefinition : Definition
 
 class BarGroupDefinition : Definition
 {
-    CurrencyDefinition fillCurrency; // the shared pool (ContinuousDelivery)
-    BigDouble       pipeRate;        // total throughput the group can spend per second
     int             maxActive;
-    BarFillBehavior behavior;        // class family
+    List<BarDefinition> bars;     // the group OWNS its bars: membership is placement
 }
 ```
 
-**Behaviors:** `ContinuousDelivery` drains the pool currency into the active bars; `TimedFill` fills
-from time alone (no pool). Future variants (tap-a-chunk, dump-the-pool) are sibling classes.
+**A group owns its bars**, so a bar's declaring scope IS its group's: the progress fact and the
+`activeBars` set that selects it have one home and one lifetime. That is also what makes the
+settlement order below literal, and it gives `SetActiveBars` its membership test for free.
 
-**Rate is the pipe.** Each active, unfilled bar demands its own `fillRate`; if the pipe (and the pool
-balance) covers total demand, every bar fills at its rate; otherwise all throttle proportionally.
-Buffing the pipe (`{target: groupId, ×2}`) eventually lets multiple bars run at their caps in
-parallel — rehearsal speed becomes parallel learning. Per-bar speed is buffable by bar id or tag.
-A pool (`fillCurrency`) shared by several live groups arbitrates the same way, one level up: when
-the pool can't cover the groups' combined demand, **every live bar drawing it throttles
-proportionally, across groups** — the pipe is per-group, the pool is shared, and processing order
-never picks a winner.
+**A group holds bars and caps how many run at once.** That is its entire job. It owns no currency
+and no throughput: a bar names what it drinks and fills at its own rate, and throttling a bar is that
+rate rather than a second cap over the set. A bar with no `fillCurrency` fills from time alone, which
+is the whole of the distinction a behavior class used to carry.
 
-**Selection is state**: `activeBars` per group; empty = pool accrues, nothing drains.
+**Owning no number, a group is not an effect target.** `maxActive` is an int and stays outside the
+multiplier system - nothing addresses it - and there is nothing else on a group to multiply. Buffing
+a set of bars is a TAG they share, which is the mechanism that already fans one effect out to many
+owners; a group target would instead mean "all my members", a second kind of target resolution the
+vocabulary does not need.
+
+**A bar's rate resolves stage 1 ONLY**: `GetMultiplier(declaringScope, bar, bar.fillCurrency, rate)`,
+with no currency stage. Stage 2 is "effects on this currency's total production", and a bar CONSUMES -
+letting a currency-total buff through would speed the drain as well as the supply, which is not what
+either buff means. The bar's own currency is passed as the coordinate, so an effect may narrow to it
+(`{target: cover_1, currencyId: rehearsal}`); a bar that fills from time passes none, which no
+narrowing effect matches.
+
+**A null `availableWhen` on a bar is OPEN**, the opposite of a purchase gate: fail-closed binds entry
+points that create value out of a spend, and a bar's availability is a selection filter.
+
+**A bar drinks what it names.** Each active, available, unfilled bar wants `fillRate × dt` and takes
+what is there, in the deterministic order below. When a pool cannot cover its bars, the ones later in
+the order simply stall - which is correct feedback, not unfairness: the amount delivered per second is
+the inflow whatever the split, so dividing it proportionally would deliver no more, it would only
+replace one bar visibly filling with three inching. Per-bar speed is buffable by bar id or tag, and a
+buffed bar drinks proportionally faster.
+
+**Selection is state**: `activeBars` per group; empty = the pool accrues and nothing drains.
 `SetActiveBars` is **fail-closed** like every entry point (§12.11): it rejects a set that exceeds
 `maxActive`, names a bar outside the group, names an unavailable bar (`availableWhen` false), or
-names a completed non-repeating bar. On completion the stream **stops** (choosing is the mechanic
-in Ch. 1); auto-advance is a field on `ContinuousDelivery` (behavior classes carry their own config
-beyond the snippet shown) that a later chapter's automation can grant.
+names a completed non-repeating bar. On completion the stream **stops** - choosing is the mechanic in
+Ch. 1, and letting more run in parallel is `maxActive` rising, which is an unlock rather than a
+multiplier.
 
 **Completion is derived**: complete ⇔ `progress ≥ fillAmount`. For a non-repeating bar, progress is
 monotonic until reset and **uncapped** — overfill is allowed and readable — so the crossing happens
@@ -957,11 +981,19 @@ bar is still active and available, subtract `fillAmount`, increment `fillCount`,
 flips availability stops the loop honestly instead of executing precomputed fires against a changed
 world. Residual progress is retained; a buffed rate crossing several thresholds in one tick pays
 every crossing. (The arithmetic shortcut `fires = floor((progress + Δ)/fillAmount)` is a valid
-optimization only when `onComplete` cannot affect the bar's environment.) When several bars
-complete in the same tick, settlement order is deterministic — scopes in tree order (parent before
-child), then groups, then bars within a group, in declaration order — and a reset during
-settlement invalidates the remaining completions from the old scope-life, exactly as the trigger
-sweep rule (§12.5).
+optimization only when `onComplete` cannot affect the bar's environment, which in practice means an
+EMPTY list; a bar with actions iterates.)
+
+**The snapshot admits; live state may only disqualify.** Every rate and gate the draw needs is
+resolved BEFORE the segment's production deposits (12.9), and only the bars that snapshot
+recorded as drawing enter settlement at all. The per-iteration re-reads may take a bar OUT of the
+loop; they may never put one in. Without that asymmetry the seam has a second door: a repeating bar
+can sit at full progress with its gate closed - its own `onComplete` shut it last segment and the
+residual is retained, and a save can load in that state - and a live-only test would let this
+segment's deposits open the gate and pay the whole backlog. Both the draw and the
+settlement run in one deterministic order — scopes in tree order (parent before child), then groups,
+then bars within a group, in declaration order — and a reset during settlement invalidates the
+remaining completions from the old scope-life, exactly as the trigger sweep rule (§12.5).
 
 **Cascades** (bar B buffs bar A per fill): B declares `perFill: [{effect, growth}]` — e.g.
 `{{target: barA, ×1.05}, multiply}`; the applied count is B's `fillCount` — the same pattern as
@@ -1005,8 +1037,11 @@ wrong multiplier. Within each segment the economy phases are **fixed**, resolved
 of effects and entry conditions** — every rate entry is judged and sized against pre-deposit state
 before any deposit lands, so definition order never changes production: rate production deposits
 (pool currencies included) → bar
-consumption (proportional throttle, §12.7) → iterative bar completion — production before
-consumption, so an empty pool fed at +1/sec serves a 1/sec bar demand in the same tick — then wall
+consumption (§12.7) → iterative bar completion — production before
+consumption, so an empty pool fed at +1/sec serves a 1/sec bar demand in the same tick. Bar DEMAND
+is resolved BEFORE the deposits, from the same start-of-segment snapshot as everything else; the pool
+BALANCE is the one thing read live, which is exactly what that carve-out says. Resolving demand after
+the deposits would let a segment's own production open a bar's gate and draw for the whole dt — then wall
 clocks advance to the segment boundary **for the timer set snapshotted at segment start**: a timer
 born mid-segment (a bar action's `StartEvent`) is never charged for a segment it didn't live
 through, and a handicap or buff live at segment start governs the whole segment, expiring only at
@@ -1144,10 +1179,19 @@ per-feature: any kind an author gates with explains itself for free.
   walk cannot reach siblings, so a cross-tree reference is a load-time error rather than a silent
   runtime miss.
 - Effect reach is validated for every target kind (§12.2): a currency-total effect must be declared
-  at the currency's home scope or an ancestor; an exact source target (producer, generator, bar,
-  group) must be declared at the target's scope or an ancestor — a sibling-declared effect resolves
+  at the currency's home scope or an ancestor; an exact source target (producer, generator, bar)
+  must be declared at the target's scope or an ancestor — a sibling-declared effect resolves
   at load but the target's outward walk never visits it, so it is an error, not a warning; a tag
   target must match at least one member within the effect's declaring scope's subtree.
+- A bar group's `maxActive` is at least 1, and it lists no null bars. A bar's `fillAmount` and
+  `fillRate` are positive - a nonpositive threshold is an unbounded settlement loop, and a zero rate
+  is a bar no multiplier can move - and a named `fillCurrency` must be reachable on its own chain
+  (none is legal: it fills from time). `perFill` on a NON-REPEATING bar is an error (12.6). A
+  repeating bar carrying `perFill` records its fill-count write ahead of `onComplete`, so a
+  completion list resetting the scope that homes its own count trips set-then-wiped. An Effect
+  targeting a bar GROUP warns: a group owns no number for a gather to reach. `BarsCompleted` reaches
+  like every other scope-attached read: the group's declaring scope is the acting scope or an
+  ancestor.
 - An action list that sets a fact and later resets the scope declaring it errors (set-then-wiped —
   e.g. an event's `event_tierN_done` flag must be declared outside the scope its own `onComplete`
   resets).
@@ -1179,7 +1223,7 @@ Assets/Scripts/
     Purchasing.cs           // TryBuy(generator | upgrade): fail-closed gate, spend, count or latch, payload
     CareerEffectDefinition.cs  // formula-shaped multipliers + the MultiplierFormula family
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply)
-    BarDefinition.cs  BarGroupDefinition.cs  BarFillBehavior.cs  BarSystem.cs
+    BarDefinition.cs  BarGroupDefinition.cs  BarSystem.cs
   Loop/
     ChapterDefinition.cs  TierDefinition.cs   // rungs declared here
     ChapterManager.cs      // forward-only advance, reacting to root completion flags
@@ -1271,9 +1315,9 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   `{target: id-or-tag, currencyId?, stat?, multiplier}`, gathered on read from
   facts (purchases, timed buffs, events, modifier grants, fill counts, career totals) and never
   stored; flat bonuses are contributions; tags name sets from the member side.
-- **Bars:** generic fillables — own fill rate per bar, group pipe rate (proportional throttle),
-  optional pool currency or time-fill, repeating with per-fill cascade effects scaled by fill count,
-  uncapped overfill, completion derived from progress.
+- **Bars:** generic fillables — each names an optional pool currency and its own fill rate, taking
+  what is there in declaration order; a group only caps how many run at once; repeating bars carry
+  per-fill cascade effects scaled by fill count; uncapped overfill, completion derived from progress.
 - **Events:** data + one ActiveEvent record; `StartEvent`/`CompleteEvent`/`AbortEvent` are
   self-guarding operations callable from anywhere; entry runs `onEntry` (banking the run if the
   host rung's own gate is met, discarding it otherwise) then creates the record; handicaps are ×<1

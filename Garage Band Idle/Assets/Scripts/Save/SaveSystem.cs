@@ -263,9 +263,10 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // triggers, generators, upgrades) plus the modifier stacks, whose ids
         // name declared content too - a modifier is declared on a scope, and a
         // stack's id resolves by walking outward from the scope holding it.
-        // Pending-claim currencies and
-        // roadie allocation validate against the tree instead (below). Bar and
-        // group ids, event ids, buff ids, and song ids gain their filters WITH
+        // Bar facts come through here too: a bar's home is its GROUP's home,
+        // so a scope's own groups are the whole question. Pending-claim
+        // currencies and roadie allocation validate against the tree instead
+        // (below). Event ids, buff ids, and song ids gain their filters WITH
         // their definition families - the same incremental contract as the
         // validation pass.
         private static void FilterToDeclared(ScopeFacts facts, ScopeState state)
@@ -329,6 +330,85 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     facts.generatorCounts.Remove(key);
             }
 
+            // Progress is uncapped by design - overfill is allowed and
+            // readable (12.7) - so the only illegal value is a negative one.
+            List<string> staleProgress = null;
+            foreach (var pair in facts.barProgress)
+            {
+                if (FindBar(definition, pair.Key) == null)
+                    Debug.LogWarning($"SaveSystem: bar progress '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
+                else if (pair.Value < BigNumber.Zero)
+                    Debug.LogWarning($"SaveSystem: bar progress '{pair.Key}' is {pair.Value} - dropped.");
+                else
+                    continue;
+                (staleProgress ??= new List<string>()).Add(pair.Key);
+            }
+            if (staleProgress != null)
+            {
+                foreach (var key in staleProgress)
+                    facts.barProgress.Remove(key);
+            }
+
+            // A fill count is a REPEATING bar's fact and nothing else's: a
+            // non-repeating bar never acquires one, so a count on disk naming one
+            // is tampering or a stale write. Zero already reads as absent.
+            List<string> staleFills = null;
+            foreach (var pair in facts.fillCounts)
+            {
+                var bar = FindBar(definition, pair.Key);
+                if (bar == null)
+                    Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
+                else if (!bar.repeating)
+                    Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' names a non-repeating bar, which acquires none - dropped.");
+                else if (pair.Value <= 0)
+                    Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' is {pair.Value} - dropped.");
+                else
+                    continue;
+                (staleFills ??= new List<string>()).Add(pair.Key);
+            }
+            if (staleFills != null)
+            {
+                foreach (var key in staleFills)
+                    facts.fillCounts.Remove(key);
+            }
+
+            // Selection is the player's fact, so it is filtered rather than
+            // rebuilt: an unknown group goes, a bar outside its group goes, and a
+            // set still over maxActive after that is CLEARED rather than
+            // truncated - refusing a tampered selection beats picking which bars
+            // survive, and the player simply reselects.
+            List<string> staleSelections = null;
+            foreach (var pair in facts.activeBars)
+            {
+                var group = FindGroup(definition, pair.Key);
+                if (group == null)
+                {
+                    Debug.LogWarning($"SaveSystem: active-bar set for group '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
+                    (staleSelections ??= new List<string>()).Add(pair.Key);
+                    continue;
+                }
+                pair.Value.RemoveWhere(barId =>
+                {
+                    foreach (var bar in group.bars)
+                    {
+                        if (bar != null && bar.Id == barId)
+                            return false;
+                    }
+                    Debug.LogWarning($"SaveSystem: active bar '{barId}' is not in group '{group.Id}' - dropped.");
+                    return true;
+                });
+                if (pair.Value.Count > group.maxActive)
+                {
+                    Debug.LogWarning($"SaveSystem: group '{group.Id}' holds {pair.Value.Count} active bars of at most {group.maxActive} - cleared.");
+                    pair.Value.Clear();
+                }
+            }
+            if (staleSelections != null)
+            {
+                foreach (var key in staleSelections)
+                    facts.activeBars.Remove(key);
+            }
+
             // A stack is a count of a modifier declared at this scope or an
             // ancestor - the same walk the read does. A nonpositive count is not
             // a stack: RemoveModifier deletes the key at zero, so one on disk is
@@ -349,6 +429,33 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 foreach (var key in staleStacks)
                     facts.modifierStacks.Remove(key);
             }
+        }
+
+        // A bar and its group are found in this scope's OWN declaration lists:
+        // the group owns its bars, and the group's scope homes both their facts.
+        private static Economy.BarDefinition FindBar(ScopeDefinition definition, string barId)
+        {
+            foreach (var group in definition.barGroups)
+            {
+                if (group == null)
+                    continue;
+                foreach (var bar in group.bars)
+                {
+                    if (bar != null && bar.Id == barId)
+                        return bar;
+                }
+            }
+            return null;
+        }
+
+        private static Economy.BarGroupDefinition FindGroup(ScopeDefinition definition, string groupId)
+        {
+            foreach (var group in definition.barGroups)
+            {
+                if (group != null && group.Id == groupId)
+                    return group;
+            }
+            return null;
         }
 
         private static bool DeclaresModifierOnChain(ScopeState state, string modifierId)

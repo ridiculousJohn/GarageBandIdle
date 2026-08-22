@@ -41,6 +41,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly CareerEffectDefinition RoadieActive;
         public readonly ModifierDefinition GjTap1;
         public readonly TriggerDefinition Tier1Trigger;
+        public readonly BarGroupDefinition LearnCovers;
+        public readonly BarDefinition Cover1;
+        public readonly BarDefinition Cover2;
+        public readonly BarDefinition Cover3;
 
         public TestTree()
         {
@@ -137,6 +141,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             RoadieActive.formula = new RoadieActiveBoost { perRoadie = 0.05 };
             RootDef.careerEffects.Add(RoadieActive);
 
+            // learn_covers: each cover drinks Rehearsal at 2/s, and the group
+            // caps it to ONE at a time, since choosing the next one is the
+            // mechanic. Each completion grants its own fan-rate modifier, which
+            // is what a one-shot completion has instead of a cascade.
+            LearnCovers = MakeDefinition<BarGroupDefinition>("learn_covers");
+            LearnCovers.maxActive = 1;
+            Cover1 = Cover("cover_1", "cover_bonus_1", 100, 1.15);
+            Cover2 = Cover("cover_2", "cover_bonus_2", 300, 1.15);
+            Cover3 = Cover("cover_3", "cover_bonus_3", 600, 1.2);
+            Tier1Def.barGroups.Add(LearnCovers);
+
             // The Garage Jam reward: +25% tap for the rest of the chapter, so
             // it is granted at ch1 and outlives the tier resets.
             GjTap1 = MakeDefinition<ModifierDefinition>("gj_tap_1");
@@ -146,6 +161,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Root = ScopeState.Build(RootDef);
             Ch1 = (ChapterScopeState)Root.FindInSubtree("ch1");
             Tier1 = Root.FindInSubtree("tier1");
+        }
+
+        // One cover and the modifier its completion grants. Both are filed at
+        // tier1, so a run reset clears the bonus along with the progress.
+        private BarDefinition Cover(string id, string modifierId, double fillAmount, double bonus)
+        {
+            var modifier = MakeDefinition<ModifierDefinition>(modifierId);
+            modifier.effects.Add(new Effect { target = "fans", stat = Stat.Rate, multiplier = bonus });
+            Tier1Def.modifiers.Add(modifier);
+
+            var bar = MakeDefinition<BarDefinition>(id);
+            bar.fillCurrency = Rehearsal;
+            bar.fillAmount = fillAmount;
+            bar.fillRate = 2;
+            bar.onComplete.Add(new AddModifier { scope = Tier1Def, modifier = modifier });
+            LearnCovers.bars.Add(bar);
+            return bar;
         }
 
         public static ProducesEntry Entry(CurrencyDefinition currency, string stat, double value, Condition condition = null) =>

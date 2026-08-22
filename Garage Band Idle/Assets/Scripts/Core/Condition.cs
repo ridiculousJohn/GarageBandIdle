@@ -102,12 +102,18 @@ namespace RidiculousGaming.GarageBandIdle
             return completed >= count;
         }
 
-        // Scope attachment for groups lands with build step 5; the reference
-        // itself is what makes the bars reachable without a lookup.
+        // The count reads each bar's progress by walking OUTWARD from the
+        // acting scope, and a bar's progress is homed at its group's scope - so
+        // that scope must be the acting one or an ancestor, or the walk never
+        // reaches the fact and the count is permanently zero.
         public override void Validate(ValidationContext ctx)
         {
             if (group == null)
+            {
                 ctx.AddError(ValidationCheck.NullEntry, "BarsCompleted names no bar group.");
+                return;
+            }
+            ctx.RequireOnChain(group, "BarsCompleted");
         }
     }
 

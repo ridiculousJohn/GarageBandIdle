@@ -18,7 +18,7 @@ always that the content belongs on a scope.
 | 3 | ContentDatabase + validation | **DONE 2026-08-18** — 123/123 green (122 project-authored + Addressables' TestStub) |
 | 4 | Producers, generators, upgrades + resolution | **DONE 2026-08-19** - 208/208 green at the time |
 | - | Correction pass (2026-08-20) | **DONE** - 194/194 green: authored content references assets rather than ids, the content database and `IDefinitionSource` deleted, modifiers and bar groups declared, `ResetScope` self-or-enclosed, ids unique per chain, content faults throw |
-| 5 | Bars | not started |
+| 5 | Bars | **DONE 2026-08-21** - 266/266 green |
 | 6 | Events + trigger sweep | not started |
 | 7 | Tick + GameSession | not started |
 | 8 | Chapter 1 JSON + importer + walkthrough tests | not started |
@@ -35,7 +35,7 @@ always that the content belongs on a scope.
    declaration lists land with their families in steps 4–6, since their types don't exist yet),
    `GameContext` (outward chain walks, rebasing), `IDefinitionSource` seam, Economy data shapes
    (`CurrencyDefinition`, `ModifierDefinition` + stacking, `BarDefinition`/`BarGroupDefinition`/
-   `BarFillBehavior`), NumberFormatter display rules. All currency/production values are
+   `BarGroupDefinition`), NumberFormatter display rules. All currency/production values are
    `BigNumber`, authored fields included.
 2. **Save system** (§12.10) — serialize the ScopeState tree and nothing else; schemaVersion +
    explicit migrations (missing path or newer version = refused); checksum bound over version AND
@@ -63,10 +63,10 @@ always that the content belongs on a scope.
    generator contributions, granted modifier stacks, career facts); later rows join with their
    steps. Extends validation: produces-entry targets, generator/upgrade reference resolution,
    tag membership extending to producers and generators.
-5. **Bars** (§12.7) — fill behaviors (`ContinuousDelivery`, `TimedFill`), proportional pipe/pool
-   throttling across groups, iterative completion settlement in deterministic order, cascades
-   (`perFill` × `fillCount` — the fill-count row of effects-from-facts), `SetActiveBars`
-   (fail-closed). Extends validation: bar/group membership and availability checks.
+5. **Bars** (§12.7) — a bar drinks the currency it names at its own rate, taking what is there in
+   declaration order; a group only caps how many run at once. Iterative completion settlement in
+   deterministic order, cascades (`perFill` × `fillCount` — the fill-count row of
+   effects-from-facts), `SetActiveBars` (fail-closed). Extends validation: bar and group checks.
 6. **Events + trigger sweep** (§6.1, §12.8, §12.5) — `EventDefinition` declared on its host scope
    (`ScopeDefinition.events`), with the lifecycle operations holding a direct reference and the
    `ActiveEvent` record's id resolving outward, exactly as modifiers do; the three self-guarding lifecycle operations,

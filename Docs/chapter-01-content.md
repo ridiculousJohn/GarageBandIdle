@@ -102,21 +102,21 @@ per-bandmate constant anywhere.
 | Id | Cost | Gate | Action |
 |---|---|---|---|
 | `play_for_crowd` | 100 | `OwnedCountAtLeast(drummer, 1)` | `SetFlag(fans_revealed)` |
-| `learn_covers` | 200 | `CurrencyAtLeast(fans, 25)` | `SetFlag(rehearsal_revealed)` |
+| `unlock_covers` | 200 | `CurrencyAtLeast(fans, 25)` | `SetFlag(rehearsal_revealed)` |
 | `cut_demo` | 0 | `All[CurrencyAtLeast(fans, 50), BarsCompleted(learn_covers, 1)]` | `SetFlag(album)` — flag at **ch1**, so the release region persists across runs; the row's module hides on `Not(FlagSet(album))` |
 
 The gear *region* has no unlock and no flag: it gates directly on `EarnedTotalAtLeast(cash, 250)` (§2).
 
 ## 7. Bars (tier1)
 
-Group `learn_covers`: `{fillCurrency: rehearsal, pipeRate: 2/s, maxActive: 1, ContinuousDelivery
-(autoAdvance: false)}` — choosing the next cover is the mechanic (§12.7).
+Group `learn_covers`: `{maxActive: 1}` — choosing the next cover is the mechanic (§12.7). The group
+carries nothing else; each cover names Rehearsal as its own fill currency.
 
-| Bar | fillAmount | fillRate | onComplete |
-|---|---|---|---|
-| `cover_1` "Three-Chord Anthem" | 100 | 2/s | `AddModifier(tier1, cover_bonus_1)` |
-| `cover_2` "Parking-Lot Standard" | 300 | 2/s | `AddModifier(tier1, cover_bonus_2)` |
-| `cover_3` "The Crowd-Pleaser" | 600 | 2/s | `AddModifier(tier1, cover_bonus_3)` |
+| Bar | fillCurrency | fillAmount | fillRate | onComplete |
+|---|---|---|---|---|
+| `cover_1` "Three-Chord Anthem" | rehearsal | 100 | 2/s | `AddModifier(tier1, cover_bonus_1)` |
+| `cover_2` "Parking-Lot Standard" | rehearsal | 300 | 2/s | `AddModifier(tier1, cover_bonus_2)` |
+| `cover_3` "The Crowd-Pleaser" | rehearsal | 600 | 2/s | `AddModifier(tier1, cover_bonus_3)` |
 
 Non-repeating; 1,000 Rehearsal finishes all three. Completion is a moment that leaves no derivable
 effect-fact for a non-repeating bar, so the fan-rate reward is an `AddModifier` grant — cleared
@@ -226,8 +226,8 @@ Every gate above is a flag or a monotonic fact — nothing strobes with spending
 | ~160s | buy `stage_presence` → taps now 2/press | conditioned entry on tap_producer |
 | ~205s | 3 amps owned → drummer available → bought at 250 | `OwnedCountAtLeast(practice_amp, 3)` |
 | ~217s | buy `play_for_crowd` → fans accrue at 0.35 + 0.02/s | `SetFlag(fans_revealed)` — nothing pre-banked |
-| ~300s | 25 fans → buy `learn_covers` → Rehearsal live (0.5/s + 1/press) | `SetFlag(rehearsal_revealed)` |
-| ~350s | `cover_1` fills (100 rehearsal through the 2/s pipe) → fan rate ×1.15 | `AddModifier(tier1, cover_bonus_1)` |
+| ~300s | 25 fans → buy `unlock_covers` → Rehearsal live (0.5/s + 1/press) | `SetFlag(rehearsal_revealed)` |
+| ~350s | `cover_1` fills (100 rehearsal at its own 2/s rate) → fan rate ×1.15 | `AddModifier(tier1, cover_bonus_1)` |
 | ~352s | 50 fans + 1 cover → **release**: `floor((50/5)^0.5)` = **3** → records 3, ch1_records 3; tier1 resets | one formula evaluation, two targets |
 
 At 3 taps/s the same trace lands at ~293s. Second run re-walks band → fans → covers ~30% faster
@@ -288,7 +288,7 @@ Current rates at switch-in, 4h later:
 Claim = rate × min(14400, 14400) × 0.5 → **cash 604,800; fans 4,666; rehearsal 3,600** stored as
 the pending claim; the idle dialog offers Double It. The ad callback marks the claim `doubled`
 (1,209,600 / 9,332 / 7,200); dismissal deposits exactly once. Bar progress moved zero — the pool
-banked instead, so the returning player insta-pours covers at the 2/s pipe. Had a timed Garage Jam
+banked instead, so the returning player insta-pours covers at their 2/s rate. Had a timed Garage Jam
 been running, the claim would be zero (§9).
 
 **Tuning observation, no action needed:** a doubled 4h fan claim (9,332 fans) releases for
@@ -304,6 +304,12 @@ tutorial chapter; the gate is the knob if not.
 
 - Flags `fans`/`covers`/`gear` → `fans_revealed` / `rehearsal_revealed` / *deleted*: id-collision
   rule (§12.12), §12.2's authored snippet, and the pass-7 no-flag ruling for the gear region.
+- The `learn_covers` content unlock renamed `unlock_covers`: the same id-collision rule. The JSON
+  gave that one name to BOTH the unlock and the bar group and told them apart by kind
+  (`"setBy": "upgrade:learn_covers"` against `"group": "learn_covers"`), but ids are unique per chain
+  across ALL kinds - an Effect target is a string, so one word cannot address two assets. The GROUP
+  keeps the name, since it is what `BarsCompleted` reads and what the player-facing "Learn Covers"
+  matches; the unlock takes the verb-first form `play_for_crowd` and `cut_demo` already use.
 - `browse_gear` upgrade deleted — the region gates directly on the earned total (§2).
 - Garage Jam's internal tiers 1–3 → three `EventDefinition`s gated on completion flags (§6.1);
   `baselineReset` → `onEntry: [ExecuteRung, ResetScope]`; goals retuned 500/2500/10000 →

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle;
@@ -69,6 +70,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.purchasedUpgrades.Add("stage_presence");
             tree.Tier1.firedTriggers.Add("tier1_trigger");   // declared by the fixture's tier1
             tree.Tier1.barProgress["cover_1"] = 42;
+            // A fill count is a REPEATING bar's fact and Chapter 1 authors no
+            // repeating bar, so a round trip that carries one says so on both
+            // sides of the save.
+            tree.Cover1.repeating = true;
             tree.Tier1.fillCounts["cover_1"] = 2;
             tree.Tier1.activeBars["learn_covers"] = new System.Collections.Generic.HashSet<string> { "cover_1" };
             tree.Tier1.modifierStacks["gj_tap_1"] = 2;
@@ -93,6 +98,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var json = SaveSystem.Serialize(saved.Root);
 
             var fresh = new TestTree();
+            fresh.Cover1.repeating = true;
             Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.RootDef, out var root));
 
             var tier1 = root.FindInSubtree("tier1");
@@ -371,6 +377,60 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = root.FindInSubtree("ch1");
             Assert.AreEqual(1, ch1.modifierStacks.Count);
             Assert.IsTrue(ch1.modifierStacks.ContainsKey("gj_tap_1"));
+        }
+
+        [Test]
+        public void Bar_facts_from_removed_content_are_dropped()
+        {
+            var saved = new TestTree();
+            saved.Tier1.barProgress["cover_1"] = 40;                  // declared - survives
+            saved.Tier1.barProgress["ghost_bar"] = 10;
+            saved.Tier1.barProgress["cover_2"] = -5;                  // progress only ever rises
+            saved.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+            saved.Tier1.activeBars["ghost_group"] = new HashSet<string> { "cover_1" };
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not declared"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cover_2' is -5"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("group 'ghost_group' is not declared"));
+            Assert.IsTrue(Load(json, out var root));
+
+            var tier1 = root.FindInSubtree("tier1");
+            Assert.AreEqual((BigNumber)40, tier1.barProgress["cover_1"]);
+            Assert.AreEqual(1, tier1.barProgress.Count);
+            Assert.AreEqual(new HashSet<string> { "cover_1" }, tier1.activeBars["learn_covers"]);
+            Assert.AreEqual(1, tier1.activeBars.Count);
+        }
+
+        [Test]
+        public void A_fill_count_belongs_only_to_a_repeating_bar()
+        {
+            var saved = new TestTree();
+            saved.Tier1.fillCounts["cover_1"] = 2;                    // cover_1 is non-repeating
+            saved.Tier1.fillCounts["ghost_bar"] = 1;
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cover_1' names a non-repeating bar"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not declared"));
+            Assert.IsTrue(Load(json, out var root));
+
+            Assert.IsEmpty(root.FindInSubtree("tier1").fillCounts);
+        }
+
+        [Test]
+        public void An_oversized_selection_is_cleared_rather_than_truncated()
+        {
+            var saved = new TestTree();
+            // learn_covers holds maxActive 1. Naming two bars gets NEITHER:
+            // picking which one survives is a guess, and the player reselects.
+            saved.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1", "cover_2", "ghost_bar" };
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not in group 'learn_covers'"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("holds 2 active bars of at most 1 - cleared"));
+            Assert.IsTrue(Load(json, out var root));
+
+            Assert.IsEmpty(root.FindInSubtree("tier1").activeBars["learn_covers"]);
         }
 
         [Test]

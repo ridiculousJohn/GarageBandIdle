@@ -9,12 +9,11 @@ Bars are the only place in the economy that CONSUMES. Everything through step 4 
 this pay"; a bar answers "what does this drink, and what happens when it is full". Three numbers per
 tick segment, in this order:
 
-1. **Demand** - each active, available, unfilled bar wants `fillRate` units per second, and each
-   group's pipe caps what its bars can collectively spend. Both are ordinary produced numbers, so
-   both go through `GetMultiplier`.
-2. **Draw** - the pool pays what it can. Within a group the pipe clamps; across every group drawing
-   the same pool currency, a shortfall scales all of them by one factor. Processing order never
-   picks a winner (12.7).
+1. **Demand** - each active, available, unfilled bar wants `fillRate` units per second. That rate is
+   an ordinary produced number, so it goes through `GetMultiplier`.
+2. **Draw** - each bar takes `min(rate * dt, balance)` from the currency IT names, in declaration
+   order. The balance is read live per bar, so an earlier draw is visible to a later one and an
+   empty pool stalls the rest. There are no totals, so nothing is divided (12.7).
 3. **Settlement** - progress crossings fire `onComplete`, iteratively for repeating bars, in one
    deterministic order across the whole subtree.
 
@@ -34,13 +33,15 @@ selects it have one lifetime because they have one home. It also makes 12.7's se
 ("then groups, then bars within a group, in declaration order") literal, and gives `SetActiveBars`
 its membership test for free.
 
-**`BarFillBehavior` config stands as authored**: `ContinuousDelivery {autoAdvance}` drains a pool,
-`TimedFill {}` fills from time alone.
+**Ruling (2026-08-21, replacing the pipe and the proportional split) - a group holds bars and caps
+how many run at once, and nothing else.** `fillCurrency` lives on the BAR: the bar is what drinks, so
+it names what it drinks, and a bar with none fills from time alone - which is the whole of what
+`BarFillBehavior` used to say, so that family and both its subclasses are deleted along with
+`pipeRate`. Throttling a bar is its own `fillRate`; a second cap over the set expressed the same
+outcome, and in Chapter 1 the pipe equalled the one active bar's rate and never bound anything.
 
-**Ruling - the pipe governs pool spending only.** `pipeRate` is "total throughput the group can
-spend per second" (12.7) and a `TimedFill` group spends nothing, so the pipe and the pool
-arbitration apply to `ContinuousDelivery` groups alone; `maxActive` is the only throttle a timed
-group has. A `TimedFill` group that authors a `fillCurrency` is an error (a pool nothing drains).
+Owning no number, a group is not an effect target - it leaves `Targetables`. Buffing a set of bars is
+a tag they share, which is the mechanism that already fans one effect out to many owners.
 
 **Ruling - a null `availableWhen` on a bar is OPEN**, the opposite of step 4's null purchase gate.
 The fail-closed rule binds entry points that create value out of a spend; a bar's availability is a
@@ -49,15 +50,15 @@ nothing about a null bar gate.
 
 ## Resolution
 
-**Ruling - bar and pipe rates resolve stage 1 only.** Both are read as
-`GetMultiplier(declaringScopeCtx, owner, group.fillCurrency, Stat.Rate)` with the bar or the group
-as owner, and the currency stage is NOT applied. Stage 2 is "effects on this currency's total
-production" and a bar consumes rather than produces; letting a currency-total effect through would
-mean `records_income` speeds the drain on Rehearsal as well as its supply, which is not what either
-buff means. The fill currency is passed as the currency coordinate anyway so an effect may still
-narrow to it (`{target: cover_1, currencyId: rehearsal}`); a `TimedFill` bar passes an empty
-coordinate, which no narrowing effect matches. `maxActive` is an int and stays outside the
-multiplier system entirely - nothing addresses it.
+**Ruling - a bar's rate resolves stage 1 only.** It is read as
+`GetMultiplier(declaringScopeCtx, bar, bar.fillCurrency, Stat.Rate)`, and the currency stage is NOT
+applied. Stage 2 is "effects on this currency's total production" and a bar consumes rather than
+produces; letting a currency-total effect through would mean `records_income` speeds the drain on
+Rehearsal as well as its supply, which is not what either buff means. The bar's own currency is
+passed as the coordinate anyway so an effect may still narrow to it
+(`{target: cover_1, currencyId: rehearsal}`); a bar that fills from time passes an empty coordinate,
+which no narrowing effect matches. `maxActive` is an int and stays outside the multiplier system
+entirely - nothing addresses it.
 
 **The cascade row of 12.6 joins `GetMultiplier`.** At each scope on the outward walk, after the
 upgrade and modifier passes: for every declared group, for every bar in it with
@@ -79,10 +80,10 @@ gates are not carved out, so resolving them after the deposits would let this se
 production flip a bar's `availableWhen` and have it draw for the whole dt - the coupling the
 snapshot rule exists to forbid. Step 5 therefore ships the seam rather than one call:
 
-- **`BarSystem.ResolveDemand(subtreeRoot, defs, nowUtc)`** - called by the tick BEFORE the
+- **`BarSystem.ResolveDemand(subtreeRoot, segmentStartUtc)`** - called by the tick BEFORE the
   production phase. Walks the subtree in tree order (parent before child), groups then bars in
-  declaration order, and returns a `BarDemand` snapshot: per bar its effective fill rate,
-  eligibility, and pre-fill progress; per group its effective pipe and pool currency; per scope the
+  declaration order, and returns a `BarDemand` snapshot: a flat list of the drawing bars, each with
+  its effective fill rate, its pre-fill progress, the home of the currency it names, and its scope's
   `ScopeFacts` reference identity. Nothing is mutated.
 - **`BarSystem.ConsumeAndSettle(demand, dtSeconds, settlementUtc)`** - called AFTER the production
   phase. Reads pool balances live, draws, then settles completions. Fill and settlement stay one
@@ -111,29 +112,17 @@ Fill, using the snapshot's order:
   admitting it to the draw would spend pool currency every segment forever and settle none of it. A
   non-repeating bar fails the progress leg on its own when `fillAmount <= 0`; a repeating one needs
   the explicit test.
-- **Demand** is the bar's effective rate, never its remaining need. 12.7 says "each active, unfilled
-  bar demands its own `fillRate`", and clamping to the remainder would let a nearly-full bar free
-  pipe for its neighbors mid-segment, which is exactly the winner-picking the proportional rule
-  forbids. Overfill is allowed and readable (12.7), so the pool pays for the last partial step.
-- **Group clamp**: `groupScale = min(1, effectivePipe / groupDemand)`, guarded - **a zero group
-  demand takes an explicit no-draw branch and never reaches the division**. Zero demand needs no
-  authoring error to arise: a zero multiplier is legal (an event handicap is x0), so every eligible
-  bar in a group can resolve to a zero rate even though `fillRate > 0` is validated. `BigNumber`
-  THROWS on a NaN or infinite result rather than clamping (its constructor is the one door), so an
-  unguarded 0/0 aborts the tick.
-- **Pool arbitration**: group draws sharing one `fillCurrency` are summed over dt against the
-  balance at that currency's home. Short pool means one factor `poolScale = balance / totalDraw`
-  applied to every drawing bar across every group on that pool - **guarded the same way**: a pool
-  whose groups all draw zero skips the scale entirely.
-- **One spend per pool per segment**: per-bar draws accumulate against a running remainder (clamped,
-  in the deterministic order above, so BigNumber rounding can never oversell the pool), then a
-  single `TrySpend` at the home moves the total. Spending, not depositing: `earnedTotals` is
-  untouched, and a failed spend adds nothing.
-- **TimedFill** bars advance only if the snapshot recorded them as DRAWING - selected, available,
-  positive `fillAmount`, and below it if non-repeating - exactly like any other bar. What they skip
-  is only the pipe clamp, the pool arbitration, and the spend: `progress += effectiveRate * dt`,
-  paid by nothing. `activeBars` and `maxActive` are the whole throttle for a timed group, so
-  bypassing the selection test would make its bars unstoppable.
+- **The draw** is `min(rate * dt, balance)` at the currency's home, taken in the order above, then
+  spent. The balance is read live PER BAR, so an earlier bar's draw is visible to a later one and an
+  empty pool stalls the rest. There are no totals, so there is nothing to divide and no division to
+  guard: the four divide sites the proportional model needed are gone with it. Overfill is allowed
+  and readable (12.7), so a bar takes its whole rate rather than its remaining need.
+- **Spending, not depositing**: `earnedTotals` is untouched, because a bar's fill is not income.
+- **A bar with no `fillCurrency`** advances only if the snapshot recorded it as DRAWING - selected,
+  available, positive `fillAmount`, and below it if non-repeating - exactly like any other bar. What
+  it skips is only the balance read and the spend: `progress += effectiveRate * dt`, paid by nothing.
+  `activeBars` and `maxActive` are its whole throttle, so bypassing the selection test would make it
+  unstoppable.
 
 ## Settlement
 
@@ -182,9 +171,9 @@ step 4 gave `TryBuy`'s computed cost: the release build executes the check, the 
 it.
 
 Completion does not touch `activeBars` - selection is the player's fact, and `SetActiveBars` is its
-only writer. A completed bar left selected demands nothing. `ContinuousDelivery.autoAdvance` is not
-implemented here: no chapter grants it yet, and how a chapter grants it is undecided (an Effect
-multiplies numbers; it cannot flip a bool), so its semantics are settled when a chapter wants it.
+only writer. A completed bar left selected demands nothing. Auto-advance is not a field any more -
+it died with the behavior classes, and how a chapter would grant it was undecided anyway (an Effect
+multiplies numbers; it cannot flip a bool).
 
 ## Entry point - `SetActiveBars(ctx, group, bars)`
 
@@ -194,8 +183,9 @@ one.** The caller here is a widget bound to the group, so it has the `BarGroupDe
 would make this the only entry point in the codebase taking ids (`CanBuy(ctx, generator)`,
 `Buy(ctx, upgrade)`, `FireProducer(ctx, producer)`, `GetRate(scope, now, currency)` all take the
 asset). The ids in the fact keys below are the other half of the same rule and are CORRECT as ids:
-`activeBars[groupId]`, `fillCounts[barId]`, and the `{target: groupId}` effect coordinate, which is
-a string because an effect target is a filter over names, not a reference.
+`activeBars[groupId]`, `fillCounts[barId]`, and the `{target: cover_1}` effect coordinate, which is
+a string because an effect target is a filter over names, not a reference. (A group is not among
+those names - it owns no number, so nothing targets it.)
 
 Fail-closed and all-or-nothing (12.7/12.11): refuses an unknown group, a set larger than
 `maxActive` after de-duplication, any bar outside the group, any bar whose `availableWhen` is false
@@ -205,15 +195,18 @@ group's declaring scope. The foreground-subtree guard layers on in step 7.
 
 ## Validation extensions
 
-- **Collection**: `barGroups` joins the per-scope `CollectDeclared` pass; bars are collected in a
-  nested pass that maps each bar to its group's scope in `declaringScopeByDefinition`, so
-  `DeclaringScope(bar)` answers for a bar the way it does for a producer. `DuplicateHome` covers a group declared by two scopes and a bar listed by two groups.
-- **Group**: null `behavior` is a `NullEntry` error; `ContinuousDelivery` requires a
-  `fillCurrency` the declaring scope can reach outward (`RequireOnChain`, the check every other
-  currency operand already gets) and `pipeRate > 0`; `TimedFill` errors on a set `fillCurrency`;
-  `maxActive >= 1`.
+- **Collection LANDED with the 2026-08-20 reference pass.** `CollectDeclared` already walks
+  `barGroups` and, in a nested pass, each group's bars; `RecordHome` records both; `DeclaredBy`
+  yields the group then its bars, and `Targetables` yields the bars alone. So `DeclaringScope(bar)` already answers,
+  `DuplicateHome` already covers a group declared by two scopes and a bar listed by two groups, and
+  id/tag collision and tag membership already include bars. What step 5 adds is the per-scope
+  VALIDATION branch, which does not exist: the scope loop has producer, generator, upgrade and
+  career branches and no group branch.
+- **Group**: `maxActive >= 1`, and no null entries in `bars`. That is all a group has.
 - **Bar**: `fillAmount > 0` and `fillRate > 0` are `NumericRange` errors (a nonpositive threshold is
-  an unbounded settlement loop; a zero rate is a bar no multiplier can ever move). `availableWhen`
+  an unbounded settlement loop; a zero rate is a bar no multiplier can ever move). A named
+  `fillCurrency` gets `RequireOnChain`, the check every other currency operand already gets; a null
+  one is legal and says the bar fills from time. `availableWhen`
   validates in the declaring scope when present. `onComplete` runs through `ValidateActionList` with
   container key `bar:<id>`, joining set-then-wiped, reads-zeros, flag-setter tracking, the modifier
   ledgers, and the cycle graph.
@@ -232,10 +225,13 @@ group's declaring scope. The foreground-subtree guard layers on in step 7.
   unreachable rather than merely inert, which is what makes it an error and not a warning. The
   alternative - granting non-repeating bars a count of 1 - is rejected: it would give a one-shot bar
   a second reward channel that duplicates `onComplete`, and 12.6 would have to change.
-- **Effect reach**: the `BarDefinition`/`BarGroupDefinition` branch left empty in step 4
-  (`ValidateEffectCoordinates`, `ValidateEffectTargetReach`) gets the producer/generator treatment -
-  the effect must be declared at the target's scope or an ancestor, error otherwise.
-  `TagHasMemberInSubtree` extends membership to groups and bars.
+- **Effect narrowing**: `SatisfiesNarrowing`'s switch falls to `default: return true` for a bar,
+  commented as waiting for step 5's production model. A bar has one now - the rate read is
+  `GetMultiplier(ctx, bar, bar.fillCurrency, Stat.Rate)` - so the pair it validates against is that
+  bar's own currency and `rate`: a currency coordinate must name it by id or tag, and a stat
+  coordinate must be `rate`. A bar with no currency has no pair for a currency coordinate to name.
+  Groups leave `Targetables` entirely, so an effect aimed at one warns as a kind that is not a
+  target.
 - **`BarsCompleted`** gains the reach check its step-3 comment promised: the group's declaring scope
   must be the acting scope or an ancestor (`ChainReach`), and its evaluation walks `group.bars`.
 
@@ -253,40 +249,43 @@ The step 2 incremental contract, applied in `FilterToDeclared` against the scope
 
 ## Files and tests
 
-New: `Economy/BarSystem.cs` (the name 12.13's file layout already uses). Modified:
-`BarDefinition.cs` (groupId removed), `BarGroupDefinition.cs` (bars list), `ScopeDefinition.cs`
-(barGroups), `Producer.cs` (perFill gather, `Grown`/`Stacked` split), `Condition.cs`
-(`BarsCompleted` walk + reach), `ContentValidator.cs`, `SaveSystem.cs`.
+New: `Economy/BarSystem.cs` (the name 12.13's file layout already uses). Deleted:
+`Economy/BarFillBehavior.cs` - the family and both subclasses, since a null `fillCurrency` says
+everything they said. Modified: `BarDefinition.cs` (gains `fillCurrency`), `BarGroupDefinition.cs`
+(loses `fillCurrency`, `pipeRate` and `behavior`), `Producer.cs` (perFill gather, `Grown`/`Stacked`
+split, a null currency coordinate), `Condition.cs` (`BarsCompleted` reach - its `Evaluate` already
+walks `group.bars`), `Effect.cs` (a group is no longer a target kind), `ContentValidator.cs`,
+`SaveSystem.cs`. `ScopeDefinition.barGroups`, `BarGroupDefinition.bars` and
+`GrowthKind`/`PerFillEntry` need no edit - they landed with the 2026-08-20 reference pass.
 
-Tests - new `BarSystemTests`: pipe clamp, cross-group proportional split on a shared pool, pool
-exhaustion, spend-not-earn, TimedFill ignoring pool and pipe, overfill retained, non-repeating
+Tests - new `BarSystemTests`: a short pool feeding bars in declaration order until it runs out,
+two groups drawing one pool in tree order, pool
+exhaustion, spend-not-earn, a currency-free bar ignoring the pool, overfill retained, non-repeating
 crossing fires once and not again on a second segment, repeating iterative settlement with residual,
 an `onComplete` that flips availability stopping the loop, a reset mid-settlement dropping the rest
 of that scope-life, the empty-`onComplete` shortcut matching the iterative result, deterministic
-order across scopes and groups, and every `SetActiveBars` refusal. Regressions for the four divide
-sites, each one asserting the tick survives rather than throwing: a group whose every drawing bar
-resolves to a zero rate through an x0 handicap, a pool whose groups all draw zero, and a nonpositive
-`fillAmount` on a repeating bar asserting that the pool balance and the bar's progress are BOTH
+order across scopes and groups, and every `SetActiveBars` refusal. Degenerate numbers: a bar whose
+rate resolves to zero through an x0 handicap draws nothing, and a nonpositive
+`fillAmount` on a repeating bar leaves the pool balance and the bar's progress BOTH
 unchanged after a segment (not merely that nothing threw), with and without an `onComplete` list.
-Pipe resolution: a `{target: groupId, x2}` multiplier doubles the throughput the group's bars share,
-asserted against a demand that the base `pipeRate` would clamp - a test the clamp cases alone would
-pass even if the implementation read the base value. Snapshot tests: a deposit made between
+Snapshot tests: a deposit made between
 `ResolveDemand` and `ConsumeAndSettle` moves the pool but changes no rate and opens no gate, while
 settlement's own re-reads still see live state; and a repeating bar entering the segment gate-closed
-with a full backlog, where the deposits open the gate and settlement still pays NOTHING. TimedFill selection: an unselected bar, an unavailable bar,
+with a full backlog, where the deposits open the gate and settlement still pays NOTHING. Currency-free selection: an unselected bar, an unavailable bar,
 and a completed non-repeating bar each advance zero while a selected available one advances. A completion-driven `ResetScope` stamping the segment-end boundary rather than anything
 derived from scaled dt.
-`ResolutionTests` extends with the cascade row (both growth kinds, linear saturation, bar-targeted
-effects reaching the fill rate, a currency-total effect NOT reaching it). `ContentValidatorTests`
+`ResolutionTests` extends with the cascade row (both growth kinds, linear saturation, and a stray
+count for an undeclared bar contributing nothing); `BarSystemTests` carries the reach cases, where
+the draw is observable - a bar-targeted buff reaching the fill rate, a currency-total effect not. `ContentValidatorTests`
 and `SaveSystemTests` extend per the two sections above; `TestTree` grows the Chapter 1 cover group.
 No production assets - step 8 authors those.
 
 ## Docs on landing
 
-12.7 records the rulings that are not in it today: the group owns its bars, the pipe governs pool
-spending only, stage-1-only rate resolution, a null bar gate is open, the empty-`onComplete`
-condition for the arithmetic shortcut, and the settlement entry gate (snapshot admits, live state
-may only disqualify). 12.6's fill-count row
+12.7 records the rulings that are not in it today: the group owns its bars and caps how many run,
+the bar names what it drinks and takes what is there, stage-1-only rate resolution, a group is not an
+effect target, a null bar gate is open, the empty-`onComplete` condition for the arithmetic shortcut,
+and the settlement entry gate (snapshot admits, live state may only disqualify). 12.6's fill-count row
 names `perFill` gathering through the declaration list and says the cascade is repeating-bars-only.
 12.9 needs no change - it already says what the demand snapshot must obey - but its bar-consumption
 phase gains the note that demand is resolved before the production deposits, since that is the
@@ -310,6 +309,8 @@ sweep and event goal latching that share the transaction (step 6). Bar-completio
 events (they already work through the shared action machinery; the lifecycle ops land in step 6).
 The command boundary (step 7). UI, including bar rendering and the group widget (step 9). Additional
 fill behaviors (tap-a-chunk, dump-the-pool) - sibling classes when a chapter wants one.
-`ContinuousDelivery.autoAdvance`, which waits for the chapter that grants it. A `fillCounts`
+Auto-advance, which died with the behavior classes and waits for the chapter that wants it - and
+with it any notion of a shared throughput budget across parallel bars, which is a design decision at
+that time rather than a field carried from the start. A `fillCounts`
 overflow policy: no authored bar repeats, so the boundary is unreachable and the rule that would
 govern it is unwritten on purpose.

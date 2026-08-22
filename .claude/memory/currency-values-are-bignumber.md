@@ -8,7 +8,7 @@ metadata:
 
 Design doc §12.14 rule 1: break_infinity (BigDouble, wrapped as `BigNumber`) for ALL currency and
 production values. That includes AUTHORED fields — condition thresholds, action amounts, formula
-constants and divisors, bar fillAmount/fillRate, group pipeRate — not just runtime balances. In
+constants and divisors, bar fillAmount/fillRate — not just runtime balances. In
 spine step 1 I wrote them as `double` and John called it out: "it's irrelevant if BigNumber
 serializes or not, they have to be numbers that we can use. Making those doubles is a huge
 mistake."

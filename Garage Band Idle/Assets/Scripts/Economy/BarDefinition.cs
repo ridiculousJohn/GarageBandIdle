@@ -29,8 +29,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [CreateAssetMenu(menuName = "Garage Band Idle/Bar")]
     public class BarDefinition : Definition
     {
+        // What this bar drinks, and how fast. A null currency fills from time
+        // alone - that is the whole difference between the two fill modes, so
+        // there is no behavior class (design doc 12.7).
+        public CurrencyDefinition fillCurrency;
         public BigNumber fillAmount;
-        public BigNumber fillRate;          // this bar's own max fill speed (units/sec)
+        public BigNumber fillRate;          // this bar's own fill speed (units/sec)
         public bool repeating;              // fill -> fire onComplete -> reset to 0 -> go again
         [SerializeReference, SubclassPicker] public Condition availableWhen;
         [SerializeReference, SubclassPicker] public List<GameAction> onComplete = new();
