@@ -356,6 +356,9 @@ IS the host and the outward walk recovers it, exactly as for every other content
   for the next reset to claim. And an event **dies with its scope**: any reset that reaches the host
   clears the record - a mid-event release, a capstone resetting the chapter from above.
 - **Reward constraint:** never Records or any advancement currency - an event's payout is lateral.
+  Authoring, not a validated rule: nothing in the model marks a currency as advancement, so a check
+  would have to invent that vocabulary, and one that followed rung references would flag the
+  legitimate case - an `onEnd` running `RestartScope` banks Records through the tier's own gate.
 - **Levels:** a harder rerun of an event is simply **another event** — `silent_stage_2` is its own
   definition whose `availableWhen` gates on `silent_stage_1_done`; there is no level machinery, no
   selection contract, and `StartEvent(event)` is always fully specified. The rising requirement
