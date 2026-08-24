@@ -17,3 +17,4 @@
 - [Problems, not issues](problems-not-issues.md) - a true finding is not automatically work; ask what breaks TODAY, and supply the stopping rule the review loop lacks
 - [No spec accumulation](no-spec-accumulation.md) - answer a review finding by deleting the mechanism, not by adding a paragraph; plan length is a defect signal
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20 corrections: venue asset and stationing cap deleted, scope payloads typed by tree position, currencies by direct reference
+- [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from Ctrl C; check open design questions against it instead of reasoning from scratch, and ask John for its specifics
