@@ -285,19 +285,24 @@ An event is **content plus one state record** (§12.8):
 
 ```
 EventDefinition: availableWhen (Condition), goal (Condition), timeLimit (0 = untimed),
-                 handicaps (List<Effect>), onEntry / onComplete (List<Action>), hostScopeId
-ActiveEvent:     { eventId, remainingSeconds, goalReached, claimed }   — in host scope state
+                 handicaps (List<Effect>), onEntry / rewards / onEnd (List<Action>)
+ActiveEvent:     { eventId, remainingSeconds, goalReached }   - in host scope state
 ```
 
-- **Lifecycle: three self-guarding operations.** `StartEvent(eventId)`, `CompleteEvent(eventId)`,
-  `AbortEvent(eventId)` — Action kinds like any other, invocable from anywhere (a UI module
-  forwarding intent, another action list, an automation, a test), each fail-closed against its own
-  gate: start checks `availableWhen` **and that the host holds no event record — one event per
-  scope, and an expired-but-undismissed record still counts**, complete checks `goalReached` —
-  latched, or the goal holding live — on an unclaimed record, abort checks a record exists.
-  Nothing below them knows the caller.
+The definition carries no host field: it is declared on its host scope's `events` list, so placement
+IS the host and the outward walk recovers it, exactly as for every other content family (§12.8).
+
+- **Lifecycle: two self-guarding operations.** `StartEvent(event)` and `DismissEvent(event)` are
+  **commands, not Action kinds** (12.11) - a player enters an event by choice, so no authored list
+  can start or end one, and the whole class of one event spawning another has nowhere to live. Each
+  is fail-closed against its own gate: start checks `availableWhen` **and that the host holds no
+  event record - one event per scope, and an expired-but-undismissed record still counts**, dismiss
+  checks that the host holds a record **for that event**. There is no separate claim and abort:
+  dismissal is the single ending, and it pays the reward if the goal was reached - so a successful
+  attempt cannot be thrown away by pressing the wrong button.
 - **On start** (`StartEvent`), the event's `onEntry` actions run in order — typically
-  `[ExecuteRung(hostTierRung), ResetScope(host)]` — and the ActiveEvent record is created after
+  `[RestartScope(host)]` - bank the run through the host rung's own gate, then clear it (§12.5) -
+  and the ActiveEvent record is created after
   they finish, so it lives in the fresh state. The rung checks the host rung's own gate like every
   invocation does (§12.5), banking a gate-met run exactly as a release would and discarding an
   unfinished one. Nothing is lost that could have been kept — a run the gate refuses could not have
@@ -310,47 +315,54 @@ ActiveEvent:     { eventId, remainingSeconds, goalReached, claimed }   — in ho
   player has advanced further — "come back later" is the intended experience.
 - **Goal:** a Condition, usually `CurrencyAtLeast`. Weirder goals are `All[...]` compounds.
 - **Debuff (optional):** the handicaps are ordinary Effects with multipliers below 1 — generation
-  halved is ×0.5, automation disabled or a currency locked is ×0. They apply while a **live,
-  unexpired** ActiveEvent record exists and vanish with it — an expired record contributes nothing
-  (§12.8); nothing is installed or torn down.
+  halved is ×0.5, automation disabled or a currency locked is ×0. They apply while **an
+  ActiveEvent record exists** and vanish with it (§12.8); expiry does not lift them. A failed
+  attempt sits one tap from a tier reset, so dropping the handicap at expiry would hand the player
+  a briefly unhandicapped tier that is about to be wiped. Nothing is installed or torn down.
+- **Success is one rule, timer or not.** The goal latches the moment it holds while the attempt has
+  not expired - the sweep, which runs inside every transaction, tick and command alike (§12.11),
+  writes `goalReached` latch-first like every observer. A command that reaches a spendable-balance
+  goal secures it even if a later command spends back below, and an untimed event works the same
+  way: meeting the goal is something that happened, not a state the player must still be holding
+  when the button is pressed. **A timer is the only thing that can end an attempt**, and it is the
+  only difference between a timed and an untimed event.
 - **Timer (optional):** `remainingSeconds` decrements on live ticks only, so the attempt pauses when
   the chapter is inactive or the app is closed — a deadline the player cannot attend is not a
-  challenge. The exchange: a chapter running a timed event pays **no idle earnings** on switch-in,
-  which closes both the app-close and the switch-away-to-wait-out-the-clock exploits at once.
-  **Reaching the goal before expiry secures success**: the sweep — which runs inside every
-  transaction, tick and command alike (§12.11) — latches `goalReached` on the record, latch-first
-  like every observer, and a completed attempt is claimable at any time. A command that reaches a
-  spendable-balance goal secures it even if a later command spends back below.
-  The timer matters only until the goal is met, never as a race to the Claim button; evaluation
-  order is completion state first, then the timer, and a sweep observing goal-met and expiry in the
-  same tick counts it — the tie goes to the player. Expiry **ends nothing by itself**: a
-  goal-unreached record stays, inert by derivation — handicaps stop contributing, `CompleteEvent`
-  stays disarmed — until the **player** dismisses the failed attempt
-  (`AbortEvent`) or a reset reaches the host. Because the record still occupies the host,
-  `StartEvent` keeps failing until it is dismissed — enforced in code; the UI simply doesn't offer
-  a new event while one is pending. An untimed event at insufficient power is merely unfinishable.
-- **Completion is claimed, not automatic.** A met goal arms `CompleteEvent` — exactly as 50 Fans
-  arms the release button — and fires nothing by itself. Claiming first marks the record claimed
-  (a lifecycle op invoked again from inside the list is refused), then runs `onComplete` in order —
-  rewards first (reading the dying run where they want to), `ResetScope(host)` last by convention —
-  and finally **removes the record itself if the authored reset didn't already clear it**: record
-  removal is the operation's job, never the author's, so a missing reset can't leave the reward
-  claimable forever. **Abort**
-  (`AbortEvent`) deletes the record and touches nothing else; whatever the run accumulated stays to
-  be banked by the next reset. And an event **dies with its scope**: any reset that reaches the
-  host clears the record — a mid-event release, a capstone resetting the chapter from above.
-- **Reward on success:** `onComplete` actions — a chapter-durable buff (`AddModifier`), a Roadie, a
-  Catalog song, local currency. Never Records or any advancement currency.
+  challenge. The exchange: a chapter holding a record for an event that **blocks idle** pays no idle
+  earnings on switch-in, which closes both the app-close and the switch-away-to-wait-out-the-clock
+  exploits at once. `blocksIdle` is derived - a timer is what blocks - so the idle path asks the
+  event that one question and never inspects a timer (§12.9). Untimed events accrue idle normally;
+  they can sit open for days while the player grinds toward the goal, and there is no clock to wait
+  out. A goal met in the same segment the timer expires counts - the tie goes to the player, which
+  is why the latch is taken at the segment edge before the decrement (§12.9). Expiry **ends nothing
+  by itself** and does exactly one thing: it stops the goal from latching. The record stays,
+  handicaps and all, until the **player** dismisses the attempt or a reset reaches the host. Because
+  the record still occupies the host, `StartEvent` keeps failing until it is dismissed - enforced in
+  code; the UI simply doesn't offer a new event while one is pending. An untimed event at
+  insufficient power is merely unfinishable.
+- **Dismissal is the ending, and it is claimed, not automatic.** A met goal arms nothing but the
+  reward - exactly as 50 Fans arms the release button - and fires nothing by itself. `DismissEvent`
+  **removes the record first**, then runs `rewards` if the goal was reached, then runs `onEnd`
+  either way. Removing first is what opens a rung guarded by
+  `Not(EventRewardPending(host))` so that an `onEnd` carrying `[RestartScope(tier)]` can actually
+  bank. Nothing in an action list can observe the record's absence: handicaps are
+  multipliers on production, and rewards read balances.
+- **Two ending lists, because failure has an ending too.** `rewards` runs only on success and holds
+  the payout - a chapter-durable buff (`AddModifier`), a Roadie, a Catalog song, local currency.
+  `onEnd` runs either way and is where the reset lives, so reward-before-reset is structural rather
+  than a convention an author can get backwards. What a failed run costs is therefore authoring:
+  `[RestartScope(tier)]` in `onEnd` banks whatever the tier's own gate allows and wipes the rest, a
+  bare `ResetScope(tier)` destroys it, and an empty `onEnd` leaves the leavings
+  for the next reset to claim. And an event **dies with its scope**: any reset that reaches the host
+  clears the record - a mid-event release, a capstone resetting the chapter from above.
+- **Reward constraint:** never Records or any advancement currency - an event's payout is lateral.
 - **Levels:** a harder rerun of an event is simply **another event** — `silent_stage_2` is its own
   definition whose `availableWhen` gates on `silent_stage_1_done`; there is no level machinery, no
-  selection contract, and `StartEvent(eventId)` is always fully specified. The rising requirement
+  selection contract, and `StartEvent(event)` is always fully specified. The rising requirement
   plus the player's power curve throttles level stacks as a repeatable Roadie source. Reward
   composition is per-chain authoring: each level's modifier is an *increment* that stacks with the
-  previous level's, or the next level's `onComplete` swaps them explicitly
+  previous level's, or the next level's `rewards` swaps them explicitly
   (`RemoveModifier` + `AddModifier`).
-
-Authoring guidelines: most events use debuffs; timed events are used sparingly; failure stays cheap;
-larger events include a decision (risk/reward, which song to submit) rather than a single confirm.
 
 ---
 
@@ -712,9 +724,13 @@ class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these
     Dictionary<string, int>       fillCounts;       // repeating bars
     Dictionary<string, HashSet<string>> activeBars; // per group
     Dictionary<string, int>       modifierStacks;   // AddModifier grants, keyed like every other count
-    List<ActiveEvent>             activeEvents;
     List<TimedBuff>               timedBuffs;       // {buffId, expiresAt} — Encore lives at root
     List<SongEntry>               songs;            // tier = the run's Catalog; root = Discography (§7)
+}
+
+class EventHostFacts : ScopeFacts   // a tier's or chapter's payload: scopes that can host an event
+{
+    ActiveEvent                   activeEvent;      // at most one per host (§12.8): a field, not a list
 }
 
 class RootFacts : ScopeFacts        // the root scope's payload, and no other
@@ -723,7 +739,7 @@ class RootFacts : ScopeFacts        // the root scope's payload, and no other
     HashSet<string>               entitlements;     // store-written (backstage_pass)
 }
 
-class ChapterFacts : ScopeFacts     // a chapter's payload
+class ChapterFacts : EventHostFacts // a chapter's payload
 {
     PendingClaim                  pendingClaim;     // the idle dialog's claim (§9)
 }
@@ -731,7 +747,8 @@ class ChapterFacts : ScopeFacts     // a chapter's payload
 
 A scope that cannot use a fact does not carry it: the payload type follows the scope's position in
 the tree (root, its children, everything deeper), so a root fact on a tier is unrepresentable rather
-than filtered at load. `lastActiveUtc` (§12.9) is a chapter field OUTSIDE the payload — the one
+than filtered at load - and the exclusion runs the other way too, since root cannot host an event
+and so does not carry the record. `lastActiveUtc` (§12.9) is a chapter field OUTSIDE the payload — the one
 thing a reset re-stamps instead of clearing. `ScopeState.Build` allocates each node's payload, and a
 reset installs a fresh one of the same type.
 
@@ -739,8 +756,9 @@ The tree: **root** (Records, Roadies, entitlements, completion flags, Discograph
 chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique along a CHAIN** — a read walks
 outward and stops at the first scope that declares what it names, so two sibling chapters may each
 declare their own `cash`; what must not repeat is an id visible from one scope. Scope ids stay
-unique tree-wide, since subtree searches and root's own maps key by them. A declaration in two
-scopes is refused at load. Flag reads walk the chain outward (set anywhere on it = set); `SetFlag`
+unique tree-wide, since the facts that name a scope key by them - a claim line's home, root's
+roadie allocation map - and a saved name has to be unambiguous wherever it is read back. A
+declaration in two scopes is refused at load. Flag reads walk the chain outward (set anywhere on it = set); `SetFlag`
 writes to the flag's declared home.
 
 **Flags are strings on purpose.** Everything else a scope declares is an asset, and everything that
@@ -751,6 +769,15 @@ validated against the acting chain and `SetFlag` throws at runtime on a name no 
 declares. Tags and stat names are strings for the same reason: neither is a thing, both are
 vocabulary.
 
+**A scope is addressed by reference too.** An action or condition that names a scope holds the
+`ScopeDefinition` itself, and getting from it to live state is a walk that compares assets, not
+ids: there is one state node per definition and neither points at the other, so the walk is the
+only link, but what it matches on is the reference the caller already holds. The only scope NAMES belong
+to stored facts (a claim line's home, the roadie allocation map), because a save holds text and
+nothing else: a name enters at the load boundary, resolves there, and travels no further. A scope
+id is therefore never how running code finds a scope, which is what keeps tree-wide id uniqueness a
+property of the save rather than a dependency of the economy.
+
 **Structure encodes reset relationships:**
 - **Nest** tier A inside tier B when "resetting B always resets A" is definitionally true (a ladder).
   An intermediate currency banked by A's rung is declared in B — exactly where B's reset claims it.
@@ -759,8 +786,9 @@ vocabulary.
 - Resetting an outer scope while keeping an inner one alive is unrepresentable (`ResetScope` is
   downward-closed) — wanting it means the scopes should be siblings.
 
-Reset = execute the rung's actions in order (payouts read the dying state), then clear the selected
-containers. Clearing is complete by construction — a field added to ScopeState next month is cleared
+Reset = a rung firing. Its actions run in order, payouts first so they read the dying state, and
+the clear is the last action in that list - `ResetScope` is an ordinary action the author places
+there, never something the rung does on its own. Clearing is complete by construction - a field added to ScopeState next month is cleared
 because it is in the struct. Nothing re-projects, settles, or rebuilds, because nothing derived was
 stored. `lastActiveUtc` is re-stamped, not cleared, so a fresh chapter owes no idle.
 
@@ -777,20 +805,20 @@ public abstract class Condition
 ```
 
 Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, `UpgradePurchased`,
-`BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `All`, `Any`, `Not` (the story gate
+`BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `Always`, `All`, `Any`, `Not` (the story gate
 `chapterN_complete && !storyN_seen` is
 `All[FlagSet, Not[FlagSet]]`), plus a formula-threshold kind (threshold computed from state — e.g.
 a scaling goal or reward curve reading a per-clear counter, §8.1). Records need no special kind:
 they are a currency.
 
-The two event kinds read a named host's record state: `EventRecordExists(scopeId)` — any record
-(running, expired-undismissed, or completed-unclaimed); `EventRewardPending(scopeId)` — an
-unclaimed record that is **armed** (latched `goalReached`, or the goal holding live for an untimed
-event). Unlike ordinary reads they may name the acting scope **or a scope it encloses** — their
+The two event kinds read a named host's record state, holding a direct scope reference like
+`ResetScope`: `EventRecordExists(host)` - any record
+(running, expired-undismissed, or goal-reached-undismissed); `EventRewardPending(host)` - a record
+whose `goalReached` is set. Both are pure fact reads: nothing evaluates a goal at read time. Unlike ordinary reads they may name the acting scope **or a scope it encloses** - their
 guard use is a rung refusing to reset over a pending reward (§12.12), and a guard must see the
 hosts its own reset closure contains. Composed with `Not`, they are how a rung disarms while an
-event runs or a reward waits; the player is never wedged, because claim and abort stay one tap
-away and always legal.
+event runs or a reward waits; the player is never wedged, because dismissal stays one tap away and
+always legal - it clears the record and pays the reward if the goal was reached.
 
 A condition may carry an optional **`uiText`** label ("Needs 50 fans", "Claim your event reward
 first") — pure presentation data, never read by evaluation, rendered by the rung feedback
@@ -822,9 +850,10 @@ public abstract class Action
 
 Kinds: `AddCurrency` (one or more target currencies paid from a single evaluation; amount constant
 or from a `PayoutFormula`), `AddModifier(scope, modifier)`, `RemoveModifier(scope, modifier)`,
-`SetFlag(flagId)`, `AddSong`, `ResetScope(scope)`, `ExecuteRung(tier)`, and the event lifecycle
-operations `StartEvent(eventId)` / `CompleteEvent(eventId)` / `AbortEvent(eventId)` (§6.1), each
-fail-closed against its own gate. Authored inline via
+`SetFlag(flagId)`, `AddSong`, `ResetScope(scope)`, `ExecuteRung(tier)` and `RestartScope(scope)`
+(fire that scope's rung through its own gate, then clear it - the restart idiom as one action; a
+bare `ResetScope` remains for a pure wipe). The event lifecycle operations are commands rather than
+Action kinds (§6.1, §12.11). Authored inline via
 `[SerializeReference]` wherever needed — upgrade payloads, bar completions, event rewards, rungs.
 No shared reward pool; a reused reward can be promoted to a shared asset later if duplication ever
 hurts. Actions are one-shot: they run at their moment and are never replayed on load — the state
@@ -847,8 +876,8 @@ the entry at zero, no-ops when absent.
 
 **A rung** is `{offerCondition, List<Action>}` — the one shape behind the album release (declared
 on its tier) and the capstone (declared on the chapter): a rung of the prestige ladder. Event
-lifecycle operations are **not**
-rungs — they execute authored `onEntry`/`onComplete` lists through the same action machinery
+lifecycle commands are **not**
+rungs - they execute authored `onEntry` / `rewards` / `onEnd` lists through the same action machinery
 (§6.1). Every invocation
 is **fail-closed against the rung's own gate**: `TryRung` (the UI entry point) checks the offer
 condition before executing, and **`ExecuteRung` runs another rung's action list through the same
@@ -863,7 +892,7 @@ the same code the rung runs.
 **Trigger** — the one sanctioned condition-observer: `TriggerDefinition {id, condition, actions}`,
 declared per scope. A trigger firing is a *moment*: when its condition holds and its id is not in
 the scope's `firedTriggers`, it **latches the id first, then executes its actions** — the same
-discipline as `CompleteEvent`, and it makes self-resetting triggers correct for free: an action
+discipline as `DismissEvent` removing the record before it runs a list, and it makes self-resetting triggers correct for free: an action
 list that resets the declaring scope clears the just-written latch, re-arming the trigger for the
 new life. The latch is a stored fact, so nothing derived is stored. **One-shot per scope-life,
 never repeating**: the reset that clears the declaring scope re-arms it (a tier trigger fires once
@@ -888,7 +917,7 @@ auto-finishing challenge is a trigger, not an event — events keep claimed comp
 | Purchased upgrades | `purchasedUpgrades` set | the upgrade definition's `List<Effect>` |
 | Owned generators | `generatorCounts` | `produces` entries scaled by count (contributions, not effects) |
 | Timed buffs (Encore) | `{buffId, expiresAt}` list | the buff definition's effects while unexpired |
-| Active events | live (unexpired) `ActiveEvent` record | the event definition's handicaps |
+| Active events | an `ActiveEvent` record exists | the event definition's handicaps |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `barGroups` |
 | Career facts | Records balance, Roadie allocation, songs this run, entitlements | a `CareerEffectDefinition`'s `MultiplierFormula`, computed on read (§3/§7/§8) |
@@ -1010,22 +1039,33 @@ vocabulary: cascade entries and granted stacks.
 
 Defined in §6.1. The definition is declared on its host scope like every other content family, so
 `StartEvent` holds the reference and the stored record's id resolves by walking outward (§12.3).
-Runtime is one record per host scope — **at most one**: `StartEvent` rejects a
-host that already holds a record, live or expired-but-undismissed. The tick's only job is
-decrementing `remainingSeconds` on live ticks — it evaluates nothing and fires nothing; the
-**sweep** (inside every transaction — tick and command alike) latches `goalReached` the moment a
-timed goal holds before expiry — judged on the sweep-start snapshot, latched before any trigger
-actions execute (goal-met and expiry observed together counts — the tie goes to the player) — and
-completion is claimed.
-`StartEvent` / `CompleteEvent` / `AbortEvent` are the three self-guarding operations: start checks
-`availableWhen` and the empty host, runs `onEntry`, then creates the record; complete is armed by
-`goalReached` (or the goal holding live, for untimed events), marks the record claimed (refusing
-reentry), runs `onComplete`, and removes the record whether or not the authored reset already
-cleared it; abort deletes the record and touches nothing else. Any reset that reaches the host
-kills the event — lifetime is placement. An expired, goal-unreached record is inert by derivation
-and **persists until the player dismisses it** (`AbortEvent`) or a reset reaches the host — nothing
-expires it away automatically, and while it sits there the host stays occupied. Handicaps apply
-purely by a live record's existence (§12.6). Nothing installs, so nothing tears down.
+Runtime is one record per host scope - **at most one**, and the state schema holds a single record
+rather than a list, so a second is unrepresentable rather than filtered at load. `StartEvent`
+rejects a host that already holds a record, running or expired-but-undismissed.
+
+`goalReached` latches the moment the goal holds while the attempt has not expired, and one rule
+covers timed and untimed alike. Two callers take that latch, because neither covers the other. The
+tick's timer phase latches before it decrements, which is what makes the tie - a goal met in the
+same segment the timer expires - go to the player, since the sweep runs after the last segment when
+the record already reads zero. The sweep (inside every transaction, tick and command alike) latches
+too, judged on the sweep-start snapshot and before any trigger actions execute, which is what
+catches a goal reached by a command outside any tick.
+
+`StartEvent` / `DismissEvent` are the two self-guarding commands. Start checks `availableWhen` and
+the empty host, runs `onEntry`, then creates the record - after the list, so an `onEntry` that
+resets the host puts the record in the fresh payload. Dismiss checks that the host holds a record
+**for the named event** - a sibling's record is an ordinary refusal, not a licence to pay this
+event's reward - then **removes it first**, then runs `rewards` if `goalReached` was set, then runs `onEnd` either way.
+Removing first is what opens a rung gated on `Not(EventRewardPending(host))`, so an `onEnd`
+carrying `[RestartScope(tier)]` banks instead of silently no-oping. Nothing in an
+action list can observe the record's absence: handicaps multiply production, and rewards read
+balances. Record removal is therefore the operation's job and never the author's.
+
+Any reset that reaches the host kills the event - lifetime is placement. An expired, goal-unreached
+record **persists until the player dismisses it** or a reset reaches the host - nothing expires it
+away automatically, and while it sits there the host stays occupied and the handicaps still apply.
+Expiry does exactly one thing: it stops the goal from latching. Handicaps apply purely by a record
+existing (§12.6). Nothing installs, so nothing tears down.
 
 ### 12.9 Idle (runtime)
 
@@ -1042,15 +1082,18 @@ consumption, so an empty pool fed at +1/sec serves a 1/sec bar demand in the sam
 is resolved BEFORE the deposits, from the same start-of-segment snapshot as everything else; the pool
 BALANCE is the one thing read live, which is exactly what that carve-out says. Resolving demand after
 the deposits would let a segment's own production open a bar's gate and draw for the whole dt — then wall
-clocks advance to the segment boundary **for the timer set snapshotted at segment start**: a timer
-born mid-segment (a bar action's `StartEvent`) is never charged for a segment it didn't live
-through, and a handicap or buff live at segment start governs the whole segment, expiring only at
-its edge. After the last segment: the sweep, commit, and refresh
+clocks advance to the segment boundary for every running timer in the swept set - root plus the
+foreground chapter, the same set the sweep walks, so a root-hosted event's timer advances and a
+dormant chapter's does not. No event can be born mid-segment now that starting one is a command
+rather than an action. A handicap or buff live at segment start governs the whole segment, expiring
+only at its edge. After the last segment: the sweep, commit, and refresh
 (§12.11).
 `lastActiveUtc` stamped on switch-away and, for the foreground chapter only, on
 save. Switch-in computes
 `rate × min(elapsed, cap) × idleRate` per currency at current rates — skipped below the minimum-away
-threshold and skipped entirely while a timed event runs in that chapter — and stores it as the
+threshold and skipped entirely while that chapter holds a record for an event that blocks idle
+(§6.1: `blocksIdle` is derived from the event carrying a timer, and the idle path asks the event
+rather than inspecting one) - and stores it as the
 chapter's pending claim for the idle dialog; deposit on dismissal, ad-doubling at claim time.
 The claim is an exactly-once transaction — `{claimId, amounts: [{scopeId, currencyId, amount}],
 doubled, settled}`: a line names its HOME, because a claim held at the chapter addresses currencies
@@ -1059,7 +1102,7 @@ marks `doubled`, deposit flips `settled`, and replaying either after an app kill
 `claimId`. `idle_rate`, `idle_cap`, and `game_speed` resolve through `GetMultiplier` like
 everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
 commit — for ticks and commands alike; live scopes only, single pass. The same sweep observes
-timed-event goals **from the sweep-start snapshot and latches `goalReached` before any trigger
+event goals **from the sweep-start snapshot and latches `goalReached` before any trigger
 actions execute** — success is judged on the transaction's own mutation, never on trigger
 payloads; a trigger that spends the goal currency changes nothing already secured, and its effect
 on goals is seen next sweep (§12.8).
@@ -1131,7 +1174,7 @@ refuses to run when the query says no. A reference that cannot resolve is never 
 one returns - static content cannot legitimately be in that state, so those throw. The set:
 `IsOffered(rung)` / `ExecuteRung` / `TryRung(rung)`, `CanBuy` / `Buy` / `TryBuy(generator |
 upgrade)`, `FireProducer(producer)`, `SetActiveBars(group, set)`, the event operations
-`StartEvent / CompleteEvent / AbortEvent (eventId)`, `SwitchChapter(chapterId)` (stamps
+`StartEvent / DismissEvent (event)`, `SwitchChapter(chapterId)` (stamps
 `lastActiveUtc`, computes the pending claim, §12.9), `ClaimIdle(chapterId)` (settle the pending
 claim, §9 — the dialog's double button only *requests* the rewarded ad; marking the claim `doubled`
 is AdManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked chapters only), the Ch. 6 song operations (write / name), and
@@ -1161,12 +1204,14 @@ per-feature: any kind an author gates with explains itself for free.
   declared flag with no setter warns.
 - A rung that resets a scope containing tier rungs with unreferenced payout actions warns
   (stranded value); a formula-driven grant placed after a `ResetScope` that clears its inputs warns
-  (reads zeros); reference cycles across ALL nested action references — `ExecuteRung`, the event
-  lifecycle operations, and trigger lists — are errors; a rung on the root scope is an error.
-- A rung whose reset closure contains an event host, and whose offer condition carries no
-  `EventRewardPending` guard on that host, warns (stranded reward — an armed, unclaimed reward
-  would die with the record). A warn, not an error: resetting over cheap disposable events is
-  authorable on purpose. `EventRewardPending` / `EventRecordExists` reach is validated like every
+  (reads zeros); reference cycles across ALL nested action references - `ExecuteRung`,
+  `RestartScope`, and trigger lists - are errors; a rung on the root scope is an error.
+- A rung whose reset closure contains an event host, and whose offer condition carries no REQUIRED
+  `Not(EventRewardPending(host))` - the whole condition, or a conjunct reached through `All` alone -
+  warns (stranded reward: an armed, unclaimed reward would die with the record). Requiredness is the
+  test, not the mere presence of the leg: a positive leg means the opposite, and one under an `Any`
+  is satisfied by its sibling branch. A warn, not an error: resetting over cheap disposable events
+  is authorable on purpose. `EventRewardPending` / `EventRecordExists` reach is validated like every
   scope reference: the acting scope or a scope it encloses.
 - Scope references are checked for reach: `ResetScope` may target the acting scope, a scope it
   encloses — never a peer, the root, an ancestor, or an unrelated subtree. Peers are cleared by the
@@ -1193,12 +1238,16 @@ per-feature: any kind an author gates with explains itself for free.
   like every other scope-attached read: the group's declaring scope is the acting scope or an
   ancestor.
 - An action list that sets a fact and later resets the scope declaring it errors (set-then-wiped —
-  e.g. an event's `event_tierN_done` flag must be declared outside the scope its own `onComplete`
+  e.g. an event's `event_tierN_done` flag must be declared outside the scope its own `onEnd`
   resets).
 - A balance goal on an event whose `onEntry` never resets the host scope warns.
-- An event's `onEntry` / `onComplete` may not invoke lifecycle operations targeting its own host —
-  acyclic nesting could otherwise create a second record between the empty-host check and record
-  creation.
+- An event declared on the root scope is an error: its handicaps would gather into every chapter's
+  outward walk and its occupancy would be global, and an event is a challenge inside a chapter
+  (§6.1). The state agrees - the record lives on a payload root does not carry (§12.3).
+- A gate may not be null: a generator's or event's `availableWhen`, an upgrade's gate, a rung's
+  `offerCondition`, a trigger's condition. An unauthored gate is dead content, and `Always` is how
+  an author says the gate is open. Filters keep their optional conditions - a bar's `availableWhen`
+  and a `ProducesEntry.condition` both default to active, because neither is a gate.
 - A polymorphic kind in data with no class behind it is an import error.
 
 ### 12.13 File layout
@@ -1303,7 +1352,7 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   capstone gates on Records earned within its chapter — a chapter-declared counter fed by the album
   payout and zeroed by the capstone's own reset.
 - **Rungs:** the album release and the capstone are `{offerCondition, List<Action>}`; events are
-  lifecycle operations executing authored lists (§6.1). Payout-before-clear is list order; `ResetScope` is a bare
+  lifecycle commands executing authored lists (§6.1). Payout-before-clear is list order; `ResetScope` is a bare
   downward-closed clear; every invocation — `TryRung` from the UI, `ExecuteRung` from another
   rung — is fail-closed against the rung's own gate (an unmet gate no-ops; unfinished runs
   discard, never bank). The capstone resets the **entire chapter**; completion facts live at root; replays are the same
@@ -1318,13 +1367,15 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 - **Bars:** generic fillables — each names an optional pool currency and its own fill rate, taking
   what is there in declaration order; a group only caps how many run at once; repeating bars carry
   per-fill cascade effects scaled by fill count; uncapped overfill, completion derived from progress.
-- **Events:** data + one ActiveEvent record; `StartEvent`/`CompleteEvent`/`AbortEvent` are
-  self-guarding operations callable from anywhere; entry runs `onEntry` (banking the run if the
-  host rung's own gate is met, discarding it otherwise) then creates the record; handicaps are ×<1
-  effects that exist while a live record does; timers tick live only and suppress idle; completion
-  is claimed, not automatic — `onComplete` ends in the reset that clears the record; abort deletes
-  it; any reset reaching the host kills it; expired records are inert and persist, occupying the
-  host, until dismissed or reset; rewards lateral, never Records.
+- **Events:** data + one ActiveEvent record; `StartEvent`/`DismissEvent` are self-guarding
+  commands, never Action kinds; entry runs `onEntry` (banking the run if the host rung's own
+  gate is met, discarding it otherwise) then creates the record; handicaps are ×<1 effects that
+  exist while a record does, expiry included; a timer is the only thing that ends an attempt, ticks
+  live only, and blocks idle; the goal latches whenever it holds before expiry, timed or not;
+  dismissal is the one ending - record removed first, then `rewards` if the goal was reached, then
+  `onEnd` either way, which is where the reset lives; any reset reaching the host kills it; expired
+  records persist, occupying the host and still handicapping, until dismissed; rewards lateral,
+  never Records.
 - **Triggers:** `{condition, actions}` per scope — the one sanctioned condition-observer; one-shot
   per scope-life (`firedTriggers` latch, a reset re-arms), swept after ticks and command
   transactions in live scopes only, never during idle; repeating behavior is a producer or a bar,

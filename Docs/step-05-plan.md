@@ -305,8 +305,8 @@ call `ResolveDemand` at the top of each segment, BEFORE the rate-production depo
 `ConsumeAndSettle` after them, passing the segment's real start and end stamps rather than anything
 derived from the scaled dt. A step-7 test asserting that order is the guard against the phase code
 quietly collapsing the two calls back together. The trigger
-sweep and event goal latching that share the transaction (step 6). Bar-completion actions that start
-events (they already work through the shared action machinery; the lifecycle ops land in step 6).
+sweep and event goal latching that share the transaction (step 6). Bar completions cannot start an
+event: starting one is a command, not an Action kind (§6.1), so no completion list can reach it.
 The command boundary (step 7). UI, including bar rendering and the group widget (step 9). Additional
 fill behaviors (tap-a-chunk, dump-the-pool) - sibling classes when a chapter wants one.
 Auto-advance, which died with the behavior classes and waits for the chapter that wants it - and

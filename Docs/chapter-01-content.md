@@ -159,24 +159,27 @@ Payout examples: 50 fans → 3, 125 → 5, 500 → 10, 2000 → 20. The concave 
 releases over hoarding (2× the fans in one press pays ~1.41×, not 2×).
 
 The `EventRewardPending` legs are the §12.12 stranded-reward guard: no reset can destroy an armed,
-unclaimed Garage Jam reward, and the disarmed button lists the reason per §12.11 — the player
-claims (or aborts) with one tap and presses again.
+unclaimed Garage Jam reward, and the disarmed button lists the reason per §12.11 - the player
+dismisses with one tap, taking the reward, and presses again.
 
 ## 10. Events — the Garage Jam chain (host: tier1)
 
 Three separate `EventDefinition`s (levels are separate events, §6.1). Shared shape: `handicaps:
 [{target: gear, ×0}]` (tap only — generator cash *and* fans lines pause; `band`'s base trickle
-continues), `onEntry: [ExecuteRung(tier1), ResetScope(tier1)]` — a gate-met run banks exactly as a
+continues), `onEntry: [RestartScope(tier1)]` - a gate-met run banks exactly as a
 release would, an unfinished one is discarded.
 
-| Event | availableWhen | Goal | Timer | onComplete |
+| Event | availableWhen | Goal | Timer | rewards |
 |---|---|---|---|---|
-| `garage_jam_1` | `CurrencyAtLeast(records, 1)` | `CurrencyAtLeast(cash, 150)` | 60s | `[AddModifier(ch1, gj_tap_1), SetFlag(gj1_done), ResetScope(tier1)]` |
-| `garage_jam_2` | `All[FlagSet(gj1_done), CurrencyAtLeast(records, 15)]` | `CurrencyAtLeast(cash, 300)` | 90s | `[RemoveModifier(ch1, gj_tap_1), AddModifier(ch1, gj_tap_2), SetFlag(gj2_done), ResetScope(tier1)]` |
-| `garage_jam_3` | `All[FlagSet(gj2_done), CurrencyAtLeast(records, 30)]` | `CurrencyAtLeast(cash, 600)` | 90s | `[RemoveModifier(ch1, gj_tap_2), AddModifier(ch1, gj_tap_3), SetFlag(gj3_done), ResetScope(tier1)]` |
+| `garage_jam_1` | `CurrencyAtLeast(records, 1)` | `CurrencyAtLeast(cash, 150)` | 60s | `[AddModifier(ch1, gj_tap_1), SetFlag(gj1_done)]` |
+| `garage_jam_2` | `All[FlagSet(gj1_done), CurrencyAtLeast(records, 15)]` | `CurrencyAtLeast(cash, 300)` | 90s | `[RemoveModifier(ch1, gj_tap_1), AddModifier(ch1, gj_tap_2), SetFlag(gj2_done)]` |
+| `garage_jam_3` | `All[FlagSet(gj2_done), CurrencyAtLeast(records, 30)]` | `CurrencyAtLeast(cash, 600)` | 90s | `[RemoveModifier(ch1, gj_tap_2), AddModifier(ch1, gj_tap_3), SetFlag(gj3_done)]` |
 
-`onComplete` ends with `ResetScope(tier1)` (§6.1's rewards-first, reset-last convention): claiming
-pays the bonus, clears the sprint's leavings, and the next run starts fresh with the bonus live.
+All three share `onEnd: [ResetScope(tier1)]`, which runs whether or not the goal was reached -
+dismissal pays the bonus if it was, then clears the sprint either way, and the next run starts fresh
+with whatever bonus was earned. Nothing pre-event is at stake: entry already banked the run through
+the release's own gate before wiping tier1, so a failed attempt only loses what the attempt itself
+built.
 `gj*_done` flags and the reward modifiers live at **ch1** — they survive tier resets, die at the
 capstone (§12.12's set-then-wiped check holds: nothing in these lists resets ch1). Both rungs
 guard with `Not(EventRewardPending(tier1))` (§9), so no reset can destroy an armed, unclaimed
@@ -207,7 +210,7 @@ capstone beat while `All[FlagSet(ch1_complete), Not(FlagSet(story_ch1_end_seen))
 | `the_gear` | `EarnedTotalAtLeast(cash, 250)` | tier1 | upgrade list |
 | `rehearsal_space` | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
 | `the_release` | `FlagSet(album)` | ch1 | release rung button (+ "would bank: N" preview via the same formula) |
-| `garage_jam` | `CurrencyAtLeast(records, 1)` | tier1 | event module (start/claim/abort) |
+| `garage_jam` | `CurrencyAtLeast(records, 1)` | tier1 | event module (start/dismiss) |
 | `backyard_party` | `FlagSet(album)` | ch1 | capstone rung button + `ch1_records`/30 readout |
 
 Every gate above is a flag or a monotonic fact — nothing strobes with spending (§2).
@@ -241,11 +244,11 @@ untouched by every income multiplier — keeps each cycle ≥ ~2.5 min, so the f
 ### 13.2 Event entry (mid-chapter, records = 17, mid-run: 60 fans, 1 cover done)
 
 1. `StartEvent(garage_jam_1)` — `availableWhen` holds (17 ≥ 1), host empty ✓.
-2. `onEntry` runs: `ExecuteRung(tier1)` checks the **release's own gate** — 60 ≥ 50 fans, 1 cover ✓
+2. `onEntry` runs `RestartScope(tier1)`, which checks the **release's own gate** — 60 ≥ 50 fans, 1 cover ✓
    — so the run banks exactly as a manual release: `floor((60/5)^0.5)` = 3 → records 20,
-   ch1_records +3. Then `ResetScope(tier1)` (redundant after the rung's own reset — it covers the
-   gate-unmet case, where the unfinished run is *discarded*, never banked).
-3. The `ActiveEvent` record is created in the fresh state: `{garage_jam_1, 60, false, false}`.
+   ch1_records +3, and tier1 clears. Had the gate been unmet, the rung would have no-opped and the
+   clear would still have happened - the unfinished run *discarded*, never banked.
+3. The `ActiveEvent` record is created in the fresh state: `{garage_jam_1, 60, false}`.
    Handicap `{target: gear, ×0}` now zeroes every generator line by derivation — tap only.
 4. Tap yield = 1 × (1 + 0.02×20) = **1.4/press** (no stage_presence — the reset cleared it). Goal
    150 cash ⇒ ~107 presses in 60s ≈ **1.8 taps/s** — a real but fair sprint. (At records = 1, the
@@ -253,13 +256,16 @@ untouched by every income multiplier — keeps each cycle ≥ ~2.5 min, so the f
    experience, §6.1.)
 5. Goal reached at t≈55s: the sweep latches `goalReached` — spending below 150 afterwards
    un-secures nothing.
-6. `CompleteEvent(garage_jam_1)`: marks claimed → `AddModifier(ch1, gj_tap_1)` (+25% tap for the
-   rest of the chapter), `SetFlag(gj1_done)`, `ResetScope(tier1)` — the reset clears the record
-   with the rest of the tier (the operation would remove it regardless, §6.1). A fresh run starts
-   with the bonus live. Delaying the claim is safe: the release disarms on its
-   `EventRewardPending` leg ("Claim your Garage Jam reward first") until the record is settled.
-7. If the timer had expired first: the record persists inert — handicaps stop contributing, the
-   host stays occupied, `StartEvent` refuses — until `AbortEvent` or a reset reaches tier1.
+6. `DismissEvent(garage_jam_1)`: the record is removed first, then `rewards` runs because
+   `goalReached` was set - `AddModifier(ch1, gj_tap_1)` (+25% tap for the rest of the chapter) and
+   `SetFlag(gj1_done)` - then `onEnd` runs `ResetScope(tier1)`. A fresh run starts with the bonus
+   live. Delaying the dismissal is safe: the release disarms on its `EventRewardPending` leg
+   ("Claim your Garage Jam reward first") until the record is gone, and removing the record first is
+   what lets that guard reopen.
+7. If the timer had expired first: the record persists - the `gear` handicap keeps applying, the
+   host stays occupied and `StartEvent` refuses - until the player dismisses it or a reset reaches
+   tier1. Dismissal then runs `onEnd` alone: no bonus, tier1 wiped, and nothing lost that the
+   attempt did not itself create.
 
 ### 13.3 Replay clear
 
@@ -312,7 +318,7 @@ tutorial chapter; the gate is the knob if not.
   matches; the unlock takes the verb-first form `play_for_crowd` and `cut_demo` already use.
 - `browse_gear` upgrade deleted — the region gates directly on the earned total (§2).
 - Garage Jam's internal tiers 1–3 → three `EventDefinition`s gated on completion flags (§6.1);
-  `baselineReset` → `onEntry: [ExecuteRung, ResetScope]`; goals retuned 500/2500/10000 →
+  `baselineReset` → `onEntry: [RestartScope]`; goals retuned 500/2500/10000 →
   150/300/600 (the old goals needed 8+ taps/s; new ones sit at 1.8–2.8 taps/s against the intended
   Records multipliers), timers 60/60/45 → 60/90/90.
 - Retunes for the ~300s first-demo target: amp rate 0.4 → 0.5, drummer 500 → 250 with unlock at

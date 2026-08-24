@@ -68,12 +68,15 @@ always that the content belongs on a scope.
    deterministic order, cascades (`perFill` × `fillCount` — the fill-count row of
    effects-from-facts), `SetActiveBars` (fail-closed). Extends validation: bar and group checks.
 6. **Events + trigger sweep** (§6.1, §12.8, §12.5) — `EventDefinition` declared on its host scope
-   (`ScopeDefinition.events`), with the lifecycle operations holding a direct reference and the
-   `ActiveEvent` record's id resolving outward, exactly as modifiers do; the three self-guarding lifecycle operations,
-   `EventRewardPending`/`EventRecordExists` condition kinds, handicaps by live-record derivation
-   (the active-event row of effects-from-facts), the transaction sweep (latch-first, sweep-start
+   (`ScopeDefinition.events`), the host found by the outward walk and the `ActiveEvent` record's id
+   resolving the same way, exactly as modifiers do; `StartEvent` / `DismissEvent` as COMMANDS rather
+   than Action kinds (so no authored list can start or end an event), the two ending lists
+   (`rewards` on success, `onEnd` always), `EventRewardPending`/`EventRecordExists` condition kinds,
+   handicaps derived from a record existing (the active-event row of effects-from-facts), the
+   `Always` condition and `RestartScope` action, the transaction sweep (latch-first, sweep-start
    snapshot, deterministic order, goal latch before trigger actions). Extends validation to
-   complete §12.12: lifecycle-op cycles, host rules, balance-goal-without-reset, stranded-reward
+   complete §12.12: `RestartScope` in both ledgers, no event on root, gates may not be null,
+   balance-goal-without-reset, stranded-reward
    guard, event kinds' reach.
 7. **Tick + GameSession** (§12.9) — dt segmentation at expiry timestamps, fixed economy phases per
    segment, `game_speed` scaled production vs real wall clocks, idle switch-in/pending
