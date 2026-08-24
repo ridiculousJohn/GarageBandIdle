@@ -96,7 +96,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindOnChain(scope.Id)
+            var target = ctx.Scope.FindOnChain(scope)
                 ?? throw new InvalidOperationException(
                     $"AddModifier: scope '{scope.Id}' is not on the chain from '{ctx.Scope.ScopeId}'.");
 
@@ -144,7 +144,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindOnChain(scope.Id)
+            var target = ctx.Scope.FindOnChain(scope)
                 ?? throw new InvalidOperationException(
                     $"RemoveModifier: scope '{scope.Id}' is not on the chain from '{ctx.Scope.ScopeId}'.");
 
@@ -191,7 +191,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindInSubtree(scope.Id)
+            var target = ctx.Scope.FindInSubtree(scope)
                 ?? throw new InvalidOperationException(
                     $"ResetScope: '{scope.Id}' is not the acting scope or enclosed by '{ctx.Scope.ScopeId}'.");
             if (target.Parent == null)
@@ -241,7 +241,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx)
         {
-            var target = ctx.Scope.FindInSubtree(tier.Id)
+            var target = ctx.Scope.FindInSubtree(tier)
                 ?? throw new InvalidOperationException(
                     $"ExecuteRung: scope '{tier.Id}' is not within '{ctx.Scope.ScopeId}'.");
             if (target.Definition.rung == null)

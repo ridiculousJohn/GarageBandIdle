@@ -77,7 +77,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.fillCounts["cover_1"] = 2;
             tree.Tier1.activeBars["learn_covers"] = new System.Collections.Generic.HashSet<string> { "cover_1" };
             tree.Tier1.modifierStacks["gj_tap_1"] = 2;
-            tree.Tier1.activeEvents.Add(new ActiveEvent { eventId = "garage_jam_1", remainingSeconds = 12.5, goalReached = true, claimed = false });
+            tree.Tier1.eventHost.activeEvent = new ActiveEvent { eventId = "garage_jam_1", remainingSeconds = 12.5, goalReached = true };
             tree.Tier1.songs.Add(new SongEntry { songId = "song_1", name = "Three-Chord Anthem" });
             tree.Ch1.balances["ch1_records"] = 17;
             tree.Ch1.flags.Add("album");
@@ -114,9 +114,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2, tier1.fillCounts["cover_1"]);
             Assert.IsTrue(tier1.activeBars["learn_covers"].Contains("cover_1"));
             Assert.AreEqual(2, tier1.modifierStacks["gj_tap_1"]);
-            Assert.AreEqual("garage_jam_1", tier1.activeEvents[0].eventId);
-            Assert.AreEqual(12.5, tier1.activeEvents[0].remainingSeconds);
-            Assert.IsTrue(tier1.activeEvents[0].goalReached);
+            Assert.AreEqual("garage_jam_1", tier1.eventHost.activeEvent.eventId);
+            Assert.AreEqual(12.5, tier1.eventHost.activeEvent.remainingSeconds);
+            Assert.IsTrue(tier1.eventHost.activeEvent.goalReached);
             Assert.AreEqual("Three-Chord Anthem", tier1.songs[0].name);
             Assert.AreEqual((BigNumber)17, ch1.balances["ch1_records"]);
             Assert.IsTrue(ch1.flags.Contains("album"));

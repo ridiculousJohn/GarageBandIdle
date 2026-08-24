@@ -183,8 +183,9 @@ namespace RidiculousGaming.GarageBandIdle.Save
 
         // Reads a saved payload against the type the scope's POSITION dictates,
         // never a type the save names for itself: root facts land on the root,
-        // chapter facts on a chapter, and a tier gets the base payload. Members
-        // the target type does not have are dropped by the read itself.
+        // chapter facts on a chapter, and a tier gets the event-host payload.
+        // Members the target type does not have are dropped by the read itself,
+        // which is what keeps a root file from carrying an event record.
         private static ScopeFacts ReadFacts(JObject token, ScopeState state)
         {
             var serializer = JsonSerializer.Create(MakeSettings());
@@ -192,7 +193,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 return token.ToObject<RootFacts>(serializer);
             if (state is ChapterScopeState)
                 return token.ToObject<ChapterFacts>(serializer);
-            return token.ToObject<ScopeFacts>(serializer);
+            return token.ToObject<EventHostFacts>(serializer);
         }
 
         // Tree-scoped facts carry reach rules, not just id existence (12.3): the

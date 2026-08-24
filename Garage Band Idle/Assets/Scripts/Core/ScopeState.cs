@@ -10,7 +10,6 @@ namespace RidiculousGaming.GarageBandIdle
         public string eventId;
         public double remainingSeconds;
         public bool goalReached;
-        public bool claimed;
     }
 
     // A timed buff (Encore) - absolute expiry, burns real time app-closed (design doc 9).
@@ -73,9 +72,21 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, int> fillCounts = new();             // repeating bars
         public Dictionary<string, HashSet<string>> activeBars = new(); // per group
         public Dictionary<string, int> modifierStacks = new();   // granted stacks, keyed like every other count fact
-        public List<ActiveEvent> activeEvents = new();
         public List<TimedBuff> timedBuffs = new();
         public List<SongEntry> songs = new();
+    }
+
+    // Facts a scope that can HOST an event holds - tiers and chapters. Root
+    // cannot: its handicaps would gather into every chapter's walk and its
+    // occupancy would be global, so a root event declaration is refused at load
+    // (12.12) and the record it would leave is not even representable here.
+    // At most one per host (design doc 12.8): a field rather than a list, so a
+    // second record cannot exist instead of being something the save filter has
+    // to police - picking a survivor between two is a choice nothing justifies.
+    [Serializable]
+    public class EventHostFacts : ScopeFacts
+    {
+        public ActiveEvent activeEvent;
     }
 
     // Facts only the root holds. A separate payload rather than fields every
@@ -88,9 +99,10 @@ namespace RidiculousGaming.GarageBandIdle
         public HashSet<string> entitlements = new();                   // store-written
     }
 
-    // Facts only a chapter holds.
+    // Facts only a chapter holds. A chapter can host an event, so it builds on
+    // the host payload rather than the common base.
     [Serializable]
-    public class ChapterFacts : ScopeFacts
+    public class ChapterFacts : EventHostFacts
     {
         public PendingClaim pendingClaim;
     }
@@ -122,16 +134,20 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, int> fillCounts => facts.fillCounts;
         public Dictionary<string, HashSet<string>> activeBars => facts.activeBars;
         public Dictionary<string, int> modifierStacks => facts.modifierStacks;
-        public List<ActiveEvent> activeEvents => facts.activeEvents;
+        // Null on the root, which cannot host an event. Every caller reaches a
+        // host through the outward declaration walk, and a root declaration is
+        // refused at load, so a null here is a content or caller fault rather
+        // than a branch anything takes.
+        public EventHostFacts eventHost => facts as EventHostFacts;
         public List<TimedBuff> timedBuffs => facts.timedBuffs;
         public List<SongEntry> songs => facts.songs;
 
         public string ScopeId => Definition.Id;
 
-        // A tier's payload. The base payload is allocated here rather than by a
-        // field initializer so every subclass hands in its own instead.
+        // A tier's payload. Allocated here rather than by a field initializer so
+        // every subclass hands in its own instead. A tier can host an event.
         private ScopeState(ScopeDefinition definition, ScopeState parent)
-            : this(definition, parent, new ScopeFacts()) { }
+            : this(definition, parent, new EventHostFacts()) { }
 
         protected ScopeState(ScopeDefinition definition, ScopeState parent, ScopeFacts payload)
         {
@@ -157,7 +173,7 @@ namespace RidiculousGaming.GarageBandIdle
         // The payload a reset installs. Never called from a constructor - each
         // class's constructor allocates its own, so no virtual dispatch happens
         // before the object exists.
-        protected virtual ScopeFacts NewFacts() => new ScopeFacts();
+        protected virtual ScopeFacts NewFacts() => new EventHostFacts();
 
         // Builds the state tree the definition tree describes. The public entry
         // builds a whole tree from its root, so depth decides each node's class
@@ -207,8 +223,37 @@ namespace RidiculousGaming.GarageBandIdle
             InitializeDeclared();
         }
 
-        // Depth-first search of this scope's subtree (self included). Ids are
-        // unique tree-wide, so the first hit is the only hit.
+        // The node standing for this definition, searched downward from here
+        // (self included). A definition and its state never point at each other,
+        // so the walk is the only link - but what it matches on is the asset the
+        // caller already holds, which is why nothing here depends on ids being
+        // unique. Names are the save's business (design doc 12.3).
+        public ScopeState FindInSubtree(ScopeDefinition scope)
+        {
+            if (Definition == scope)
+                return this;
+            foreach (var child in Children)
+            {
+                var found = child.FindInSubtree(scope);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+
+        // Self or an ancestor standing for this definition; null when it is not
+        // on the chain.
+        public ScopeState FindOnChain(ScopeDefinition scope)
+        {
+            for (var node = this; node != null; node = node.Parent)
+                if (node.Definition == scope)
+                    return node;
+            return null;
+        }
+
+        // Depth-first search of this scope's subtree (self included) BY ID, for
+        // the save: a file holds names and nothing else. Ids are unique
+        // tree-wide, so the first hit is the only hit.
         public ScopeState FindInSubtree(string scopeId)
         {
             if (ScopeId == scopeId)
@@ -222,7 +267,7 @@ namespace RidiculousGaming.GarageBandIdle
             return null;
         }
 
-        // Self or an ancestor by id; null when the id is not on the chain.
+        // Self or an ancestor BY ID; null when the id is not on the chain.
         public ScopeState FindOnChain(string scopeId)
         {
             for (var node = this; node != null; node = node.Parent)
