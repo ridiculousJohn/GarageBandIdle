@@ -313,9 +313,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tierBDef.generators.Add(genB);
 
             var root = ScopeState.Build(rootDef);
-            var chapter = root.FindInSubtree("chapter");
-            var tierA = root.FindInSubtree("tier_a");
-            var tierB = root.FindInSubtree("tier_b");
+            var chapter = root.FindInSubtree(chapterDef);
+            var tierA = root.FindInSubtree(tierADef);
+            var tierB = root.FindInSubtree(tierBDef);
             tierA.generatorCounts["gen_a"] = 1;
             tierB.generatorCounts["gen_b"] = 1;
             tierA.purchasedUpgrades.Add("boost_a");
@@ -429,8 +429,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 rootDef.careerEffects.Add(active);
 
                 Root = ScopeState.Build(rootDef);
-                TierA = Root.FindInSubtree("tier_a");
-                TierB = Root.FindInSubtree("tier_b");
+                TierA = Root.FindInSubtree(tierADef);
+                TierB = Root.FindInSubtree(tierBDef);
                 Root.generatorCounts["gen_root"] = 1;
                 TierA.generatorCounts["gen_a"] = 1;
                 TierB.generatorCounts["gen_b"] = 1;

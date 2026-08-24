@@ -135,8 +135,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tier2Def = TestTree.MakeScope("tier2");
             tree.Ch1Def.children.Add(tier2Def);
             var root = ScopeState.Build(tree.RootDef);   // rebuild with the sibling
-            var tier1 = root.FindInSubtree("tier1");
-            var tier2 = root.FindInSubtree("tier2");
+            var tier1 = root.FindInSubtree(tree.Tier1Def);
+            var tier2 = root.FindInSubtree(tier2Def);
             tier2.balances["merch"] = 5;
 
             // A peer is the parent's to clear, so tier1 cannot reach tier2.

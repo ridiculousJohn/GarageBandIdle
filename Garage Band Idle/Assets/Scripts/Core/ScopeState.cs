@@ -35,8 +35,9 @@ namespace RidiculousGaming.GarageBandIdle
     // which includes currencies homed at tiers BELOW it - so this is the one
     // coordinate in the schema that names a scope instead of resolving outward
     // from the scope holding the fact. Scope ids are unique tree-wide, so the
-    // name is exact, and settlement reaches the home by one named step
-    // (FindInSubtree, or FindOnChain for a currency homed further out).
+    // name is exact, and the save resolves it in one named step - downward from
+    // the chapter, or outward for a currency homed further out - with lookups it
+    // keeps private, since this is the only coordinate that needs them.
     [Serializable]
     public class ClaimEntry
     {
@@ -227,7 +228,8 @@ namespace RidiculousGaming.GarageBandIdle
         // (self included). A definition and its state never point at each other,
         // so the walk is the only link - but what it matches on is the asset the
         // caller already holds, which is why nothing here depends on ids being
-        // unique. Names are the save's business (design doc 12.3).
+        // unique. A scope has no lookup BY NAME at all: the save owns its own,
+        // privately, because a file holds text and nothing else (12.3).
         public ScopeState FindInSubtree(ScopeDefinition scope)
         {
             if (Definition == scope)
@@ -247,31 +249,6 @@ namespace RidiculousGaming.GarageBandIdle
         {
             for (var node = this; node != null; node = node.Parent)
                 if (node.Definition == scope)
-                    return node;
-            return null;
-        }
-
-        // Depth-first search of this scope's subtree (self included) BY ID, for
-        // the save: a file holds names and nothing else. Ids are unique
-        // tree-wide, so the first hit is the only hit.
-        public ScopeState FindInSubtree(string scopeId)
-        {
-            if (ScopeId == scopeId)
-                return this;
-            foreach (var child in Children)
-            {
-                var found = child.FindInSubtree(scopeId);
-                if (found != null)
-                    return found;
-            }
-            return null;
-        }
-
-        // Self or an ancestor BY ID; null when the id is not on the chain.
-        public ScopeState FindOnChain(string scopeId)
-        {
-            for (var node = this; node != null; node = node.Parent)
-                if (node.ScopeId == scopeId)
                     return node;
             return null;
         }

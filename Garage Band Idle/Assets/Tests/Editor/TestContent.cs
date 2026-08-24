@@ -159,8 +159,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Ch1Def.modifiers.Add(GjTap1);
 
             Root = ScopeState.Build(RootDef);
-            Ch1 = (ChapterScopeState)Root.FindInSubtree("ch1");
-            Tier1 = Root.FindInSubtree("tier1");
+            Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);
+            Tier1 = Root.FindInSubtree(Tier1Def);
         }
 
         // One cover and the modifier its completion grants. Both are filed at

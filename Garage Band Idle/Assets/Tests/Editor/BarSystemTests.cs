@@ -42,8 +42,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Build()
         {
             Root = ScopeState.Build(RootDef);
-            Ch1 = (ChapterScopeState)Root.FindInSubtree("ch1");
-            Tier1 = Root.FindInSubtree("tier1");
+            Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);
+            Tier1 = Root.FindInSubtree(Tier1Def);
         }
 
         // A bar names what it drinks. Most tests give a group's bars the same

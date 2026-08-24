@@ -48,11 +48,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // Load into a FRESH tree: the tests below only care that the loaded
         // state matches, not which definition instance answered.
-        private static bool Load(string json, out RootScopeState root)
+        private static bool Load(string json, out RootScopeState root, out TestTree tree)
         {
-            var tree = new TestTree();
+            tree = new TestTree();
             return SaveSystem.TryDeserialize(json, tree.RootDef, out root);
         }
+
+        // For the tests that only care whether the load succeeded: the content
+        // it loaded against is the same fresh tree either way.
+        private static bool Load(string json, out RootScopeState root) => Load(json, out root, out _);
 
         private LoadOutcome LoadDisk(out RootScopeState root)
         {
@@ -101,8 +105,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fresh.Cover1.repeating = true;
             Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.RootDef, out var root));
 
-            var tier1 = root.FindInSubtree("tier1");
-            var ch1 = (ChapterScopeState)root.FindInSubtree("ch1");
+            var tier1 = root.FindInSubtree(fresh.Tier1Def);
+            var ch1 = (ChapterScopeState)root.FindInSubtree(fresh.Ch1Def);
             Assert.AreEqual((BigNumber)123.45, tier1.balances["cash"]);
             Assert.AreEqual((BigNumber)300, tier1.earnedTotals["cash"]);
             Assert.AreEqual(BigNumber.FromMantissaExponent(1.5, 320), tier1.balances["fans"]);
@@ -139,7 +143,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestTree.DeclareCurrency(tier2, "merch");
             oldTree.Ch1Def.children.Add(tier2);
             var oldRoot = ScopeState.Build(oldTree.RootDef);
-            oldRoot.FindInSubtree("tier2").balances["merch"] = 5;
+            oldRoot.FindInSubtree(tier2).balances["merch"] = 5;
             var json = SaveSystem.Serialize(oldRoot);
 
             var newTree = new TestTree();
@@ -150,8 +154,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("tier2"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
 
-            Assert.IsNull(root.FindInSubtree("tier2"));
-            Assert.AreEqual(BigNumber.Zero, root.FindInSubtree("tier3").balances["vinyl"]);
+            Assert.IsNull(root.FindInSubtree(tier2));
+            Assert.AreEqual(BigNumber.Zero, root.FindInSubtree(tier3).balances["vinyl"]);
         }
 
         [Test]
@@ -172,7 +176,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cash'"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
 
-            var tier1 = root.FindInSubtree("tier1");
+            var tier1 = root.FindInSubtree(newTree.Tier1Def);
             Assert.IsFalse(tier1.balances.ContainsKey("cash"));
             Assert.IsFalse(tier1.flags.Contains("fans_revealed"));
             Assert.AreEqual(BigNumber.Zero, tier1.balances["vinyl"]);
@@ -319,12 +323,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var trigger = TestTree.MakeDefinition<TriggerDefinition>("t1");
             savedTree.Tier1Def.triggers.Add(trigger);
             var savedRoot = ScopeState.Build(savedTree.RootDef);
-            var tier1 = savedRoot.FindInSubtree("tier1");
+            var tier1 = savedRoot.FindInSubtree(savedTree.Tier1Def);
             tier1.firedTriggers.Add("t1");
             tier1.firedTriggers.Add("ghost_trigger");
             savedRoot.roadieAllocation["ch1"] = 1;
             savedRoot.roadieAllocation["ghost_chapter"] = 2;
-            var ch1 = (ChapterScopeState)savedRoot.FindInSubtree("ch1");
+            var ch1 = (ChapterScopeState)savedRoot.FindInSubtree(savedTree.Ch1Def);
             ch1.pendingClaim = new PendingClaim { claimId = "c1" };
             ch1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "cash", amount = 100 });
             ch1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "ghost_currency", amount = 5 });
@@ -340,12 +344,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_trigger"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
 
-            var loadedTier1 = root.FindInSubtree("tier1");
+            var loadedTier1 = root.FindInSubtree(newTree.Tier1Def);
             Assert.IsTrue(loadedTier1.firedTriggers.Contains("t1"));
             Assert.IsFalse(loadedTier1.firedTriggers.Contains("ghost_trigger"));
             Assert.AreEqual(1, root.roadieAllocation["ch1"]);
             Assert.IsFalse(root.roadieAllocation.ContainsKey("ghost_chapter"));
-            var loadedCh1 = (ChapterScopeState)root.FindInSubtree("ch1");
+            var loadedCh1 = (ChapterScopeState)root.FindInSubtree(newTree.Ch1Def);
             Assert.AreEqual((BigNumber)100, ClaimAmount(loadedCh1.pendingClaim, "tier1", "cash"));
             Assert.IsFalse(HasClaimFor(loadedCh1.pendingClaim, "ghost_currency"));
         }
@@ -367,14 +371,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_modifier"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_upgrade"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_generator"));
-            Assert.IsTrue(Load(json, out var root));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            var tier1 = root.FindInSubtree("tier1");
+            var tier1 = root.FindInSubtree(loaded.Tier1Def);
             Assert.AreEqual(3, tier1.generatorCounts["drummer"]);
             Assert.IsFalse(tier1.generatorCounts.ContainsKey("ghost_generator"));
             Assert.IsTrue(tier1.purchasedUpgrades.Contains("amp_strings"));
             Assert.IsFalse(tier1.purchasedUpgrades.Contains("ghost_upgrade"));
-            var ch1 = root.FindInSubtree("ch1");
+            var ch1 = root.FindInSubtree(loaded.Ch1Def);
             Assert.AreEqual(1, ch1.modifierStacks.Count);
             Assert.IsTrue(ch1.modifierStacks.ContainsKey("gj_tap_1"));
         }
@@ -393,9 +397,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not declared"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cover_2' is -5"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("group 'ghost_group' is not declared"));
-            Assert.IsTrue(Load(json, out var root));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            var tier1 = root.FindInSubtree("tier1");
+            var tier1 = root.FindInSubtree(loaded.Tier1Def);
             Assert.AreEqual((BigNumber)40, tier1.barProgress["cover_1"]);
             Assert.AreEqual(1, tier1.barProgress.Count);
             Assert.AreEqual(new HashSet<string> { "cover_1" }, tier1.activeBars["learn_covers"]);
@@ -412,9 +416,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cover_1' names a non-repeating bar"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not declared"));
-            Assert.IsTrue(Load(json, out var root));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            Assert.IsEmpty(root.FindInSubtree("tier1").fillCounts);
+            Assert.IsEmpty(root.FindInSubtree(loaded.Tier1Def).fillCounts);
         }
 
         [Test]
@@ -428,9 +432,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not in group 'learn_covers'"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("holds 2 active bars of at most 1 - cleared"));
-            Assert.IsTrue(Load(json, out var root));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            Assert.IsEmpty(root.FindInSubtree("tier1").activeBars["learn_covers"]);
+            Assert.IsEmpty(root.FindInSubtree(loaded.Tier1Def).activeBars["learn_covers"]);
         }
 
         [Test]
@@ -445,11 +449,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("roadie allocation for 'ch1' is -2"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'gj_tap_1' has count 0"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'drummer' is -3"));
-            Assert.IsTrue(Load(json, out var root));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
 
             Assert.IsEmpty(root.roadieAllocation);
-            Assert.IsEmpty(root.FindInSubtree("ch1").modifierStacks);
-            Assert.IsEmpty(root.FindInSubtree("tier1").generatorCounts);
+            Assert.IsEmpty(root.FindInSubtree(loaded.Ch1Def).modifierStacks);
+            Assert.IsEmpty(root.FindInSubtree(loaded.Tier1Def).generatorCounts);
         }
 
         [Test]
@@ -489,7 +493,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             savedRoot.roadieAllocation["ch1"] = 1;      // a chapter - valid
             savedRoot.roadieAllocation["tier1"] = 2;    // in the tree, but not a chapter
-            var savedCh1 = (ChapterScopeState)savedRoot.FindInSubtree("ch1");
+            var savedCh1 = (ChapterScopeState)savedRoot.FindInSubtree(savedTree.Ch1Def);
             savedCh1.pendingClaim = new PendingClaim { claimId = "y" };
             savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "cash", amount = 10 });    // in ch1's subtree - valid
             savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "root", currencyId = "records", amount = 5 });   // on the ancestor chain - valid
@@ -508,7 +512,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(1, root.roadieAllocation["ch1"]);
             Assert.IsFalse(root.roadieAllocation.ContainsKey("tier1"));
-            var ch1 = (ChapterScopeState)root.FindInSubtree("ch1");
+            var ch1 = (ChapterScopeState)root.FindInSubtree(newTree.Ch1Def);
             Assert.AreEqual((BigNumber)10, ClaimAmount(ch1.pendingClaim, "tier1", "cash"));
             Assert.AreEqual((BigNumber)5, ClaimAmount(ch1.pendingClaim, "root", "records"));
             Assert.IsFalse(HasClaimFor(ch1.pendingClaim, "merch2"));
@@ -532,7 +536,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             savedTree.RootDef.children.Add(ch2);
             var savedRoot = ScopeState.Build(savedTree.RootDef);
 
-            var savedCh1 = (ChapterScopeState)savedRoot.FindInSubtree("ch1");
+            var savedCh1 = (ChapterScopeState)savedRoot.FindInSubtree(savedTree.Ch1Def);
             savedCh1.pendingClaim = new PendingClaim { claimId = "z" };
             savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1", currencyId = "cash", amount = 10 });
             savedCh1.pendingClaim.amounts.Add(new ClaimEntry { scopeId = "tier1b", currencyId = "cash", amount = 20 });
@@ -550,7 +554,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cash' at scope 'ch2'"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
 
-            var ch1 = (ChapterScopeState)root.FindInSubtree("ch1");
+            var ch1 = (ChapterScopeState)root.FindInSubtree(newTree.Ch1Def);
             Assert.AreEqual(2, ch1.pendingClaim.amounts.Count);
             Assert.AreEqual((BigNumber)10, ClaimAmount(ch1.pendingClaim, "tier1", "cash"));
             Assert.AreEqual((BigNumber)20, ClaimAmount(ch1.pendingClaim, "tier1b", "cash"));

@@ -250,7 +250,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                         entries.RemoveAt(i);
                         continue;
                     }
-                    var home = state.FindInSubtree(entry.scopeId) ?? state.FindOnChain(entry.scopeId);
+                    var home = InSubtreeById(state, entry.scopeId) ?? OnChainById(state, entry.scopeId);
                     if (home != null && home.Definition.DeclaresCurrency(entry.currencyId))
                         continue;
                     Debug.LogWarning($"SaveSystem: pending-claim currency '{entry.currencyId}' at scope '{entry.scopeId}' is not reachable from chapter '{state.ScopeId}' - dropped.");
@@ -270,6 +270,33 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // (below). Event ids, buff ids, and song ids gain their filters WITH
         // their definition families - the same incremental contract as the
         // validation pass.
+        // The two lookups BY NAME, private because this is the only place a name
+        // is all there is: a save file holds text, so a stored coordinate names
+        // its scope and is resolved here, once, at the boundary. Everything past
+        // this point addresses a scope by reference (design doc 12.3), which is
+        // why these are not on ScopeState for anyone else to reach for. Scope
+        // ids are unique tree-wide, so the first hit is the only hit.
+        private static ScopeState InSubtreeById(ScopeState from, string scopeId)
+        {
+            if (from.ScopeId == scopeId)
+                return from;
+            foreach (var child in from.Children)
+            {
+                var found = InSubtreeById(child, scopeId);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+
+        private static ScopeState OnChainById(ScopeState from, string scopeId)
+        {
+            for (var node = from; node != null; node = node.Parent)
+                if (node.ScopeId == scopeId)
+                    return node;
+            return null;
+        }
+
         private static void FilterToDeclared(ScopeFacts facts, ScopeState state)
         {
             var definition = state.Definition;
