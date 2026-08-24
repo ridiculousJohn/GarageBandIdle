@@ -19,6 +19,11 @@ plans to survive scrutiny is the wrong objective function - individually defensi
 are exactly the ones that pile up, because nothing ever triggers a "delete this instead"
 reflex.
 
+**Trimming has the opposite failure, 2026-08-24.** Cutting the step 6 plan from 343 lines to 152 by
+paragraph size dropped a required validation check, because the checks are one-liners and the
+argument prose is what runs long. Cut argument - the paragraph defending a ruling nobody has
+challenged - never a sentence that names a check, a rule, or a test.
+
 **How to apply:** Before specifying an edge case, ask what authored content actually
 exercises it - if Chapter 1's data never reaches the state, the policy is premature and the
 mechanism probably is too. Magic constants (a fills-per-settlement backstop), saturation

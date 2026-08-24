@@ -21,8 +21,16 @@ grouping mechanism - and step 5 then framed removing it as a decision needing Jo
 rather than as a correction. John had to spend attention on a fork that should not have
 existed, in a doc long enough that he had to scrutinize every word to catch it.
 
+A second instance, 2026-08-24: an event's ending list carrying a reset raised "should the reset be
+intrinsic to a rung / a flag on the rung / a new run-ended concept," and the answer was that what
+goes in an authored list is the AUTHOR's choice, covered already. John: "you're making this way
+more complicated than it needs to be... inventing systems for things that already have clean
+concise solutions." Content decisions - which actions a list holds, how a gate is composed, what a
+failure costs - are authoring. Architecture is only what makes them expressible.
+
 **How to apply:** The test is not "is this defensible" - it is "does the architecture
-already do this". Ids are for cross-references; placement, nesting, and declaration lists
+already do this", and then "is this even an architecture question, or is it what someone types into
+an asset". Ids are for cross-references; placement, nesting, and declaration lists
 express ownership and grouping. When a plan introduces a new shape, say out loud which
 existing primitive it is NOT reusing and why, in the plan's first paragraph about it, not
 buried. See [[no-spec-accumulation]] for the habit that hides these, and
