@@ -20,10 +20,14 @@ invented. Suite is 205/205 after them.
   step 4 shipped them as authored fact with clamping in both formulas. The global boost is linear in
   the pool, so where Roadies sit changes the sprint, not the total, and price is the throttle. If a
   cap is ever wanted it belongs at the WRITE (`SetRoadieAllocation`), never in the read.
-- **Scope payloads are typed by position**: `ScopeFacts` for every scope, `RootFacts` adding
+- **Scope payloads are typed by the scope's authored KIND** (2026-08-24: this originally read
+  "typed by position", and the position half is now wrong - a definition is a `RootDefinition`,
+  `ChapterDefinition` or `TierDefinition` and builds its own state node, so nothing infers a kind
+  from depth): `ScopeFacts` for every scope, `RootFacts` adding
   `roadieAllocation` + `entitlements`, `ChapterFacts` adding `pendingClaim`; `RootScopeState` /
-  `ChapterScopeState` with `lastActiveUtc` on the chapter one. `ScopeState.Build` allocates each
-  node's payload by depth; `Root()` / `Chapter()` extensions replace the base-class property (a base
+  `ChapterScopeState` with `lastActiveUtc` on the chapter one, plus `TierFacts`/`TierScopeState` and
+  the abstract `InteriorFacts`/`InteriorDefinition` middles. Each definition allocates its own
+  node's payload; `Root()` / `Chapter()` extensions replace the base-class property (a base
   class never names its derived types). `SaveSystem` reads each node's facts against the type the
   tree position dictates, so a save cannot name its own type, and the three placement filters are
   gone - unrepresentable beats policed.

@@ -17,7 +17,7 @@
 - [Problems, not issues](problems-not-issues.md) - a true finding is not automatically work; ask what breaks TODAY, and supply the stopping rule the review loop lacks
 - [Pick the simplest option](pick-the-simplest-option.md) - weighing alternatives is wanted; the defect is that the elaborate one always wins the pick
 - [No spec accumulation](no-spec-accumulation.md) - answer a review finding by deleting the mechanism, not by adding a paragraph; plan length is a defect signal
-- [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20 corrections: venue asset and stationing cap deleted, scope payloads typed by tree position, currencies by direct reference
+- [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20 corrections: venue asset and stationing cap deleted, scope payloads typed by authored kind, currencies by direct reference
 - [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from Ctrl C; check open design questions against it instead of reasoning from scratch, and ask John for its specifics
 - [Doc decisions land when made](doc-decisions-land-when-made.md) - a settled decision goes into the design doc immediately; only code-describing edits wait for the code
 - [Tests exercise runtime code](tests-exercise-runtime-code.md) - fixtures are fine, a second implementation of runtime behavior is not; convert the call sites instead

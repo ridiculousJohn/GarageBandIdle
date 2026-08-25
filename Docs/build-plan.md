@@ -19,6 +19,7 @@ always that the content belongs on a scope.
 | 4 | Producers, generators, upgrades + resolution | **DONE 2026-08-19** - 208/208 green at the time |
 | - | Correction pass (2026-08-20) | **DONE** - 194/194 green: authored content references assets rather than ids, the content database and `IDefinitionSource` deleted, modifiers and bar groups declared, `ResetScope` self-or-enclosed, ids unique per chain, content faults throw |
 | 5 | Bars | **DONE 2026-08-21** - 266/266 green |
+| - | Scope kind refactor (2026-08-24) | **DONE** - 271/271 green: a scope is authored as `RootDefinition` / `ChapterDefinition` / `TierDefinition` under the abstract `InteriorDefinition`, each building its own state node, so no depth test infers a kind; `rung` moved off the base and `RungOnRoot` was deleted with it; the save populates the payload the node holds; the three outward walks ask `Declares` / `MultiplierFor` / `SourceTermsFor` instead of reading lists off a base-typed node; placement is validated root -> chapters -> tiers |
 | 6 | Events + trigger sweep | not started |
 | 7 | Tick + GameSession | not started |
 | 8 | Chapter 1 JSON + importer + walkthrough tests | not started |
@@ -31,7 +32,8 @@ always that the content belongs on a scope.
    6 kinds (`Action` renamed for the `System.Action` collision), `PayoutFormula` + 2 kinds,
    `Rung` (renamed from `Press` in step 3), `TriggerDefinition` (shape only), `ScopeState` (complete §12.3 *state* schema; reset
    swaps the `ScopeFacts` payload, so new fields clear by construction; the root is structurally
-   unresettable), `ScopeDefinition` (currencies, flags, triggers, rung — the remaining
+   unresettable), `ScopeDefinition` (currencies, flags, triggers, and the rung that moved to
+   `InteriorDefinition` in the 2026-08-24 refactor — the remaining
    declaration lists land with their families in steps 4–6, since their types don't exist yet),
    `GameContext` (outward chain walks, rebasing), `IDefinitionSource` seam, Economy data shapes
    (`CurrencyDefinition`, `ModifierDefinition` + stacking, `BarDefinition`/`BarGroupDefinition`/
@@ -68,7 +70,8 @@ always that the content belongs on a scope.
    deterministic order, cascades (`perFill` × `fillCount` — the fill-count row of
    effects-from-facts), `SetActiveBars` (fail-closed). Extends validation: bar and group checks.
 6. **Events + trigger sweep** (§6.1, §12.8, §12.5) — `EventDefinition` declared on its host scope
-   (`ScopeDefinition.events`), the host found by the outward walk and the `ActiveEvent` record's id
+   (`InteriorDefinition.events` - root cannot host one), the host found by the outward walk asked for
+   an `InteriorScopeState`, and the `ActiveEvent` record's id
    resolving the same way, exactly as modifiers do; `StartEvent` / `DismissEvent` as COMMANDS rather
    than Action kinds (so no authored list can start or end an event), the two ending lists
    (`rewards` on success, `onEnd` always), `EventRewardPending`/`EventRecordExists` condition kinds,
