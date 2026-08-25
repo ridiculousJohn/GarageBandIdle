@@ -263,3 +263,24 @@ Build plan step 6's status line and its "full 12.12 only once step 6 lands" cave
 Everything else settled on 2026-08-24 - two operations, the two ending lists, remove-first,
 one latch rule, handicaps on record existence, `blocksIdle`, and `claimed` deleted - is already in
 6.1, 12.4, 12.5, 12.8, 12.9 and 12.11.
+
+## Landing order
+
+Step 6 lands as six changesets in the order listed, each compiling and green on its own.
+
+- **A. `Always` + the gate flip** - the new condition kind, then the four null-gate checks (rung
+  offer, trigger condition, generator `availableWhen`, upgrade `gate`) become errors, fixtures get
+  `Always`, and the two stale comments in `Rung.cs` and `GeneratorDefinition.cs` are rewritten.
+  **Landed 2026-08-24, 272/272 green.** Two audit corrections to the text above: the upgrade gate
+  already warned (not silent), and `GameActionTests` needed no fixture change - its one gate-less
+  rung is the runtime backstop test, which stays.
+- **B. `RestartScope`** - the action, both validation ledgers at the caller's index, its
+  `GameActionTests` cases and the two `ContentValidatorTests` ledger assertions.
+- **C. The event family, declaration only** - `EventDefinition`, `InteriorDefinition.events` +
+  the `Declares` override, `InteriorScopeState` with the handicap `MultiplierFor` override, the
+  two condition kinds, the `FilterToDeclared` extension, and the validation branch. No operations
+  yet - exercised through `ResolutionTests`, `ConditionTests`, `SaveSystemTests` and
+  `TestContent`'s two events.
+- **D. `EventSystem`** - Start / Dismiss / `AdvanceTimers` plus `EventSystemTests`.
+- **E. `Core/Sweep.cs`** plus `SweepTests`.
+- **F. Docs on landing** - the section above, plus the build-plan status line.
