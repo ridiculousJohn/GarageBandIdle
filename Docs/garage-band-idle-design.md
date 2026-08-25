@@ -897,7 +897,8 @@ is **fail-closed against the rung's own gate**: `TryRung` (the UI entry point) c
 condition before executing, and **`ExecuteRung` runs another rung's action list through the same
 check — gate met, it executes; gate unmet, it no-ops.** There is no bypass: a payout is only
 reachable through its own gate, so an unfinished run is discarded by whatever reset follows, never
-banked. References are validated acyclic at load. No rung may be authored on the root scope.
+banked. References are validated acyclic at load. A rung is declared on `InteriorDefinition`
+(§12.3), so the root has no field to hold one - unauthorable rather than refused.
 
 **PayoutFormula** — a polymorphic family computing an amount from readable state
 (`floor((fans/5)^0.5)`, piecewise diminishing-returns curves). Pure functions, so UI previews call
@@ -924,7 +925,14 @@ auto-finishing challenge is a trigger, not an event — events keep claimed comp
 
 ### 12.6 Where effects come from
 
-`GetMultiplier(owner, currencyId, stat)` gathers, from every scope on the chain outward:
+`GetMultiplier(owner, currencyId, stat)` walks the chain outward and multiplies what each scope
+returns **for itself**. The walk names no source: a scope composes its own factor from the facts it
+holds, so a kind of scope with a source the others lack adds it in one override rather than as
+another read inside the walk. That is what lets `events` live on `InteriorDefinition` (§12.3) with
+nothing on the base naming them - the interior scope folds its handicaps in, and root, having no
+override, contributes none. The same shape covers the other two walks: the rate walk sums what each
+scope returns for its own producers and generators, and the declaration walk asks each scope whether
+it declares a definition rather than reading a named list off it. Across the tree the sources are:
 
 | Source | The fact (stored) | The effects (derived on read) |
 |---|---|---|
@@ -1219,7 +1227,8 @@ per-feature: any kind an author gates with explains itself for free.
 - A rung that resets a scope containing tier rungs with unreferenced payout actions warns
   (stranded value); a formula-driven grant placed after a `ResetScope` that clears its inputs warns
   (reads zeros); reference cycles across ALL nested action references - `ExecuteRung`,
-  `RestartScope`, and trigger lists - are errors; a rung on the root scope is an error.
+  `RestartScope`, and trigger lists - are errors. A rung on the root needs no check: the field is on
+  `InteriorDefinition` (§12.3), so there is nowhere to author one.
 - A rung whose reset closure contains an event host, and whose offer condition carries no REQUIRED
   `Not(EventRewardPending(host))` - the whole condition, or a conjunct reached through `All` alone -
   warns (stranded reward: an armed, unclaimed reward would die with the record). Requiredness is the
@@ -1255,9 +1264,11 @@ per-feature: any kind an author gates with explains itself for free.
   e.g. an event's `event_tierN_done` flag must be declared outside the scope its own `onEnd`
   resets).
 - A balance goal on an event whose `onEntry` never resets the host scope warns.
-- An event declared on the root scope is an error: its handicaps would gather into every chapter's
-  outward walk and its occupancy would be global, and an event is a challenge inside a chapter
-  (§6.1). The state agrees - the record lives on a payload root does not carry (§12.3).
+- An event on the root scope needs no check. `events` is declared on `InteriorDefinition` (§12.3),
+  so root has no field to hold one: handicaps gathering into every chapter's outward walk and a
+  globally occupied host are unrepresentable rather than refused, and the state agrees - the record
+  lives on a payload root does not carry. This is the placement rule, not an exemption: if a kind of
+  scope cannot have a feature, its definition declares no data for it and there is no rule to write.
 - A gate may not be null: a generator's or event's `availableWhen`, an upgrade's gate, a rung's
   `offerCondition`, a trigger's condition. An unauthored gate is dead content, and `Always` is how
   an author says the gate is open. Filters keep their optional conditions - a bar's `availableWhen`
@@ -1275,7 +1286,9 @@ Assets/Scripts/
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root scope, and with it the whole graph; runs the §12.12 pass
-    ScopeDefinition.cs      // the base, InteriorDefinition, and the three authored kinds
+    ScopeDefinition.cs      // the abstract base: declaration lists, Declares, CreateState
+    InteriorDefinition.cs   // chapters and tiers: the rung, and events when §12.8 lands
+    RootDefinition.cs  ChapterDefinition.cs  TierDefinition.cs   // one file each - Unity binds one ScriptableObject per script, by file name
     ScopeState.cs           // the base, ScopeState<TFacts>, the three state classes and their payloads
     Condition.cs  Action.cs  PayoutFormula.cs  Trigger.cs   // the class families (+ kind classes)
     Effect.cs               // the flat struct
