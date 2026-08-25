@@ -25,7 +25,7 @@ namespace RidiculousGaming.GarageBandIdle
         UnresolvedReference,    // a referenced id resolves to nothing
         NullEntry,              // a null slot in an authored list, or a required operand
         InertOperand,           // an operand authored where the shape's own behavior never reads it
-        ScopeReach,             // ResetScope / ExecuteRung / modifier-grant reach rules
+        ScopeReach,             // ResetScope / RestartScope / ExecuteRung / modifier-grant reach rules
         ChainReach,             // ordinary reads and writes address only the acting chain
         EffectReach,            // an effect sits where its target's outward walk visits it
         EffectTargetUnmatched,  // an effect target matching nothing reachable (warn)
@@ -1169,7 +1169,10 @@ namespace RidiculousGaming.GarageBandIdle
         // rung's list. "Invokes" is transitive: an ExecuteRung issued before
         // the reset executes the target rung's whole list at that moment,
         // including its own ExecuteRungs, so nested ladders cash through the
-        // chain - only the first hop needs to precede the reset. The acting
+        // chain - only the first hop needs to precede the reset. A RestartScope
+        // records its rung edge and its reset at the SAME index, and the bank
+        // runs before the clear inside the one action, so the seed takes an
+        // edge at the reset's own index too. The acting
         // rung itself is exempt: payout-before-clear is list order, and
         // set-then-wiped covers the misordering. The doc bullet names rungs,
         // so trigger resets are not judged here.
@@ -1186,7 +1189,7 @@ namespace RidiculousGaming.GarageBandIdle
                 var reached = new HashSet<string>();
                 var frontier = new Stack<string>();
                 foreach (var edge in ctx.RungEdges)
-                    if (edge.FromKey == reset.ContainerKey && edge.Index < reset.Index && reached.Add(edge.ToKey))
+                    if (edge.FromKey == reset.ContainerKey && edge.Index <= reset.Index && reached.Add(edge.ToKey))
                         frontier.Push(edge.ToKey);
                 while (frontier.Count > 0)
                 {
@@ -1433,9 +1436,10 @@ namespace RidiculousGaming.GarageBandIdle
             : string.IsNullOrEmpty(currencyId) ? $"stat '{stat}'"
             : $"currency '{currencyId}' and stat '{stat}'";
 
-        // Cycles across nested action references are errors (12.12). Today's
-        // edges are ExecuteRung invocations from rungs and trigger lists;
-        // step 6 adds the event lifecycle operations to the same graph.
+        // Cycles across nested action references are errors (12.12). The edges
+        // are the rung invocations ExecuteRung and RestartScope record, from
+        // rungs and trigger lists; the event lifecycle operations are commands
+        // and stay out of the graph.
         private static void FinalizeCycles(ValidationContext ctx)
         {
             var adjacency = new Dictionary<string, List<RungEdgeRecord>>();

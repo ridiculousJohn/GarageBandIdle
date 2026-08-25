@@ -574,6 +574,50 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClean(f.Run());
         }
 
+        // RestartScope records the reset ledger at its own index: a deeper
+        // payout rung nothing invokes dies with its clear, exactly as it would
+        // with a bare ResetScope. The rung lives under the RUNGLESS sibling and
+        // the capstone's own ResetScope is the action replaced, so this reset
+        // is the only one that reaches it - the finding exists iff RestartScope
+        // recorded it.
+        [Test]
+        public void RestartScope_RecordsTheReset_StrandedValue_Warning()
+        {
+            var f = new ValidatorFixture();
+            var inner = TestTree.MakeTier("tier_inner");
+            inner.rung = new Rung
+            {
+                offerCondition = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 },
+                actions = { new AddCurrency { currencies = { f.Records }, amount = 1 } },
+            };
+            f.Tier1b.children.Add(inner);
+            f.Capstone.actions[3] = new RestartScope { scope = f.Tier1b };  // in place of the ResetScope
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedValue,
+                "resets 'tier1b', which contains the payout rung at 'tier_inner'");
+        }
+
+        // ...and the rung ledger at the same index: the rung it fires itself is
+        // invoked before the clear by construction, so it is never stranded.
+        [Test]
+        public void RestartScope_InvokesItsOwnRung_NoStrandedValue()
+        {
+            var f = new ValidatorFixture();
+            f.Capstone.actions[0] = new RestartScope { scope = f.Tier1 };   // in place of the ExecuteRung
+            AssertNoFinding(f.Run(), ValidationCheck.StrandedValue);
+        }
+
+        [Test]
+        public void RestartScope_RecordsTheReset_SetThenWiped_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredFlags.Add("run_done");
+            f.Trigger.actions.Clear();
+            f.Trigger.actions.Add(new SetFlag { flagId = "run_done" });
+            f.Trigger.actions.Add(new RestartScope { scope = f.Tier1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped,
+                "flag 'run_done' is set here and wiped by the ResetScope of 'tier1'");
+        }
+
         [Test]
         public void FormulaAfterReset_ReadsZeros_Warning()
         {

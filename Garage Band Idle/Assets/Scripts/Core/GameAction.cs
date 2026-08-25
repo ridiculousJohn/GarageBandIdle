@@ -201,7 +201,7 @@ namespace RidiculousGaming.GarageBandIdle
             ClearRecursive(target, ctx.NowUtc);
         }
 
-        private static void ClearRecursive(ScopeState scope, DateTime nowUtc)
+        internal static void ClearRecursive(ScopeState scope, DateTime nowUtc)
         {
             scope.Clear(nowUtc);
             foreach (var child in scope.Children)
@@ -268,6 +268,58 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             }
             ctx.RecordRungInvocation(target);
+        }
+    }
+
+    // The restart idiom as one action (design doc 12.5): fire that scope's rung
+    // through its own gate, then clear it - a bare ResetScope remains for a pure
+    // wipe. A scope with no rung just clears. Reach is ResetScope's exactly: the
+    // acting scope or a scope it encloses, never the root.
+    [Serializable]
+    public class RestartScope : GameAction
+    {
+        public ScopeDefinition scope;
+
+        public override void Execute(GameContext ctx)
+        {
+            var target = ctx.Scope.FindInSubtree(scope)
+                ?? throw new InvalidOperationException(
+                    $"RestartScope: '{scope.Id}' is not the acting scope or enclosed by '{ctx.Scope.ScopeId}'.");
+            if (target.Parent == null)
+                throw new InvalidOperationException("RestartScope: the root scope is never resettable.");
+            // Bank first, through the same gate check every invocation gets: an
+            // unmet gate is the ordinary no-op, and the run's leavings are
+            // cleared either way.
+            if (scope is InteriorDefinition interior && interior.rung != null)
+                interior.rung.TryExecute(ctx.Rebase(target));
+            ResetScope.ClearRecursive(target, ctx.NowUtc);
+        }
+
+        public override void Validate(ValidationContext ctx)
+        {
+            var target = ctx.FindScope(scope);
+            if (target == null)
+            {
+                ctx.AddError(ValidationCheck.NullEntry, "RestartScope names no scope.");
+                return;
+            }
+            if (target == ctx.RootScope)
+            {
+                ctx.AddError(ValidationCheck.ScopeReach, "RestartScope targets the root - the root is never resettable (12.12).");
+                return;
+            }
+            if (!ctx.InActingSubtree(target))
+            {
+                ctx.AddError(ValidationCheck.ScopeReach, $"RestartScope may target the acting scope or a scope it encloses (12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
+                return;
+            }
+            // An ExecuteRung and a ResetScope in one action, so BOTH ledgers
+            // record at this index - registering only the cycle edge would let
+            // set-then-wiped, reads-zeros, stranded value and stranded reward
+            // all step straight over the clear.
+            if (target is InteriorDefinition interior && interior.rung != null)
+                ctx.RecordRungInvocation(target);
+            ctx.RecordReset(target);
         }
     }
 }

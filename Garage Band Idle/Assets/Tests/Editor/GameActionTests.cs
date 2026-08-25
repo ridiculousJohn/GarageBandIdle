@@ -293,5 +293,83 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(BigNumber.Zero, tree.Ch1.balances["ch1_records"]);  // same gate every replay
             Assert.IsEmpty(tree.Ch1.flags);                                     // album flag re-walked
         }
+
+        [Test]
+        public void RestartScope_banks_through_the_rung_gate_and_then_clears()
+        {
+            var tree = new TestTree();
+            tree.Tier1Def.rung = new Rung
+            {
+                offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
+                actions = { new AddCurrency { currencies = { tree.Records }, amount = 3 } }
+            };
+            tree.Tier1.balances["fans"] = 60;
+            tree.Tier1.balances["cash"] = 500;
+
+            new RestartScope { scope = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
+
+            Assert.AreEqual((BigNumber)3, tree.Root.balances["records"]);       // banked
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["fans"]);       // then cleared
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);
+        }
+
+        [Test]
+        public void RestartScope_with_an_unmet_gate_clears_with_nothing_banked()
+        {
+            var tree = new TestTree();
+            tree.Tier1Def.rung = new Rung
+            {
+                offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
+                actions = { new AddCurrency { currencies = { tree.Records }, amount = 3 } }
+            };
+            tree.Tier1.balances["fans"] = 10;
+
+            new RestartScope { scope = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
+
+            Assert.AreEqual(BigNumber.Zero, tree.Root.balances["records"]);     // gate unmet, no payout
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["fans"]);       // the clear still ran
+        }
+
+        [Test]
+        public void RestartScope_on_a_scope_with_no_rung_just_clears()
+        {
+            var tree = new TestTree();
+            tree.Ctx(tree.Tier1).Deposit("cash", 300);
+
+            new RestartScope { scope = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
+
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);
+        }
+
+        [Test]
+        public void RestartScope_reaches_what_it_encloses_but_never_a_peer_or_an_ancestor()
+        {
+            var tree = new TestTree();
+            var tier2Def = TestTree.MakeTier("tier2");
+            tree.Ch1Def.children.Add(tier2Def);
+            var root = ScopeState.Build(tree.RootDef);   // rebuild with the sibling
+            var tier1 = root.FindInSubtree(tree.Tier1Def);
+            var tier2 = root.FindInSubtree(tier2Def);
+            tier2.balances["merch"] = 5;
+
+            Assert.Throws<System.InvalidOperationException>(
+                () => new RestartScope { scope = tier2Def }.Execute(new GameContext(tier1, tree.Now)));
+            Assert.AreEqual((BigNumber)5, tier2.balances["merch"]);
+
+            Assert.Throws<System.InvalidOperationException>(
+                () => new RestartScope { scope = tree.Ch1Def }.Execute(new GameContext(tier1, tree.Now)));
+        }
+
+        [Test]
+        public void RestartScope_refuses_the_root_even_from_a_root_context()
+        {
+            var tree = new TestTree();
+            tree.Ctx(tree.Root).Deposit("records", 30);
+
+            Assert.Throws<System.InvalidOperationException>(
+                () => new RestartScope { scope = tree.RootDef }.Execute(tree.Ctx(tree.Root)));
+
+            Assert.AreEqual((BigNumber)30, tree.Root.balances["records"]);
+        }
     }
 }

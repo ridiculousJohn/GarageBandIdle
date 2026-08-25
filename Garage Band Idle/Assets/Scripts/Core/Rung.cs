@@ -6,9 +6,8 @@ namespace RidiculousGaming.GarageBandIdle
 {
     // The one shape behind the album release and the capstone (design doc 12.5):
     // an offer condition and an action list - a rung of the prestige ladder.
-    // Every invocation - the UI's try-rung command or ExecuteRung from another
-    // rung's action list - is fail-closed against the offer condition; there is
-    // no bypass. (Renamed from Press 2026-08-18: that name collided with UI
+    // Every invocation, from the UI's try-rung command or another action list,
+    // is fail-closed against the offer condition; there is no bypass. (Renamed from Press 2026-08-18: that name collided with UI
     // button vocabulary in a codebase where the UI owns nothing.)
     [Serializable]
     public class Rung
