@@ -20,7 +20,7 @@ always that the content belongs on a scope.
 | - | Correction pass (2026-08-20) | **DONE** - 194/194 green: authored content references assets rather than ids, the content database and `IDefinitionSource` deleted, modifiers and bar groups declared, `ResetScope` self-or-enclosed, ids unique per chain, content faults throw |
 | 5 | Bars | **DONE 2026-08-21** - 266/266 green |
 | - | Scope kind refactor (2026-08-24) | **DONE** - 271/271 green: a scope is authored as `RootDefinition` / `ChapterDefinition` / `TierDefinition` under the abstract `InteriorDefinition`, each building its own state node, so no depth test infers a kind; `rung` moved off the base and `RungOnRoot` was deleted with it; the save populates the payload the node holds; the three outward walks ask `Declares` / `MultiplierFor` / `SourceTermsFor` instead of reading lists off a base-typed node; placement is validated root -> chapters -> tiers |
-| 6 | Events + trigger sweep | not started |
+| 6 | Events + trigger sweep | **DONE 2026-08-25** - 327/327 green |
 | 7 | Tick + GameSession | not started |
 | 8 | Chapter 1 JSON + importer + walkthrough tests | not started |
 | 9 | UI layer | not started |
@@ -55,8 +55,8 @@ always that the content belongs on a scope.
    plus every §12.12 check whose inputs exist by this step (id uniqueness, tag/id collision,
    scope-reference reach, effect reach per target kind, flag setter rules, set-then-wiped,
    stranded value). The pass is incremental by design: each later step is REQUIRED to extend it
-   with the checks its own shapes introduce — a "full §12.12" claim is only true once step 6
-   lands. Fail loudly at boot in dev builds: validation runs on the production load path itself.
+   with the checks its own shapes introduce - step 6 completed the set, and the full §12.12 pass
+   runs today. Fail loudly at boot in dev builds: validation runs on the production load path itself.
 4. **Producers, generators, upgrades + resolution** (§12.2, §12.6) — `ProducerDefinition` +
    produces entries, `GeneratorDefinition` (`availableWhen`, cost curve, ownedCount scaling),
    `UpgradeDefinition` (gate, effects, actions), `GetMultiplier` two-stage gathering (source
@@ -78,7 +78,7 @@ always that the content belongs on a scope.
    handicaps derived from a record existing (the active-event row of effects-from-facts), the
    `Always` condition and `RestartScope` action, the transaction sweep (latch-first, sweep-start
    snapshot, deterministic order, goal latch before trigger actions). Extends validation to
-   complete §12.12: `RestartScope` in both ledgers, no event on root, gates may not be null,
+   complete §12.12: `RestartScope` in both ledgers, gates may not be null,
    balance-goal-without-reset, stranded-reward
    guard, event kinds' reach.
 7. **Tick + GameSession** (§12.9) — dt segmentation at expiry timestamps, fixed economy phases per

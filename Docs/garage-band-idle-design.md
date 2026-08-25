@@ -704,7 +704,7 @@ A **scope** is a plain state container. Content declares, per scope: its currenc
 groups (which own their bars), **producers**, generators, upgrades, modifiers, career effects,
 triggers (§12.5), and (for tiers) its rung. **Every content family is declared somewhere** — that is
 what makes a reference resolvable by walking outward, and it is why there is no catalogue to look
-anything up in. Events join when §12.8 lands, declared on `InteriorDefinition` rather than the base,
+anything up in. Events are declared on `InteriorDefinition` rather than the base,
 since root cannot host one: the definition is placed, the record is a fact of the host. Songs are
 undecided until Chapter 6 (§7) — a `SongDefinition` may not exist at all, since a song is written at
 runtime rather than authored. A producer's `produces`
@@ -939,7 +939,7 @@ it declares a definition rather than reading a named list off it. Across the tre
 | Purchased upgrades | `purchasedUpgrades` set | the upgrade definition's `List<Effect>` |
 | Owned generators | `generatorCounts` | `produces` entries scaled by count (contributions, not effects) |
 | Timed buffs (Encore) | `{buffId, expiresAt}` list | the buff definition's effects while unexpired |
-| Active events | an `ActiveEvent` record exists | the event definition's handicaps |
+| Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `barGroups` |
 | Career facts | Records balance, Roadie allocation, songs this run, entitlements | a `CareerEffectDefinition`'s `MultiplierFormula`, computed on read (§3/§7/§8) |
@@ -1071,7 +1071,9 @@ tick's timer phase latches before it decrements, which is what makes the tie - a
 same segment the timer expires - go to the player, since the sweep runs after the last segment when
 the record already reads zero. The sweep (inside every transaction, tick and command alike) latches
 too, judged on the sweep-start snapshot and before any trigger actions execute, which is what
-catches a goal reached by a command outside any tick.
+catches a goal reached by a command outside any tick. Both callers walk the same set - root plus
+the foreground chapter's subtree: root never resets and is on every chain, while a dormant chapter
+waits, so a threshold crossed while away fires on the first sweep after switch-in.
 
 `StartEvent` / `DismissEvent` are the two self-guarding commands. Start checks `availableWhen` and
 the empty host, runs `onEntry`, then creates the record - after the list, so an `onEntry` that
@@ -1105,8 +1107,9 @@ is resolved BEFORE the deposits, from the same start-of-segment snapshot as ever
 BALANCE is the one thing read live, which is exactly what that carve-out says. Resolving demand after
 the deposits would let a segment's own production open a bar's gate and draw for the whole dt — then wall
 clocks advance to the segment boundary for every running timer in the swept set - root plus the
-foreground chapter, the same set the sweep walks, so a root-hosted event's timer advances and a
-dormant chapter's does not. No event can be born mid-segment now that starting one is a command
+foreground chapter, the same set the sweep walks. Root sweeps for its triggers but cannot host an
+event (§12.3), so only the foreground chapter's subtree contributes timers, and a dormant
+chapter's does not advance. No event can be born mid-segment now that starting one is a command
 rather than an action. A handicap or buff live at segment start governs the whole segment, expiring
 only at its edge. After the last segment: the sweep, commit, and refresh
 (§12.11).
@@ -1298,12 +1301,13 @@ Assets/Scripts/
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root scope, and with it the whole graph; runs the §12.12 pass
     ScopeDefinition.cs      // the abstract base: declaration lists, Declares, CreateState
-    InteriorDefinition.cs   // chapters and tiers: the rung, and events when §12.8 lands
+    InteriorDefinition.cs   // chapters and tiers: the rung and the events list
     RootDefinition.cs  ChapterDefinition.cs  TierDefinition.cs   // one file each - Unity binds one ScriptableObject per script, by file name
     ScopeState.cs           // the base, ScopeState<TFacts>, the three state classes and their payloads
     Condition.cs  Action.cs  PayoutFormula.cs  Trigger.cs   // the class families (+ kind classes)
     Effect.cs               // the flat struct
     GameContext.cs          // read access for Evaluate/Execute: state chain + defs
+    Sweep.cs                // the trigger sweep: latch event goals, collect eligible triggers, run them in order
   Economy/
     CurrencyDefinition.cs  ProducerDefinition.cs
     Producer.cs             // stateless resolution: Σ matching produces entries × Π multipliers + GetMultiplier

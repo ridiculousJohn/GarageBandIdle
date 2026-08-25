@@ -276,11 +276,15 @@ Step 6 lands as six changesets in the order listed, each compiling and green on 
   rung is the runtime backstop test, which stays.
 - **B. `RestartScope`** - the action, both validation ledgers at the caller's index, its
   `GameActionTests` cases and the two `ContentValidatorTests` ledger assertions.
+  **Landed 2026-08-24, 280/280 green.**
 - **C. The event family, declaration only** - `EventDefinition`, `InteriorDefinition.events` +
   the `Declares` override, `InteriorScopeState` with the handicap `MultiplierFor` override, the
   two condition kinds, the `FilterToDeclared` extension, and the validation branch. No operations
   yet - exercised through `ResolutionTests`, `ConditionTests`, `SaveSystemTests` and
-  `TestContent`'s two events.
+  `TestContent`'s two events. **Landed 2026-08-24, 298/298 green.**
 - **D. `EventSystem`** - Start / Dismiss / `AdvanceTimers` plus `EventSystemTests`.
-- **E. `Core/Sweep.cs`** plus `SweepTests`.
+  **Landed 2026-08-25, 318/318 green.**
+- **E. `Core/Sweep.cs`** plus `SweepTests`. **Landed 2026-08-25, 327/327 green.**
 - **F. Docs on landing** - the section above, plus the build-plan status line.
+  **Landed 2026-08-25.** The 12.3 `claimed` drop was already in the doc; the stale sweep note in
+  `TriggerDefinition.cs`'s comment was corrected alongside.
