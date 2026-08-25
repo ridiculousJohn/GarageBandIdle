@@ -17,3 +17,16 @@ When the thing being fixed is a class of defect rather than one site, sweep ever
 **Why:** the tiers are not obvious from the first fix, and each one is where a future session actually reads. A stale comment in a test is read by whoever changes that test; a loose rule in the design doc outranks the same rule in the build prompts, since the doc is the source of truth. Reporting "that's everything" after one tier costs a round trip and, worse, is a false all-clear.
 
 **How to apply:** for a stale symbol, grep the deleted names over `Assets/Scripts`, `Assets/Tests`, `Docs/*.md` and the chapter JSON in one pass, then sort hits into legitimate (importer refusal keys need the exact spelling they detect; a name used as the anti-pattern a rule replaced) versus stale. For a rule that was worded wrong, grep the rule's PHRASING shape, not the topic - "appears nowhere", "returns nothing", "the word" - across both docs, and check the summaries as well as the body, because a summary is what gets read first. Related: [[test-the-justification-not-just-the-claim]], and [[other-machine-lacks-ascii-rule]] for the other sweep this repo needs.
+
+**"Did you miss anything?" is a command to grep, not to remember (2026-08-24).** John asked four
+times in one session; the first three answers came from recall and were wrong, and the fourth ran an
+actual sweep and turned up three more stale doc lines. Recall of what you edited is the least
+reliable source available after a long session, and answering from it converts his check into
+another round trip.
+
+**How to run it:** list the identifiers the change RETIRED - every renamed type, deleted member and
+changed signature - and grep that list across Scripts, Tests, all of Docs, and .claude/memory in one
+pass. Grep the retired names, not the topic. Then say what you grepped, so the claim's coverage is
+inspectable instead of being a promise. Anything the sweep finds is a blocker: John's rule is that
+stale records are "bullshit that's hanging around that I don't want to find later", so they are not
+a separate lower-priority category to report and leave.

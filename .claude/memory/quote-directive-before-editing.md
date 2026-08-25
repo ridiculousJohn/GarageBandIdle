@@ -23,6 +23,16 @@ rule stick.
   describes the fix's shape; it is not a directive.
 - 2026-08-13 - committed a doc fix off "fix item 2". The fix had a directive, the commit did not,
   and the previous turn's "commit that" was treated as carrying forward.
+- 2026-08-24 - twice more, same shape: one "commit" treated as standing for the two batches after
+  it. John's reason, in his words: "I just like to look at the commits before commiting so I know
+  what the fuck you're doing." Committing unasked does not just skip a formality, it deletes his
+  review point - the staged diff is how he sees what happened. So finish the work, leave it staged
+  or dirty, say what is there, and stop.
+  The second reason matters as much: reading the diff is how he stays familiar with his own
+  codebase, and every time he has skipped that on trust, it went south. That makes commit SIZE part
+  of the same obligation - a 16-file refactor landing as one commit is unreviewable in practice even
+  when he is asked first. Prefer several small commits that each stand alone, and describe them in a
+  way that helps him read the diff rather than substituting for it.
 - 2026-08-18 - wrote a whole doc off "how about a separate build plan doc, plus a memory?" A
   question invites an answer. Quoting a question in the Acting-on line satisfies the letter and
   violates the point.
