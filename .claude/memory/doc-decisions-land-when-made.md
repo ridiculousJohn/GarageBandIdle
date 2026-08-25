@@ -23,3 +23,15 @@ substitute for the doc.
 When a decision changes a doc sentence, also grep for the same claim in `build-plan.md`, the other
 step plans, and `chapter-01-content.md` - stale content docs recreate the same failure one layer
 down. Related: [[sweep-every-tier-of-a-defect-class]], [[no-spec-accumulation]].
+
+**Grep finds renames; only a section walk finds a changed mechanism (2026-08-24).** The doc states
+intent, the code states mechanism, and changing the mechanism usually leaves the intent sentence
+true - so it hits no grep and reads fine. Section 12.6 said `GetMultiplier` "gathers from every scope
+on the chain outward", which stayed accurate as a RESULT after the walks inverted to ask each scope
+for its own factor, and it survived three identifier sweeps because of that.
+
+**The check that works:** list what the change touched, and for each item name the doc section that
+OWNS it - then open that section and read it against the code. Doing that once found a divergence
+five greps had missed (the doc calls a currency's home the scope that DECLARES it; `GameContext`
+resolves it by key presence in `balances`, which only agrees because seeding maintains it). Run it
+as part of finishing the change, not when John asks whether anything was missed.
