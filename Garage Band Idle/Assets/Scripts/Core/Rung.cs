@@ -17,7 +17,8 @@ namespace RidiculousGaming.GarageBandIdle
         [SerializeReference, SubclassPicker] public List<GameAction> actions = new();
 
         // True when the offer condition holds in the rung's own scope. A null
-        // condition never offers - an unauthored gate is closed, not open.
+        // condition never offers - the fail-closed backstop behind the load-time
+        // check, which refuses a null gate outright (12.12).
         public bool IsOffered(GameContext ctx) =>
             offerCondition != null && offerCondition.Evaluate(ctx);
 

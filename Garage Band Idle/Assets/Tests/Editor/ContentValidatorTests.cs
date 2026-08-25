@@ -759,17 +759,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "generator cost addresses 'merch' declared at 'tier1b'");
         }
 
-        // An unauthored gate refuses the buy, so the content is inert rather
-        // than broken - the same species of finding as a flag nothing sets.
+        // A gate may not be null (12.12): the runtime refuses one fail-closed
+        // either way, and Always is how an author says the gate is open.
         [Test]
-        public void NullPurchaseGate_Warning()
+        public void NullGate_EveryGatedFamily_Error()
         {
             var f = new ValidatorFixture();
             f.Amp.availableWhen = null;
             f.AmpStrings.gate = null;
+            f.Album.offerCondition = null;
+            f.Trigger.condition = null;
             var report = f.Run();
-            AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.NullEntry, "generator 'practice_amp': availableWhen is unauthored");
-            AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.NullEntry, "upgrade 'amp_strings': gate is unauthored");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry, "generator 'practice_amp': availableWhen is unauthored");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry, "upgrade 'amp_strings': gate is unauthored");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry, "scope 'tier1' rung offer: offerCondition is unauthored");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry, "trigger 'boost_trigger' condition: condition is unauthored");
         }
 
         [Test]
@@ -1003,7 +1007,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new ValidatorFixture();
             var sibling = f.AddSiblingChapter();
             sibling.Ch2.declaredFlags.Add("album");     // ch1 declares one of its own
-            sibling.Tier2.rung = new Rung { actions = { new SetFlag { flagId = "album" } } };
+            sibling.Tier2.rung = new Rung { offerCondition = new Always(), actions = { new SetFlag { flagId = "album" } } };
             AssertClean(f.Run());
         }
 
@@ -1020,6 +1024,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             sibling.Ch2.modifiers.Add(boost2);
 
             var trigger2 = TestTree.MakeDefinition<TriggerDefinition>("boost_trigger");
+            trigger2.condition = new Always();
             trigger2.actions.Add(new AddModifier { scope = sibling.Tier2, modifier = boost2 });
             sibling.Tier2.triggers.Add(trigger2);
             AssertClean(f.Run());

@@ -72,6 +72,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
+        public void Always_holds()
+        {
+            var tree = new TestTree();
+            Assert.IsTrue(new Always().Evaluate(tree.Ctx(tree.Tier1)));
+        }
+
+        [Test]
         public void Compound_kinds_have_fail_closed_empty_semantics()
         {
             var tree = new TestTree();

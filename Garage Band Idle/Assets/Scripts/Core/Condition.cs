@@ -117,6 +117,14 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
+    // The open gate. A gate may not be null (12.12), so an author says
+    // "always offered" with this kind rather than by omission.
+    [Serializable]
+    public class Always : Condition
+    {
+        public override bool Evaluate(GameContext ctx) => true;
+    }
+
     [Serializable]
     public class All : Condition
     {

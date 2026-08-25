@@ -858,13 +858,15 @@ namespace RidiculousGaming.GarageBandIdle
                 if (scope is InteriorDefinition interior && interior.rung != null)
                 {
                     ctx.EnterContainer(scope, ValidationContext.RungKey(scope.Id));
-                    if (interior.rung.offerCondition != null)
-                    {
-                        // A null offer condition is legal authoring: it never
-                        // offers (fail-closed), so only a present one validates.
-                        ctx.SetSite($"scope '{scope.Id}' rung offer");
+                    ctx.SetSite($"scope '{scope.Id}' rung offer");
+                    // A gate may not be null (12.12): the runtime refuses one
+                    // fail-closed either way, and Always is how an author says
+                    // the gate is open.
+                    if (interior.rung.offerCondition == null)
+                        ctx.AddError(ValidationCheck.NullEntry,
+                            "offerCondition is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
+                    else
                         interior.rung.offerCondition.Validate(ctx);
-                    }
                     ValidateActionList(ctx, interior.rung.actions, $"scope '{scope.Id}' rung");
                 }
 
@@ -873,11 +875,14 @@ namespace RidiculousGaming.GarageBandIdle
                     if (trigger == null)
                         continue;
                     ctx.EnterContainer(scope, "trigger:" + trigger.Id);
-                    if (trigger.condition != null)
-                    {
-                        ctx.SetSite($"trigger '{trigger.Id}' condition");
+                    ctx.SetSite($"trigger '{trigger.Id}' condition");
+                    // Same gate rule: the sweep treats a null condition as
+                    // closed and never dereferences it, but load refuses it.
+                    if (trigger.condition == null)
+                        ctx.AddError(ValidationCheck.NullEntry,
+                            "condition is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
+                    else
                         trigger.condition.Validate(ctx);
-                    }
                     ValidateActionList(ctx, trigger.actions, $"trigger '{trigger.Id}'");
                 }
 
@@ -972,8 +977,8 @@ namespace RidiculousGaming.GarageBandIdle
             var site = $"generator '{generator.Id}'";
             ctx.SetSite(site);
             if (generator.availableWhen == null)
-                ctx.AddWarning(ValidationCheck.NullEntry,
-                    "availableWhen is unauthored, so the buy is always refused - an unauthored gate is closed, not open (permanently inert content).");
+                ctx.AddError(ValidationCheck.NullEntry,
+                    "availableWhen is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
             else
             {
                 ctx.SetSite($"{site} availableWhen");
@@ -996,8 +1001,8 @@ namespace RidiculousGaming.GarageBandIdle
             var site = $"upgrade '{upgrade.Id}'";
             ctx.SetSite(site);
             if (upgrade.gate == null)
-                ctx.AddWarning(ValidationCheck.NullEntry,
-                    "gate is unauthored, so the buy is always refused - an unauthored gate is closed, not open (permanently inert content).");
+                ctx.AddError(ValidationCheck.NullEntry,
+                    "gate is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
             else
             {
                 ctx.SetSite($"{site} gate");

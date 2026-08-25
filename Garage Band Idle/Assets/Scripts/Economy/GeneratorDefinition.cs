@@ -9,10 +9,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [CreateAssetMenu(menuName = "Garage Band Idle/Generator")]
     public class GeneratorDefinition : Definition
     {
-        // A null gate refuses the buy - an unauthored gate is closed, not open
-        // (the same ruling as Rung's offer condition). Validation warns rather
-        // than errors: permanently inert content, the same species as a declared
-        // flag nothing sets.
+        // A null gate refuses the buy (the same ruling as Rung's offer
+        // condition) - the fail-closed backstop behind the load-time check,
+        // which refuses a null gate outright; Always is how an author says
+        // the gate is open (12.12).
         [SerializeReference, SubclassPicker] public Condition availableWhen;
 
         public CurrencyDefinition costCurrency;
