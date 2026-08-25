@@ -1216,6 +1216,17 @@ per-feature: any kind an author gates with explains itself for free.
 
 ### 12.12 Validation at content load
 
+- The scope tree is a tree, and it is **root, then chapters, then tiers all the way down**: exactly
+  one scope has no parent, no scope has two, every scope is reachable from the root, the top scope
+  is a `RootDefinition`, root's children are `ChapterDefinition`s, and everything below a chapter is
+  a `TierDefinition`. The kind rules are not decoration - a scope's authored kind picks its state
+  class and its payload (§12.3), so a kind out of place builds a node whose payload and parentage
+  disagree with where it sits: a root handed a parent reports itself parentless while sitting in
+  someone's children, and a tier directly under root is read as a chapter by a walk that then finds
+  the wrong payload. The graph rules cannot catch either, because they resolve the root
+  structurally - a tree topped by a tier looks rooted. `RootDefinition` also refuses a parent at
+  construction, since this pass is dev-only and a mis-parented root would corrupt every chain walk
+  quietly.
 - Every referenced id resolves (currencies, flags, generators, modifiers, scopes, tags in targets).
 - Every id is unique along a CHAIN — currencies, flags, bars, groups, producers, generators,
   upgrades, events, triggers, modifiers, songs; a declaration in two scopes is refused, and sibling
