@@ -15,6 +15,7 @@
 - [Currency values are BigNumber](currency-values-are-bignumber.md) - authored fields included (thresholds, amounts, fill rates); never default them to double; exceptions: Effect.multiplier, counts, Pow's power
 - [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - never invent a second way to express what the architecture already covers (scope placement groups things; ids are for cross-references); a covered case that seems to need something new is a conversation first
 - [Problems, not issues](problems-not-issues.md) - a true finding is not automatically work; ask what breaks TODAY, and supply the stopping rule the review loop lacks
+- [Pick the simplest option](pick-the-simplest-option.md) - weighing alternatives is wanted; the defect is that the elaborate one always wins the pick
 - [No spec accumulation](no-spec-accumulation.md) - answer a review finding by deleting the mechanism, not by adding a paragraph; plan length is a defect signal
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20 corrections: venue asset and stationing cap deleted, scope payloads typed by tree position, currencies by direct reference
 - [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from Ctrl C; check open design questions against it instead of reasoning from scratch, and ask John for its specifics
