@@ -12,14 +12,14 @@ the sweep latches event goals before it runs any trigger action - so they ship t
 Nothing new is built where one of these already answers the question:
 
 - **Host lookup**: declaration is ownership, so the host IS the declaring scope, found by the same
-  outward walk generators, upgrades and bar groups already get. The definition carries no host
-  field (6.1, 12.8). One thing is NOT free here - see "Where events are declared" below.
+  outward walk generators, upgrades and bar groups already get, asked for an `InteriorScopeState`
+  so root is not a candidate. The definition carries no host field (6.1, 12.8).
 - **Entry-point shape**: `Purchasing`'s `Can*` / `Do*` / `Try*` triple, fail-closed, content faults
   throwing from either path.
 - **Host context**: `GameContext.Rebase(host)` - what `ExecuteRung` already does.
-- **Handicap arithmetic**: `Producer.GetMultiplier`'s per-scope gather. Handicaps are one more list
-  read at each scope on the walk, beside the upgrade and modifier reads - subject to the same
-  question below about which class holds that list.
+- **Handicap arithmetic**: the per-scope gather. `Producer.GetMultiplier` multiplies what each
+  scope returns from `MultiplierFor`, so handicaps are an override on the one class that can hold a
+  record rather than a fifth read in the walk.
 - **Mid-list reset detection**: `BarSystem`'s reference-identity check (`facts == scope.facts`). A
   reset is a payload swap, so identity is the whole test.
 - **Record storage**: `ActiveEvent` and `InteriorFacts` are both in the tree. The record is a single
@@ -122,8 +122,8 @@ There is no third: arming is `goalReached` alone.
 
 ## Handicaps
 
-In `GetMultiplier`, at each scope on the outward walk: for every event the scope declares, if the
-scope's record names it, its matching `handicaps` entries contribute. Existence is the whole test -
+In `InteriorScopeState.MultiplierFor`, after `base.MultiplierFor`: for every event the scope
+declares, if the scope's record names it, its matching `handicaps` entries contribute. Existence is the whole test -
 no expiry check, because a failed attempt sits one tap from a tier reset and briefly lifting the
 handicap there would be a worse state than leaving it. Read through the declaration list, like
 upgrades, so a stray record id contributes nothing. No count scaling - there is one record.
