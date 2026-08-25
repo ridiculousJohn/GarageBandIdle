@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using RidiculousGaming.GarageBandIdle;
 using RidiculousGaming.GarageBandIdle.Economy;
+using RidiculousGaming.GarageBandIdle.Events;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
@@ -41,6 +42,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly CareerEffectDefinition RoadieActive;
         public readonly ModifierDefinition GjTap1;
         public readonly TriggerDefinition Tier1Trigger;
+        public readonly EventDefinition TimedGig;
+        public readonly EventDefinition OpenMic;
         public readonly BarGroupDefinition LearnCovers;
         public readonly BarDefinition Cover1;
         public readonly BarDefinition Cover2;
@@ -157,6 +160,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             GjTap1 = MakeDefinition<ModifierDefinition>("gj_tap_1");
             GjTap1.effects.Add(new Effect { target = "tap_producer", multiplier = 1.25 });
             Ch1Def.modifiers.Add(GjTap1);
+
+            // The two tier1 events: a timed gig that zeroes the production-
+            // tagged sources while its record sits on the host, and an untimed
+            // open mic that halves the fan rate. Both gates open, so entry
+            // tests own their refusals.
+            TimedGig = MakeDefinition<EventDefinition>("timed_gig");
+            TimedGig.availableWhen = new Always();
+            TimedGig.goal = new EarnedTotalAtLeast { currency = Fans, threshold = 100 };
+            TimedGig.timeLimitSeconds = 300;
+            TimedGig.handicaps.Add(new Effect { target = "production", multiplier = 0 });
+            Tier1Def.events.Add(TimedGig);
+
+            OpenMic = MakeDefinition<EventDefinition>("open_mic");
+            OpenMic.availableWhen = new Always();
+            OpenMic.goal = new EarnedTotalAtLeast { currency = Fans, threshold = 50 };
+            OpenMic.timeLimitSeconds = 0;
+            OpenMic.handicaps.Add(new Effect { target = "fans", stat = Stat.Rate, multiplier = 0.5 });
+            Tier1Def.events.Add(OpenMic);
 
             Root = ScopeState.Build(RootDef);
             Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);

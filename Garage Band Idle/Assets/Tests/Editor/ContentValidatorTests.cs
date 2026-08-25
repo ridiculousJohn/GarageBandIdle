@@ -1,6 +1,7 @@
 using System.Linq;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
+using RidiculousGaming.GarageBandIdle.Events;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -161,6 +162,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             sibling.Ch2.children.Add(sibling.Tier2);
             sibling.Cash = TestTree.DeclareCurrency(sibling.Tier2, "cash", "income");
             return sibling;
+        }
+
+        // The authored event shape: gated, a balance goal over a fresh run
+        // (onEntry resets the host), timed, handicapped - and BOTH resetting
+        // rungs gain the required Not(EventRewardPending) guard, since each
+        // one's reset closure contains the host. This is the shape the event
+        // checks accept clean.
+        public EventDefinition AddGuardedEvent()
+        {
+            var gig = TestTree.MakeDefinition<EventDefinition>("garage_jam");
+            gig.availableWhen = new FlagSet { flagId = "album" };
+            gig.goal = new CurrencyAtLeast { currency = Fans, threshold = 500 };
+            gig.timeLimitSeconds = 600;
+            gig.handicaps.Add(new Effect { target = "cash", multiplier = 0 });
+            gig.onEntry.Add(new ResetScope { scope = Tier1 });
+            gig.rewards.Add(new AddCurrency { currencies = { Ch1Records }, amount = 5 });
+            Tier1.events.Add(gig);
+
+            Album.offerCondition = new All
+            {
+                conditions = { Album.offerCondition, new Not { condition = new EventRewardPending { host = Tier1 } } }
+            };
+            Capstone.offerCondition = new All
+            {
+                conditions = { Capstone.offerCondition, new Not { condition = new EventRewardPending { host = Tier1 } } }
+            };
+            return gig;
         }
     }
 
@@ -616,6 +644,150 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Trigger.actions.Add(new RestartScope { scope = f.Tier1 });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped,
                 "flag 'run_done' is set here and wiped by the ResetScope of 'tier1'");
+        }
+
+        // ---- events ----
+
+        [Test]
+        public void Event_AuthoredShape_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent();
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void Event_NullGate_Error()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent().availableWhen = null;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "event 'garage_jam': availableWhen is unauthored");
+        }
+
+        [Test]
+        public void Event_NullGoal_DismissOnly_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent().goal = null;
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.NullEntry,
+                "goal is unauthored - the event is dismiss-only");
+        }
+
+        [Test]
+        public void Event_NegativeTimeLimit_Error()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent().timeLimitSeconds = -5;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange,
+                "timeLimitSeconds is -5");
+        }
+
+        [Test]
+        public void Event_HandicapJudgedAtTheDeclaringScope_EffectReach_Error()
+        {
+            var f = new ValidatorFixture();
+            TestTree.DeclareCurrency(f.Tier1b, "merch");
+            f.AddGuardedEvent().handicaps.Add(new Effect { target = "merch", multiplier = 0.5 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach,
+                "targets currency 'merch' homed at 'tier1b'");
+        }
+
+        [Test]
+        public void Event_DeclaredByTwoScopes_DuplicateHome_Error()
+        {
+            var f = new ValidatorFixture();
+            var gig = f.AddGuardedEvent();
+            f.Tier1b.events.Add(gig);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome,
+                "an event has one home");
+        }
+
+        [Test]
+        public void EventId_JoinsTheChainIdSpace_DuplicateId_Error()
+        {
+            var f = new ValidatorFixture();
+            var twin = TestTree.MakeDefinition<EventDefinition>("cash");
+            twin.availableWhen = new Always();
+            f.Tier1.events.Add(twin);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateId,
+                "'cash' is declared twice on the chain at 'tier1'");
+        }
+
+        // rewards and onEnd validate as ONE container in that order: a flag set
+        // by the reward and wiped by onEnd's reset is exactly the misordering
+        // set-then-wiped exists to catch.
+        [Test]
+        public void Event_RewardsAndOnEnd_AreOneContainer_SetThenWiped_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredFlags.Add("gig_done");
+            var gig = f.AddGuardedEvent();
+            gig.rewards.Add(new SetFlag { flagId = "gig_done" });
+            gig.onEnd.Add(new ResetScope { scope = f.Tier1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped,
+                "flag 'gig_done' is set here and wiped by the ResetScope of 'tier1'");
+        }
+
+        [Test]
+        public void Event_BalanceGoalWithoutEntryReset_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent().onEntry.Clear();
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.BalanceGoalWithoutReset,
+                "a balance goal on an event whose onEntry never resets the host");
+        }
+
+        [Test]
+        public void StrandedReward_UnguardedResettingRung_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent();
+            // Unwrap the album's guard; the capstone stays guarded, so the one
+            // finding is the album's own reset over its host.
+            f.Album.offerCondition = ((All)f.Album.offerCondition).conditions[0];
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedReward,
+                "resets 'tier1', which contains the event host 'tier1'");
+        }
+
+        // Requiredness is the test: a guard reachable only through an Any is
+        // satisfied by its sibling branch, so it does not count.
+        [Test]
+        public void StrandedReward_GuardUnderAny_StillWarns()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent();
+            var albumGate = (All)f.Album.offerCondition;
+            albumGate.conditions[1] = new Any
+            {
+                conditions = { albumGate.conditions[1], new FlagSet { flagId = "album" } }
+            };
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedReward,
+                "resets 'tier1', which contains the event host 'tier1'");
+        }
+
+        // Root passes the subtree check from root-owned content but holds no
+        // record field at all, so a root host is a permanently closed gate.
+        [Test]
+        public void EventConditionHost_CannotHostAnEvent_ScopeReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var trigger = TestTree.MakeDefinition<TriggerDefinition>("root_trigger");
+            trigger.condition = new EventRecordExists { host = f.Root };
+            f.Root.triggers.Add(trigger);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
+                "EventRecordExists names 'root', which cannot host an event");
+        }
+
+        [Test]
+        public void EventConditionHost_OffTheActingSubtree_ScopeReach_Error()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent();
+            // The trigger acts at tier1; ch1 is an ancestor, not enclosed.
+            f.Trigger.condition = new EventRecordExists { host = f.Ch1 };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
+                "EventRecordExists may name the acting scope or a scope it encloses");
         }
 
         [Test]

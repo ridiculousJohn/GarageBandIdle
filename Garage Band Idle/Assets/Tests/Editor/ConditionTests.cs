@@ -71,6 +71,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(new BarsCompleted { group = tree.LearnCovers, count = 2 }.Evaluate(ctx));
         }
 
+        // Both kinds are pure fact reads over the named host's record, reached
+        // downward from the acting scope like ResetScope's reference.
+        [Test]
+        public void The_event_kinds_read_the_named_hosts_record()
+        {
+            var tree = new TestTree();
+            var fromCh1 = tree.Ctx(tree.Ch1);
+            var exists = new EventRecordExists { host = tree.Tier1Def };
+            var pending = new EventRewardPending { host = tree.Tier1Def };
+
+            Assert.IsFalse(exists.Evaluate(fromCh1));
+            Assert.IsFalse(pending.Evaluate(fromCh1));
+
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 0 };
+            Assert.IsTrue(exists.Evaluate(fromCh1));       // expired still exists
+            Assert.IsFalse(pending.Evaluate(fromCh1));     // armed only by the latch
+
+            tree.Tier1.activeEvent.goalReached = true;
+            Assert.IsTrue(pending.Evaluate(fromCh1));
+        }
+
         [Test]
         public void Always_holds()
         {

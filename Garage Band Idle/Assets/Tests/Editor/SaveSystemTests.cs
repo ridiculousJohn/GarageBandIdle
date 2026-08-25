@@ -81,7 +81,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.fillCounts["cover_1"] = 2;
             tree.Tier1.activeBars["learn_covers"] = new System.Collections.Generic.HashSet<string> { "cover_1" };
             tree.Tier1.modifierStacks["gj_tap_1"] = 2;
-            tree.Tier1.Facts.activeEvent = new ActiveEvent { eventId = "garage_jam_1", remainingSeconds = 12.5, goalReached = true };
+            tree.Tier1.Facts.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 12.5, goalReached = true };
             tree.Tier1.songs.Add(new SongEntry { songId = "song_1", name = "Three-Chord Anthem" });
             tree.Ch1.balances["ch1_records"] = 17;
             tree.Ch1.flags.Add("album");
@@ -118,7 +118,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2, tier1.fillCounts["cover_1"]);
             Assert.IsTrue(tier1.activeBars["learn_covers"].Contains("cover_1"));
             Assert.AreEqual(2, tier1.modifierStacks["gj_tap_1"]);
-            Assert.AreEqual("garage_jam_1", tier1.Facts.activeEvent.eventId);
+            Assert.AreEqual("timed_gig", tier1.Facts.activeEvent.eventId);
             Assert.AreEqual(12.5, tier1.Facts.activeEvent.remainingSeconds);
             Assert.IsTrue(tier1.Facts.activeEvent.goalReached);
             Assert.AreEqual("Three-Chord Anthem", tier1.songs[0].name);
@@ -352,6 +352,37 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var loadedCh1 = (ChapterScopeState)root.FindInSubtree(newTree.Ch1Def);
             Assert.AreEqual((BigNumber)100, ClaimAmount(loadedCh1.pendingClaim, "tier1", "cash"));
             Assert.IsFalse(HasClaimFor(loadedCh1.pendingClaim, "ghost_currency"));
+        }
+
+        [Test]
+        public void An_event_record_the_scope_never_declares_is_dropped()
+        {
+            var saved = new TestTree();
+            saved.Tier1.activeEvent = new ActiveEvent { eventId = "ghost_event", remainingSeconds = 5 };
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_event"));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
+            var tier1 = (TierScopeState)root.FindInSubtree(loaded.Tier1Def);
+            Assert.IsNull(tier1.activeEvent);
+        }
+
+        // Past the limit reads as expired and a negative timer would owe the
+        // player time; an untimed record's timer clamps to zero the same way.
+        [Test]
+        public void An_event_timer_is_clamped_into_its_authored_range()
+        {
+            var saved = new TestTree();
+            saved.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 9999 };
+            Assert.IsTrue(Load(SaveSystem.Serialize(saved.Root), out var root, out var loaded));
+            var tier1 = (TierScopeState)root.FindInSubtree(loaded.Tier1Def);
+            Assert.AreEqual(300, tier1.activeEvent.remainingSeconds);    // timed_gig's limit
+
+            saved = new TestTree();
+            saved.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = -5 };
+            Assert.IsTrue(Load(SaveSystem.Serialize(saved.Root), out root, out loaded));
+            tier1 = (TierScopeState)root.FindInSubtree(loaded.Tier1Def);
+            Assert.AreEqual(0, tier1.activeEvent.remainingSeconds);
         }
 
         [Test]

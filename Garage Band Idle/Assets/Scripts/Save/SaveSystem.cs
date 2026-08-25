@@ -452,6 +452,36 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 foreach (var key in staleStacks)
                     facts.modifierStacks.Remove(key);
             }
+
+            // The event record is the interior payload's single field. A record
+            // for an event this scope never declares is dropped, and a timer is
+            // clamped into [0, timeLimitSeconds] - past the end reads as
+            // expired, and an untimed event carries no remaining time at all.
+            if (facts is InteriorFacts interiorFacts && interiorFacts.activeEvent != null)
+            {
+                var record = interiorFacts.activeEvent;
+                Events.EventDefinition declared = null;
+                if (definition is InteriorDefinition interior)
+                {
+                    foreach (var evt in interior.events)
+                    {
+                        if (evt != null && evt.Id == record.eventId)
+                        {
+                            declared = evt;
+                            break;
+                        }
+                    }
+                }
+                if (declared == null)
+                {
+                    Debug.LogWarning($"SaveSystem: event record '{record.eventId}' is not declared by scope '{definition.Id}' - dropped.");
+                    interiorFacts.activeEvent = null;
+                }
+                else
+                {
+                    record.remainingSeconds = Math.Clamp(record.remainingSeconds, 0, declared.timeLimitSeconds);
+                }
+            }
         }
 
         // A bar and its group are found in this scope's OWN declaration lists:

@@ -51,6 +51,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
         }
 
+        // ---- the active-event row (12.6) ----
+
+        // Handicaps ride on the record EXISTING: an expired, undismissed record
+        // still applies them, because a failed attempt sits one tap from a
+        // reset and briefly lifting the handicap there would be the worse state
+        // (12.8).
+        [Test]
+        public void An_event_record_applies_its_handicaps_and_expiry_does_not_lift_them()
+        {
+            var tree = new TestTree();
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "no record");
+
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 100 };
+            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "running");
+
+            tree.Tier1.activeEvent.remainingSeconds = 0;
+            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "expired");
+        }
+
+        // Read through the DECLARATION list, like an upgrade latch: a record
+        // naming an event this scope never declared contributes nothing.
+        [Test]
+        public void A_record_for_an_undeclared_event_contributes_nothing()
+        {
+            var tree = new TestTree();
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "ghost_event", remainingSeconds = 100 };
+
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
+        }
+
         // ---- the match rule ----
 
         [Test]

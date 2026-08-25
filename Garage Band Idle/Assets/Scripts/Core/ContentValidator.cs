@@ -33,6 +33,8 @@ namespace RidiculousGaming.GarageBandIdle
         SetThenWiped,           // a list sets a fact, then resets the scope declaring it
         FormulaReadsCleared,    // a formula-driven grant after a reset clearing its inputs (warn)
         StrandedValue,          // a rung resets a subtree holding a payout rung it never invokes (warn)
+        StrandedReward,         // a rung's reset closure holds an event host its own gate does not guard (warn)
+        BalanceGoalWithoutReset,// an event balance goal whose onEntry never resets the host (warn)
         ReferenceCycle,         // cycles across nested action references
         RemoveWithoutGrant,     // RemoveModifier naming a stack nothing grants there (warn)
         UnconsumedStat,         // a stat no system consumes (warn) - the typo guard a named vocabulary lacks
@@ -550,6 +552,8 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var generator in scope.generators) if (generator != null) yield return generator;
             foreach (var upgrade in scope.upgrades) if (upgrade != null) yield return upgrade;
             foreach (var career in scope.careerEffects) if (career != null) yield return career;
+            if (scope is InteriorDefinition interior)
+                foreach (var evt in interior.events) if (evt != null) yield return evt;
             foreach (var group in scope.barGroups)
             {
                 if (group == null) continue;
@@ -721,6 +725,8 @@ namespace RidiculousGaming.GarageBandIdle
                 CollectDeclared(scope, scope.generators, "generators");
                 CollectDeclared(scope, scope.upgrades, "upgrades");
                 CollectDeclared(scope, scope.careerEffects, "careerEffects");
+                if (scope is InteriorDefinition interiorScope)
+                    CollectDeclared(scope, interiorScope.events, "events");
             }
 
             // ---- ids are unique along a CHAIN, not tree-wide ----
@@ -845,6 +851,8 @@ namespace RidiculousGaming.GarageBandIdle
                 RecordHome(scope, scope.generators);
                 RecordHome(scope, scope.upgrades);
                 RecordHome(scope, scope.careerEffects);
+                if (scope is InteriorDefinition interiorScope)
+                    RecordHome(scope, interiorScope.events, "an event has one home");
             }
 
             var ctx = new ValidationContext(report, root, parentByScope,
@@ -884,6 +892,16 @@ namespace RidiculousGaming.GarageBandIdle
                     else
                         trigger.condition.Validate(ctx);
                     ValidateActionList(ctx, trigger.actions, $"trigger '{trigger.Id}'");
+                }
+
+                if (scope is InteriorDefinition eventHost)
+                {
+                    foreach (var evt in eventHost.events)
+                    {
+                        if (evt == null)
+                            continue; // flagged during id collection
+                        ValidateEvent(ctx, evt, scope);
+                    }
                 }
 
                 foreach (var producer in scope.producers)
@@ -941,6 +959,7 @@ namespace RidiculousGaming.GarageBandIdle
             ctx.ClearSite();
             FinalizeListChecks(ctx);
             FinalizeStrandedValue(ctx);
+            FinalizeStrandedReward(ctx);
             FinalizeFlagChecks(ctx);
             FinalizeModifierChecks(ctx);
             FinalizeCycles(ctx);
@@ -970,6 +989,81 @@ namespace RidiculousGaming.GarageBandIdle
                         $"value is {entry.value} - a contribution never subtracts.");
                 entry.condition?.Validate(ctx);
             }
+        }
+
+        // An event's own shape plus its two ledger containers (12.12): onEntry
+        // stands alone; rewards and onEnd are ONE container in that order,
+        // because they run back to back in a single transaction - a flag set in
+        // rewards and wiped by onEnd's reset is exactly what set-then-wiped
+        // exists to catch. Gates, goal, and handicaps are judged in the HOST's
+        // scope (12.4), which the container's acting scope already is.
+        private static void ValidateEvent(ValidationContext ctx, Events.EventDefinition evt, ScopeDefinition scope)
+        {
+            var site = $"event '{evt.Id}'";
+            ctx.EnterContainer(scope, "event:" + evt.Id + " entry");
+            ctx.SetSite(site);
+            if (evt.availableWhen == null)
+                ctx.AddError(ValidationCheck.NullEntry,
+                    "availableWhen is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
+            else
+            {
+                ctx.SetSite($"{site} availableWhen");
+                evt.availableWhen.Validate(ctx);
+            }
+
+            ctx.SetSite($"{site} goal");
+            if (evt.goal == null)
+                ctx.AddWarning(ValidationCheck.NullEntry,
+                    "goal is unauthored - the event is dismiss-only and can never reward.");
+            else
+                evt.goal.Validate(ctx);
+
+            ctx.SetSite(site);
+            if (ctx.RequireFiniteDouble(evt.timeLimitSeconds, $"{site} timeLimitSeconds") && evt.timeLimitSeconds < 0)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"timeLimitSeconds is {evt.timeLimitSeconds} - zero is untimed, and a negative limit means nothing.");
+
+            for (var i = 0; i < evt.handicaps.Count; i++)
+                ValidateEffect(ctx, evt.handicaps[i], $"{site} handicaps[{i}]", scope);
+
+            // A live-balance goal over a host onEntry never resets is met by
+            // whatever the player already holds when the event starts (12.12).
+            if (evt.goal != null && ReadsABalance(evt.goal) && !ResetsScope(evt.onEntry, scope))
+            {
+                ctx.SetSite($"{site} goal");
+                ctx.AddWarning(ValidationCheck.BalanceGoalWithoutReset,
+                    "a balance goal on an event whose onEntry never resets the host is met by whatever the player already holds.");
+            }
+
+            ValidateActionList(ctx, evt.onEntry, $"{site} onEntry");
+
+            ctx.EnterContainer(scope, "event:" + evt.Id + " end");
+            var ending = new List<GameAction>(evt.rewards.Count + evt.onEnd.Count);
+            ending.AddRange(evt.rewards);
+            ending.AddRange(evt.onEnd);
+            ValidateActionList(ctx, ending, $"{site} rewards+onEnd");
+        }
+
+        // Whether a condition reads a live balance anywhere in its tree.
+        private static bool ReadsABalance(Condition condition) => condition switch
+        {
+            CurrencyAtLeast => true,
+            All all => all.conditions.Any(c => c != null && ReadsABalance(c)),
+            Any any => any.conditions.Any(c => c != null && ReadsABalance(c)),
+            Not not => not.condition != null && ReadsABalance(not.condition),
+            _ => false
+        };
+
+        private static bool ResetsScope(List<GameAction> actions, ScopeDefinition scope)
+        {
+            foreach (var action in actions)
+            {
+                if (action is ResetScope reset && reset.scope == scope)
+                    return true;
+                if (action is RestartScope restart && restart.scope == scope)
+                    return true;
+            }
+            return false;
         }
 
         private static void ValidateGenerator(ValidationContext ctx, Economy.GeneratorDefinition generator)
@@ -1213,6 +1307,67 @@ namespace RidiculousGaming.GarageBandIdle
                             $"{reset.Site}: resets '{reset.Target.Id}', which contains the payout rung at '{scope.Id}' with no ExecuteRung before the reset - stranded value (12.12).");
                 }
             }
+        }
+
+        // A rung whose reset closure contains an event host must REQUIRE that
+        // host to hold no armed reward, or firing it destroys an unclaimed
+        // reward with the record (12.12: stranded reward). Required means the
+        // whole condition or a conjunct reached through All alone: a leg under
+        // an Any is satisfied by its sibling branch, and a positive leg means
+        // the opposite. A warn, not an error: resetting over cheap disposable
+        // events is authorable on purpose.
+        private static void FinalizeStrandedReward(ValidationContext ctx)
+        {
+            foreach (var reset in ctx.Resets)
+            {
+                if (!reset.ContainerKey.StartsWith("rung:"))
+                    continue;
+                Rung rung = null;
+                foreach (var scope in ctx.TreeScopes)
+                {
+                    if (scope is InteriorDefinition owner && owner.rung != null
+                        && ValidationContext.RungKey(scope.Id) == reset.ContainerKey)
+                    {
+                        rung = owner.rung;
+                        break;
+                    }
+                }
+                if (rung == null)
+                    continue;
+
+                var guarded = new HashSet<ScopeDefinition>();
+                CollectRequiredGuards(rung.offerCondition, guarded);
+                foreach (var scope in ctx.ScopesInSubtree(reset.Target))
+                {
+                    if (scope is not InteriorDefinition host)
+                        continue;
+                    var hostsAnEvent = false;
+                    foreach (var evt in host.events)
+                    {
+                        if (evt != null)
+                        {
+                            hostsAnEvent = true;
+                            break;
+                        }
+                    }
+                    if (!hostsAnEvent || guarded.Contains(scope))
+                        continue;
+                    ctx.AddWarning(ValidationCheck.StrandedReward,
+                        $"{reset.Site}: resets '{reset.Target.Id}', which contains the event host '{scope.Id}', and the rung's offer condition carries no required Not(EventRewardPending('{scope.Id}')) - an armed, unclaimed reward dies with the record (stranded reward, 12.12).");
+                }
+            }
+        }
+
+        // The hosts guarded as a REQUIRED conjunct: the whole condition, or a
+        // leg reached through All alone.
+        private static void CollectRequiredGuards(Condition condition, HashSet<ScopeDefinition> guarded)
+        {
+            if (condition is Not not && not.condition is EventRewardPending pending && pending.host != null)
+                guarded.Add(pending.host);
+            else if (condition is All all)
+                foreach (var leg in all.conditions)
+                    if (leg != null)
+                        CollectRequiredGuards(leg, guarded);
         }
 
         // Every declaration is its own flag, so the no-setter question is asked

@@ -365,6 +365,61 @@ namespace RidiculousGaming.GarageBandIdle
         protected override ScopeFacts NewFacts() => new TFacts();
     }
 
+    // A scope that can host an event - the walk's answer when a caller needs a
+    // host, so root is excluded by type rather than by a check (12.8). Holds
+    // the record accessor and folds handicaps into the multiplier gather.
+    public abstract class InteriorScopeState : ScopeState
+    {
+        protected InteriorScopeState(InteriorDefinition definition, ScopeState parent, InteriorFacts payload)
+            : base(definition, parent, payload) { }
+
+        // The payload-type invariant makes this the same one cast as
+        // ScopeState<TFacts>.Facts: an interior node only ever holds
+        // InteriorFacts.
+        public ActiveEvent activeEvent
+        {
+            get => ((InteriorFacts)facts).activeEvent;
+            set => ((InteriorFacts)facts).activeEvent = value;
+        }
+
+        // Handicaps ride on the record EXISTING - no expiry check, because a
+        // failed attempt sits one tap from a reset and briefly lifting the
+        // handicap there would be the worse state (12.8). Read through the
+        // declaration list, like upgrades: a stray record id contributes
+        // nothing. No count scaling - there is one record.
+        internal override BigNumber MultiplierFor(GameContext origin, Definition owner,
+                                                  CurrencyDefinition currency, string stat)
+        {
+            var product = base.MultiplierFor(origin, owner, currency, stat);
+            var record = activeEvent;
+            if (record == null)
+                return product;
+            foreach (var evt in ((InteriorDefinition)Definition).events)
+            {
+                if (evt == null || evt.Id != record.eventId)
+                    continue;
+                foreach (var effect in evt.handicaps)
+                    if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
+                        product *= effect.multiplier;
+            }
+            return product;
+        }
+    }
+
+    // The typed-payload layer for interior scopes: the same three members as
+    // ScopeState<TFacts>, duplicated because C# cannot interpose a non-generic
+    // base under a generic one - and the walk needs InteriorScopeState as a
+    // bare type to ask for.
+    public abstract class InteriorScopeState<TFacts> : InteriorScopeState where TFacts : InteriorFacts, new()
+    {
+        protected InteriorScopeState(InteriorDefinition definition, ScopeState parent)
+            : base(definition, parent, new TFacts()) { }
+
+        public TFacts Facts => (TFacts)facts;
+
+        protected override ScopeFacts NewFacts() => new TFacts();
+    }
+
     // The one scope nothing resets, and the only holder of career facts.
     public class RootScopeState : ScopeState<RootFacts>
     {
@@ -377,7 +432,7 @@ namespace RidiculousGaming.GarageBandIdle
 
     // Root's direct children. The idle claim and lastActiveUtc live here
     // because idle is a per-chapter concept (design doc 12.9).
-    public class ChapterScopeState : ScopeState<ChapterFacts>
+    public class ChapterScopeState : InteriorScopeState<ChapterFacts>
     {
         internal ChapterScopeState(ChapterDefinition definition, ScopeState parent)
             : base(definition, parent) { }
@@ -401,7 +456,7 @@ namespace RidiculousGaming.GarageBandIdle
 
     // Everything below a chapter, at any depth - the tree nests freely, and
     // one class covers every level because TierDefinition does.
-    public class TierScopeState : ScopeState<TierFacts>
+    public class TierScopeState : InteriorScopeState<TierFacts>
     {
         internal TierScopeState(TierDefinition definition, ScopeState parent)
             : base(definition, parent) { }
