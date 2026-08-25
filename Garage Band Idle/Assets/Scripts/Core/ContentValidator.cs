@@ -18,6 +18,7 @@ namespace RidiculousGaming.GarageBandIdle
     public enum ValidationCheck
     {
         ScopeGraph,             // exactly one root, one parent each, every scope reachable
+        ScopePlacement,         // root -> chapters -> tiers: a scope's authored kind fits where it sits
         DuplicateId,            // Definition ids and flags share one id space per chain
         DuplicateHome,          // a currency, flag, or trigger declared by two scopes
         TagIdCollision,         // a tag may not collide with any id
@@ -653,6 +654,35 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!visited.Contains(scope))
                     report.Add(ValidationSeverity.Error, ValidationCheck.ScopeGraph,
                         $"scope '{scope.Id}' is not reachable from the root '{root.Id}'.");
+
+            // ---- kind placement: root, then chapters, then tiers all the way down ----
+            // A scope's authored class decides its state class and its payload,
+            // so a kind in the wrong place builds a node whose payload and
+            // parentage disagree with where it sits - a RootDefinition given a
+            // parent, a TierScopeState where Chapter() expects a chapter. Both
+            // are content faults, refused before any state is built.
+            if (root is not RootDefinition)
+                report.Add(ValidationSeverity.Error, ValidationCheck.ScopePlacement,
+                    $"the tree's root scope '{root.Id}' is a {root.GetType().Name}; a root scope is a RootDefinition (12.3).");
+            foreach (var scope in treeScopes)
+            {
+                foreach (var child in scope.children)
+                {
+                    if (child == null)
+                        continue;
+                    if (scope == root)
+                    {
+                        if (child is not ChapterDefinition)
+                            report.Add(ValidationSeverity.Error, ValidationCheck.ScopePlacement,
+                                $"scope '{child.Id}' is a {child.GetType().Name} directly under the root; root's children are chapters (12.3).");
+                    }
+                    else if (child is not TierDefinition)
+                    {
+                        report.Add(ValidationSeverity.Error, ValidationCheck.ScopePlacement,
+                            $"scope '{child.Id}' is a {child.GetType().Name} under '{scope.Id}'; everything below a chapter is a tier (12.3).");
+                    }
+                }
+            }
 
             // ---- id space: every definition the tree declares, plus flags ----
             var allDefinitions = new List<Definition>();

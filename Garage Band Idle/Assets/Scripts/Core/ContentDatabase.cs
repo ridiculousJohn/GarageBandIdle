@@ -20,9 +20,13 @@ namespace RidiculousGaming.GarageBandIdle
     // ever call for it.
     public class ContentDatabase
     {
-        private readonly List<AsyncOperationHandle<ScopeDefinition>> handles = new();
+        // Typed to the root's authored kind: the tree build needs a
+        // RootDefinition, and an Addressables key naming a chapter or a tier
+        // fails the load here rather than producing a tree rooted at one.
 
-        public ScopeDefinition Root { get; private set; }
+        private readonly List<AsyncOperationHandle<RootDefinition>> handles = new();
+
+        public RootDefinition Root { get; private set; }
 
         // Blocking boot-time load of the root scope, held for the database's
         // lifetime (releasing a handle releases its assets). A failed load
@@ -35,7 +39,7 @@ namespace RidiculousGaming.GarageBandIdle
         public static ContentDatabase LoadRoot(object rootKey)
         {
             var database = new ContentDatabase();
-            var handle = Addressables.LoadAssetAsync<ScopeDefinition>(rootKey);
+            var handle = Addressables.LoadAssetAsync<RootDefinition>(rootKey);
             var root = handle.WaitForCompletion();
             database.handles.Add(handle);
             if (handle.Status != AsyncOperationStatus.Succeeded || root == null)

@@ -261,6 +261,57 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "declaredCurrencies[");
         }
 
+        // ---- scope kind placement ----
+
+        [Test]
+        public void ScopePlacement_TierAtTheRoot_Error()
+        {
+            // A tree whose top node is a tier: structurally a root, so the
+            // graph checks pass and only the kind check catches it.
+            var fakeRoot = TestTree.MakeTier("root");
+            var ch1 = TestTree.MakeChapter("ch1");
+            fakeRoot.children.Add(ch1);
+
+            AssertFinding(ContentValidator.Validate(fakeRoot), ValidationSeverity.Error,
+                ValidationCheck.ScopePlacement, "is a TierDefinition");
+        }
+
+        [Test]
+        public void ScopePlacement_TierDirectlyUnderRoot_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Root.children.Add(TestTree.MakeTier("loose_tier"));
+
+            AssertFinding(f.Run(), ValidationSeverity.Error,
+                ValidationCheck.ScopePlacement, "root's children are chapters");
+        }
+
+        [Test]
+        public void ScopePlacement_ChapterUnderAChapter_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.children.Add(TestTree.MakeChapter("ch_inner"));
+
+            AssertFinding(f.Run(), ValidationSeverity.Error,
+                ValidationCheck.ScopePlacement, "everything below a chapter is a tier");
+        }
+
+        [Test]
+        public void ScopePlacement_RootNestedInTheTree_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.children.Add(TestTree.MakeRoot("inner_root"));
+
+            AssertFinding(f.Run(), ValidationSeverity.Error,
+                ValidationCheck.ScopePlacement, "is a RootDefinition");
+        }
+
+        [Test]
+        public void ScopePlacement_ChapterOneShape_NoFinding()
+        {
+            AssertNoFinding(new ValidatorFixture().Run(), ValidationCheck.ScopePlacement);
+        }
+
         // ---- ResetScope reach ----
 
         [Test]

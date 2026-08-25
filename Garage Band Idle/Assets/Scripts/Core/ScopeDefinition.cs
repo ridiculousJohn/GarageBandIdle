@@ -92,41 +92,4 @@ namespace RidiculousGaming.GarageBandIdle
             return false;
         }
     }
-
-    // Every scope inside another one - chapters and tiers. Root is the sole
-    // exclusion, which is what puts the rung here: a rung is the ladder step out
-    // of a scope, and the root is what the ladder climbs toward.
-    public abstract class InteriorDefinition : ScopeDefinition
-    {
-        // The album release (tier) or capstone (chapter). Null for scopes with
-        // no rung. SerializeReference so "no rung" stays null instead of an
-        // auto-created empty instance.
-        [SerializeReference] public Rung rung;
-    }
-
-    // The tree's one parentless scope: career facts, no rung, no event.
-    [CreateAssetMenu(menuName = "Garage Band Idle/Scope/Root")]
-    public class RootDefinition : ScopeDefinition
-    {
-        // Typed, because the tree build must hand back a RootScopeState and the
-        // polymorphic entry point can only promise a ScopeState.
-        internal RootScopeState CreateRoot() => new RootScopeState(this);
-
-        internal override ScopeState CreateState(ScopeState parent) => CreateRoot();
-    }
-
-    // Root's direct children. Idle is per-chapter, so its claim and clock live
-    // on the state this makes (design doc 12.9).
-    [CreateAssetMenu(menuName = "Garage Band Idle/Scope/Chapter")]
-    public class ChapterDefinition : InteriorDefinition
-    {
-        internal override ScopeState CreateState(ScopeState parent) => new ChapterScopeState(this, parent);
-    }
-
-    // Everything below a chapter, at any depth - the tree nests freely.
-    [CreateAssetMenu(menuName = "Garage Band Idle/Scope/Tier")]
-    public class TierDefinition : InteriorDefinition
-    {
-        internal override ScopeState CreateState(ScopeState parent) => new TierScopeState(this, parent);
-    }
 }

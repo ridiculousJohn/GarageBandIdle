@@ -8,6 +8,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     public class ScopeChainTests
     {
         [Test]
+        public void Build_refuses_a_root_declared_as_a_child()
+        {
+            // The runtime backstop behind the ScopePlacement check: a nested
+            // root would report itself parentless while sitting in someone's
+            // Children, which every chain walk would then read wrong.
+            var root = TestTree.MakeRoot("root");
+            var chapter = TestTree.MakeChapter("ch1");
+            root.children.Add(chapter);
+            chapter.children.Add(TestTree.MakeRoot("inner_root"));
+
+            Assert.Throws<System.InvalidOperationException>(() => ScopeState.Build(root));
+        }
+
+        [Test]
         public void Deposit_lands_at_the_currency_home_and_bumps_earned_total()
         {
             var tree = new TestTree();
