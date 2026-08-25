@@ -502,20 +502,21 @@ A dormant chapter with no generators accrues nothing (zero rate), so parking an 
 earns nothing — the system self-regulates without a rule.
 
 `idleRate` (base 50%) and `cap` (base 4 h, plus a minimum-away threshold below which nothing pays)
-are two **reserved effect target ids** — `idle_rate` and `idle_cap` — so the monetization features
-are ordinary Effects:
+are two **stats** — `idle_rate` and `idle_cap`, names in the same open vocabulary as `rate` and
+`yield` (§12.2) — so the bases and the monetization features alike are ordinary Effects, read per
+currency exactly as production reads `rate`:
 
 | Player | Idle payout | How |
 |---|---|---|
 | Free, no action | 50% | Claimed from the idle dialog on switch-in |
-| Free, watches ad | 100% (2×) for that claim | "Double it" on the dialog applies `{target: idle_rate, ×2}` to the pending claim |
+| Free, watches ad | 100% (2×) for that claim | "Double it" on the dialog applies `{stat: idle_rate, ×2}` to the pending claim |
 | Backstage Pass owner | 100% (2×) always | The same effect, derived from a permanent entitlement fact; also raises `idle_cap` |
 
 Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
 **Encore (the accelerator).** A **game-speed multiplier**, not an income multiplier: a timed buff
-(`{buffId, expiresAt}` in state) whose effect is `{target: game_speed, ×2}`. `game_speed` is a
-reserved effect target whose sole consumer is the tick — `effective dt = real dt ×
+(`{buffId, expiresAt}` in state) whose effect is `{stat: game_speed, ×2}`. `game_speed` is a
+stat whose sole consumer is the tick — `effective dt = real dt ×
 GetMultiplier(game_speed)` — so every rate, accrual, and bar fill in the live chapter speeds up
 automatically. Yields never scale (per-firing, no time component), and **wall-clock decrements
 never scale**: event `remainingSeconds` and buff expirations burn real seconds. The timer is an
@@ -671,19 +672,25 @@ gets its name from its members (`rhythm_section` declared by the drummer and bas
 list members and later additions join by declaring the tag. An effect applies at the level of what
 it matches: on a producer or generator (by id or tag) it multiplies **inside the sum** (that
 source's term); on a currency (by id or tag) it multiplies **the total** — one rule, no double
-counting. "Global income" is this tag mechanism, not a reserved id: income currencies declare an
+counting. "Global income" is this tag mechanism, not a wildcard: income currencies declare an
 `income` tag (Ch. 1: cash), the career effects of §3 target it, and a later income stream joins the
 stack by declaring the tag.
 
-**Reserved target ids:** `idle_rate`, `idle_cap`, `game_speed` (§9) — each consumed by exactly one
-system (`game_speed` by the tick, which scales the production dt; wall-clock decrements never scale).
+**Consumer-owned stats:** `idle_rate`, `idle_cap`, `game_speed` (§9) — stats in the same open
+vocabulary as `rate` and `yield`, each read by exactly one system (`game_speed` by the tick, which
+scales the production dt; wall-clock decrements never scale). Nothing marks them special: the stat
+vocabulary is open precisely so a new consumer adds its name and its own query, no new machinery.
 
 `GetMultiplier(owner, currencyId, stat)` answers one question: *which factors apply to this
 number?* A number is identified by its owner and coordinates — a `produces` entry by
-(source, currencyId, stat), a reserved id by its name alone. An effect matches when its `target`
-names the owner (by id or any of its tags) and each optional coordinate it sets agrees: both empty
-matches everything the owner has, either one narrows, both name one entry exactly — the Effect
-address mirrors the `produces` entry's coordinates. `currencyId` matches an id or a tag, exactly as
+(source, currencyId, stat), a consumer-owned stat by its name alone. An effect matches when its
+`target` names the owner (by id or any of its tags) and each optional coordinate it sets agrees:
+both coordinates empty matches everything the owner has, either one narrows, both name one entry
+exactly — the Effect address mirrors the `produces` entry's coordinates. **An empty `target` is
+the wildcard: "every currency."** It applies at the currency stage — one stage per effect, since
+root sits on both gather walks and a stage-less wildcard there would be collected twice — so
+`{stat: rate, ×2}` speeds every currency's rate (bar fills excluded, as with any currency-stage
+effect), and `{stat: idle_rate, ×0.5}` is the idle base itself. `currencyId` matches an id or a tag, exactly as
 `target` does, so "every rate entry paying an income currency" is one effect rather than one per
 currency — and a currency stays out of it by not declaring the tag (§8.2's fans rule). **Where matches are gathered from is two
 explicit stages**, which is what keeps sibling scopes isolated (§12.3):
@@ -1124,8 +1131,8 @@ The claim is an exactly-once transaction — `{claimId, amounts: [{scopeId, curr
 doubled, settled}`: a line names its HOME, because a claim held at the chapter addresses currencies
 homed at tiers below it, and nothing resolves a name downward. The ad callback
 marks `doubled`, deposit flips `settled`, and replaying either after an app kill is idempotent by
-`claimId`. `idle_rate`, `idle_cap`, and `game_speed` resolve through `GetMultiplier` like
-everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
+`claimId`. `idle_rate` and `idle_cap` are stats read through `GetMultiplier` per currency, and
+`game_speed` once per segment — the same gather as everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
 commit — for ticks and commands alike; live scopes only, single pass. The same sweep observes
 event goals **from the sweep-start snapshot and latches `goalReached` before any trigger
 actions execute** — success is judged on the transaction's own mutation, never on trigger
@@ -1423,11 +1430,11 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   transactions in live scopes only, never during idle; repeating behavior is a producer or a bar,
   never a trigger.
 - **Idle:** per chapter — one active chapter ticks; switch-in computes `rate × min(t, cap) ×
-  idleRate` (base 50%/4 h; `idle_rate`/`idle_cap` are effect targets) into a pending claim presented
+  idleRate` (base 50%/4 h authored as effects on the `idle_rate`/`idle_cap` stats) into a pending claim presented
   as the idle dialog — the ad doubles the claim, deposit on dismissal; app close is not special;
   yields and bar progress never accrue.
 - **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2×/Overdrive 4×
-  (`game_speed` reserved target, tick-consumed; wall clocks never scale); Backstage Pass (lifetime,
+  (`game_speed` stat, tick-consumed; wall clocks never scale); Backstage Pass (lifetime,
   permanent Overdrive); Buy Roadies (repeatable); Tip Jar; no subscriptions.
 - **Engine:** Unity; break_infinity numbers; DateTime ticks; checksummed JSON save of the state tree;
   one Addressables load of the root scope, which carries the whole directly-referenced content
