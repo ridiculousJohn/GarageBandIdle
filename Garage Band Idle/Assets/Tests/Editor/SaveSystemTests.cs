@@ -81,7 +81,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.fillCounts["cover_1"] = 2;
             tree.Tier1.activeBars["learn_covers"] = new System.Collections.Generic.HashSet<string> { "cover_1" };
             tree.Tier1.modifierStacks["gj_tap_1"] = 2;
-            tree.Tier1.eventHost.activeEvent = new ActiveEvent { eventId = "garage_jam_1", remainingSeconds = 12.5, goalReached = true };
+            tree.Tier1.Facts.activeEvent = new ActiveEvent { eventId = "garage_jam_1", remainingSeconds = 12.5, goalReached = true };
             tree.Tier1.songs.Add(new SongEntry { songId = "song_1", name = "Three-Chord Anthem" });
             tree.Ch1.balances["ch1_records"] = 17;
             tree.Ch1.flags.Add("album");
@@ -105,7 +105,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fresh.Cover1.repeating = true;
             Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.RootDef, out var root));
 
-            var tier1 = root.FindInSubtree(fresh.Tier1Def);
+            var tier1 = (TierScopeState)root.FindInSubtree(fresh.Tier1Def);
             var ch1 = (ChapterScopeState)root.FindInSubtree(fresh.Ch1Def);
             Assert.AreEqual((BigNumber)123.45, tier1.balances["cash"]);
             Assert.AreEqual((BigNumber)300, tier1.earnedTotals["cash"]);
@@ -118,9 +118,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(2, tier1.fillCounts["cover_1"]);
             Assert.IsTrue(tier1.activeBars["learn_covers"].Contains("cover_1"));
             Assert.AreEqual(2, tier1.modifierStacks["gj_tap_1"]);
-            Assert.AreEqual("garage_jam_1", tier1.eventHost.activeEvent.eventId);
-            Assert.AreEqual(12.5, tier1.eventHost.activeEvent.remainingSeconds);
-            Assert.IsTrue(tier1.eventHost.activeEvent.goalReached);
+            Assert.AreEqual("garage_jam_1", tier1.Facts.activeEvent.eventId);
+            Assert.AreEqual(12.5, tier1.Facts.activeEvent.remainingSeconds);
+            Assert.IsTrue(tier1.Facts.activeEvent.goalReached);
             Assert.AreEqual("Three-Chord Anthem", tier1.songs[0].name);
             Assert.AreEqual((BigNumber)17, ch1.balances["ch1_records"]);
             Assert.IsTrue(ch1.flags.Contains("album"));
@@ -139,7 +139,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Save against a tree that has tier2; load against one where tier2
             // was removed and tier3 added.
             var oldTree = new TestTree();
-            var tier2 = TestTree.MakeScope("tier2");
+            var tier2 = TestTree.MakeTier("tier2");
             TestTree.DeclareCurrency(tier2, "merch");
             oldTree.Ch1Def.children.Add(tier2);
             var oldRoot = ScopeState.Build(oldTree.RootDef);
@@ -147,7 +147,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var json = SaveSystem.Serialize(oldRoot);
 
             var newTree = new TestTree();
-            var tier3 = TestTree.MakeScope("tier3");
+            var tier3 = TestTree.MakeTier("tier3");
             TestTree.DeclareCurrency(tier3, "vinyl");
             newTree.Ch1Def.children.Add(tier3);
 
@@ -486,7 +486,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // A sibling chapter with its own currency, to prove a claim cannot
             // reach across chapters.
             var savedTree = new TestTree();
-            var ch2 = TestTree.MakeScope("ch2");
+            var ch2 = TestTree.MakeChapter("ch2");
             TestTree.DeclareCurrency(ch2, "merch2");
             savedTree.RootDef.children.Add(ch2);
             var savedRoot = ScopeState.Build(savedTree.RootDef);
@@ -501,7 +501,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var json = SaveSystem.Serialize(savedRoot);
 
             var newTree = new TestTree();
-            var ch2Again = TestTree.MakeScope("ch2");
+            var ch2Again = TestTree.MakeChapter("ch2");
             TestTree.DeclareCurrency(ch2Again, "merch2");
             newTree.RootDef.children.Add(ch2Again);
 
@@ -528,10 +528,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Same_currency_id_in_two_homes_stays_two_claim_lines()
         {
             var savedTree = new TestTree();
-            var tier1b = TestTree.MakeScope("tier1b");
+            var tier1b = TestTree.MakeTier("tier1b");
             TestTree.DeclareCurrency(tier1b, "cash");     // ch1's second tier, its own asset
             savedTree.Ch1Def.children.Add(tier1b);
-            var ch2 = TestTree.MakeScope("ch2");
+            var ch2 = TestTree.MakeChapter("ch2");
             TestTree.DeclareCurrency(ch2, "cash");        // a sibling chapter, its own asset
             savedTree.RootDef.children.Add(ch2);
             var savedRoot = ScopeState.Build(savedTree.RootDef);
@@ -544,10 +544,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var json = SaveSystem.Serialize(savedRoot);
 
             var newTree = new TestTree();
-            var tier1bAgain = TestTree.MakeScope("tier1b");
+            var tier1bAgain = TestTree.MakeTier("tier1b");
             TestTree.DeclareCurrency(tier1bAgain, "cash");
             newTree.Ch1Def.children.Add(tier1bAgain);
-            var ch2Again = TestTree.MakeScope("ch2");
+            var ch2Again = TestTree.MakeChapter("ch2");
             TestTree.DeclareCurrency(ch2Again, "cash");
             newTree.RootDef.children.Add(ch2Again);
 

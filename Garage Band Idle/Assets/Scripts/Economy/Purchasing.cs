@@ -17,14 +17,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     {
         public static bool CanBuy(GameContext ctx, GeneratorDefinition generator)
         {
-            var declaringCtx = ctx.Rebase(Producer.DeclaringScope(ctx.Scope, generator, s => s.generators));
+            var declaringCtx = ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, generator));
             return generator.IsAvailable(declaringCtx)
                 && declaringCtx.CanSpend(generator.costCurrency.Id, CostOf(generator, declaringCtx));
         }
 
         public static bool CanBuy(GameContext ctx, UpgradeDefinition upgrade)
         {
-            var declaringCtx = ctx.Rebase(Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades));
+            var declaringCtx = ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade));
             return upgrade.IsOffered(declaringCtx)
                 && !declaringCtx.Scope.purchasedUpgrades.Contains(upgrade.Id)   // the latch IS the one-shot; a reset re-arms it
                 && declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost);
@@ -34,7 +34,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // caller bug, so the guard throws rather than no-oping.
         public static void Buy(GameContext ctx, GeneratorDefinition generator)
         {
-            var declaring = Producer.DeclaringScope(ctx.Scope, generator, s => s.generators);
+            var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, generator);
             var declaringCtx = ctx.Rebase(declaring);
             var cost = CostOf(generator, declaringCtx);
             if (!generator.IsAvailable(declaringCtx) || !declaringCtx.CanSpend(generator.costCurrency.Id, cost))
@@ -47,7 +47,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         public static void Buy(GameContext ctx, UpgradeDefinition upgrade)
         {
-            var declaring = Producer.DeclaringScope(ctx.Scope, upgrade, s => s.upgrades);
+            var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade);
             var declaringCtx = ctx.Rebase(declaring);
             if (!upgrade.IsOffered(declaringCtx) || declaring.purchasedUpgrades.Contains(upgrade.Id)
                 || !declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost))

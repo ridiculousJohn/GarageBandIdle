@@ -13,9 +13,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     {
         public readonly DateTime Now = new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);
 
-        public readonly ScopeDefinition RootDef;
-        public readonly ScopeDefinition Ch1Def;
-        public readonly ScopeDefinition Tier1Def;
+        public readonly RootDefinition RootDef;
+        public readonly ChapterDefinition Ch1Def;
+        public readonly TierDefinition Tier1Def;
         public readonly CurrencyDefinition Rehearsal;   // tier1's own pool
         public readonly CurrencyDefinition Shared;      // root's, so every chapter draws the same one
         public readonly CurrencyDefinition Fans;
@@ -26,15 +26,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         public BarFixture()
         {
-            Tier1Def = TestTree.MakeScope("tier1");
+            Tier1Def = TestTree.MakeTier("tier1");
             Rehearsal = TestTree.DeclareCurrency(Tier1Def, "rehearsal");
             Fans = TestTree.DeclareCurrency(Tier1Def, "fans");
             Tier1Def.declaredFlags.Add("encore");
 
-            Ch1Def = TestTree.MakeScope("ch1");
+            Ch1Def = TestTree.MakeChapter("ch1");
             Ch1Def.children.Add(Tier1Def);
 
-            RootDef = TestTree.MakeScope("root");
+            RootDef = TestTree.MakeRoot("root");
             Shared = TestTree.DeclareCurrency(RootDef, "shared");
             RootDef.children.Add(Ch1Def);
         }

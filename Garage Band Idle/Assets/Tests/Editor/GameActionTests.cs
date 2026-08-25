@@ -132,7 +132,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ResetScope_reaches_what_it_encloses_but_never_a_peer_or_an_ancestor()
         {
             var tree = new TestTree();
-            var tier2Def = TestTree.MakeScope("tier2");
+            var tier2Def = TestTree.MakeTier("tier2");
             tree.Ch1Def.children.Add(tier2Def);
             var root = ScopeState.Build(tree.RootDef);   // rebuild with the sibling
             var tier1 = root.FindInSubtree(tree.Tier1Def);

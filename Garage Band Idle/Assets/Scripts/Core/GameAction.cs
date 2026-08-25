@@ -237,16 +237,16 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class ExecuteRung : GameAction
     {
-        public ScopeDefinition tier;
+        public InteriorDefinition tier;
 
         public override void Execute(GameContext ctx)
         {
             var target = ctx.Scope.FindInSubtree(tier)
                 ?? throw new InvalidOperationException(
                     $"ExecuteRung: scope '{tier.Id}' is not within '{ctx.Scope.ScopeId}'.");
-            if (target.Definition.rung == null)
+            if (tier.rung == null)
                 throw new InvalidOperationException($"ExecuteRung: scope '{tier.Id}' declares no rung.");
-            target.Definition.rung.TryExecute(ctx.Rebase(target));
+            tier.rung.TryExecute(ctx.Rebase(target));
         }
 
         public override void Validate(ValidationContext ctx)
@@ -262,7 +262,7 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.AddError(ValidationCheck.ScopeReach, $"ExecuteRung may only reference a rung declared within the acting scope (12.12); '{target.Id}' is outside '{ctx.ActingScope.Id}'.");
                 return;
             }
-            if (target.rung == null)
+            if (tier.rung == null)
             {
                 ctx.AddError(ValidationCheck.UnresolvedReference, $"ExecuteRung targets scope '{target.Id}', which declares no rung.");
                 return;

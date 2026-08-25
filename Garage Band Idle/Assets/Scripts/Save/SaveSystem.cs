@@ -92,7 +92,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // onto it. Unknown ids from removed content are dropped with a warning;
         // content added since the save starts fresh. False on any structural
         // failure - malformed json, checksum mismatch, unmigratable version.
-        public static bool TryDeserialize(string json, ScopeDefinition rootDefinition, out RootScopeState root)
+        public static bool TryDeserialize(string json, RootDefinition rootDefinition, out RootScopeState root)
         {
             root = null;
             if (rootDefinition == null)
@@ -150,14 +150,12 @@ namespace RidiculousGaming.GarageBandIdle.Save
         {
             if (node.facts != null)
             {
-                var payload = ReadFacts(node.facts, state);
-                FilterToDeclared(payload, state);
-                FilterTreeScopedFacts(payload, state);
-                state.ApplyLoadedFacts(payload);
+                PopulateFacts(node.facts, state);
+                FilterToDeclared(state.facts, state);
+                FilterTreeScopedFacts(state.facts, state);
             }
             if (state is ChapterScopeState chapter)
                 chapter.lastActiveUtc = node.lastActiveUtc;
-            EnsureDeclared(state);
 
             foreach (var childNode in node.children)
             {
@@ -181,19 +179,16 @@ namespace RidiculousGaming.GarageBandIdle.Save
             // state - content added since the save simply starts new.
         }
 
-        // Reads a saved payload against the type the scope's POSITION dictates,
-        // never a type the save names for itself: root facts land on the root,
-        // chapter facts on a chapter, and a tier gets the event-host payload.
-        // Members the target type does not have are dropped by the read itself,
-        // which is what keeps a root file from carrying an event record.
-        private static ScopeFacts ReadFacts(JObject token, ScopeState state)
+        // Fills the payload the node already holds, whose type its own definition
+        // chose - so the save never names a type and a root file cannot carry an
+        // event record, because RootFacts has nowhere to put one. Json.NET reuses
+        // the existing collections, so a declared currency the save omits keeps
+        // the zero seeded when the tree was built.
+        private static void PopulateFacts(JObject token, ScopeState state)
         {
             var serializer = JsonSerializer.Create(MakeSettings());
-            if (state is RootScopeState)
-                return token.ToObject<RootFacts>(serializer);
-            if (state is ChapterScopeState)
-                return token.ToObject<ChapterFacts>(serializer);
-            return token.ToObject<EventHostFacts>(serializer);
+            using var reader = token.CreateReader();
+            serializer.Populate(reader, state.facts);
         }
 
         // Tree-scoped facts carry reach rules, not just id existence (12.3): the
@@ -513,16 +508,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         }
 
         // A currency declared since the save was written gets its zero entries.
-        private static void EnsureDeclared(ScopeState state)
-        {
-            foreach (var currencyId in state.Definition.currencyIds)
-            {
-                if (!state.balances.ContainsKey(currencyId))
-                    state.balances[currencyId] = BigNumber.Zero;
-                if (!state.earnedTotals.ContainsKey(currencyId))
-                    state.earnedTotals[currencyId] = BigNumber.Zero;
-            }
-        }
+
 
         // ---- files: atomic write with backup, load with fallback ----
 
@@ -546,7 +532,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 throw new IOException("SaveSystem: written save failed verification - previous save left untouched.");
             }
 
-            if (FileLoadable(path, root.Definition))
+            if (FileLoadable(path, root.DefinitionAs<RootDefinition>()))
             {
                 File.Replace(tmp, path, BackupPath(path));
             }
@@ -568,7 +554,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // Failed, because "couldn't read your save" must never be answered by
         // starting a new game. (File.Exists returns false for ALL of those, so
         // it decides nothing here.)
-        public static LoadOutcome LoadFromDisk(string path, ScopeDefinition rootDefinition, out RootScopeState root)
+        public static LoadOutcome LoadFromDisk(string path, RootDefinition rootDefinition, out RootScopeState root)
         {
             root = null;
 
@@ -615,7 +601,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
         }
 
-        private static bool TryLoadFile(string path, ScopeDefinition rootDefinition, out RootScopeState root)
+        private static bool TryLoadFile(string path, RootDefinition rootDefinition, out RootScopeState root)
         {
             root = null;
             return TryRead(path, out var json) == ReadResult.Ok && TryDeserialize(json, rootDefinition, out root);
@@ -625,7 +611,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // checksum-valid but unusable primary (newer schema, missing migration,
         // wrong root, malformed payload) must never rotate over the known-good
         // backup. Verifying a bad file emits its diagnostics - honest tracing.
-        private static bool FileLoadable(string path, ScopeDefinition rootDefinition) =>
+        private static bool FileLoadable(string path, RootDefinition rootDefinition) =>
             TryLoadFile(path, rootDefinition, out _);
 
         // Structural check only - parse and checksum, no tree application. Used

@@ -24,7 +24,6 @@ namespace RidiculousGaming.GarageBandIdle
         UnresolvedReference,    // a referenced id resolves to nothing
         NullEntry,              // a null slot in an authored list, or a required operand
         InertOperand,           // an operand authored where the shape's own behavior never reads it
-        RungOnRoot,
         ScopeReach,             // ResetScope / ExecuteRung / modifier-grant reach rules
         ChainReach,             // ordinary reads and writes address only the acting chain
         EffectReach,            // an effect sits where its target's outward walk visits it
@@ -824,20 +823,19 @@ namespace RidiculousGaming.GarageBandIdle
             // ---- container walk: every rung and trigger, in tree order ----
             foreach (var scope in treeScopes)
             {
-                if (scope.rung != null)
+                // Only an interior scope has a rung at all - the root has no such
+                // field, so "no rung on the root" needs no check here.
+                if (scope is InteriorDefinition interior && interior.rung != null)
                 {
-                    if (scope == root)
-                        report.Add(ValidationSeverity.Error, ValidationCheck.RungOnRoot,
-                            $"the root scope '{root.Id}' declares a rung - rungs live on tiers and chapters (12.12).");
                     ctx.EnterContainer(scope, ValidationContext.RungKey(scope.Id));
-                    if (scope.rung.offerCondition != null)
+                    if (interior.rung.offerCondition != null)
                     {
                         // A null offer condition is legal authoring: it never
                         // offers (fail-closed), so only a present one validates.
                         ctx.SetSite($"scope '{scope.Id}' rung offer");
-                        scope.rung.offerCondition.Validate(ctx);
+                        interior.rung.offerCondition.Validate(ctx);
                     }
-                    ValidateActionList(ctx, scope.rung.actions, $"scope '{scope.Id}' rung");
+                    ValidateActionList(ctx, interior.rung.actions, $"scope '{scope.Id}' rung");
                 }
 
                 foreach (var trigger in scope.triggers)
@@ -1165,12 +1163,12 @@ namespace RidiculousGaming.GarageBandIdle
 
                 foreach (var scope in ctx.ScopesInSubtree(reset.Target))
                 {
-                    if (scope.rung == null)
+                    if (scope is not InteriorDefinition interior || interior.rung == null)
                         continue;
                     var rungKey = ValidationContext.RungKey(scope.Id);
                     if (rungKey == reset.ContainerKey)
                         continue;
-                    if (!scope.rung.actions.Any(a => a is AddCurrency))
+                    if (!interior.rung.actions.Any(a => a is AddCurrency))
                         continue;
                     if (!reached.Contains(rungKey))
                         ctx.AddWarning(ValidationCheck.StrandedValue,

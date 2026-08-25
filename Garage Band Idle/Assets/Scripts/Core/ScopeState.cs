@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RidiculousGaming.GarageBandIdle.Economy;
 
 namespace RidiculousGaming.GarageBandIdle
 {
@@ -60,8 +61,10 @@ namespace RidiculousGaming.GarageBandIdle
     // REPLACES this object wholesale, which is what makes clearing complete by
     // construction (design doc 12.3): a field added here next month is cleared
     // because it is here - no clear method to forget to update.
+    // Abstract, like every payload above a leaf: a scope class names the
+    // concrete type it wants, so nothing can hold a payload by default.
     [Serializable]
-    public class ScopeFacts
+    public abstract class ScopeFacts
     {
         public Dictionary<string, BigNumber> balances = new();
         public Dictionary<string, BigNumber> earnedTotals = new();     // per currency, same home as its balance
@@ -84,10 +87,20 @@ namespace RidiculousGaming.GarageBandIdle
     // At most one per host (design doc 12.8): a field rather than a list, so a
     // second record cannot exist instead of being something the save filter has
     // to police - picking a survivor between two is a choice nothing justifies.
+    // Never a payload itself - only the base the interior leaves derive, so
+    // "can host an event" is a fact of the type rather than a question asked
+    // of a scope that might answer no. The parallel of InteriorDefinition.
     [Serializable]
-    public class EventHostFacts : ScopeFacts
+    public abstract class InteriorFacts : ScopeFacts
     {
         public ActiveEvent activeEvent;
+    }
+
+    // A tier's payload. Nothing beyond what hosting brings; it exists because
+    // a tier names its own concrete type like every other scope class does.
+    [Serializable]
+    public class TierFacts : InteriorFacts
+    {
     }
 
     // Facts only the root holds. A separate payload rather than fields every
@@ -103,7 +116,7 @@ namespace RidiculousGaming.GarageBandIdle
     // Facts only a chapter holds. A chapter can host an event, so it builds on
     // the host payload rather than the common base.
     [Serializable]
-    public class ChapterFacts : EventHostFacts
+    public class ChapterFacts : InteriorFacts
     {
         public PendingClaim pendingClaim;
     }
@@ -112,7 +125,7 @@ namespace RidiculousGaming.GarageBandIdle
     // doc 12.3/12.10). The COMPLETE mutable state is the facts payload; a
     // chapter adds lastActiveUtc OUTSIDE its payload on purpose - it is the one
     // field a reset re-stamps rather than clears (a fresh chapter owes no idle).
-    public class ScopeState
+    public abstract class ScopeState
     {
         public readonly ScopeDefinition Definition;
         public readonly ScopeState Parent;
@@ -135,53 +148,38 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, int> fillCounts => facts.fillCounts;
         public Dictionary<string, HashSet<string>> activeBars => facts.activeBars;
         public Dictionary<string, int> modifierStacks => facts.modifierStacks;
-        // Null on the root, which cannot host an event. Every caller reaches a
-        // host through the outward declaration walk, and a root declaration is
-        // refused at load, so a null here is a content or caller fault rather
-        // than a branch anything takes.
-        public EventHostFacts eventHost => facts as EventHostFacts;
         public List<TimedBuff> timedBuffs => facts.timedBuffs;
         public List<SongEntry> songs => facts.songs;
 
         public string ScopeId => Definition.Id;
 
-        // A tier's payload. Allocated here rather than by a field initializer so
-        // every subclass hands in its own instead. A tier can host an event.
-        private ScopeState(ScopeDefinition definition, ScopeState parent)
-            : this(definition, parent, new EventHostFacts()) { }
+        // The definition as the kind this node was built from. Only the save's
+        // write path needs it: everything else reads Definition base-typed,
+        // because a chain walk crosses all three kinds in one loop.
+        public T DefinitionAs<T>() where T : ScopeDefinition => (T)Definition;
 
+        // Stores references. Nothing else happens during construction, so no
+        // virtual member runs before the object it belongs to exists.
         protected ScopeState(ScopeDefinition definition, ScopeState parent, ScopeFacts payload)
         {
             Definition = definition;
             Parent = parent;
             facts = payload;
-            InitializeDeclared();
         }
 
-        // Installs a loaded payload. The save reads each node against the type
-        // its tree position dictates; this refuses anything else rather than
-        // trusting the caller got it right.
-        internal void ApplyLoadedFacts(ScopeFacts payload)
-        {
-            if (payload == null)
-                throw new ArgumentNullException(nameof(payload));
-            if (payload.GetType() != facts.GetType())
-                throw new InvalidOperationException(
-                    $"Scope '{ScopeId}' holds {facts.GetType().Name}; a {payload.GetType().Name} payload cannot be applied to it.");
-            facts = payload;
-        }
+        // The payload a reset installs, named by the type argument the class
+        // supplied. Never called from a constructor - the payload is built as a
+        // constructor argument, so no virtual dispatch happens before the object
+        // exists.
+        protected abstract ScopeFacts NewFacts();
 
-        // The payload a reset installs. Never called from a constructor - each
-        // class's constructor allocates its own, so no virtual dispatch happens
-        // before the object exists.
-        protected virtual ScopeFacts NewFacts() => new EventHostFacts();
-
-        // Builds the state tree the definition tree describes. The public entry
-        // builds a whole tree from its root, so depth decides each node's class
-        // instead of a caller passing a parent.
-        public static RootScopeState Build(ScopeDefinition rootDefinition)
+        // Builds the state tree the definition tree describes. Each definition
+        // makes its own node, so a scope's kind is what it was authored as -
+        // there is no depth test here inferring one.
+        public static RootScopeState Build(RootDefinition rootDefinition)
         {
-            var root = new RootScopeState(rootDefinition);
+            var root = rootDefinition.CreateRoot();
+            root.InitializeDeclared();
             foreach (var chapterDefinition in rootDefinition.children)
                 BuildChild(chapterDefinition, root);
             return root;
@@ -189,19 +187,116 @@ namespace RidiculousGaming.GarageBandIdle
 
         private static ScopeState BuildChild(ScopeDefinition definition, ScopeState parent)
         {
-            // Chapters are root's children (12.3); everything deeper is a tier.
-            var state = parent.Parent == null
-                ? new ChapterScopeState(definition, parent)
-                : new ScopeState(definition, parent);
+            // Seeding is its own step, after the node exists: the declared
+            // facts a subclass adds are read through a virtual, and nothing
+            // virtual can run inside a constructor.
+            var state = definition.CreateState(parent);
+            state.InitializeDeclared();
             parent.Children.Add(state);
             foreach (var childDefinition in definition.children)
                 BuildChild(childDefinition, state);
             return state;
         }
 
+        // This scope's own factor for one number (design doc 12.6). The caller
+        // multiplies what each scope on the chain returns and never learns what
+        // a factor is made of, so a kind of scope that has a source the others
+        // do not adds it here rather than in the walk.
+        internal virtual BigNumber MultiplierFor(GameContext origin, Definition owner,
+                                                 CurrencyDefinition currency, string stat)
+        {
+            var product = BigNumber.One;
+
+            // Purchased upgrades, read through the DECLARATION list: the order
+            // is the authored one, and a latch for an upgrade this scope never
+            // declared cannot contribute.
+            foreach (var upgrade in Definition.upgrades)
+            {
+                if (upgrade == null || !purchasedUpgrades.Contains(upgrade.Id))
+                    continue;
+                foreach (var effect in upgrade.effects)
+                    if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
+                        product *= effect.multiplier;
+            }
+
+            // Granted modifier stacks: the stored count scales the effect by the
+            // definition's own stacking kind (design doc 12.5). The stack is a
+            // count here; the definition resolves OUTWARD, since a chapter's
+            // modifier can be granted anywhere inside it (design doc 8.2/12.5).
+            foreach (var pair in modifierStacks)
+            {
+                var modifier = Producer.FindModifier(this, pair.Key);
+                foreach (var effect in modifier.effects)
+                    if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
+                        product *= Producer.Stacked(effect.multiplier, pair.Value, modifier.stacking);
+            }
+
+            // Repeating-bar cascades: a completed fill applies the carrying
+            // entry's effect again, scaled by the entry's own growth kind
+            // (design doc 12.6/12.7). Read through the DECLARATION list, like
+            // upgrades: a stray fillCount for a bar this scope never declared
+            // cannot contribute.
+            foreach (var group in Definition.barGroups)
+            {
+                if (group == null)
+                    continue;
+                foreach (var bar in group.bars)
+                {
+                    if (bar == null || !fillCounts.TryGetValue(bar.Id, out var fills) || fills <= 0)
+                        continue;
+                    foreach (var entry in bar.perFill)
+                    {
+                        if (entry == null)
+                            continue;
+                        if (Producer.Matches(entry.effect.target, entry.effect.currencyId, entry.effect.stat, owner, currency, stat))
+                            product *= Producer.Grown(entry.effect.multiplier, fills, entry.growth);
+                    }
+                }
+            }
+
+            // Career effects declared here, computed against the ORIGIN context
+            // rather than this scope's.
+            foreach (var career in Definition.careerEffects)
+            {
+                if (career == null || career.formula == null)
+                    continue;
+                if (Producer.Matches(career.target, career.currencyId, career.stat, owner, currency, stat))
+                    product *= career.formula.Compute(origin);
+            }
+
+            return product;
+        }
+
+        // The rate this scope's own sources pay into one currency, before the
+        // currency stage. Asked of every node in a subtree walk, same contract
+        // as MultiplierFor: the caller sums, the scope decides what it has.
+        internal virtual BigNumber SourceTermsFor(DateTime nowUtc, CurrencyDefinition currency, string stat)
+        {
+            var declaringCtx = new GameContext(this, nowUtc);
+            var sum = BigNumber.Zero;
+
+            foreach (var producer in Definition.producers)
+            {
+                if (producer == null)
+                    continue;
+                sum += Producer.SourceTerm(declaringCtx, producer, producer.produces, 1, currency, stat);
+            }
+            foreach (var generator in Definition.generators)
+            {
+                if (generator == null)
+                    continue;
+                if (!generatorCounts.TryGetValue(generator.Id, out var owned) || owned <= 0)
+                    continue;
+                sum += Producer.SourceTerm(declaringCtx, generator, generator.produces, owned, currency, stat);
+            }
+            return sum;
+        }
+
         // Declared currencies get their balance and earned-total entries at the
-        // home scope; a chain walk finds the holder by key presence.
-        private void InitializeDeclared()
+        // home scope; a chain walk finds the holder by key presence. Virtual
+        // because Clear re-runs it: a derived payload with its own keys seeds
+        // them here or a reset leaves them missing.
+        internal virtual void InitializeDeclared()
         {
             foreach (var currencyId in Definition.currencyIds)
             {
@@ -254,28 +349,38 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
-    // The one scope nothing resets, and the only holder of career facts.
-    public class RootScopeState : ScopeState
+    // A scope that has named its payload type. The type argument IS the naming,
+    // so allocation, reset and typed access all follow from it and none of them
+    // can disagree. The definition needs no type parameter: each leaf's own
+    // constructor types it, which is where a mismatched pair would be caught.
+    public abstract class ScopeState<TFacts> : ScopeState where TFacts : ScopeFacts, new()
     {
-        internal RootScopeState(ScopeDefinition definition)
-            : base(definition, null, new RootFacts()) { }
+        protected ScopeState(ScopeDefinition definition, ScopeState parent)
+            : base(definition, parent, new TFacts()) { }
 
-        public RootFacts Facts => (RootFacts)facts;
+        // The one cast in the hierarchy. It has to be a cast rather than a typed
+        // field because reset REPLACES the payload.
+        public TFacts Facts => (TFacts)facts;
+
+        protected override ScopeFacts NewFacts() => new TFacts();
+    }
+
+    // The one scope nothing resets, and the only holder of career facts.
+    public class RootScopeState : ScopeState<RootFacts>
+    {
+        internal RootScopeState(RootDefinition definition)
+            : base(definition, null) { }
 
         public Dictionary<string, int> roadieAllocation => Facts.roadieAllocation;
         public HashSet<string> entitlements => Facts.entitlements;
-
-        protected override ScopeFacts NewFacts() => new RootFacts();
     }
 
     // Root's direct children. The idle claim and lastActiveUtc live here
     // because idle is a per-chapter concept (design doc 12.9).
-    public class ChapterScopeState : ScopeState
+    public class ChapterScopeState : ScopeState<ChapterFacts>
     {
-        internal ChapterScopeState(ScopeDefinition definition, ScopeState parent)
-            : base(definition, parent, new ChapterFacts()) { }
-
-        public ChapterFacts Facts => (ChapterFacts)facts;
+        internal ChapterScopeState(ChapterDefinition definition, ScopeState parent)
+            : base(definition, parent) { }
 
         public DateTime lastActiveUtc;
 
@@ -285,8 +390,6 @@ namespace RidiculousGaming.GarageBandIdle
             set => Facts.pendingClaim = value;
         }
 
-        protected override ScopeFacts NewFacts() => new ChapterFacts();
-
         // A reset re-stamps the idle clock rather than clearing it: a fresh
         // chapter owes no idle (design doc 12.3).
         public override void Clear(DateTime nowUtc)
@@ -294,5 +397,13 @@ namespace RidiculousGaming.GarageBandIdle
             base.Clear(nowUtc);
             lastActiveUtc = nowUtc;
         }
+    }
+
+    // Everything below a chapter, at any depth - the tree nests freely, and
+    // one class covers every level because TierDefinition does.
+    public class TierScopeState : ScopeState<TierFacts>
+    {
+        internal TierScopeState(TierDefinition definition, ScopeState parent)
+            : base(definition, parent) { }
     }
 }

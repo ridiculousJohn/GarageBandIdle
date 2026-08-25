@@ -704,8 +704,8 @@ A **scope** is a plain state container. Content declares, per scope: its currenc
 groups (which own their bars), **producers**, generators, upgrades, modifiers, career effects,
 triggers (§12.5), and (for tiers) its rung. **Every content family is declared somewhere** — that is
 what makes a reference resolvable by walking outward, and it is why there is no catalogue to look
-anything up in. Events join the list when §12.8 lands, declared on the scope that hosts them, the
-same shape modifiers use: the definition is placed, the record is a fact of the host. Songs are
+anything up in. Events join when §12.8 lands, declared on `InteriorDefinition` rather than the base,
+since root cannot host one: the definition is placed, the record is a fact of the host. Songs are
 undecided until Chapter 6 (§7) — a `SongDefinition` may not exist at all, since a song is written at
 runtime rather than authored. A producer's `produces`
 entries are live exactly while its declaring scope belongs to the foreground chapter's **live
@@ -731,7 +731,7 @@ class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these
     List<SongEntry>               songs;            // tier = the run's Catalog; root = Discography (§7)
 }
 
-class EventHostFacts : ScopeFacts   // a tier's or chapter's payload: scopes that can host an event
+class InteriorFacts : ScopeFacts     // every scope inside another: chapters and tiers
 {
     ActiveEvent                   activeEvent;      // at most one per host (§12.8): a field, not a list
 }
@@ -742,18 +742,29 @@ class RootFacts : ScopeFacts        // the root scope's payload, and no other
     HashSet<string>               entitlements;     // store-written (backstage_pass)
 }
 
-class ChapterFacts : EventHostFacts // a chapter's payload
+class ChapterFacts : InteriorFacts  // a chapter's payload
 {
     PendingClaim                  pendingClaim;     // the idle dialog's claim (§9)
 }
+
+class TierFacts : InteriorFacts     // a tier's payload; nothing beyond what hosting brings
+{
+}
 ```
 
-A scope that cannot use a fact does not carry it: the payload type follows the scope's position in
-the tree (root, its children, everything deeper), so a root fact on a tier is unrepresentable rather
-than filtered at load - and the exclusion runs the other way too, since root cannot host an event
-and so does not carry the record. `lastActiveUtc` (§12.9) is a chapter field OUTSIDE the payload — the one
-thing a reset re-stamps instead of clearing. `ScopeState.Build` allocates each node's payload, and a
-reset installs a fresh one of the same type.
+`ScopeFacts` and `InteriorFacts` are abstract - a payload is always one of the three leaf types, so
+no scope holds a payload by default.
+
+A scope that cannot use a fact does not carry it. **A scope is authored as one of three kinds** -
+`RootDefinition`, `ChapterDefinition`, `TierDefinition`, with `InteriorDefinition` the abstract
+middle the last two share - and the definition builds its own state node, so nothing infers a
+scope's kind from where it sits in the tree. Each state class names one payload type, which makes a
+root fact on a tier unrepresentable rather than filtered at load, and the exclusion runs the other
+way too: root cannot host an event and so does not carry the record. The rule the placement follows:
+**if a kind of scope cannot have a feature, its definition declares no data for that feature** - the
+rung lives on `InteriorDefinition`, not on the base with a validation check behind it.
+`lastActiveUtc` (§12.9) is a chapter field OUTSIDE the payload — the one thing a reset re-stamps
+instead of clearing. A reset installs a fresh payload of the same type.
 
 The tree: **root** (Records, Roadies, entitlements, completion flags, Discography, any counters a
 chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique along a CHAIN** — a read walks
@@ -1264,7 +1275,8 @@ Assets/Scripts/
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root scope, and with it the whole graph; runs the §12.12 pass
-    ScopeDefinition.cs / ScopeState.cs
+    ScopeDefinition.cs      // the base, InteriorDefinition, and the three authored kinds
+    ScopeState.cs           // the base, ScopeState<TFacts>, the three state classes and their payloads
     Condition.cs  Action.cs  PayoutFormula.cs  Trigger.cs   // the class families (+ kind classes)
     Effect.cs               // the flat struct
     GameContext.cs          // read access for Evaluate/Execute: state chain + defs
@@ -1277,7 +1289,6 @@ Assets/Scripts/
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply)
     BarDefinition.cs  BarGroupDefinition.cs  BarSystem.cs
   Loop/
-    ChapterDefinition.cs  TierDefinition.cs   // rungs declared here
     ChapterManager.cs      // forward-only advance, reacting to root completion flags
   Events/
     EventDefinition.cs  EventSystem.cs

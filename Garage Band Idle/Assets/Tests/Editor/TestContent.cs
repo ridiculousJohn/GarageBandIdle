@@ -15,12 +15,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     {
         public readonly DateTime Now = new DateTime(2026, 8, 18, 12, 0, 0, DateTimeKind.Utc);
 
-        public readonly ScopeDefinition RootDef;
-        public readonly ScopeDefinition Ch1Def;
-        public readonly ScopeDefinition Tier1Def;
+        public readonly RootDefinition RootDef;
+        public readonly ChapterDefinition Ch1Def;
+        public readonly TierDefinition Tier1Def;
         public readonly RootScopeState Root;
         public readonly ChapterScopeState Ch1;
-        public readonly ScopeState Tier1;
+        public readonly TierScopeState Tier1;
 
         public readonly CurrencyDefinition Cash;
         public readonly CurrencyDefinition Fans;
@@ -48,7 +48,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         public TestTree()
         {
-            Tier1Def = MakeScope("tier1");
+            Tier1Def = MakeTier("tier1");
             Cash = DeclareCurrency(Tier1Def, "cash", "income");
             Fans = DeclareCurrency(Tier1Def, "fans");
             Rehearsal = DeclareCurrency(Tier1Def, "rehearsal");
@@ -56,12 +56,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Tier1Trigger = MakeDefinition<TriggerDefinition>("tier1_trigger");
             Tier1Def.triggers.Add(Tier1Trigger);
 
-            Ch1Def = MakeScope("ch1");
+            Ch1Def = MakeChapter("ch1");
             Ch1Records = DeclareCurrency(Ch1Def, "ch1_records");
             Ch1Def.declaredFlags.AddRange(new[] { "album", "gj1_done" });
             Ch1Def.children.Add(Tier1Def);
 
-            RootDef = MakeScope("root");
+            RootDef = MakeRoot("root");
             Records = DeclareCurrency(RootDef, "records");
             Roadies = DeclareCurrency(RootDef, "roadies");
             RootDef.declaredFlags.Add("ch1_complete");
@@ -160,7 +160,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Root = ScopeState.Build(RootDef);
             Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);
-            Tier1 = Root.FindInSubtree(Tier1Def);
+            Tier1 = (TierScopeState)Root.FindInSubtree(Tier1Def);
         }
 
         // One cover and the modifier its completion grants. Both are filed at
@@ -185,12 +185,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         public GameContext Ctx(ScopeState scope) => new GameContext(scope, Now);
 
-        public static ScopeDefinition MakeScope(string id)
+        // A scope is authored as one of three kinds, so a fixture names the kind
+        // it wants rather than making a shapeless one and hoping depth sorts it.
+        public static T MakeScope<T>(string id) where T : ScopeDefinition
         {
-            var def = ScriptableObject.CreateInstance<ScopeDefinition>();
+            var def = ScriptableObject.CreateInstance<T>();
             def.EditorInit(id);
             return def;
         }
+
+        public static RootDefinition MakeRoot(string id) => MakeScope<RootDefinition>(id);
+        public static ChapterDefinition MakeChapter(string id) => MakeScope<ChapterDefinition>(id);
+        public static TierDefinition MakeTier(string id) => MakeScope<TierDefinition>(id);
 
         // Declares a currency at its home and hands back the asset, so the
         // fixture registers the same instance the scope references.

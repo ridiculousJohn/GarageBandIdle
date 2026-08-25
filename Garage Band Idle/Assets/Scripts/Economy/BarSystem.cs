@@ -281,7 +281,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // The foreground-subtree guard layers on in step 7.
         public static bool SetActiveBars(GameContext ctx, BarGroupDefinition group, IReadOnlyList<BarDefinition> bars)
         {
-            var declaring = Producer.DeclaringScope(ctx.Scope, group, s => s.barGroups);
+            var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, group);
             var declaringCtx = ctx.Rebase(declaring);
             if (bars == null)
                 return false;

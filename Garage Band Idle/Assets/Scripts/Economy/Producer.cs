@@ -31,67 +31,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             if (owner == null)
                 return BigNumber.One;
 
+            // Each scope on the chain composes its own factor however it likes;
+            // this only multiplies what comes back.
             var product = BigNumber.One;
             for (var node = origin.Scope; node != null; node = node.Parent)
-            {
-                // Purchased upgrades, read through the DECLARATION list: the
-                // order is the authored one, and a latch for an upgrade this
-                // scope never declared cannot contribute.
-                foreach (var upgrade in node.Definition.upgrades)
-                {
-                    if (upgrade == null || !node.purchasedUpgrades.Contains(upgrade.Id))
-                        continue;
-                    foreach (var effect in upgrade.effects)
-                        if (Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                            product *= effect.multiplier;
-                }
-
-                // Granted modifier stacks: the stored count scales the effect by
-                // the definition's own stacking kind (design doc 12.5).
-                foreach (var pair in node.modifierStacks)
-                {
-                    // The stack is a count at this scope; the definition is
-                    // resolved OUTWARD from here, since a chapter's modifier can
-                    // be granted anywhere inside it (design doc 8.2/12.5).
-                    var modifier = FindModifier(node, pair.Key);
-                    foreach (var effect in modifier.effects)
-                        if (Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                            product *= Stacked(effect.multiplier, pair.Value, modifier.stacking);
-                }
-
-                // Repeating-bar cascades: a completed fill applies the
-                // carrying entry's effect again, scaled by the entry's own
-                // growth kind (design doc 12.6/12.7). Read through the
-                // DECLARATION list, like upgrades: a stray fillCount for a bar
-                // this scope never declared cannot contribute.
-                foreach (var group in node.Definition.barGroups)
-                {
-                    if (group == null)
-                        continue;
-                    foreach (var bar in group.bars)
-                    {
-                        if (bar == null || !node.fillCounts.TryGetValue(bar.Id, out var fills) || fills <= 0)
-                            continue;
-                        foreach (var entry in bar.perFill)
-                        {
-                            if (entry == null)
-                                continue;
-                            if (Matches(entry.effect.target, entry.effect.currencyId, entry.effect.stat, owner, currency, stat))
-                                product *= Grown(entry.effect.multiplier, fills, entry.growth);
-                        }
-                    }
-                }
-
-                // Career effects declared here, computed against the ORIGIN
-                // context rather than this scope's.
-                foreach (var career in node.Definition.careerEffects)
-                {
-                    if (career == null || career.formula == null)
-                        continue;
-                    if (Matches(career.target, career.currencyId, career.stat, owner, currency, stat))
-                        product *= career.formula.Compute(origin);
-                }
-            }
+                product *= node.MultiplierFor(origin, owner, currency, stat);
             return product;
         }
 
@@ -107,7 +51,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // one per currency, and a currency stays out by not carrying the tag -
         // which is how 8.2 already states the fans rule ("the fan rate must
         // never carry a roadie-targeted tag").
-        private static bool Matches(string target, string effectCurrencyId, string effectStat,
+        internal static bool Matches(string target, string effectCurrencyId, string effectStat,
                                     Definition owner, CurrencyDefinition currency, string stat)
         {
             if (string.IsNullOrEmpty(target))
@@ -147,7 +91,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // Granted stacks add the one case a cascade has no room for: Replace
         // holds a re-grant at count 1 rather than scaling it (design doc 12.5).
-        private static BigNumber Stacked(BigNumber multiplier, int count, StackingKind stacking)
+        internal static BigNumber Stacked(BigNumber multiplier, int count, StackingKind stacking)
         {
             switch (stacking)
             {
@@ -165,7 +109,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // One source's term: the sum of its matching entries whose conditions
         // hold, times the stored count that scales it (1 for a producer), times
         // the stage-1 product. Conditions are judged in the declaring scope.
-        private static BigNumber SourceTerm(GameContext declaringCtx, Definition source,
+        internal static BigNumber SourceTerm(GameContext declaringCtx, Definition source,
                                             List<ProducesEntry> entries, int countScale,
                                             CurrencyDefinition currency, string stat)
         {
@@ -205,21 +149,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
             void Accumulate(ScopeState node)
             {
-                var declaringCtx = new GameContext(node, nowUtc);
-                foreach (var producer in node.Definition.producers)
-                {
-                    if (producer == null)
-                        continue;
-                    Add(node, SourceTerm(declaringCtx, producer, producer.produces, 1, currency, Stat.Rate));
-                }
-                foreach (var generator in node.Definition.generators)
-                {
-                    if (generator == null)
-                        continue;
-                    if (!node.generatorCounts.TryGetValue(generator.Id, out var owned) || owned <= 0)
-                        continue;
-                    Add(node, SourceTerm(declaringCtx, generator, generator.produces, owned, currency, Stat.Rate));
-                }
+                Add(node, node.SourceTermsFor(nowUtc, currency, Stat.Rate));
                 foreach (var child in node.Children)
                     Accumulate(child);
             }
@@ -243,7 +173,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // condition mid-fire (design doc 12.2).
         public static void FireProducer(GameContext ctx, ProducerDefinition producer)
         {
-            var declaring = DeclaringScope(ctx.Scope, producer, s => s.producers);
+            var declaring = DeclaringScope<ScopeState>(ctx.Scope, producer);
             var declaringCtx = ctx.Rebase(declaring);
 
             // Every currency this firing pays, in authored order, resolved
@@ -280,7 +210,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // bug, not a branch. Matching the id instead would answer with a
         // same-named currency from another chapter.
         internal static ScopeState FindCurrencyHome(ScopeState from, CurrencyDefinition currency) =>
-            DeclaringScope(from, currency, d => d.declaredCurrencies);
+            DeclaringScope<ScopeState>(from, currency);
 
         // A granted stack names its modifier by id, because the save is ids;
         // the definition is found by walking outward to the scope declaring it,
@@ -299,18 +229,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // scope is the one whose list holds the reference, found by walking
         // OUTWARD from the acting scope. Anything off that chain is unreachable
         // at runtime and refused at load, so a miss is a bug.
-        internal static ScopeState DeclaringScope<T>(ScopeState from, T definition,
-                                                     Func<ScopeDefinition, List<T>> lists) where T : Definition
+        // The type parameter is the OTHER half of the question: an event is
+        // declared by a scope that can host one, so the search says so and root
+        // is not a candidate rather than being skipped by a check.
+        internal static T DeclaringScope<T>(ScopeState from, Definition definition) where T : ScopeState
         {
             for (var node = from; node != null; node = node.Parent)
-            {
-                var list = lists(node.Definition);
-                for (var i = 0; i < list.Count; i++)
-                    if (list[i] == definition)
-                        return node;
-            }
+                if (node is T typed && typed.Definition.Declares(definition))
+                    return typed;
             throw new InvalidOperationException(
-                $"No scope on the chain from '{from.ScopeId}' declares '{definition.Id}'.");
+                $"No {typeof(T).Name} on the chain from '{from.ScopeId}' declares '{definition.Id}'.");
         }
     }
 }

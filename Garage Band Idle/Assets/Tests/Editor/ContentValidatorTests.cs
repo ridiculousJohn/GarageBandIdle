@@ -10,10 +10,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // every other test breaks exactly one thing and asserts the finding.
     public class ValidatorFixture
     {
-        public readonly ScopeDefinition Root;
-        public readonly ScopeDefinition Ch1;
-        public readonly ScopeDefinition Tier1;
-        public readonly ScopeDefinition Tier1b;
+        public readonly RootDefinition Root;
+        public readonly ChapterDefinition Ch1;
+        public readonly TierDefinition Tier1;
+        public readonly TierDefinition Tier1b;
         public readonly Rung Album;
         public readonly Rung Capstone;
         public readonly TriggerDefinition Trigger;
@@ -33,10 +33,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         public ValidatorFixture()
         {
-            Root = TestTree.MakeScope("root");
-            Ch1 = TestTree.MakeScope("ch1");
-            Tier1 = TestTree.MakeScope("tier1");
-            Tier1b = TestTree.MakeScope("tier1b");
+            Root = TestTree.MakeRoot("root");
+            Ch1 = TestTree.MakeChapter("ch1");
+            Tier1 = TestTree.MakeTier("tier1");
+            Tier1b = TestTree.MakeTier("tier1b");
             Root.children.Add(Ch1);
             Ch1.children.Add(Tier1);
             Ch1.children.Add(Tier1b);
@@ -149,14 +149,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // question is asked rather than from a tree-wide map.
         public class Sibling
         {
-            public ScopeDefinition Ch2;
-            public ScopeDefinition Tier2;
+            public ChapterDefinition Ch2;
+            public TierDefinition Tier2;
             public CurrencyDefinition Cash;   // tier1's id, a different asset
         }
 
         public Sibling AddSiblingChapter()
         {
-            var sibling = new Sibling { Ch2 = TestTree.MakeScope("ch2"), Tier2 = TestTree.MakeScope("tier2") };
+            var sibling = new Sibling { Ch2 = TestTree.MakeChapter("ch2"), Tier2 = TestTree.MakeTier("tier2") };
             Root.children.Add(sibling.Ch2);
             sibling.Ch2.children.Add(sibling.Tier2);
             sibling.Cash = TestTree.DeclareCurrency(sibling.Tier2, "cash", "income");
@@ -261,14 +261,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "declaredCurrencies[");
         }
 
-        [Test]
-        public void RungOnRoot_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Root.rung = new Rung();
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.RungOnRoot, "'root'");
-        }
-
         // ---- ResetScope reach ----
 
         [Test]
@@ -291,8 +283,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ResetScope_UnrelatedSubtree_Error()
         {
             var f = new ValidatorFixture();
-            var ch2 = TestTree.MakeScope("ch2");
-            var tier2 = TestTree.MakeScope("tier2");
+            var ch2 = TestTree.MakeChapter("ch2");
+            var tier2 = TestTree.MakeTier("tier2");
             ch2.children.Add(tier2);
             f.Root.children.Add(ch2);
             ((ResetScope)f.Album.actions[2]).scope = tier2;
@@ -520,7 +512,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void StrandedValue_NestedLadder_TransitiveRung_NoFindings()
         {
             var f = new ValidatorFixture();
-            var inner = TestTree.MakeScope("tier_inner");
+            var inner = TestTree.MakeTier("tier_inner");
             inner.rung = new Rung
             {
                 offerCondition = new CurrencyAtLeast { currency = f.Fans, threshold = 1 },

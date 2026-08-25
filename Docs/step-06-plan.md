@@ -11,26 +11,58 @@ the sweep latches event goals before it runs any trigger action - so they ship t
 
 Nothing new is built where one of these already answers the question:
 
-- **Host lookup**: `Producer.DeclaringScope(from, def, s => s.events)`. Declaration is ownership, so
-  the host IS the declaring scope, found by the same outward walk generators, upgrades and bar
-  groups already get. The definition carries no host field (6.1, 12.8).
+- **Host lookup**: declaration is ownership, so the host IS the declaring scope, found by the same
+  outward walk generators, upgrades and bar groups already get. The definition carries no host
+  field (6.1, 12.8). One thing is NOT free here - see "Where events are declared" below.
 - **Entry-point shape**: `Purchasing`'s `Can*` / `Do*` / `Try*` triple, fail-closed, content faults
   throwing from either path.
 - **Host context**: `GameContext.Rebase(host)` - what `ExecuteRung` already does.
 - **Handicap arithmetic**: `Producer.GetMultiplier`'s per-scope gather. Handicaps are one more list
-  read at each scope on the walk, beside the upgrade and modifier reads.
+  read at each scope on the walk, beside the upgrade and modifier reads - subject to the same
+  question below about which class holds that list.
 - **Mid-list reset detection**: `BarSystem`'s reference-identity check (`facts == scope.facts`). A
   reset is a payload swap, so identity is the whole test.
-- **Record storage**: `ActiveEvent` landed in step 1. The record moves to a new `EventHostFacts`
-  payload (tiers and chapters) as a single field, so "at most one" and "never on root" are both
-  unrepresentable rather than enforced - load cannot deliver two or place one at root, and the
-  filter needs no rule for either.
+- **Record storage**: `ActiveEvent` and `InteriorFacts` are both in the tree. The record is a single
+  field on the payload chapters and tiers hold and root does not, so "at most one" and "never on
+  root" are unrepresentable rather than enforced - load cannot deliver two or place one at root,
+  and the filter needs no rule for either.
 - **Latch storage**: `firedTriggers` and `TriggerDefinition` landed in step 1. The sweep is the
   missing consumer, not new state.
 - **Validation**: the per-family branch in the scope loop, `ValidateActionList`, `ValidateEffect`,
   and the existing cycle and reset ledgers. Events add a branch, not machinery.
 - **Save**: `FilterToDeclared`'s existing per-family filter, extended the way steps 4 and 5
   extended it.
+
+## Where events are declared
+
+`events` goes on `InteriorDefinition` beside `rung`, because root cannot host one. No special walk
+is needed: the three outward walks stopped reading lists off a base-typed loop variable and now ask
+each scope for what it has.
+
+```csharp
+// ScopeDefinition answers for its own lists; InteriorDefinition adds events.
+internal virtual bool Declares(Definition definition)
+
+// Each scope composes its own factor; the interior state folds in handicaps.
+internal virtual BigNumber MultiplierFor(GameContext origin, Definition owner,
+                                         CurrencyDefinition currency, string stat)
+```
+
+`Producer.GetMultiplier` walks and multiplies what `MultiplierFor` returns. The declaration walk is
+typed by what it is searching for, so `StartEvent` asks for a scope that can host one:
+
+```csharp
+internal static T DeclaringScope<T>(ScopeState from, Definition definition) where T : ScopeState
+
+Producer.DeclaringScope<InteriorScopeState>(from, eventDefinition)
+```
+
+Root is not a candidate because it is not an `InteriorScopeState`, not because a check skipped it.
+Neither walk names a family, so `events` appears in no signature outside the class that has them,
+and root has no member to declare, answer or validate.
+
+`InteriorScopeState` lands with this step - it has nothing to hold until `MultiplierFor` needs
+overriding for handicaps.
 
 ## New pieces
 
@@ -39,7 +71,7 @@ Nothing new is built where one of these already answers the question:
    definition, mirroring `GeneratorDefinition.IsAvailable`. `BlocksIdle` is derived
    (`timeLimitSeconds > 0`) so the idle path asks one question and never inspects a timer; a bool
    becomes another term in that property if one is ever wanted.
-2. `ScopeDefinition.events` - the list 12.3 already reserves.
+2. `InteriorDefinition.events` - the list 12.3 reserves, on the class that can host one.
 3. `Events/EventSystem.cs` - the two operations plus `AdvanceTimers`.
 4. `Core/Sweep.cs` - `Sweep.Run(root, foregroundChapter, nowUtc)`.
 5. No lifecycle `GameAction` kinds. Start and dismiss are commands (12.11), so no authored list
@@ -47,10 +79,10 @@ Nothing new is built where one of these already answers the question:
 6. Two `Condition` kinds: `EventRecordExists(host)`, `EventRewardPending(host)`, each holding a
    `ScopeDefinition` like `ResetScope.scope`, reached self-or-enclosed via `FindInSubtree` at
    runtime and `InActingSubtree` at load. Both are pure fact reads.
-7. `ActiveEvent` loses `claimed`, leaving `{eventId, remainingSeconds, goalReached}` - with one
-   ending that removes the record, no legal state has it set. It moves to a new `EventHostFacts`
-   payload between `ScopeFacts` and `ChapterFacts`: tiers and chapters can host an event, root
-   cannot, so root does not carry the field at all. A single field, never a list.
+7. `ActiveEvent` is `{eventId, remainingSeconds, goalReached}` - with one ending that removes the
+   record, no legal state carries a claimed flag. It sits on `InteriorFacts`, which `ChapterFacts`
+   and `TierFacts` derive and `RootFacts` does not, so root cannot carry the field at all. A single
+   field, never a list. Both shapes are already in the tree.
 8. `Always` - a `Condition` kind that always holds, which is how an author opens a gate now that a
    null gate is refused at load.
 9. `RestartScope(scope)` - a `GameAction`: fire that scope's rung through its own gate, then clear
@@ -129,10 +161,9 @@ beside the other nine families, so an event declared by two scopes is a `Duplica
 one asset, one home, like everything else a scope declares. Events do not join `Targetables`: an
 event owns no number.
 
-- An event declared on the ROOT scope is an error: its handicaps would gather into every chapter's
-  outward walk and its occupancy would be global, and 6.1 scopes an event to a chapter. The same
-  species as a rung on the root, and it is what makes `EventHostFacts` sound - root does not carry
-  the field, so the state and the rule agree.
+- No check for an event on the root. `RootDefinition` has no `events` list to put one in, exactly as
+  it has no `rung`, so the rule 6.1 states - an event is scoped to a chapter, and root handicaps
+  would gather into every chapter's walk - is carried by the type rather than by a finding.
 - Per event: `availableWhen` null is an ERROR - it is a gate, and a gate is required now that
   `Always` exists to say "open". `goal` null warns - dismiss-only, never rewarding.
   `timeLimitSeconds` finite and nonnegative. `handicaps` through `ValidateEffect` from the declaring
