@@ -10,6 +10,7 @@
 - [Quote directive before editing](quote-directive-before-editing.md) - the write gate now lives in the repo CLAUDE.md ("No write without a live order"); this is the failure record behind it, and it absorbed the verify-only and stop-and-ask rules 2026-08-21
 - [No inaction epilogues](no-inaction-epilogues.md) - never close a response with what you didn't do ("nothing edited"); repo state is a fact, restraint is not news
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
+- [Commit means the whole tree](commit-means-the-whole-tree.md) - "commit" sweeps everything dirty, memory files included; never curate the commit, and never infer a John-preference from incidental repo state (no quote = my invention)
 - [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) - verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - Scripts, then Tests, then both docs and the chapter JSON; grep the rule's phrasing, not its topic
 - [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - direct references constrain authoring, not runtime addressing; cross-chain aliasing is the feature; the downward production walk is the one place identity is load-bearing
