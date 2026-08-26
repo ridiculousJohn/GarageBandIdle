@@ -187,6 +187,47 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
+        // The unique (currency, home) pairs one subtree's sources pay at
+        // Stat.Rate, in tree order then declaration order - GetRate's sibling,
+        // enumerating what it sums. The home is resolved from a CONTRIBUTING
+        // scope's chain, exactly as GetRate resolves it, and the pair is the
+        // point: the tick deposits through the home reference and the idle
+        // claim's lines retain it, so neither consumer looks anything up twice.
+        public static List<(CurrencyDefinition currency, ScopeState home)> RatePairs(ScopeState subtreeRoot)
+        {
+            var pairs = new List<(CurrencyDefinition currency, ScopeState home)>();
+            Walk(subtreeRoot);
+            return pairs;
+
+            void Walk(ScopeState node)
+            {
+                foreach (var producer in node.Definition.producers)
+                    if (producer != null)
+                        Collect(node, producer.produces);
+                foreach (var generator in node.Definition.generators)
+                    if (generator != null)
+                        Collect(node, generator.produces);
+                foreach (var child in node.Children)
+                    Walk(child);
+            }
+
+            // Declaration-shaped on purpose: whether an entry contributes right
+            // now (a condition, an unowned generator) is GetRate's question,
+            // asked per segment - a pair whose rate is zero simply deposits
+            // nothing.
+            void Collect(ScopeState node, List<ProducesEntry> entries)
+            {
+                foreach (var entry in entries)
+                {
+                    if (entry == null || entry.currency == null || entry.stat != Stat.Rate)
+                        continue;
+                    if (pairs.Exists(pair => pair.currency == entry.currency))
+                        continue;
+                    pairs.Add((entry.currency, FindCurrencyHome(node, entry.currency)));
+                }
+            }
+        }
+
         // Fires one producer: every yield entry resolved against PRE-FIRE state
         // - conditions and amounts judged together, multipliers included - and
         // only then deposited, so no output can flip a sibling output's

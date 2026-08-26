@@ -402,9 +402,10 @@ Six changesets, each compiling and green on its own.
   edits; `ModifierDefinition.appliesWhen`, the `GameContext` idle-accumulation circumstance, the
   `IdleAccumulation` condition kind, and the `GetRate(ctx, currency)` reshape, plus their tests -
   the mechanism lands here beside the other modifier-shape work, so E only consumes it.
-- **C. `TickSystem`** - the segments and phases, plus `GameConfig` (born here for `maxGameSpeed`;
-  `minimumAwaySeconds` and `idleCapSeconds` wait for their consumer), plus `TickSystemTests` -
-  called directly, no session yet.
+- **C. `TickSystem`** - **LANDED 2026-08-26, 368/368**: the segments and phases, plus `GameConfig`
+  (born here for `maxGameSpeed`; `minimumAwaySeconds` and `idleCapSeconds` wait for their
+  consumer), plus `TickSystemTests` - called directly, no session yet. The `(currency, home)` pair
+  enumeration landed as `Producer.RatePairs`, GetRate's sibling.
 - **D. `GameSession` core** - phases, the boundary, the pipeline, the command wrappers, `Tick`,
   plus `GameSessionTests`.
 - **E. Idle** - `SwitchChapter`, `ClaimIdle`, the monotonic stamps (the reset re-stamp included),
