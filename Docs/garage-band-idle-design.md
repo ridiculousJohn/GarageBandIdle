@@ -651,10 +651,10 @@ against `availableWhen` and affordability — the domain owns the gate, never th
 ```csharp
 [Serializable] public struct Effect
 {
-    public string target;      // a currency id, a producer/generator/bar id, or a TAG
+    public string target;      // a currency/producer/generator/bar id or a TAG; empty is the
+                               // wildcard — "every currency", applied at the currency stage
     public string currencyId;  // optional — narrow to entries paying this currency (id or TAG)
-    public string stat;        // optional — narrow to this stat ("rate"/"yield")
-                               // both empty = every number the target has; both set = one entry
+    public string stat;        // REQUIRED and exact — the one stat this factor answers for
     public double multiplier;
 }
 ```
@@ -684,9 +684,12 @@ vocabulary is open precisely so a new consumer adds its name and its own query, 
 `GetMultiplier(owner, currencyId, stat)` answers one question: *which factors apply to this
 number?* A number is identified by its owner and coordinates — a `produces` entry by
 (source, currencyId, stat), a consumer-owned stat by its name alone. An effect matches when its
-`target` names the owner (by id or any of its tags) and each optional coordinate it sets agrees:
-both coordinates empty matches everything the owner has, either one narrows, both name one entry
-exactly — the Effect address mirrors the `produces` entry's coordinates. **An empty `target` is
+`target` names the owner (by id or any of its tags), its `stat` names the queried stat EXACTLY,
+and the optional `currencyId` agrees — empty matches everything the owner has, set narrows by id
+or tag. **The stat is required**: a query resolves one number and a number always has a stat, so a
+stat-less effect would claim to answer questions of different kinds with one factor — "rate and
+yield alike" is two entries, an empty stat is a load-time error, and at runtime it matches nothing
+(fail-closed). **An empty `target` is
 the wildcard: "every currency."** It applies at the currency stage — one stage per effect, since
 root sits on both gather walks and a stage-less wildcard there would be collected twice — so
 `{stat: rate, ×2}` speeds every currency's rate (bar fills excluded, as with any currency-stage
@@ -1133,7 +1136,11 @@ homed at tiers below it, and nothing resolves a name downward. The ad callback
 marks `doubled`, deposit flips `settled`, and replaying either after an app kill is idempotent by
 `claimId`. `idle_rate` and `idle_cap` are stats read through `GetMultiplier` per currency, and
 `game_speed` once per segment — the same gather as everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
-commit — for ticks and commands alike; live scopes only, single pass. The same sweep observes
+commit — for ticks and commands alike; live scopes only, single pass. The sweep is conditional on
+the transaction's RESULTING phase: only a transaction ending in `Live` sweeps. One ending in
+`AwaitingIdleClaim` or `NoChapter` commits and refreshes without sweeping — a stored claim awaits
+presentation, and any sweep (root included, since a root trigger may legally reset a descendant
+chapter) could destroy it — and the transaction that enters `Live` performs the deferred sweep. The same sweep observes
 event goals **from the sweep-start snapshot and latches `goalReached` before any trigger
 actions execute** — success is judged on the transaction's own mutation, never on trigger
 payloads; a trigger that spends the goal currency changes nothing already secured, and its effect
@@ -1142,14 +1149,22 @@ on goals is seen next sweep (§12.8).
 **GameSession** — the transient execution context, never serialized:
 `{foregroundChapterId, phase: NoChapter | AwaitingIdleClaim | Live, commandInProgress}` — launch
 and backgrounding are `NoChapter`, so no-foreground states are explicit rather than a null id.
-Durable facts live in the tree; the session holds only orchestration. The chapter to reopen at launch is a
-**non-authoritative UI preference**, never inferred from economy timestamps — `lastActiveUtc`
+Durable facts live in the tree; the session holds only orchestration. The CURRENT chapter is one of
+those durable facts — a root-held id written by `SwitchChapter` when it enters a chapter
+(backgrounding leaves it: it names where play left off, which is where boot returns), so it travels
+with the save, cloud restore included. Boot auto-enters the recorded chapter and offers no
+selection; only a save with no recorded chapter — a fresh game — shows a chapter select, and such a
+save holds no pending claim to conflict with. That is what makes an unsettled claim unstrandable:
+every load that carries one lands on the chapter that owns it, and the claim re-offers. Never
+inferred from economy timestamps — `lastActiveUtc`
 records idle-settlement boundaries, not UI history. While `phase == AwaitingIdleClaim`, only claim
 and switch commands are legal — mutating commands are refused, so a rung or automation can never
 reset away an unsettled claim; settling flips the session to `Live`. Authenticated ad/store
 callbacks are always **phase-eligible, never reentrant**: a callback is a serialized mutation
-transaction — queued behind `commandInProgress`, then mutation → sweep → commit → one refresh like
-any command — so marking the pending claim `doubled` repaints the dialog even while no ticks run.
+transaction — queued behind `commandInProgress`, then the same pipeline as any command, its sweep
+conditional on the resulting phase like every transaction's — so marking the pending claim
+`doubled` sweeps nothing (the phase stays `AwaitingIdleClaim`) yet still repaints the dialog,
+because the refresh is unconditional.
 Callbacks are not UI commands (§12.11). **The session also draws the
 command boundary**: **every chapter-local mutation** — `TryBuy`, `FireProducer`, `TryRung`,
 `SetActiveBars`, the event operations, the song operations, and any future mechanic command — is
@@ -1195,7 +1210,8 @@ a prefab plus an entry. Sections live on the `ChapterDefinition`.
 transaction publishes one final state change, so a rung's payout, flag, and reset render as one).
 The full pipeline is fixed: **mutation → one trigger sweep → trigger actions → transaction commit →
 one refresh** — the sweep runs inside the transaction, so a trigger's payload renders atomically
-with the command that armed it.
+with the command that armed it (the sweep itself is conditional on the transaction's resulting
+phase, §12.9; the refresh never is).
 Visible sections re-evaluate `visibleWhen`; visible modules re-read what they show. Event-driven,
 never per-render-frame; fine-graining is a mechanical optimization if profiling ever asks.
 
@@ -1410,7 +1426,7 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 - **Economy:** producers are named definitions owning base contributions —
   `produces: [{currencyId, stat, value, condition?}]`, stats (`rate`, `yield`) named and extensible;
   generators contribute the same entry shape, scaled by owned count; **Effect** =
-  `{target: id-or-tag, currencyId?, stat?, multiplier}`, gathered on read from
+  `{target: id-or-tag, currencyId?, stat, multiplier}` (the stat required and exact), gathered on read from
   facts (purchases, timed buffs, events, modifier grants, fill counts, career totals) and never
   stored; flat bonuses are contributions; tags name sets from the member side.
 - **Bars:** generic fillables — each names an optional pool currency and its own fill rate, taking

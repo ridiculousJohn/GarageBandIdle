@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 7994d8cd-29fb-4920-8032-e10d58f56a96
-  modified: 2026-08-21T18:55:16.149Z
+  modified: 2026-08-26T01:39:37.636Z
 ---
 
 **Before fixing a finding, ask what breaks today** - not whether the finding is true. A finding is a
