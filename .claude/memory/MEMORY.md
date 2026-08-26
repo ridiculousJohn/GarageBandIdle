@@ -11,6 +11,7 @@
 - [No inaction epilogues](no-inaction-epilogues.md) - never close a response with what you didn't do ("nothing edited"); repo state is a fact, restraint is not news
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite repo-root AGENTS.md; it governs a different agent, and quoting it invents constraints John never set
 - [Commit means the whole tree](commit-means-the-whole-tree.md) - "commit" sweeps everything dirty, memory files included; never curate the commit, and never infer a John-preference from incidental repo state (no quote = my invention)
+- [Asides do not close the main question](asides-do-not-close-the-main-question.md) - "as an aside" is a detour; the pre-aside question stays open, and my recommendation never enters a "decided" list without John's words accepting it
 - [Test the justification, not just the claim](test-the-justification-not-just-the-claim.md) - verify reasons for NOT doing something; three deferral/restriction justifications failed checking in one session
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - Scripts, then Tests, then both docs and the chapter JSON; grep the rule's phrasing, not its topic
 - [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - direct references constrain authoring, not runtime addressing; cross-chain aliasing is the feature; the downward production walk is the one place identity is load-bearing
@@ -20,6 +21,7 @@
 - [Never cave to pressure](never-cave-to-pressure.md) - a factual answer changes only when the facts change; capitulating to end an argument is worse than being wrong
 - [Pushback means re-derive](pushback-means-rederive.md) - John disputing my model of HIS design means restate the mechanism from primitives, not defend the reading; doc wording can itself be the defect (the "reserved target ids" hour, 2026-08-25)
 - [Pick the simplest option](pick-the-simplest-option.md) - weighing alternatives is wanted; the defect is that the elaborate one always wins the pick
+- [Same-but-different demands a has-to](same-but-different-demands-a-has-to.md) - when John calls two mechanisms one thing spelled twice, split the bundle and answer has-to per item; conceded equivalence concedes the point unless a has-to exists
 - [No spec accumulation](no-spec-accumulation.md) - answer a review finding by deleting the mechanism, not by adding a paragraph; plan length is a defect signal
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20 corrections: venue asset and stationing cap deleted, scope payloads typed by authored kind, currencies by direct reference
 - [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from Ctrl C; check open design questions against it instead of reasoning from scratch, and ask John for its specifics

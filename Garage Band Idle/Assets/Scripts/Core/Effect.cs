@@ -8,10 +8,10 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public struct Effect
     {
-        public string target;      // a currency id, a producer/generator/bar id, or a tag
+        public string target;      // a currency/producer/generator/bar id or a tag; empty is the
+                                   // wildcard - "every currency", applied at the currency stage
         public string currencyId;  // optional - narrow to entries paying this currency, by id OR tag
-        public string stat;        // optional - narrow to this stat ("rate"/"yield")
-                                   // both empty = every number the target has; both set = one entry
+        public string stat;        // REQUIRED and exact - the one stat this factor answers for
         public double multiplier;
     }
 }

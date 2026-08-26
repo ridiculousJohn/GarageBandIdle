@@ -89,13 +89,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var byId = TestTree.MakeDefinition<ModifierDefinition>("by_id");
             tree.Tier1Def.modifiers.Add(byId);
-            byId.effects.Add(new Effect { target = "practice_amp", multiplier = 2 });
+            byId.effects.Add(new Effect { target = "practice_amp", stat = Stat.Rate, multiplier = 2 });
             var byTag = TestTree.MakeDefinition<ModifierDefinition>("by_tag");
             tree.Tier1Def.modifiers.Add(byTag);
-            byTag.effects.Add(new Effect { target = "gear", multiplier = 3 });
+            byTag.effects.Add(new Effect { target = "gear", stat = Stat.Rate, multiplier = 3 });
             var byNothing = TestTree.MakeDefinition<ModifierDefinition>("by_nothing");
             tree.Tier1Def.modifiers.Add(byNothing);
-            byNothing.effects.Add(new Effect { target = "bassist", multiplier = 5 });
+            byNothing.effects.Add(new Effect { target = "bassist", stat = Stat.Rate, multiplier = 5 });
 
             var ctx = tree.Ctx(tree.Tier1);
             tree.Tier1.modifierStacks["by_id"] = 1;
@@ -106,35 +106,121 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // tag only; nothing matches an id the owner does not answer to.
             AssertClose(6, Producer.GetMultiplier(ctx, tree.PracticeAmp, tree.Cash, Stat.Rate), "practice_amp");
             AssertClose(3, Producer.GetMultiplier(ctx, tree.Drummer, tree.Cash, Stat.Rate), "drummer");
-            AssertClose(1, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "tap_producer");
+            AssertClose(1, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Rate), "tap_producer");
         }
 
         [Test]
-        public void Coordinates_narrow_a_match_from_every_number_down_to_one()
+        public void Coordinates_narrow_a_match_from_every_entry_of_a_stat_down_to_one()
         {
             var tree = new TestTree();
-            var everything = TestTree.MakeDefinition<ModifierDefinition>("everything");
-            tree.Tier1Def.modifiers.Add(everything);
-            everything.effects.Add(new Effect { target = "tap_producer", multiplier = 2 });
+            var everyYield = TestTree.MakeDefinition<ModifierDefinition>("every_yield");
+            tree.Tier1Def.modifiers.Add(everyYield);
+            everyYield.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = 2 });
             var justCash = TestTree.MakeDefinition<ModifierDefinition>("just_cash");
             tree.Tier1Def.modifiers.Add(justCash);
-            justCash.effects.Add(new Effect { target = "tap_producer", currencyId = "cash", multiplier = 3 });
-            var justRate = TestTree.MakeDefinition<ModifierDefinition>("just_rate");
-            tree.Tier1Def.modifiers.Add(justRate);
-            justRate.effects.Add(new Effect { target = "tap_producer", stat = Stat.Rate, multiplier = 5 });
+            justCash.effects.Add(new Effect { target = "tap_producer", currencyId = "cash", stat = Stat.Yield, multiplier = 3 });
+            var everyRate = TestTree.MakeDefinition<ModifierDefinition>("every_rate");
+            tree.Tier1Def.modifiers.Add(everyRate);
+            everyRate.effects.Add(new Effect { target = "tap_producer", stat = Stat.Rate, multiplier = 5 });
             var exactly = TestTree.MakeDefinition<ModifierDefinition>("exactly");
             tree.Tier1Def.modifiers.Add(exactly);
             exactly.effects.Add(new Effect { target = "tap_producer", currencyId = "rehearsal", stat = Stat.Rate, multiplier = 7 });
 
             var ctx = tree.Ctx(tree.Tier1);
-            foreach (var id in new[] { "everything", "just_cash", "just_rate", "exactly" })
+            foreach (var id in new[] { "every_yield", "just_cash", "every_rate", "exactly" })
                 tree.Tier1.modifierStacks[id] = 1;
 
-            // Both coordinates empty matches everything the owner has; either one
-            // narrows; both name one entry exactly.
+            // The stat is exact and required; the optional currency coordinate
+            // narrows within it, from every entry of that stat down to one.
             AssertClose(2 * 3, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "cash yield");
-            AssertClose(2 * 5 * 7, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Rehearsal, Stat.Rate), "rehearsal rate");
+            AssertClose(5 * 7, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Rehearsal, Stat.Rate), "rehearsal rate");
             AssertClose(2, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Rehearsal, Stat.Yield), "rehearsal yield");
+        }
+
+        // ---- the wildcard and the consumer-owned stats (12.2) ----
+
+        [Test]
+        public void A_wildcard_lifts_every_currency_and_is_collected_once()
+        {
+            var tree = new TestTree();
+            var everyCurrency = TestTree.MakeDefinition<ModifierDefinition>("every_currency");
+            everyCurrency.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });
+            tree.RootDef.modifiers.Add(everyCurrency);
+            tree.Root.modifierStacks["every_currency"] = 1;
+            tree.Tier1.generatorCounts["practice_amp"] = 4;
+            tree.Tier1.flags.Add("fans_revealed");
+
+            // Root sits on BOTH gather walks; one stage per effect is what
+            // keeps this x2 rather than x4 - and the stat is exact, so the tap
+            // yield stays out of it.
+            AssertClose(0.5 * 4 * 2, Producer.GetRate(tree.Tier1, Now, tree.Cash), "cash rate");
+            AssertClose(0.35 * 2, Producer.GetRate(tree.Tier1, Now, tree.Fans), "every currency");
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cash, tree.Cash, Stat.Yield), "the stat is exact");
+        }
+
+        [Test]
+        public void A_wildcard_never_reaches_a_bars_fill_rate()
+        {
+            var tree = new TestTree();
+            var everyCurrency = TestTree.MakeDefinition<ModifierDefinition>("every_currency");
+            everyCurrency.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });
+            tree.RootDef.modifiers.Add(everyCurrency);
+            tree.Root.modifierStacks["every_currency"] = 1;
+
+            // A bar consumes: its rate resolves stage 1 only, with the bar as
+            // the owner, which a currency-stage wildcard never matches.
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cover1, tree.Rehearsal, Stat.Rate));
+        }
+
+        [Test]
+        public void A_wildcard_narrowed_by_currency_reaches_that_currency_alone()
+        {
+            var tree = new TestTree();
+            var cashOnly = TestTree.MakeDefinition<ModifierDefinition>("cash_only");
+            cashOnly.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 0.5 });
+            tree.RootDef.modifiers.Add(cashOnly);
+            tree.Root.modifierStacks["cash_only"] = 1;
+
+            // The currency coordinate narrows the wildcard's "every currency"
+            // down to one; the stat stays exact.
+            var ctx = tree.Ctx(tree.Tier1);
+            AssertClose(0.5, Producer.GetMultiplier(ctx, tree.Cash, tree.Cash, Stat.Rate), "cash rate");
+            AssertClose(1, Producer.GetMultiplier(ctx, tree.Fans, tree.Fans, Stat.Rate), "fans untouched");
+            AssertClose(1, Producer.GetMultiplier(ctx, tree.Cash, tree.Cash, Stat.Yield), "yield untouched");
+        }
+
+        [Test]
+        public void An_ownerless_query_matches_wildcards_only()
+        {
+            var tree = new TestTree();
+            var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            var targeted = TestTree.MakeDefinition<ModifierDefinition>("targeted");
+            targeted.effects.Add(new Effect { target = "tap_producer", stat = Stat.GameSpeed, multiplier = 3 });
+            tree.RootDef.modifiers.Add(encore);
+            tree.RootDef.modifiers.Add(targeted);
+            tree.Root.modifierStacks["encore"] = 1;
+            tree.Root.modifierStacks["targeted"] = 1;
+
+            // The tick's read: no owner, no currency, matched by name alone.
+            AssertClose(2, Producer.GetMultiplier(new GameContext(tree.Ch1, Now), null, null, Stat.GameSpeed));
+        }
+
+        // Load-refused content, but the runtime backstop is what keeps a
+        // {target: cash, x2}-shaped effect from answering a question of a kind
+        // its author never chose.
+        [Test]
+        public void A_statless_effect_matches_nothing_at_runtime()
+        {
+            var tree = new TestTree();
+            var statless = TestTree.MakeDefinition<ModifierDefinition>("statless");
+            statless.effects.Add(new Effect { target = "cash", multiplier = 2 });
+            tree.Tier1Def.modifiers.Add(statless);
+            tree.Tier1.modifierStacks["statless"] = 1;
+
+            var ctx = tree.Ctx(tree.Tier1);
+            AssertClose(1, Producer.GetMultiplier(ctx, tree.Cash, tree.Cash, Stat.Rate), "matches no rate");
+            AssertClose(1, Producer.GetMultiplier(ctx, tree.Cash, tree.Cash, Stat.Yield), "matches no yield");
         }
 
         [Test]
@@ -144,15 +230,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var replace = TestTree.MakeDefinition<ModifierDefinition>("replace_boost");
             tree.Tier1Def.modifiers.Add(replace);
             replace.stacking = StackingKind.Replace;
-            replace.effects.Add(new Effect { target = "tap_producer", multiplier = 2 });
+            replace.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = 2 });
             var linear = TestTree.MakeDefinition<ModifierDefinition>("linear_boost");
             tree.Tier1Def.modifiers.Add(linear);
             linear.stacking = StackingKind.Linear;
-            linear.effects.Add(new Effect { target = "tap_producer", multiplier = 2 });
+            linear.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = 2 });
             var multiply = TestTree.MakeDefinition<ModifierDefinition>("multiply_boost");
             tree.Tier1Def.modifiers.Add(multiply);
             multiply.stacking = StackingKind.Multiply;
-            multiply.effects.Add(new Effect { target = "tap_producer", multiplier = 2 });
+            multiply.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = 2 });
 
             var ctx = tree.Ctx(tree.Tier1);
             tree.Tier1.modifierStacks["replace_boost"] = 3;
@@ -177,7 +263,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var decay = TestTree.MakeDefinition<ModifierDefinition>("decay");
             tree.Tier1Def.modifiers.Add(decay);
             decay.stacking = StackingKind.Linear;
-            decay.effects.Add(new Effect { target = "tap_producer", multiplier = 0.5 });
+            decay.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = 0.5 });
 
             var ctx = tree.Ctx(tree.Tier1);
             tree.Tier1.modifierStacks["decay"] = 1;
@@ -202,7 +288,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var huge = TestTree.MakeDefinition<ModifierDefinition>("huge");
             tree.Tier1Def.modifiers.Add(huge);
             huge.stacking = StackingKind.Linear;
-            huge.effects.Add(new Effect { target = "tap_producer", multiplier = double.MaxValue });
+            huge.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = double.MaxValue });
             tree.Tier1.modifierStacks["huge"] = 2;
 
             // Past double range without ever having been an infinity: the
@@ -337,7 +423,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var boostA = TestTree.MakeDefinition<UpgradeDefinition>("boost_a");
             boostA.gate = new CurrencyAtLeast { currency = coin, threshold = 0 };
             boostA.costCurrency = coin;
-            boostA.effects.Add(new Effect { target = "gen_a", multiplier = 4 });
+            boostA.effects.Add(new Effect { target = "gen_a", stat = Stat.Rate, multiplier = 4 });
             tierADef.generators.Add(genA);
             tierADef.upgrades.Add(boostA);
             tierBDef.generators.Add(genB);
@@ -365,7 +451,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["practice_amp"] = 4;
 
             // 1 + 0.02 x 20 = 1.4, on the rate and on the tap yield alike - the
-            // career effect sets no stat coordinate (walkthrough 13.2).
+            // stat leg is exact, so walkthrough 13.2's "alike" is one career per
+            // stat, both on the income tag.
             AssertClose(0.5 * 4 * 1.4, Producer.GetRate(tree.Tier1, Now, tree.Cash), "cash rate");
             AssertClose(1.4, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cash, tree.Cash, Stat.Yield), "cash yield");
 
@@ -450,10 +537,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
                 var total = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_total");
                 total.target = "income";
+                total.stat = Stat.Rate;
                 total.formula = new RoadieTotalBoost { perRoadie = 0.05 };
                 var active = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_active");
                 active.target = "production";          // the SOURCE knows its chapter; a currency total does not
                 active.currencyId = "income";
+                active.stat = Stat.Rate;
                 active.formula = new RoadieActiveBoost { perRoadie = 0.05 };
                 rootDef.careerEffects.Add(total);
                 rootDef.careerEffects.Add(active);
@@ -479,7 +568,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bar.repeating = true;
             bar.perFill.Add(new PerFillEntry
             {
-                effect = new Effect { target = "practice_amp", multiplier = multiplier },
+                effect = new Effect { target = "practice_amp", stat = Stat.Rate, multiplier = multiplier },
                 growth = growth,
             });
             group.bars.Add(bar);

@@ -39,8 +39,9 @@ root
     double-count (§8.2), aimed at the SOURCES because only a source knows which chapter it produces
     in. Every producer and generator declares the `production` tag; the `currencyId: income`
     narrowing is what keeps a bandmate's Fans line out of it.
-- Reserved-target base values: `idle_rate` 0.5, `idle_cap` 14400s (4h), `game_speed` 1; Encore buff
-  `{target: game_speed, ×2}`, Overdrive `×4` (§9). Minimum-away threshold: 180s.
+- Idle bases: fraction 0.5 authored as a root modifier `{stat: rate, ×0.5}` applying only during
+  idle accumulation (`appliesWhen`, §12.5); cap 14400s (4h) and minimum-away threshold 180s are
+  `GameConfig` values. `game_speed` base 1; Encore buff `{stat: game_speed, ×2}`, Overdrive `×4` (§9).
 - Flags: `ch1_complete`, `story_ch1_open_seen`, `story_ch1_end_seen`.
 
 ## 3. Currencies
@@ -93,8 +94,8 @@ per-bandmate constant anywhere.
 | Id | Cost | Gate | Carries |
 |---|---|---|---|
 | `stage_presence` | 250 | `EarnedTotalAtLeast(cash, 250)` | nothing — pure latch; tap_producer's conditioned entry reads it |
-| `amp_strings` | 500 | `EarnedTotalAtLeast(cash, 500)` | effect `{target: practice_amp, ×2}` |
-| `kit_upgrade` | 5,000 | `EarnedTotalAtLeast(cash, 5000)` | effect `{target: drummer, currencyId: cash, ×2}` — fans line untouched |
+| `amp_strings` | 500 | `EarnedTotalAtLeast(cash, 500)` | effect `{target: practice_amp, stat: rate, ×2}` |
+| `kit_upgrade` | 5,000 | `EarnedTotalAtLeast(cash, 5000)` | effect `{target: drummer, currencyId: cash, stat: rate, ×2}` — fans line untouched |
 | `tight_set` | 20,000 | `CurrencyAtLeast(fans, 30)` | effect `{target: cash, stat: rate, ×1.5}` — currency-total, declared at cash's home ✓ |
 
 **Content unlocks** (each sets a flag; revealed content gates on it):
@@ -165,7 +166,7 @@ dismisses with one tap, taking the reward, and presses again.
 ## 10. Events — the Garage Jam chain (host: tier1)
 
 Three separate `EventDefinition`s (levels are separate events, §6.1). Shared shape: `handicaps:
-[{target: gear, ×0}]` (tap only — generator cash *and* fans lines pause; `band`'s base trickle
+[{target: gear, stat: rate, ×0}]` (tap only — generator cash *and* fans lines pause; `band`'s base trickle
 continues), `onEntry: [RestartScope(tier1)]` - a gate-met run banks exactly as a
 release would, an unfinished one is discarded.
 
@@ -249,7 +250,7 @@ untouched by every income multiplier — keeps each cycle ≥ ~2.5 min, so the f
    ch1_records +3, and tier1 clears. Had the gate been unmet, the rung would have no-opped and the
    clear would still have happened - the unfinished run *discarded*, never banked.
 3. The `ActiveEvent` record is created in the fresh state: `{garage_jam_1, 60, false}`.
-   Handicap `{target: gear, ×0}` now zeroes every generator line by derivation — tap only.
+   Handicap `{target: gear, stat: rate, ×0}` now zeroes every generator line by derivation — tap only.
 4. Tap yield = 1 × (1 + 0.02×20) = **1.4/press** (no stage_presence — the reset cleared it). Goal
    150 cash ⇒ ~107 presses in 60s ≈ **1.8 taps/s** — a real but fair sprint. (At records = 1, the
    earliest possible attempt, it's 2.4 taps/s — intentionally brutal; "come back later" is the

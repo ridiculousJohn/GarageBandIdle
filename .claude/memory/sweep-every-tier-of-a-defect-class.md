@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 393cd63b-24b4-4eb6-bad0-62e5972e7ae8
-  modified: 2026-08-14T19:49:48.626Z
+  modified: 2026-08-26T18:39:07.034Z
 ---
 
 When the thing being fixed is a class of defect rather than one site, sweep every tier that can hold it before saying what is left. On 2026-08-14 I reported "two things" from a grep of `Assets/Scripts` alone, and John asked "did you miss anything?" three times; each round found the next tier down.
@@ -30,3 +30,10 @@ pass. Grep the retired names, not the topic. Then say what you grepped, so the c
 inspectable instead of being a promise. Anything the sweep finds is a blocker: John's rule is that
 stale records are "bullshit that's hanging around that I don't want to find later", so they are not
 a separate lower-priority category to report and leave.
+
+**Standing exception (John, 2026-08-27):** the archived step plans for LANDED steps
+(`Docs/step-04-plan.md` and successors) keep their stale lines - specifically step-04's
+`idle_rate`/`idle_cap` forward reference, which predates the idle respell. He declined both the
+one-line fix and deleting the archived plans, and closed it with "just leave it". A sweep that
+hits an archived step plan reports nothing and relitigates nothing; only the live plan, the design
+doc, the content doc, code, and tests are sweep targets.

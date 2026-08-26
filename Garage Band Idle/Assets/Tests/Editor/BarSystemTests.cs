@@ -87,7 +87,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Grant(ScopeState scope, string target, double multiplier)
         {
             var modifier = TestTree.MakeDefinition<ModifierDefinition>("mod_" + target + "_" + multiplier);
-            modifier.effects.Add(new Effect { target = target, multiplier = multiplier });
+            modifier.effects.Add(new Effect { target = target, stat = Stat.Rate, multiplier = multiplier });
             scope.Definition.modifiers.Add(modifier);
             scope.modifierStacks[modifier.Id] = 1;
         }
@@ -299,7 +299,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ticker = f.Bar(timed, "ticker", 1000, 2);
             f.Build();
             var modifier = TestTree.MakeDefinition<ModifierDefinition>("narrowed");
-            modifier.effects.Add(new Effect { target = "rehearsal_fill", currencyId = "rehearsal", multiplier = 4 });
+            modifier.effects.Add(new Effect { target = "rehearsal_fill", currencyId = "rehearsal", stat = Stat.Rate, multiplier = 4 });
             drinker.EditorInit("drinker", "rehearsal_fill");
             ticker.EditorInit("ticker", "rehearsal_fill");
             f.Tier1Def.modifiers.Add(modifier);

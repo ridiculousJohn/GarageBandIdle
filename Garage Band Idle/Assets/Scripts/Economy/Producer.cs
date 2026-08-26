@@ -23,14 +23,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // Every factor applying to one number, gathered from the origin scope
         // outward to the root. The origin IS one stage's gather origin: the
-        // source's declaring scope for stage 1, the currency's home for stage 2.
-        // Career formulas compute against this context, per the ruling on
-        // MultiplierFormula.
+        // source's declaring scope for stage 1, the currency's home for stage 2,
+        // and the acting scope for an owner-less consumer-stat read (the tick's
+        // game_speed), which matches wildcard effects only. Career formulas
+        // compute against this context, per the ruling on MultiplierFormula.
         public static BigNumber GetMultiplier(GameContext origin, Definition owner, CurrencyDefinition currency, string stat)
         {
-            if (owner == null)
-                return BigNumber.One;
-
             // Each scope on the chain composes its own factor however it likes;
             // this only multiplies what comes back.
             var product = BigNumber.One;
@@ -40,11 +38,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         }
 
         // An effect matches an owner plus coordinates when its target names the
-        // owner - by id or by any of its tags - and each optional coordinate it
-        // sets agrees: both empty matches everything the owner has, either one
-        // narrows, both name one entry exactly (design doc 12.2). A currency-
-        // stage effect with no stat is what lets records_income reach the tap
-        // yield while a stat: rate narrowing leaves it alone.
+        // owner - by id or by any of its tags - the queried stat is EXACTLY its
+        // stat, and the optional currency coordinate agrees (design doc 12.2).
+        // The stat leg is required: a query resolves one number and a number
+        // always has a stat, so a stat-less effect would claim to answer
+        // questions of different kinds with one factor - "rate and yield alike"
+        // is two entries, and an empty effect stat matches nothing, the
+        // fail-closed backstop behind the load-time error.
+        //
+        // An empty TARGET is the wildcard, "every currency": it applies at the
+        // currency stage only, because root sits on both gather walks and a
+        // stage-less wildcard would be collected twice. An owner-less query
+        // (the tick's game_speed read) matches wildcards only.
         //
         // The currency coordinate matches by id OR tag, exactly as target does:
         // "every rate entry paying an income currency" is one effect rather than
@@ -54,18 +59,22 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         internal static bool Matches(string target, string effectCurrencyId, string effectStat,
                                     Definition owner, CurrencyDefinition currency, string stat)
         {
+            if (string.IsNullOrEmpty(effectStat) || effectStat != stat)
+                return false;
             if (string.IsNullOrEmpty(target))
+            {
+                if (owner != null && !(owner is CurrencyDefinition))
+                    return false;
+            }
+            else if (owner == null || (target != owner.Id && !owner.HasTag(target)))
+            {
                 return false;
-            if (target != owner.Id && !owner.HasTag(target))
-                return false;
-            // A null currency is "this number has no currency coordinate" - the
-            // rate of a bar that fills from time and is paid by nothing. A
-            // target-only effect still reaches it, since 12.7 has per-bar speed
-            // buffable by id or tag; a narrowing one names a stage that never runs.
+            }
+            // A null currency is "this query has no currency coordinate" - the
+            // rate of a bar that fills from time, or the tick's game_speed read.
+            // A narrowing effect names a coordinate such a query never passes.
             if (!string.IsNullOrEmpty(effectCurrencyId) && (currency == null
                 || (effectCurrencyId != currency.Id && !currency.HasTag(effectCurrencyId))))
-                return false;
-            if (!string.IsNullOrEmpty(effectStat) && effectStat != stat)
                 return false;
             return true;
         }

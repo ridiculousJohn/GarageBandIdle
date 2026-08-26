@@ -482,7 +482,9 @@ purchasable is also earnable in-game.
 chapter on screen ticks live; every other chapter is dormant. Each chapter's state carries one
 `lastActiveUtc`, stamped on switch-away and — **for the foreground chapter only** — on save; a
 global save never touches dormant chapters' stamps, or it would truncate their idle. **Switching into a chapter** computes, for each
-of its currencies, `rate × min(elapsed, cap) × idleRate` — from *current* state, so Records earned
+of its currencies, `idleRate × min(elapsed, cap)` — `idleRate` is the ordinary rate gather run
+under the idle-accumulation context (§12.5), so the ×0.5 base joins and live-only buffs excuse
+themselves — from *current* state, so Records earned
 elsewhere while away correctly boost the payout — and stores it as a **pending claim** in the
 chapter's state, presented as the **idle dialog**: the amount earned, plus "Double it" (a rewarded
 ad that doubles *this claim*); a Backstage Pass owner sees the already-doubled amount and just OKs
@@ -502,15 +504,18 @@ A dormant chapter with no generators accrues nothing (zero rate), so parking an 
 earns nothing — the system self-regulates without a rule.
 
 `idleRate` (base 50%) and `cap` (base 4 h, plus a minimum-away threshold below which nothing pays)
-are two **stats** — `idle_rate` and `idle_cap`, names in the same open vocabulary as `rate` and
-`yield` (§12.2) — so the bases and the monetization features alike are ordinary Effects, read per
-currency exactly as production reads `rate`:
+are two different kinds of number. The cap and the threshold are **seconds** — thresholds, not
+multipliers — and live in `GameConfig`. The fraction IS a multiplier, and it is an ordinary rate
+effect: a root modifier `{stat: rate, ×0.5}` that **applies only during idle accumulation**
+(`appliesWhen`, §12.5). The claim runs the same rate gather the tick runs, under an
+idle-accumulation context, so idle-only factors join, live-only buffs excuse themselves, and no
+second vocabulary exists:
 
 | Player | Idle payout | How |
 |---|---|---|
 | Free, no action | 50% | Claimed from the idle dialog on switch-in |
-| Free, watches ad | 100% (2×) for that claim | "Double it" on the dialog applies `{stat: idle_rate, ×2}` to the pending claim |
-| Backstage Pass owner | 100% (2×) always | The same effect, derived from a permanent entitlement fact; also raises `idle_cap` |
+| Free, watches ad | 100% (2×) for that claim | "Double it" marks the pending claim `doubled`; deposit pays ×2 (§12.9) |
+| Backstage Pass owner | 100% (2×) always | A permanent idle-only modifier `{stat: rate, ×2}` derived from the entitlement; the cap raise is entitlement plumbing on the config read |
 
 Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
@@ -676,10 +681,13 @@ counting. "Global income" is this tag mechanism, not a wildcard: income currenci
 `income` tag (Ch. 1: cash), the career effects of §3 target it, and a later income stream joins the
 stack by declaring the tag.
 
-**Consumer-owned stats:** `idle_rate`, `idle_cap`, `game_speed` (§9) — stats in the same open
-vocabulary as `rate` and `yield`, each read by exactly one system (`game_speed` by the tick, which
-scales the production dt; wall-clock decrements never scale). Nothing marks them special: the stat
-vocabulary is open precisely so a new consumer adds its name and its own query, no new machinery.
+**Consumer-owned stats:** `game_speed` (§9) — a stat in the same open vocabulary as `rate` and
+`yield`, read by exactly one system (the tick, which scales the production dt; wall-clock
+decrements never scale). Nothing marks it special: the stat vocabulary is open precisely so a new
+consumer adds its name and its own query, no new machinery. The idle fraction is deliberately NOT
+a stat: idle pay is the live rate gathered under an idle-accumulation context (§9, §12.9), so its
+factors are ordinary rate effects on modifiers that apply only then (`appliesWhen`, §12.5) —
+"rate but idle" is a circumstance of one gather, never a second vocabulary.
 
 `GetMultiplier(owner, currencyId, stat)` answers one question: *which factors apply to this
 number?* A number is identified by its owner and coordinates — a `produces` entry by
@@ -693,7 +701,8 @@ yield alike" is two entries, an empty stat is a load-time error, and at runtime 
 the wildcard: "every currency."** It applies at the currency stage — one stage per effect, since
 root sits on both gather walks and a stage-less wildcard there would be collected twice — so
 `{stat: rate, ×2}` speeds every currency's rate (bar fills excluded, as with any currency-stage
-effect), and `{stat: idle_rate, ×0.5}` is the idle base itself. `currencyId` matches an id or a tag, exactly as
+effect), and `{stat: game_speed, ×2}` — Encore — is a wildcard read owner-less by the tick, which
+matches wildcards only. `currencyId` matches an id or a tag, exactly as
 `target` does, so "every rate entry paying an income currency" is one effect rather than one per
 currency — and a currency stays out of it by not declaring the tag (§8.2's fans rule). **Where matches are gathered from is two
 explicit stages**, which is what keeps sibling scopes isolated (§12.3):
@@ -892,7 +901,12 @@ and a grant may only name one the target scope can reach outward, so the read re
 by the same walk every reference gets. The numbers stay in the `ModifierDefinition` — a named `List<Effect>` with a
 **`stacking` enum: `Replace | Linear | Multiply`**. `Replace`: a re-grant keeps count at 1;
 `Linear` / `Multiply`: a re-grant increments count, and the name picks the count-scaling formula
-(`1 + (m−1)·n` vs. `m^n`) — duplicate-grant policy and growth are one closed choice. The entry is
+(`1 + (m−1)·n` vs. `m^n`) — duplicate-grant policy and growth are one closed choice. A modifier may
+also declare an optional **`appliesWhen`** condition, judged at gather time against the QUERYING
+context (the origin — the same evaluation-context ruling formulas follow): a modifier excuses
+itself from circumstances it does not apply to — a live-only buff, or §9's idle fraction, which
+applies only during idle accumulation. Absent means always; the Effects themselves stay
+unconditional, the timing lives on the carrier. The entry is
 the fact, saved and cleared with its scope. Reserved for grants from
 *moments that leave no other trace* (an event reward); when a count already exists as state, derive
 from it instead (§12.6). **`RemoveModifier`** is its exact inverse: decrements one stack, deletes
@@ -1013,7 +1027,7 @@ vocabulary does not need.
 with no currency stage. Stage 2 is "effects on this currency's total production", and a bar CONSUMES -
 letting a currency-total buff through would speed the drain as well as the supply, which is not what
 either buff means. The bar's own currency is passed as the coordinate, so an effect may narrow to it
-(`{target: cover_1, currencyId: rehearsal}`); a bar that fills from time passes none, which no
+(`{target: cover_1, currencyId: rehearsal, stat: rate}`); a bar that fills from time passes none, which no
 narrowing effect matches.
 
 **A null `availableWhen` on a bar is OPEN**, the opposite of a purchase gate: fail-closed binds entry
@@ -1057,7 +1071,7 @@ then bars within a group, in declaration order — and a reset during settlement
 remaining completions from the old scope-life, exactly as the trigger sweep rule (§12.5).
 
 **Cascades** (bar B buffs bar A per fill): B declares `perFill: [{effect, growth}]` — e.g.
-`{{target: barA, ×1.05}, multiply}`; the applied count is B's `fillCount` — the same pattern as
+`{{target: barA, stat: rate, ×1.05}, multiply}`; the applied count is B's `fillCount` — the same pattern as
 generator contributions scaling by `ownedCount`. Growth lives on the carrying entry, never on the
 Effect atom: `multiply` (m^n) or `linear` (1 + (m−1)·n) — the same growth vocabulary
 `ModifierDefinition`'s `stacking` enum uses for granted stacks (§12.5). **`linear` saturates at
@@ -1125,7 +1139,8 @@ only at its edge. After the last segment: the sweep, commit, and refresh
 (§12.11).
 `lastActiveUtc` stamped on switch-away and, for the foreground chapter only, on
 save. Switch-in computes
-`rate × min(elapsed, cap) × idleRate` per currency at current rates — skipped below the minimum-away
+`idleRate × min(elapsed, cap)` per currency at current rates — `idleRate` being the ordinary rate
+gather under the idle-accumulation context — skipped below the minimum-away
 threshold and skipped entirely while that chapter holds a record for an event that blocks idle
 (§6.1: `blocksIdle` is derived from the event carrying a timer, and the idle path asks the event
 rather than inspecting one) - and stores it as the
@@ -1134,8 +1149,9 @@ The claim is an exactly-once transaction — `{claimId, amounts: [{scopeId, curr
 doubled, settled}`: a line names its HOME, because a claim held at the chapter addresses currencies
 homed at tiers below it, and nothing resolves a name downward. The ad callback
 marks `doubled`, deposit flips `settled`, and replaying either after an app kill is idempotent by
-`claimId`. `idle_rate` and `idle_cap` are stats read through `GetMultiplier` per currency, and
-`game_speed` once per segment — the same gather as everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
+`claimId`. The idle fraction rides the rate gather via `appliesWhen` (§12.5), the cap is a
+`GameConfig` threshold beside the minimum-away one, and `game_speed` is gathered once per
+segment — the same gather as everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
 commit — for ticks and commands alike; live scopes only, single pass. The sweep is conditional on
 the transaction's RESULTING phase: only a transaction ending in `Live` sweeps. One ending in
 `AwaitingIdleClaim` or `NoChapter` commits and refreshes without sweeping — a stored claim awaits
@@ -1337,7 +1353,7 @@ Assets/Scripts/
     GeneratorDefinition.cs  UpgradeDefinition.cs
     Purchasing.cs           // TryBuy(generator | upgrade): fail-closed gate, spend, count or latch, payload
     CareerEffectDefinition.cs  // formula-shaped multipliers + the MultiplierFormula family
-    ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply)
+    ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply) + optional appliesWhen
     BarDefinition.cs  BarGroupDefinition.cs  BarSystem.cs
   Loop/
     ChapterManager.cs      // forward-only advance, reacting to root completion flags
@@ -1445,8 +1461,9 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   per scope-life (`firedTriggers` latch, a reset re-arms), swept after ticks and command
   transactions in live scopes only, never during idle; repeating behavior is a producer or a bar,
   never a trigger.
-- **Idle:** per chapter — one active chapter ticks; switch-in computes `rate × min(t, cap) ×
-  idleRate` (base 50%/4 h authored as effects on the `idle_rate`/`idle_cap` stats) into a pending claim presented
+- **Idle:** per chapter — one active chapter ticks; switch-in computes `idleRate × min(t, cap)`
+  (the rate gather under the idle-accumulation context; base 50% an idle-only root modifier via
+  `appliesWhen`, cap 4 h a `GameConfig` threshold) into a pending claim presented
   as the idle dialog — the ad doubles the claim, deposit on dismissal; app close is not special;
   yields and bar progress never accrue.
 - **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2×/Overdrive 4×

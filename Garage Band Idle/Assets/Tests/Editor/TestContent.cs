@@ -38,6 +38,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly UpgradeDefinition AmpStrings;
         public readonly UpgradeDefinition TightSet;
         public readonly CareerEffectDefinition RecordsIncome;
+        public readonly CareerEffectDefinition RecordsIncomeYield;
         public readonly CareerEffectDefinition RoadieTotal;
         public readonly CareerEffectDefinition RoadieActive;
         public readonly ModifierDefinition GjTap1;
@@ -108,7 +109,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AmpStrings.gate = new EarnedTotalAtLeast { currency = Cash, threshold = 500 };
             AmpStrings.costCurrency = Cash;
             AmpStrings.cost = 500;
-            AmpStrings.effects.Add(new Effect { target = "practice_amp", multiplier = 2 });
+            AmpStrings.effects.Add(new Effect { target = "practice_amp", stat = Stat.Rate, multiplier = 2 });
 
             // A currency-total effect narrowed to one stat: it lifts the cash
             // rate and leaves the tap yield alone.
@@ -122,11 +123,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Tier1Def.generators.AddRange(new[] { PracticeAmp, Drummer });
             Tier1Def.upgrades.AddRange(new[] { StagePresence, AmpStrings, TightSet });
 
-            // 1 + 0.02 * records, on the income tag cash carries.
+            // 1 + 0.02 * records, on the income tag cash carries. The stat leg
+            // is exact, so "rate and yield alike" is one career per stat.
             RecordsIncome = MakeDefinition<CareerEffectDefinition>("records_income");
             RecordsIncome.target = "income";
+            RecordsIncome.stat = Stat.Rate;
             RecordsIncome.formula = new LinearOnBalance { currency = Records, coefficient = 0.02 };
             RootDef.careerEffects.Add(RecordsIncome);
+
+            RecordsIncomeYield = MakeDefinition<CareerEffectDefinition>("records_income_yield");
+            RecordsIncomeYield.target = "income";
+            RecordsIncomeYield.stat = Stat.Yield;
+            RecordsIncomeYield.formula = new LinearOnBalance { currency = Records, coefficient = 0.02 };
+            RootDef.careerEffects.Add(RecordsIncomeYield);
 
             // The two roadie effects, composed at different levels: the global
             // product on the income currency, the per-chapter factor on the
@@ -158,7 +167,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The Garage Jam reward: +25% tap for the rest of the chapter, so
             // it is granted at ch1 and outlives the tier resets.
             GjTap1 = MakeDefinition<ModifierDefinition>("gj_tap_1");
-            GjTap1.effects.Add(new Effect { target = "tap_producer", multiplier = 1.25 });
+            GjTap1.effects.Add(new Effect { target = "tap_producer", currencyId = "cash", stat = Stat.Yield, multiplier = 1.25 });
             Ch1Def.modifiers.Add(GjTap1);
 
             // The two tier1 events: a timed gig that zeroes the production-
@@ -169,7 +178,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TimedGig.availableWhen = new Always();
             TimedGig.goal = new EarnedTotalAtLeast { currency = Fans, threshold = 100 };
             TimedGig.timeLimitSeconds = 300;
-            TimedGig.handicaps.Add(new Effect { target = "production", multiplier = 0 });
+            TimedGig.handicaps.Add(new Effect { target = "production", stat = Stat.Rate, multiplier = 0 });
+            TimedGig.handicaps.Add(new Effect { target = "production", stat = Stat.Yield, multiplier = 0 });
             Tier1Def.events.Add(TimedGig);
 
             OpenMic = MakeDefinition<EventDefinition>("open_mic");

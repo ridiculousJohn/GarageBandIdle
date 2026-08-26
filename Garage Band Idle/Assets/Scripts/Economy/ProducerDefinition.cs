@@ -7,17 +7,27 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // Stat names are named, not enumerated (design doc 12.2): a stat means
     // something because a system consumes it - the tick consumes rate,
     // FireProducer consumes yield - so a later accumulation concept is a new
-    // name plus its consumer, and no existing field grows. These constants are
-    // what code compares against; the validator warns on an authored stat
-    // outside Consumed, which recovers the typo protection an enum would give.
+    // name plus its consumer, and no existing field grows. The vocabulary
+    // SPLITS by consumer: produced stats are what a produces entry may name,
+    // since a contribution has to be summed by something, while game_speed is
+    // read through GetMultiplier alone (owner-less, by the tick) - one shared
+    // list would let {cash, game_speed, 10} validate as a contribution nothing
+    // ever sums. The validator warns on an authored stat outside its site's
+    // set, which recovers the typo protection an enum would give.
     public static class Stat
     {
-        public const string Rate = "rate";      // units/second - accrues idle time
-        public const string Yield = "yield";    // units/firing - never accrues
+        public const string Rate = "rate";            // units/second - accrues idle time
+        public const string Yield = "yield";          // units/firing - never accrues
+        public const string GameSpeed = "game_speed"; // scales the tick's production dt; wall clocks never scale
 
-        public static bool IsConsumed(string stat) => stat == Rate || stat == Yield;
+        public static bool IsProduced(string stat) => stat == Rate || stat == Yield;
 
-        public const string ConsumedNames = Rate + ", " + Yield;   // for validation messages
+        public static bool IsEffectAddress(string stat) => stat == GameSpeed;
+
+        // For validation messages. An effect's stat coordinate may name any of
+        // the three; a produces entry only the first two.
+        public const string ProducedNames = Rate + ", " + Yield;
+        public const string EffectStatNames = ProducedNames + ", " + GameSpeed;
     }
 
     // One authored number: which currency, which stat, the base value, plus an

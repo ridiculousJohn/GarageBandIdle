@@ -37,7 +37,7 @@ namespace RidiculousGaming.GarageBandIdle
         BalanceGoalWithoutReset,// an event balance goal whose onEntry never resets the host (warn)
         ReferenceCycle,         // cycles across nested action references
         RemoveWithoutGrant,     // RemoveModifier naming a stack nothing grants there (warn)
-        UnconsumedStat,         // a stat no system consumes (warn) - the typo guard a named vocabulary lacks
+        UnconsumedStat,         // a stat outside its site's vocabulary (warn) - the typo guard a named vocabulary lacks
         NumericRange            // an authored number outside its legal range: NaN, infinity, wrong sign
     }
 
@@ -448,16 +448,18 @@ namespace RidiculousGaming.GarageBandIdle
             return true;
         }
 
-        // A stat means something because a system consumes it (12.2), so one
-        // outside the consumed set produces nothing. The warn is what recovers
-        // the typo protection an enum would have given a named vocabulary.
-        public void RequireConsumedStat(string stat, string what)
+        // A produced stat means something because a contribution sums into it
+        // (12.2); the effect-address stats are read through GetMultiplier
+        // alone, so a produces entry naming one is a contribution nothing ever
+        // sums. The warn is what recovers the typo protection an enum would
+        // have given a named vocabulary.
+        public void RequireProducedStat(string stat, string what)
         {
-            if (Economy.Stat.IsConsumed(stat))
+            if (Economy.Stat.IsProduced(stat))
                 return;
             AddWarning(ValidationCheck.UnconsumedStat, string.IsNullOrEmpty(stat)
-                ? $"{what} names no stat - no system consumes it."
-                : $"{what} names stat '{stat}', which no system consumes ({Economy.Stat.ConsumedNames}).");
+                ? $"{what} names no stat - no contribution sums it."
+                : $"{what} names stat '{stat}', which no contribution sums ({Economy.Stat.ProducedNames}).");
         }
 
         // ---- ledgers ----
@@ -513,6 +515,29 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var entry in entries)
                 if (entry != null && entry.currency == currency && entry.stat == stat)
                     return true;
+            return false;
+        }
+
+        // Whether the usage scope's subtree homes a currency the narrowing
+        // selects (any currency when the narrowing is empty) that some source
+        // pays with this stat. This is a wildcard's whole reachable set: it is
+        // collected only on home-to-root walks, only subtree homes put this
+        // scope on such a walk, and the walk itself only runs for a
+        // (currency, stat) pair some contribution pays - GetRate returns
+        // before its currency stage on a zero sum, and FireProducer only
+        // stages the currencies its entries name.
+        public bool SubtreeHomesMatchingCurrency(ScopeDefinition top, string currencyId, string stat)
+        {
+            foreach (var scope in ScopesInSubtree(top))
+                foreach (var currency in scope.declaredCurrencies)
+                {
+                    if (currency == null)
+                        continue;
+                    if (!string.IsNullOrEmpty(currencyId) && currency.Id != currencyId && !currency.HasTag(currencyId))
+                        continue;
+                    if (SomeSourcePays(currency, stat))
+                        return true;
+                }
             return false;
         }
 
@@ -968,9 +993,9 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // A produces entry addresses its currency on the declaring chain, its
-        // condition is judged there, and its stat must be one a system consumes.
-        // A null condition is legal authoring: the condition is optional, and an
-        // entry is not a gate (12.2).
+        // condition is judged there, and its stat must be one a contribution
+        // sums into. A null condition is legal authoring: the condition is
+        // optional, and an entry is not a gate (12.2).
         private static void ValidateProducesEntries(ValidationContext ctx, List<Economy.ProducesEntry> entries, string siteBase)
         {
             for (var i = 0; i < entries.Count; i++)
@@ -983,7 +1008,7 @@ namespace RidiculousGaming.GarageBandIdle
                     continue;
                 }
                 ctx.RequireOnChain(entry.currency, "a produces entry");
-                ctx.RequireConsumedStat(entry.stat, "a produces entry");
+                ctx.RequireProducedStat(entry.stat, "a produces entry");
                 if (entry.value < BigNumber.Zero)
                     ctx.AddError(ValidationCheck.NumericRange,
                         $"value is {entry.value} - a contribution never subtracts.");
@@ -1462,22 +1487,57 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.AddError(ValidationCheck.UnresolvedReference,
                     $"{site}: narrows to '{currencyId}', which is no currency id and no tag any currency carries.");
 
-            // An empty stat is the legal "every stat" address; a non-empty one no
-            // system consumes narrows to nothing.
-            if (!string.IsNullOrEmpty(stat))
-                ctx.RequireConsumedStat(stat, $"{site} stat narrowing");
+            // The stat coordinate is required and exact (12.2): an empty one
+            // matches nothing at runtime, so it is refused at load rather than
+            // shipped inert; a name outside the effect vocabulary is the typo
+            // warn. Either way, a coordinate already reported as naming nothing
+            // is not reported a second time as half of an unsatisfiable pair,
+            // so the target check below runs without the bad stat filter.
+            var statValid = Economy.Stat.IsProduced(stat) || Economy.Stat.IsEffectAddress(stat);
+            if (string.IsNullOrEmpty(stat))
+                ctx.AddError(ValidationCheck.NullEntry,
+                    $"{site}: no stat - the coordinate is required, and a stat-less effect matches nothing (12.2).");
+            else if (!statValid)
+                ctx.AddWarning(ValidationCheck.UnconsumedStat,
+                    $"{site} stat narrowing names stat '{stat}', which no consumer reads ({Economy.Stat.EffectStatNames}).");
 
-            // A coordinate already reported as naming nothing is not reported a
-            // second time as half of an unsatisfiable pair, so the target check
-            // below sees only the narrowings that do name something.
+            // game_speed is read by an owner-less, currency-less query - the
+            // tick's once-per-segment gather - so a target or currency narrowing
+            // on one is never passed a coordinate to match: dead content.
+            if (stat == Economy.Stat.GameSpeed && (!string.IsNullOrEmpty(target) || !string.IsNullOrEmpty(currencyId)))
+            {
+                ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
+                    $"{site}: a game_speed effect is matched by an owner-less, currency-less query, so the narrowing never selects anything (12.2).");
+                return;
+            }
+
+            // An empty target is the wildcard (12.2). What is left to check is
+            // reach, which differs by consumer. game_speed is gathered from the
+            // foreground chapter outward, so below chapter level it is never
+            // visited. A currency-stage wildcard is collected on the walk from
+            // a currency's HOME outward, so it answers only for currencies
+            // homed in the usage scope's subtree - the ancestor direction
+            // MatchNarrowingCurrency allows belongs to source-targeted effects,
+            // whose stage-1 walk visits this scope; a wildcard has no stage 1.
             if (string.IsNullOrEmpty(target))
             {
-                ctx.AddWarning(ValidationCheck.EffectTargetUnmatched, $"{site}: empty target matches nothing.");
+                if (stat == Economy.Stat.GameSpeed)
+                {
+                    if (!(home is ChapterDefinition) && !(home is RootDefinition))
+                        ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
+                            $"{site}: a game_speed effect at '{home.Id}' is never gathered - the tick reads from the foreground chapter outward, so it must live at a chapter or the root (12.2).");
+                }
+                else if (statValid && !ctx.SubtreeHomesMatchingCurrency(home, currencyResolves ? currencyId : null, stat))
+                {
+                    ctx.AddWarning(ValidationCheck.EffectTargetUnmatched, string.IsNullOrEmpty(currencyId)
+                        ? $"{site}: the wildcard applies at the currency stage, and no currency homed within '{home.Id}' is paid at '{stat}' - the home-to-root gather never visits this effect (12.12)."
+                        : $"{site}: the wildcard applies at the currency stage, and no currency matching '{currencyId}' homed within '{home.Id}' is paid at '{stat}' - the home-to-root gather never visits this effect (12.12).");
+                }
                 return;
             }
             ValidateTargetCoordinate(ctx, target, site, home,
                 currencyResolves ? currencyId : null,
-                Economy.Stat.IsConsumed(stat) ? stat : null);
+                statValid ? stat : null);
         }
 
         private static void ValidateTargetCoordinate(ValidationContext ctx, string target, string site, ScopeDefinition home,
@@ -1551,7 +1611,9 @@ namespace RidiculousGaming.GarageBandIdle
                 // narrowing can only name that same currency. The stat is not
                 // free either: GetRate asks the stage for `rate`, FireProducer
                 // asks for `yield` once per yield term, so a stat nothing pays
-                // this currency with is a stage that never runs.
+                // this currency with is a stage that never runs. (game_speed
+                // never reaches here: a narrowed one is reported as dead
+                // content before the target check runs.)
                 case Economy.CurrencyDefinition currency:
                     if (!string.IsNullOrEmpty(currencyId) && currency.Id != currencyId && !currency.HasTag(currencyId))
                         return false;
