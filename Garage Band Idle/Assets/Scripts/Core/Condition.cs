@@ -192,6 +192,26 @@ namespace RidiculousGaming.GarageBandIdle
         public override bool Evaluate(GameContext ctx) => true;
     }
 
+    // The claim's circumstance (design doc 12.5): true only under a context the
+    // idle claim constructed. Composed with Not, a live-only buff is ordinary
+    // authoring.
+    [Serializable]
+    public class IdleAccumulation : Condition
+    {
+        public override bool Evaluate(GameContext ctx) => ctx.IdleAccumulation;
+
+        // Only a modifier's appliesWhen and a chapter-reachable RATE entry's
+        // condition are ever evaluated under a claim's context; anywhere else
+        // the circumstance is never set, so the condition is dead content
+        // (12.5).
+        public override void Validate(ValidationContext ctx)
+        {
+            if (!ctx.IdleCircumstancePossible)
+                ctx.AddWarning(ValidationCheck.InertOperand,
+                    "IdleAccumulation sits at a site never evaluated under a claim's context - only a modifier's appliesWhen and a chapter-reachable rate entry see the circumstance (12.5).");
+        }
+    }
+
     [Serializable]
     public class All : Condition
     {

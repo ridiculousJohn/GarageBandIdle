@@ -1,12 +1,11 @@
 using System;
-using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
-    // A multiplier computed from career state rather than authored as a constant
-    // (the career row of design doc 12.6). Deliberately not an Effect: an
-    // Effect's multiplier is an authored double, and these are unbounded
-    // BigNumber products of live facts.
+    // The formula half of "an effect's factor is a constant or a formula"
+    // (design doc 12.2): a factor computed from stored facts on every read,
+    // returning BigNumber because the results are unbounded products of live
+    // facts rather than authored doubles.
     //
     // Compute receives the GATHER-ORIGIN context - the source scope in stage 1,
     // the currency home in stage 2 - never a context rebased to the declaring
@@ -42,7 +41,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             ctx.RequireOnChain(currency, "LinearOnBalance");
             if (ctx.RequireFiniteDouble(coefficient, "LinearOnBalance coefficient") && coefficient < 0)
                 ctx.AddError(ValidationCheck.NumericRange,
-                    $"LinearOnBalance coefficient is {coefficient} - a career multiplier never shrinks with the fact it derives from.");
+                    $"LinearOnBalance coefficient is {coefficient} - a formula factor never shrinks with the fact it derives from.");
         }
     }
 
@@ -71,7 +70,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             if (ctx.RequireFiniteDouble(perRoadie, "RoadieTotalBoost perRoadie") && perRoadie < 0)
                 ctx.AddError(ValidationCheck.NumericRange,
-                    $"RoadieTotalBoost perRoadie is {perRoadie} - a career multiplier never shrinks with the fact it derives from.");
+                    $"RoadieTotalBoost perRoadie is {perRoadie} - a formula factor never shrinks with the fact it derives from.");
         }
     }
 
@@ -98,18 +97,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             if (ctx.RequireFiniteDouble(perRoadie, "RoadieActiveBoost perRoadie") && perRoadie < 0)
                 ctx.AddError(ValidationCheck.NumericRange,
-                    $"RoadieActiveBoost perRoadie is {perRoadie} - a career multiplier never shrinks with the fact it derives from.");
+                    $"RoadieActiveBoost perRoadie is {perRoadie} - a formula factor never shrinks with the fact it derives from.");
         }
-    }
-
-    // The scope-attached career effect: the same coordinate triple an Effect
-    // carries, plus the formula that computes the factor.
-    [CreateAssetMenu(menuName = "Garage Band Idle/Career Effect")]
-    public class CareerEffectDefinition : Definition
-    {
-        public string target;       // a currency id, a producer/generator id, or a tag
-        public string currencyId;   // optional - narrow to entries paying this currency
-        public string stat;         // optional - narrow to this stat
-        [SerializeReference, SubclassPicker] public MultiplierFormula formula;
     }
 }

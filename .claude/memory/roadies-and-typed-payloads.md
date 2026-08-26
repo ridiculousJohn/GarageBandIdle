@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 725a3991-fe12-4b4f-bdb9-02cb627048e5
-  modified: 2026-08-20T20:03:27.332Z
+  modified: 2026-08-26T19:25:30.624Z
 ---
 
 Four corrections landed 2026-08-20, before step 5 began, each reversing something a build step had
@@ -13,7 +13,9 @@ invented. Suite is 205/205 after them.
 
 - **`RoadieVenueDefinition` is DELETED.** Roadies attach to the band and are stationed per chapter;
   "venue" was flavor prose in section 8.2 that step 4 turned into an asset with a `chapterScopeId`
-  back-pointer. The two boosts are `CareerEffectDefinition`s on root whose formulas carry their own
+  back-pointer. The two boosts are formula-shaped effects in permanent modifiers on root (the
+  `CareerEffectDefinition` family they started as folded into modifiers in step 7 slice B,
+  2026-08-26) whose formulas carry their own
   `perRoadie`: `RoadieTotalBoost` sums the whole `roadieAllocation` map, `RoadieActiveBoost` reads
   the chapter it resolves on. Nothing walks the tree for numbers, nothing points back at a chapter.
 - **No stationing cap.** The pre-build doc only ever said per-venue rates and caps were *planned*;

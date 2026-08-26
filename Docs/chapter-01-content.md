@@ -30,8 +30,11 @@ root
 **Root content** (declared once, game-wide; listed here because Ch. 1 is the first consumer):
 
 - Currencies: `records`, `roadies` (both accumulate, never spent in Ch. 1), `discography` (list, Ch. 6+).
-- Career effects (§12.6 — formula-shaped, exist from minute one):
-  - `records_income`: `{target: income, × (1 + 0.02 × records.balance)}` — additive within the term.
+- Permanent modifiers (§12.5/§12.6 — root-declared, root-applied via `permanentModifiers`;
+  formula-shaped effects that exist from minute one):
+  - `records_income`: `{target: income, stat: rate, × (1 + 0.02 × records.balance)}` plus the same
+    entry at `stat: yield` — additive within the term, and "rate and yield alike" is one entry per
+    stat (§12.2).
   - `roadie_total`: `{target: income, stat: rate, × Π over chapters (1 + 0.05 × stationed there)}`
     (§8.2) — `perRoadie` lives on the formula.
   - `roadie_active`: `{target: production, currencyId: income, stat: rate,
@@ -48,7 +51,7 @@ root
 
 | Id | Declared in | Tags | Notes |
 |---|---|---|---|
-| `cash` | tier1 | `income` | The income tag is what every career effect targets (§12.2). |
+| `cash` | tier1 | `income` | The income tag is what the Records and Roadie modifiers target (§12.2). |
 | `fans` | tier1 | — | **Never income-tagged, never roadie-buffable** — the farm throttle (§8.2). |
 | `rehearsal` | tier1 | — | Fill pool for the cover bars. |
 | `ch1_records` | ch1 | — | Capstone gate counter; fed by the release payout, zeroed by the capstone's own reset (§5). |

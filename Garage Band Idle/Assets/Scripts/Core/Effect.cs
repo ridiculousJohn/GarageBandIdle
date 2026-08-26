@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
 {
@@ -13,5 +14,10 @@ namespace RidiculousGaming.GarageBandIdle
         public string currencyId;  // optional - narrow to entries paying this currency, by id OR tag
         public string stat;        // REQUIRED and exact - the one stat this factor answers for
         public double multiplier;
+
+        // The factor is a constant or a formula (design doc 12.2): the authored
+        // multiplier when this is absent, the formula computed against the
+        // gather-origin context on every read when it is present.
+        [SerializeReference, SubclassPicker] public Economy.MultiplierFormula formula;
     }
 }

@@ -130,7 +130,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = Ready();
             Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp));
 
-            AssertClose(0.5, Producer.GetRate(tree.Tier1, tree.Now, tree.Cash), "rate");
+            AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "rate");
         }
 
         // ---- upgrades ----
@@ -192,13 +192,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = Ready();
             tree.Tier1.generatorCounts["practice_amp"] = 1;
-            AssertClose(0.5, Producer.GetRate(tree.Tier1, tree.Now, tree.Cash), "before");
+            AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "before");
 
             Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.AmpStrings));
-            AssertClose(1, Producer.GetRate(tree.Tier1, tree.Now, tree.Cash), "after");
+            AssertClose(1, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "after");
 
             tree.Tier1.purchasedUpgrades.Clear();
-            AssertClose(0.5, Producer.GetRate(tree.Tier1, tree.Now, tree.Cash), "latch gone");
+            AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "latch gone");
         }
 
         [Test]

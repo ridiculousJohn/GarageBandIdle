@@ -23,7 +23,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly GeneratorDefinition Amp;
         public readonly UpgradeDefinition StagePresence;
         public readonly UpgradeDefinition AmpStrings;
-        public readonly CareerEffectDefinition RecordsIncome;
+        public readonly ModifierDefinition RecordsIncome;
         public readonly CurrencyDefinition Cash;
         public readonly CurrencyDefinition Fans;
         public readonly CurrencyDefinition Records;
@@ -107,7 +107,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The economy declarations: a producer reading an upgrade latch, a
             // tagged generator with a cost curve, an upgrade whose effect targets
-            // that generator, and the career effect on the income tag.
+            // that generator, and the permanent Records modifier on the income tag.
             Tap = TestTree.MakeDefinition<ProducerDefinition>("tap_producer");
             Tap.produces.Add(TestTree.Entry(Cash, Stat.Yield, 1));
             Tier1.producers.Add(Tap);
@@ -134,11 +134,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Tier1.upgrades.Add(AmpStrings);
             Tap.produces.Add(TestTree.Entry(Cash, Stat.Yield, 1, new UpgradePurchased { upgrade = StagePresence }));
 
-            RecordsIncome = TestTree.MakeDefinition<CareerEffectDefinition>("records_income");
-            RecordsIncome.target = "income";
-            RecordsIncome.stat = Stat.Rate;
-            RecordsIncome.formula = new LinearOnBalance { currency = Records, coefficient = 0.02 };
-            Root.careerEffects.Add(RecordsIncome);
+            RecordsIncome = TestTree.MakeDefinition<ModifierDefinition>("records_income");
+            RecordsIncome.effects.Add(new Effect { target = "income", stat = Stat.Rate,
+                formula = new LinearOnBalance { currency = Records, coefficient = 0.02 } });
+            Root.modifiers.Add(RecordsIncome);
+            Root.permanentModifiers.Add(RecordsIncome);
 
             Ch1.modifiers.Add(Boost);
         }
@@ -1233,33 +1233,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "UpgradePurchased addresses 'merch_deal' declared at 'tier1b'");
         }
 
-        // ---- career effects ----
+        // ---- permanent modifiers and formula effects ----
 
         [Test]
-        public void CareerEffect_NoFormula_Error()
+        public void FormulaEffect_TargetOutOfReach_Error()
         {
             var f = new ValidatorFixture();
-            f.RecordsIncome.formula = null;
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "career effect 'records_income': no formula");
-        }
-
-        [Test]
-        public void CareerEffect_TargetOutOfReach_Error()
-        {
-            var f = new ValidatorFixture();
-            var local = TestTree.MakeDefinition<CareerEffectDefinition>("tier_career");
-            local.target = "records";                                // homed at the root, declared at tier1
-            local.stat = Stat.Rate;
-            local.formula = new LinearOnBalance { currency = f.Ch1Records, coefficient = 1 };
-            f.Tier1.careerEffects.Add(local);
+            var local = TestTree.MakeDefinition<ModifierDefinition>("tier_records");
+            local.effects.Add(new Effect { target = "records", stat = Stat.Rate,    // homed at the root, applied at tier1
+                formula = new LinearOnBalance { currency = f.Ch1Records, coefficient = 1 } });
+            f.Tier1.modifiers.Add(local);
+            f.Tier1.permanentModifiers.Add(local);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "targets currency 'records' homed at 'root'");
         }
 
         [Test]
-        public void CareerFormula_NegativeCoefficient_Error()
+        public void FormulaEffect_NegativeCoefficient_Error()
         {
             var f = new ValidatorFixture();
-            ((LinearOnBalance)f.RecordsIncome.formula).coefficient = -0.02;
+            ((LinearOnBalance)f.RecordsIncome.effects[0].formula).coefficient = -0.02;
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never shrinks");
         }
 
@@ -1267,15 +1259,117 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void RoadieBoost_NegativePerRoadie_Error()
         {
             var f = new ValidatorFixture();
-            var roadie = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_total");
-            roadie.target = "income";
-            roadie.stat = Stat.Rate;
-            roadie.formula = new RoadieTotalBoost { perRoadie = -0.05 };
-            f.Root.careerEffects.Add(roadie);
+            var roadie = TestTree.MakeDefinition<ModifierDefinition>("roadie_total");
+            roadie.effects.Add(new Effect { target = "income", stat = Stat.Rate,
+                formula = new RoadieTotalBoost { perRoadie = -0.05 } });
+            f.Root.modifiers.Add(roadie);
+            f.Root.permanentModifiers.Add(roadie);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never shrinks");
         }
 
+        [Test]
+        public void PermanentModifier_DeclaredOffTheChain_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = TestTree.MakeDefinition<ModifierDefinition>("sibling_boost");
+            sibling.effects.Add(new Effect { target = "cash", stat = Stat.Rate, multiplier = 2 });
+            f.Tier1b.modifiers.Add(sibling);
+            f.Tier1.permanentModifiers.Add(sibling);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "a permanent modifier entry addresses 'sibling_boost' declared at 'tier1b'");
+        }
 
+        // Membership is one implicit application, so a second entry for the
+        // same modifier would double-apply outside the stacking vocabulary.
+        [Test]
+        public void PermanentModifier_ListedTwice_Error()
+        {
+            var f = new ValidatorFixture();
+            var standing = TestTree.MakeDefinition<ModifierDefinition>("standing");
+            standing.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
+            f.Tier1.modifiers.Add(standing);
+            f.Tier1.permanentModifiers.Add(standing);
+            f.Tier1.permanentModifiers.Add(standing);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateId,
+                "'standing' is listed twice");
+        }
+
+        // Declaration plus permanent application at one scope is the normal
+        // case, not a DuplicateHome - the list is usage, and it joins no id
+        // collection.
+        [Test]
+        public void PermanentModifier_DeclaredAndAppliedAtOneScope_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            var standing = TestTree.MakeDefinition<ModifierDefinition>("standing");
+            standing.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
+            f.Tier1.modifiers.Add(standing);
+            f.Tier1.permanentModifiers.Add(standing);
+            AssertClean(f.Run());
+        }
+
+        // ---- appliesWhen (12.5) ----
+
+        [Test]
+        public void AppliesWhen_IsValidatedAsAConditionAtTheUsageSite()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.appliesWhen = new FlagSet { flagId = "missing_flag" };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "FlagSet references flag 'missing_flag'");
+        }
+
+        [Test]
+        public void IdleAccumulation_InAppliesWhen_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.appliesWhen = new IdleAccumulation();
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void IdleAccumulation_InAProducesEntryCondition_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(TestTree.Entry(f.Cash, Stat.Rate, 1, new IdleAccumulation()));
+            AssertClean(f.Run());
+        }
+
+        // The idle gather asks a chapter subtree for RATE alone: a yield
+        // condition is read only by live FireProducer calls, so the
+        // circumstance can never hold there.
+        [Test]
+        public void IdleAccumulation_OnAYieldEntry_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(TestTree.Entry(f.Cash, Stat.Yield, 1, new IdleAccumulation()));
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.InertOperand,
+                "never evaluated under a claim's context");
+        }
+
+        // A root-declared source sits outside every chapter's idle walk, so
+        // even its rate conditions never see the circumstance.
+        [Test]
+        public void IdleAccumulation_OnARootSourceRateEntry_Warning()
+        {
+            var f = new ValidatorFixture();
+            var houseBand = TestTree.MakeDefinition<ProducerDefinition>("house_band");
+            houseBand.produces.Add(TestTree.Entry(f.Records, Stat.Rate, 1, new IdleAccumulation()));
+            f.Root.producers.Add(houseBand);
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.InertOperand,
+                "never evaluated under a claim's context");
+        }
+
+        // Gates, triggers, rung offers, and event goals are never evaluated
+        // under a claim's context, so the circumstance there is dead content.
+        [Test]
+        public void IdleAccumulation_OutsideAnIdleEvaluatedSite_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Trigger.condition = new IdleAccumulation();
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.InertOperand,
+                "never evaluated under a claim's context");
+        }
 
 
         // ---- numeric range across every authored double ----
@@ -1285,7 +1379,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Amp.growth = double.NaN;
-            ((LinearOnBalance)f.RecordsIncome.formula).coefficient = double.NaN;
+            ((LinearOnBalance)f.RecordsIncome.effects[0].formula).coefficient = double.NaN;
             ((RootCurveFormula)((AddCurrency)f.Album.actions[0]).formula).exponent = double.PositiveInfinity;
             f.Boost.effects.Add(new Effect { target = "cash", stat = Stat.Rate, multiplier = double.NaN });
 

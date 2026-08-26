@@ -25,8 +25,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // outward to the root. The origin IS one stage's gather origin: the
         // source's declaring scope for stage 1, the currency's home for stage 2,
         // and the acting scope for an owner-less consumer-stat read (the tick's
-        // game_speed), which matches wildcard effects only. Career formulas
-        // compute against this context, per the ruling on MultiplierFormula.
+        // game_speed), which matches wildcard effects only. Effect formulas and
+        // appliesWhen conditions are judged against this context, per the
+        // ruling on MultiplierFormula.
         public static BigNumber GetMultiplier(GameContext origin, Definition owner, CurrencyDefinition currency, string stat)
         {
             // Each scope on the chain composes its own factor however it likes;
@@ -78,6 +79,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return false;
             return true;
         }
+
+        // An effect's factor is a constant or a formula (design doc 12.2): the
+        // authored multiplier when no formula is present, the formula computed
+        // against the gather-origin context when one is. Count scaling composes
+        // on the computed value.
+        internal static BigNumber FactorOf(in Effect effect, GameContext origin) =>
+            effect.formula != null ? effect.formula.Compute(origin) : (BigNumber)effect.multiplier;
 
         // Count scaling, the one arithmetic both consumers of the vocabulary
         // share (design doc 12.7): Linear adds the excess per count, Multiply
@@ -138,27 +146,30 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // The stage-2 product for one currency, gathered from its home outward.
         // The currency's own definition is the owner, so its tags match - which
-        // is how the income tag carries every career effect (design doc 8.2).
+        // is how the income tag carries the Records and Roadie factors (design
+        // doc 8.2).
         private static BigNumber CurrencyStage(GameContext atHome, CurrencyDefinition currency, string stat) =>
             GetMultiplier(atHome, currency, currency, stat);
 
         // The rate one subtree pays into one currency, per second of production
         // time. Enumerates the subtree's declared producers and generators,
         // applies both stages, and sums. The tick and the idle claim consume
-        // this; the subtree root is explicit because "the foreground chapter" is
-        // a session concept, not an economy one.
-        public static BigNumber GetRate(ScopeState subtreeRoot, DateTime nowUtc, CurrencyDefinition currency)
+        // this; the context carries the walk root explicitly - "the foreground
+        // chapter" is a session concept, not an economy one - along with the
+        // timestamp and the circumstance, so the idle claim's gather differs
+        // from the tick's only in the context it hands over.
+        public static BigNumber GetRate(GameContext ctx, CurrencyDefinition currency)
         {
             var sum = BigNumber.Zero;
             ScopeState home = null;
-            Accumulate(subtreeRoot);
+            Accumulate(ctx.Scope);
             if (sum == BigNumber.Zero)
                 return BigNumber.Zero;
-            return sum * CurrencyStage(new GameContext(home, nowUtc), currency, Stat.Rate);
+            return sum * CurrencyStage(ctx.Rebase(home), currency, Stat.Rate);
 
             void Accumulate(ScopeState node)
             {
-                Add(node, node.SourceTermsFor(nowUtc, currency, Stat.Rate));
+                Add(node, node.SourceTermsFor(ctx, currency, Stat.Rate));
                 foreach (var child in node.Children)
                     Accumulate(child);
             }

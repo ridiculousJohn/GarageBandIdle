@@ -463,8 +463,9 @@ throttle of §8.1 stands on Fans being unbuffable by Roadies, and the `currencyI
 is what enforces it even on a bandmate that pays Cash and Fans from one definition. (Deliberately open: whether reallocating applies retroactively to a dormant
 chapter's idle claim computed at current rates.)
 
-**Where the numbers live.** Each factor is a `CareerEffectDefinition` on the root scope whose
-formula carries its own `perRoadie` (`RoadieTotalBoost`, `RoadieActiveBoost`); both read the root's
+**Where the numbers live.** Each factor is a formula-shaped effect inside a permanent modifier on
+the root scope (`permanentModifiers`, §12.5) whose formula carries its own `perRoadie`
+(`RoadieTotalBoost`, `RoadieActiveBoost`); both read the root's
 `roadieAllocation` map and nothing else. The global one takes the product over the map's entries -
 one entry per chapter holding Roadies, additive within the entry - and the local one reads the
 entry for the chapter it resolves on. No per-chapter asset, no id pointing back at a chapter. There
@@ -678,8 +679,8 @@ list members and later additions join by declaring the tag. An effect applies at
 it matches: on a producer or generator (by id or tag) it multiplies **inside the sum** (that
 source's term); on a currency (by id or tag) it multiplies **the total** — one rule, no double
 counting. "Global income" is this tag mechanism, not a wildcard: income currencies declare an
-`income` tag (Ch. 1: cash), the career effects of §3 target it, and a later income stream joins the
-stack by declaring the tag.
+`income` tag (Ch. 1: cash), the Records and Roadie modifiers of §3/§8 target it, and a later income
+stream joins the stack by declaring the tag.
 
 **Consumer-owned stats:** `game_speed` (§9) — a stat in the same open vocabulary as `rate` and
 `yield`, read by exactly one system (the tick, which scales the production dt; wall-clock
@@ -720,10 +721,12 @@ source tag instead. That is the entire modifier system.
 ### 12.3 Scopes: state containers
 
 A **scope** is a plain state container. Content declares, per scope: its currencies, flags, bar
-groups (which own their bars), **producers**, generators, upgrades, modifiers, career effects,
+groups (which own their bars), **producers**, generators, upgrades, modifiers,
 triggers (§12.5), and (for tiers) its rung. **Every content family is declared somewhere** — that is
 what makes a reference resolvable by walking outward, and it is why there is no catalogue to look
-anything up in. Events are declared on `InteriorDefinition` rather than the base,
+anything up in. A scope also carries `permanentModifiers` — a USAGE list, not a declaration:
+each entry references a modifier declared on the reachable chain and applies it permanently
+(§12.5), so the list joins no id space and homes nothing. Events are declared on `InteriorDefinition` rather than the base,
 since root cannot host one: the definition is placed, the record is a fact of the host. Songs are
 undecided until Chapter 6 (§7) — a `SongDefinition` may not exist at all, since a song is written at
 runtime rather than authored. A producer's `produces`
@@ -912,6 +915,16 @@ the fact, saved and cleared with its scope. Reserved for grants from
 from it instead (§12.6). **`RemoveModifier`** is its exact inverse: decrements one stack, deletes
 the entry at zero, no-ops when absent.
 
+A scope may also list **`permanentModifiers`** — a USAGE list, the parallel of an `AddModifier`
+grant minus the moment: each entry references a modifier declared on the reachable chain (ownership
+stays where it is), and the gather reads it directly — nothing granted, nothing saved, reset-immune.
+Root's apply to everything; a chapter's apply exactly to its own chain, which is the
+chapter-unique-buff case. Permanent membership contributes an implicit application count of 1,
+MERGED with the scope's stored stacks for the same modifier and resolved through the modifier's own
+stacking kind — `Replace` means permanent-plus-granted is still one application, so the two paths
+can never double-apply outside the vocabulary. The Records curve and the Roadie boosts of §3/§8 are
+this list's first content, as formula-shaped effects (§12.6) inside root-declared modifiers.
+
 **A rung** is `{offerCondition, List<Action>}` — the one shape behind the album release (declared
 on its tier) and the capstone (declared on the chapter): a rung of the prestige ladder. Event
 lifecycle commands are **not**
@@ -966,9 +979,12 @@ it declares a definition rather than reading a named list off it. Across the tre
 | Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `barGroups` |
-| Career facts | Records balance, Roadie allocation, songs this run, entitlements | a `CareerEffectDefinition`'s `MultiplierFormula`, computed on read (§3/§7/§8) |
+| Permanent modifiers | none - the `permanentModifiers` usage list is authored, not stored (§12.5) | the modifier's effects at an implicit application count of 1, merged with granted stacks; the career factors of §3/§7/§8 (Records balance, Roadie allocation) live here as formula-shaped effects |
 
-A `MultiplierFormula` computes against the **gather-origin** context - the source's scope in stage 1,
+**An effect's factor is a constant or a formula**: the authored `multiplier` when no formula is
+present, a `MultiplierFormula` computed on read when one is - every effect site (upgrades, granted
+modifiers, handicaps, cascades) carries the capability, and count scaling composes on the computed
+value. A `MultiplierFormula` computes against the **gather-origin** context - the source's scope in stage 1,
 the currency's home in stage 2 - never one rebased to where the effect is declared. This is a
 deliberate asymmetry with §12.4, where conditions and action lists evaluate in their declaring scope:
 a multiplier is addressed to a NUMBER, and the number's identity includes the chain it resolves on.
@@ -1339,7 +1355,7 @@ Assets/Scripts/
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root scope, and with it the whole graph; runs the §12.12 pass
-    ScopeDefinition.cs      // the abstract base: declaration lists, Declares, CreateState
+    ScopeDefinition.cs      // the abstract base: declaration lists + the permanentModifiers usage list, Declares, CreateState
     InteriorDefinition.cs   // chapters and tiers: the rung and the events list
     RootDefinition.cs  ChapterDefinition.cs  TierDefinition.cs   // one file each - Unity binds one ScriptableObject per script, by file name
     ScopeState.cs           // the base, ScopeState<TFacts>, the three state classes and their payloads
@@ -1352,7 +1368,7 @@ Assets/Scripts/
     Producer.cs             // stateless resolution: Σ matching produces entries × Π multipliers + GetMultiplier
     GeneratorDefinition.cs  UpgradeDefinition.cs
     Purchasing.cs           // TryBuy(generator | upgrade): fail-closed gate, spend, count or latch, payload
-    CareerEffectDefinition.cs  // formula-shaped multipliers + the MultiplierFormula family
+    MultiplierFormula.cs    // the formula family an Effect's factor can compute from
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply) + optional appliesWhen
     BarDefinition.cs  BarGroupDefinition.cs  BarSystem.cs
   Loop/
@@ -1442,8 +1458,8 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 - **Economy:** producers are named definitions owning base contributions —
   `produces: [{currencyId, stat, value, condition?}]`, stats (`rate`, `yield`) named and extensible;
   generators contribute the same entry shape, scaled by owned count; **Effect** =
-  `{target: id-or-tag, currencyId?, stat, multiplier}` (the stat required and exact), gathered on read from
-  facts (purchases, timed buffs, events, modifier grants, fill counts, career totals) and never
+  `{target: id-or-tag, currencyId?, stat, multiplier-or-formula}` (the stat required and exact), gathered on read from
+  facts (purchases, timed buffs, events, modifier grants, permanent memberships, fill counts) and never
   stored; flat bonuses are contributions; tags name sets from the member side.
 - **Bars:** generic fillables — each names an optional pool currency and its own fill rate, taking
   what is there in declaration order; a group only caps how many run at once; repeating bars carry

@@ -212,6 +212,13 @@ namespace RidiculousGaming.GarageBandIdle
         private string containerKey;
         private int actionIndex = -1;
 
+        // True only while validating a site the runtime can evaluate under the
+        // claim's idle-accumulation context: a modifier's appliesWhen, and a
+        // RATE entry's condition on a source some chapter's subtree contains.
+        // Everywhere else an IdleAccumulation condition reads a circumstance
+        // that is never set (12.5).
+        public bool IdleCircumstancePossible { get; internal set; }
+
         internal List<FlagSetterRecord> FlagSetters { get; } = new();
         internal List<ModifierGrantRecord> ModifierGrants { get; } = new();
         internal List<ModifierRemoveRecord> ModifierRemoves { get; } = new();
@@ -576,7 +583,6 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var modifier in scope.modifiers) if (modifier != null) yield return modifier;
             foreach (var generator in scope.generators) if (generator != null) yield return generator;
             foreach (var upgrade in scope.upgrades) if (upgrade != null) yield return upgrade;
-            foreach (var career in scope.careerEffects) if (career != null) yield return career;
             if (scope is InteriorDefinition interior)
                 foreach (var evt in interior.events) if (evt != null) yield return evt;
             foreach (var group in scope.barGroups)
@@ -749,7 +755,6 @@ namespace RidiculousGaming.GarageBandIdle
                         CollectDeclared(scope, group.bars, $"barGroup '{group.Id}' bars");
                 CollectDeclared(scope, scope.generators, "generators");
                 CollectDeclared(scope, scope.upgrades, "upgrades");
-                CollectDeclared(scope, scope.careerEffects, "careerEffects");
                 if (scope is InteriorDefinition interiorScope)
                     CollectDeclared(scope, interiorScope.events, "events");
             }
@@ -875,7 +880,6 @@ namespace RidiculousGaming.GarageBandIdle
                 RecordHome(scope, scope.producers);
                 RecordHome(scope, scope.generators);
                 RecordHome(scope, scope.upgrades);
-                RecordHome(scope, scope.careerEffects);
                 if (scope is InteriorDefinition interiorScope)
                     RecordHome(scope, interiorScope.events, "an event has one home");
             }
@@ -971,12 +975,30 @@ namespace RidiculousGaming.GarageBandIdle
                     ValidateUpgrade(ctx, upgrade, scope);
                 }
 
-                foreach (var career in scope.careerEffects)
+                // Usage, not declaration: each entry must reference a modifier
+                // declared on the chain reachable from the usage scope - the
+                // same reach a grant gets - and appear ONCE, because membership
+                // is one implicit application and the read iterates the list.
+                // The effects and appliesWhen are judged per usage site with
+                // the granted ones, below.
+                var permanentSeen = new HashSet<Economy.ModifierDefinition>();
+                for (var i = 0; i < scope.permanentModifiers.Count; i++)
                 {
-                    if (career == null)
+                    var permanent = scope.permanentModifiers[i];
+                    ctx.EnterContainer(scope, "permanent:" + scope.Id);
+                    ctx.SetSite($"scope '{scope.Id}' permanentModifiers[{i}]");
+                    if (permanent == null)
+                    {
+                        ctx.AddError(ValidationCheck.NullEntry, "null permanent modifier entry.");
                         continue;
-                    ctx.EnterContainer(scope, "career:" + career.Id);
-                    ValidateCareerEffect(ctx, career, scope);
+                    }
+                    if (!permanentSeen.Add(permanent))
+                    {
+                        ctx.AddError(ValidationCheck.DuplicateId,
+                            $"'{permanent.Id}' is listed twice - permanent membership is one implicit application, and a second entry would double-apply outside the stacking vocabulary (12.5).");
+                        continue;
+                    }
+                    ctx.RequireOnChain(permanent, "a permanent modifier entry");
                 }
             }
 
@@ -1012,7 +1034,15 @@ namespace RidiculousGaming.GarageBandIdle
                 if (entry.value < BigNumber.Zero)
                     ctx.AddError(ValidationCheck.NumericRange,
                         $"value is {entry.value} - a contribution never subtracts.");
+                // Only the idle claim's gather carries the circumstance, and it
+                // asks a chapter subtree for RATE alone - a yield condition is
+                // read only by live FireProducer calls, and a root-declared
+                // source sits outside every chapter's walk - so "this line pays
+                // only while idle" is coherent authoring exactly there (12.5).
+                ctx.IdleCircumstancePossible = entry.stat == Economy.Stat.Rate
+                    && !(ctx.ActingScope is RootDefinition);
                 entry.condition?.Validate(ctx);
+                ctx.IdleCircumstancePossible = false;
             }
         }
 
@@ -1236,16 +1266,6 @@ namespace RidiculousGaming.GarageBandIdle
             ValidateActionList(ctx, bar.onComplete, site);
         }
 
-        private static void ValidateCareerEffect(ValidationContext ctx, Economy.CareerEffectDefinition career, ScopeDefinition scope)
-        {
-            var site = $"career effect '{career.Id}'";
-            ctx.SetSite(site);
-            if (career.formula == null)
-                ctx.AddError(ValidationCheck.NullEntry, "no formula - there is no factor to compute.");
-            ValidateEffectAddress(ctx, career.target, career.currencyId, career.stat, site, scope);
-            career.formula?.Validate(ctx);
-        }
-
         private static void ValidateActionList(ValidationContext ctx, List<GameAction> actions, string siteBase)
         {
             for (var i = 0; i < actions.Count; i++)
@@ -1418,10 +1438,12 @@ namespace RidiculousGaming.GarageBandIdle
                     ctx.AddWarning(ValidationCheck.RemoveWithoutGrant,
                         $"{remove.Site}: RemoveModifier removes '{remove.Modifier.Id}' at '{remove.Target.Id}', where nothing grants it.");
 
-            // An effect's numbers are the same wherever it is granted; its
-            // ADDRESS is not, so the address is judged once per grant site - the
-            // granted-to scope is where the effect lives. A modifier nothing
-            // grants is judged from the scope that DECLARES it, which is the
+            // An effect's numbers are the same wherever the modifier is applied;
+            // its ADDRESS is not, so the address - and the formulas and
+            // appliesWhen judged from the same place - is validated once per
+            // usage site: every grant target, plus every scope whose
+            // permanentModifiers list carries the modifier. A modifier nothing
+            // uses is judged from the scope that DECLARES it, which is the
             // loosest legal grant site (a grant must name a scope the modifier's
             // own declaration can reach), so every authored reference still
             // resolves (12.12).
@@ -1433,31 +1455,57 @@ namespace RidiculousGaming.GarageBandIdle
                     for (var i = 0; i < modifier.effects.Count; i++)
                         ValidateEffectNumbers(ctx, modifier.effects[i], $"modifier '{modifier.Id}' effects[{i}]");
 
-                    var grantedAt = ctx.ModifierGrants
-                        .Where(g => g.Modifier == modifier)
-                        .Select(g => g.Target)
-                        .Distinct()
-                        .ToList();
-                    if (grantedAt.Count == 0)
-                    {
-                        for (var i = 0; i < modifier.effects.Count; i++)
-                            ValidateEffectAddress(ctx, modifier.effects[i], $"modifier '{modifier.Id}' effects[{i}]", scope);
-                    }
-                    else
-                    {
-                        foreach (var home in grantedAt)
-                            for (var i = 0; i < modifier.effects.Count; i++)
-                                ValidateEffectAddress(ctx, modifier.effects[i],
-                                    $"modifier '{modifier.Id}' (granted at '{home.Id}') effects[{i}]", home);
-                    }
+                    var sites = new List<(ScopeDefinition home, string at)>();
+                    foreach (var target in ctx.ModifierGrants
+                                 .Where(g => g.Modifier == modifier).Select(g => g.Target).Distinct())
+                        sites.Add((target, $" (granted at '{target.Id}')"));
+                    foreach (var user in ctx.TreeScopes)
+                        if (user.permanentModifiers.Contains(modifier) && !sites.Any(s => s.home == user))
+                            sites.Add((user, $" (applied at '{user.Id}')"));
+                    if (sites.Count == 0)
+                        sites.Add((scope, string.Empty));
+                    foreach (var (home, at) in sites)
+                        ValidateModifierAtSite(ctx, modifier, home, at);
                 }
+            ctx.ClearSite();
         }
 
-        // One Effect atom: numbers, then address.
+        // One modifier judged from one usage site: each effect's address and
+        // formula, then the appliesWhen condition - the reads all walk outward
+        // from the site, so the site is the acting scope for all of them.
+        private static void ValidateModifierAtSite(ValidationContext ctx, Economy.ModifierDefinition modifier,
+                                                   ScopeDefinition home, string at)
+        {
+            ctx.EnterContainer(home, "modifier:" + modifier.Id);
+            for (var i = 0; i < modifier.effects.Count; i++)
+            {
+                var effectSite = $"modifier '{modifier.Id}'{at} effects[{i}]";
+                ValidateEffectAddress(ctx, modifier.effects[i], effectSite, home);
+                if (modifier.effects[i].formula != null)
+                {
+                    ctx.SetSite(effectSite);
+                    modifier.effects[i].formula.Validate(ctx);
+                    ctx.SetSite(null);
+                }
+            }
+            if (modifier.appliesWhen != null)
+            {
+                ctx.SetSite($"modifier '{modifier.Id}'{at} appliesWhen");
+                ctx.IdleCircumstancePossible = true;
+                modifier.appliesWhen.Validate(ctx);
+                ctx.IdleCircumstancePossible = false;
+                ctx.SetSite(null);
+            }
+        }
+
+        // One Effect atom: numbers, then address, then the formula when one is
+        // authored - its reads walk outward from where the effect lives, which
+        // the walker has already made the acting scope here.
         private static void ValidateEffect(ValidationContext ctx, Effect effect, string site, ScopeDefinition home)
         {
             ValidateEffectNumbers(ctx, effect, site);
             ValidateEffectAddress(ctx, effect, site, home);
+            effect.formula?.Validate(ctx);
         }
 
         // The multiplier is the same number wherever the effect is granted, so
@@ -1476,8 +1524,7 @@ namespace RidiculousGaming.GarageBandIdle
         // Resolution and reach are the same question here: the gather walks
         // outward from a source or a currency home, so it passes this effect
         // only for candidates sitting in this scope's subtree, and the
-        // coordinates are the filter it applies to them. Career effects come
-        // through too - the same triple without being an Effect.
+        // coordinates are the filter it applies to them.
         private static void ValidateEffectAddress(ValidationContext ctx, string target, string currencyId, string stat, string site, ScopeDefinition home)
         {
             // The currency coordinate narrows to a currency, by id or by a tag a

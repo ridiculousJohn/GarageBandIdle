@@ -37,10 +37,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly UpgradeDefinition StagePresence;
         public readonly UpgradeDefinition AmpStrings;
         public readonly UpgradeDefinition TightSet;
-        public readonly CareerEffectDefinition RecordsIncome;
-        public readonly CareerEffectDefinition RecordsIncomeYield;
-        public readonly CareerEffectDefinition RoadieTotal;
-        public readonly CareerEffectDefinition RoadieActive;
+        public readonly ModifierDefinition RecordsIncome;
+        public readonly ModifierDefinition RoadieTotal;
+        public readonly ModifierDefinition RoadieActive;
         public readonly ModifierDefinition GjTap1;
         public readonly TriggerDefinition Tier1Trigger;
         public readonly EventDefinition TimedGig;
@@ -123,35 +122,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Tier1Def.generators.AddRange(new[] { PracticeAmp, Drummer });
             Tier1Def.upgrades.AddRange(new[] { StagePresence, AmpStrings, TightSet });
 
-            // 1 + 0.02 * records, on the income tag cash carries. The stat leg
-            // is exact, so "rate and yield alike" is one career per stat.
-            RecordsIncome = MakeDefinition<CareerEffectDefinition>("records_income");
-            RecordsIncome.target = "income";
-            RecordsIncome.stat = Stat.Rate;
-            RecordsIncome.formula = new LinearOnBalance { currency = Records, coefficient = 0.02 };
-            RootDef.careerEffects.Add(RecordsIncome);
-
-            RecordsIncomeYield = MakeDefinition<CareerEffectDefinition>("records_income_yield");
-            RecordsIncomeYield.target = "income";
-            RecordsIncomeYield.stat = Stat.Yield;
-            RecordsIncomeYield.formula = new LinearOnBalance { currency = Records, coefficient = 0.02 };
-            RootDef.careerEffects.Add(RecordsIncomeYield);
+            // 1 + 0.02 * records, on the income tag cash carries - a permanent
+            // modifier on root, declared there and applied there. The stat leg
+            // is exact, so "rate and yield alike" is one entry per stat.
+            RecordsIncome = MakeDefinition<ModifierDefinition>("records_income");
+            RecordsIncome.effects.Add(new Effect { target = "income", stat = Stat.Rate,
+                formula = new LinearOnBalance { currency = Records, coefficient = 0.02 } });
+            RecordsIncome.effects.Add(new Effect { target = "income", stat = Stat.Yield,
+                formula = new LinearOnBalance { currency = Records, coefficient = 0.02 } });
+            RootDef.modifiers.Add(RecordsIncome);
+            RootDef.permanentModifiers.Add(RecordsIncome);
 
             // The two roadie effects, composed at different levels: the global
             // product on the income currency, the per-chapter factor on the
             // SOURCES, narrowed to income so a bandmate's fans line stays out.
-            RoadieTotal = MakeDefinition<CareerEffectDefinition>("roadie_total");
-            RoadieTotal.target = "income";
-            RoadieTotal.stat = Stat.Rate;
-            RoadieTotal.formula = new RoadieTotalBoost { perRoadie = 0.05 };
-            RootDef.careerEffects.Add(RoadieTotal);
+            RoadieTotal = MakeDefinition<ModifierDefinition>("roadie_total");
+            RoadieTotal.effects.Add(new Effect { target = "income", stat = Stat.Rate,
+                formula = new RoadieTotalBoost { perRoadie = 0.05 } });
+            RootDef.modifiers.Add(RoadieTotal);
+            RootDef.permanentModifiers.Add(RoadieTotal);
 
-            RoadieActive = MakeDefinition<CareerEffectDefinition>("roadie_active");
-            RoadieActive.target = "production";
-            RoadieActive.currencyId = "income";
-            RoadieActive.stat = Stat.Rate;
-            RoadieActive.formula = new RoadieActiveBoost { perRoadie = 0.05 };
-            RootDef.careerEffects.Add(RoadieActive);
+            RoadieActive = MakeDefinition<ModifierDefinition>("roadie_active");
+            RoadieActive.effects.Add(new Effect { target = "production", currencyId = "income", stat = Stat.Rate,
+                formula = new RoadieActiveBoost { perRoadie = 0.05 } });
+            RootDef.modifiers.Add(RoadieActive);
+            RootDef.permanentModifiers.Add(RoadieActive);
 
             // learn_covers: each cover drinks Rehearsal at 2/s, and the group
             // caps it to ONE at a time, since choosing the next one is the

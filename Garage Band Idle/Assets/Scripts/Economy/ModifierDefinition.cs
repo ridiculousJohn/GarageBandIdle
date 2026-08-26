@@ -23,5 +23,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     {
         public StackingKind stacking = StackingKind.Replace;
         public List<Effect> effects = new();
+
+        // Judged at gather time against the ORIGIN context; absent means always.
+        // A false condition skips the whole modifier - permanent membership and
+        // granted stacks alike (design doc 12.5). The effects stay unconditional
+        // atoms; the timing lives here, on the carrier.
+        [SerializeReference, SubclassPicker] public Condition appliesWhen;
     }
 }

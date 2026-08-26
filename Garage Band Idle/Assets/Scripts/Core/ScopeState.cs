@@ -216,7 +216,23 @@ namespace RidiculousGaming.GarageBandIdle
                     continue;
                 foreach (var effect in upgrade.effects)
                     if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                        product *= effect.multiplier;
+                        product *= Producer.FactorOf(effect, origin);
+            }
+
+            // Permanent memberships contribute an implicit application count of
+            // 1, MERGED with this scope's stored stacks for the same modifier
+            // and resolved through the modifier's own stacking kind - Replace
+            // means permanent-plus-granted is still one application, so the two
+            // paths can never double-apply outside the vocabulary (12.5). Ids
+            // are chain-unique, so the stack's id names this same asset.
+            foreach (var modifier in Definition.permanentModifiers)
+            {
+                if (modifier == null || !Applies(modifier, origin))
+                    continue;
+                modifierStacks.TryGetValue(modifier.Id, out var stacks);
+                foreach (var effect in modifier.effects)
+                    if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
+                        product *= Producer.Stacked(Producer.FactorOf(effect, origin), 1 + stacks, modifier.stacking);
             }
 
             // Granted modifier stacks: the stored count scales the effect by the
@@ -226,9 +242,13 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var pair in modifierStacks)
             {
                 var modifier = Producer.FindModifier(this, pair.Key);
+                if (Definition.permanentModifiers.Contains(modifier))
+                    continue;                       // merged into the permanent application above
+                if (!Applies(modifier, origin))
+                    continue;
                 foreach (var effect in modifier.effects)
                     if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                        product *= Producer.Stacked(effect.multiplier, pair.Value, modifier.stacking);
+                        product *= Producer.Stacked(Producer.FactorOf(effect, origin), pair.Value, modifier.stacking);
             }
 
             // Repeating-bar cascades: a completed fill applies the carrying
@@ -249,30 +269,28 @@ namespace RidiculousGaming.GarageBandIdle
                         if (entry == null)
                             continue;
                         if (Producer.Matches(entry.effect.target, entry.effect.currencyId, entry.effect.stat, owner, currency, stat))
-                            product *= Producer.Grown(entry.effect.multiplier, fills, entry.growth);
+                            product *= Producer.Grown(Producer.FactorOf(entry.effect, origin), fills, entry.growth);
                     }
                 }
-            }
-
-            // Career effects declared here, computed against the ORIGIN context
-            // rather than this scope's.
-            foreach (var career in Definition.careerEffects)
-            {
-                if (career == null || career.formula == null)
-                    continue;
-                if (Producer.Matches(career.target, career.currencyId, career.stat, owner, currency, stat))
-                    product *= career.formula.Compute(origin);
             }
 
             return product;
         }
 
+        // Whether a modifier applies under this gather's circumstance, judged
+        // against the ORIGIN context - the same evaluation-context ruling
+        // formulas follow. Absent means always (design doc 12.5).
+        private static bool Applies(Economy.ModifierDefinition modifier, GameContext origin) =>
+            modifier.appliesWhen == null || modifier.appliesWhen.Evaluate(origin);
+
         // The rate this scope's own sources pay into one currency, before the
         // currency stage. Asked of every node in a subtree walk, same contract
-        // as MultiplierFor: the caller sums, the scope decides what it has.
-        internal virtual BigNumber SourceTermsFor(DateTime nowUtc, CurrencyDefinition currency, string stat)
+        // as MultiplierFor: the caller sums, the scope decides what it has. The
+        // context rebases rather than being rebuilt, so the circumstance rides
+        // through to every entry condition and gather it implies.
+        internal virtual BigNumber SourceTermsFor(GameContext ctx, CurrencyDefinition currency, string stat)
         {
-            var declaringCtx = new GameContext(this, nowUtc);
+            var declaringCtx = ctx.Rebase(this);
             var sum = BigNumber.Zero;
 
             foreach (var producer in Definition.producers)
@@ -400,7 +418,7 @@ namespace RidiculousGaming.GarageBandIdle
                     continue;
                 foreach (var effect in evt.handicaps)
                     if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                        product *= effect.multiplier;
+                        product *= Producer.FactorOf(effect, origin);
             }
             return product;
         }

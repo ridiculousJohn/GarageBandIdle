@@ -116,8 +116,10 @@ authoring.
 Validation: `appliesWhen` validates as a condition wherever the modifier's addresses are judged -
 per grant site, or the declaring scope when nothing grants it. An `IdleAccumulation` condition in
 a site never evaluated under a claim's context (a gate, a trigger, a rung offer, an event goal) is
-dead content and warns; a produces entry is evaluated under both circumstances, so one there is
-legal ("this line pays only while idle" is coherent authoring).
+dead content and warns; the one entry site evaluated under both circumstances is a RATE entry on a
+source some chapter's subtree contains, so one there is legal ("this line pays only while idle" is
+coherent authoring). A yield condition is read only by live FireProducer calls, and a
+root-declared source sits outside every chapter's idle walk, so those warn too.
 
 ## TickSystem
 
@@ -282,15 +284,18 @@ caller.
 - Career-effect checks move into effect validation with the formula field (non-null formula
   validated where a career's formula was; constant path validated as today).
 - `permanentModifiers` validates as USAGE, never ownership: each entry must reference a modifier
-  declared on the chain reachable from the usage scope - the same reach a grant gets - with its
-  effects validated from the usage scope. It joins no id collection and no `RecordHome`: a
+  declared on the chain reachable from the usage scope - the same reach a grant gets - and appear
+  once per list, since membership is one implicit application and a duplicate entry would
+  double-apply outside the stacking vocabulary (error); its effects are validated from the usage
+  scope. It joins no id collection and no `RecordHome`: a
   modifier both declared and permanently applied at one scope is the normal case, not a
   `DuplicateHome`. Neither list has, or gains, a declared-but-unused warn; `RemoveWithoutGrant`
   stays the only modifier-shaped finding.
 - `appliesWhen` validates as a condition at the same sites the modifier's addresses are judged
   (per grant site, declaring scope when ungranted); an `IdleAccumulation` condition in a site
   never evaluated under a claim's context (gate, trigger, rung offer, event goal) is dead content
-  (warn); on a produces entry it is legal.
+  (warn); it is legal on a rate entry some chapter's subtree contains, and dead on a yield entry
+  or a root-declared source's entries (warn).
 - `GameConfig` is fail-loud at its consumers (requirement 7): a null config, a non-finite or
   sub-1 `maxGameSpeed`, or a non-finite or negative `minimumAwaySeconds` or `idleCapSeconds`
   throws - at `TickSystem.Tick` for direct use and at session construction - never a silent clamp
@@ -328,7 +333,7 @@ appliesWhen (`ResolutionTests`, `ContentValidatorTests`): a modifier with
 `appliesWhen: IdleAccumulation` contributes under an idle-accumulation context and not under a
 live one, permanent membership and granted stacks alike; a live-only modifier
 (`Not(IdleAccumulation)`) inverts that; absent applies always; the validator rows above (dead
-sites warn, produces entries legal).
+sites warn, chapter-reachable rate entries legal, yield and root-source entries warn).
 
 `TickSystemTests`: rate deposits land at their homes scaled by dt, two currencies at two homes;
 sizing against pre-deposit state (a rate entry conditioned on a threshold this segment's own
@@ -391,8 +396,9 @@ Six changesets, each compiling and green on its own.
   the produced/address split, the validator flips (empty target legal, empty stat an error), the
   audit of existing fixtures for stat-less effects, `ResolutionTests` and `ContentValidatorTests`
   rows. (The idle stats it briefly carried were removed when the idle respell was decided.)
-- **B. Careers fold + appliesWhen** - `Effect.formula`, `permanentModifiers`,
-  `CareerEffectDefinition` deleted, the converted content and tests, the career-describing doc
+- **B. Careers fold + appliesWhen** - **LANDED 2026-08-26, 356/356**: `Effect.formula`,
+  `permanentModifiers`, `CareerEffectDefinition` deleted (the `MultiplierFormula` family survives
+  in its own file), the converted content and tests, the career-describing doc
   edits; `ModifierDefinition.appliesWhen`, the `GameContext` idle-accumulation circumstance, the
   `IdleAccumulation` condition kind, and the `GetRate(ctx, currency)` reshape, plus their tests -
   the mechanism lands here beside the other modifier-shape work, so E only consumes it.

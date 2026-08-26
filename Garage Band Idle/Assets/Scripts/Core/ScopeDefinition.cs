@@ -31,17 +31,20 @@ namespace RidiculousGaming.GarageBandIdle
         // Modifiers grantable within this scope's subtree. The grant writes a
         // stack on the target scope; the read resolves it outward to here.
         public List<Economy.ModifierDefinition> modifiers = new();
+
+        // A USAGE list, the parallel of an AddModifier grant minus the moment:
+        // each entry references a modifier declared on the reachable chain, and
+        // the gather reads it directly - nothing granted, nothing saved,
+        // reset-immune. Contributes an implicit application count of 1, merged
+        // with this scope's stored stacks through the modifier's own stacking
+        // kind (design doc 12.5).
+        public List<Economy.ModifierDefinition> permanentModifiers = new();
         public List<Economy.GeneratorDefinition> generators = new();
 
         // Bar groups homed here; each group owns its bars (design doc 12.7).
         // The fill and settlement systems land with build step 5.
         public List<Economy.BarGroupDefinition> barGroups = new();
         public List<Economy.UpgradeDefinition> upgrades = new();
-
-        // Formula-shaped multipliers that exist from minute one and contribute
-        // 1x until their facts do (design doc 12.6). Declared where the facts
-        // they read live - Chapter 1's three are all root's.
-        public List<Economy.CareerEffectDefinition> careerEffects = new();
 
         // The declared ids, in authored order. Every runtime fact is keyed by
         // id, so this is what state and the save walk; a null slot is a load
@@ -74,6 +77,8 @@ namespace RidiculousGaming.GarageBandIdle
         // Whether this scope declares that definition. A scope answers for its
         // OWN lists, so the outward walk never names one - which is what lets a
         // kind of scope declare something the other kinds cannot.
+        // permanentModifiers is deliberately absent: it is usage, not
+        // declaration - the modifiers it references are declared elsewhere.
         internal virtual bool Declares(Definition definition) =>
             Holds(declaredCurrencies, definition)
             || Holds(producers, definition)
@@ -81,7 +86,6 @@ namespace RidiculousGaming.GarageBandIdle
             || Holds(generators, definition)
             || Holds(barGroups, definition)
             || Holds(upgrades, definition)
-            || Holds(careerEffects, definition)
             || Holds(triggers, definition);
 
         protected static bool Holds<T>(List<T> list, Definition definition) where T : Definition

@@ -153,8 +153,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Root sits on BOTH gather walks; one stage per effect is what
             // keeps this x2 rather than x4 - and the stat is exact, so the tap
             // yield stays out of it.
-            AssertClose(0.5 * 4 * 2, Producer.GetRate(tree.Tier1, Now, tree.Cash), "cash rate");
-            AssertClose(0.35 * 2, Producer.GetRate(tree.Tier1, Now, tree.Fans), "every currency");
+            AssertClose(0.5 * 4 * 2, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
+            AssertClose(0.35 * 2, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Fans), "every currency");
             AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cash, tree.Cash, Stat.Yield), "the stat is exact");
         }
 
@@ -301,10 +301,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_roadie_boost_never_overflows_on_its_way_into_BigNumber()
         {
             var tree = new TestTree();
-            ((RoadieActiveBoost)tree.RoadieActive.formula).perRoadie = double.MaxValue;
+            ((RoadieActiveBoost)tree.RoadieActive.effects[0].formula).perRoadie = double.MaxValue;
             tree.Root.roadieAllocation["ch1"] = 2;
 
-            var boost = tree.RoadieActive.formula.Compute(tree.Ctx(tree.Tier1));
+            var boost = tree.RoadieActive.effects[0].formula.Compute(tree.Ctx(tree.Tier1));
             Assert.IsTrue(boost > (BigNumber)double.MaxValue, $"expected a value past double range, got {boost}");
         }
 
@@ -321,8 +321,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["drummer"] = 1;
             tree.Root.roadieAllocation["ch1"] = 2;              // 1 + 0.05 x 2 on both roadie factors
 
-            AssertClose(3 * 1.1 * 1.1, Producer.GetRate(tree.Tier1, Now, tree.Cash), "cash rate");
-            AssertClose(0.35 + 0.02, Producer.GetRate(tree.Tier1, Now, tree.Fans), "fan rate");
+            AssertClose(3 * 1.1 * 1.1, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
+            AssertClose(0.35 + 0.02, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Fans), "fan rate");
         }
 
         [Test]
@@ -346,11 +346,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["drummer"] = 2;
 
             // 0.5 x 3 + 3 x 2
-            AssertClose(7.5, Producer.GetRate(tree.Tier1, Now, tree.Cash), "no upgrades");
+            AssertClose(7.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "no upgrades");
 
             // amp_strings doubles the amp's term only - the drummer's is untouched.
             tree.Tier1.purchasedUpgrades.Add("amp_strings");
-            AssertClose(9, Producer.GetRate(tree.Tier1, Now, tree.Cash), "amp_strings");
+            AssertClose(9, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "amp_strings");
         }
 
         [Test]
@@ -361,7 +361,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.purchasedUpgrades.Add("tight_set");
 
             // tight_set targets cash with stat: rate, so it lifts the rate...
-            AssertClose(0.5 * 4 * 1.5, Producer.GetRate(tree.Tier1, Now, tree.Cash), "cash rate");
+            AssertClose(0.5 * 4 * 1.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
 
             // ...and leaves the tap yield alone.
             AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cash, tree.Cash, Stat.Yield), "cash yield");
@@ -371,10 +371,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Owned_counts_scale_a_generator_and_absent_counts_contribute_nothing()
         {
             var tree = new TestTree();
-            AssertClose(0, Producer.GetRate(tree.Tier1, Now, tree.Cash), "nothing owned");
+            AssertClose(0, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "nothing owned");
 
             tree.Tier1.generatorCounts["practice_amp"] = 7;
-            AssertClose(3.5, Producer.GetRate(tree.Tier1, Now, tree.Cash), "seven amps");
+            AssertClose(3.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "seven amps");
         }
 
         [Test]
@@ -383,9 +383,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
 
             // The Jam's rehearsal rate is gated on the reveal: no pre-banking.
-            AssertClose(0, Producer.GetRate(tree.Tier1, Now, tree.Rehearsal), "before the reveal");
+            AssertClose(0, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Rehearsal), "before the reveal");
             tree.Tier1.flags.Add("rehearsal_revealed");
-            AssertClose(0.5, Producer.GetRate(tree.Tier1, Now, tree.Rehearsal), "after the reveal");
+            AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Rehearsal), "after the reveal");
         }
 
         [Test]
@@ -396,12 +396,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["drummer"] = 3;
 
             // The band's base accrual plus each bandmate's own fans entry.
-            AssertClose(0.35 + 0.02 * 3, Producer.GetRate(tree.Tier1, Now, tree.Fans), "from tier1");
+            AssertClose(0.35 + 0.02 * 3, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Fans), "from tier1");
 
             // Asking from further out finds the same sources - the subtree root
             // decides what is counted, not where the currency lives.
-            AssertClose(0.35 + 0.02 * 3, Producer.GetRate(tree.Ch1, Now, tree.Fans), "from ch1");
-            AssertClose(0, Producer.GetRate(tree.Root, Now, tree.Roadies), "a currency nothing produces");
+            AssertClose(0.35 + 0.02 * 3, Producer.GetRate(tree.Ctx(tree.Ch1), tree.Fans), "from ch1");
+            AssertClose(0, Producer.GetRate(tree.Ctx(tree.Root), tree.Roadies), "a currency nothing produces");
         }
 
         [Test]
@@ -436,12 +436,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tierB.generatorCounts["gen_b"] = 1;
             tierA.purchasedUpgrades.Add("boost_a");
 
-            AssertClose(4, Producer.GetRate(tierA, Now, coin), "tier_a carries its own boost");
-            AssertClose(1, Producer.GetRate(tierB, Now, coin), "tier_b never sees a sibling's effect");
-            AssertClose(5, Producer.GetRate(chapter, Now, coin), "the chapter total is the SUM of the terms");
+            AssertClose(4, Producer.GetRate(new GameContext(tierA, Now), coin), "tier_a carries its own boost");
+            AssertClose(1, Producer.GetRate(new GameContext(tierB, Now), coin), "tier_b never sees a sibling's effect");
+            AssertClose(5, Producer.GetRate(new GameContext(chapter, Now), coin), "the chapter total is the SUM of the terms");
         }
 
-        // ---- career effects ----
+        // ---- permanent modifiers and formula effects ----
 
         [Test]
         public void Records_income_lifts_every_number_the_income_tag_carries()
@@ -451,14 +451,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["practice_amp"] = 4;
 
             // 1 + 0.02 x 20 = 1.4, on the rate and on the tap yield alike - the
-            // stat leg is exact, so walkthrough 13.2's "alike" is one career per
+            // stat leg is exact, so walkthrough 13.2's "alike" is one entry per
             // stat, both on the income tag.
-            AssertClose(0.5 * 4 * 1.4, Producer.GetRate(tree.Tier1, Now, tree.Cash), "cash rate");
+            AssertClose(0.5 * 4 * 1.4, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
             AssertClose(1.4, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cash, tree.Cash, Stat.Yield), "cash yield");
 
             // Fans are never income-tagged: the farm throttle stands on it.
             tree.Tier1.flags.Add("fans_revealed");
-            AssertClose(0.35, Producer.GetRate(tree.Tier1, Now, tree.Fans), "fans");
+            AssertClose(0.35, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Fans), "fans");
         }
 
         [Test]
@@ -471,8 +471,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Additive within a chapter, multiplicative across them: 1.15 x 1.05
             // everywhere, and the chapter being worked applies its own factor a
             // second time (design doc 8.2).
-            AssertClose(1.15 * 1.05 * 1.15, Producer.GetRate(world.TierA, Now, world.CoinA), "chapter a");
-            AssertClose(1.15 * 1.05 * 1.05, Producer.GetRate(world.TierB, Now, world.CoinB), "chapter b");
+            AssertClose(1.15 * 1.05 * 1.15, Producer.GetRate(new GameContext(world.TierA, Now), world.CoinA), "chapter a");
+            AssertClose(1.15 * 1.05 * 1.05, Producer.GetRate(new GameContext(world.TierB, Now), world.CoinB), "chapter b");
         }
 
         [Test]
@@ -487,8 +487,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             spread.Root.roadieAllocation["chapter_a"] = 2;
             spread.Root.roadieAllocation["chapter_b"] = 2;
 
-            AssertClose(1.20, Producer.GetRate(stacked.Root, Now, stacked.Prestige), "stacked");
-            AssertClose(1.10 * 1.10, Producer.GetRate(spread.Root, Now, spread.Prestige), "spread");
+            AssertClose(1.20, Producer.GetRate(new GameContext(stacked.Root, Now), stacked.Prestige), "stacked");
+            AssertClose(1.10 * 1.10, Producer.GetRate(new GameContext(spread.Root, Now), spread.Prestige), "spread");
         }
 
         [Test]
@@ -499,7 +499,142 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // A root-homed number resolves on root's chain, which holds no
             // chapter: the total boost applies, the active double-count does not.
-            AssertClose(1.15, Producer.GetRate(world.Root, Now, world.Prestige), "root-homed");
+            AssertClose(1.15, Producer.GetRate(new GameContext(world.Root, Now), world.Prestige), "root-homed");
+        }
+
+        [Test]
+        public void A_formula_effect_in_a_granted_modifier_computes_against_the_origin()
+        {
+            var tree = new TestTree();
+            var scaled = TestTree.MakeDefinition<ModifierDefinition>("scaled");
+            scaled.stacking = StackingKind.Linear;
+            scaled.effects.Add(new Effect { target = "practice_amp", stat = Stat.Rate,
+                formula = new LinearOnBalance { currency = tree.Cash, coefficient = 0.1 } });
+            tree.Tier1Def.modifiers.Add(scaled);
+            tree.Tier1.modifierStacks["scaled"] = 1;
+            tree.Tier1.balances["cash"] = 5;
+
+            // 1 + 0.1 x 5, read off the origin's chain like every formula.
+            AssertClose(1.5, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "one stack");
+
+            // Count scaling composes on the COMPUTED value: 1 + (1.5 - 1) x 2.
+            tree.Tier1.modifierStacks["scaled"] = 2;
+            AssertClose(2, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "two stacks");
+        }
+
+        [Test]
+        public void A_chapters_permanent_modifier_applies_on_its_own_chain_and_not_a_siblings()
+        {
+            var rootDef = TestTree.MakeRoot("root");
+            var chapterADef = TestTree.MakeChapter("chapter_a");
+            var chapterBDef = TestTree.MakeChapter("chapter_b");
+            var tierADef = TestTree.MakeTier("tier_a");
+            var tierBDef = TestTree.MakeTier("tier_b");
+            var coinA = TestTree.DeclareCurrency(tierADef, "coin_a");
+            var coinB = TestTree.DeclareCurrency(tierBDef, "coin_b");
+            rootDef.children.Add(chapterADef);
+            rootDef.children.Add(chapterBDef);
+            chapterADef.children.Add(tierADef);
+            chapterBDef.children.Add(tierBDef);
+            tierADef.generators.Add(MakeGenerator("gen_a", coinA));
+            tierBDef.generators.Add(MakeGenerator("gen_b", coinB));
+
+            // The chapter-unique buff: declared and applied at chapter_a, so
+            // only a gather walking through chapter_a ever collects it.
+            var chapterBoost = TestTree.MakeDefinition<ModifierDefinition>("chapter_boost");
+            chapterBoost.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });
+            chapterADef.modifiers.Add(chapterBoost);
+            chapterADef.permanentModifiers.Add(chapterBoost);
+
+            var root = ScopeState.Build(rootDef);
+            var tierA = root.FindInSubtree(tierADef);
+            var tierB = root.FindInSubtree(tierBDef);
+            tierA.generatorCounts["gen_a"] = 1;
+            tierB.generatorCounts["gen_b"] = 1;
+
+            AssertClose(2, Producer.GetRate(new GameContext(tierA, Now), coinA), "its own chain");
+            AssertClose(1, Producer.GetRate(new GameContext(tierB, Now), coinB), "a sibling's chain");
+        }
+
+        // Permanent membership is declaration, not state: there is no fact for
+        // a reset to clear, unlike the granted stack it would wipe.
+        [Test]
+        public void A_permanent_modifier_survives_a_reset()
+        {
+            var tree = new TestTree();
+            var standing = TestTree.MakeDefinition<ModifierDefinition>("standing");
+            standing.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
+            tree.Ch1Def.modifiers.Add(standing);
+            tree.Ch1Def.permanentModifiers.Add(standing);
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+
+            AssertClose(1, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "applies");
+
+            tree.Ch1.Clear(Now);
+            tree.Tier1.Clear(Now);
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+            AssertClose(1, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "survives the reset");
+        }
+
+        [Test]
+        public void A_modifier_both_permanent_and_granted_resolves_through_its_own_stacking_kind()
+        {
+            var tree = new TestTree();
+            var linear = TestTree.MakeDefinition<ModifierDefinition>("both_linear");
+            linear.stacking = StackingKind.Linear;
+            linear.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = 2 });
+            tree.Tier1Def.modifiers.Add(linear);
+            tree.Tier1Def.permanentModifiers.Add(linear);
+
+            // Permanent membership alone is one application.
+            var ctx = tree.Ctx(tree.Tier1);
+            AssertClose(2, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "implicit 1");
+
+            // Granted stacks MERGE with the implicit 1: count 3, 1 + (2-1) x 3.
+            tree.Tier1.modifierStacks["both_linear"] = 2;
+            AssertClose(4, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "1 + 2 stacks");
+
+            // Replace means permanent-plus-granted is still ONE application.
+            var replace = TestTree.MakeDefinition<ModifierDefinition>("both_replace");
+            replace.effects.Add(new Effect { target = "tap_producer", stat = Stat.Rate, multiplier = 3 });
+            tree.Tier1Def.modifiers.Add(replace);
+            tree.Tier1Def.permanentModifiers.Add(replace);
+            tree.Tier1.modifierStacks["both_replace"] = 5;
+            AssertClose(3, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Rate), "replace stays one");
+        }
+
+        // ---- appliesWhen (12.5) ----
+
+        [Test]
+        public void An_idle_only_modifier_contributes_under_the_idle_circumstance_alone()
+        {
+            var tree = new TestTree();
+            var idleOnly = TestTree.MakeDefinition<ModifierDefinition>("idle_only");
+            idleOnly.appliesWhen = new IdleAccumulation();
+            idleOnly.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 0.5 });
+            tree.RootDef.modifiers.Add(idleOnly);
+            tree.RootDef.permanentModifiers.Add(idleOnly);
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+
+            AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "live");
+            AssertClose(0.25, Producer.GetRate(new GameContext(tree.Tier1, Now, idleAccumulation: true), tree.Cash), "idle");
+        }
+
+        // The inverse composes from the same two primitives, and the condition
+        // binds a granted stack exactly as it binds a permanent membership.
+        [Test]
+        public void A_live_only_modifier_excuses_itself_from_the_idle_gather()
+        {
+            var tree = new TestTree();
+            var liveOnly = TestTree.MakeDefinition<ModifierDefinition>("live_only");
+            liveOnly.appliesWhen = new Not { condition = new IdleAccumulation() };
+            liveOnly.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
+            tree.Tier1Def.modifiers.Add(liveOnly);
+            tree.Tier1.modifierStacks["live_only"] = 1;
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+
+            AssertClose(1, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "live");
+            AssertClose(0.5, Producer.GetRate(new GameContext(tree.Tier1, Now, idleAccumulation: true), tree.Cash), "idle");
         }
 
         // Two chapters, each with its own run currency - the shape section 8.2's
@@ -535,17 +670,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 tierBDef.generators.Add(genB);
                 rootDef.generators.Add(genRoot);
 
-                var total = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_total");
-                total.target = "income";
-                total.stat = Stat.Rate;
-                total.formula = new RoadieTotalBoost { perRoadie = 0.05 };
-                var active = TestTree.MakeDefinition<CareerEffectDefinition>("roadie_active");
-                active.target = "production";          // the SOURCE knows its chapter; a currency total does not
-                active.currencyId = "income";
-                active.stat = Stat.Rate;
-                active.formula = new RoadieActiveBoost { perRoadie = 0.05 };
-                rootDef.careerEffects.Add(total);
-                rootDef.careerEffects.Add(active);
+                var total = TestTree.MakeDefinition<ModifierDefinition>("roadie_total");
+                total.effects.Add(new Effect { target = "income", stat = Stat.Rate,
+                    formula = new RoadieTotalBoost { perRoadie = 0.05 } });
+                var active = TestTree.MakeDefinition<ModifierDefinition>("roadie_active");
+                // the SOURCE knows its chapter; a currency total does not
+                active.effects.Add(new Effect { target = "production", currencyId = "income", stat = Stat.Rate,
+                    formula = new RoadieActiveBoost { perRoadie = 0.05 } });
+                rootDef.modifiers.Add(total);
+                rootDef.modifiers.Add(active);
+                rootDef.permanentModifiers.Add(total);
+                rootDef.permanentModifiers.Add(active);
 
                 Root = ScopeState.Build(rootDef);
                 TierA = Root.FindInSubtree(tierADef);

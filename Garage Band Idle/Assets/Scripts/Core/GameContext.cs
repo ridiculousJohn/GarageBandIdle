@@ -12,17 +12,24 @@ namespace RidiculousGaming.GarageBandIdle
         public readonly ScopeState Scope;
         public readonly DateTime NowUtc;
 
+        // The claim's circumstance (design doc 12.5/12.9): the idle claim builds
+        // its contexts with this set, everything else builds without, and
+        // nothing mutates it - a rebase carries it, so one gather runs whole
+        // under one circumstance. Read by the IdleAccumulation condition kind.
+        public readonly bool IdleAccumulation;
+
         // No definition source: every reference an authored object holds is the
         // object itself, and every id a FACT holds resolves by walking this
         // scope outward. Nothing needs a catalogue.
-        public GameContext(ScopeState scope, DateTime nowUtc)
+        public GameContext(ScopeState scope, DateTime nowUtc, bool idleAccumulation = false)
         {
             Scope = scope;
             NowUtc = nowUtc;
+            IdleAccumulation = idleAccumulation;
         }
 
         // A nested invocation runs in the owning object's scope (design doc 12.4).
-        public GameContext Rebase(ScopeState scope) => new GameContext(scope, NowUtc);
+        public GameContext Rebase(ScopeState scope) => new GameContext(scope, NowUtc, IdleAccumulation);
 
         // ---- reads: chain walk outward from the acting scope ----
 
