@@ -406,8 +406,11 @@ Six changesets, each compiling and green on its own.
   (born here for `maxGameSpeed`; `minimumAwaySeconds` and `idleCapSeconds` wait for their
   consumer), plus `TickSystemTests` - called directly, no session yet. The `(currency, home)` pair
   enumeration landed as `Producer.RatePairs`, GetRate's sibling.
-- **D. `GameSession` core** - phases, the boundary, the pipeline, the command wrappers, `Tick`,
-  plus `GameSessionTests`.
+- **D. `GameSession` core** - **LANDED 2026-08-26, 380/380**: phases, the boundary, the pipeline,
+  the command wrappers, `Tick`, plus `GameSessionTests`. `SwitchChapter` landed as the transition
+  skeleton (John's call): same-chapter no-op, null backgrounds, a stored unsettled claim re-offers
+  as `AwaitingIdleClaim`, otherwise straight to `Live` - the stamps, settle-out, claim computation,
+  skip rules, and the current-chapter root fact stay E's, growing the same command.
 - **E. Idle** - `SwitchChapter`, `ClaimIdle`, the monotonic stamps (the reset re-stamp included),
   the current-chapter root fact and its save filter, minimum-away and cap read from `GameConfig`,
   the `BlocksIdle` read, the retained claim references (creation and load), the authored idle-only
