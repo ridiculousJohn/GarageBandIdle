@@ -221,9 +221,12 @@ an editor test asserts the placement and the group's bundle mode.
   uniqueness already lives. The 12.12 pass runs on the composed pair, on the load path, as today;
   a boot smoke test exercises the whole load in the editor.
 
-The pre-restart residue goes first, and it reaches past `Assets/ScriptableObjects/`: the 41 dead
-assets there (broken script references and deleted families - Rewards, Sections, StoryBeats,
-CurrencyGroups), the 10 prefabs under `Assets/Prefabs/`, each carrying a dead MonoBehaviour
+The pre-restart residue goes first, and it reaches past `Assets/ScriptableObjects/`: the 41 flat
+assets there (26 bound to deleted or rewritten scripts - BarGroups, Bars, Chapters, Currencies,
+CurrencyGroups, Events, Rewards, Sections, StoryBeats - and 15 whose classes survived the restart
+with their GUIDs intact, Producers, Generators, and Upgrades, so those still load; all 41 are
+pre-restart authoring at flat paths the scope-qualified importer output replaces), the 10 prefabs
+under `Assets/Prefabs/`, each carrying a dead MonoBehaviour
 reference (the three row scripts and the six module scripts), `SampleScene.unity` with its
 `EditorBuildSettings` entry, the 48 stale labeled entries in the default Addressables group, AND
 the 13 legacy label definitions in the settings' label table are deleted outright in slice A,
@@ -231,8 +234,10 @@ before the importer writes anything - the 13 legacy labels are replaced by the s
 label. A directory that existed to hold deleted residue goes with it, `.meta` included: the 12
 flat family folders, `Prefabs/` with its `Modules/`, and `Scenes/`. `ScriptableObjects/` itself
 stays - it is the importer's managed root, and its flat children are exactly what the
-scope-qualified paths replace. Update-in-place cannot load an asset bound to a deleted type, and
-the single root entry replaces the label scheme those entries served. Nothing dangles: the row
+scope-qualified paths replace. Update-in-place cannot refresh any of them: the 26 with dead
+bindings will not load, and the 15 live-bound ones sit at flat paths the scope-qualified importer
+never writes, so it would strand them as duplicates rather than overwrite - both reasons the purge
+precedes the first import. The single root entry replaces the label scheme those entries served. Nothing dangles: the row
 prefabs were reachable only from their module prefabs, those only from the `module/*` addresses and
 the `Sections` assets, and no script or test names any of it. Deleting the scene also retires the
 stale `GameManager` component it carried, which slice D would otherwise author a second time.
@@ -354,7 +359,7 @@ bring back, not a silent doc fix.
 
 Four changesets, each compiling and green on its own.
 
-- **A. The importer + root.json**: the pre-restart purge first (the 41 dead assets, the 10 prefabs,
+- **A. The importer + root.json**: the pre-restart purge first (the 41 flat assets, the 10 prefabs,
   `SampleScene` with its build-settings entry, the emptied directories, the 48 stale
   Addressables entries, the 13 label definitions), then `ContentDatabase`'s composition pair (with
   `CompositionTests`, the root-targeting identity row included), DTOs
