@@ -295,9 +295,10 @@ Current rates at switch-in, 4h later:
 - fans: (0.35 + 7×0.02) × 1.15 × 1.15 = **0.648/s** (no income multiplier — by design)
 - rehearsal: **0.5/s** (the rate entry; tap yields pay nothing while away — nothing fires)
 
-Claim = rate × min(14400, 14400) × 0.5 → **cash 604,800; fans 4,666; rehearsal 3,600** stored as
-the pending claim; the idle dialog offers Double It. The ad callback marks the claim `doubled`
-(1,209,600 / 9,332 / 7,200); dismissal deposits exactly once. Bar progress moved zero — the pool
+Claim = rate × min(14400, 14400) × 0.5 → **cash 604,800; fans 4,666; rehearsal 3,600** as the
+transient offer; the idle dialog offers Double It. The ad callback doubles and settles in one
+transaction (1,209,600 / 9,332 / 7,200); a plain dismissal deposits the base amounts. Either way
+settlement is exactly once and advances the stamp. Bar progress moved zero — the pool
 banked instead, so the returning player insta-pours covers at their 2/s rate. Had a timed Garage Jam
 been running, the claim would be zero (§9).
 

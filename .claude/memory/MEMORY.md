@@ -19,6 +19,7 @@
 - [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - never invent a second way to express what the architecture already covers (scope placement groups things; ids are for cross-references); a covered case that seems to need something new is a conversation first
 - [Problems, not issues](problems-not-issues.md) - a true finding is not automatically work; ask what breaks TODAY, and supply the stopping rule the review loop lacks
 - [Never cave to pressure](never-cave-to-pressure.md) - a factual answer changes only when the facts change; capitulating to end an argument is worse than being wrong
+- [Lead with the concession](lead-with-the-concession.md) - when John challenges a change I made, answer the challenged thing FIRST; defending the surrounding code before conceding buries the concession and reads as gaslighting; never present a test-weakening workaround as "the fix"
 - [Pushback means re-derive](pushback-means-rederive.md) - John disputing my model of HIS design means restate the mechanism from primitives, not defend the reading; doc wording can itself be the defect (the "reserved target ids" hour, 2026-08-25)
 - [Pick the simplest option](pick-the-simplest-option.md) - weighing alternatives is wanted; the defect is that the elaborate one always wins the pick
 - [Same-but-different demands a has-to](same-but-different-demands-a-has-to.md) - when John calls two mechanisms one thing spelled twice, split the bundle and answer has-to per item; conceded equivalence concedes the point unless a has-to exists

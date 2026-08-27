@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 725a3991-fe12-4b4f-bdb9-02cb627048e5
-  modified: 2026-08-26T19:25:30.624Z
+  modified: 2026-08-26T22:59:13.353Z
 ---
 
 Four corrections landed 2026-08-20, before step 5 began, each reversing something a build step had
@@ -26,7 +26,9 @@ invented. Suite is 205/205 after them.
   "typed by position", and the position half is now wrong - a definition is a `RootDefinition`,
   `ChapterDefinition` or `TierDefinition` and builds its own state node, so nothing infers a kind
   from depth): `ScopeFacts` for every scope, `RootFacts` adding
-  `roadieAllocation` + `entitlements`, `ChapterFacts` adding `pendingClaim`; `RootScopeState` /
+  `roadieAllocation` + `entitlements` + `currentChapterId`, `ChapterFacts` adding nothing (its
+  `pendingClaim` was deleted 2026-08-26 - the stamp is the pending claim, offers are transient);
+  `RootScopeState` /
   `ChapterScopeState` with `lastActiveUtc` on the chapter one, plus `TierFacts`/`TierScopeState` and
   the abstract `InteriorFacts`/`InteriorDefinition` middles. Each definition allocates its own
   node's payload; `Root()` / `Chapter()` extensions replace the base-class property (a base

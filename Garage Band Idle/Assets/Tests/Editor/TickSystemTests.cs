@@ -259,6 +259,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 () => TickSystem.Tick(tree.Root, tree.Ch1, Config(double.NaN), 10, end));
             Assert.Throws<System.InvalidOperationException>(
                 () => TickSystem.Tick(tree.Root, tree.Ch1, Config(double.PositiveInfinity), 10, end));
+
+            // The idle thresholds are guarded by the same Require.
+            var negativeAway = Config();
+            negativeAway.minimumAwaySeconds = -1;
+            Assert.Throws<System.InvalidOperationException>(
+                () => TickSystem.Tick(tree.Root, tree.Ch1, negativeAway, 10, end));
         }
     }
 }

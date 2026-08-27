@@ -616,8 +616,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.RootDef.permanentModifiers.Add(idleOnly);
             tree.Tier1.generatorCounts["practice_amp"] = 1;
 
+            // The authored idle base (x0.5) joins every idle gather, so the
+            // idle number carries both factors.
             AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "live");
-            AssertClose(0.25, Producer.GetRate(new GameContext(tree.Tier1, Now, idleAccumulation: true), tree.Cash), "idle");
+            AssertClose(0.125, Producer.GetRate(new GameContext(tree.Tier1, Now, idleAccumulation: true), tree.Cash), "idle");
         }
 
         // The inverse composes from the same two primitives, and the condition
@@ -633,8 +635,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.modifierStacks["live_only"] = 1;
             tree.Tier1.generatorCounts["practice_amp"] = 1;
 
+            // Live sees the buff and not the base; idle sees the base and not
+            // the buff.
             AssertClose(1, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "live");
-            AssertClose(0.5, Producer.GetRate(new GameContext(tree.Tier1, Now, idleAccumulation: true), tree.Cash), "idle");
+            AssertClose(0.25, Producer.GetRate(new GameContext(tree.Tier1, Now, idleAccumulation: true), tree.Cash), "idle");
         }
 
         // Two chapters, each with its own run currency - the shape section 8.2's

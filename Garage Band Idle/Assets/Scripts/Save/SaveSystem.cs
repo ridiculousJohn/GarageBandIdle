@@ -193,12 +193,32 @@ namespace RidiculousGaming.GarageBandIdle.Save
 
         // Tree-scoped facts carry reach rules, not just id existence (12.3): the
         // roadie allocation is keyed by root's direct children (the chapters),
-        // and a pending claim's currencies must be homed in that chapter's
-        // subtree or on its ancestor chain - a sibling chapter's currency can
-        // never appear in it. Placement itself needs no check: the payload types
-        // make a root fact on a tier unrepresentable.
+        // and the recorded current chapter must be one of them. Placement itself
+        // needs no check: the payload types make a root fact on a tier
+        // unrepresentable.
         private static void FilterTreeScopedFacts(ScopeFacts facts, ScopeState state)
         {
+            // The recorded current chapter must still be authored: boot
+            // auto-enters it, and a stale id would strand the launch. Cleared,
+            // not remapped - a fresh chapter select is the honest recovery.
+            if (facts is RootFacts recorded && !string.IsNullOrEmpty(recorded.currentChapterId))
+            {
+                var authored = false;
+                foreach (var child in state.Children)
+                {
+                    if (child.ScopeId == recorded.currentChapterId)
+                    {
+                        authored = true;
+                        break;
+                    }
+                }
+                if (!authored)
+                {
+                    Debug.LogWarning($"SaveSystem: current chapter '{recorded.currentChapterId}' is not a chapter this content authors - cleared.");
+                    recorded.currentChapterId = null;
+                }
+            }
+
             if (facts is RootFacts rootFacts && rootFacts.roadieAllocation.Count > 0)
             {
                 List<string> invalid = null;
@@ -229,29 +249,6 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 }
             }
 
-            if (facts is ChapterFacts chapterFacts && chapterFacts.pendingClaim != null)
-            {
-                // Each line names its own home, so validating one is a single
-                // question rather than a union of name sets: the scope is this
-                // chapter, something in its subtree, or something on its chain,
-                // and it declares that currency.
-                var entries = chapterFacts.pendingClaim.amounts;
-                for (var i = entries.Count - 1; i >= 0; i--)
-                {
-                    var entry = entries[i];
-                    if (entry == null)
-                    {
-                        Debug.LogWarning($"SaveSystem: a null pending-claim entry at chapter '{state.ScopeId}' - dropped.");
-                        entries.RemoveAt(i);
-                        continue;
-                    }
-                    var home = InSubtreeById(state, entry.scopeId) ?? OnChainById(state, entry.scopeId);
-                    if (home != null && home.Definition.DeclaresCurrency(entry.currencyId))
-                        continue;
-                    Debug.LogWarning($"SaveSystem: pending-claim currency '{entry.currencyId}' at scope '{entry.scopeId}' is not reachable from chapter '{state.ScopeId}' - dropped.");
-                    entries.RemoveAt(i);
-                }
-            }
         }
 
         // Unknown ids from removed content are dropped with a warning (12.10).
@@ -260,38 +257,11 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // name declared content too - a modifier is declared on a scope, and a
         // stack's id resolves by walking outward from the scope holding it.
         // Bar facts come through here too: a bar's home is its GROUP's home,
-        // so a scope's own groups are the whole question. Pending-claim
-        // currencies and roadie allocation validate against the tree instead
-        // (below). Event ids, buff ids, and song ids gain their filters WITH
+        // so a scope's own groups are the whole question. The roadie allocation
+        // and the recorded current chapter validate against the tree instead
+        // (above). Event ids, buff ids, and song ids gain their filters WITH
         // their definition families - the same incremental contract as the
         // validation pass.
-        // The two lookups BY NAME, private because this is the only place a name
-        // is all there is: a save file holds text, so a stored coordinate names
-        // its scope and is resolved here, once, at the boundary. Everything past
-        // this point addresses a scope by reference (design doc 12.3), which is
-        // why these are not on ScopeState for anyone else to reach for. Scope
-        // ids are unique tree-wide, so the first hit is the only hit.
-        private static ScopeState InSubtreeById(ScopeState from, string scopeId)
-        {
-            if (from.ScopeId == scopeId)
-                return from;
-            foreach (var child in from.Children)
-            {
-                var found = InSubtreeById(child, scopeId);
-                if (found != null)
-                    return found;
-            }
-            return null;
-        }
-
-        private static ScopeState OnChainById(ScopeState from, string scopeId)
-        {
-            for (var node = from; node != null; node = node.Parent)
-                if (node.ScopeId == scopeId)
-                    return node;
-            return null;
-        }
-
         private static void FilterToDeclared(ScopeFacts facts, ScopeState state)
         {
             var definition = state.Definition;

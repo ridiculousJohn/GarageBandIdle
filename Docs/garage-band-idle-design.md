@@ -481,16 +481,26 @@ purchasable is also earnable in-game.
 
 **Idle earnings (per chapter).** The unit of idle is the **chapter**, and "active" is singular: the
 chapter on screen ticks live; every other chapter is dormant. Each chapter's state carries one
-`lastActiveUtc`, stamped on switch-away and — **for the foreground chapter only** — on save; a
-global save never touches dormant chapters' stamps, or it would truncate their idle. **Switching into a chapter** computes, for each
+`lastActiveUtc`, stamped when leaving it live — switch-away or backgrounding — and, **for the
+foreground chapter only and only while live**, on save — a save under the dialog must leave the
+unpaid window; a
+global save never touches dormant chapters' stamps, or it would truncate their idle. **The stamp IS
+the pending claim**: everything specific about an offer is computed from it, and nothing about an
+offer is ever saved. **Switching into a chapter** computes, for each
 of its currencies, `idleRate × min(elapsed, cap)` — `idleRate` is the ordinary rate gather run
 under the idle-accumulation context (§12.5), so the ×0.5 base joins and live-only buffs excuse
 themselves — from *current* state, so Records earned
-elsewhere while away correctly boost the payout — and stores it as a **pending claim** in the
-chapter's state, presented as the **idle dialog**: the amount earned, plus "Double it" (a rewarded
-ad that doubles *this claim*); a Backstage Pass owner sees the already-doubled amount and just OKs
-it. The claim deposits when the dialog is dismissed — any exit path — and a claim that survives an
-app kill re-offers on the next entry; then the chapter is live. **Closing the app is not a
+elsewhere while away correctly boost the payout — into a **transient offer** (the lines, the
+window's end, a doubled flag; session-held, dead with the process), presented as the **idle
+dialog**: the amount earned, plus "Double it" (a rewarded
+ad that doubles *this offer*); a Backstage Pass owner sees the already-doubled amount and just OKs
+it. The offer deposits on dismissal or chapter switch — or, doubled, in the ad
+callback's own transaction (§12.9) — while backgrounding instead drops it and leaves the window
+unpaid; settling always advances the
+stamp to the window it paid. A kill with the dialog up saves nothing: the stamp never moved, so the
+next entry recomputes the offer — same or slightly larger, capped — and what is shown is always
+exactly what is paid, because only one offer is ever alive. Then the chapter is live. **Closing the
+app is not a
 mechanic**: it is the state where no chapter is active, and launching runs the same switch-in path.
 In-game chapter switching and time away are one mechanic.
 
@@ -515,7 +525,7 @@ second vocabulary exists:
 | Player | Idle payout | How |
 |---|---|---|
 | Free, no action | 50% | Claimed from the idle dialog on switch-in |
-| Free, watches ad | 100% (2×) for that claim | "Double it" marks the pending claim `doubled`; deposit pays ×2 (§12.9) |
+| Free, watches ad | 100% (2×) for that offer | "Double it" doubles and settles the offer in the callback's own transaction (§12.9) |
 | Backstage Pass owner | 100% (2×) always | A permanent idle-only modifier `{stat: rate, ×2}` derived from the entitlement; the cap raise is entitlement plumbing on the config read |
 
 Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
@@ -762,12 +772,12 @@ class RootFacts : ScopeFacts        // the root scope's payload, and no other
 {
     Dictionary<string, int>       roadieAllocation; // chapterId → stationed count (§8)
     HashSet<string>               entitlements;     // store-written (backstage_pass)
+    string                        currentChapterId; // where play left off; boot returns here (§12.9)
 }
 
-class ChapterFacts : InteriorFacts  // a chapter's payload
-{
-    PendingClaim                  pendingClaim;     // the idle dialog's claim (§9)
-}
+class ChapterFacts : InteriorFacts  // a chapter's payload; nothing beyond what hosting brings —
+{                                   // the idle stamp (lastActiveUtc) lives BESIDE the payload,
+}                                   // re-stamped rather than cleared, and IS the pending claim (§9)
 
 class TierFacts : InteriorFacts     // a tier's payload; nothing beyond what hosting brings
 {
@@ -792,8 +802,8 @@ The tree: **root** (Records, Roadies, entitlements, completion flags, Discograph
 chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique along a CHAIN** — a read walks
 outward and stops at the first scope that declares what it names, so two sibling chapters may each
 declare their own `cash`; what must not repeat is an id visible from one scope. Scope ids stay
-unique tree-wide, since the facts that name a scope key by them - a claim line's home, root's
-roadie allocation map - and a saved name has to be unambiguous wherever it is read back. A
+unique tree-wide, since the facts that name a scope key by them - root's roadie allocation map,
+the recorded current chapter - and a saved name has to be unambiguous wherever it is read back. A
 declaration in two scopes is refused at load. Flag reads walk the chain outward (set anywhere on it = set); `SetFlag`
 writes to the flag's declared home.
 
@@ -809,7 +819,7 @@ vocabulary.
 `ScopeDefinition` itself, and getting from it to live state is a walk that compares assets, not
 ids: there is one state node per definition and neither points at the other, so the walk is the
 only link, but what it matches on is the reference the caller already holds. The only scope NAMES belong
-to stored facts (a claim line's home, the roadie allocation map), because a save holds text and
+to stored facts (the roadie allocation map, the recorded current chapter), because a save holds text and
 nothing else: a name enters at the load boundary, resolves there, and travels no further. A scope
 id is therefore never how running code finds a scope, which is what keeps tree-wide id uniqueness a
 property of the save rather than a dependency of the economy.
@@ -1153,50 +1163,61 @@ chapter's does not advance. No event can be born mid-segment now that starting o
 rather than an action. A handicap or buff live at segment start governs the whole segment, expiring
 only at its edge. After the last segment: the sweep, commit, and refresh
 (§12.11).
-`lastActiveUtc` stamped on switch-away and, for the foreground chapter only, on
-save. Switch-in computes
+`lastActiveUtc` stamped when leaving a LIVE chapter — switch-away or backgrounding — and, for the
+foreground chapter only and only while Live, on save (a save under the dialog must leave the
+unpaid window); every write is monotonic (max), so a rolled-back clock can delay
+a stamp but never regress one. **The stamp IS the pending claim** — nothing about an offer is ever
+saved. Switch-in computes
 `idleRate × min(elapsed, cap)` per currency at current rates — `idleRate` being the ordinary rate
 gather under the idle-accumulation context — skipped below the minimum-away
 threshold and skipped entirely while that chapter holds a record for an event that blocks idle
 (§6.1: `blocksIdle` is derived from the event carrying a timer, and the idle path asks the event
-rather than inspecting one) - and stores it as the
-chapter's pending claim for the idle dialog; deposit on dismissal, ad-doubling at claim time.
-The claim is an exactly-once transaction — `{claimId, amounts: [{scopeId, currencyId, amount}],
-doubled, settled}`: a line names its HOME, because a claim held at the chapter addresses currencies
-homed at tiers below it, and nothing resolves a name downward. The ad callback
-marks `doubled`, deposit flips `settled`, and replaying either after an app kill is idempotent by
-`claimId`. The idle fraction rides the rate gather via `appliesWhen` (§12.5), the cap is a
+rather than inspecting one) - into a **transient offer** for the idle dialog: the lines
+(currency, home, amount — all references), the window's end B, and a `doubled` flag, computed once
+over the explicit window [stamp, B], held by the session, never serialized. The claim never
+computes anything: deposit pays the stored lines — ×2 when the ad callback marked the offer
+`doubled` — and advances the stamp to B, the window actually paid, in one transaction. That is the
+whole exactly-once mechanism: the save is the tree, so a kill anywhere keeps both writes or
+neither. A kill or backgrounding with the dialog up destroys the offer and leaves the stamp, so
+the next entry recomputes from the same window start — the unpaid window simply stays open,
+capped — and what is shown is always what is paid, because only one offer is ever alive. A
+SETTLED window ends at B: time past B is foreground presence, never idle — the next live exit
+stamps over it.
+The idle fraction rides the rate gather via `appliesWhen` (§12.5), the cap is a
 `GameConfig` threshold beside the minimum-away one, and `game_speed` is gathered once per
 segment — the same gather as everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
 commit — for ticks and commands alike; live scopes only, single pass. The sweep is conditional on
 the transaction's RESULTING phase: only a transaction ending in `Live` sweeps. One ending in
-`AwaitingIdleClaim` or `NoChapter` commits and refreshes without sweeping — a stored claim awaits
-presentation, and any sweep (root included, since a root trigger may legally reset a descendant
-chapter) could destroy it — and the transaction that enters `Live` performs the deferred sweep. The same sweep observes
+`AwaitingIdleClaim` or `NoChapter` commits and refreshes without sweeping — an offer awaits its
+dialog, and any sweep (root included, since a root trigger may legally reset a descendant
+chapter) could reset the chapter, re-stamping the unpaid window away — and the transaction that enters `Live` performs the deferred sweep. The same sweep observes
 event goals **from the sweep-start snapshot and latches `goalReached` before any trigger
 actions execute** — success is judged on the transaction's own mutation, never on trigger
 payloads; a trigger that spends the goal currency changes nothing already secured, and its effect
 on goals is seen next sweep (§12.8).
 
 **GameSession** — the transient execution context, never serialized:
-`{foregroundChapterId, phase: NoChapter | AwaitingIdleClaim | Live, commandInProgress}` — launch
-and backgrounding are `NoChapter`, so no-foreground states are explicit rather than a null id.
+`{foregroundChapter, phase: NoChapter | AwaitingIdleClaim | Live, currentOffer, commandInProgress}` — launch
+and backgrounding are `NoChapter`, so no-foreground states are explicit rather than a null reference.
 Durable facts live in the tree; the session holds only orchestration. The CURRENT chapter is one of
 those durable facts — a root-held id written by `SwitchChapter` when it enters a chapter
 (backgrounding leaves it: it names where play left off, which is where boot returns), so it travels
 with the save, cloud restore included. Boot auto-enters the recorded chapter and offers no
 selection; only a save with no recorded chapter — a fresh game — shows a chapter select, and such a
-save holds no pending claim to conflict with. That is what makes an unsettled claim unstrandable:
-every load that carries one lands on the chapter that owns it, and the claim re-offers. Never
+save owes no idle to conflict with. That is what makes an unpaid window unstrandable:
+every load lands on the chapter whose stamp holds it, and the offer recomputes. Never
 inferred from economy timestamps — `lastActiveUtc`
 records idle-settlement boundaries, not UI history. While `phase == AwaitingIdleClaim`, only claim
 and switch commands are legal — mutating commands are refused, so a rung or automation can never
-reset away an unsettled claim; settling flips the session to `Live`. Authenticated ad/store
+reset away an unpaid window; settling flips the session to `Live`. Authenticated ad/store
 callbacks are always **phase-eligible, never reentrant**: a callback is a serialized mutation
 transaction — queued behind `commandInProgress`, then the same pipeline as any command, its sweep
-conditional on the resulting phase like every transaction's — so marking the pending claim
-`doubled` sweeps nothing (the phase stays `AwaitingIdleClaim`) yet still repaints the dialog,
-because the refresh is unconditional.
+conditional on the resulting phase like every transaction's. The idle double is ATOMIC with its
+settlement: the rewarded-ad callback doubles and claims in one transaction — recomputing from the
+stamp first when no offer is live (the mid-ad kill) — so a doubled offer never sits exposed to an
+exit's undoubled settle or a backgrounding's drop, and the transaction ends in `Live` and sweeps
+like any claim. A callback that leaves the phase alone (a store entitlement written mid-dialog)
+sweeps nothing yet still repaints the dialog, because the refresh is unconditional.
 Callbacks are not UI commands (§12.11). **The session also draws the
 command boundary**: **every chapter-local mutation** — `TryBuy`, `FireProducer`, `TryRung`,
 `SetActiveBars`, the event operations, the song operations, and any future mechanic command — is
@@ -1204,14 +1225,17 @@ rejected when its owning scope lies outside the foreground chapter's live subtre
 tree-wide, but reachable is not the same as mutable. Root-owned commands
 (`SetRoadieAllocation`, `AcknowledgeStory`) and the session commands (`SwitchChapter`, `ClaimIdle`)
 are the exceptions. This guard is orchestration — it lives here, never in chapters or scopes.
-**Switching away settles first**: the switch transaction deposits the outgoing chapter's unsettled
-claim at its undoubled value (switching is an exit path, §9) before stamping out, so pending
-dialogs never accumulate across chapters.
+**Switching away settles first**: the switch transaction deposits the outgoing chapter's
+outstanding offer at its undoubled value (switching is an exit path, §9), advancing the stamp to
+the offer's window; leaving a live chapter just stamps out at now. Backgrounding is the exception:
+it drops the offer and leaves the stamp, so backgrounding and an app kill behave identically and
+pending dialogs never accumulate across chapters.
 
 ### 12.10 Save
 
 Serialize the ScopeState tree, nested as the scopes are — **and nothing else**: every root fact
-(Records, Roadies, the allocation, entitlements, timed buffs, Discography) is a field of the root
+(Records, Roadies, the allocation, entitlements, timed buffs, the current chapter, Discography) is
+a field of the root
 scope's state (§12.3), so principle 2 is literally the save format. JSON + checksum, validated on
 load (ids resolve; unknown ids from removed content are dropped with a warning). No grants, no
 derived values, no replay of actions. Idle payouts are capped client-side.
@@ -1255,13 +1279,13 @@ one returns - static content cannot legitimately be in that state, so those thro
 `IsOffered(rung)` / `ExecuteRung` / `TryRung(rung)`, `CanBuy` / `Buy` / `TryBuy(generator |
 upgrade)`, `FireProducer(producer)`, `SetActiveBars(group, set)`, the event operations
 `StartEvent / DismissEvent (event)`, `SwitchChapter(chapterId)` (stamps
-`lastActiveUtc`, computes the pending claim, §12.9), `ClaimIdle(chapterId)` (settle the pending
-claim, §9 — the dialog's double button only *requests* the rewarded ad; marking the claim `doubled`
-is AdManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked chapters only), the Ch. 6 song operations (write / name), and
+`lastActiveUtc`, computes the idle offer, §12.9), `ClaimIdle(chapterId)` (settle the
+offer, §9 — the dialog's double button only *requests* the rewarded ad; doubling and settling the
+offer is AdManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked chapters only), the Ch. 6 song operations (write / name), and
 `AcknowledgeStory(storyId)` (sets the root `storyN_seen` latch, §10). All fail-closed — each checks
 its own gate. Ad and store
 callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations (extend
-a buff, mark an idle claim doubled, write an entitlement, grant Roadies) — they are not UI paths.
+a buff, double and settle the idle offer, write an entitlement, grant Roadies) — they are not UI paths.
 
 **A disarmed rung explains itself**: the rung-button widget evaluates its gate's top-level legs
 individually at the two refresh moments and lists the unmet legs' `uiText` (§12.4); threshold
@@ -1350,8 +1374,9 @@ per-feature: any kind an author gates with explains itself for free.
 Assets/Scripts/
   Core/
     GameManager.cs          // bootstrap, save/load, chapter switching
-    GameSession.cs          // transient orchestration: foreground chapter, phase, command guard — never serialized
+    GameSession.cs          // transient orchestration: foreground chapter, phase, the idle offer, command guard — never serialized
     TickSystem.cs           // fixed-interval tick on real (DateTime) time
+    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root scope, and with it the whole graph; runs the §12.12 pass
@@ -1479,9 +1504,10 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   never a trigger.
 - **Idle:** per chapter — one active chapter ticks; switch-in computes `idleRate × min(t, cap)`
   (the rate gather under the idle-accumulation context; base 50% an idle-only root modifier via
-  `appliesWhen`, cap 4 h a `GameConfig` threshold) into a pending claim presented
-  as the idle dialog — the ad doubles the claim, deposit on dismissal; app close is not special;
-  yields and bar progress never accrue.
+  `appliesWhen`, cap 4 h a `GameConfig` threshold) into a transient offer presented
+  as the idle dialog — the stamp IS the pending claim, the ad callback doubles and settles
+  atomically, a plain dismissal deposits the base, settlement advances the stamp; app close is not
+  special; yields and bar progress never accrue.
 - **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2×/Overdrive 4×
   (`game_speed` stat, tick-consumed; wall clocks never scale); Backstage Pass (lifetime,
   permanent Overdrive); Buy Roadies (repeatable); Tip Jar; no subscriptions.

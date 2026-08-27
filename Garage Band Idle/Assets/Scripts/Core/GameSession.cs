@@ -16,12 +16,34 @@ namespace RidiculousGaming.GarageBandIdle
         Live
     }
 
+    // One line of the idle offer: the currency, its home, and the amount - all
+    // references, born from the same (currency, home) enumeration GetRate sums,
+    // because nothing about an offer ever crosses a save boundary.
+    public class IdleOfferLine
+    {
+        public CurrencyDefinition currency;
+        public ScopeState home;
+        public BigNumber amount;
+    }
+
+    // The transient idle offer (design doc 12.9): computed once over the
+    // explicit window [stamp, windowEndUtc], held by the session, marked by the
+    // ad callback, paid by settlement, dead with the process. THE STAMP IS THE
+    // PENDING CLAIM - a kill with the dialog up saves nothing, and the next
+    // entry recomputes from the stamp it never advanced.
+    public class IdleOffer
+    {
+        public DateTime windowEndUtc;
+        public List<IdleOfferLine> lines = new();
+        public bool doubled;
+    }
+
     // The transient execution context (design doc 12.9): plain C#, never
     // serialized, holding only orchestration - the foreground chapter, the
-    // phase, and the reentrancy guard. Durable facts live in the tree. The
-    // session draws the command boundary and owns the transaction pipeline;
-    // the wrapped systems stay public and unchanged, and tests keep calling
-    // them directly.
+    // phase, the outstanding offer, and the reentrancy guard. Durable facts
+    // live in the tree. The session draws the command boundary and owns the
+    // transaction pipeline; the wrapped systems stay public and unchanged, and
+    // tests keep calling them directly.
     public class GameSession
     {
         public readonly RootScopeState Root;
@@ -29,6 +51,12 @@ namespace RidiculousGaming.GarageBandIdle
 
         public ChapterScopeState ForegroundChapter { get; private set; }
         public SessionPhase Phase { get; private set; } = SessionPhase.NoChapter;
+
+        // The outstanding idle offer - non-null exactly while the phase is
+        // AwaitingIdleClaim. Step 9's dialog renders it; step 10's ad callback
+        // doubles AND settles it in one transaction (12.9), so a doubled offer
+        // is never left exposed to an exit's undoubled settle.
+        public IdleOffer CurrentOffer { get; private set; }
 
         // The 12.11 hook, one per completed transaction and none on a refusal;
         // step 9's widgets subscribe. Unconditional where the sweep is not,
@@ -50,15 +78,19 @@ namespace RidiculousGaming.GarageBandIdle
 
         // ---- the session commands ----
 
-        // Legal in every phase. What lands here is the transition skeleton:
-        // switching to the CURRENT chapter (or to null while already
-        // NoChapter) is a no-op success that runs no pipeline; a null incoming
-        // chapter is backgrounding; an incoming chapter holding an unsettled
-        // claim re-offers it, and otherwise the switch enters Live, whose
-        // closing sweep is the deferred "first live sweep after switch-in"
-        // (12.8). The idle half of the command - the monotonic stamps, the
-        // settle-out, the claim computation and its skip rules, the current-
-        // chapter root fact - is the idle changeset's.
+        // Legal in every phase, one transaction (12.9). Switching to the
+        // CURRENT chapter (or to null while already NoChapter) is a no-op
+        // success that runs no pipeline: the stamp is old during a live
+        // session, and recomputing here would mint an offer covering time the
+        // player spent playing. A live outgoing chapter stamps at now; one
+        // with an offer up settles it undoubled on a chapter-to-chapter switch
+        // (an exit path, section 9) and DROPS it on backgrounding - the stamp
+        // stays, so the unpaid window recomputes on return and backgrounding
+        // and an app kill behave identically. Entering Live directly makes
+        // this transaction's closing sweep the deferred "first live sweep
+        // after switch-in" (12.8); entering AwaitingIdleClaim sweeps nothing,
+        // because even a root trigger can legally reset a descendant chapter,
+        // re-stamping the unpaid window away before it is presented.
         public void SwitchChapter(ChapterScopeState chapter, DateTime nowUtc)
         {
             GuardReentrancy();
@@ -67,19 +99,131 @@ namespace RidiculousGaming.GarageBandIdle
             commandInProgress = true;
             try
             {
+                var outgoing = ForegroundChapter;
+                if (outgoing != null)
+                {
+                    if (CurrentOffer != null)
+                    {
+                        if (chapter != null)
+                            SettleOffer(outgoing, honorDoubled: false);
+                        else
+                            CurrentOffer = null;
+                    }
+                    else
+                    {
+                        outgoing.StampActive(nowUtc);
+                    }
+                }
+
                 ForegroundChapter = chapter;
                 if (chapter == null)
+                {
                     Phase = SessionPhase.NoChapter;
-                else if (chapter.pendingClaim != null && !chapter.pendingClaim.settled)
-                    Phase = SessionPhase.AwaitingIdleClaim;
+                }
                 else
-                    Phase = SessionPhase.Live;
+                {
+                    Root.currentChapterId = chapter.ScopeId;   // the durable root fact boot returns to
+                    Phase = EnterChapter(chapter, nowUtc);
+                }
                 CloseTransaction(nowUtc);
             }
             finally
             {
                 commandInProgress = false;
             }
+        }
+
+        // AwaitingIdleClaim only. Pure settlement - the claim never computes
+        // anything: the stored lines deposit at their held homes, x2 when the
+        // ad callback marked the offer doubled, and the stamp advances in the
+        // same transaction, which is the whole exactly-once mechanism (12.9) -
+        // the save is the tree, so a kill keeps both writes or neither. This
+        // transaction's sweep - root plus the now-live foreground - is the
+        // deferred one: a threshold crossed while away, by the switch's own
+        // settle-out, or by this deposit fires here, root triggers included.
+        public bool ClaimIdle(DateTime nowUtc)
+        {
+            GuardReentrancy();
+            if (Phase != SessionPhase.AwaitingIdleClaim)
+                return false;
+            commandInProgress = true;
+            try
+            {
+                SettleOffer(ForegroundChapter, honorDoubled: true);
+                Phase = SessionPhase.Live;
+                CloseTransaction(nowUtc);
+                return true;
+            }
+            finally
+            {
+                commandInProgress = false;
+            }
+        }
+
+        // The incoming chapter's phase (12.9's point 4). The offer is computed
+        // once over the explicit window [stamp, nowUtc] at current state, so
+        // Records earned while away boost it, under the idle-accumulation
+        // circumstance - the authored root base joins the gather and live-only
+        // modifiers excuse themselves - and skipped entirely when the away
+        // time is under the minimum, a blocking record holds, or every line
+        // computes zero.
+        private SessionPhase EnterChapter(ChapterScopeState chapter, DateTime nowUtc)
+        {
+            // The 12.10 clamp: a backwards clock claims nothing.
+            var elapsed = Math.Max(0, (nowUtc - chapter.lastActiveUtc).TotalSeconds);
+            if (elapsed < config.minimumAwaySeconds || BlockedByEvent(chapter))
+                return SessionPhase.Live;
+
+            var seconds = Math.Min(elapsed, config.idleCapSeconds);
+            var idleCtx = new GameContext(chapter, nowUtc, idleAccumulation: true);
+            var offer = new IdleOffer { windowEndUtc = nowUtc };
+            foreach (var (currency, home) in Producer.RatePairs(chapter))
+            {
+                var amount = Producer.GetRate(idleCtx, currency) * seconds;
+                if (amount == BigNumber.Zero)
+                    continue;
+                offer.lines.Add(new IdleOfferLine { currency = currency, home = home, amount = amount });
+            }
+            if (offer.lines.Count == 0)
+                return SessionPhase.Live;
+
+            CurrentOffer = offer;
+            return SessionPhase.AwaitingIdleClaim;
+        }
+
+        // Settlement pays the stored lines through their held references -
+        // nothing resolves a name here - and advances the stamp to the window
+        // actually paid, never the settlement moment. Time past the window's
+        // end is foreground presence, never idle: the next live exit stamps
+        // over it. Then the offer dies.
+        private void SettleOffer(ChapterScopeState chapter, bool honorDoubled)
+        {
+            var offer = CurrentOffer;
+            foreach (var line in offer.lines)
+            {
+                var amount = honorDoubled && offer.doubled ? line.amount * 2 : line.amount;
+                new GameContext(line.home, offer.windowEndUtc).Deposit(line.currency.Id, amount);
+            }
+            chapter.StampActive(offer.windowEndUtc);
+            CurrentOffer = null;
+        }
+
+        // Skipped entirely while any record in the chapter's subtree is for an
+        // event that blocks idle (6.1) - the idle path asks the event, never
+        // inspects a timer. Read through the declaration list, like every
+        // record read, so a stray record id blocks nothing.
+        private static bool BlockedByEvent(ScopeState node)
+        {
+            if (node is InteriorScopeState host && host.activeEvent != null)
+            {
+                foreach (var evt in ((InteriorDefinition)node.Definition).events)
+                    if (evt != null && evt.Id == host.activeEvent.eventId && evt.BlocksIdle)
+                        return true;
+            }
+            foreach (var child in node.Children)
+                if (BlockedByEvent(child))
+                    return true;
+            return false;
         }
 
         // Live only; TickSystem.Tick inside the same pipeline. Nonpositive dt

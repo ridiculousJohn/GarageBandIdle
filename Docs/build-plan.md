@@ -21,7 +21,7 @@ always that the content belongs on a scope.
 | 5 | Bars | **DONE 2026-08-21** - 266/266 green |
 | - | Scope kind refactor (2026-08-24) | **DONE** - 271/271 green: a scope is authored as `RootDefinition` / `ChapterDefinition` / `TierDefinition` under the abstract `InteriorDefinition`, each building its own state node, so no depth test infers a kind; `rung` moved off the base and `RungOnRoot` was deleted with it; the save populates the payload the node holds; the three outward walks ask `Declares` / `MultiplierFor` / `SourceTermsFor` instead of reading lists off a base-typed node; placement is validated root -> chapters -> tiers |
 | 6 | Events + trigger sweep | **DONE 2026-08-25** - 327/327 green |
-| 7 | Tick + GameSession | not started |
+| 7 | Tick + GameSession | **DONE 2026-08-26** - 397/397 green (six slices A-F; two design revisions absorbed mid-step: the idle respell, then the claim respell - the stamp IS the pending claim, offers are transient and session-held) |
 | 8 | Chapter 1 JSON + importer + walkthrough tests | not started |
 | 9 | UI layer | not started |
 | 10 | Meta & monetization | not started |
@@ -43,7 +43,8 @@ always that the content belongs on a scope.
    explicit migrations (missing path or newer version = refused); checksum bound over version AND
    payload; atomic write whose backup only ever receives verified content; load falls back to the
    backup on any read or verification failure. Unknown-id drops cover the families knowable today
-   (currencies, flags, trigger latches, roadie scope ids, pending-claim currencies); later
+   (currencies, flags, trigger latches, roadie scope ids - the recorded current chapter joins in
+   step 7); later
    definition families extend the filter with their steps — the same incremental contract as the
    validation pass. The negative-clock clamp lives in step 7: §12.10 files it under save
    hardening, but it guards elapsed-time computation, which doesn't exist until idle does.
@@ -62,7 +63,8 @@ always that the content belongs on a scope.
    `UpgradeDefinition` (gate, effects, actions), `GetMultiplier` two-stage gathering (source
    scope-to-root, currency home-to-root), `FireProducer` (atomic pre-fire resolution), `TryBuy`
    (fail-closed). Effects-from-facts covers the rows whose sources exist here (upgrades,
-   generator contributions, granted modifier stacks, career facts); later rows join with their
+   generator contributions, granted modifier stacks, and the career facts step 7 later folded
+   into permanent modifiers); later rows join with their
    steps. Extends validation: produces-entry targets, generator/upgrade reference resolution,
    tag membership extending to producers and generators.
 5. **Bars** (§12.7) — a bar drinks the currency it names at its own rate, taking what is there in
@@ -82,10 +84,10 @@ always that the content belongs on a scope.
    balance-goal-without-reset, stranded-reward
    guard, event kinds' reach.
 7. **Tick + GameSession** (§12.9) — dt segmentation at expiry timestamps, fixed economy phases per
-   segment, `game_speed` scaled production vs real wall clocks, idle switch-in/pending
-   claim/exactly-once settlement (including the §12.10 negative-clock clamp: a backwards device
-   clock clamps elapsed to zero, never mints currency), phase machine + command boundary, the
-   fail-closed entry points, refresh pipeline hooks.
+   segment, `game_speed` scaled production vs real wall clocks, idle switch-in with the transient
+   offer and exactly-once settlement via the stamp (including the §12.10 negative-clock clamp: a
+   backwards device clock clamps elapsed to zero, never mints currency), phase machine + command
+   boundary, the fail-closed entry points, refresh pipeline hooks.
 8. **Chapter 1 JSON + importer + walkthrough tests** (§12.14.5) — the chapter JSON schema, the
    editor importer (materializes SO assets and WIRES THEM INTO the scope tree's declaration lists,
    since a declaration is a direct reference and there are no labels to assign; re-import overwrites; mine the old

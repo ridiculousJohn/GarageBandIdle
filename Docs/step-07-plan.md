@@ -28,9 +28,9 @@ slices is orchestration over what steps 1-6 shipped.
 - **The command surface being wrapped**: `Rung.TryExecute`, `Purchasing.TryBuy` (generator and
   upgrade), `Producer.FireProducer`, `BarSystem.SetActiveBars`, `EventSystem.TryStart` /
   `TryDismiss`. None change; the boundary is orchestration and lives in the session (12.9).
-- **State**: `pendingClaim`, `lastActiveUtc`, `timedBuffs` - all in the tree since steps 1-2,
-  persisted and filtered by the save since step 2 (the reset re-stamp turns monotonic in slice E,
-  the one touch). `BlocksIdle` - step 6 shipped the property; this step is what reads it.
+- **State**: `lastActiveUtc`, `timedBuffs` - in the tree since steps 1-2, persisted since step 2
+  (the reset re-stamp turns monotonic in slice E; the claim respell deleted `pendingClaim` - the
+  stamp is the pending claim). `BlocksIdle` - step 6 shipped the property; this step is what reads it.
 - **Deposit at the home**: `GameContext.Deposit` - claim settlement and rate deposits alike.
 
 ## game_speed + the wildcard
@@ -169,7 +169,8 @@ while the pre-expiry segment's latch-before-decrement gives the boundary tie to 
 Plain C#, no MonoBehaviour, constructed over the root and a `GameConfig` - a small settings
 ScriptableObject (`minimumAwaySeconds`, `idleCapSeconds`, `maxGameSpeed`, and whatever global knobs join it later) that tests build
 inline and step 8's `GameManager` references as the real asset. The session is never serialized
-and holds only orchestration: `{foregroundChapter, phase, commandInProgress}` plus one refresh
+and holds only orchestration: `{foregroundChapter, phase, currentOffer, commandInProgress}` plus
+one refresh
 event (the 12.11 hook; step 9 subscribes).
 
 - **Phases**: `NoChapter | AwaitingIdleClaim | Live`. Launch and backgrounding are `NoChapter`.
@@ -179,17 +180,17 @@ event (the 12.11 hook; step 9 subscribes).
   writes its id at root, and backgrounding leaves it - the fact names where play left off, which
   is where boot returns. Step 8's `GameManager` reads it at launch and auto-enters that chapter,
   offering no selection; only a save with no recorded chapter (a fresh game) shows a chapter
-  select, and such a save holds no pending claim to conflict with. This is what makes an unsettled
-  claim unstrandable: every load that carries one lands on the chapter that owns it, where it
-  re-offers.
+  select, and such a save owes no idle to conflict with. This is what makes an unpaid window
+  unstrandable: every load lands on the chapter whose stamp holds it, where the offer recomputes.
 - **The transaction pipeline**, fixed for ticks and commands alike (12.9/12.11): guards (phase,
   boundary, `commandInProgress`) - mutation - `Sweep.Run(root, foregroundChapter, nowUtc)` -
   commit - one refresh. The sweep is CONDITIONAL on the resulting phase: only a transaction
   ending in `Live` sweeps. Ending in `AwaitingIdleClaim` or `NoChapter` commits and refreshes
-  without sweeping - a callback answered mid-dialog (12.9's phase-eligible contract) or a
-  backgrounding that keeps a claim must not open the chapter to a trigger's reset - and the
-  transaction that enters `Live` performs the deferred sweep. The refresh IS unconditional, which
-  is what repaints the dialog when a callback marks the claim doubled. Commit is a seam, not
+  without sweeping - a store callback answered mid-dialog (12.9's phase-eligible contract) or a
+  backgrounding that leaves the unpaid window must not open the chapter to a trigger's reset - and
+  the transaction that enters `Live` performs the deferred sweep (the ad callback's atomic
+  double-and-settle is one of those). The refresh IS unconditional, which
+  is what repaints the dialog when a mid-dialog callback changes what it shows. Commit is a seam, not
   machinery: every refusal precedes any mutation, so
   there is nothing to roll back, and commit is simply the point after the sweep where the
   transaction's state is what refresh reads. A refused command runs no pipeline - nothing mutated,
@@ -209,57 +210,67 @@ event (the 12.11 hook; step 9 subscribes).
 
 ## Idle
 
-Every `lastActiveUtc` write is MONOTONIC - `max(lastActiveUtc, nowUtc)` - at all three stamp
-sites: switch-away, backgrounding, and the reset re-stamp in `ChapterScopeState.Clear` (step 8's
-save-stamp inherits the same rule). The 12.10 clamp alone is not enough: clamping the read but
-stamping a rolled-back clock into state mints the difference the moment the clock recovers. A
-monotonic stamp may under-pay across a rollback; it can never pay for time that did not pass.
+Respelled 2026-08-26 (John's call): THE STAMP IS THE PENDING CLAIM. `PendingClaim` and
+`ClaimEntry` are deleted from state; nothing about an offer is ever saved, and with them go the
+scopeId coordinate, the claim save filter, and the load-path reattachment. The offer is a
+transient session-held object - the lines (currency, home, amount - all references), the window's
+end B, and a `doubled` flag - computed once over the explicit window [stamp, B] and dead with the
+process. The claim never computes anything: settlement pays the stored lines and advances the
+stamp to B, the window actually paid, in one transaction - the save is the tree, so a kill keeps
+both writes or neither, which is the whole exactly-once mechanism. A kill with the dialog up
+recomputes from the unmoved stamp at the next entry - same or slightly larger, capped - so what is
+shown is always what is paid, because only one offer is ever alive.
+
+Every `lastActiveUtc` write is MONOTONIC - `max(lastActiveUtc, nowUtc)` - at every stamp site:
+leaving a live chapter (switch-away or backgrounding), settlement's advance to B, and the reset
+re-stamp in `ChapterScopeState.Clear` (step 8's save-stamp inherits the same rule, and stamps only
+while Live - stamping under a dialog would erase the unpaid window). The 12.10 clamp alone is not
+enough: clamping the read but stamping a rolled-back clock into state mints the difference the
+moment the clock recovers. A monotonic stamp may under-pay across a rollback; it can never pay for
+time that did not pass.
 
 **`SwitchChapter(chapter, nowUtc)`** - the session command, legal in every phase, one transaction:
 
 1. Switching to the CURRENT chapter (or to null while already `NoChapter`) is a no-op success -
    nothing stamps, nothing recomputes. The stamp is old during a live session (written at the last
    switch-away), so recomputing here would mint a claim covering time the player spent playing.
-2. When switching INTO another chapter, the outgoing one settles first: an unsettled
-   `pendingClaim` deposits at its undoubled value (switching is an exit path, 9/12.9). Either way
-   the outgoing chapter stamps.
-3. A null incoming chapter is backgrounding: the outgoing chapter STAMPS (12.9: "stamped on
-   switch-away" - skipping it would pay idle for the live session on return), the unsettled claim
-   STAYS to re-offer so backgrounding and an app kill behave identically, and phase goes
-   `NoChapter`. Settle-first is a chapter-to-chapter rule only.
-4. The incoming chapter: an unsettled claim that survived an app kill re-offers as it stands -
-   same `claimId`, nothing recomputed. Otherwise `elapsed = max(0, nowUtc - lastActiveUtc)` (the
-   12.10 clamp - a backwards clock claims nothing), and the claim is skipped entirely - straight
-   to `Live` - when elapsed is under `GameConfig.minimumAwaySeconds`, when any record in the
-   chapter's subtree is for an event whose `BlocksIdle` holds, or when every line computes zero.
-   Otherwise: `pendingClaim = {claimId: fresh guid, amounts}` with one line per rate-paid currency
-   - `GetRate(idleCtx, currency) * min(elapsed, GameConfig.idleCapSeconds)` at current state, so
-   Records earned while away boost it - where `idleCtx` is the chapter's context constructed with
-   the idle-accumulation circumstance, so the x0.5 root base joins the gather and live-only
-   modifiers excuse themselves. Each line serializes its home's scope id and RETAINS the home reference
-   from the enumeration's `(currency, home)` pair, transient beside the id - no second lookup;
-   phase goes `AwaitingIdleClaim`.
+2. When switching INTO another chapter, the outgoing one settles first: an outstanding offer
+   deposits at its undoubled value (switching is an exit path, 9/12.9) and the stamp advances to
+   the offer's window end. A live outgoing chapter stamps at now instead.
+3. A null incoming chapter is backgrounding: a live outgoing chapter STAMPS (skipping it would pay
+   idle for the live session on return), but one with an offer up does NOT - the offer drops and
+   the stamp stays, so the unpaid window recomputes on return and backgrounding and an app kill
+   behave identically. Phase goes `NoChapter`. Settle-first is a chapter-to-chapter rule only.
+4. The incoming chapter: `elapsed = max(0, nowUtc - lastActiveUtc)` (the 12.10 clamp - a backwards
+   clock claims nothing), and the offer is skipped entirely - straight to `Live` - when elapsed is
+   under `GameConfig.minimumAwaySeconds`, when any record in the chapter's subtree is for an event
+   whose `BlocksIdle` holds, or when every line computes zero. Otherwise the transient offer: one
+   line per rate-paid currency - `GetRate(idleCtx, currency) * min(elapsed,
+   GameConfig.idleCapSeconds)` at current state, so Records earned while away boost it - where
+   `idleCtx` is the chapter's context constructed with the idle-accumulation circumstance, so the
+   x0.5 root base joins the gather and live-only modifiers excuse themselves. Each line holds the
+   currency and home references straight from the enumeration's `(currency, home)` pair - no
+   lookup, nothing serialized; phase goes `AwaitingIdleClaim`.
 5. The closing sweep follows the pipeline's GENERAL rule - only a transaction ending in `Live`
    sweeps. Entering `Live` directly: root plus the new foreground, the "first live sweep after
    switch-in" (12.8). Entering `AwaitingIdleClaim`: no sweep - a root trigger can legally carry
-   `ResetScope` against a descendant chapter (`FindInSubtree` reach), so even a root-only sweep
-   could swap `ChapterFacts` and destroy the claim before it is presented, the exact write
+   `ResetScope` against a descendant chapter (`FindInSubtree` reach), and the reset's re-stamp
+   would erase the unpaid window before the dialog presents it, the exact write
    `AwaitingIdleClaim` exists to forbid (12.9). The rule is phase-derived, not command-paired:
-   a callback marking the claim `doubled` is a legal transaction while the dialog is up and it
-   does not sweep either.
+   a callback landing while the dialog is up follows it too - the ad callback doubles and settles
+   atomically and ends in `Live` (so it sweeps), while one that leaves the phase alone does not.
 
-**`ClaimIdle(nowUtc)`** - `AwaitingIdleClaim` only. Each line deposits at its RETAINED home
-reference, doubled lines at x2 (the `doubled` flag is written by step 10's ad callback; the
-Backstage Pass pre-double is an authored idle-only modifier). Nothing resolves a name at
-settlement - requirement 8's downward walk is aggregation, not resolution - so references attach
-at the two boundaries instead: creation retains them, and the save's load path, which already owns
-claim-id resolution privately (12.3), reattaches them to the claim it rehydrates. Then `settled`
-flips and the claim object STAYS - a settled survivor is what makes replay after an app kill
-idempotent: it never re-offers and never re-deposits. Phase goes `Live`, and this transaction's
+**`ClaimIdle(nowUtc)`** - `AwaitingIdleClaim` only. Pure settlement: each stored line deposits at
+its held home reference, x2 when the offer is `doubled` (written by step 10's ad callback, which
+settles in the same transaction - a doubled offer is never left exposed to an exit's undoubled
+settle; the Backstage Pass pre-double is an authored idle-only modifier), the stamp advances to
+the window's end B - time past B is foreground presence, never idle; the next live exit stamps
+over it - and the offer dies. Phase goes `Live`, and this transaction's
 sweep - root plus the now-live foreground - is the deferred one: a threshold crossed while away,
 by the switch's own settle-out, or by this deposit fires here, root triggers included.
 
-`lastActiveUtc` on save (foreground only, 12.9, monotonic like every stamp) is one line at the
+`lastActiveUtc` on save (foreground only and only while Live, 12.9 - a save under the dialog must
+leave the unpaid window - monotonic like every stamp) is one line at the
 save call site, and no save call site exists until `GameManager` - it lands in step 8 with the
 caller.
 
@@ -305,11 +316,10 @@ caller.
 
 No version bump - pre-ship formats revise in place (12.10). One new field: the current-chapter id
 at root, written by `SwitchChapter`; the unknown-id filter clears it when content no longer
-authors that chapter. Everything else already persists: `pendingClaim`, `lastActiveUtc` and
-`timedBuffs` since step 2, careers were stateless, and permanent modifiers are declaration, not
-state. One load addition: the claim resolution the save already owns privately now also attaches
-each surviving line's transient home reference, so settlement never resolves a name
-(requirement 8).
+authors that chapter. Everything else already persists: `lastActiveUtc` and `timedBuffs` since
+step 2, careers were stateless, permanent modifiers are declaration, not state, and the claim
+respell deleted `pendingClaim` along with its save filter - an offer never touches the save, so
+the load path resolves nothing for it.
 
 ## Tests
 
@@ -353,21 +363,23 @@ transaction, none on a refusal; a transaction ending in `AwaitingIdleClaim` or `
 commits and refreshes without sweeping, and the one entering `Live` performs the deferred sweep;
 reentrancy throws; an invalid `GameConfig` refuses construction.
 
-Idle: switch-away stamps and settles undoubled; backgrounding stamps and keeps the claim; a
+Idle: switch-away settles the offer undoubled and advances the stamp to its window; backgrounding
+leaves the stamp under an offer and stamps a live chapter; a
 same-chapter switch is a no-op that neither stamps nor recomputes; rollback recovery - a stamp
-attempted at a rolled-back clock preserves the newer timestamp at all three sites (switch-away,
+attempted at a rolled-back clock preserves the newer timestamp at every site (leaving live,
 backgrounding, reset re-stamp), and the recovered clock pays no phantom idle; switch-in computes
 `GetRate(idleCtx) x min(elapsed, idleCapSeconds)` with the authored root base joining the gather
 and a live-only modifier contributing nothing to it; the negative clock claims nothing;
-below minimum-away skips; a blocking record skips; an unsettled survivor re-offers by `claimId`
-and a settled one does not; neither a chapter trigger nor a ROOT trigger carrying a reset fires
-during the switch that creates a claim - no sweep runs, the claim survives to present, and both
-fire on the claim's own sweep; `ClaimIdle` deposits through the retained references (x2 when
-doubled), a
-LOADED claim settles the same way through the references the save attached, `settled` flips, and
-replay no-ops; claim lines reach a tier-homed currency and a root-homed one; a currency-narrowed
+below minimum-away skips; a blocking record skips; an unclaimed offer recomputes from the unmoved
+stamp - bigger window, capped - and after settlement the advanced stamp offers nothing again;
+neither a chapter trigger nor a ROOT trigger carrying a reset fires
+during the switch that creates an offer - no sweep runs, the offer survives to present, and both
+fire on the claim's own sweep; `ClaimIdle` deposits through the offer's held references (x2 when
+doubled), advances the stamp to the window's end rather than the claim moment, and replay is
+refused by phase; a relaunch re-offers from the round-tripped stamp and deposits into the loaded
+tree; offer lines reach a tier-homed currency and a root-homed one; a currency-narrowed
 idle-only effect scales only its currency's line, and a chapter-declared idle-only modifier only
-its own chapter's claim; switching into a chapter records it as the
+its own chapter's offer; switching into a chapter records it as the
 root current-chapter fact and backgrounding leaves the record; a recorded chapter no content
 authors is dropped at load.
 
@@ -411,9 +423,12 @@ Six changesets, each compiling and green on its own.
   skeleton (John's call): same-chapter no-op, null backgrounds, a stored unsettled claim re-offers
   as `AwaitingIdleClaim`, otherwise straight to `Live` - the stamps, settle-out, claim computation,
   skip rules, and the current-chapter root fact stay E's, growing the same command.
-- **E. Idle** - `SwitchChapter`, `ClaimIdle`, the monotonic stamps (the reset re-stamp included),
-  the current-chapter root fact and its save filter, minimum-away and cap read from `GameConfig`,
-  the `BlocksIdle` read, the retained claim references (creation and load), the authored idle-only
-  root base in `TestContent`, plus the idle tests.
-- **F. Docs on landing** - the remaining edits above, the build-plan status line. 12.13 already
-  lists `GameSession.cs` and `TickSystem.cs`.
+- **E. Idle** - **LANDED 2026-08-26, 399/399, then respelled the same day**: `SwitchChapter`,
+  `ClaimIdle`, the monotonic stamps (the reset re-stamp included), the current-chapter root fact
+  and its save filter, minimum-away and cap read from `GameConfig`, the `BlocksIdle` read, the
+  authored idle-only root base in `TestContent`, plus the idle tests (`IdleTests`). The respell
+  (John's call) replaced the persisted claim with the-stamp-is-the-claim: `PendingClaim` and
+  `ClaimEntry` deleted, the offer transient, settlement advances the stamp to its window.
+- **F. Docs on landing** - **LANDED 2026-08-26**: the careers edits had already landed with B, so
+  what remained was the build-plan status line and step-7 detail, `currentChapterId` in 12.3's
+  RootFacts block, `GameConfig.cs` in 12.13, and the chapter JSON's stale career-effects mention.

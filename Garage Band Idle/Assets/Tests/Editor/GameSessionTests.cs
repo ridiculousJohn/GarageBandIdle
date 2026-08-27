@@ -78,7 +78,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Tree.Tier1.balances["cash"] = 1000;
             f.Tree.Tier1.earnedTotals["cash"] = 1000;
             f.Tree.Tier1.generatorCounts["practice_amp"] = 1;
-            f.Tree.Ch1.pendingClaim = new PendingClaim { claimId = "c1" };
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);   // the amp's idle rate makes a real offer
 
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase);
@@ -91,10 +91,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.Tick(10, f.Tree.Now.AddSeconds(10));
             Assert.AreEqual((BigNumber)1000, f.Tree.Tier1.balances["cash"]);   // the amp's rate never ran
 
-            // The switch stays legal, and backgrounding keeps the claim.
+            // The switch stays legal, and backgrounding leaves the stamp - the
+            // unpaid window recomputes on return.
             f.Session.SwitchChapter(null, f.Tree.Now);
             Assert.AreEqual(SessionPhase.NoChapter, f.Session.Phase);
-            Assert.IsNotNull(f.Tree.Ch1.pendingClaim);
+            Assert.IsNull(f.Session.CurrentOffer);
+            Assert.AreEqual(f.Tree.Now.AddSeconds(-1000), f.Tree.Ch1.lastActiveUtc);
         }
 
         [Test]
@@ -208,16 +210,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new Fixture();
             f.Tree.Tier1Trigger.condition = new Always();
             f.Tree.Tier1Trigger.actions.Add(new SetFlag { flagId = "fans_revealed" });
-            f.Tree.Ch1.pendingClaim = new PendingClaim { claimId = "c1" };
+            f.Tree.Tier1.generatorCounts["practice_amp"] = 1;
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
 
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
 
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase);
             Assert.AreEqual(1, f.Refreshes);
-            // The sweep that could destroy the claim never ran, and the claim
-            // stands to present.
+            // The sweep whose reset could erase the unpaid window never ran,
+            // and the offer stands to present.
             Assert.IsEmpty(f.Tree.Tier1.firedTriggers);
-            Assert.IsFalse(f.Tree.Ch1.pendingClaim.settled);
+            Assert.IsNotNull(f.Session.CurrentOffer);
         }
 
         [Test]
@@ -233,20 +236,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(SessionPhase.Live, f.Session.Phase);
             Assert.IsTrue(f.Tree.Tier1.firedTriggers.Contains("tier1_trigger"));
-        }
-
-        // A settled survivor never re-offers: the switch lands Live, not
-        // AwaitingIdleClaim - replay idempotence is the claim's own suite; the
-        // phase rule is this one's.
-        [Test]
-        public void A_settled_claim_does_not_hold_the_switch_in_AwaitingIdleClaim()
-        {
-            var f = new Fixture();
-            f.Tree.Ch1.pendingClaim = new PendingClaim { claimId = "c1", settled = true };
-
-            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
-
-            Assert.AreEqual(SessionPhase.Live, f.Session.Phase);
         }
 
         // ---- reentrancy and construction ----
@@ -277,6 +266,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.Throws<System.InvalidOperationException>(() => new GameSession(tree.Root, null));
             Assert.Throws<System.InvalidOperationException>(() => new GameSession(tree.Root, Config(0.5)));
             Assert.Throws<System.InvalidOperationException>(() => new GameSession(tree.Root, Config(double.NaN)));
+
+            var negativeCap = Config();
+            negativeCap.idleCapSeconds = -1;
+            Assert.Throws<System.InvalidOperationException>(() => new GameSession(tree.Root, negativeCap));
         }
     }
 }

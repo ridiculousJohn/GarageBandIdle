@@ -31,32 +31,6 @@ namespace RidiculousGaming.GarageBandIdle
         public string name;
     }
 
-    // One line of a claim: an amount, and the HOME it lands in. The claim is
-    // held at the CHAPTER but addresses what the chapter's production paid into,
-    // which includes currencies homed at tiers BELOW it - so this is the one
-    // coordinate in the schema that names a scope instead of resolving outward
-    // from the scope holding the fact. Scope ids are unique tree-wide, so the
-    // name is exact, and the save resolves it in one named step - downward from
-    // the chapter, or outward for a currency homed further out - with lookups it
-    // keeps private, since this is the only coordinate that needs them.
-    [Serializable]
-    public class ClaimEntry
-    {
-        public string scopeId;
-        public string currencyId;
-        public BigNumber amount;
-    }
-
-    // The idle dialog's exactly-once claim transaction (design doc 12.9).
-    [Serializable]
-    public class PendingClaim
-    {
-        public string claimId;
-        public List<ClaimEntry> amounts = new();
-        public bool doubled;
-        public bool settled;
-    }
-
     // Every mutable fact a reset destroys, in one replaceable payload. Reset
     // REPLACES this object wholesale, which is what makes clearing complete by
     // construction (design doc 12.3): a field added here next month is cleared
@@ -111,14 +85,21 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public Dictionary<string, int> roadieAllocation = new();       // chapterId to stationed count
         public HashSet<string> entitlements = new();                   // store-written
+
+        // Where play left off - written by SwitchChapter on entry, left by
+        // backgrounding, and where boot returns (design doc 12.9). A durable
+        // fact so it travels with the save, cloud restore included; this is
+        // what makes an unsettled claim unstrandable.
+        public string currentChapterId;
     }
 
-    // Facts only a chapter holds. A chapter can host an event, so it builds on
-    // the host payload rather than the common base.
+    // A chapter's payload. Nothing beyond what hosting brings: the idle stamp
+    // (lastActiveUtc) lives BESIDE the payload on ChapterScopeState, re-stamped
+    // rather than cleared, and IS the pending claim (design doc 12.9) - nothing
+    // about an idle offer is ever saved.
     [Serializable]
     public class ChapterFacts : InteriorFacts
     {
-        public PendingClaim pendingClaim;
     }
 
     // A scope is a plain state container; the save IS the tree of these (design
@@ -446,10 +427,17 @@ namespace RidiculousGaming.GarageBandIdle
 
         public Dictionary<string, int> roadieAllocation => Facts.roadieAllocation;
         public HashSet<string> entitlements => Facts.entitlements;
+
+        public string currentChapterId
+        {
+            get => Facts.currentChapterId;
+            set => Facts.currentChapterId = value;
+        }
     }
 
-    // Root's direct children. The idle claim and lastActiveUtc live here
-    // because idle is a per-chapter concept (design doc 12.9).
+    // Root's direct children. The idle stamp lives here because idle is a
+    // per-chapter concept (design doc 12.9), and the stamp IS the pending
+    // claim - everything specific about an offer is computed from it.
     public class ChapterScopeState : InteriorScopeState<ChapterFacts>
     {
         internal ChapterScopeState(ChapterDefinition definition, ScopeState parent)
@@ -457,10 +445,15 @@ namespace RidiculousGaming.GarageBandIdle
 
         public DateTime lastActiveUtc;
 
-        public PendingClaim pendingClaim
+        // Every lastActiveUtc write is MONOTONIC (design doc 12.9/12.10): the
+        // clamp on the read alone is not enough - stamping a rolled-back clock
+        // into state would mint the difference the moment the clock recovers.
+        // A monotonic stamp may under-pay across a rollback; it can never pay
+        // for time that did not pass.
+        public void StampActive(DateTime nowUtc)
         {
-            get => Facts.pendingClaim;
-            set => Facts.pendingClaim = value;
+            if (nowUtc > lastActiveUtc)
+                lastActiveUtc = nowUtc;
         }
 
         // A reset re-stamps the idle clock rather than clearing it: a fresh
@@ -468,7 +461,7 @@ namespace RidiculousGaming.GarageBandIdle
         public override void Clear(DateTime nowUtc)
         {
             base.Clear(nowUtc);
-            lastActiveUtc = nowUtc;
+            StampActive(nowUtc);
         }
     }
 

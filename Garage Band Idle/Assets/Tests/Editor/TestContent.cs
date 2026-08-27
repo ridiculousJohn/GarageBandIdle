@@ -40,6 +40,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly ModifierDefinition RecordsIncome;
         public readonly ModifierDefinition RoadieTotal;
         public readonly ModifierDefinition RoadieActive;
+        public readonly ModifierDefinition IdleBase;
         public readonly ModifierDefinition GjTap1;
         public readonly TriggerDefinition Tier1Trigger;
         public readonly EventDefinition TimedGig;
@@ -147,6 +148,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 formula = new RoadieActiveBoost { perRoadie = 0.05 } });
             RootDef.modifiers.Add(RoadieActive);
             RootDef.permanentModifiers.Add(RoadieActive);
+
+            // The idle fraction (9, 12.5): a wildcard rate x0.5 on root that
+            // applies only under the idle-accumulation circumstance - "rate
+            // but idle" is a circumstance of one gather, never a second
+            // vocabulary. Every idle-context gather in the suite carries it.
+            IdleBase = MakeDefinition<ModifierDefinition>("idle_base");
+            IdleBase.appliesWhen = new IdleAccumulation();
+            IdleBase.effects.Add(new Effect { stat = Stat.Rate, multiplier = 0.5 });
+            RootDef.modifiers.Add(IdleBase);
+            RootDef.permanentModifiers.Add(IdleBase);
 
             // learn_covers: each cover drinks Rehearsal at 2/s, and the group
             // caps it to ONE at a time, since choosing the next one is the
