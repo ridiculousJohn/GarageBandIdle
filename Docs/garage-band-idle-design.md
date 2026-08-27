@@ -812,8 +812,9 @@ names one holds a direct reference (§12.14) - but a flag has no data beyond its
 there would be nothing inside a `FlagDefinition` to author. The cost of that choice is that a flag
 name is the one authored reference a typo can break, which is why `SetFlag` and `FlagSet` are
 validated against the acting chain and `SetFlag` throws at runtime on a name no scope on the chain
-declares. Tags and stat names are strings for the same reason: neither is a thing, both are
-vocabulary.
+declares. Tags, stat names, and the `Effect` selectors (`target`, `currencyId`) are strings for
+the same reason: a selector matches by id OR tag (§12.2), so it cannot be a reference to one
+thing - all of these are vocabulary, not things.
 
 **A scope is addressed by reference too.** An action or condition that names a scope holds the
 `ScopeDefinition` itself, and getting from it to live state is a walk that compares assets, not
@@ -1379,7 +1380,7 @@ Assets/Scripts/
     GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
-    ContentDatabase.cs      // loads the root scope, and with it the whole graph; runs the §12.12 pass
+    ContentDatabase.cs      // loads the root + labeled chapter roots, composes the pair, runs the §12.12 pass
     ScopeDefinition.cs      // the abstract base: declaration lists + the permanentModifiers usage list, Declares, CreateState
     InteriorDefinition.cs   // chapters and tiers: the rung and the events list
     RootDefinition.cs  ChapterDefinition.cs  TierDefinition.cs   // one file each - Unity binds one ScriptableObject per script, by file name
@@ -1430,15 +1431,32 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
 3. UI refresh on the two triggers of §12.11; no per-frame polling of balances.
 4. Versioned, checksummed saves (explicit migrations, atomic write + backup), validate on load, cap
    idle earnings client-side.
-5. Content in ScriptableObjects, reached by DIRECT REFERENCE from the root scope; Addressables
-   carries the root, and the direct references bring the rest of the tree with it, so the whole
-   graph is resident from boot. Per-chapter streaming would need indirect handles, staged
+5. Content in ScriptableObjects, reached by DIRECT REFERENCE within each authored subtree.
+   **Startup composes the tree**: Addressables carries the root definition at a fixed address and
+   every chapter root under one `chapter` label; boot loads both, sorts the chapters by id (until
+   ordering becomes an explicit authored fact), and carries the PAIR — the root asset plus the
+   chapter set — into state construction and validation, which answer "children of root" from the
+   set and every deeper child from the serialized lists. Nothing is cloned or mutated: scope
+   operations resolve by asset identity, so the tree's root definition must BE the loaded asset —
+   a clone would strand every authored reference to root — and with no mutation, nothing writes
+   through to the editor asset. Every handle is held for the session. Identity also constrains
+   PACKING: root-owned assets are implicit dependencies of both the root entry and every chapter
+   entry, and Addressables duplicates implicit dependencies across bundles — so the root and
+   chapter entries share one `PackTogether` group, keeping every definition a single runtime
+   instance. `RootDefinition`'s
+   serialized child
+   list stays empty: the chapter document set IS the roster, and no asset stores a copy of it.
+   The label is consumed exactly once, at the load boundary, exactly as the save consumes scope
+   names (§12.3); no runtime read ever consults it, so requirement 8 stands untouched. Each
+   chapter's direct references still bring its whole subtree, and the graph is resident from
+   boot. Per-chapter streaming would need indirect handles, staged
    validation, and staged state construction; it is a later architectural change if load time or
    memory ever argues for it, not a property of today's design. **Authoring is a
    JSON document per chapter, materialized into SO assets by an editor importer**; the assets stay
    fully hand-authorable — `[SerializeReference]` plus the subclass-picker drawer create and edit
    polymorphic kinds in the inspector. An authored reference is an object field: it cannot name
-   something that does not exist, so only flags, tags, and stat names stay strings.
+   something that does not exist, so only flags, tags, stat names, and the `Effect` selectors
+   (`target`, `currencyId` — id-or-tag matchers, §12.2) stay strings.
    **Re-import overwrites**: the JSON is the source of truth for a chapter it authored; content
    born in the editor is simply never re-imported over. (If round-tripping ever matters, a
    chapter/game exporter back to JSON is a later addition — deliberately not built now.) A
@@ -1512,5 +1530,5 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
   (`game_speed` stat, tick-consumed; wall clocks never scale); Backstage Pass (lifetime,
   permanent Overdrive); Buy Roadies (repeatable); Tip Jar; no subscriptions.
 - **Engine:** Unity; break_infinity numbers; DateTime ticks; checksummed JSON save of the state tree;
-  one Addressables load of the root scope, which carries the whole directly-referenced content
-  graph; load-time validation of all authored data.
+  boot composes the root address plus the `chapter` label into the tree, each chapter's direct
+  references carrying its subtree; load-time validation of all authored data.
