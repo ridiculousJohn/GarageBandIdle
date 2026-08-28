@@ -57,6 +57,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Fans = DeclareCurrency(Tier1Def, "fans");
             Rehearsal = DeclareCurrency(Tier1Def, "rehearsal");
             Tier1Def.declaredFlags.AddRange(new[] { "fans_revealed", "rehearsal_revealed" });
+            // The generator vocabulary is tier1's, since only its generators
+            // carry it; income and production are root's, per the content doc.
+            Tier1Def.declaredTags.AddRange(new[] { "gear", "bandmate" });
             Tier1Trigger = MakeDefinition<TriggerDefinition>("tier1_trigger");
             Tier1Def.triggers.Add(Tier1Trigger);
 
@@ -69,6 +72,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Records = DeclareCurrency(RootDef, "records");
             Roadies = DeclareCurrency(RootDef, "roadies");
             RootDef.declaredFlags.Add("ch1_complete");
+            RootDef.declaredTags.AddRange(new[] { "income", "production" });
             RootDef.children.Add(Ch1Def);
 
             // The Jam: two cash yield entries (the second reads the upgrade

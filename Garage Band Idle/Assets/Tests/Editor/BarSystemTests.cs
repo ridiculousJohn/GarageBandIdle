@@ -300,6 +300,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Build();
             var modifier = TestTree.MakeDefinition<ModifierDefinition>("narrowed");
             modifier.effects.Add(new Effect { target = "rehearsal_fill", currencyId = "rehearsal", stat = Stat.Rate, multiplier = 4 });
+            f.Tier1Def.declaredTags.Add("rehearsal_fill");
             drinker.EditorInit("drinker", "rehearsal_fill");
             ticker.EditorInit("ticker", "rehearsal_fill");
             f.Tier1Def.modifiers.Add(modifier);

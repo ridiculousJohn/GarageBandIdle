@@ -19,6 +19,13 @@ namespace RidiculousGaming.GarageBandIdle
         // and the flag its lifetime; reads walk the whole chain.
         public List<string> declaredFlags = new();
 
+        // The tag vocabulary this scope's subtree may carry - bare strings for
+        // the same reason flags are, since a tag has no data beyond its own
+        // existence. A definition CARRYING one resolves it by walking outward to
+        // the scope declaring it; an Effect selector filtering on one resolves
+        // nothing, so the declaration binds carriers alone (design doc 12.2).
+        public List<string> declaredTags = new();
+
         public List<TriggerDefinition> triggers = new();
 
         // Economy declarations: the facts these create live and die with this

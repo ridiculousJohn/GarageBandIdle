@@ -22,7 +22,7 @@ always that the content belongs on a scope.
 | - | Scope kind refactor (2026-08-24) | **DONE** - 271/271 green: a scope is authored as `RootDefinition` / `ChapterDefinition` / `TierDefinition` under the abstract `InteriorDefinition`, each building its own state node, so no depth test infers a kind; `rung` moved off the base and `RungOnRoot` was deleted with it; the save populates the payload the node holds; the three outward walks ask `Declares` / `MultiplierFor` / `SourceTermsFor` instead of reading lists off a base-typed node; placement is validated root -> chapters -> tiers |
 | 6 | Events + trigger sweep | **DONE 2026-08-25** - 327/327 green |
 | 7 | Tick + GameSession | **DONE 2026-08-26** - 397/397 green (six slices A-F; two design revisions absorbed mid-step: the idle respell, then the claim respell - the stamp IS the pending claim, offers are transient and session-held) |
-| - | Tag declarations + effect-selector deletion | not started - precedes step 8; `declaredTags` on the scope, carried tags resolved outward, and the downward effect-selector searches deleted (slice 0 of `step-08-plan.md`) |
+| - | Tag declarations + effect-selector deletion | **DONE 2026-08-27** - 379/379 green: `declaredTags` on the scope joining the per-chain name space, carried tags resolved outward from the carrier, and the downward effect-selector searches deleted, leaving the stat coordinate and the two game_speed shape checks (slice 0 of `step-08-plan.md`) |
 | 8 | Chapter 1 JSON + importer + walkthrough tests | not started |
 | 9 | UI layer | not started |
 | 10 | Meta & monetization | not started |

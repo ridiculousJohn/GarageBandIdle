@@ -20,15 +20,13 @@ namespace RidiculousGaming.GarageBandIdle
         ScopeGraph,             // exactly one root, one parent each, every scope reachable
         ScopePlacement,         // root -> chapters -> tiers: a scope's authored kind fits where it sits
         DuplicateId,            // Definition ids and flags share one id space per chain
-        DuplicateHome,          // a currency, flag, or trigger declared by two scopes
-        TagIdCollision,         // a tag may not collide with any id
+        DuplicateHome,          // a currency, flag, trigger, or tag declared by two scopes
+        TagIdCollision,         // a declared tag and an id claiming one word on a chain
         UnresolvedReference,    // a referenced id resolves to nothing
         NullEntry,              // a null slot in an authored list, or a required operand
         InertOperand,           // an operand authored where the shape's own behavior never reads it
         ScopeReach,             // ResetScope / RestartScope / ExecuteRung / modifier-grant reach rules
         ChainReach,             // ordinary reads and writes address only the acting chain
-        EffectReach,            // an effect sits where its target's outward walk visits it
-        EffectTargetUnmatched,  // an effect target matching nothing reachable (warn)
         FlagNoSetter,           // a declared flag nothing sets (warn)
         SetThenWiped,           // a list sets a fact, then resets the scope declaring it
         FormulaReadsCleared,    // a formula-driven grant after a reset clearing its inputs (warn)
@@ -206,7 +204,6 @@ namespace RidiculousGaming.GarageBandIdle
         private readonly Dictionary<ScopeDefinition, ScopeDefinition> parentByScope;
         private readonly Dictionary<Definition, ScopeDefinition> declaringScopeByDefinition;
         private readonly List<ScopeDefinition> treeScopes;
-        private readonly List<Definition> allDefinitions;
 
         private string site;
         private string containerKey;
@@ -232,15 +229,13 @@ namespace RidiculousGaming.GarageBandIdle
             ScopeDefinition rootScope,
             Dictionary<ScopeDefinition, ScopeDefinition> parentByScope,
             Dictionary<Definition, ScopeDefinition> declaringScopeByDefinition,
-            List<ScopeDefinition> treeScopes,
-            List<Definition> allDefinitions)
+            List<ScopeDefinition> treeScopes)
         {
             this.report = report;
             RootScope = rootScope;
             this.parentByScope = parentByScope;
             this.declaringScopeByDefinition = declaringScopeByDefinition;
             this.treeScopes = treeScopes;
-            this.allDefinitions = allDefinitions;
         }
 
         internal static string RungKey(string scopeId) => "rung:" + scopeId;
@@ -276,62 +271,6 @@ namespace RidiculousGaming.GarageBandIdle
         private string Prefix(string message) => site == null ? message : $"{site}: {message}";
 
         // ---- tree queries mirroring the runtime walks ----
-
-        // Every targetable member of a subtree that answers to a name, by id or
-        // by tag. An effect's address is a FILTER the gather applies to
-        // candidates it has already found (Producer.Matches), never a lookup -
-        // so the question is never "which asset is this id". A tag names many
-        // owners on purpose, and ids repeat across chains, so this is a LIST:
-        // the address is inert only when NONE of them can satisfy the rest of
-        // the tuple.
-        public List<Definition> MatchTargets(ScopeDefinition top, string name)
-        {
-            var matches = new List<Definition>();
-            if (top == null || string.IsNullOrEmpty(name))
-                return matches;
-            foreach (var scope in ScopesInSubtree(top))
-                foreach (var candidate in ContentValidator.Targetables(scope))
-                    if (candidate.Id == name || candidate.HasTag(name))
-                        matches.Add(candidate);
-            return matches;
-        }
-
-        // A definition of a kind no multiplier resolves against, answering to
-        // the name by id. Asked only once nothing targetable answers, so a kind
-        // mistake reads as one rather than as a typo.
-        public Definition MatchOtherKind(ScopeDefinition top, string name)
-        {
-            if (top == null || string.IsNullOrEmpty(name))
-                return null;
-            foreach (var scope in ScopesInSubtree(top))
-            {
-                if (scope.Id == name)
-                    return scope;
-                foreach (var declared in ContentValidator.DeclaredBy(scope))
-                    if (declared.Id == name)
-                        return declared;
-            }
-            return null;
-        }
-
-        // The currency coordinate narrows which currency's contribution an
-        // effect applies to, and the gather only ever offers currencies an
-        // outward walk from somewhere in the effect's subtree can see - so that
-        // subtree plus the effect's own chain is the whole legal space.
-        public bool MatchNarrowingCurrency(ScopeDefinition top, string name)
-        {
-            if (top == null || string.IsNullOrEmpty(name))
-                return false;
-            foreach (var scope in treeScopes)
-            {
-                if (!InSubtree(top, scope) && !InSubtree(scope, top))
-                    continue;
-                foreach (var currency in scope.declaredCurrencies)
-                    if (currency != null && (currency.Id == name || currency.HasTag(name)))
-                        return true;
-            }
-            return false;
-        }
 
         public ScopeDefinition FindScope(ScopeDefinition scope) =>
             scope != null && treeScopes.Contains(scope) ? scope : null;
@@ -492,69 +431,6 @@ namespace RidiculousGaming.GarageBandIdle
         public void RecordReset(ScopeDefinition target) =>
             Resets.Add(new ResetRecord(containerKey, actionIndex, target, site));
 
-        // ---- tag membership for effect targets ----
-
-        // Whether any source can pay this currency with this stat. An entry's
-        // currency must resolve on its source's chain (12.12), so every possible
-        // payer sits at or below the currency's home. The entry's CONDITION does
-        // not matter: whether a gate ever opens is not a load-time question.
-        public bool SomeSourcePays(Economy.CurrencyDefinition currency, string stat)
-        {
-            var home = DeclaringScope(currency);
-            if (home == null)
-                return true;   // an undeclared currency is reported where it is referenced
-            foreach (var scope in ScopesInSubtree(home))
-            {
-                foreach (var producer in scope.producers)
-                    if (producer != null && PaysWith(producer.produces, currency, stat))
-                        return true;
-                foreach (var generator in scope.generators)
-                    if (generator != null && PaysWith(generator.produces, currency, stat))
-                        return true;
-            }
-            return false;
-        }
-
-        // The entry's currency is compared by REFERENCE: a same-named currency
-        // on another chain is a different currency, and it pays nothing here.
-        private static bool PaysWith(List<Economy.ProducesEntry> entries, Economy.CurrencyDefinition currency, string stat)
-        {
-            foreach (var entry in entries)
-                if (entry != null && entry.currency == currency && entry.stat == stat)
-                    return true;
-            return false;
-        }
-
-        // Whether the usage scope's subtree homes a currency the narrowing
-        // selects (any currency when the narrowing is empty) that some source
-        // pays with this stat. This is a wildcard's whole reachable set: it is
-        // collected only on home-to-root walks, only subtree homes put this
-        // scope on such a walk, and the walk itself only runs for a
-        // (currency, stat) pair some contribution pays - GetRate returns
-        // before its currency stage on a zero sum, and FireProducer only
-        // stages the currencies its entries name.
-        public bool SubtreeHomesMatchingCurrency(ScopeDefinition top, string currencyId, string stat)
-        {
-            foreach (var scope in ScopesInSubtree(top))
-                foreach (var currency in scope.declaredCurrencies)
-                {
-                    if (currency == null)
-                        continue;
-                    if (!string.IsNullOrEmpty(currencyId) && currency.Id != currencyId && !currency.HasTag(currencyId))
-                        continue;
-                    if (SomeSourcePays(currency, stat))
-                        return true;
-                }
-            return false;
-        }
-
-        // Whether a name is vocabulary anywhere in the content. Deliberately
-        // unscoped, and deliberately including the kinds no multiplier resolves
-        // against: the scoped question is asked first, by MatchTarget, and this
-        // one only separates "you typed a word nothing carries" from "that tag
-        // exists, just not where this effect can see it".
-        public bool TagExists(string tag) => allDefinitions.Any(d => d.HasTag(tag));
-
         internal IReadOnlyList<ScopeDefinition> TreeScopes => treeScopes;
 
         internal IEnumerable<ScopeDefinition> ScopesInSubtree(ScopeDefinition top)
@@ -593,21 +469,22 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // The kinds a multiplier can resolve against (12.2): the currencies a
-        // scope homes plus the sources and bars it declares. Scope, trigger,
-        // upgrade, and modifier tags are vocabulary, not targets - no effect
-        // ever multiplies one of those, and neither is a bar GROUP: its only
-        // members are a set of bars and an int cap, so there is no number for a
-        // gather to reach. Buffing a set of bars is a tag they share (12.7).
-        internal static IEnumerable<Definition> Targetables(ScopeDefinition scope)
+        // Every tag one definition carries, against the vocabulary its own chain
+        // declares (12.2). The declared set arrives already accumulated from the
+        // root down, which is the carrier's outward walk read the other way -
+        // the answer is the same, and nothing enumerates what lies below.
+        private static void CheckCarriedTags(Definition definition, ScopeDefinition scope,
+                                             HashSet<string> declaredTags, ValidationReport report)
         {
-            foreach (var currency in scope.declaredCurrencies) if (currency != null) yield return currency;
-            foreach (var producer in scope.producers) if (producer != null) yield return producer;
-            foreach (var generator in scope.generators) if (generator != null) yield return generator;
-            foreach (var group in scope.barGroups)
+            for (var i = 0; i < definition.Tags.Count; i++)
             {
-                if (group == null) continue;
-                foreach (var bar in group.bars) if (bar != null) yield return bar;
+                var tag = definition.Tags[i];
+                if (string.IsNullOrEmpty(tag))
+                    report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
+                        $"{definition.GetType().Name} '{definition.Id}' at '{scope.Id}' tags[{i}] is empty.");
+                else if (!declaredTags.Contains(tag))
+                    report.Add(ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                        $"{definition.GetType().Name} '{definition.Id}' at '{scope.Id}' carries tag '{tag}', which no scope on its chain declares (12.2).");
             }
         }
 
@@ -719,32 +596,20 @@ namespace RidiculousGaming.GarageBandIdle
                 }
             }
 
-            // ---- id space: every definition the tree declares, plus flags ----
-            var allDefinitions = new List<Definition>();
-            var definitionSeen = new HashSet<Definition>();
+            // ---- null slots in the declaration lists ----
             // Declaration is the only way content enters the game, so the
             // declaration lists ARE the id space - there is nothing else to
-            // enumerate.
+            // enumerate, and a null slot is a key nothing can hold.
             void CollectDeclared<T>(ScopeDefinition scope, List<T> list, string label) where T : Definition
             {
                 for (var i = 0; i < list.Count; i++)
-                {
-                    var definition = list[i];
-                    if (definition == null)
-                    {
+                    if (list[i] == null)
                         report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
                             $"scope '{scope.Id}' {label}[{i}] is null.");
-                        continue;
-                    }
-                    if (definitionSeen.Add(definition))
-                        allDefinitions.Add(definition);
-                }
             }
 
             foreach (var scope in allScopes)
             {
-                if (definitionSeen.Add(scope))
-                    allDefinitions.Add(scope);
                 CollectDeclared(scope, scope.declaredCurrencies, "declaredCurrencies");
                 CollectDeclared(scope, scope.triggers, "triggers");
                 CollectDeclared(scope, scope.producers, "producers");
@@ -782,24 +647,30 @@ namespace RidiculousGaming.GarageBandIdle
                     scopeIds[scope.Id] = scope;
             }
 
-            void CheckChain(ScopeDefinition scope, Dictionary<string, string> inherited, Dictionary<string, string> inheritedTags)
+            // The chain's name space, carried downward: ids, flags, and declared
+            // tags all claim the same words, and the set of tag declarations
+            // visible here IS the outward walk a carrier below would make -
+            // expressed as inheritance so the pass never looks down for one.
+            void CheckChain(ScopeDefinition scope, Dictionary<string, (string Desc, bool IsTag)> inherited,
+                            HashSet<string> inheritedTagDeclarations)
             {
-                var visible = new Dictionary<string, string>(inherited);
-                var visibleTags = new Dictionary<string, string>(inheritedTags);
-                var claimedHere = new List<string>();
-                void Claim(string id, string desc, bool isFlag)
+                var visible = new Dictionary<string, (string Desc, bool IsTag)>(inherited);
+                var declaredTags = new HashSet<string>(inheritedTagDeclarations);
+                void Claim(string id, string desc, bool isTag, ValidationCheck duplicate)
                 {
                     if (string.IsNullOrEmpty(id))
                         return;
                     if (visible.TryGetValue(id, out var existing))
+                        // One word claimed by both a tag and an id is the
+                        // ambiguity TagIdCollision names: an effect selector
+                        // tries the same string both ways, so nothing downstream
+                        // could tell them apart. Two claims of one kind are an
+                        // ordinary duplicate.
                         report.Add(ValidationSeverity.Error,
-                            isFlag ? ValidationCheck.DuplicateHome : ValidationCheck.DuplicateId,
-                            $"'{id}' is declared twice on the chain at '{scope.Id}': {existing} and {desc}.");
+                            isTag == existing.IsTag ? duplicate : ValidationCheck.TagIdCollision,
+                            $"'{id}' is declared twice on the chain at '{scope.Id}': {existing.Desc} and {desc}.");
                     else
-                    {
-                        visible[id] = desc;
-                        claimedHere.Add(id);
-                    }
+                        visible[id] = (desc, isTag);
                 }
 
                 foreach (var definition in DeclaredBy(scope))
@@ -807,7 +678,7 @@ namespace RidiculousGaming.GarageBandIdle
                     if (string.IsNullOrEmpty(definition.Id))
                         report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
                             $"a {definition.GetType().Name} declared at '{scope.Id}' has a null or empty id.");
-                    Claim(definition.Id, $"{definition.GetType().Name} at '{scope.Id}'", false);
+                    Claim(definition.Id, $"{definition.GetType().Name} at '{scope.Id}'", false, ValidationCheck.DuplicateId);
                 }
                 for (var i = 0; i < scope.declaredFlags.Count; i++)
                 {
@@ -816,38 +687,36 @@ namespace RidiculousGaming.GarageBandIdle
                         report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
                             $"scope '{scope.Id}' declaredFlags[{i}] is empty.");
                     else
-                        Claim(flag, $"flag at '{scope.Id}'", true);
+                        Claim(flag, $"flag at '{scope.Id}'", false, ValidationCheck.DuplicateHome);
+                }
+                for (var i = 0; i < scope.declaredTags.Count; i++)
+                {
+                    var tag = scope.declaredTags[i];
+                    if (string.IsNullOrEmpty(tag))
+                    {
+                        report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
+                            $"scope '{scope.Id}' declaredTags[{i}] is empty.");
+                        continue;
+                    }
+                    Claim(tag, $"declared tag at '{scope.Id}'", true, ValidationCheck.DuplicateHome);
+                    declaredTags.Add(tag);
                 }
 
-                // A tag is vocabulary; colliding with an id VISIBLE here would
-                // make an effect target ambiguous exactly where it resolves,
-                // since the filter tries the same string as an id and as a tag.
-                // Both directions collide, so tags travel down the chain the way
-                // ids do: a tag declared here meets the ids from above, and an id
-                // declared here meets the tags from above.
+                // A carrier resolves its tag the way every other name resolves:
+                // outward from the scope that declares the CARRIER, to the first
+                // scope declaring the word. Nothing here interprets a tag an
+                // Effect names - a selector is a match string, not a reference
+                // (12.2) - so this is the whole of the pass's tag checking.
                 foreach (var definition in DeclaredBy(scope))
-                    foreach (var tag in definition.Tags)
-                    {
-                        if (string.IsNullOrEmpty(tag))
-                            continue;
-                        if (visible.ContainsKey(tag))
-                            report.Add(ValidationSeverity.Error, ValidationCheck.TagIdCollision,
-                                $"tag '{tag}' (on {definition.GetType().Name} '{definition.Id}') collides with an id visible at '{scope.Id}'.");
-                        else if (!visibleTags.ContainsKey(tag))
-                            visibleTags[tag] = $"{definition.GetType().Name} '{definition.Id}' at '{scope.Id}'";
-                    }
-
-                foreach (var id in claimedHere)
-                    if (inheritedTags.TryGetValue(id, out var carrier))
-                        report.Add(ValidationSeverity.Error, ValidationCheck.TagIdCollision,
-                            $"id '{id}' declared at '{scope.Id}' collides with tag '{id}', carried by {carrier} and visible here.");
+                    CheckCarriedTags(definition, scope, declaredTags, report);
+                CheckCarriedTags(scope, scope, declaredTags, report);
 
                 foreach (var child in scope.children)
                     if (child != null)
-                        CheckChain(child, visible, visibleTags);
+                        CheckChain(child, visible, declaredTags);
             }
             if (rootDefinition != null)
-                CheckChain(rootDefinition, new Dictionary<string, string>(), new Dictionary<string, string>());
+                CheckChain(rootDefinition, new Dictionary<string, (string, bool)>(), new HashSet<string>());
 
             // ---- homes: declaration is ownership, one asset to one scope ----
             // Keyed by ASSET and never by id: two chains may each declare their
@@ -885,7 +754,7 @@ namespace RidiculousGaming.GarageBandIdle
             }
 
             var ctx = new ValidationContext(report, root, parentByScope,
-                declaringScopeByDefinition, treeScopes, allDefinitions);
+                declaringScopeByDefinition, treeScopes);
 
             // ---- container walk: every rung and trigger, in tree order ----
             foreach (var scope in treeScopes)
@@ -1439,14 +1308,14 @@ namespace RidiculousGaming.GarageBandIdle
                         $"{remove.Site}: RemoveModifier removes '{remove.Modifier.Id}' at '{remove.Target.Id}', where nothing grants it.");
 
             // An effect's numbers are the same wherever the modifier is applied;
-            // its ADDRESS is not, so the address - and the formulas and
-            // appliesWhen judged from the same place - is validated once per
-            // usage site: every grant target, plus every scope whose
-            // permanentModifiers list carries the modifier. A modifier nothing
-            // uses is judged from the scope that DECLARES it, which is the
-            // loosest legal grant site (a grant must name a scope the modifier's
-            // own declaration can reach), so every authored reference still
-            // resolves (12.12).
+            // its stat coordinate, its formula, and appliesWhen are judged from
+            // where the reads walk outward, so they are validated once per usage
+            // site: every grant target, plus every scope whose permanentModifiers
+            // list carries the modifier. A modifier nothing uses has no site at
+            // all, and gets none of the three - deliberately, since none of them
+            // can execute until something applies it, and the moment anything
+            // does the site exists and every check runs. What reports the
+            // modifier itself is the orphan sweep (12.12).
             foreach (var scope in ctx.TreeScopes)
                 foreach (var modifier in scope.modifiers)
                 {
@@ -1462,8 +1331,6 @@ namespace RidiculousGaming.GarageBandIdle
                     foreach (var user in ctx.TreeScopes)
                         if (user.permanentModifiers.Contains(modifier) && !sites.Any(s => s.home == user))
                             sites.Add((user, $" (applied at '{user.Id}')"));
-                    if (sites.Count == 0)
-                        sites.Add((scope, string.Empty));
                     foreach (var (home, at) in sites)
                         ValidateModifierAtSite(ctx, modifier, home, at);
                 }
@@ -1517,188 +1384,44 @@ namespace RidiculousGaming.GarageBandIdle
                     $"{site}: multiplier is {effect.multiplier} - a multiplier never flips a number's sign (zero is legal: an event handicap is x0).");
         }
 
-        private static void ValidateEffectAddress(ValidationContext ctx, Effect effect, string site, ScopeDefinition home) =>
-            ValidateEffectAddress(ctx, effect.target, effect.currencyId, effect.stat, site, home);
-
         // One effect address (12.12), judged from the scope the effect LIVES in.
-        // Resolution and reach are the same question here: the gather walks
-        // outward from a source or a currency home, so it passes this effect
-        // only for candidates sitting in this scope's subtree, and the
-        // coordinates are the filter it applies to them.
-        private static void ValidateEffectAddress(ValidationContext ctx, string target, string currencyId, string stat, string site, ScopeDefinition home)
+        // Only the stat coordinate is checked. `target` and `currencyId` are
+        // SELECTORS - match strings the gather tests against a candidate it
+        // already holds (12.2) - and answering one would mean enumerating the
+        // definitions below this scope, the exact inversion of how the gather
+        // works. An effect nothing answers to is content with no takers.
+        private static void ValidateEffectAddress(ValidationContext ctx, Effect effect, string site, ScopeDefinition home)
         {
-            // The currency coordinate narrows to a currency, by id or by a tag a
-            // currency carries; anything else narrows to nothing at all.
-            var currencyResolves = string.IsNullOrEmpty(currencyId) || ctx.MatchNarrowingCurrency(home, currencyId);
-            if (!currencyResolves)
-                ctx.AddError(ValidationCheck.UnresolvedReference,
-                    $"{site}: narrows to '{currencyId}', which is no currency id and no tag any currency carries.");
+            var stat = effect.stat;
 
             // The stat coordinate is required and exact (12.2): an empty one
             // matches nothing at runtime, so it is refused at load rather than
             // shipped inert; a name outside the effect vocabulary is the typo
-            // warn. Either way, a coordinate already reported as naming nothing
-            // is not reported a second time as half of an unsatisfiable pair,
-            // so the target check below runs without the bad stat filter.
-            var statValid = Economy.Stat.IsProduced(stat) || Economy.Stat.IsEffectAddress(stat);
+            // warn.
             if (string.IsNullOrEmpty(stat))
                 ctx.AddError(ValidationCheck.NullEntry,
                     $"{site}: no stat - the coordinate is required, and a stat-less effect matches nothing (12.2).");
-            else if (!statValid)
+            else if (!Economy.Stat.IsProduced(stat) && !Economy.Stat.IsEffectAddress(stat))
                 ctx.AddWarning(ValidationCheck.UnconsumedStat,
                     $"{site} stat narrowing names stat '{stat}', which no consumer reads ({Economy.Stat.EffectStatNames}).");
 
-            // game_speed is read by an owner-less, currency-less query - the
-            // tick's once-per-segment gather - so a target or currency narrowing
-            // on one is never passed a coordinate to match: dead content.
-            if (stat == Economy.Stat.GameSpeed && (!string.IsNullOrEmpty(target) || !string.IsNullOrEmpty(currencyId)))
-            {
-                ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
+            // The one placement exception (12.12): game_speed has a single
+            // consumer whose gather origin is fixed in CODE rather than by
+            // content - the tick's once-per-segment, owner-less, currency-less
+            // query from the foreground chapter (12.9). So a narrowing on one is
+            // never passed a coordinate to match, and one applied below chapter
+            // level is never on that walk. Both answers come from this site's own
+            // kind with nothing enumerated, which is what makes them checks where
+            // the general case is not one.
+            if (stat != Economy.Stat.GameSpeed)
+                return;
+            if (!string.IsNullOrEmpty(effect.target) || !string.IsNullOrEmpty(effect.currencyId))
+                ctx.AddWarning(ValidationCheck.InertOperand,
                     $"{site}: a game_speed effect is matched by an owner-less, currency-less query, so the narrowing never selects anything (12.2).");
-                return;
-            }
-
-            // An empty target is the wildcard (12.2). What is left to check is
-            // reach, which differs by consumer. game_speed is gathered from the
-            // foreground chapter outward, so below chapter level it is never
-            // visited. A currency-stage wildcard is collected on the walk from
-            // a currency's HOME outward, so it answers only for currencies
-            // homed in the usage scope's subtree - the ancestor direction
-            // MatchNarrowingCurrency allows belongs to source-targeted effects,
-            // whose stage-1 walk visits this scope; a wildcard has no stage 1.
-            if (string.IsNullOrEmpty(target))
-            {
-                if (stat == Economy.Stat.GameSpeed)
-                {
-                    if (!(home is ChapterDefinition) && !(home is RootDefinition))
-                        ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                            $"{site}: a game_speed effect at '{home.Id}' is never gathered - the tick reads from the foreground chapter outward, so it must live at a chapter or the root (12.2).");
-                }
-                else if (statValid && !ctx.SubtreeHomesMatchingCurrency(home, currencyResolves ? currencyId : null, stat))
-                {
-                    ctx.AddWarning(ValidationCheck.EffectTargetUnmatched, string.IsNullOrEmpty(currencyId)
-                        ? $"{site}: the wildcard applies at the currency stage, and no currency homed within '{home.Id}' is paid at '{stat}' - the home-to-root gather never visits this effect (12.12)."
-                        : $"{site}: the wildcard applies at the currency stage, and no currency matching '{currencyId}' homed within '{home.Id}' is paid at '{stat}' - the home-to-root gather never visits this effect (12.12).");
-                }
-                return;
-            }
-            ValidateTargetCoordinate(ctx, target, site, home,
-                currencyResolves ? currencyId : null,
-                statValid ? stat : null);
+            else if (home is not ChapterDefinition && home is not RootDefinition)
+                ctx.AddWarning(ValidationCheck.InertOperand,
+                    $"{site}: a game_speed effect at '{home.Id}' is never gathered - the tick reads from the foreground chapter outward, so it must live at a chapter or the root (12.2).");
         }
-
-        private static void ValidateTargetCoordinate(ValidationContext ctx, string target, string site, ScopeDefinition home,
-                                                     string currencyId, string stat)
-        {
-            void WrongKind(Definition definition) =>
-                ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                    $"{site}: targets '{target}' ({definition.GetType().Name}), which is not an effect target kind (12.2: currency, producer, generator, bar, or tag).");
-
-            var candidates = ctx.MatchTargets(home, target);
-            if (candidates.Count > 0)
-            {
-                // The three coordinates address ONE entry TOGETHER (12.2), so
-                // they are judged together: a tag matching three sources is
-                // right as long as one of them pays the narrowed currency, and
-                // wrong when none does - Producer.Matches would then refuse
-                // every candidate the gather ever offers.
-                if (!candidates.Any(c => SatisfiesNarrowing(ctx, c, currencyId, stat)))
-                    ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                        $"{site}: targets '{target}', but nothing it matches within '{home.Id}' pairs with {NarrowingText(currencyId, stat)} - the coordinates never select an entry together (12.2).");
-                return;
-            }
-
-            var wrongKind = ctx.MatchOtherKind(home, target);
-            if (wrongKind != null)
-            {
-                WrongKind(wrongKind);
-                return;
-            }
-
-            // Nothing the gather can bring here answers to the name. Whether
-            // that is a typo or a misplacement is the rest of the tree's
-            // business, and its answer picks the MESSAGE - it never accepts an
-            // address this effect could not reach.
-            var elsewhere = ctx.MatchTargets(ctx.RootScope, target);
-            var namedElsewhere = elsewhere.FirstOrDefault(d => d.Id == target);
-            if (namedElsewhere != null)
-            {
-                var declaredAt = ctx.DeclaringScope(namedElsewhere)?.Id;
-                ctx.AddError(ValidationCheck.EffectReach, namedElsewhere is Economy.CurrencyDefinition
-                    ? $"{site}: targets currency '{target}' homed at '{declaredAt}', but '{home.Id}' is not the home or an ancestor of it - the home-to-root gather never visits this effect (12.12)."
-                    : $"{site}: targets '{target}' declared at '{declaredAt}', but '{home.Id}' is not that scope or an ancestor of it - the source's outward walk never visits this effect (12.12).");
-                return;
-            }
-
-            var otherKindElsewhere = ctx.MatchOtherKind(ctx.RootScope, target);
-            if (otherKindElsewhere != null)
-            {
-                WrongKind(otherKindElsewhere);
-                return;
-            }
-
-            if (elsewhere.Count > 0 || ctx.TagExists(target))
-                ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                    $"{site}: tag '{target}' matches no member within '{home.Id}' (12.12).");
-            else
-                ctx.AddWarning(ValidationCheck.EffectTargetUnmatched,
-                    $"{site}: target '{target}' matches no id and no tag.");
-        }
-
-        // Whether one candidate owner can satisfy the narrowing coordinates -
-        // the question Producer.Matches asks at runtime, asked here of authored
-        // data. Empty narrowings are satisfied by anything.
-        private static bool SatisfiesNarrowing(ValidationContext ctx, Definition candidate, string currencyId, string stat)
-        {
-            if (string.IsNullOrEmpty(currencyId) && string.IsNullOrEmpty(stat))
-                return true;
-            switch (candidate)
-            {
-                // The currency stage evaluates with owner == currency, so the
-                // narrowing can only name that same currency. The stat is not
-                // free either: GetRate asks the stage for `rate`, FireProducer
-                // asks for `yield` once per yield term, so a stat nothing pays
-                // this currency with is a stage that never runs. (game_speed
-                // never reaches here: a narrowed one is reported as dead
-                // content before the target check runs.)
-                case Economy.CurrencyDefinition currency:
-                    if (!string.IsNullOrEmpty(currencyId) && currency.Id != currencyId && !currency.HasTag(currencyId))
-                        return false;
-                    return string.IsNullOrEmpty(stat) || ctx.SomeSourcePays(currency, stat);
-                case Economy.ProducerDefinition producer:
-                    return producer.produces.Any(entry => EntrySatisfies(entry, currencyId, stat));
-                case Economy.GeneratorDefinition generator:
-                    return generator.produces.Any(entry => EntrySatisfies(entry, currencyId, stat));
-                // A bar's one produced number is its fill rate, read as
-                // GetMultiplier(.., bar.fillCurrency, rate) - stage 1 only, since
-                // a bar consumes rather than produces. So the pair a coordinate
-                // can name is that bar's own currency and `rate`; one that fills
-                // from time has no currency for a coordinate to name.
-                case Economy.BarDefinition bar:
-                    if (!string.IsNullOrEmpty(stat) && stat != Economy.Stat.Rate)
-                        return false;
-                    if (string.IsNullOrEmpty(currencyId))
-                        return true;
-                    return bar.fillCurrency != null
-                        && (bar.fillCurrency.Id == currencyId || bar.fillCurrency.HasTag(currencyId));
-                default:
-                    return true;
-            }
-        }
-
-        private static bool EntrySatisfies(Economy.ProducesEntry entry, string currencyId, string stat)
-        {
-            if (entry?.currency == null)
-                return false;   // a null entry or operand is reported where it is authored
-            if (!string.IsNullOrEmpty(currencyId) && entry.currency.Id != currencyId && !entry.currency.HasTag(currencyId))
-                return false;
-            return string.IsNullOrEmpty(stat) || entry.stat == stat;
-        }
-
-        private static string NarrowingText(string currencyId, string stat) =>
-            string.IsNullOrEmpty(stat) ? $"currency '{currencyId}'"
-            : string.IsNullOrEmpty(currencyId) ? $"stat '{stat}'"
-            : $"currency '{currencyId}' and stat '{stat}'";
 
         // Cycles across nested action references are errors (12.12). The edges
         // are the rung invocations ExecuteRung and RestartScope record, from

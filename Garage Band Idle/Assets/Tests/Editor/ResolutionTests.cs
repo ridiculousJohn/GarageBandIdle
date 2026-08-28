@@ -410,6 +410,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Two sibling tiers under one chapter, each with a generator paying a
             // chapter-homed currency. The shape that makes isolation visible.
             var rootDef = TestTree.MakeRoot("root");
+            rootDef.declaredTags.Add("income");
             var chapterDef = TestTree.MakeChapter("chapter");
             var coin = TestTree.DeclareCurrency(chapterDef, "coin", "income");
             var tierADef = TestTree.MakeTier("tier_a");
@@ -655,6 +656,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public RoadieWorld()
             {
                 var rootDef = TestTree.MakeRoot("root");
+                rootDef.declaredTags.AddRange(new[] { "income", "production" });
                 Prestige = TestTree.DeclareCurrency(rootDef, "prestige", "income");
                 var chapterADef = TestTree.MakeChapter("chapter_a");
                 var chapterBDef = TestTree.MakeChapter("chapter_b");

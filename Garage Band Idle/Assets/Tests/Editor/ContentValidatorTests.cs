@@ -44,6 +44,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Records = TestTree.DeclareCurrency(Root, "records");
             Root.declaredFlags.Add("ch1_complete");
+            // income is a game-wide word, so root declares it; gear is only ever
+            // carried by tier1's generators, so tier1 is high enough (12.2).
+            Root.declaredTags.Add("income");
+            Tier1.declaredTags.Add("gear");
             Ch1Records = TestTree.DeclareCurrency(Ch1, "ch1_records");
             Ch1.declaredFlags.Add("album");
             Cash = TestTree.DeclareCurrency(Tier1, "cash", "income");
@@ -267,12 +271,80 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome, "a trigger has one home");
         }
 
+        // A declared tag joins the same per-chain name space as ids and flags,
+        // because a selector tries the same string both ways.
         [Test]
         public void TagCollidingWithId_Error()
         {
             var f = new ValidatorFixture();
-            TestTree.DeclareCurrency(f.Tier1, "extra", "cash");
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.TagIdCollision, "tag 'cash'");
+            f.Tier1.declaredTags.Add("cash");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.TagIdCollision, "declared tag at 'tier1'");
+        }
+
+        [Test]
+        public void TagCollidingWithAFlag_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.declaredTags.Add("album");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.TagIdCollision, "flag at 'ch1'");
+        }
+
+        [Test]
+        public void TagDeclaredTwiceOnAChain_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredTags.Add("income");   // root already declares it, and tier1 is on its chain
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome,
+                "'income' is declared twice on the chain");
+        }
+
+        // Two SIBLING scopes may each declare one: a declaration is permission,
+        // not identity, and matching is a string compare, so the word means the
+        // same thing wherever it is carried (12.2).
+        [Test]
+        public void SiblingScopes_MayEachDeclareTheSameTag_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredTags.Add("cover_set");
+            f.Tier1b.declaredTags.Add("cover_set");
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void CarriedTagNoScopeOnTheChainDeclares_Error()
+        {
+            var f = new ValidatorFixture();
+            TestTree.DeclareCurrency(f.Tier1, "merch", "collectible");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "carries tag 'collectible', which no scope on its chain declares");
+        }
+
+        // The declaration has to be OUTWARD of the carrier, so one filed in a
+        // sibling subtree is unreachable exactly as an off-chain flag is.
+        [Test]
+        public void CarriedTagDeclaredOffTheChain_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1b.declaredTags.Add("collectible");
+            TestTree.DeclareCurrency(f.Tier1, "merch", "collectible");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "carries tag 'collectible', which no scope on its chain declares");
+        }
+
+        [Test]
+        public void EmptyDeclaredTag_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1b.declaredTags.Add("");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "'tier1b' declaredTags[0] is empty");
+        }
+
+        [Test]
+        public void EmptyCarriedTag_Error()
+        {
+            var f = new ValidatorFixture();
+            TestTree.DeclareCurrency(f.Tier1, "merch", "");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "'merch' at 'tier1' tags[0] is empty");
         }
 
         // ---- scope graph ----
@@ -691,16 +763,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void Event_HandicapJudgedAtTheDeclaringScope_EffectReach_Error()
-        {
-            var f = new ValidatorFixture();
-            TestTree.DeclareCurrency(f.Tier1b, "merch");
-            f.AddGuardedEvent().handicaps.Add(new Effect { target = "merch", stat = Stat.Rate, multiplier = 0.5 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach,
-                "targets currency 'merch' homed at 'tier1b'");
-        }
-
-        [Test]
         public void Event_DeclaredByTwoScopes_DuplicateHome_Error()
         {
             var f = new ValidatorFixture();
@@ -814,102 +876,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertNoFinding(report, ValidationCheck.SetThenWiped);
         }
 
-        // ---- effects ----
+        // ---- effect selectors are never checked (12.12) ----
 
+        // The regression guard for the deleted downward searches: a selector may
+        // name something declared BELOW the scope the effect is applied at, and
+        // that is ordinary authoring - the definition walks outward and meets the
+        // effect. Nothing here looks down to confirm it.
         [Test]
-        public void EffectReach_GrantBelowCurrencyHome_Error()
+        public void EffectSelector_NamingSomethingDeclaredBelowTheSite_NoFindings()
         {
             var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "ch1_records", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "'ch1_records'");
+            var chapterWide = TestTree.MakeDefinition<ModifierDefinition>("chapter_wide");
+            chapterWide.effects.Add(new Effect { target = "tap_producer", currencyId = "cash", stat = Stat.Yield, multiplier = 1.25 });
+            f.Ch1.modifiers.Add(chapterWide);          // declared at ch1, naming tier1's producer
+            f.Ch1.permanentModifiers.Add(chapterWide); // applied at ch1, so tier1 is strictly below the site
+            AssertClean(f.Run());
         }
 
+        // A selector answering to nothing is content with no takers, which is
+        // what a correct root buff looks like before a chapter carrying its tag
+        // loads - and it is equally what a typo looks like. Separating the two
+        // needs the whole-tree orphan sweep, so nothing is reported here.
         [Test]
-        public void EffectTag_NoMemberInGrantSubtree_Warning()
+        public void EffectSelector_MatchingNothingAnywhere_NoFindings()
         {
             var f = new ValidatorFixture();
-            TestTree.DeclareCurrency(f.Root, "merch", "collectible");   // the tag exists, but not inside tier1
-            f.Boost.effects.Add(new Effect { target = "collectible", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "matches no member within 'tier1'");
-        }
-
-        // Tag membership reaches the sources a scope declares, not just its
-        // currencies: the gear tag lives on tier1's generator.
-        [Test]
-        public void EffectTag_MatchedByADeclaredGenerator_NoFindings()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "gear", stat = Stat.Rate, multiplier = 2 });
-            AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
-        }
-
-        // A tag living only on a scope or trigger is vocabulary, not a target -
-        // no multiplier ever resolves against those kinds.
-        [Test]
-        public void EffectTag_OnlyOnNonTargetableKinds_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Tier1.EditorInit("tier1", "gearish"); // the tag exists, but only on the scope itself
-            f.Boost.effects.Add(new Effect { target = "gearish", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "matches no member within 'tier1'");
-        }
-
-        [Test]
-        public void EffectTarget_MatchesNothing_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "nonsense", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "matches no id and no tag");
-        }
-
-        [Test]
-        public void EffectTarget_WrongDefinitionKind_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "tier1", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "not an effect target kind");
-        }
-
-        [Test]
-        public void Effect_UnknownNarrowingCurrency_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "cash", currencyId = "ghost", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "narrows to 'ghost', which is no currency id and no tag any currency carries");
-        }
-
-        // Reference resolution is unconditional - a modifier nothing grants
-        // still has every reference checked.
-        [Test]
-        public void UngrantedModifier_ReferencesStillValidated()
-        {
-            var f = new ValidatorFixture();
-            var orphan = TestTree.MakeDefinition<ModifierDefinition>("orphan");
-            orphan.effects.Add(new Effect { target = "nonsense", stat = Stat.Rate, multiplier = 2 });
-            orphan.effects.Add(new Effect { target = "cash", currencyId = "ghost", stat = Stat.Rate, multiplier = 2 });
-            f.Ch1.modifiers.Add(orphan);   // declared but never granted
-            var report = f.Run();
-            AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "modifier 'orphan' effects[0]");
-            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "narrows to 'ghost', which is no currency id and no tag any currency carries");
-        }
-
-        // The currency coordinate matches an entry's CURRENCY, so a tag only a
-        // producer carries narrows to nothing at runtime - it must not validate.
-        [Test]
-        public void Effect_NarrowingByACurrencyTag_NoFindings()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "practice_amp", currencyId = "income", stat = Stat.Rate, multiplier = 2 });
-            AssertNoFinding(f.Run(), ValidationCheck.UnresolvedReference);
-        }
-
-        [Test]
-        public void Effect_NarrowingByANonCurrencyTag_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "practice_amp", currencyId = "gear", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
-                "narrows to 'gear', which is no currency id and no tag any currency carries");
+            f.Boost.effects.Add(new Effect { target = "nonsense", currencyId = "ghost", stat = Stat.Rate, multiplier = 2 });
+            AssertClean(f.Run());
         }
 
         // ---- producers, generators, upgrades ----
@@ -1034,23 +1027,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void UpgradeEffect_TargetingASiblingsSource_EffectReach_Error()
-        {
-            var f = new ValidatorFixture();
-            var sibling = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
-            sibling.availableWhen = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 };
-            sibling.costCurrency = f.Ch1Records;
-            sibling.baseCost = 5;
-            sibling.produces.Add(TestTree.Entry(f.Ch1Records, Stat.Rate, 1));
-            f.Tier1b.generators.Add(sibling);
-
-            // tier1's upgrade cannot reach a source declared in tier1b: the
-            // source's own outward walk never visits tier1.
-            f.AmpStrings.effects.Add(new Effect { target = "merch_stand", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "targets 'merch_stand' declared at 'tier1b'");
-        }
-
-        [Test]
         public void Effect_NegativeMultiplier_Error()
         {
             var f = new ValidatorFixture();
@@ -1107,18 +1083,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClean(f.Run());
         }
 
-        [Test]
-        public void Effect_WildcardWithUnknownNarrowingCurrency_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { currencyId = "ghost", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
-                "narrows to 'ghost', which is no currency id and no tag any currency carries");
-        }
-
         // game_speed is read by an owner-less, currency-less query, so a target
         // or currency narrowing on one is dead content; the bare wildcard is the
-        // authored shape.
+        // authored shape. This is the one selector the pass reads at all, and
+        // only because it never has to look for what the selector names.
         [Test]
         public void Effect_GameSpeedNarrowed_DeadContent_Warning()
         {
@@ -1126,7 +1094,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Boost.effects.Add(new Effect { target = "cash", stat = Stat.GameSpeed, multiplier = 2 });
             f.Boost.effects.Add(new Effect { currencyId = "cash", stat = Stat.GameSpeed, multiplier = 2 });
             var report = f.Run();
-            Assert.AreEqual(2, report.OfCheck(ValidationCheck.EffectTargetUnmatched).Count(), Dump(report));
+            Assert.AreEqual(2, report.OfCheck(ValidationCheck.InertOperand).Count(), Dump(report));
         }
 
         // The tick gathers game_speed from the foreground chapter outward, so
@@ -1149,45 +1117,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             f.Boost.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });   // Boost is granted at tier1
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched,
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.InertOperand,
                 "must live at a chapter or the root");
         }
-
-        // A wildcard is collected on home-to-root walks only, so its reachable
-        // currencies are the ones homed in its own subtree - the ancestor
-        // direction a targeted effect's narrowing may use does not exist here.
-        [Test]
-        public void Effect_WildcardNarrowedToAnAncestorHomedCurrency_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { currencyId = "records", stat = Stat.Rate, multiplier = 2 });   // root-homed, Boost at tier1
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched,
-                "no currency matching 'records' homed within 'tier1'");
-        }
-
-        [Test]
-        public void Effect_WildcardWhereNoCurrencyIsHomed_Warning()
-        {
-            var f = new ValidatorFixture();
-            var orphan = TestTree.MakeDefinition<ModifierDefinition>("orphan_wildcard");
-            orphan.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });
-            f.Tier1b.modifiers.Add(orphan);   // tier1b homes no currency
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched,
-                "no currency homed within 'tier1b' is paid at 'rate'");
-        }
-
-        // Homed is not enough: the currency stage only runs for a pair some
-        // contribution pays, so a wildcard narrowed to an unpaid pair is dead -
-        // the same SomeSourcePays question the targeted path already asks.
-        [Test]
-        public void Effect_WildcardNarrowedToAnUnpaidPair_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { currencyId = "fans", stat = Stat.Yield, multiplier = 2 });   // fans is homed, nothing pays it
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched,
-                "no currency matching 'fans' homed within 'tier1' is paid at 'yield'");
-        }
-
 
         [Test]
         public void DeclaringTheSameSourceTwice_Error()
@@ -1234,18 +1166,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // ---- permanent modifiers and formula effects ----
-
-        [Test]
-        public void FormulaEffect_TargetOutOfReach_Error()
-        {
-            var f = new ValidatorFixture();
-            var local = TestTree.MakeDefinition<ModifierDefinition>("tier_records");
-            local.effects.Add(new Effect { target = "records", stat = Stat.Rate,    // homed at the root, applied at tier1
-                formula = new LinearOnBalance { currency = f.Ch1Records, coefficient = 1 } });
-            f.Tier1.modifiers.Add(local);
-            f.Tier1.permanentModifiers.Add(local);
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "targets currency 'records' homed at 'root'");
-        }
 
         [Test]
         public void FormulaEffect_NegativeCoefficient_Error()
@@ -1498,72 +1418,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeGraph, "child of both");
         }
 
-        // Tags travel down a chain with ids, so a collision is caught where both
-        // are visible even though neither scope declares both halves.
+        // Tag declarations travel down a chain with ids, so a collision is caught
+        // where both are visible even though neither scope declares both halves.
         [Test]
         public void AncestorTagCollidingWithADescendantId_Error()
         {
             var f = new ValidatorFixture();
-            TestTree.DeclareCurrency(f.Root, "merch", "encore");
+            f.Root.declaredTags.Add("encore");
             TestTree.DeclareCurrency(f.Tier1, "encore");
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.TagIdCollision, "collides with tag 'encore'");
-        }
-
-        // ---- the coordinates address one entry TOGETHER (12.2) ----
-
-        // The currency stage evaluates with owner == currency, so a currency
-        // target narrowed to a DIFFERENT currency can never match anything.
-        [Test]
-        public void EffectCoordinates_CurrencyTargetNarrowedToAnotherCurrency_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "cash", currencyId = "fans", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "never select an entry together");
-        }
-
-        [Test]
-        public void EffectCoordinates_SourceNarrowedToACurrencyItNeverProduces_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.AmpStrings.effects.Add(new Effect { target = "practice_amp", currencyId = "fans", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "pairs with currency 'fans'");
-        }
-
-        [Test]
-        public void EffectCoordinates_SourceNarrowedToAStatItNeverProduces_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.AmpStrings.effects.Add(new Effect { target = "practice_amp", stat = Stat.Yield, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "pairs with stat 'yield'");
-        }
-
-        // The currency stage is only ever asked for a stat something pays the
-        // currency with, so nothing paying fans a rate makes the pair inert.
-        [Test]
-        public void EffectCoordinates_CurrencyNarrowedToAStatNothingPaysIt_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "fans", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched, "pairs with stat 'rate'");
-        }
-
-        [Test]
-        public void EffectCoordinates_CurrencyNarrowedToAStatSomethingPays_NoFindings()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "cash", stat = Stat.Yield, multiplier = 2 });   // the tap pays it
-            AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
-        }
-
-        // A tag names many owners on purpose: the pair holds when ONE of them
-        // can pay it, not when the first one can.
-        [Test]
-        public void EffectCoordinates_TagTargetSatisfiedBySomeOwner_NoFindings()
-        {
-            var f = new ValidatorFixture();
-            f.Tap.EditorInit("tap_producer", "gear");   // the amp already carries it, with rate entries
-            f.AmpStrings.effects.Add(new Effect { target = "gear", stat = Stat.Yield, multiplier = 2 });
-            AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.TagIdCollision,
+                "declared tag at 'root' and CurrencyDefinition at 'tier1'");
         }
 
         // ---- bars and groups ----
@@ -1656,15 +1520,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "null perFill entry");
         }
 
-        [Test]
-        public void Bar_PerFillEffectMustReachItsTarget_EffectReach_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Cover1.repeating = true;
-            f.Cover1.perFill.Add(new PerFillEntry { effect = new Effect { target = "ch1_records", stat = Stat.Rate, multiplier = 2 } });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.EffectReach, "'ch1_records'");
-        }
-
         // The implicit fill-count write: a cascade whose own completion list
         // resets the scope homing the count it reads would never accumulate.
         [Test]
@@ -1708,36 +1563,5 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "BarsCompleted");
         }
 
-        // A bar's one produced number is its fill rate, read with its OWN fill
-        // currency as the coordinate - so that currency and `rate` are the pair a
-        // narrowing may name.
-        [Test]
-        public void EffectCoordinates_BarNarrowedToItsOwnFillCurrency_NoFindings()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "cover_1", currencyId = "rehearsal", stat = Stat.Rate, multiplier = 2 });
-            AssertNoFinding(f.Run(), ValidationCheck.EffectTargetUnmatched);
-        }
-
-        [Test]
-        public void EffectCoordinates_BarNarrowedToAnotherCurrency_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "cover_1", currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched,
-                "targets 'cover_1'");
-        }
-
-        // A group holds bars and a cap, so it owns no number for a gather to
-        // reach and is not a target kind at all. Buffing a set of bars is a tag
-        // they share.
-        [Test]
-        public void EffectCoordinates_TargetingABarGroup_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Boost.effects.Add(new Effect { target = "covers", stat = Stat.Rate, multiplier = 2 });
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.EffectTargetUnmatched,
-                "not an effect target kind");
-        }
     }
 }
