@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a939c408c72371458b2b3d32bdd3aa1, type: 3}
+  m_Name: tap_producer
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ProducerDefinition
+  id: tap_producer
+  tags:
+  - production
+  produces:
+  - currency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
+    stat: yield
+    value:
+      _value:
+        mantissa: 1
+        exponent: 0
+    condition:
+      rid: -2
+  - currency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
+    stat: yield
+    value:
+      _value:
+        mantissa: 1
+        exponent: 0
+    condition:
+      rid: 367766403059023873
+  - currency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
+    stat: yield
+    value:
+      _value:
+        mantissa: 1
+        exponent: 0
+    condition:
+      rid: 367766403059023874
+  - currency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
+    stat: rate
+    value:
+      _value:
+        mantissa: 5
+        exponent: -1
+    condition:
+      rid: 367766403059023875
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 367766403059023873
+      type: {class: UpgradePurchased, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        upgrade: {fileID: 11400000, guid: 5e369145a5eec70429c5340838720701, type: 2}
+    - rid: 367766403059023874
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: rehearsal_revealed
+    - rid: 367766403059023875
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: rehearsal_revealed

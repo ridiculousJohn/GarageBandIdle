@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da0688336f1d57f48bbcb6016a7a2455, type: 3}
+  m_Name: kit_upgrade
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
+  id: kit_upgrade
+  tags: []
+  gate:
+    rid: 367766403059023872
+  costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
+  cost:
+    _value:
+      mantissa: 5
+      exponent: 3
+  effects:
+  - target: drummer
+    currencyId: cash
+    stat: rate
+    multiplier:
+      _value:
+        mantissa: 2
+        exponent: 0
+    formula:
+      rid: -2
+  actions: []
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 367766403059023872
+      type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        currency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
+        threshold:
+          _value:
+            mantissa: 5
+            exponent: 3

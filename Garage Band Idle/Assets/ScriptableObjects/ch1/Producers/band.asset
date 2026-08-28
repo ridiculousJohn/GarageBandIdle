@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a939c408c72371458b2b3d32bdd3aa1, type: 3}
+  m_Name: band
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ProducerDefinition
+  id: band
+  tags:
+  - production
+  produces:
+  - currency: {fileID: 11400000, guid: 8fcd19c799d152b4b95054ec949a12ff, type: 2}
+    stat: rate
+    value:
+      _value:
+        mantissa: 3.4999999999999996
+        exponent: -1
+    condition:
+      rid: 367766403059023932
+  references:
+    version: 2
+    RefIds:
+    - rid: 367766403059023932
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: fans_revealed

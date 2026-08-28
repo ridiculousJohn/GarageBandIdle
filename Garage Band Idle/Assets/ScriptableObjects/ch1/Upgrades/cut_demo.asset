@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da0688336f1d57f48bbcb6016a7a2455, type: 3}
+  m_Name: cut_demo
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
+  id: cut_demo
+  tags: []
+  gate:
+    rid: 367766403059023897
+  costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
+  cost:
+    _value:
+      mantissa: 0
+      exponent: 0
+  effects: []
+  actions:
+  - rid: 367766403059023898
+  references:
+    version: 2
+    RefIds:
+    - rid: 367766403059023897
+      type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        conditions:
+        - rid: 367766403059023899
+        - rid: 367766403059023900
+    - rid: 367766403059023898
+      type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        flagId: album
+    - rid: 367766403059023899
+      type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        currency: {fileID: 11400000, guid: 8fcd19c799d152b4b95054ec949a12ff, type: 2}
+        threshold:
+          _value:
+            mantissa: 5
+            exponent: 1
+    - rid: 367766403059023900
+      type: {class: BarsCompleted, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        group: {fileID: 11400000, guid: 39c5b5ff358d2334980304e5cbd38669, type: 2}
+        count: 1

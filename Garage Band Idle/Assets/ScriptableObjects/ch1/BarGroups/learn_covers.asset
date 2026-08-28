@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f855d87ec83a3f4199d884f80ed02fa, type: 3}
+  m_Name: learn_covers
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.BarGroupDefinition
+  id: learn_covers
+  tags: []
+  maxActive: 1
+  bars:
+  - {fileID: 11400000, guid: b2b3280b39b18c14c8aa98db70d86220, type: 2}
+  - {fileID: 11400000, guid: 089a42576c645a848b103105328c821a, type: 2}
+  - {fileID: 11400000, guid: 808f40fec5a2de2479c68c49d334549d, type: 2}

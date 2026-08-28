@@ -10,29 +10,25 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c35210d72fdb0f1449ed7fe2ca7504a1, type: 3}
-  m_Name: idle_base
+  m_Name: cover_bonus_1
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
-  id: idle_base
+  id: cover_bonus_1
   tags: []
   stacking: 0
   effects:
-  - target: 
+  - target: fans
     currencyId: 
     stat: rate
     multiplier:
       _value:
-        mantissa: 5
-        exponent: -1
+        mantissa: 1.15
+        exponent: 0
     formula:
       rid: -2
   appliesWhen:
-    rid: 367766403059023937
+    rid: -2
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766403059023937
-      type: {class: IdleAccumulation, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: 

@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 816df2cc482c3e04abe79d33cc6a9673, type: 3}
+  m_Name: garage_jam_1
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Events.EventDefinition
+  id: garage_jam_1
+  tags: []
+  availableWhen:
+    rid: 367766403059023925
+  goal:
+    rid: 367766403059023926
+  timeLimitSeconds: 60
+  handicaps:
+  - target: gear
+    currencyId: 
+    stat: rate
+    multiplier:
+      _value:
+        mantissa: 0
+        exponent: 0
+    formula:
+      rid: -2
+  onEntry:
+  - rid: 367766403059023927
+  rewards:
+  - rid: 367766403059023928
+  - rid: 367766403059023929
+  onEnd:
+  - rid: 367766403059023930
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 367766403059023925
+      type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        currency: {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}
+        threshold:
+          _value:
+            mantissa: 1
+            exponent: 0
+    - rid: 367766403059023926
+      type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        currency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
+        threshold:
+          _value:
+            mantissa: 1.5
+            exponent: 2
+    - rid: 367766403059023927
+      type: {class: RestartScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
+    - rid: 367766403059023928
+      type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        scope: {fileID: 11400000, guid: 53d76036188af0f46bb1c8a21ad9afd2, type: 2}
+        modifier: {fileID: 11400000, guid: 40cbc90550c89f447a9caf1c4c433d64, type: 2}
+    - rid: 367766403059023929
+      type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        flagId: gj1_done
+    - rid: 367766403059023930
+      type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}

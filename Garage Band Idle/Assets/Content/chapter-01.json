@@ -1,0 +1,373 @@
+{
+  "type": "ChapterDefinition",
+  "id": "ch1",
+
+  "flags": ["album", "gj1_done", "gj2_done", "gj3_done"],
+
+  "currencies": [
+    { "id": "ch1_records" }
+  ],
+
+  "modifiers": [
+    {
+      "id": "gj_tap_1",
+      "effects": [
+        { "target": "tap_producer", "currencyId": "cash", "stat": "yield", "multiplier": 1.25 }
+      ]
+    },
+    {
+      "id": "gj_tap_2",
+      "effects": [
+        { "target": "tap_producer", "currencyId": "cash", "stat": "yield", "multiplier": 1.5 }
+      ]
+    },
+    {
+      "id": "gj_tap_3",
+      "effects": [
+        { "target": "tap_producer", "currencyId": "cash", "stat": "yield", "multiplier": 2 }
+      ]
+    }
+  ],
+
+  "rung": {
+    "offerCondition": {
+      "type": "All",
+      "conditions": [
+        { "type": "CurrencyAtLeast", "currency": "ch1_records", "threshold": 30 },
+        {
+          "type": "Not",
+          "uiText": "Claim your Garage Jam reward first",
+          "condition": { "type": "EventRewardPending", "host": "tier1" }
+        }
+      ]
+    },
+    "actions": [
+      { "type": "ExecuteRung", "tier": "tier1" },
+      { "type": "AddCurrency", "currencies": ["roadies"], "amount": 1 },
+      { "type": "SetFlag", "flagId": "ch1_complete" },
+      { "type": "ResetScope", "scope": "ch1" }
+    ]
+  },
+
+  "children": [
+    {
+      "type": "TierDefinition",
+      "id": "tier1",
+
+      "declaredTags": ["gear", "bandmate"],
+
+      "flags": ["fans_revealed", "rehearsal_revealed"],
+
+      "currencies": [
+        { "id": "cash", "tags": ["income"] },
+        { "id": "fans" },
+        { "id": "rehearsal" }
+      ],
+
+      "producers": [
+        {
+          "id": "tap_producer",
+          "tags": ["production"],
+          "produces": [
+            { "currency": "cash", "stat": "yield", "value": 1 },
+            {
+              "currency": "cash", "stat": "yield", "value": 1,
+              "condition": { "type": "UpgradePurchased", "upgrade": "stage_presence" }
+            },
+            {
+              "currency": "rehearsal", "stat": "yield", "value": 1,
+              "condition": { "type": "FlagSet", "flagId": "rehearsal_revealed" }
+            },
+            {
+              "currency": "rehearsal", "stat": "rate", "value": 0.5,
+              "condition": { "type": "FlagSet", "flagId": "rehearsal_revealed" }
+            }
+          ]
+        },
+        {
+          "id": "band",
+          "tags": ["production"],
+          "produces": [
+            {
+              "currency": "fans", "stat": "rate", "value": 0.35,
+              "condition": { "type": "FlagSet", "flagId": "fans_revealed" }
+            }
+          ]
+        }
+      ],
+
+      "generators": [
+        {
+          "id": "practice_amp",
+          "tags": ["gear", "production"],
+          "availableWhen": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 100 },
+          "costCurrency": "cash",
+          "baseCost": 60,
+          "growth": 1.15,
+          "produces": [
+            { "currency": "cash", "stat": "rate", "value": 0.5 }
+          ]
+        },
+        {
+          "id": "drummer",
+          "tags": ["gear", "bandmate", "production"],
+          "availableWhen": { "type": "OwnedCountAtLeast", "generator": "practice_amp", "count": 3 },
+          "costCurrency": "cash",
+          "baseCost": 250,
+          "growth": 1.15,
+          "produces": [
+            { "currency": "cash", "stat": "rate", "value": 3 },
+            { "currency": "fans", "stat": "rate", "value": 0.02 }
+          ]
+        },
+        {
+          "id": "bassist",
+          "tags": ["gear", "bandmate", "production"],
+          "availableWhen": { "type": "OwnedCountAtLeast", "generator": "drummer", "count": 5 },
+          "costCurrency": "cash",
+          "baseCost": 4000,
+          "growth": 1.15,
+          "produces": [
+            { "currency": "cash", "stat": "rate", "value": 20 },
+            { "currency": "fans", "stat": "rate", "value": 0.02 }
+          ]
+        },
+        {
+          "id": "guitarist",
+          "tags": ["gear", "bandmate", "production"],
+          "availableWhen": { "type": "OwnedCountAtLeast", "generator": "bassist", "count": 5 },
+          "costCurrency": "cash",
+          "baseCost": 30000,
+          "growth": 1.15,
+          "produces": [
+            { "currency": "cash", "stat": "rate", "value": 130 },
+            { "currency": "fans", "stat": "rate", "value": 0.02 }
+          ]
+        }
+      ],
+
+      "upgrades": [
+        {
+          "id": "stage_presence",
+          "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 250 },
+          "costCurrency": "cash",
+          "cost": 250
+        },
+        {
+          "id": "amp_strings",
+          "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 500 },
+          "costCurrency": "cash",
+          "cost": 500,
+          "effects": [
+            { "target": "practice_amp", "stat": "rate", "multiplier": 2 }
+          ]
+        },
+        {
+          "id": "kit_upgrade",
+          "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 5000 },
+          "costCurrency": "cash",
+          "cost": 5000,
+          "effects": [
+            { "target": "drummer", "currencyId": "cash", "stat": "rate", "multiplier": 2 }
+          ]
+        },
+        {
+          "id": "tight_set",
+          "gate": { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 30 },
+          "costCurrency": "cash",
+          "cost": 20000,
+          "effects": [
+            { "target": "cash", "stat": "rate", "multiplier": 1.5 }
+          ]
+        },
+        {
+          "id": "play_for_crowd",
+          "gate": { "type": "OwnedCountAtLeast", "generator": "drummer", "count": 1 },
+          "costCurrency": "cash",
+          "cost": 100,
+          "actions": [
+            { "type": "SetFlag", "flagId": "fans_revealed" }
+          ]
+        },
+        {
+          "id": "unlock_covers",
+          "gate": { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 25 },
+          "costCurrency": "cash",
+          "cost": 200,
+          "actions": [
+            { "type": "SetFlag", "flagId": "rehearsal_revealed" }
+          ]
+        },
+        {
+          "id": "cut_demo",
+          "gate": {
+            "type": "All",
+            "conditions": [
+              { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 50 },
+              { "type": "BarsCompleted", "group": "learn_covers", "count": 1 }
+            ]
+          },
+          "costCurrency": "cash",
+          "cost": 0,
+          "actions": [
+            { "type": "SetFlag", "flagId": "album" }
+          ]
+        }
+      ],
+
+      "barGroups": [
+        {
+          "id": "learn_covers",
+          "maxActive": 1,
+          "bars": [
+            {
+              "id": "cover_1",
+              "fillCurrency": "rehearsal",
+              "fillAmount": 100,
+              "fillRate": 2,
+              "onComplete": [
+                { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_1" }
+              ]
+            },
+            {
+              "id": "cover_2",
+              "fillCurrency": "rehearsal",
+              "fillAmount": 300,
+              "fillRate": 2,
+              "onComplete": [
+                { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_2" }
+              ]
+            },
+            {
+              "id": "cover_3",
+              "fillCurrency": "rehearsal",
+              "fillAmount": 600,
+              "fillRate": 2,
+              "onComplete": [
+                { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_3" }
+              ]
+            }
+          ]
+        }
+      ],
+
+      "modifiers": [
+        {
+          "id": "cover_bonus_1",
+          "effects": [
+            { "target": "fans", "stat": "rate", "multiplier": 1.15 }
+          ]
+        },
+        {
+          "id": "cover_bonus_2",
+          "effects": [
+            { "target": "fans", "stat": "rate", "multiplier": 1.15 }
+          ]
+        },
+        {
+          "id": "cover_bonus_3",
+          "effects": [
+            { "target": "fans", "stat": "rate", "multiplier": 1.20 }
+          ]
+        }
+      ],
+
+      "events": [
+        {
+          "id": "garage_jam_1",
+          "availableWhen": { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1 },
+          "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 150 },
+          "timeLimitSeconds": 60,
+          "handicaps": [
+            { "target": "gear", "stat": "rate", "multiplier": 0 }
+          ],
+          "onEntry": [
+            { "type": "RestartScope", "scope": "tier1" }
+          ],
+          "rewards": [
+            { "type": "AddModifier", "scope": "ch1", "modifier": "gj_tap_1" },
+            { "type": "SetFlag", "flagId": "gj1_done" }
+          ],
+          "onEnd": [
+            { "type": "ResetScope", "scope": "tier1" }
+          ]
+        },
+        {
+          "id": "garage_jam_2",
+          "availableWhen": {
+            "type": "All",
+            "conditions": [
+              { "type": "FlagSet", "flagId": "gj1_done" },
+              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 15 }
+            ]
+          },
+          "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 300 },
+          "timeLimitSeconds": 90,
+          "handicaps": [
+            { "target": "gear", "stat": "rate", "multiplier": 0 }
+          ],
+          "onEntry": [
+            { "type": "RestartScope", "scope": "tier1" }
+          ],
+          "rewards": [
+            { "type": "RemoveModifier", "scope": "ch1", "modifier": "gj_tap_1" },
+            { "type": "AddModifier", "scope": "ch1", "modifier": "gj_tap_2" },
+            { "type": "SetFlag", "flagId": "gj2_done" }
+          ],
+          "onEnd": [
+            { "type": "ResetScope", "scope": "tier1" }
+          ]
+        },
+        {
+          "id": "garage_jam_3",
+          "availableWhen": {
+            "type": "All",
+            "conditions": [
+              { "type": "FlagSet", "flagId": "gj2_done" },
+              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 30 }
+            ]
+          },
+          "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 600 },
+          "timeLimitSeconds": 90,
+          "handicaps": [
+            { "target": "gear", "stat": "rate", "multiplier": 0 }
+          ],
+          "onEntry": [
+            { "type": "RestartScope", "scope": "tier1" }
+          ],
+          "rewards": [
+            { "type": "RemoveModifier", "scope": "ch1", "modifier": "gj_tap_2" },
+            { "type": "AddModifier", "scope": "ch1", "modifier": "gj_tap_3" },
+            { "type": "SetFlag", "flagId": "gj3_done" }
+          ],
+          "onEnd": [
+            { "type": "ResetScope", "scope": "tier1" }
+          ]
+        }
+      ],
+
+      "rung": {
+        "offerCondition": {
+          "type": "All",
+          "conditions": [
+            { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 50, "uiText": "50 fans" },
+            { "type": "BarsCompleted", "group": "learn_covers", "count": 1, "uiText": "Learn a cover" },
+            {
+              "type": "Not",
+              "uiText": "Claim your Garage Jam reward first",
+              "condition": { "type": "EventRewardPending", "host": "tier1" }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "AddCurrency",
+            "currencies": ["records", "ch1_records"],
+            "formula": { "type": "RootCurveFormula", "currency": "fans", "divisor": 5, "exponent": 0.5 }
+          },
+          { "type": "ResetScope", "scope": "tier1" }
+        ]
+      }
+    }
+  ]
+}

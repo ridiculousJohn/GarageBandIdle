@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da0688336f1d57f48bbcb6016a7a2455, type: 3}
+  m_Name: play_for_crowd
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
+  id: play_for_crowd
+  tags: []
+  gate:
+    rid: 367766403059023933
+  costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
+  cost:
+    _value:
+      mantissa: 1
+      exponent: 2
+  effects: []
+  actions:
+  - rid: 367766403059023934
+  references:
+    version: 2
+    RefIds:
+    - rid: 367766403059023933
+      type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        generator: {fileID: 11400000, guid: 5b005e8c874631040b8ac5ad50552de8, type: 2}
+        count: 1
+    - rid: 367766403059023934
+      type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        flagId: fans_revealed

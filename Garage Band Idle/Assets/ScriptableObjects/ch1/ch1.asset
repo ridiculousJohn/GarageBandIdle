@@ -1,0 +1,104 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e85efeb47a5932e4aa14f6cde68b3fd1, type: 3}
+  m_Name: ch1
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.ChapterDefinition
+  id: ch1
+  tags: []
+  children:
+  - {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
+  declaredCurrencies:
+  - {fileID: 11400000, guid: 572c8b18c2e4baa489f9c4a0dfe8a80d, type: 2}
+  declaredFlags:
+  - album
+  - gj1_done
+  - gj2_done
+  - gj3_done
+  declaredTags: []
+  triggers: []
+  producers: []
+  modifiers:
+  - {fileID: 11400000, guid: 40cbc90550c89f447a9caf1c4c433d64, type: 2}
+  - {fileID: 11400000, guid: 7b1cfe493d97de04da7e329efb2c43ca, type: 2}
+  - {fileID: 11400000, guid: 559a72c37a67974469e902b75ea5d0a4, type: 2}
+  permanentModifiers: []
+  generators: []
+  barGroups: []
+  upgrades: []
+  rung:
+    rid: 367766403059023912
+  events: []
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 367766403059023912
+      type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        offerCondition:
+          rid: 367766403059023913
+        actions:
+        - rid: 367766403059023914
+        - rid: 367766403059023915
+        - rid: 367766403059023916
+        - rid: 367766403059023917
+    - rid: 367766403059023913
+      type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        conditions:
+        - rid: 367766403059023918
+        - rid: 367766403059023919
+    - rid: 367766403059023914
+      type: {class: ExecuteRung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        tier: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
+    - rid: 367766403059023915
+      type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        currencies:
+        - {fileID: 11400000, guid: 3b2bd3891e5799b43a5ae26c39c0da01, type: 2}
+        amount:
+          _value:
+            mantissa: 1
+            exponent: 0
+        formula:
+          rid: -2
+    - rid: 367766403059023916
+      type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        flagId: ch1_complete
+    - rid: 367766403059023917
+      type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        scope: {fileID: 11400000}
+    - rid: 367766403059023918
+      type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        currency: {fileID: 11400000, guid: 572c8b18c2e4baa489f9c4a0dfe8a80d, type: 2}
+        threshold:
+          _value:
+            mantissa: 3
+            exponent: 1
+    - rid: 367766403059023919
+      type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Claim your Garage Jam reward first
+        condition:
+          rid: 367766403059023920
+    - rid: 367766403059023920
+      type: {class: EventRewardPending, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        host: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
