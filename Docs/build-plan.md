@@ -22,9 +22,11 @@ always that the content belongs on a scope.
 | - | Scope kind refactor (2026-08-24) | **DONE** - 271/271 green: a scope is authored as `RootDefinition` / `ChapterDefinition` / `TierDefinition` under the abstract `InteriorDefinition`, each building its own state node, so no depth test infers a kind; `rung` moved off the base and `RungOnRoot` was deleted with it; the save populates the payload the node holds; the three outward walks ask `Declares` / `MultiplierFor` / `SourceTermsFor` instead of reading lists off a base-typed node; placement is validated root -> chapters -> tiers |
 | 6 | Events + trigger sweep | **DONE 2026-08-25** - 327/327 green |
 | 7 | Tick + GameSession | **DONE 2026-08-26** - 397/397 green (six slices A-F; two design revisions absorbed mid-step: the idle respell, then the claim respell - the stamp IS the pending claim, offers are transient and session-held) |
+| - | Tag declarations + effect-selector deletion | not started - precedes step 8; `declaredTags` on the scope, carried tags resolved outward, and the downward effect-selector searches deleted (slice 0 of `step-08-plan.md`) |
 | 8 | Chapter 1 JSON + importer + walkthrough tests | not started |
 | 9 | UI layer | not started |
 | 10 | Meta & monetization | not started |
+| 11 | Orphan sweep | not started |
 
 ## Step detail
 
@@ -55,7 +57,9 @@ always that the content belongs on a scope.
    validation-pass *framework*
    plus every §12.12 check whose inputs exist by this step (id uniqueness, tag/id collision,
    scope-reference reach, effect reach per target kind, flag setter rules, set-then-wiped,
-   stranded value). The pass is incremental by design: each later step is REQUIRED to extend it
+   stranded value; the effect-reach and effect-target checks this step shipped are deleted - they
+   judged an effect by enumerating candidates BELOW it, and §12.12 now leaves effect placement
+   unjudged). The pass is incremental by design: each later step is REQUIRED to extend it
    with the checks its own shapes introduce - step 6 completed the set, and the full §12.12 pass
    runs today. Fail loudly at boot in dev builds: validation runs on the production load path itself.
 4. **Producers, generators, upgrades + resolution** (§12.2, §12.6) — `ProducerDefinition` +
@@ -66,7 +70,9 @@ always that the content belongs on a scope.
    generator contributions, granted modifier stacks, and the career facts step 7 later folded
    into permanent modifiers); later rows join with their
    steps. Extends validation: produces-entry targets, generator/upgrade reference resolution,
-   tag membership extending to producers and generators.
+   tag membership extending to producers and generators - that last one deleted with step 3's
+   effect-target checks. Producers and generators still carry tags, and each carried tag is now
+   checked the other way round: outward from the carrier to the scope declaring it (§12.2).
 5. **Bars** (§12.7) — a bar drinks the currency it names at its own rate, taking what is there in
    declaration order; a group only caps how many run at once. Iterative completion settlement in
    deterministic order, cascades (`perFill` × `fillCount` — the fill-count row of
@@ -100,6 +106,18 @@ always that the content belongs on a scope.
     (the roadie-boost arithmetic is step 4's), Encore/game-speed buffs, AdManager (rewarded: Encore
     top-up, Double It), IAPManager (Backstage Pass, Roadie bundles, Tip Jar), story beat cards +
     `AcknowledgeStory`.
+11. **Orphan sweep** (§12.12) - the one whole-tree validation pass, and validation's only legitimate
+    use of the tree-wide exception: what nothing references. A modifier nothing grants and no scope
+    lists - which also has no site, so its formula and `appliesWhen` were never validated, another
+    reason the sweep is what surfaces it - a declared tag nothing carries, a declared flag nothing
+    sets (`FlagNoSetter` is already an
+    instance of this shape), and an `Effect` selector no definition's outward walk ever answers to -
+    the last being where a misspelled `target` or `currencyId` is caught, since the per-site checks
+    deliberately cannot claim it (§12.2). ONE pass that walks every definition outward and records
+    what it met, then reports what went unmet - never a per-effect search, which is the whole reason
+    the coverage waited for a pass of this shape. Everything it finds is dead weight rather than
+    broken behavior, so nothing depends on it; it lands when authored content is voluminous enough
+    that hand-checking stops being reliable.
 
 Verification per step: the headless loop (compile grep + edit-mode suite; see the repo memory
 `unity-headless-verify-loop`). John reviews and commits per changeset.

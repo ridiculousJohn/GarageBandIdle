@@ -40,12 +40,15 @@ root
   - `roadie_active`: `{target: production, currencyId: income, stat: rate,
     × (1 + 0.05 × stationed at the chapter on the resolution chain)}` — the active chapter's
     double-count (§8.2), aimed at the SOURCES because only a source knows which chapter it produces
-    in. Every producer and generator declares the `production` tag; the `currencyId: income`
+    in. Every producer and generator carries the `production` tag; the `currencyId: income`
     narrowing is what keeps a bandmate's Fans line out of it.
 - Idle bases: fraction 0.5 authored as a root modifier `{stat: rate, ×0.5}` applying only during
   idle accumulation (`appliesWhen`, §12.5); cap 14400s (4h) and minimum-away threshold 180s are
   `GameConfig` values. `game_speed` base 1; Encore buff `{stat: game_speed, ×2}`, Overdrive `×4` (§9).
 - Flags: `ch1_complete`, `story_ch1_open_seen`, `story_ch1_end_seen`.
+- Tags: `income`, `production` - the declared vocabulary the modifiers above filter on (§12.2).
+  Declared at root because they are game-wide words: every chapter's income currency and every
+  source carries one, and a carrier resolves its declaration by walking outward.
 
 ## 3. Currencies
 
@@ -89,6 +92,10 @@ The `gear` tag exists for the event handicap (×0 = "generators paused"); `bandm
 silently left out of it - the `currencyId: income` narrowing is what decides which lines it lifts.
 Band size drives the fan rate because each bandmate's fans entry scales with `ownedCount` — no
 per-bandmate constant anywhere.
+
+Declaration homes (§12.2): tier1 declares `gear` and `bandmate` - its generators carry both, and a
+carrier resolves its declaration outward, so tier1 is high enough. `income` and `production` are
+root's, per §2, because sources in every chapter carry them.
 
 ## 6. Upgrades (all tier1 — the reveal chain is re-walked every run, §2)
 

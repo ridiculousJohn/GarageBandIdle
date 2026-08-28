@@ -451,7 +451,8 @@ inside the global product and again locally, which is what makes stationing Road
 chapter being worked (8 Roadies stacked: ~1.96x there, 1.40x everywhere else; spread 2/2/2/2: 1.46x
 globally and ~1.61x on the chapter being worked). Allocation balances spreading for the total
 against concentrating to sprint an active replay - both are real strategies. **Both
-factors are ordinary effects whose target is authored data** — a tag (Ch. 1: `income`, declared by Cash) — so
+factors are ordinary effects whose target is authored data** — a tag (Ch. 1: `income`, carried by Cash
+and declared at root) — so
 *what* Roadies help with is a per-chapter design decision, never a code decision. Both carry
 `stat: rate`: Roadies are the passive-crew lever and scale production, never a tap's yield. They are
 composed at different LEVELS, though. `roadie_total` is a currency-total effect - it is the same
@@ -684,13 +685,20 @@ product of matching multipliers. An Effect never carries a count or growth; wher
 scales an effect (fill counts, modifier stacks), the carrying entry declares the growth (§12.7).
 
 **Tags** — every Definition carries `tags: [...]`; an Effect's target matches an id or a tag. A set
-gets its name from its members (`rhythm_section` declared by the drummer and bassist), so buffs never
-list members and later additions join by declaring the tag. An effect applies at the level of what
+gets its name from its members (`rhythm_section` carried by the drummer and bassist), so buffs never
+list members and later additions join the set by carrying the tag. **The vocabulary itself is
+declared on a scope**, beside its flags (§12.3): `declaredTags` names the words a scope's subtree may
+carry, and a definition CARRYING a tag resolves it by walking OUTWARD to the scope that declares it.
+An effect filtering on one resolves nothing - a selector is a match string the gather evaluates
+against a candidate it already holds (§12.12), so the declaration binds carriers and only carriers.
+Declaring a word high enough that everyone who touches it can see the declaration is how a set stays
+one vocabulary, but that placement is authoring discipline; what the pass enforces is the carrier's
+walk. An effect applies at the level of what
 it matches: on a producer or generator (by id or tag) it multiplies **inside the sum** (that
 source's term); on a currency (by id or tag) it multiplies **the total** — one rule, no double
-counting. "Global income" is this tag mechanism, not a wildcard: income currencies declare an
-`income` tag (Ch. 1: cash), the Records and Roadie modifiers of §3/§8 target it, and a later income
-stream joins the stack by declaring the tag.
+counting. "Global income" is this tag mechanism, not a wildcard: root declares `income`, income
+currencies carry it (Ch. 1: cash), the Records and Roadie modifiers of §3/§8 filter on it, and a
+later income stream joins the stack by carrying the tag.
 
 **Consumer-owned stats:** `game_speed` (§9) — a stat in the same open vocabulary as `rate` and
 `yield`, read by exactly one system (the tick, which scales the production dt; wall-clock
@@ -715,7 +723,7 @@ root sits on both gather walks and a stage-less wildcard there would be collecte
 effect), and `{stat: game_speed, ×2}` — Encore — is a wildcard read owner-less by the tick, which
 matches wildcards only. `currencyId` matches an id or a tag, exactly as
 `target` does, so "every rate entry paying an income currency" is one effect rather than one per
-currency — and a currency stays out of it by not declaring the tag (§8.2's fans rule). **Where matches are gathered from is two
+currency — and a currency stays out of it by not carrying the tag (§8.2's fans rule). **Where matches are gathered from is two
 explicit stages**, which is what keeps sibling scopes isolated (§12.3):
 
 ```
@@ -724,13 +732,16 @@ currencyTotal      = Σ sourceContributions
                      × currency-targeted effects      gathered from the CURRENCY's home → root
 ```
 
-A currency-targeted effect must therefore be declared at the currency's home scope or an ancestor
-(validated, §12.12); a descendant scope wanting a local boost targets its producer, generator, or a
-source tag instead. That is the entire modifier system.
+A currency-targeted effect must therefore be applied at the currency's home scope or an ancestor; a
+descendant scope wanting a local boost targets its producer, generator, or a source tag instead.
+That is a placement rule rather than a load-time check: an effect nobody walks up to meet simply has
+no takers, which is also what a root buff looks like before any chapter carrying its tag is loaded.
+That is the entire modifier system.
 
 ### 12.3 Scopes: state containers
 
-A **scope** is a plain state container. Content declares, per scope: its currencies, flags, bar
+A **scope** is a plain state container. Content declares, per scope: its currencies, flags, declared
+tags (§12.2 - the vocabulary, distinct from the tags the scope itself carries), bar
 groups (which own their bars), **producers**, generators, upgrades, modifiers,
 triggers (§12.5), and (for tiers) its rung. **Every content family is declared somewhere** — that is
 what makes a reference resolvable by walking outward, and it is why there is no catalogue to look
@@ -812,9 +823,11 @@ names one holds a direct reference (§12.14) - but a flag has no data beyond its
 there would be nothing inside a `FlagDefinition` to author. The cost of that choice is that a flag
 name is the one authored reference a typo can break, which is why `SetFlag` and `FlagSet` are
 validated against the acting chain and `SetFlag` throws at runtime on a name no scope on the chain
-declares. Tags, stat names, and the `Effect` selectors (`target`, `currencyId`) are strings for
-the same reason: a selector matches by id OR tag (§12.2), so it cannot be a reference to one
-thing - all of these are vocabulary, not things.
+declares. **Tags are declared the same way**, and for the same reason: a tag has no data beyond its
+own existence either, so a scope's `declaredTags` is a list of bare strings, and a definition may
+carry only a tag some scope on its own chain declares. Stat names and the `Effect` selectors
+(`target`, `currencyId`) stay strings too: a selector matches by id OR tag (§12.2), so it cannot be
+a reference to one thing - all of these are vocabulary, not things.
 
 **A scope is addressed by reference too.** An action or condition that names a scope holds the
 `ScopeDefinition` itself, and getting from it to live state is a walk that compares assets, not
@@ -1310,11 +1323,35 @@ per-feature: any kind an author gates with explains itself for free.
   structurally - a tree topped by a tier looks rooted. `RootDefinition` also refuses a parent at
   construction, since this pass is dev-only and a mis-parented root would corrupt every chain walk
   quietly.
-- Every referenced id resolves (currencies, flags, generators, modifiers, scopes, tags in targets).
+- Every referenced id resolves (currencies, flags, generators, modifiers, scopes). An `Effect`
+  selector is not in that list: `target` and `currencyId` are match strings the gather evaluates
+  against a candidate it already holds (§12.2), never references to resolve.
 - Every id is unique along a CHAIN — currencies, flags, bars, groups, producers, generators,
   upgrades, events, triggers, modifiers, songs; a declaration in two scopes is refused, and sibling
   subtrees may reuse an id freely because neither can see the other. Scope ids stay unique tree-wide.
-- A tag may not collide with any id; an Effect target matching nothing reachable warns.
+- A tag is declared on a scope like a flag, and a declared tag joins the same per-chain name space ids
+  and flags share: colliding with either is refused in both directions, and so is the same word
+  declared twice on one chain. Scope ids stay out of that space - they are unique tree-wide and no
+  selector ever addresses a scope, so a tag may spell one. Carrying a tag no scope on the definition's
+  own chain declares is an error, found by the carrier's own outward walk, and that walk is the only
+  tag check the pass performs. Two SIBLING scopes may each declare the same word: a declaration is
+  permission, not identity, and matching is a string compare, so the word means the same thing
+  wherever it is carried - an effect above both chains matching an id in one and a carried tag in the
+  other is the aliasing that placement asks for (§12.2), not a collision.
+- An `Effect` selector is never checked. `target` and `currencyId` are answered from the other end - a
+  definition walks outward, meets the effect, and answers to the word or does not - so a selector
+  naming something declared below the scope the effect is applied at is ordinary authoring (Ch. 1:
+  `gj_tap_1` applied at ch1, naming tier1's `tap_producer`), and an effect nothing answers to has no
+  takers, which is legal: it is what a correct root buff looks like before a chapter carrying its tag
+  loads. Whether anything ANSWERS to a selector is statically decidable and exact - the definitions,
+  their ids, their tags, their produced currencies and stats, and every site an effect is applied at
+  are all authored - but only by one pass over the whole tree, walking every definition outward and
+  recording which effects it meets. No single site can answer it without looking down, which is why
+  nothing here does. What is genuinely runtime is only whether a match goes LIVE: a gate opening, an
+  `appliesWhen` holding, a grant firing. Until that pass exists a misspelled selector - `incone`,
+  `tap_produer` - ships as an inert effect with no finding, which is accepted: its home is the orphan
+  sweep, where unreferenced modifiers, flags nothing sets, and selectors nothing answers to are one
+  collection problem.
 - A `SetFlag` naming an undeclared flag is an error, as is one whose home is off the acting chain -
   including a home the acting scope encloses, which the outward write can never reach (§2). A
   declared flag with no setter warns.
@@ -1340,20 +1377,24 @@ per-feature: any kind an author gates with explains itself for free.
   targets) may address only the acting scope's chain — itself or an ancestor. The runtime state
   walk cannot reach siblings, so a cross-tree reference is a load-time error rather than a silent
   runtime miss.
-- Effect reach is validated for every target kind (§12.2): a currency-total effect must be declared
-  at the currency's home scope or an ancestor; an exact source target (producer, generator, bar)
-  must be declared at the target's scope or an ancestor — a sibling-declared effect resolves
-  at load but the target's outward walk never visits it, so it is an error, not a warning; a tag
-  target must match at least one member within the effect's declaring scope's subtree.
+- Effect PLACEMENT is not validated (§12.2). Where an effect is applied decides which definitions
+  walk up and meet it, and an effect nothing meets is content with no takers rather than a defect.
+  Judging it would mean enumerating an effect's possible askers - a downward search, and the exact
+  inversion of how the gather works. The exception is a stat with ONE consumer whose gather origin is
+  fixed in CODE rather than by content: `game_speed` is read once per segment by an owner-less,
+  currency-less query originating at the foreground chapter (§9), so an effect carrying any narrowing
+  can never be passed a coordinate to match, and one applied below chapter level is never on that
+  walk. Both are warnings, and both are answered by the site's own KIND with nothing enumerated -
+  which is what makes them checks where the general case is not one.
 - A bar group's `maxActive` is at least 1, and it lists no null bars. A bar's `fillAmount` and
   `fillRate` are positive - a nonpositive threshold is an unbounded settlement loop, and a zero rate
   is a bar no multiplier can move - and a named `fillCurrency` must be reachable on its own chain
   (none is legal: it fills from time). `perFill` on a NON-REPEATING bar is an error (12.6). A
   repeating bar carrying `perFill` records its fill-count write ahead of `onComplete`, so a
-  completion list resetting the scope that homes its own count trips set-then-wiped. An Effect
-  targeting a bar GROUP warns: a group owns no number for a gather to reach. `BarsCompleted` reaches
-  like every other scope-attached read: the group's declaring scope is the acting scope or an
-  ancestor.
+  completion list resetting the scope that homes its own count trips set-then-wiped. `BarsCompleted`
+  reaches like every other scope-attached read: the group's declaring scope is the acting scope or an
+  ancestor. A group is not an effect target (§12.7), but nothing checks a selector for naming one:
+  that would mean interpreting the word, which is the search this pass does not do.
 - An action list that sets a fact and later resets the scope declaring it errors (set-then-wiped —
   e.g. an event's `event_tierN_done` flag must be declared outside the scope its own `onEnd`
   resets).

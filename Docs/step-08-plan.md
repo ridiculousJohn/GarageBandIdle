@@ -44,7 +44,10 @@ Two JSON documents, one schema:
 - **`root.json`** - the game-wide declarations Chapter 1 happens to consume first (content doc
   section 2): root currencies (`records`, `roadies`), the three permanent modifiers with their
   formula effects, the idle base (`idle_base`, wildcard rate x0.5, `appliesWhen: IdleAccumulation`),
-  root flags (`ch1_complete`, the story latches).
+  root flags (`ch1_complete`, the story latches), and root's `declaredTags`, `income` and
+  `production` - the words its modifiers filter on, declared here because they are game-wide:
+  currencies and sources in every chapter carry them, and a carrier resolves its declaration by
+  walking outward (12.2).
 - **`chapter-01.json`** - the ch1 subtree: the chapter, tier1, and every declaration the content
   doc files on them (sections 3-10).
 
@@ -67,8 +70,13 @@ doc already spells them:
 
 - **Scopes** nest as authored: the chapter block carries its own declarations plus a `children`
   array of tier blocks, tiers recur. Every scope block's lists mirror `ScopeDefinition`'s
-  (`currencies`, `flags`, `producers`, `generators`, `upgrades`, `barGroups`, `modifiers`,
-  `permanentModifiers`, `triggers`, and on interiors `rung` and `events`).
+  (`currencies`, `flags`, `declaredTags`, `producers`, `generators`, `upgrades`, `barGroups`,
+  `modifiers`, `permanentModifiers`, `triggers`, and on interiors `rung` and `events`).
+  `declaredTags` is the vocabulary the scope declares, a list of bare strings like `flags`. It is
+  spelled in full where `flags` is not, because `tags` is already taken on EVERY block, scopes
+  included: a scope is a `Definition`, so it carries tags of its own (§12.2 - scope tags are
+  vocabulary, never effect targets), and one block cannot author both meanings under one key. The
+  `tags` a block carries must each be declared by some scope on its own chain (12.2).
 - **Polymorphic kinds** are discriminated by a `type` field naming the class (`CurrencyAtLeast`,
   `All`, `SetFlag`, `AddModifier`, `RootCurveFormula`, `LinearOnBalance`, ...). A type with no
   class behind it is an import ERROR that aborts the import (12.14.5) - the old importer's
@@ -108,11 +116,18 @@ incremental contract as validation.
 
 `ChapterJsonImporter` under `Assets/Scripts/Editor/`, rebuilt on the old one's mechanics:
 
-- **Stable paths, update-in-place.** Each definition materializes at a deterministic path,
-  SCOPE-QUALIFIED because only scope ids are tree-wide unique (12.3):
-  `Assets/ScriptableObjects/<document>/<scope path>/<family>/<id>.asset`
-  (`.../ch01/tier1/Generators/practice_amp.asset`). Definition ids are chain-unique, so sibling
-  tiers may both author a `cash` and their assets must not collide. Re-import loads the
+- **Stable paths, update-in-place.** Each definition materializes at a deterministic path grouped
+  DOCUMENT then FAMILY, so a chapter's assets sit together and each family folder is a per-chapter
+  list rather than a game-wide one:
+  `Assets/ScriptableObjects/<document>/<family>/<id>.asset`
+  (`.../ch1/Generators/practice_amp.asset`, `.../ch1/Currencies/cash.asset`). The document folder
+  is the document's own top scope id (`root`, `ch1`); a scope asset sits at its document root
+  (`ch1/ch1.asset`, `ch1/tier1.asset`). Paths are an EDITOR concern only - runtime loads by
+  Addressables address and label, never by path - so browsability is a first-class goal. Definition
+  ids are chain-unique, so two SIBLING scopes in one document could author the same id in the same
+  family; that is the only way two assets map to one path, and it is an import ERROR that names both
+  and aborts, disambiguated when a chapter with sibling tiers actually introduces one - Chapter 1's
+  single chain never does. Re-import loads the
   existing asset and overwrites its fields rather than recreating it, so GUIDs survive and every
   direct reference (a chapter's own subtree wiring, the Addressables entries, anything hand-wired
   in the editor)
@@ -154,7 +169,9 @@ incremental contract as validation.
   resolves every target path, verifies each lands inside its managed directory, and refuses
   CASE-INSENSITIVE collisions across the union - `cash` and `Cash` on two chains are legal
   identity but one file on Windows. Everything
-  deeper (reach, placement, stranded value, wildcard viability) is 12.12's job on the result.
+  deeper (scope-reference reach, carried tags resolving outward, stranded value) is 12.12's job on
+  the result - effect placement and wildcard viability are nobody's: an effect with no taker is
+  legal content (12.12).
 - **After the writes, validate what boot will load**: the importer reloads the persisted root and
   labeled chapter assets, composes them through the same seam, and runs `ContentValidator` on
   that assembly - validating the bare root asset would inspect nothing, since its serialized
@@ -225,7 +242,7 @@ The pre-restart residue goes first, and it reaches past `Assets/ScriptableObject
 assets there (26 bound to deleted or rewritten scripts - BarGroups, Bars, Chapters, Currencies,
 CurrencyGroups, Events, Rewards, Sections, StoryBeats - and 15 whose classes survived the restart
 with their GUIDs intact, Producers, Generators, and Upgrades, so those still load; all 41 are
-pre-restart authoring at flat paths the scope-qualified importer output replaces), the 10 prefabs
+pre-restart authoring at flat paths the document-scoped importer output replaces), the 10 prefabs
 under `Assets/Prefabs/`, each carrying a dead MonoBehaviour
 reference (the three row scripts and the six module scripts), `SampleScene.unity` with its
 `EditorBuildSettings` entry, the 48 stale labeled entries in the default Addressables group, AND
@@ -234,8 +251,8 @@ before the importer writes anything - the 13 legacy labels are replaced by the s
 label. A directory that existed to hold deleted residue goes with it, `.meta` included: the 12
 flat family folders, `Prefabs/` with its `Modules/`, and `Scenes/`. `ScriptableObjects/` itself
 stays - it is the importer's managed root, and its flat children are exactly what the
-scope-qualified paths replace. Update-in-place cannot refresh any of them: the 26 with dead
-bindings will not load, and the 15 live-bound ones sit at flat paths the scope-qualified importer
+document-scoped paths replace. Update-in-place cannot refresh any of them: the 26 with dead
+bindings will not load, and the 15 live-bound ones sit at flat paths the document-scoped importer
 never writes, so it would strand them as duplicates rather than overwrite - both reasons the purge
 precedes the first import. The single root entry replaces the label scheme those entries served. Nothing dangles: the row
 prefabs were reachable only from their module prefabs, those only from the `module/*` addresses and
@@ -349,23 +366,50 @@ subscribers - step 9. `SetRoadieAllocation`, `AcknowledgeStory`, story beat card
 ## Docs on landing
 
 The build-plan status line, step 3's stale one-root-load description revised to the composition
-contract, and 12.13's `ScriptableObjects/` folder sketch gains the per-scope
-nesting the importer actually writes. 12.13 already lists `GameManager.cs`; the content doc needs
-no edit -
-it is the source the JSON is authored FROM, and any delta found while authoring is a finding to
-bring back, not a silent doc fix.
+contract, and 12.13's `ScriptableObjects/` folder sketch gains the document-then-family
+nesting the importer actually writes. 12.13 already lists `GameManager.cs`. The content doc needs no
+edit FOR STEP 8 - it is the source the JSON is authored FROM, and any delta found while authoring is
+a finding to bring back, not a silent doc fix. Its tag declaration homes landed with the slice 0
+design change, ahead of this step.
 
 ## Landing order
 
-Four changesets, each compiling and green on its own.
+Five changesets, each compiling and green on its own. Slice 0 is not step 8 work - it touches no
+importer, JSON, or Addressables, only `ScopeDefinition` and `ContentValidator` from steps 3 to 7 -
+but it is a precondition for A, which authors `root.json` with `declaredTags` in it and cannot
+validate until the pass understands the field.
 
+- **0. `declaredTags` + the effect-selector deletion** (§12.2, §12.12): `declaredTags` on
+  `ScopeDefinition` beside `declaredFlags`; `declaredTags` joining the per-chain name space through
+  the same `Claim` call as ids and flags, which retires the carrier-derived collision loops and their
+  `visibleTags`/`inheritedTags` maps; the new carrier check, resolving each carried tag outward from
+  its declaring scope; `NullEntry` on an empty declared or carried tag, mirroring empty
+  `declaredFlags`. Then the selector deletion: `MatchNarrowingCurrency`,
+  `SubtreeHomesMatchingCurrency`, `MatchTargets`, `MatchOtherKind`, `ValidateTargetCoordinate` and
+  what dies with them (`SatisfiesNarrowing`, `SomeSourcePays`, `TagExists`, `Targetables`,
+  `NarrowingText`), the `EffectReach` and `EffectTargetUnmatched` members, and the ungranted-modifier
+  fallback site in `ValidateModifierAtSite`. `ValidateEffectAddress` keeps the stat checks and the two
+  game_speed shape checks, which move to `InertOperand`. Dropping the fallback gives up more than the
+  addresses: a modifier nothing grants and no scope lists has no site, so its `formula` and
+  `appliesWhen` go unvalidated too - deliberately, since neither can execute until something applies
+  it, and the moment anything does the site exists and every check runs. Effect NUMBERS are
+  unaffected: `ValidateEffectNumbers` already runs per declared modifier, outside the site loop. What
+  reports the orphan itself is step 11's sweep. Tests: the 22 that encode the deleted
+  contract retire, every fixture declares the tags its tree carries (`TestContent`,
+  `ContentValidatorTests`, `ResolutionTests`, and `BarSystemTests` for `rehearsal_fill`), and one new
+  test per new rule - collision both directions, one word declared twice on a chain, a carried tag
+  nobody declares, the two empty cases, the game_speed pair under `InertOperand`, and the regression
+  guard: a selector naming something declared BELOW its site produces no finding.
 - **A. The importer + root.json**: the pre-restart purge first (the 41 flat assets, the 10 prefabs,
   `SampleScene` with its build-settings entry, the emptied directories, the 48 stale
   Addressables entries, the 13 label definitions), then `ContentDatabase`'s composition pair (with
   `CompositionTests`, the root-targeting identity row included), DTOs
   and type mapping, the lints, the preflight-then-write
-  scope-qualified import, `root.json` authored, the root asset + its fixed-address entry,
-  `ChapterImporterTests`.
+  document-scoped import, `root.json` authored, the root asset + its fixed-address entry,
+  `ChapterImporterTests`. The union in this slice is root.json alone, and it validates clean on its
+  own: nothing in it carries a tag it cannot resolve, and a selector with no taker is not a finding
+  (12.12) - root's modifiers filter on `income` and `production` before any chapter carries them,
+  which is exactly the case the deleted checks got wrong.
 - **B. chapter-01.json**: the chapter schema blocks, the document authored from the content doc,
   the `chapter` label as its roster act,
   import green with zero validator ERRORS plus the two whitelisted `FlagNoSetter` warnings,
