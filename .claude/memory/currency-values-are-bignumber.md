@@ -8,15 +8,15 @@ metadata:
   modified: 2026-08-28T17:46:17.653Z
 ---
 
-Design doc §12.14 rule 1: break_infinity (BigDouble, wrapped as `BigNumber`) for ALL currency and
-production values. That includes AUTHORED fields — condition thresholds, action amounts, formula
-constants and divisors, bar fillAmount/fillRate — not just runtime balances. In
+Design doc section 12.14 rule 1: break_infinity (BigDouble, wrapped as `BigNumber`) for ALL currency and
+production values. That includes AUTHORED fields - condition thresholds, action amounts, formula
+constants and divisors, bar fillAmount/fillRate - not just runtime balances. In
 spine step 1 I wrote them as `double` and John called it out: "it's irrelevant if BigNumber
 serializes or not, they have to be numbers that we can use. Making those doubles is a huge
 mistake."
 
-**Why:** Late-chapter values exceed double's ~1e308 range — a gate of 1e320 cash is unrepresentable
-in a double field, and the comparisons happen in BigNumber space anyway. The doc's own §12.7
+**Why:** Late-chapter values exceed double's ~1e308 range - a gate of 1e320 cash is unrepresentable
+in a double field, and the comparisons happen in BigNumber space anyway. The doc's own section 12.7
 snippet declares these fields BigDouble; typing them double was drift I introduced, not a decision
 anyone made.
 

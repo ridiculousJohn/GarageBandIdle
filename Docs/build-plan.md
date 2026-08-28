@@ -23,7 +23,7 @@ always that the content belongs on a scope.
 | 6 | Events + trigger sweep | **DONE 2026-08-25** - 327/327 green |
 | 7 | Tick + GameSession | **DONE 2026-08-26** - 397/397 green (six slices A-F; two design revisions absorbed mid-step: the idle respell, then the claim respell - the stamp IS the pending claim, offers are transient and session-held) |
 | - | Tag declarations + effect-selector deletion | **DONE 2026-08-27** - 379/379 green: `declaredTags` on the scope joining the per-chain name space, carried tags resolved outward from the carrier, and the downward effect-selector searches deleted, leaving the stat coordinate and the two game_speed shape checks (slice 0 of `step-08-plan.md`) |
-| 8 | Chapter 1 JSON + importer + walkthrough tests | **slice A landed 2026-08-27** - 404/404 green: `ComposedContent` and the load-and-compose `ContentDatabase`, the save reshaped onto the pair, the document-scoped importer with its lints and preflight-the-union contract, `root.json`, and the root entry in one PackTogether group; slices B-D remain |
+| 8 | Chapter 1 JSON + importer + walkthrough tests | **slice A landed 2026-08-27** - 405/405 green: `ComposedContent` and the load-and-compose `ContentDatabase`, the save reshaped onto the pair, the document-scoped importer with its lints and preflight-the-union contract, `root.json`, and the root entry in one PackTogether group; slices B-D remain |
 | 9 | UI layer | not started |
 | 10 | Meta & monetization | not started |
 | 11 | Orphan sweep | not started |

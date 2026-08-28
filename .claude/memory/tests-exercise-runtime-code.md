@@ -14,7 +14,7 @@ does. If the tests reach for one, the suite is proving the copy works.
 
 **Why:** 2026-08-24. Removing the by-name scope lookup from `ScopeState` left ~30 test call sites
 using it, and rather than convert them I added a test-only extension method with the same name and
-the same body. John: "having tests that use methods that the runtime doesn't use is just fucking
+the same body. John: "having tests that use methods that the runtime doesn't use is just
 stupid." Two harms, and the second was the one I missed - the reference walk that production
 actually depends on was then exercised by four call sites instead of the whole suite, and
 `FindInSubtree("tier1")` and `FindInSubtree(Tier1Def)` read identically while resolving through

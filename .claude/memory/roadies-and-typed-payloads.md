@@ -5,11 +5,11 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 725a3991-fe12-4b4f-bdb9-02cb627048e5
-  modified: 2026-08-26T22:59:13.353Z
+  modified: 2026-08-28T20:27:48.673Z
 ---
 
 Four corrections landed 2026-08-20, before step 5 began, each reversing something a build step had
-invented. Suite is 205/205 after them.
+invented. `Docs/build-plan.md`'s correction-pass row is the authority for the suite count.
 
 - **`RoadieVenueDefinition` is DELETED.** Roadies attach to the band and are stationed per chapter;
   "venue" was flavor prose in section 8.2 that step 4 turned into an asset with a `chapterScopeId`
@@ -50,7 +50,7 @@ ids), and such an id resolves by walking its scope OUTWARD, never by lookup. Con
 are declared content (`ScopeDefinition.modifiers`) with stacks as `Dictionary<string, int>`; bar
 groups are declared and own their bars; ids are unique per CHAIN rather than tree-wide (scope ids
 stay tree-wide); `ResetScope` reaches self-or-enclosed only, never a peer; and the
-"declared but undiscoverable" check died with the catalogue. Suite: 194 tests.
+"declared but undiscoverable" check died with the catalogue.
 
 **Why:** each was a second way to say something the architecture already said - see
 [[reuse-the-existing-mechanism]] - and John found all four by reading, not by being told.

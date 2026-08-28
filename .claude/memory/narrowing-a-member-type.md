@@ -28,4 +28,4 @@ claim to John that the covariant version worked.
 **How to apply:** reach for the generic base first. If the narrowing is needed at exactly one
 boundary rather than throughout, a single generic accessor beats spreading casts across call sites -
 but check whether the site needs the narrow type at all, since the answer is often that a signature
-upstream should have carried it. Related: [[pick-the-simplest-option]].
+upstream should have carried it. Related: [[reuse-the-existing-mechanism]].

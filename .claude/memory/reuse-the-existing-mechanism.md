@@ -1,11 +1,11 @@
 ---
 name: reuse-the-existing-mechanism
-description: "Never invent a second way to express what the architecture already expresses; a covered case that seems to need a new mechanism is a conversation, not a decision to make alone"
+description: "Never invent a second way to express what the architecture already expresses, and when two shapes both work take the smaller one; a covered case that seems to need a new mechanism is a conversation, not a decision to make alone"
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: efd4f70d-d22b-4ea0-8736-2d55c0b412d5
-  modified: 2026-08-20T18:18:14.719Z
+  modified: 2026-08-28T20:25:50.076Z
 ---
 
 Before adding a field, a type, an id indirection, or any new mechanism, name the existing
@@ -35,3 +35,20 @@ express ownership and grouping. When a plan introduces a new shape, say out loud
 existing primitive it is NOT reusing and why, in the plan's first paragraph about it, not
 buried. See [[no-spec-accumulation]] for the habit that hides these, and
 [[quote-directive-before-editing]] for the standing edit protocol.
+
+**The selection defect: the elaborate option always wins the pick (2026-08-24).** Laying out the
+options is wanted - John's correction was exact: "by all means you should consider all options, just
+pick the simpliest one." Four in one session, and he named the simple
+option each time: a downcast `eventHost` accessor on the base instead of giving the tier its own
+class; an untyped `ScopeDefinition` plus a depth test plus typed state classes instead of typed
+definitions acting as their own factories; three hand-written `Facts` properties instead of one
+generic base class; and constructor-parameter juggling instead of moving the initialize call to
+where the field is assigned. Every one of them was mechanism added to work around a type that
+should have existed.
+
+So: weigh them, then take the smallest thing that satisfies the constraint. State the simple one as
+the answer and the elaborate one as the alternative, not the reverse. A cast, a null check, a depth
+test, or a runtime guard standing in for a type is the specific tell - the simple option is almost
+always "add the class that was missing" ([[narrowing-a-member-type]] is the worked case). If the
+elaborate option is genuinely right, the reason has to be a constraint that breaks the simple one,
+not a benefit the elaborate one adds.
