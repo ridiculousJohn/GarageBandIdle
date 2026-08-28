@@ -415,7 +415,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var coin = TestTree.DeclareCurrency(chapterDef, "coin", "income");
             var tierADef = TestTree.MakeTier("tier_a");
             var tierBDef = TestTree.MakeTier("tier_b");
-            rootDef.children.Add(chapterDef);
             chapterDef.children.Add(tierADef);
             chapterDef.children.Add(tierBDef);
 
@@ -429,7 +428,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tierADef.upgrades.Add(boostA);
             tierBDef.generators.Add(genB);
 
-            var root = ScopeState.Build(rootDef);
+            var root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { chapterDef }));
             var chapter = root.FindInSubtree(chapterDef);
             var tierA = root.FindInSubtree(tierADef);
             var tierB = root.FindInSubtree(tierBDef);
@@ -533,8 +532,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tierBDef = TestTree.MakeTier("tier_b");
             var coinA = TestTree.DeclareCurrency(tierADef, "coin_a");
             var coinB = TestTree.DeclareCurrency(tierBDef, "coin_b");
-            rootDef.children.Add(chapterADef);
-            rootDef.children.Add(chapterBDef);
             chapterADef.children.Add(tierADef);
             chapterBDef.children.Add(tierBDef);
             tierADef.generators.Add(MakeGenerator("gen_a", coinA));
@@ -547,7 +544,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             chapterADef.modifiers.Add(chapterBoost);
             chapterADef.permanentModifiers.Add(chapterBoost);
 
-            var root = ScopeState.Build(rootDef);
+            var root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { chapterADef, chapterBDef }));
             var tierA = root.FindInSubtree(tierADef);
             var tierB = root.FindInSubtree(tierBDef);
             tierA.generatorCounts["gen_a"] = 1;
@@ -664,8 +661,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 var tierBDef = TestTree.MakeTier("tier_b");
                 CoinA = TestTree.DeclareCurrency(tierADef, "coin_a", "income");
                 CoinB = TestTree.DeclareCurrency(tierBDef, "coin_b", "income");
-                rootDef.children.Add(chapterADef);
-                rootDef.children.Add(chapterBDef);
                 chapterADef.children.Add(tierADef);
                 chapterBDef.children.Add(tierBDef);
 
@@ -688,7 +683,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 rootDef.permanentModifiers.Add(total);
                 rootDef.permanentModifiers.Add(active);
 
-                Root = ScopeState.Build(rootDef);
+                Root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { chapterADef, chapterBDef }));
                 TierA = Root.FindInSubtree(tierADef);
                 TierB = Root.FindInSubtree(tierBDef);
                 Root.generatorCounts["gen_root"] = 1;

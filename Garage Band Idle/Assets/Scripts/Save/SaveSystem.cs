@@ -92,11 +92,17 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // onto it. Unknown ids from removed content are dropped with a warning;
         // content added since the save starts fresh. False on any structural
         // failure - malformed json, checksum mismatch, unmigratable version.
-        public static bool TryDeserialize(string json, RootDefinition rootDefinition, out RootScopeState root)
+        //
+        // The tree comes from the composed PAIR and never the bare root asset:
+        // root's serialized child list is empty by contract (12.14.5), so a
+        // tree built from it alone would read every saved chapter as removed
+        // content and drop it - while reporting a successful load.
+        public static bool TryDeserialize(string json, ComposedContent content, out RootScopeState root)
         {
             root = null;
+            var rootDefinition = content.Root;
             if (rootDefinition == null)
-                throw new ArgumentNullException(nameof(rootDefinition), "SaveSystem: loading requires the content tree.");
+                throw new ArgumentNullException(nameof(content), "SaveSystem: loading requires the content tree.");
             try
             {
                 var envelope = JObject.Parse(json);
@@ -134,7 +140,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     return false;
                 }
 
-                root = ScopeState.Build(rootDefinition);
+                root = ScopeState.Build(content);
                 Apply(rootNode, root);
                 return true;
             }
@@ -519,7 +525,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // The backup only ever receives content that VERIFIES: a corrupt
         // primary (the recovery case) is deleted, never rotated over a good
         // backup - File.Replace would otherwise install it as the new .bak.
-        public static void WriteAtomic(string path, RootScopeState root)
+        public static void WriteAtomic(string path, RootScopeState root, ComposedContent content)
         {
             var json = Serialize(root);
             var tmp = path + ".tmp";
@@ -532,7 +538,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 throw new IOException("SaveSystem: written save failed verification - previous save left untouched.");
             }
 
-            if (FileLoadable(path, root.DefinitionAs<RootDefinition>()))
+            if (FileLoadable(path, content))
             {
                 File.Replace(tmp, path, BackupPath(path));
             }
@@ -554,16 +560,16 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // Failed, because "couldn't read your save" must never be answered by
         // starting a new game. (File.Exists returns false for ALL of those, so
         // it decides nothing here.)
-        public static LoadOutcome LoadFromDisk(string path, RootDefinition rootDefinition, out RootScopeState root)
+        public static LoadOutcome LoadFromDisk(string path, ComposedContent content, out RootScopeState root)
         {
             root = null;
 
             var primaryRead = TryRead(path, out var primaryJson);
-            if (primaryRead == ReadResult.Ok && TryDeserialize(primaryJson, rootDefinition, out root))
+            if (primaryRead == ReadResult.Ok && TryDeserialize(primaryJson, content, out root))
                 return LoadOutcome.LoadedPrimary;
 
             var backupRead = TryRead(BackupPath(path), out var backupJson);
-            if (backupRead == ReadResult.Ok && TryDeserialize(backupJson, rootDefinition, out root))
+            if (backupRead == ReadResult.Ok && TryDeserialize(backupJson, content, out root))
             {
                 Debug.LogWarning("SaveSystem: primary save unusable - loaded the backup.");
                 return LoadOutcome.LoadedBackup;
@@ -601,18 +607,18 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
         }
 
-        private static bool TryLoadFile(string path, RootDefinition rootDefinition, out RootScopeState root)
+        private static bool TryLoadFile(string path, ComposedContent content, out RootScopeState root)
         {
             root = null;
-            return TryRead(path, out var json) == ReadResult.Ok && TryDeserialize(json, rootDefinition, out root);
+            return TryRead(path, out var json) == ReadResult.Ok && TryDeserialize(json, content, out root);
         }
 
         // Backup eligibility equals LOADABILITY, not just envelope integrity: a
         // checksum-valid but unusable primary (newer schema, missing migration,
         // wrong root, malformed payload) must never rotate over the known-good
         // backup. Verifying a bad file emits its diagnostics - honest tracing.
-        private static bool FileLoadable(string path, RootDefinition rootDefinition) =>
-            TryLoadFile(path, rootDefinition, out _);
+        private static bool FileLoadable(string path, ComposedContent content) =>
+            TryLoadFile(path, content, out _);
 
         // Structural check only - parse and checksum, no tree application. Used
         // to verify a write before it replaces the previous save.

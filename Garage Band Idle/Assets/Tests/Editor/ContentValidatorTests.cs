@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
@@ -32,13 +33,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly BarGroupDefinition Covers;
         public readonly BarDefinition Cover1;
 
+        // Root's children are the roster, never its serialized list (12.14.5).
+        public readonly List<ChapterDefinition> Chapters = new();
+
         public ValidatorFixture()
         {
             Root = TestTree.MakeRoot("root");
             Ch1 = TestTree.MakeChapter("ch1");
             Tier1 = TestTree.MakeTier("tier1");
             Tier1b = TestTree.MakeTier("tier1b");
-            Root.children.Add(Ch1);
+            Chapters.Add(Ch1);
             Ch1.children.Add(Tier1);
             Ch1.children.Add(Tier1b);
 
@@ -147,7 +151,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Ch1.modifiers.Add(Boost);
         }
 
-        public ValidationReport Run() => ContentValidator.Validate(Root);
+        public ComposedContent Content => ComposedContent.Compose(Root, Chapters);
+
+        public ValidationReport Run() => ContentValidator.Validate(Content);
 
         // A second chapter under the same root, deliberately reusing chapter
         // one's ids. Sibling subtrees cannot see each other, so every reuse
@@ -163,7 +169,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public Sibling AddSiblingChapter()
         {
             var sibling = new Sibling { Ch2 = TestTree.MakeChapter("ch2"), Tier2 = TestTree.MakeTier("tier2") };
-            Root.children.Add(sibling.Ch2);
+            Chapters.Add(sibling.Ch2);
             sibling.Ch2.children.Add(sibling.Tier2);
             sibling.Cash = TestTree.DeclareCurrency(sibling.Tier2, "cash", "income");
             // Its own economy, reusing chapter one's producer id: a source pays
@@ -354,7 +360,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ScopeUnderTwoParents_Error()
         {
             var f = new ValidatorFixture();
-            f.Root.children.Add(f.Tier1);
+            f.Tier1b.children.Add(f.Tier1);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeGraph, "child of both");
         }
 
@@ -370,28 +376,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- scope kind placement ----
 
-        [Test]
-        public void ScopePlacement_TierAtTheRoot_Error()
-        {
-            // A tree whose top node is a tier: structurally a root, so the
-            // graph checks pass and only the kind check catches it.
-            var fakeRoot = TestTree.MakeTier("root");
-            var ch1 = TestTree.MakeChapter("ch1");
-            fakeRoot.children.Add(ch1);
-
-            AssertFinding(ContentValidator.Validate(fakeRoot), ValidationSeverity.Error,
-                ValidationCheck.ScopePlacement, "is a TierDefinition");
-        }
-
-        [Test]
-        public void ScopePlacement_TierDirectlyUnderRoot_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Root.children.Add(TestTree.MakeTier("loose_tier"));
-
-            AssertFinding(f.Run(), ValidationSeverity.Error,
-                ValidationCheck.ScopePlacement, "root's children are chapters");
-        }
+        // Root's own two placement rules are structural: the composed pair is
+        // typed to a RootDefinition and a roster of chapters, so a tier at the
+        // root or directly under it cannot be composed at all - CompositionTests
+        // owns what is left, the refusal of a serialized root child.
 
         [Test]
         public void ScopePlacement_ChapterUnderAChapter_Error()
@@ -444,7 +432,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch2 = TestTree.MakeChapter("ch2");
             var tier2 = TestTree.MakeTier("tier2");
             ch2.children.Add(tier2);
-            f.Root.children.Add(ch2);
+            f.Chapters.Add(ch2);
             ((ResetScope)f.Album.actions[2]).scope = tier2;
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach, "is neither from 'tier1'");
         }
@@ -1295,17 +1283,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- numeric range across every authored double ----
 
         [Test]
+        // The two doubles left in the authored surface - Pow's power and a wall
+        // clock. Every other authored number is a BigNumber now, and BigNumber
+        // refuses NaN and infinity at construction, so those cannot be written
+        // at all: the type carries the check the pass used to.
         public void NonFiniteDoubles_Error()
         {
             var f = new ValidatorFixture();
-            f.Amp.growth = double.NaN;
-            ((LinearOnBalance)f.RecordsIncome.effects[0].formula).coefficient = double.NaN;
             ((RootCurveFormula)((AddCurrency)f.Album.actions[0]).formula).exponent = double.PositiveInfinity;
-            f.Boost.effects.Add(new Effect { target = "cash", stat = Stat.Rate, multiplier = double.NaN });
+            f.AddGuardedEvent().timeLimitSeconds = double.NaN;
 
             var report = f.Run();
-            var findings = report.OfCheck(ValidationCheck.NumericRange).Count();
-            Assert.AreEqual(4, findings, Dump(report));
+            Assert.AreEqual(2, report.OfCheck(ValidationCheck.NumericRange).Count(), Dump(report));
             AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NumericRange, "must be finite");
         }
 

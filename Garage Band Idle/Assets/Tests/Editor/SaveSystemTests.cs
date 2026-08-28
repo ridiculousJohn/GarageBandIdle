@@ -34,7 +34,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static bool Load(string json, out RootScopeState root, out TestTree tree)
         {
             tree = new TestTree();
-            return SaveSystem.TryDeserialize(json, tree.RootDef, out root);
+            return SaveSystem.TryDeserialize(json, tree.Content, out root);
         }
 
         // For the tests that only care whether the load succeeded: the content
@@ -44,7 +44,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private LoadOutcome LoadDisk(out RootScopeState root)
         {
             var tree = new TestTree();
-            return SaveSystem.LoadFromDisk(SavePath, tree.RootDef, out root);
+            return SaveSystem.LoadFromDisk(SavePath, tree.Content, out root);
         }
 
         private static TestTree Populate(TestTree tree)
@@ -84,7 +84,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var fresh = new TestTree();
             fresh.Cover1.repeating = true;
-            Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.RootDef, out var root));
+            Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.Content, out var root));
 
             var tier1 = (TierScopeState)root.FindInSubtree(fresh.Tier1Def);
             var ch1 = (ChapterScopeState)root.FindInSubtree(fresh.Ch1Def);
@@ -121,7 +121,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tier2 = TestTree.MakeTier("tier2");
             TestTree.DeclareCurrency(tier2, "merch");
             oldTree.Ch1Def.children.Add(tier2);
-            var oldRoot = ScopeState.Build(oldTree.RootDef);
+            var oldRoot = ScopeState.Build(oldTree.Content);
             oldRoot.FindInSubtree(tier2).balances["merch"] = 5;
             var json = SaveSystem.Serialize(oldRoot);
 
@@ -131,7 +131,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             newTree.Ch1Def.children.Add(tier3);
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("tier2"));
-            Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
+            Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.Content, out var root));
 
             Assert.IsNull(root.FindInSubtree(tier2));
             Assert.AreEqual(BigNumber.Zero, root.FindInSubtree(tier3).balances["vinyl"]);
@@ -153,7 +153,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestTree.DeclareCurrency(newTree.Tier1Def, "vinyl");
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cash'"));
-            Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
+            Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.Content, out var root));
 
             var tier1 = root.FindInSubtree(newTree.Tier1Def);
             Assert.IsFalse(tier1.balances.ContainsKey("cash"));
@@ -169,7 +169,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var json = SaveSystem.Serialize(tree.Root);
             Assert.Throws<ArgumentNullException>(
-                () => SaveSystem.TryDeserialize(json, null, out _));
+                () => SaveSystem.TryDeserialize(json, default, out _));
         }
 
         [Test]
@@ -227,9 +227,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Root.balances["records"] = 1;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
             tree.Root.balances["records"] = 2;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
 
             Assert.IsTrue(File.Exists(SaveSystem.BackupPath(SavePath)));
             Assert.IsTrue(Load(File.ReadAllText(SaveSystem.BackupPath(SavePath)), out var backupRoot));
@@ -243,9 +243,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Root.balances["records"] = 1;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
             tree.Root.balances["records"] = 2;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
             Corrupt(SavePath);
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("checksum"));
@@ -261,13 +261,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Root.balances["records"] = 1;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
             tree.Root.balances["records"] = 2;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);   // backup now holds records=1
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);   // backup now holds records=1
             Corrupt(SavePath);
 
             tree.Root.balances["records"] = 3;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);   // must NOT install the corrupt file as .bak
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);   // must NOT install the corrupt file as .bak
 
             Assert.IsTrue(Load(File.ReadAllText(SavePath), out var primary));
             Assert.AreEqual((BigNumber)3, primary.balances["records"]);
@@ -280,9 +280,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Root.balances["records"] = 1;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
             tree.Root.balances["records"] = 2;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);   // backup = records 1, primary = records 2
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);   // backup = records 1, primary = records 2
 
             using (new FileStream(SavePath, FileMode.Open, FileAccess.Read, FileShare.None))   // lock the primary
             {
@@ -301,7 +301,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var savedTree = new TestTree();
             var trigger = TestTree.MakeDefinition<TriggerDefinition>("t1");
             savedTree.Tier1Def.triggers.Add(trigger);
-            var savedRoot = ScopeState.Build(savedTree.RootDef);
+            var savedRoot = ScopeState.Build(savedTree.Content);
             var tier1 = savedRoot.FindInSubtree(savedTree.Tier1Def);
             tier1.firedTriggers.Add("t1");
             tier1.firedTriggers.Add("ghost_trigger");
@@ -316,7 +316,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // then tier1's latch.
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_chapter"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_trigger"));
-            Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.RootDef, out var root));
+            Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.Content, out var root));
 
             var loadedTier1 = root.FindInSubtree(newTree.Tier1Def);
             Assert.IsTrue(loadedTier1.firedTriggers.Contains("t1"));
@@ -463,9 +463,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Root.balances["records"] = 1;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
             tree.Root.balances["records"] = 2;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);   // backup now holds records=1
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);   // backup now holds records=1
 
             // The app-downgrade case: a checksum-VALID primary from a newer
             // build. Envelope integrity passes; loadability does not.
@@ -474,7 +474,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             File.WriteAllText(SavePath, Rechecksum(envelope));
 
             tree.Root.balances["records"] = 3;
-            SaveSystem.WriteAtomic(SavePath, tree.Root);   // must NOT install the newer-schema file as .bak
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);   // must NOT install the newer-schema file as .bak
 
             Assert.IsTrue(Load(File.ReadAllText(SavePath), out var primary));
             Assert.AreEqual((BigNumber)3, primary.balances["records"]);
@@ -486,7 +486,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Tree_scoped_facts_enforce_ownership_and_reach()
         {
             var savedTree = new TestTree();
-            var savedRoot = ScopeState.Build(savedTree.RootDef);
+            var savedRoot = ScopeState.Build(savedTree.Content);
             savedRoot.roadieAllocation["ch1"] = 1;      // a chapter - valid
             savedRoot.roadieAllocation["tier1"] = 2;    // in the tree, but not a chapter
             var json = SaveSystem.Serialize(savedRoot);
@@ -502,7 +502,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Inaccessible_primary_with_no_backup_is_Failed_never_NoSave()
         {
             var tree = new TestTree();
-            SaveSystem.WriteAtomic(SavePath, tree.Root);   // primary exists, no backup yet
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);   // primary exists, no backup yet
 
             using (new FileStream(SavePath, FileMode.Open, FileAccess.Read, FileShare.None))   // make it unreadable
             {
@@ -521,8 +521,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(LoadOutcome.NoSave, LoadDisk(out _));
 
             var tree = new TestTree();
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
-            SaveSystem.WriteAtomic(SavePath, tree.Root);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
             Corrupt(SavePath);
             Corrupt(SaveSystem.BackupPath(SavePath));
 

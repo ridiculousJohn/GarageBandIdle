@@ -15,10 +15,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Children, which every chain walk would then read wrong.
             var root = TestTree.MakeRoot("root");
             var chapter = TestTree.MakeChapter("ch1");
-            root.children.Add(chapter);
             chapter.children.Add(TestTree.MakeRoot("inner_root"));
+            var content = ComposedContent.Compose(root, new[] { chapter });
 
-            Assert.Throws<System.InvalidOperationException>(() => ScopeState.Build(root));
+            Assert.Throws<System.InvalidOperationException>(() => ScopeState.Build(content));
         }
 
         [Test]

@@ -31,7 +31,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     public class LinearOnBalance : MultiplierFormula
     {
         public CurrencyDefinition currency;
-        public double coefficient;
+        public BigNumber coefficient;
 
         public override BigNumber Compute(GameContext ctx) =>
             BigNumber.One + coefficient * ctx.GetBalance(currency.Id);
@@ -39,7 +39,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public override void Validate(ValidationContext ctx)
         {
             ctx.RequireOnChain(currency, "LinearOnBalance");
-            if (ctx.RequireFiniteDouble(coefficient, "LinearOnBalance coefficient") && coefficient < 0)
+            if (coefficient < BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"LinearOnBalance coefficient is {coefficient} - a formula factor never shrinks with the fact it derives from.");
         }
@@ -53,22 +53,19 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [Serializable]
     public class RoadieTotalBoost : MultiplierFormula
     {
-        public double perRoadie;
+        public BigNumber perRoadie;
 
-        // perRoadie converts BEFORE the multiplication: done in double
-        // arithmetic the term can overflow to infinity before the wrapper sees
-        // it, and BigNumber refuses infinities at construction.
         public override BigNumber Compute(GameContext ctx)
         {
             var product = BigNumber.One;
             foreach (var stationed in ctx.Scope.Root().roadieAllocation.Values)
-                product *= BigNumber.One + (BigNumber)perRoadie * stationed;
+                product *= BigNumber.One + perRoadie * stationed;
             return product;
         }
 
         public override void Validate(ValidationContext ctx)
         {
-            if (ctx.RequireFiniteDouble(perRoadie, "RoadieTotalBoost perRoadie") && perRoadie < 0)
+            if (perRoadie < BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"RoadieTotalBoost perRoadie is {perRoadie} - a formula factor never shrinks with the fact it derives from.");
         }
@@ -81,7 +78,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     [Serializable]
     public class RoadieActiveBoost : MultiplierFormula
     {
-        public double perRoadie;
+        public BigNumber perRoadie;
 
         public override BigNumber Compute(GameContext ctx)
         {
@@ -90,12 +87,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return BigNumber.One;           // resolving off any chapter's chain: no local factor
             if (!ctx.Scope.Root().roadieAllocation.TryGetValue(chapter.ScopeId, out var stationed))
                 return BigNumber.One;
-            return BigNumber.One + (BigNumber)perRoadie * stationed;
+            return BigNumber.One + perRoadie * stationed;
         }
 
         public override void Validate(ValidationContext ctx)
         {
-            if (ctx.RequireFiniteDouble(perRoadie, "RoadieActiveBoost perRoadie") && perRoadie < 0)
+            if (perRoadie < BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"RoadieActiveBoost perRoadie is {perRoadie} - a formula factor never shrinks with the fact it derives from.");
         }

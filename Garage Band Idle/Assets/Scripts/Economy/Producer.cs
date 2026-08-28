@@ -85,7 +85,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // against the gather-origin context when one is. Count scaling composes
         // on the computed value.
         internal static BigNumber FactorOf(in Effect effect, GameContext origin) =>
-            effect.formula != null ? effect.formula.Compute(origin) : (BigNumber)effect.multiplier;
+            effect.formula != null ? effect.formula.Compute(origin) : effect.multiplier;
 
         // Count scaling, the one arithmetic both consumers of the vocabulary
         // share (design doc 12.7): Linear adds the excess per count, Multiply
@@ -95,10 +95,6 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // backwards - a negative yield reaches Deposit, which would drive an
         // earned total DOWNWARD. Reduced to nothing is the semantic; reduced
         // past nothing is not one.
-        // The multiplier arrives as BigNumber rather than the authored double so
-        // the count scaling happens IN BigNumber: (m-1)*n in double arithmetic
-        // can overflow to infinity before the wrapper ever sees it, which the
-        // whole point of the wrapper is to prevent.
         internal static BigNumber Grown(BigNumber multiplier, int count, GrowthKind growth)
         {
             if (growth == GrowthKind.Linear)

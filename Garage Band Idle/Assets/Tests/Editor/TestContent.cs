@@ -19,6 +19,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly RootDefinition RootDef;
         public readonly ChapterDefinition Ch1Def;
         public readonly TierDefinition Tier1Def;
+
+        // Root's children come from the roster, never its serialized list
+        // (12.14.5), so a test adding a sibling chapter adds it here and
+        // rebuilds from Content.
+        public readonly List<ChapterDefinition> Chapters = new();
         public readonly RootScopeState Root;
         public readonly ChapterScopeState Ch1;
         public readonly TierScopeState Tier1;
@@ -73,7 +78,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Roadies = DeclareCurrency(RootDef, "roadies");
             RootDef.declaredFlags.Add("ch1_complete");
             RootDef.declaredTags.AddRange(new[] { "income", "production" });
-            RootDef.children.Add(Ch1Def);
+            Chapters.Add(Ch1Def);
 
             // The Jam: two cash yield entries (the second reads the upgrade
             // latch) plus the reveal-gated rehearsal pair.
@@ -199,7 +204,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             OpenMic.handicaps.Add(new Effect { target = "fans", stat = Stat.Rate, multiplier = 0.5 });
             Tier1Def.events.Add(OpenMic);
 
-            Root = ScopeState.Build(RootDef);
+            Root = ScopeState.Build(Content);
             Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);
             Tier1 = (TierScopeState)Root.FindInSubtree(Tier1Def);
         }
@@ -223,6 +228,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         public static ProducesEntry Entry(CurrencyDefinition currency, string stat, double value, Condition condition = null) =>
             new ProducesEntry { currency = currency, stat = stat, value = value, condition = condition };
+
+        public ComposedContent Content => ComposedContent.Compose(RootDef, Chapters);
 
         public GameContext Ctx(ScopeState scope) => new GameContext(scope, Now);
 

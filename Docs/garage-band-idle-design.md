@@ -672,7 +672,8 @@ against `availableWhen` and affordability — the domain owns the gate, never th
                                // wildcard — "every currency", applied at the currency stage
     public string currencyId;  // optional — narrow to entries paying this currency (id or TAG)
     public string stat;        // REQUIRED and exact — the one stat this factor answers for
-    public double multiplier;
+    public BigNumber multiplier;   // the gather's product is BigNumber, so an authored
+                                   // constant spans the same range (§12.14 req 1)
 }
 ```
 
@@ -1455,7 +1456,15 @@ Assets/Scripts/
     SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs
     Widgets/ (GeneratorRowUI, BarGroupUI, RungButtonUI, CurrencyHeaderUI, JamButtonUI, ...)
     NumberFormatter.cs  StoryBeatUI.cs  CollectScreenUI.cs  RoadieAllocationUI.cs
-ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bars/  Modifiers/  Songs/
+ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)
+  root/                  // the document's own top scope id
+    root.asset           // the scope sits at its document root
+    Currencies/  Modifiers/
+  ch1/
+    ch1.asset  tier1.asset
+    Currencies/  Producers/  Generators/  Upgrades/  BarGroups/  Bars/  Events/  Triggers/
+Content/                 // the authored JSON the importer reads
+  root.json  chapter-01.json
 ```
 
 ### 12.14 Requirements
@@ -1466,8 +1475,13 @@ ScriptableObjects/  Chapters/  Currencies/  Generators/  Upgrades/  Events/  Bar
    throws where it is born rather than spreading. The library deliberately PRESERVES both and every
    comparison answers false against a NaN operand, so no downstream sign check could catch one; that
    is why the invariant lives in the type and consumers never test for it. A corollary: arithmetic
-   in raw `double` that then converts (a count times a multiplier, say) can overflow before the
-   wrapper sees it, so mixed expressions convert FIRST.
+   in raw `double` that then converts (a count times a rate, say) can overflow before the
+   wrapper sees it, so mixed expressions convert FIRST. **An author may write any number the game
+   can compute**: every field the runtime holds as `BigNumber` is authored as one, RATIOS included -
+   `Effect.multiplier`, a generator's `growth`, the formula coefficients - because the gather's
+   product and every formula factor are themselves unbounded. The exceptions are the numbers the
+   runtime cannot widen either: counts (`int` in state), `Pow`'s power (a `double` by `BigDouble`'s
+   own signature), and wall clocks, which are seconds.
 2. Tick on real elapsed time (`DateTime.UtcNow` deltas), not frame time.
 3. UI refresh on the two triggers of §12.11; no per-frame polling of balances.
 4. Versioned, checksummed saves (explicit migrations, atomic write + backup), validate on load, cap

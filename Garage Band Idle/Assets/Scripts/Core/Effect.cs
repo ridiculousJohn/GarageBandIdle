@@ -13,7 +13,11 @@ namespace RidiculousGaming.GarageBandIdle
                                    // wildcard - "every currency", applied at the currency stage
         public string currencyId;  // optional - narrow to entries paying this currency, by id OR tag
         public string stat;        // REQUIRED and exact - the one stat this factor answers for
-        public double multiplier;
+
+        // BigNumber, not a ratio-sized double: the gather's product is BigNumber
+        // and a formula factor is unbounded, so an authored constant has to span
+        // the same range the runtime can reach.
+        public BigNumber multiplier;
 
         // The factor is a constant or a formula (design doc 12.2): the authored
         // multiplier when this is absent, the formula computed against the

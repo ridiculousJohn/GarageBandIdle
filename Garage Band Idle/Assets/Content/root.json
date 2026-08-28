@@ -1,0 +1,61 @@
+{
+  "type": "RootDefinition",
+  "id": "root",
+
+  "declaredTags": ["income", "production"],
+
+  "flags": ["ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen"],
+
+  "currencies": [
+    { "id": "records" },
+    { "id": "roadies" }
+  ],
+
+  "modifiers": [
+    {
+      "id": "records_income",
+      "effects": [
+        {
+          "target": "income",
+          "stat": "rate",
+          "formula": { "type": "LinearOnBalance", "currency": "records", "coefficient": 0.02 }
+        },
+        {
+          "target": "income",
+          "stat": "yield",
+          "formula": { "type": "LinearOnBalance", "currency": "records", "coefficient": 0.02 }
+        }
+      ]
+    },
+    {
+      "id": "roadie_total",
+      "effects": [
+        {
+          "target": "income",
+          "stat": "rate",
+          "formula": { "type": "RoadieTotalBoost", "perRoadie": 0.05 }
+        }
+      ]
+    },
+    {
+      "id": "roadie_active",
+      "effects": [
+        {
+          "target": "production",
+          "currencyId": "income",
+          "stat": "rate",
+          "formula": { "type": "RoadieActiveBoost", "perRoadie": 0.05 }
+        }
+      ]
+    },
+    {
+      "id": "idle_base",
+      "appliesWhen": { "type": "IdleAccumulation" },
+      "effects": [
+        { "stat": "rate", "multiplier": 0.5 }
+      ]
+    }
+  ],
+
+  "permanentModifiers": ["records_income", "roadie_total", "roadie_active", "idle_base"]
+}

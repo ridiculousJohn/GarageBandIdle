@@ -99,9 +99,15 @@ doc already spells them:
 - **Strings stay strings** only where the runtime says so: flag ids, tags, stat names, and the
   `Effect` selectors `target` and `currencyId` - id-or-tag MATCH selectors the gather evaluates
   (12.2), never resolved references, even when a value happens to name an id.
-- **Numbers**: currency-valued fields parse into `BigNumber` (thresholds, amounts, costs, fill
-  rates - the authored-fields rule); `Effect.multiplier`, growth, counts, and `Pow`'s power stay
-  double/int.
+- **Numbers**: an author can write any number the game can compute, so every field the runtime
+  holds as `BigNumber` parses as one - thresholds, amounts, costs, fill rates, and the RATIOS that
+  joined them (`Effect.multiplier`, generator `growth`, `LinearOnBalance.coefficient`, both
+  `perRoadie`s), since the gather's product and every formula factor are `BigNumber` and unbounded.
+  Counts stay `int`, because state holds them as `int`; `Pow`'s power (`RootCurveFormula.exponent`)
+  and wall clocks (`timeLimitSeconds`) stay `double`, the first by `BigDouble`'s own signature.
+  A plain JSON number carries everything up to double range; past ~1.8e308 the reader collapses the
+  token to infinity before any converter sees it, so those are authored QUOTED (`"1e400"`) and the
+  converter splits mantissa from exponent. An unquoted one aborts naming the spelling that works.
 - **Unknown keys abort** - Newtonsoft `MissingMemberHandling.Error` over strict DTOs gives the old
   importer's hand-rolled guard (`amount` where a condition wants `value`, and every misspelling)
   for free, and an explicit JSON `null` behaves as absent (`NullValueHandling.Ignore`), the single

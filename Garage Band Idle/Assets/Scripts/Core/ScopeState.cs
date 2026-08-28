@@ -156,12 +156,14 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Builds the state tree the definition tree describes. Each definition
         // makes its own node, so a scope's kind is what it was authored as -
-        // there is no depth test here inferring one.
-        public static RootScopeState Build(RootDefinition rootDefinition)
+        // there is no depth test here inferring one. Root's children come from
+        // the composed roster and every deeper child from a serialized list
+        // (12.14.5).
+        public static RootScopeState Build(ComposedContent content)
         {
-            var root = rootDefinition.CreateRoot();
+            var root = content.Root.CreateRoot();
             root.InitializeDeclared();
-            foreach (var chapterDefinition in rootDefinition.children)
+            foreach (var chapterDefinition in content.Chapters)
                 BuildChild(chapterDefinition, root);
             return root;
         }

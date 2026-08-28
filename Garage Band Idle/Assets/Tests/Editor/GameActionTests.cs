@@ -134,7 +134,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var tier2Def = TestTree.MakeTier("tier2");
             tree.Ch1Def.children.Add(tier2Def);
-            var root = ScopeState.Build(tree.RootDef);   // rebuild with the sibling
+            var root = ScopeState.Build(tree.Content);   // rebuild with the sibling
             var tier1 = root.FindInSubtree(tree.Tier1Def);
             var tier2 = root.FindInSubtree(tier2Def);
             tier2.balances["merch"] = 5;
@@ -347,7 +347,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var tier2Def = TestTree.MakeTier("tier2");
             tree.Ch1Def.children.Add(tier2Def);
-            var root = ScopeState.Build(tree.RootDef);   // rebuild with the sibling
+            var root = ScopeState.Build(tree.Content);   // rebuild with the sibling
             var tier1 = root.FindInSubtree(tree.Tier1Def);
             var tier2 = root.FindInSubtree(tier2Def);
             tier2.balances["merch"] = 5;

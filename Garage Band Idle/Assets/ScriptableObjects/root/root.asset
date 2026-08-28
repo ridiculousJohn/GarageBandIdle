@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d249a1c0812d5a14da79e3f85fd1286d, type: 3}
+  m_Name: root
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.RootDefinition
+  id: root
+  tags: []
+  children: []
+  declaredCurrencies:
+  - {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}
+  - {fileID: 11400000, guid: 3b2bd3891e5799b43a5ae26c39c0da01, type: 2}
+  declaredFlags:
+  - ch1_complete
+  - story_ch1_open_seen
+  - story_ch1_end_seen
+  declaredTags:
+  - income
+  - production
+  triggers: []
+  producers: []
+  modifiers:
+  - {fileID: 11400000, guid: f3eda54f7bc829744becbf48edef47f9, type: 2}
+  - {fileID: 11400000, guid: febf3aa60793e9544a202353a3bb505a, type: 2}
+  - {fileID: 11400000, guid: efc843a56e2cf86449ecc8265b0ffa91, type: 2}
+  - {fileID: 11400000, guid: 7a6736d7cc6bcd649bc0c1ae88800f32, type: 2}
+  permanentModifiers:
+  - {fileID: 11400000, guid: f3eda54f7bc829744becbf48edef47f9, type: 2}
+  - {fileID: 11400000, guid: febf3aa60793e9544a202353a3bb505a, type: 2}
+  - {fileID: 11400000, guid: efc843a56e2cf86449ecc8265b0ffa91, type: 2}
+  - {fileID: 11400000, guid: 7a6736d7cc6bcd649bc0c1ae88800f32, type: 2}
+  generators: []
+  barGroups: []
+  upgrades: []

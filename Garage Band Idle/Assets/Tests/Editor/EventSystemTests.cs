@@ -82,7 +82,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var innerDef = TestTree.MakeTier("tier_inner");
             tree.Tier1Def.children.Add(innerDef);
-            var root = ScopeState.Build(tree.RootDef);   // rebuild with the child
+            var root = ScopeState.Build(tree.Content);   // rebuild with the child
             var inner = (TierScopeState)root.FindInSubtree(innerDef);
             var tier1 = (TierScopeState)root.FindInSubtree(tree.Tier1Def);
             // Only the rebase to the resolved host makes this reset legal:

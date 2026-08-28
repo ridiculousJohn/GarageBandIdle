@@ -490,10 +490,19 @@ namespace RidiculousGaming.GarageBandIdle
 
         // The content IS the tree: every definition the game can reach hangs
         // off the root scope by direct reference, so validation walks it rather
-        // than auditing a catalogue (design doc 12.12).
-        public static ValidationReport Validate(ScopeDefinition rootDefinition)
+        // than auditing a catalogue (design doc 12.12). It takes the composed
+        // pair, because root's children are the roster and only the pair holds
+        // them (12.14.5).
+        public static ValidationReport Validate(ComposedContent content)
         {
             var report = new ValidationReport();
+            var rootDefinition = content.Root;
+
+            // Root answers for its children from the roster; every other scope
+            // from its own serialized list. One accessor, so every walk below
+            // sees the same tree.
+            IReadOnlyList<ScopeDefinition> ChildrenOf(ScopeDefinition scope) =>
+                scope == rootDefinition ? content.Chapters : scope.children;
 
             // ---- scope graph: the root and everything its children reach ----
             var allScopes = new List<ScopeDefinition>();
@@ -501,7 +510,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (rootDefinition != null && scopeSeen.Add(rootDefinition))
                 allScopes.Add(rootDefinition);
             for (var i = 0; i < allScopes.Count; i++)
-                foreach (var child in allScopes[i].children)
+                foreach (var child in ChildrenOf(allScopes[i]))
                     if (child != null && scopeSeen.Add(child))
                         allScopes.Add(child);
 
@@ -509,9 +518,10 @@ namespace RidiculousGaming.GarageBandIdle
             var graphFault = false;
             foreach (var scope in allScopes)
             {
-                for (var i = 0; i < scope.children.Count; i++)
+                var children = ChildrenOf(scope);
+                for (var i = 0; i < children.Count; i++)
                 {
-                    var child = scope.children[i];
+                    var child = children[i];
                     if (child == null)
                     {
                         report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
@@ -548,7 +558,7 @@ namespace RidiculousGaming.GarageBandIdle
                         : "no root scope exists - every scope has a parent (a children cycle).");
                 return report;
             }
-            var root = roots[0];
+            var root = rootDefinition;
 
             var treeScopes = new List<ScopeDefinition>();
             var visited = new HashSet<ScopeDefinition>();
@@ -557,7 +567,7 @@ namespace RidiculousGaming.GarageBandIdle
                 if (!visited.Add(scope))
                     return;
                 treeScopes.Add(scope);
-                foreach (var child in scope.children)
+                foreach (var child in ChildrenOf(scope))
                     if (child != null)
                         Walk(child);
             }
@@ -567,28 +577,24 @@ namespace RidiculousGaming.GarageBandIdle
                     report.Add(ValidationSeverity.Error, ValidationCheck.ScopeGraph,
                         $"scope '{scope.Id}' is not reachable from the root '{root.Id}'.");
 
-            // ---- kind placement: root, then chapters, then tiers all the way down ----
+            // ---- kind placement: chapters, then tiers all the way down ----
             // A scope's authored class decides its state class and its payload,
             // so a kind in the wrong place builds a node whose payload and
             // parentage disagree with where it sits - a RootDefinition given a
             // parent, a TierScopeState where Chapter() expects a chapter. Both
-            // are content faults, refused before any state is built.
-            if (root is not RootDefinition)
-                report.Add(ValidationSeverity.Error, ValidationCheck.ScopePlacement,
-                    $"the tree's root scope '{root.Id}' is a {root.GetType().Name}; a root scope is a RootDefinition (12.3).");
+            // are content faults, refused before any state is built. The two
+            // rules about root itself are structural now: the composed pair is
+            // typed to a RootDefinition and a roster of chapters, so neither a
+            // root of the wrong kind nor a non-chapter under it can be built.
             foreach (var scope in treeScopes)
             {
+                if (scope == root)
+                    continue;
                 foreach (var child in scope.children)
                 {
                     if (child == null)
                         continue;
-                    if (scope == root)
-                    {
-                        if (child is not ChapterDefinition)
-                            report.Add(ValidationSeverity.Error, ValidationCheck.ScopePlacement,
-                                $"scope '{child.Id}' is a {child.GetType().Name} directly under the root; root's children are chapters (12.3).");
-                    }
-                    else if (child is not TierDefinition)
+                    if (child is not TierDefinition)
                     {
                         report.Add(ValidationSeverity.Error, ValidationCheck.ScopePlacement,
                             $"scope '{child.Id}' is a {child.GetType().Name} under '{scope.Id}'; everything below a chapter is a tier (12.3).");
@@ -711,7 +717,7 @@ namespace RidiculousGaming.GarageBandIdle
                     CheckCarriedTags(definition, scope, declaredTags, report);
                 CheckCarriedTags(scope, scope, declaredTags, report);
 
-                foreach (var child in scope.children)
+                foreach (var child in ChildrenOf(scope))
                     if (child != null)
                         CheckChain(child, visible, declaredTags);
             }
@@ -1008,7 +1014,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (generator.baseCost <= BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"baseCost is {generator.baseCost} - generator purchases repeat, so a free one is an unbounded rate printer.");
-            if (ctx.RequireFiniteDouble(generator.growth, $"{site} growth") && generator.growth <= 0)
+            if (generator.growth <= BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"growth is {generator.growth} - the cost curve is a positive ratio.");
             ValidateProducesEntries(ctx, generator.produces, site);
@@ -1379,7 +1385,7 @@ namespace RidiculousGaming.GarageBandIdle
         // it is judged independently of placement.
         private static void ValidateEffectNumbers(ValidationContext ctx, Effect effect, string site)
         {
-            if (ctx.RequireFiniteDouble(effect.multiplier, $"{site} multiplier") && effect.multiplier < 0)
+            if (effect.multiplier < BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"{site}: multiplier is {effect.multiplier} - a multiplier never flips a number's sign (zero is legal: an event handicap is x0).");
         }

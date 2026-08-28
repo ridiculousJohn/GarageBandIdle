@@ -18,9 +18,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public CurrencyDefinition costCurrency;
         public BigNumber baseCost;
 
-        // A curve ratio, so a double - same species as Effect.multiplier and
-        // Pow's power, not a currency value.
-        public double growth = 1;
+        // A curve ratio, and BigNumber like every other authored number the
+        // runtime can compute past a double: CostAt raises it to the owned
+        // count, so the curve itself is unbounded. Pow's POWER stays a double,
+        // by the library's own signature.
+        public BigNumber growth = 1;
 
         public List<ProducesEntry> produces = new();
 

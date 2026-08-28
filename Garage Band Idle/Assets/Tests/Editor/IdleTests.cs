@@ -58,9 +58,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 var merchPress = TestTree.MakeDefinition<ProducerDefinition>("merch_press");
                 merchPress.produces.Add(TestTree.Entry(merch, Stat.Rate, 2));
                 ch2Def.producers.Add(merchPress);
-                Tree.RootDef.children.Add(ch2Def);
+                Tree.Chapters.Add(ch2Def);
 
-                Root = ScopeState.Build(Tree.RootDef);
+                Root = ScopeState.Build(Tree.Content);
                 Ch1 = (ChapterScopeState)Root.FindInSubtree(Tree.Ch1Def);
                 Tier1 = Root.FindInSubtree(Tree.Tier1Def);
                 Ch2 = (ChapterScopeState)Root.FindInSubtree(ch2Def);
@@ -383,7 +383,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Killed with the dialog up: the save carries the stamp and nothing
             // of the offer; the relaunch recomputes over the grown window.
             var json = SaveSystem.Serialize(f.Tree.Root);
-            Assert.IsTrue(SaveSystem.TryDeserialize(json, f.Tree.RootDef, out var loaded));
+            Assert.IsTrue(SaveSystem.TryDeserialize(json, f.Tree.Content, out var loaded));
             var loadedCh1 = (ChapterScopeState)loaded.FindInSubtree(f.Tree.Ch1Def);
             var loadedTier1 = loaded.FindInSubtree(f.Tree.Tier1Def);
             Assert.AreEqual(f.Tree.Now.AddSeconds(-1000), loadedCh1.lastActiveUtc);
@@ -461,12 +461,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new Fixture();
             f.Tree.Root.currentChapterId = "ch1";
             var kept = SaveSystem.Serialize(f.Tree.Root);
-            Assert.IsTrue(SaveSystem.TryDeserialize(kept, f.Tree.RootDef, out var loaded));
+            Assert.IsTrue(SaveSystem.TryDeserialize(kept, f.Tree.Content, out var loaded));
             Assert.AreEqual("ch1", loaded.currentChapterId);
 
             f.Tree.Root.currentChapterId = "chapter_gone";
             var stale = SaveSystem.Serialize(f.Tree.Root);
-            Assert.IsTrue(SaveSystem.TryDeserialize(stale, f.Tree.RootDef, out var cleared));
+            Assert.IsTrue(SaveSystem.TryDeserialize(stale, f.Tree.Content, out var cleared));
             Assert.IsNull(cleared.currentChapterId);
         }
     }

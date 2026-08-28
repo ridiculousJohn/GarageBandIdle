@@ -23,7 +23,7 @@ always that the content belongs on a scope.
 | 6 | Events + trigger sweep | **DONE 2026-08-25** - 327/327 green |
 | 7 | Tick + GameSession | **DONE 2026-08-26** - 397/397 green (six slices A-F; two design revisions absorbed mid-step: the idle respell, then the claim respell - the stamp IS the pending claim, offers are transient and session-held) |
 | - | Tag declarations + effect-selector deletion | **DONE 2026-08-27** - 379/379 green: `declaredTags` on the scope joining the per-chain name space, carried tags resolved outward from the carrier, and the downward effect-selector searches deleted, leaving the stat coordinate and the two game_speed shape checks (slice 0 of `step-08-plan.md`) |
-| 8 | Chapter 1 JSON + importer + walkthrough tests | not started |
+| 8 | Chapter 1 JSON + importer + walkthrough tests | **slice A landed 2026-08-27** - 404/404 green: `ComposedContent` and the load-and-compose `ContentDatabase`, the save reshaped onto the pair, the document-scoped importer with its lints and preflight-the-union contract, `root.json`, and the root entry in one PackTogether group; slices B-D remain |
 | 9 | UI layer | not started |
 | 10 | Meta & monetization | not started |
 | 11 | Orphan sweep | not started |
@@ -50,10 +50,12 @@ always that the content belongs on a scope.
    definition families extend the filter with their steps — the same incremental contract as the
    validation pass. The negative-clock clamp lives in step 7: §12.10 files it under save
    hardening, but it guards elapsed-time computation, which doesn't exist until idle does.
-3. **ContentDatabase + validation** (§12.12, §12.14.5–6) — one Addressables load of the root
-   scope, which brings the whole directly-referenced graph with it (the label-based discovery and
-   `IDefinitionSource` lookup this step originally shipped are deleted; per-chapter Addressables
-   entries can be planned later if load time or memory ever calls for them), and the
+3. **ContentDatabase + validation** (§12.12, §12.14.5–6) — the Addressables load of the content
+   set, each entry bringing its own directly-referenced graph with it (the label-based discovery and
+   `IDefinitionSource` lookup this step originally shipped are deleted). The one-root-load this
+   step described became the composition PAIR in step 8 slice A: the root asset at a fixed address
+   plus the chapter roots under one label, composed into `ComposedContent`, since root's serialized
+   child list is empty by contract and the chapter documents are the roster. And the
    validation-pass *framework*
    plus every §12.12 check whose inputs exist by this step (id uniqueness, tag/id collision,
    scope-reference reach, effect reach per target kind, flag setter rules, set-then-wiped,

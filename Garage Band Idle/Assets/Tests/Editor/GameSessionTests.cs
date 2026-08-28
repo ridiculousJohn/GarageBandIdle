@@ -134,8 +134,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             var ch2Def = TestTree.MakeChapter("ch2");
-            tree.RootDef.children.Add(ch2Def);
-            var root = ScopeState.Build(tree.RootDef);
+            tree.Chapters.Add(ch2Def);
+            var root = ScopeState.Build(tree.Content);
             var ch1 = (ChapterScopeState)root.FindInSubtree(tree.Ch1Def);
             var tier1 = root.FindInSubtree(tree.Tier1Def);
             var ch2 = (ChapterScopeState)root.FindInSubtree(ch2Def);

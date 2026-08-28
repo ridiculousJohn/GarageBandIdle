@@ -143,8 +143,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             lurker.condition = new Always();
             lurker.actions.Add(new SetFlag { flagId = "ch2_flag" });
             ch2Def.triggers.Add(lurker);
-            tree.RootDef.children.Add(ch2Def);
-            var root = ScopeState.Build(tree.RootDef);   // rebuild with the sibling
+            tree.Chapters.Add(ch2Def);
+            var root = ScopeState.Build(tree.Content);   // rebuild with the sibling
             var ch1 = (ChapterScopeState)root.FindInSubtree(tree.Ch1Def);
             var ch2 = (ChapterScopeState)root.FindInSubtree(ch2Def);
 

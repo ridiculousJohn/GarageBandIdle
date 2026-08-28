@@ -19,6 +19,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly CurrencyDefinition Rehearsal;   // tier1's own pool
         public readonly CurrencyDefinition Shared;      // root's, so every chapter draws the same one
         public readonly CurrencyDefinition Fans;
+        public readonly List<ChapterDefinition> Chapters = new();
 
         public RootScopeState Root;
         public ChapterScopeState Ch1;
@@ -36,12 +37,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             RootDef = TestTree.MakeRoot("root");
             Shared = TestTree.DeclareCurrency(RootDef, "shared");
-            RootDef.children.Add(Ch1Def);
+            Chapters.Add(Ch1Def);
         }
 
         public void Build()
         {
-            Root = ScopeState.Build(RootDef);
+            Root = ScopeState.Build(ComposedContent.Compose(RootDef, Chapters));
             Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);
             Tier1 = Root.FindInSubtree(Tier1Def);
         }
