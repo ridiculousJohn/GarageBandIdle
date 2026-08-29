@@ -113,10 +113,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // The tap's four entries in order: the flat cash line, the
         // stage_presence bonus as a CONDITIONED entry rather than an
-        // upgrade-owned contribution, then the two rehearsal lines - the rate
-        // one gated too, so nothing pre-banks before the reveal.
+        // upgrade-owned contribution, then the two rehearsal lines - which
+        // carry no condition, because the reveal is the currency's own.
         [Test]
-        public void The_tap_producer_pays_the_four_gated_entries()
+        public void The_tap_producer_pays_the_four_entries()
         {
             var tap = Find(tier1.producers, "tap_producer");
 
@@ -128,16 +128,38 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)0.5, tap.produces[3].value);
             Assert.IsNull(tap.produces[0].condition, "the base tap line is unconditional");
             Assert.AreEqual("stage_presence", ((UpgradePurchased)tap.produces[1].condition).upgrade.Id);
-            Assert.AreEqual("rehearsal_revealed", ((FlagSet)tap.produces[2].condition).flagId);
-            Assert.AreEqual("rehearsal_revealed", ((FlagSet)tap.produces[3].condition).flagId);
+            Assert.IsNull(tap.produces[2].condition, "rehearsal's own gate covers the yield line");
+            Assert.IsNull(tap.produces[3].condition, "and the rate line with it");
 
-            // Base fan accrual, gated on the reveal; band size adds to it from
-            // the bandmates' own entries.
+            // Base fan accrual; band size adds to it from the bandmates' own
+            // entries, and none of them repeats the reveal.
             var band = Find(tier1.producers, "band");
             var fans = band.produces.Single();
             Assert.AreEqual(("fans", Stat.Rate), (fans.currency.Id, fans.stat));
             Assert.AreEqual((BigNumber)0.35, fans.value);
-            Assert.AreEqual("fans_revealed", ((FlagSet)fans.condition).flagId);
+            Assert.IsNull(fans.condition);
+        }
+
+        // The reveals live on the currencies (12.2). Fans is why: its sources
+        // are band plus every bandmate generator, and play_for_crowd gates on
+        // owning a drummer - so with the gate on the entries, a bandmate
+        // necessarily exists before the flag is set and trickles fans behind
+        // the reveal.
+        [Test]
+        public void The_reveals_are_declared_on_the_currencies_not_on_the_entries()
+        {
+            Assert.AreEqual("fans_revealed",
+                ((FlagSet)Find(tier1.declaredCurrencies, "fans").activeWhen).flagId);
+            Assert.AreEqual("rehearsal_revealed",
+                ((FlagSet)Find(tier1.declaredCurrencies, "rehearsal").activeWhen).flagId);
+            Assert.IsNull(Find(tier1.declaredCurrencies, "cash").activeWhen, "cash is live from the first press");
+
+            // No source repeats the gate - that is the whole point of moving it.
+            foreach (var entry in tier1.producers.SelectMany(p => p.produces)
+                         .Concat(tier1.generators.SelectMany(g => g.produces)))
+                Assert.IsFalse(entry.condition is FlagSet flag
+                        && (flag.flagId == "fans_revealed" || flag.flagId == "rehearsal_revealed"),
+                    $"a {entry.currency.Id} entry repeats a reveal the currency already states");
         }
 
         // ---- section 5: generators ----

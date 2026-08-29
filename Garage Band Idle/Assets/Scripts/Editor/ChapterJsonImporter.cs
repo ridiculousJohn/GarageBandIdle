@@ -390,8 +390,15 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             scope.declaredFlags.AddRange(dto.flags);
             scope.declaredTags.AddRange(dto.declaredTags);
 
-            foreach (var currency in dto.currencies)
-                scope.declaredCurrencies.Add((CurrencyDefinition)build.Built[currency]);
+            foreach (var currencyDto in dto.currencies)
+            {
+                var currency = (CurrencyDefinition)build.Built[currencyDto];
+                // The gate is judged at the currency's own home, which is the
+                // scope declaring it - so it resolves from here, like every
+                // other reference on this block.
+                currency.activeWhen = BuildCondition(build, scope, currencyDto.activeWhen);
+                scope.declaredCurrencies.Add(currency);
+            }
 
             foreach (var producerDto in dto.producers)
             {

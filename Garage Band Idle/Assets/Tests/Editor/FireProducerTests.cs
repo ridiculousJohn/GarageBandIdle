@@ -12,6 +12,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static void AssertClose(double expected, BigNumber actual, string what = null) =>
             Assert.AreEqual(expected, actual.ToDouble(), 1e-9, what ?? string.Empty);
 
+        // The atomicity 12.2 promises, extended to the currency gate: every
+        // output is judged against ONE pre-fire snapshot, and the commit honors
+        // what that snapshot said. Here the cash deposit closes rehearsal's own
+        // gate the instant it lands, and rehearsal is paid anyway - re-asking
+        // during the commit loop would abort a sibling's write mid-firing.
+        [Test]
+        public void A_deposit_never_aborts_a_siblings_write_mid_fire()
+        {
+            var tree = new TestTree();
+            foreach (var entry in tree.TapProducer.produces)
+                if (entry.currency == tree.Rehearsal)
+                    entry.condition = null;         // the currency states the gate now
+            tree.Rehearsal.activeWhen = new Not
+            {
+                condition = new CurrencyAtLeast { currency = tree.Cash, threshold = 1 }
+            };
+
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
+
+            AssertClose(1, tree.Tier1.balances["cash"], "cash");
+            AssertClose(1, tree.Tier1.balances["rehearsal"], "resolved before the cash deposit closed its gate");
+
+            // The next firing sizes against the state the last one left, and
+            // the gate is shut by then - the snapshot moved, not the rule.
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
+
+            AssertClose(2, tree.Tier1.balances["cash"]);
+            AssertClose(1, tree.Tier1.balances["rehearsal"], "shut on the next fire's own snapshot");
+        }
+
         [Test]
         public void Firing_pays_the_yield_entries_whose_conditions_hold()
         {

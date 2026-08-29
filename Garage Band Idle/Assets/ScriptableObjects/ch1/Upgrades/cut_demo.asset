@@ -15,7 +15,7 @@ MonoBehaviour:
   id: cut_demo
   tags: []
   gate:
-    rid: 367766403059023897
+    rid: 367766404092395545
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   cost:
     _value:
@@ -23,22 +23,22 @@ MonoBehaviour:
       exponent: 0
   effects: []
   actions:
-  - rid: 367766403059023898
+  - rid: 367766404092395546
   references:
     version: 2
     RefIds:
-    - rid: 367766403059023897
+    - rid: 367766404092395545
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 367766403059023899
-        - rid: 367766403059023900
-    - rid: 367766403059023898
+        - rid: 367766404092395547
+        - rid: 367766404092395548
+    - rid: 367766404092395546
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: album
-    - rid: 367766403059023899
+    - rid: 367766404092395547
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -47,7 +47,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 1
-    - rid: 367766403059023900
+    - rid: 367766404092395548
       type: {class: BarsCompleted, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

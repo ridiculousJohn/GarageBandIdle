@@ -202,7 +202,11 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var line in offer.lines)
             {
                 var amount = honorDoubled && offer.doubled ? line.amount * 2 : line.amount;
-                new GameContext(line.home, offer.windowEndUtc).Deposit(line.currency.Id, amount);
+                // Resolved: the line's currency was judged active by the gather
+                // that built the offer, under the claim's own circumstance. A
+                // re-ask here would run under a live context instead and could
+                // refuse a line the offer already promised, mid-settlement.
+                new GameContext(line.home, offer.windowEndUtc).DepositResolved(line.currency.Id, amount);
             }
             chapter.StampActive(offer.windowEndUtc);
             CurrentOffer = null;

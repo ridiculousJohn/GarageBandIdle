@@ -35,35 +35,35 @@ MonoBehaviour:
   barGroups: []
   upgrades: []
   rung:
-    rid: 367766403059023912
+    rid: 367766404092395560
   events: []
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766403059023912
+    - rid: 367766404092395560
       type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         offerCondition:
-          rid: 367766403059023913
+          rid: 367766404092395561
         actions:
-        - rid: 367766403059023914
-        - rid: 367766403059023915
-        - rid: 367766403059023916
-        - rid: 367766403059023917
-    - rid: 367766403059023913
+        - rid: 367766404092395562
+        - rid: 367766404092395563
+        - rid: 367766404092395564
+        - rid: 367766404092395565
+    - rid: 367766404092395561
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 367766403059023918
-        - rid: 367766403059023919
-    - rid: 367766403059023914
+        - rid: 367766404092395566
+        - rid: 367766404092395567
+    - rid: 367766404092395562
       type: {class: ExecuteRung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         tier: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
-    - rid: 367766403059023915
+    - rid: 367766404092395563
       type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currencies:
@@ -74,15 +74,15 @@ MonoBehaviour:
             exponent: 0
         formula:
           rid: -2
-    - rid: 367766403059023916
+    - rid: 367766404092395564
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: ch1_complete
-    - rid: 367766403059023917
+    - rid: 367766404092395565
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000}
-    - rid: 367766403059023918
+    - rid: 367766404092395566
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -91,13 +91,13 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 1
-    - rid: 367766403059023919
+    - rid: 367766404092395567
       type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Claim your Garage Jam reward first
         condition:
-          rid: 367766403059023920
-    - rid: 367766403059023920
+          rid: 367766404092395568
+    - rid: 367766404092395568
       type: {class: EventRewardPending, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

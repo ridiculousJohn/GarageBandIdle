@@ -1,11 +1,11 @@
 ---
 name: pushback-means-rederive
-description: "John disputing my model of HIS design means re-derive from primitives and produce a discriminator, not defend the reading; on a same-but-different challenge, split the bundle and answer HAS-TO per item"
+description: "John disputing my model of HIS design means re-derive from primitives and produce a discriminator, not defend the reading; on a same-but-different challenge, split the bundle and answer HAS-TO per item; a trade-off I call exclusive is a bundle too"
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 686db24c-b6c5-412c-aea3-669efcf46f19
-  modified: 2026-08-28T20:25:33.088Z
+  modified: 2026-08-28T22:52:02.733Z
 ---
 
 2026-08-25, step 7 planning: an hour burned on "reserved target ids". John said from the start
@@ -40,6 +40,23 @@ once I split the bundle: game_speed has a has-to (scales seconds not units/secon
 point, reaches bar fills), idle_cap was never a multiplier at all, idle_rate had no has-to. Two of
 three conceded, one kept, and his follow-up extensions (live-only buffs, chapter-local idle) made
 the replacement design strictly better.
+
+**A trade-off I state as exclusive is a bundle too (2026-08-28).** Currency `activeWhen`: John
+said the gate looked like it would be evaluated twice, once by the gather and again by `Deposit`. I
+answered "that second evaluation is the feature", offered a binary - pay the double call, or drop
+the `Deposit` check and lose authored-payout coverage - and wrote "the two questions are the same
+question". They were independent, and splitting `Deposit` into a checked authored write and an
+unchecked resolved one answers both. A review then found the real defect: the second call reads
+state the commit loop is moving, so it could abort a sibling's write mid-firing and could make an
+idle settlement refuse a line its own offer had presented.
+
+What let me stop looking was analogy. I called the check "an assertion, like the negative-amount
+throw", and once it had that name the only question left was whether redundancy is a smell - which
+I answered correctly. The question I skipped was whether it IS an assertion: `amount < 0` is a value
+in hand and cannot change, while a condition reads live state. **Before defending a redundant check
+as an assertion, prove the answer cannot change between the two calls.** And when I catch myself
+writing that two questions are the same question, that sentence is the bundle claim - split it
+before defending either half.
 
 "It's equivalent but I prefer this spelling" is not an answer to "why does it HAVE to be different"
 - once equivalence is conceded, the design point is conceded unless a per-item has-to exists.

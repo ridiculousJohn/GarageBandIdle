@@ -14,3 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.CurrencyDefinition
   id: rehearsal
   tags: []
+  activeWhen:
+    rid: 367766404092395521
+  references:
+    version: 2
+    RefIds:
+    - rid: 367766404092395521
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: rehearsal_revealed

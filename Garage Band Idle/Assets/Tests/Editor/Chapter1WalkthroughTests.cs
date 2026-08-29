@@ -252,14 +252,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Drummer.IsAvailable(f.Ctx(f.Tier1)), "OwnedCountAtLeast(practice_amp, 3)");
             f.Buy(f.Drummer);
 
-            // The BAND's base trickle is the gated line (content doc section
-            // 4); a bandmate's own 0.02 carries no condition (section 5), and
-            // the drummer necessarily precedes the reveal because
-            // play_for_crowd gates on owning one. So the reveal starts the
-            // accrual that matters rather than uncovering a total already run
-            // up - it just is not a hard zero before it.
-            Assert.AreEqual((BigNumber)0, f.Balance(f.Tier1, f.Fans), "no fans banked at the moment the drummer lands");
-            AssertClose(0.02, f.Rate(f.Fans), "the bandmate line alone, before the reveal");
+            // Nothing pre-banks. The gate is the CURRENCY's, so it covers the
+            // drummer's own 0.02 line too - which matters because
+            // play_for_crowd gates on owning a drummer, so a bandmate always
+            // exists before the flag is set.
+            Assert.AreEqual((BigNumber)0, f.Balance(f.Tier1, f.Fans), "fans before the reveal");
+            AssertClose(0, f.Rate(f.Fans), "an inactive currency takes nothing from any source");
             f.Buy(f.PlayForCrowd);
             Assert.IsTrue(f.Tier1.flags.Contains("fans_revealed"));
             // 0.35 base plus the drummer's own 0.02: band size IS the fan rate,

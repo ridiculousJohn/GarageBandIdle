@@ -622,7 +622,44 @@ clock; author timed goals with that end in mind.
 
 ### 12.2 The economy: Currency, Producer, Generator, Effect
 
-**Currency** — `{id, balance}`. Pure state. It does not know how it is earned.
+**Currency** - `{id, balance, activeWhen?}`. Pure state: it does not know how it is earned, but it
+may say when it is **active**. An inactive currency accrues nothing and refuses an authored grant -
+every `SourceTerm` returns zero for it, so a source's rate and yield lines and the total agree at
+zero rather than a readout promising income the balance never receives, and `Deposit` throws, so an
+authored `AddCurrency` naming it is a content bug that surfaces the moment it fires instead of a
+silent write behind a reveal. Absent means always active. The condition is judged at the currency's
+own **home**, so every source gets the same answer.
+
+The gate is answered **once per payment**, and which write it is answered by is the difference
+between the two deposit entry points. A GATHERED payment - a firing, the tick's rate phase, an idle
+settlement - sizes every amount against one snapshot and then commits them, so the gate is answered
+by `SourceTerm` at resolve time and the commit goes through `DepositResolved`, which does not re-ask.
+Re-asking there would be a filter inside a commit loop whose own earlier deposits move the state the
+gate reads: one output could abort a sibling's write mid-firing, which is the atomicity this section
+promises, and a settlement could refuse a line the offer already presented, leaving the stamp
+unadvanced and the offer live to pay twice. An AUTHORED payment has no gather to have judged it, so
+`AddCurrency` is refused at the write or nowhere - and because its targets are TIED to one
+evaluation (§5), every one of them is checked before any is written. A per-target check-then-write
+loop would bank the first and refuse the second, which is the drift the single evaluation exists to
+prevent, and the command exits without closing its transaction, so a retry pays the first again.
+
+`IdleAccumulation` is refused inside one, at any depth. It is the one condition whose answer depends
+on which GATHER is asking rather than on the tree, and a gate deciding whether a currency takes
+income at all cannot hold that. What the spelling COSTS varies, which is why the kind is refused
+rather than one shape of it. Bare, the gate is shut for every acting scope but the claim, and no
+action list ever runs under one, so a rung payout or an event reward throws on content that is
+otherwise correct. Negated, those keep working and the currency instead vanishes from the idle offer
+with nothing reported, since its rate gathers to zero under the claim and a zero line is never
+presented. Both mechanics - "earns only while away" and "earns nothing while away" - are a wildcard
+x0 modifier on `rate` and `yield` carrying an `appliesWhen`, which does the same thing in whichever
+direction the author wants it and leaves authored payouts alone.
+
+It is the only currency-level gate, and the sentence it says is "this does not exist for you yet."
+"It exists but the income is paused" is a different sentence with a mechanism already: an x0 modifier
+on `rate` and `yield` carrying an `appliesWhen` (§12.5). The two differ exactly where it matters - a
+freeze still takes an authored payout, an inactive currency does not - and that difference is why
+only one of them is a field. A modifier can reach the gather and zero a number; it cannot refuse a
+`Deposit`, because `AddCurrency` never consults one.
 
 **Producer** — a named definition that owns base contributions. Each `produces` entry declares one
 number — which currency, which **stat**, the base value — plus an optional condition that must hold
@@ -649,11 +686,16 @@ Chapter 1's Jam is a producer, not UI logic:
 
 ```
 tap_producer.produces: [ { cash,      yield, 1 },
-                         { rehearsal, yield, 1,   FlagSet(rehearsal_revealed) },
-                         { rehearsal, rate,  0.5, FlagSet(rehearsal_revealed) } ]
-                         // the rate is gated too — Rehearsal accrues nothing before its reveal.
-                         // (An UNconditioned rate entry is how a pre-banking mechanic would be
-                         // authored, if a chapter ever wants one.)
+                         { rehearsal, yield, 1 },
+                         { rehearsal, rate,  0.5 } ]
+                         // No conditions: `rehearsal` declares activeWhen
+                         // FlagSet(rehearsal_revealed), so both entries pay nothing before
+                         // the reveal - and so does every Rehearsal source authored later.
+                         // A reveal is a property of the CURRENCY; per entry it is a rule
+                         // each new source has to remember, and one that forgets fails open.
+                         // (A currency with NO activeWhen is how a pre-banking mechanic is
+                         // authored, if a chapter ever wants one: it accrues while its
+                         // readout is still hidden.)
 ```
 
 **Generator** — the purchasable. Definition: `{id, tags, availableWhen, costCurrency, baseCost,
@@ -1356,6 +1398,16 @@ per-feature: any kind an author gates with explains itself for free.
 - A `SetFlag` naming an undeclared flag is an error, as is one whose home is off the acting chain -
   including a home the acting scope encloses, which the outward write can never reach (§2). A
   declared flag with no setter warns.
+- A currency's `activeWhen` is judged at the currency's own home, so its operands take the reach
+  check there rather than at any site that reads the currency. An `IdleAccumulation` anywhere inside
+  one is an ERROR, not the inert-operand warning it draws elsewhere: the circumstance does reach the
+  gate, and that is the problem - it names which gather is asking, so the gate stops being a property
+  of the currency. The damage varies with the spelling, which is why the kind is refused and not one
+  shape of it: bare, every authored payout throws; negated, the currency silently leaves the idle
+  offer (§12.2). There is deliberately
+  no static check on an `AddCurrency` naming a gated currency: whether the gate holds at that site
+  when the action actually fires is a runtime question this pass cannot decide, and `Deposit`
+  throwing is the answer - loud, at the moment it matters.
 - A rung that resets a scope containing tier rungs with unreferenced payout actions warns
   (stranded value); a formula-driven grant placed after a `ResetScope` that clears its inputs warns
   (reads zeros); reference cycles across ALL nested action references - `ExecuteRung`,

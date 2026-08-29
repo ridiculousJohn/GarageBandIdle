@@ -62,6 +62,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Fans = DeclareCurrency(Tier1Def, "fans");
             Rehearsal = DeclareCurrency(Tier1Def, "rehearsal");
             Tier1Def.declaredFlags.AddRange(new[] { "fans_revealed", "rehearsal_revealed" });
+            // The reveals stay on the ENTRIES here, which is the other legal
+            // way to author them (12.2). Chapter 1 puts them on the currencies
+            // instead, and Chapter1ContentTests is what holds it to that; this
+            // fixture keeps fans and rehearsal ungated so the suites that use
+            // them as plain currencies are not all about reveals.
             // The generator vocabulary is tier1's, since only its generators
             // carry it; income and production are root's, per the content doc.
             Tier1Def.declaredTags.AddRange(new[] { "gear", "bandmate" });

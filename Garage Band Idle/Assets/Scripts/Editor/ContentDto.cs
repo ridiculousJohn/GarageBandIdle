@@ -216,6 +216,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
 
     internal class CurrencyDto : DefinitionDto
     {
+        public ConditionDto activeWhen;
     }
 
     internal class ProducerDto : DefinitionDto

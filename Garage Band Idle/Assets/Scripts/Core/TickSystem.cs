@@ -111,7 +111,7 @@ namespace RidiculousGaming.GarageBandIdle
                 amounts.Add(Producer.GetRate(liveCtx, pair.currency) * effDt);
             for (var i = 0; i < pairs.Count; i++)
                 if (amounts[i] != BigNumber.Zero)
-                    liveCtx.Rebase(pairs[i].home).Deposit(pairs[i].currency.Id, amounts[i]);
+                    liveCtx.Rebase(pairs[i].home).DepositResolved(pairs[i].currency.Id, amounts[i]);
 
             // Consumption on scaled time, settlement stamped at the segment's
             // real end; then wall clocks burn real seconds - game_speed never

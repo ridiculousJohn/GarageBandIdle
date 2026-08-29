@@ -33,9 +33,10 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx)
         {
+            // One evaluation, and one all-or-nothing commit: the targets are
+            // tied, so a refusal on the second may not leave the first paid.
             BigNumber value = formula != null ? formula.Compute(ctx) : amount;
-            foreach (var currency in currencies)
-                ctx.Deposit(currency.Id, value);
+            ctx.DepositAll(currencies, value);
         }
 
         public override void Validate(ValidationContext ctx)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
@@ -89,12 +90,63 @@ namespace RidiculousGaming.GarageBandIdle
 
         // ---- writes: each lands at the fact's home ----
 
+        // The AUTHORED write: an AddCurrency names its currencies directly and
+        // no gather ever sized it, so this is the only place an inactive one
+        // can be refused (12.2), and it refuses loudly - swallowing an authored
+        // grant would lose a run's value in silence.
+        //
+        // Every OTHER write goes through DepositResolved. The split is not
+        // convenience: this check reads live state, and a gathered payment is
+        // committed in a loop whose earlier deposits move that state, so asking
+        // here would let one output abort a sibling's mid-commit - the exact
+        // atomicity 12.2 promises a firing.
+        public void Deposit(string currencyId, BigNumber amount)
+        {
+            RequireActive(currencyId);
+            DepositResolved(currencyId, amount);
+        }
+
+        // The authored write for TIED targets: an AddCurrency pays several
+        // currencies from a single evaluation, and design doc 5 is that those
+        // amounts can never drift. A per-target check-then-write loop breaks
+        // that as surely as re-evaluating the amount would - the second target
+        // refusing after the first has banked is exactly the drift, and the
+        // command exits without closing its transaction, so a retry pays the
+        // first one twice. So every target is checked before any is written:
+        // the same resolve-then-commit shape a gather uses, for the same reason.
+        public void DepositAll(IReadOnlyList<Economy.CurrencyDefinition> currencies, BigNumber amount)
+        {
+            foreach (var currency in currencies)
+                RequireActive(currency.Id);
+            // A negative amount is refused by the first DepositResolved, before
+            // it writes - one amount pays every target, so there is no later
+            // call that could find it negative after an earlier one landed.
+            foreach (var currency in currencies)
+                DepositResolved(currency.Id, amount);
+        }
+
+        private void RequireActive(string currencyId)
+        {
+            var home = HomeOf(currencyId);
+            var currency = DeclaredAt(home, currencyId);
+            if (currency != null && !currency.IsActive(Rebase(home)))
+                throw new InvalidOperationException(
+                    $"Deposit for currency '{currencyId}': the currency is not active (12.2) - an authored payout may not land behind a reveal.");
+        }
+
+        // The write a gather already judged: FireProducer, the tick's rate
+        // phase and the idle settlement each size every amount against ONE
+        // snapshot and then commit, and an inactive currency arrives from that
+        // snapshot as a zero term nobody deposits. So the gate is answered at
+        // resolve time, once, and the commit honors what it answered rather
+        // than re-asking against state the commit itself is moving.
+        //
         // Deposits at the currency's home: balance and earned total together.
         // A deposit is a grant; spending moves the balance alone. A negative
         // amount would drive an earned total DOWNWARD, and section 2's
         // strobe-proofing - a threshold met once stays met - stands on that
         // never happening; authored negatives are refused at load.
-        public void Deposit(string currencyId, BigNumber amount)
+        public void DepositResolved(string currencyId, BigNumber amount)
         {
             if (amount < BigNumber.Zero)
                 throw new InvalidOperationException(
@@ -102,6 +154,17 @@ namespace RidiculousGaming.GarageBandIdle
             var home = HomeOf(currencyId);
             home.balances[currencyId] += amount;
             home.earnedTotals[currencyId] += amount;
+        }
+
+        // The currency asset the home declares under this id. The home is
+        // already resolved, so this reads ONE scope's own declaration list -
+        // the same shape the granted-stack read uses, never a search.
+        private static Economy.CurrencyDefinition DeclaredAt(ScopeState home, string currencyId)
+        {
+            foreach (var currency in home.Definition.declaredCurrencies)
+                if (currency != null && currency.Id == currencyId)
+                    return currency;
+            return null;
         }
 
         // Whether the balance covers the amount right now - a question about

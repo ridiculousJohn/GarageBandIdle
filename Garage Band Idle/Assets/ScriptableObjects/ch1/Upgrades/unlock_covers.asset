@@ -15,7 +15,7 @@ MonoBehaviour:
   id: unlock_covers
   tags: []
   gate:
-    rid: 367766403059023938
+    rid: 367766404092395585
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   cost:
     _value:
@@ -23,11 +23,11 @@ MonoBehaviour:
       exponent: 2
   effects: []
   actions:
-  - rid: 367766403059023939
+  - rid: 367766404092395586
   references:
     version: 2
     RefIds:
-    - rid: 367766403059023938
+    - rid: 367766404092395585
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -36,7 +36,7 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 1
-    - rid: 367766403059023939
+    - rid: 367766404092395586
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: rehearsal_revealed

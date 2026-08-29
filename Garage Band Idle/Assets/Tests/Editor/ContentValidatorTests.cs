@@ -579,6 +579,71 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "CurrencyAtLeast");
         }
 
+        // A currency's gate is judged at the currency's own HOME, not at the
+        // sites that read it - so ch1's counter cannot gate on a flag the tier
+        // it encloses declares (12.2).
+        [Test]
+        public void CurrencyActiveWhen_FlagBelowHome_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredFlags.Add("revealed");
+            f.Ch1Records.activeWhen = new FlagSet { flagId = "revealed" };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "flag 'revealed'");
+        }
+
+        [Test]
+        public void CurrencyActiveWhen_FlagAtHome_Clean()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredFlags.Add("revealed");
+            f.Cash.activeWhen = new FlagSet { flagId = "revealed" };
+            AssertNoFinding(f.Run(), ValidationCheck.ChainReach);
+        }
+
+        // Refused outright, reachable or not (12.2): the gate answers which
+        // gather is asking, no action list runs under a claim, so every rung
+        // payout and event reward to that currency would throw. Cash IS paid at
+        // rate by the tier's amp, so this is the case where the circumstance
+        // genuinely arrives - and it is still refused.
+        [Test]
+        public void CurrencyActiveWhen_Idle_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cash.activeWhen = new IdleAccumulation();
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.KindPlacement, "IdleAccumulation");
+        }
+
+        // The compound kinds recurse through Validate, so an operand nested at
+        // any depth is reached. This spelling is the one that does NOT throw at
+        // runtime - Not(IdleAccumulation) leaves the gate open for every
+        // authored payout and only drops the currency from the idle offer - so
+        // it is the case that proves the rule refuses the KIND rather than the
+        // one shape whose failure is loud.
+        [Test]
+        public void CurrencyActiveWhen_IdleNested_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cash.activeWhen = new All
+            {
+                conditions =
+                {
+                    new FlagSet { flagId = "ch1_complete" },
+                    new Not { condition = new IdleAccumulation() },
+                }
+            };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.KindPlacement, "IdleAccumulation");
+        }
+
+        // The site it belongs at is untouched.
+        [Test]
+        public void ModifierAppliesWhen_Idle_Clean()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.appliesWhen = new IdleAccumulation();
+            AssertNoFinding(f.Run(), ValidationCheck.KindPlacement);
+            AssertNoFinding(f.Run(), ValidationCheck.InertOperand);
+        }
+
         [Test]
         public void CurrencyCondition_NoCurrency_Error()
         {

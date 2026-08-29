@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle;
 using RidiculousGaming.GarageBandIdle.Economy;
@@ -26,6 +27,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual((BigNumber)100, tree.Tier1.balances["fans"]);
             Assert.AreEqual((BigNumber)50, tree.Root.balances["records"]);
+        }
+
+        // The same tie, seen from the refusal side: one inactive target refuses
+        // the whole grant, and the active one is NOT paid. A per-target
+        // check-then-write loop would bank records and then throw on fans -
+        // the drift the single evaluation exists to prevent, plus a retry that
+        // pays records a second time.
+        [Test]
+        public void AddCurrency_refuses_every_target_when_one_is_inactive()
+        {
+            var tree = new TestTree();
+            tree.Fans.activeWhen = new FlagSet { flagId = "fans_revealed" };
+            var action = new AddCurrency { currencies = { tree.Records, tree.Fans }, amount = 5 };
+
+            var thrown = Assert.Throws<InvalidOperationException>(() => action.Execute(tree.Ctx(tree.Tier1)));
+            StringAssert.Contains("not active", thrown.Message);
+            Assert.AreEqual((BigNumber)0, tree.Root.balances["records"], "the active target stayed unpaid");
+            Assert.AreEqual((BigNumber)0, tree.Root.earnedTotals["records"]);
+
+            tree.Tier1.flags.Add("fans_revealed");
+            action.Execute(tree.Ctx(tree.Tier1));
+
+            Assert.AreEqual((BigNumber)5, tree.Root.balances["records"]);
+            Assert.AreEqual((BigNumber)5, tree.Tier1.balances["fans"]);
         }
 
         [Test]

@@ -203,9 +203,28 @@ namespace RidiculousGaming.GarageBandIdle
         // Only a modifier's appliesWhen and a chapter-reachable RATE entry's
         // condition are ever evaluated under a claim's context; anywhere else
         // the circumstance is never set, so the condition is dead content
-        // (12.5).
+        // (12.5). A currency's activeWhen is the one site that refuses it
+        // outright rather than reporting it inert - the circumstance IS
+        // evaluated there, and that is the problem (12.2).
         public override void Validate(ValidationContext ctx)
         {
+            // The gate decides whether a currency takes income AT ALL, and this
+            // operand makes that answer depend on which gather is asking rather
+            // than on the currency. What it COSTS depends on the spelling,
+            // which is why the kind is refused and not one shape of it: bare,
+            // the gate is shut for every acting scope but the claim, and since
+            // no action list runs under one, a rung payout or event reward
+            // throws on content that is otherwise correct; negated, those keep
+            // working and the currency instead drops out of the idle offer with
+            // nothing said. An author cannot tell the two apart by reading
+            // them. Either mechanic is a wildcard x0 modifier on rate and yield
+            // carrying appliesWhen, whichever way round it is wanted.
+            if (ctx.CurrencyGate)
+            {
+                ctx.AddError(ValidationCheck.KindPlacement,
+                    "IdleAccumulation in a currency's activeWhen: the gate would answer differently depending on which GATHER is asking, and what that costs depends on the spelling - a bare one throws on every authored payout, since no action list runs under a claim, while a negated one silently drops the currency out of the idle offer. Author the circumstance as a modifier's appliesWhen instead (12.2).");
+                return;
+            }
             if (!ctx.IdleCircumstancePossible)
                 ctx.AddWarning(ValidationCheck.InertOperand,
                     "IdleAccumulation sits at a site never evaluated under a claim's context - only a modifier's appliesWhen and a chapter-reachable rate entry see the circumstance (12.5).");

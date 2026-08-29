@@ -15,7 +15,7 @@ MonoBehaviour:
   id: amp_strings
   tags: []
   gate:
-    rid: 367766403059023876
+    rid: 367766404092395524
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   cost:
     _value:
@@ -37,7 +37,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766403059023876
+    - rid: 367766404092395524
       type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

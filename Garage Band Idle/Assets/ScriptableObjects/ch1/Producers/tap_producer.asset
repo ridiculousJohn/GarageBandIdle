@@ -31,7 +31,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     condition:
-      rid: 367766403059023873
+      rid: 367766404092395522
   - currency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
     stat: yield
     value:
@@ -39,7 +39,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     condition:
-      rid: 367766403059023874
+      rid: -2
   - currency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
     stat: rate
     value:
@@ -47,24 +47,14 @@ MonoBehaviour:
         mantissa: 5
         exponent: -1
     condition:
-      rid: 367766403059023875
+      rid: -2
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766403059023873
+    - rid: 367766404092395522
       type: {class: UpgradePurchased, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         upgrade: {fileID: 11400000, guid: 5e369145a5eec70429c5340838720701, type: 2}
-    - rid: 367766403059023874
-      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: 
-        flagId: rehearsal_revealed
-    - rid: 367766403059023875
-      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: 
-        flagId: rehearsal_revealed

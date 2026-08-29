@@ -100,6 +100,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- the happy path ----
 
+        // The one authored member a currency has (12.2), resolved from the
+        // scope that declares it - which is the home the gate is judged at.
+        [Test]
+        public void A_currency_gate_imports_onto_the_currency()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", @"{
+                ""type"": ""ChapterDefinition"",
+                ""id"": ""ch1"",
+                ""flags"": [""revealed""],
+                ""currencies"": [
+                    { ""id"": ""cash"", ""tags"": [""income""],
+                      ""activeWhen"": { ""type"": ""FlagSet"", ""flagId"": ""revealed"" } },
+                    { ""id"": ""plain"" }
+                ],
+                ""children"": [{ ""type"": ""TierDefinition"", ""id"": ""tier1"" }]
+            }");
+
+            Import();
+
+            Assert.AreEqual("revealed",
+                ((FlagSet)Load<CurrencyDefinition>("ch1/Currencies/cash.asset").activeWhen).flagId);
+            Assert.IsNull(Load<CurrencyDefinition>("ch1/Currencies/plain.asset").activeWhen,
+                "an unauthored gate stays null, which is always active");
+        }
+
         [Test]
         public void A_minimal_pair_imports_and_wires()
         {

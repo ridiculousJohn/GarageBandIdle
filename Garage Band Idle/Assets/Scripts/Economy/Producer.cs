@@ -137,6 +137,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
             if (baseSum == BigNumber.Zero)
                 return BigNumber.Zero;      // nothing contributes, and no factor changes that
+            // An inactive currency takes nothing from any source (12.2). Asked
+            // AFTER the entry sum, so a source paying this currency nothing
+            // never pays for the home walk. Zeroing the term rather than
+            // refusing the deposit is what keeps a per-source readout, the
+            // total, and the balance agreeing - and what lets the tick stay
+            // quiet, since a zero amount is never handed to Deposit at all.
+            if (!currency.IsActive(declaringCtx.Rebase(FindCurrencyHome(declaringCtx.Scope, currency))))
+                return BigNumber.Zero;
             return baseSum * countScale * GetMultiplier(declaringCtx, source, currency, stat);
         }
 
@@ -256,7 +264,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
             for (var i = 0; i < currencies.Count; i++)
                 if (amounts[i] != BigNumber.Zero)
-                    declaringCtx.Deposit(currencies[i].Id, amounts[i]);
+                    declaringCtx.DepositResolved(currencies[i].Id, amounts[i]);
         }
 
         // ---- tree lookups ----

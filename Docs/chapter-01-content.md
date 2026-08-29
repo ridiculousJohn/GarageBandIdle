@@ -52,12 +52,18 @@ root
 
 ## 3. Currencies
 
-| Id | Declared in | Tags | Notes |
-|---|---|---|---|
-| `cash` | tier1 | `income` | The income tag is what the Records and Roadie modifiers target (§12.2). |
-| `fans` | tier1 | — | **Never income-tagged, never roadie-buffable** — the farm throttle (§8.2). |
-| `rehearsal` | tier1 | — | Fill pool for the cover bars. |
-| `ch1_records` | ch1 | — | Capstone gate counter; fed by the release payout, zeroed by the capstone's own reset (§5). |
+| Id | Declared in | Tags | activeWhen | Notes |
+|---|---|---|---|---|
+| `cash` | tier1 | `income` | - | The income tag is what the Records and Roadie modifiers target (§12.2). |
+| `fans` | tier1 | - | `FlagSet(fans_revealed)` | **Never income-tagged, never roadie-buffable** - the farm throttle (§8.2). |
+| `rehearsal` | tier1 | - | `FlagSet(rehearsal_revealed)` | Fill pool for the cover bars. |
+| `ch1_records` | ch1 | - | - | Capstone gate counter; fed by the release payout, zeroed by the capstone's own reset (§5). |
+
+The two reveals are declared on the CURRENCY, not on the entries that pay it (§12.2). Fans is why:
+its sources are `band` plus every bandmate generator, so the per-entry form is a rule each new source
+has to remember, and the one that forgets fails open silently. `play_for_crowd` gates on owning a
+drummer, so a bandmate necessarily exists before the flag is set - with the gate on the entries, that
+drummer trickles fans behind the reveal.
 
 Flags: tier1 declares `fans_revealed`, `rehearsal_revealed`; ch1 declares `album`, `gj1_done`,
 `gj2_done`, `gj3_done`. (The design doc's §2 speaks loosely of "`fans` and `covers`" flags — authored
@@ -71,11 +77,12 @@ tap_producer ("Jam")  [production]:                      # fired by the Jam butt
   { cash,      yield, 1 }
   { cash,      yield, 1,   UpgradePurchased(stage_presence) }   # the upgrade is a latch; the flat
                                                                 # bonus is this conditioned entry (§12.2)
-  { rehearsal, yield, 1,   FlagSet(rehearsal_revealed) }
-  { rehearsal, rate,  0.5, FlagSet(rehearsal_revealed) }        # no pre-banking: rate gated too
+  { rehearsal, yield, 1 }                                       # both unconditioned: rehearsal's own
+  { rehearsal, rate,  0.5 }                                     # activeWhen covers them (§3)
 
 band ("Local Buzz")  [production]:                       # nothing presents it; pure rate
-  { fans, rate, 0.35, FlagSet(fans_revealed) }           # base fan accrual — band-size adds below
+  { fans, rate, 0.35 }                                   # base fan accrual - band-size adds below;
+                                                         # fans' own activeWhen is the reveal gate
 ```
 
 ## 5. Generators (all tier1; cost currency `cash`, growth 1.15; tags shown)

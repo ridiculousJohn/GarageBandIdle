@@ -25,6 +25,7 @@ namespace RidiculousGaming.GarageBandIdle
         UnresolvedReference,    // a referenced id resolves to nothing
         NullEntry,              // a null slot in an authored list, or a required operand
         InertOperand,           // an operand authored where the shape's own behavior never reads it
+        KindPlacement,          // a polymorphic kind authored at a site that may not carry it
         ScopeReach,             // ResetScope / RestartScope / ExecuteRung / modifier-grant reach rules
         ChainReach,             // ordinary reads and writes address only the acting chain
         FlagNoSetter,           // a declared flag nothing sets (warn)
@@ -215,6 +216,12 @@ namespace RidiculousGaming.GarageBandIdle
         // Everywhere else an IdleAccumulation condition reads a circumstance
         // that is never set (12.5).
         public bool IdleCircumstancePossible { get; internal set; }
+
+        // True only while validating a currency's activeWhen, where
+        // IdleAccumulation is refused outright rather than merely warned about
+        // (12.2). Nesting comes free: the compound kinds recurse through
+        // Validate, so the flag reaches an operand at any depth.
+        public bool CurrencyGate { get; internal set; }
 
         internal List<FlagSetterRecord> FlagSetters { get; } = new();
         internal List<ModifierGrantRecord> ModifierGrants { get; } = new();
@@ -765,6 +772,21 @@ namespace RidiculousGaming.GarageBandIdle
             // ---- container walk: every rung and trigger, in tree order ----
             foreach (var scope in treeScopes)
             {
+                // A currency's activeWhen is judged at the currency's own home,
+                // which IS the scope declaring it - so the acting scope is this
+                // one, and its operands take the reach check from here (12.2).
+                foreach (var currency in scope.declaredCurrencies)
+                {
+                    if (currency == null || currency.activeWhen == null)
+                        continue;
+                    ctx.EnterContainer(scope, "currency:" + currency.Id);
+                    ctx.SetSite($"currency '{currency.Id}' activeWhen");
+                    ctx.CurrencyGate = true;
+                    currency.activeWhen.Validate(ctx);
+                    ctx.CurrencyGate = false;
+                    ctx.SetSite(null);
+                }
+
                 // Only an interior scope has a rung at all - the root has no such
                 // field, so "no rung on the root" needs no check here.
                 if (scope is InteriorDefinition interior && interior.rung != null)

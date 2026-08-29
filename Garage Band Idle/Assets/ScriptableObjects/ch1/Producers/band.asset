@@ -23,12 +23,9 @@ MonoBehaviour:
         mantissa: 3.4999999999999996
         exponent: -1
     condition:
-      rid: 367766403059023932
+      rid: -2
   references:
     version: 2
     RefIds:
-    - rid: 367766403059023932
-      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: 
-        flagId: fans_revealed
+    - rid: -2
+      type: {class: , ns: , asm: }

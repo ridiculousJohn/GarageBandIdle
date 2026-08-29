@@ -14,6 +14,78 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static void AssertClose(double expected, BigNumber actual, string what = null) =>
             Assert.AreEqual(expected, actual.ToDouble(), 1e-9, what ?? string.Empty);
 
+        // ---- the currency gate (12.2) ----
+
+        // One gate on the currency covers every source, which is the whole
+        // reason it sits there: fans is paid by band AND by each bandmate, and
+        // play_for_crowd cannot be bought without a drummer, so a per-entry
+        // rule leaves the drummer trickling fans behind the reveal.
+        [Test]
+        public void An_inactive_currency_takes_nothing_from_any_source()
+        {
+            var tree = new TestTree();
+            tree.Fans.activeWhen = new FlagSet { flagId = "fans_revealed" };
+            tree.Tier1.generatorCounts[tree.Drummer.Id] = 1;
+
+            // The drummer's fans line carries NO condition of its own, and it
+            // is the one the currency gate has to cover: play_for_crowd gates
+            // on owning a drummer, so a bandmate always exists before the flag.
+            AssertClose(0, Producer.GetRate(tree.Ctx(tree.Ch1), tree.Fans), "band and the bandmate alike");
+
+            tree.Tier1.flags.Add("fans_revealed");
+            AssertClose(0.37, Producer.GetRate(tree.Ctx(tree.Ch1), tree.Fans), "0.35 base plus the drummer's 0.02");
+        }
+
+        // The gate rides SourceTerm, which the yield path shares, so one
+        // firing pays its ungated currency and withholds its gated one.
+        [Test]
+        public void An_inactive_currency_pays_no_yield_either()
+        {
+            var tree = new TestTree();
+            tree.Rehearsal.activeWhen = new FlagSet { flagId = "rehearsal_revealed" };
+            // The currency states the reveal now, so the entries stop repeating
+            // it - which is what leaves the gate as the only thing refusing.
+            foreach (var entry in tree.TapProducer.produces)
+                if (entry.currency == tree.Rehearsal)
+                    entry.condition = null;
+
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
+            AssertClose(0, tree.Tier1.balances["rehearsal"], "the tap's rehearsal yield is the currency's to refuse");
+            AssertClose(1, tree.Tier1.balances["cash"], "cash is ungated and paid in the same firing");
+
+            tree.Tier1.flags.Add("rehearsal_revealed");
+            Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
+            AssertClose(1, tree.Tier1.balances["rehearsal"]);
+        }
+
+        // The half the gather cannot reach: an authored AddCurrency computes no
+        // term, so the refusal has to be at the write, and it throws rather
+        // than swallowing - a dropped grant is a lost run, not a quiet no-op.
+        [Test]
+        public void An_inactive_currency_refuses_an_authored_deposit()
+        {
+            var tree = new TestTree();
+            tree.Fans.activeWhen = new FlagSet { flagId = "fans_revealed" };
+            var pay = new AddCurrency { currencies = { tree.Fans }, amount = 10 };
+
+            var thrown = Assert.Throws<InvalidOperationException>(() => pay.Execute(tree.Ctx(tree.Tier1)));
+            StringAssert.Contains("not active", thrown.Message);
+            AssertClose(0, tree.Tier1.balances["fans"]);
+
+            tree.Tier1.flags.Add("fans_revealed");
+            pay.Execute(tree.Ctx(tree.Tier1));
+            AssertClose(10, tree.Tier1.balances["fans"]);
+        }
+
+        [Test]
+        public void A_currency_with_no_gate_is_always_active()
+        {
+            var tree = new TestTree();
+            tree.Tier1.generatorCounts[tree.PracticeAmp.Id] = 1;
+
+            AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Ch1), tree.Cash), "no flags set, and cash never needed one");
+        }
+
         // ---- the cascade row (12.6) ----
 
         [TestCase(GrowthKind.Multiply, 1.331)]      // 1.1 ^ 3

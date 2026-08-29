@@ -103,6 +103,34 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(w.Session.CurrentOffer);
         }
 
+        // Settlement commits every line the offer promised, even when paying
+        // one closes another's gate. The offer judged them together against one
+        // snapshot; re-asking per line would refuse the second after the first
+        // had banked, leaving the stamp unadvanced and the offer live to pay
+        // the first one again.
+        [Test]
+        public void One_lines_deposit_never_refuses_a_later_line()
+        {
+            var f = new Fixture();
+            f.Tree.Tier1.flags.Add("fans_revealed");            // band's line joins the offer
+            f.Tree.Cash.activeWhen = new Not
+            {
+                condition = new CurrencyAtLeast { currency = f.Tree.Fans, threshold = 1 }
+            };
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase);
+
+            Assert.IsTrue(f.Session.ClaimIdle(f.Tree.Now));
+
+            // Fans settles first and shuts cash's gate; cash is paid anyway.
+            AssertClose(175, f.Tree.Tier1.balances["fans"]);     // 0.175/s x 1000
+            AssertClose(250, f.Tree.Tier1.balances["cash"]);     // 0.25/s x 1000
+            Assert.AreEqual(f.Tree.Now, f.Tree.Ch1.lastActiveUtc, "the stamp advanced with the payment");
+            Assert.IsNull(f.Session.CurrentOffer);
+        }
+
         [Test]
         public void Backgrounding_drops_the_offer_and_leaves_the_stamp()
         {
