@@ -3,7 +3,7 @@
 ## The project
 - [Project layout and workflow](project-layout-and-workflow.md) - a rewind doesn't revert the filesystem; heredocs mangle C#; old commits are a dead architecture
 - [Design review revisions](design-review-revisions.md) - register of designs the twelve review passes DELETED, plus the deferred questions; the doc cannot show an absence
-- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when the editor is closed; exit 0 proves nothing, grep for `error CS`
+- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when the editor is closed; exit 0 proves nothing, grep for `error CS`; a reimport churns rids and trailing whitespace
 - [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - names resolve outward from the acting scope; cross-chain aliasing is the feature
 - [Currency values are BigNumber](currency-values-are-bignumber.md) - anything the runtime could compute past a double, authored fields included; only counts and Pow's power are exempt
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20: venue assets and stationing caps deleted, payloads typed by authored kind, currencies by direct reference
@@ -23,7 +23,7 @@
 ## Judgment
 - [Problems, not issues](problems-not-issues.md) - what breaks TODAY, not what is true; and a reason for NOT doing something gets checked like any other claim
 - [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - name the primitive that already covers it, and when two shapes both work take the smaller one
-- [No spec accumulation](no-spec-accumulation.md) - answer a finding by deleting the mechanism, not by adding a paragraph; cut argument, never a named check
+- [No spec accumulation](no-spec-accumulation.md) - answer a finding by deleting the mechanism, not by adding a paragraph; cut argument, never a named check; two rounds on one operand means delete it
 - [Tests exercise runtime code](tests-exercise-runtime-code.md) - fixtures are fine, a second implementation of runtime behavior is not; convert the call sites instead
 - [Doc decisions land when made](doc-decisions-land-when-made.md) - a settled decision goes in the design doc immediately; only code-describing edits wait for the code
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - "did you miss anything?" is a command to grep; Scripts, Tests, the live docs, the chapter JSON

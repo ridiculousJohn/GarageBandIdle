@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: efd4f70d-d22b-4ea0-8736-2d55c0b412d5
-  modified: 2026-08-20T18:18:24.777Z
+  modified: 2026-08-31T16:54:19.509Z
 ---
 
 When a review finds a hole, the first move is to ask whether the mechanism should exist at
@@ -23,6 +23,17 @@ reflex.
 paragraph size dropped a required validation check, because the checks are one-liners and the
 argument prose is what runs long. Cut argument - the paragraph defending a ruling nobody has
 challenged - never a sentence that names a check, a rule, or a test.
+
+**The tell that it is time to delete: one operand generating a finding in CONSECUTIVE review
+rounds (2026-08-28).** Currency `activeWhen` took four rounds, and `IdleAccumulation` inside one was
+the root of three: a settlement that threw mid-payment, a validator blessing gates nothing could
+reach, then the same reach test still over-permissive because entry conditions could block it. Each
+round I sharpened the reach walk, and each sharpening was individually correct and still inexact.
+Refusing the operand outright deleted the walk, closed all three, and cost no expressiveness - the
+mechanic it looked like was already a wildcard x0 modifier with an `appliesWhen`. Two rounds on the
+same thing is the signal to stop asking "how do I check this better" and start asking "should this
+be authorable at all". A check that needs sharpening twice is usually guarding something that should
+not exist.
 
 **How to apply:** Before specifying an edge case, ask what authored content actually
 exercises it - if Chapter 1's data never reaches the state, the policy is premature and the

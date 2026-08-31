@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ff77d597-62a9-412c-b32f-c1489e34fb56
-  modified: 2026-08-28T03:05:06.181Z
+  modified: 2026-08-31T16:53:50.777Z
 ---
 
 Verification loop for [[project-layout-and-workflow]], established during slice 3.5 (2026-07-21). Repo paths here are relative to the repo root as `<repo>/...`, since the checkout lives at a different absolute path on each of John's machines.
@@ -31,4 +31,5 @@ Resolve the editor rather than hardcoding it: read the version from `<repo>/Gara
 - **The results XML lands a beat AFTER the process returns.** Even from a synchronous foreground invocation, the very next command can see no file - and on 2026-08-07 a second read of the same path, issued immediately, still missed it while the log already held its `Saving results to:` line. Re-check before concluding the run failed. Related tell for a genuine failure: `-runTests` exits 1 when tests fail and leaves `$LASTEXITCODE` empty when they all pass, which is the reverse of the usual reading - the XML summary is the answer, not the code.
 - **Wait for the Unity process to exit before grepping the log.** A background runner reports "completed" while batchmode is still flushing, and a half-written log has no importer summary and no `Exiting batchmode successfully` - which reads exactly like a failed import. Poll for no process named `Unity` (`Unity Hub` and `Unity.Licensing.Client` are not it), then grep.
 - Any change to a definition class's serialized fields REQUIRES re-running the import: old assets deserialize stale/default values until rewritten (enum renumbering, renamed fields). Boot validation flagging `None`/unknown ids after a schema change usually means "reimport not run yet".
+- **What a reimport does to the diff, so it is not mistaken for content change.** Two mechanical effects, both Unity's serializer rather than the importer. (1) `SerializeReference` `rid` values REGENERATE on every import, so every asset holding a Condition, GameAction or formula shows as modified with no semantic change - `git diff` on one shows only the rid pair. Say so when reporting a dirty tree, or John reads a 40-file diff as 40 changes. (2) An empty serialized string is emitted as `uiText: ` WITH a trailing space, so `git diff --check` flags whatever generated assets a diff happens to touch. It is in every committed asset carrying a Condition, nothing enforces it (no `core.whitespace`, no CI, LFS is the only hook), and hand-stripping it is undone by the next import. It was raised as a review finding on 2026-08-28 and rejected on those grounds; check `git grep 'uiText: $' HEAD` before accepting it as one again.
 - Run import before tests: Chapter1ContentTests validates the imported assets against the JSON.
