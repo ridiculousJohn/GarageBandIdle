@@ -5,10 +5,10 @@ metadata:
   node_type: memory
   type: project
   originSessionId: a3758315-7030-4a24-98c6-20cdec0e772e
-  modified: 2026-08-28T20:46:09.172Z
+  modified: 2026-08-31T21:00:29.124Z
 ---
 
-Garage Band Idle is John's personal Unity 6000.5.4f1 idle game. The Unity project (Assets/,
+Garage Band Idle is John's personal Unity 6000.5.10f1 idle game. The Unity project (Assets/,
 Packages/, ProjectSettings/) sits one level down at `<repo>/Garage Band Idle/`, with `Docs/` beside
 it at the repo root. Authority: the repo `CLAUDE.md` names the design doc and `Docs/build-plan.md`;
 this file is only the mechanics.

@@ -5,12 +5,12 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ff77d597-62a9-412c-b32f-c1489e34fb56
-  modified: 2026-08-31T16:53:50.777Z
+  modified: 2026-08-31T21:00:30.279Z
 ---
 
 Verification loop for [[project-layout-and-workflow]], established during slice 3.5 (2026-07-21). Repo paths here are relative to the repo root as `<repo>/...`, since the checkout lives at a different absolute path on each of John's machines.
 
-Resolve the editor rather than hardcoding it: read the version from `<repo>/Garage Band Idle/ProjectSettings/ProjectVersion.txt` (6000.5.4f1 as of 2026-08-04) and use that version's `Editor/Unity.exe` under the local Unity Hub editors directory - `Program Files\Unity\Hub\Editor\<version>\Editor\Unity.exe` on the Windows boxes. Several versions are usually installed side by side; never take the newest.
+Resolve the editor rather than hardcoding it: read the version from `<repo>/Garage Band Idle/ProjectSettings/ProjectVersion.txt` (6000.5.10f1 as of 2026-08-31) and use that version's `Editor/Unity.exe` under the local Unity Hub editors directory - `Program Files\Unity\Hub\Editor\<version>\Editor\Unity.exe` on the Windows boxes. Several versions are usually installed side by side; never take the newest.
 
 **Why:** Changes can be verified without John pressing Play: batchmode compiles the code, re-runs the JSON import, and runs the edit-mode suite. Only Play-mode behavior and inspector UI need his eyes.
 
