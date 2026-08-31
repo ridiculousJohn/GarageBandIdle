@@ -83,6 +83,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- the stamps ----
 
+        // A chapter never LEFT owes no idle (12.3). Ch2 carries a starter rate
+        // and has never been entered, so measured from the stamp's default a
+        // first visit would hand over a capped offer for a chapter the player
+        // has not played. This is the case no construction-time stamp reaches:
+        // the switch lands nine hours into a session the player sat through, so
+        // there is no boot and no load anywhere near it. The sibling test above
+        // sets Ch2's stamp by hand to keep it quiet; that workaround is the
+        // symptom this covers.
+        [Test]
+        public void A_first_switch_into_a_never_entered_chapter_owes_no_idle()
+        {
+            var w = new TwoChapters();
+            w.Ch1.lastActiveUtc = w.Tree.Now;
+            w.Session.SwitchChapter(w.Ch1, w.Tree.Now);
+
+            var later = w.Tree.Now.AddHours(9);
+            w.Session.SwitchChapter(w.Ch2, later);
+
+            Assert.AreEqual(SessionPhase.Live, w.Session.Phase);
+            Assert.IsNull(w.Session.CurrentOffer);
+            Assert.AreEqual(later, w.Ch2.lastActiveUtc, "entry stamped what it found unstamped");
+            Assert.AreEqual(BigNumber.Zero, w.Ch2.balances["merch"], "nothing accrued for a chapter never played");
+        }
+
         [Test]
         public void Switch_away_settles_the_offer_undoubled_and_stamps_its_window()
         {

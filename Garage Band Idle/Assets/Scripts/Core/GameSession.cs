@@ -165,10 +165,24 @@ namespace RidiculousGaming.GarageBandIdle
         // Records earned while away boost it, under the idle-accumulation
         // circumstance - the authored root base joins the gather and live-only
         // modifiers excuse themselves - and skipped entirely when the away
-        // time is under the minimum, a blocking record holds, or every line
-        // computes zero.
+        // time is under the minimum, a blocking record holds, every line
+        // computes zero, or the chapter has never been left.
         private SessionPhase EnterChapter(ChapterScopeState chapter, DateTime nowUtc)
         {
+            // A chapter never LEFT owes no idle (12.3). The stamp means "when I
+            // last stopped playing this one" - written by the exit above,
+            // re-written by a reset - so its default is the ABSENCE of a moment
+            // rather than year one, and a window measured from it would bill the
+            // player for two millennia. Answered here because entry is the only
+            // place the question arises: a stamp written at construction cannot
+            // cover a chapter authored after the save was written, nor a first
+            // switch into a dormant one hours into a session.
+            if (chapter.lastActiveUtc == default)
+            {
+                chapter.StampActive(nowUtc);
+                return SessionPhase.Live;
+            }
+
             // The 12.10 clamp: a backwards clock claims nothing.
             var elapsed = Math.Max(0, (nowUtc - chapter.lastActiveUtc).TotalSeconds);
             if (elapsed < config.minimumAwaySeconds || BlockedByEvent(chapter))

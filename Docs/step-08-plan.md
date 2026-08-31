@@ -22,7 +22,7 @@ strict key handling, the condition pre-pass that aborts the import, stable asset
 id, update-in-place re-import - and its lint vocabulary. The content itself is re-authored from
 `chapter-01-content.md` against the current schema.
 
-## Existing systems this uses unchanged
+## Existing systems this builds on
 
 - **The definition families**: every authored shape has its class already - scopes, currencies,
   producers, generators, upgrades, bars/groups, modifiers (with `appliesWhen`, formulas,
@@ -30,12 +30,20 @@ id, update-in-place re-import - and its lint vocabulary. The content itself is r
   importer maps JSON onto them; no family gains a member for step 8.
 - **`ContentValidator`**: the real gate on imported content. Import lints only catch what JSON can
   get wrong before assets exist; the loaded tree answers to 12.12 exactly as fixtures do.
-- **`GameSession` / `TickSystem`**: complete from step 7; `GameManager` only calls them.
-  `SaveSystem` takes ONE reshape: `TryDeserialize`, `LoadFromDisk`, and the backup-loadability
-  check behind `WriteAtomic` build state from the composed PAIR, not the bare root - built from
-  the root alone, the empty-children contract would read every saved chapter as removed content
-  and drop it while the load reports success, and backup rotation would judge loadability against
-  a chapterless tree.
+- **`TickSystem`**: complete from step 7; `GameManager` only calls it.
+- **`GameSession`**: called rather than extended, with ONE exception found in slice D review -
+  `EnterChapter` answers a DEFAULT stamp by stamping it and returning `Live`, because a chapter
+  never LEFT owes no idle (12.3) and a window measured from the default would bill the player
+  from year one. Entry is the only site that can answer it: a stamp written at construction,
+  boot, or load reaches neither a chapter authored after the save was written - the load leaves
+  content it has no node for freshly built, on purpose - nor a first switch into a dormant
+  chapter hours into a session. `ChapterScopeState.Clear` had stated the same rule for reset
+  since step 5; construction never had.
+- **`SaveSystem`**: takes ONE reshape - `TryDeserialize`, `LoadFromDisk`, and the
+  backup-loadability check behind `WriteAtomic` build state from the composed PAIR, not the bare
+  root - built from the root alone, the empty-children contract would read every saved chapter as
+  removed content and drop it while the load reports success, and backup rotation would judge
+  loadability against a chapterless tree.
 
 ## The documents
 
@@ -282,8 +290,9 @@ scene, holding the `GameConfig` reference and nothing the session already owns:
   load-boundary name resolution, one scan of `root.Children` - and `SwitchChapter` enters it,
   re-offering any unpaid window as the idle dialog phase (nothing renders it until step 9; the
   session state is simply correct). A fresh game has no recorded chapter and step 9 owns the
-  chapter select, so until then boot auto-enters the sole authored chapter - an explicit stopgap,
-  removed when the select exists.
+  chapter select, so until then boot auto-enters the FIRST chapter by id - deterministic because
+  composition sorts the roster (12.14.5), and the sole authored chapter while Chapter 1 stands
+  alone - an explicit stopgap, removed when the select exists.
 - **Tick**: `Update` diffs `DateTime.UtcNow` against the `TickBaseline` - a small plain class the
   manager owns, because this is the one behavior-bearing piece of the driver - and calls
   `session.Tick(dt, now)` - real elapsed time, never frame time (requirement 2). The baseline
@@ -352,6 +361,12 @@ every update whether or not the session accepted the tick (the pause-replay and 
 regressions), and passes a backwards diff through as nonpositive dt; the headless boot helper
 maps `LoadedPrimary`/`LoadedBackup`/`NoSave` to loaded tree, loaded backup, and fresh build, and
 `Failed` to the hard stop.
+
+The never-left stamp gets one test per path no construction-time stamp could reach: in
+`GameBootTests`, a save recording a chapter that content has since retired, loaded against a roster
+whose new chapter carries a starter rate - the record clears, the fallback enters it unstamped, and
+entry owes nothing; in `IdleTests`, a first switch into a never-entered chapter nine hours into a
+session, where no boot or load is anywhere near the switch.
 
 `SaveSystemTests` gains the composed round-trip: empty serialized root children, the chapter
 supplied through the pair, nondefault chapter facts surviving `TryDeserialize` and `LoadFromDisk`,

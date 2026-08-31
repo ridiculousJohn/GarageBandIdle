@@ -18,7 +18,7 @@ MonoBehaviour:
   - bandmate
   - production
   availableWhen:
-    rid: 367766404092395580
+    rid: 367766467262545983
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   baseCost:
     _value:
@@ -50,7 +50,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766404092395580
+    - rid: 367766467262545983
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

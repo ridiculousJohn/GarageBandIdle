@@ -15,9 +15,9 @@ MonoBehaviour:
   id: garage_jam_1
   tags: []
   availableWhen:
-    rid: 367766404092395573
+    rid: 367766467262545973
   goal:
-    rid: 367766404092395574
+    rid: 367766467262545974
   timeLimitSeconds: 60
   handicaps:
   - target: gear
@@ -30,18 +30,18 @@ MonoBehaviour:
     formula:
       rid: -2
   onEntry:
-  - rid: 367766404092395575
+  - rid: 367766467262545975
   rewards:
-  - rid: 367766404092395576
-  - rid: 367766404092395577
+  - rid: 367766467262545976
+  - rid: 367766467262545977
   onEnd:
-  - rid: 367766404092395578
+  - rid: 367766467262545978
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766404092395573
+    - rid: 367766467262545973
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -50,7 +50,7 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 367766404092395574
+    - rid: 367766467262545974
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -59,20 +59,20 @@ MonoBehaviour:
           _value:
             mantissa: 1.5
             exponent: 2
-    - rid: 367766404092395575
+    - rid: 367766467262545975
       type: {class: RestartScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
-    - rid: 367766404092395576
+    - rid: 367766467262545976
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 53d76036188af0f46bb1c8a21ad9afd2, type: 2}
         modifier: {fileID: 11400000, guid: 40cbc90550c89f447a9caf1c4c433d64, type: 2}
-    - rid: 367766404092395577
+    - rid: 367766467262545977
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: gj1_done
-    - rid: 367766404092395578
+    - rid: 367766467262545978
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}

@@ -15,11 +15,11 @@ MonoBehaviour:
   id: rehearsal
   tags: []
   activeWhen:
-    rid: 367766404092395521
+    rid: 367766467262545921
   references:
     version: 2
     RefIds:
-    - rid: 367766404092395521
+    - rid: 367766467262545921
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
