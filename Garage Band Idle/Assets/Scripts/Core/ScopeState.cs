@@ -5,7 +5,6 @@ using RidiculousGaming.GarageBandIdle.Economy;
 namespace RidiculousGaming.GarageBandIdle
 {
     // The one record an event leaves in its host scope (design doc 12.8).
-    [Serializable]
     public class ActiveEvent
     {
         public string eventId;
@@ -14,7 +13,6 @@ namespace RidiculousGaming.GarageBandIdle
     }
 
     // A timed buff (Encore) - absolute expiry, burns real time app-closed (design doc 9).
-    [Serializable]
     public class TimedBuff
     {
         public string buffId;
@@ -24,7 +22,6 @@ namespace RidiculousGaming.GarageBandIdle
     // A song written during a run (tier = the run's Catalog) or kept forever
     // (root = Discography). Chapter 6 machinery; the field exists because the
     // schema is complete from day one (design doc 12.3).
-    [Serializable]
     public class SongEntry
     {
         public string songId;
@@ -37,7 +34,6 @@ namespace RidiculousGaming.GarageBandIdle
     // because it is here - no clear method to forget to update.
     // Abstract, like every payload above a leaf: a scope class names the
     // concrete type it wants, so nothing can hold a payload by default.
-    [Serializable]
     public abstract class ScopeFacts
     {
         public Dictionary<string, BigNumber> balances = new();
@@ -64,7 +60,6 @@ namespace RidiculousGaming.GarageBandIdle
     // Never a payload itself - only the base the interior leaves derive, so
     // "can host an event" is a fact of the type rather than a question asked
     // of a scope that might answer no. The parallel of InteriorDefinition.
-    [Serializable]
     public abstract class InteriorFacts : ScopeFacts
     {
         public ActiveEvent activeEvent;
@@ -72,7 +67,6 @@ namespace RidiculousGaming.GarageBandIdle
 
     // A tier's payload. Nothing beyond what hosting brings; it exists because
     // a tier names its own concrete type like every other scope class does.
-    [Serializable]
     public class TierFacts : InteriorFacts
     {
     }
@@ -80,7 +74,6 @@ namespace RidiculousGaming.GarageBandIdle
     // Facts only the root holds. A separate payload rather than fields every
     // scope carries: a tier that cannot use them should not be able to hold
     // them, and the type says so instead of a load-time filter.
-    [Serializable]
     public class RootFacts : ScopeFacts
     {
         public Dictionary<string, int> roadieAllocation = new();       // chapterId to stationed count
@@ -97,7 +90,6 @@ namespace RidiculousGaming.GarageBandIdle
     // (lastActiveUtc) lives BESIDE the payload on ChapterScopeState, re-stamped
     // rather than cleared, and IS the pending claim (design doc 12.9) - nothing
     // about an idle offer is ever saved.
-    [Serializable]
     public class ChapterFacts : InteriorFacts
     {
     }

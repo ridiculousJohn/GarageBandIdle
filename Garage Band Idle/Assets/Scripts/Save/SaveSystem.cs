@@ -38,7 +38,6 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // The payload stays a raw token here and is read against the type the
         // scope's position in the definition tree dictates - a save never names
         // its own payload type.
-        [Serializable]
         private class SaveNode
         {
             public string scopeId;
