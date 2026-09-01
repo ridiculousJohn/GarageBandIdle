@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
   id: roadie_active
   tags: []
+  displayName: 
   stacking: 0
   effects:
   - target: production
@@ -24,7 +25,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 367766467262545988
+      rid: 7579425172932264021
   appliesWhen:
     rid: -2
   references:
@@ -32,7 +33,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766467262545988
+    - rid: 7579425172932264021
       type: {class: RoadieActiveBoost, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         perRoadie:

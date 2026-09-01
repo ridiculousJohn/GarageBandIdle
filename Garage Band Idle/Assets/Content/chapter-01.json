@@ -1,11 +1,12 @@
 {
   "type": "ChapterDefinition",
   "id": "ch1",
+  "displayName": "The Garage",
 
   "flags": ["album", "gj1_done", "gj2_done", "gj3_done"],
 
   "currencies": [
-    { "id": "ch1_records" }
+    { "id": "ch1_records", "displayName": "Garage Records" }
   ],
 
   "modifiers": [
@@ -30,6 +31,7 @@
   ],
 
   "rung": {
+    "label": "Play the Backyard Party",
     "offerCondition": {
       "type": "All",
       "conditions": [
@@ -49,6 +51,83 @@
     ]
   },
 
+  "sections": [
+    {
+      "title": "The Garage Floor",
+      "visibleWhen": { "type": "Always" },
+      "scopeId": "tier1",
+      "modules": [
+        { "prefabId": "currency_line", "contentId": "cash" },
+        {
+          "prefabId": "currency_line",
+          "contentId": "fans",
+          "visibleWhen": { "type": "FlagSet", "flagId": "fans_revealed" }
+        },
+        {
+          "prefabId": "currency_line",
+          "contentId": "rehearsal",
+          "visibleWhen": { "type": "FlagSet", "flagId": "rehearsal_revealed" }
+        },
+        {
+          "prefabId": "currency_line",
+          "contentId": "records",
+          "visibleWhen": { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1 }
+        },
+        { "prefabId": "jam_button", "contentId": "tap_producer" }
+      ]
+    },
+    {
+      "title": "The Band",
+      "visibleWhen": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 100 },
+      "scopeId": "tier1",
+      "modules": [
+        { "prefabId": "generator_list" }
+      ]
+    },
+    {
+      "title": "The Gear",
+      "visibleWhen": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 250 },
+      "scopeId": "tier1",
+      "modules": [
+        { "prefabId": "upgrade_list" }
+      ]
+    },
+    {
+      "title": "The Rehearsal Space",
+      "visibleWhen": { "type": "FlagSet", "flagId": "rehearsal_revealed" },
+      "scopeId": "tier1",
+      "modules": [
+        { "prefabId": "bar_group" }
+      ]
+    },
+    {
+      "title": "The Release",
+      "visibleWhen": { "type": "FlagSet", "flagId": "album" },
+      "scopeId": "ch1",
+      "modules": [
+        { "prefabId": "rung_button", "scopeId": "tier1" }
+      ]
+    },
+    {
+      "title": "Garage Jam",
+      "visibleWhen": { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1 },
+      "scopeId": "tier1",
+      "modules": [
+        { "prefabId": "event_row", "contentId": "garage_jam_1" },
+        { "prefabId": "event_row", "contentId": "garage_jam_2" },
+        { "prefabId": "event_row", "contentId": "garage_jam_3" }
+      ]
+    },
+    {
+      "title": "The Backyard Party",
+      "visibleWhen": { "type": "FlagSet", "flagId": "album" },
+      "scopeId": "ch1",
+      "modules": [
+        { "prefabId": "rung_button" }
+      ]
+    }
+  ],
+
   "children": [
     {
       "type": "TierDefinition",
@@ -59,14 +138,15 @@
       "flags": ["fans_revealed", "rehearsal_revealed"],
 
       "currencies": [
-        { "id": "cash", "tags": ["income"] },
-        { "id": "fans", "activeWhen": { "type": "FlagSet", "flagId": "fans_revealed" } },
-        { "id": "rehearsal", "activeWhen": { "type": "FlagSet", "flagId": "rehearsal_revealed" } }
+        { "id": "cash", "displayName": "Cash", "tags": ["income"] },
+        { "id": "fans", "displayName": "Fans", "activeWhen": { "type": "FlagSet", "flagId": "fans_revealed" } },
+        { "id": "rehearsal", "displayName": "Rehearsal", "activeWhen": { "type": "FlagSet", "flagId": "rehearsal_revealed" } }
       ],
 
       "producers": [
         {
           "id": "tap_producer",
+          "displayName": "Jam",
           "tags": ["production"],
           "produces": [
             { "currency": "cash", "stat": "yield", "value": 1 },
@@ -80,6 +160,7 @@
         },
         {
           "id": "band",
+          "displayName": "Local Buzz",
           "tags": ["production"],
           "produces": [
             { "currency": "fans", "stat": "rate", "value": 0.35 }
@@ -90,6 +171,7 @@
       "generators": [
         {
           "id": "practice_amp",
+          "displayName": "Practice Amp",
           "tags": ["gear", "production"],
           "availableWhen": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 100 },
           "costCurrency": "cash",
@@ -101,6 +183,7 @@
         },
         {
           "id": "drummer",
+          "displayName": "Drummer",
           "tags": ["gear", "bandmate", "production"],
           "availableWhen": { "type": "OwnedCountAtLeast", "generator": "practice_amp", "count": 3 },
           "costCurrency": "cash",
@@ -113,6 +196,7 @@
         },
         {
           "id": "bassist",
+          "displayName": "Bassist",
           "tags": ["gear", "bandmate", "production"],
           "availableWhen": { "type": "OwnedCountAtLeast", "generator": "drummer", "count": 5 },
           "costCurrency": "cash",
@@ -125,6 +209,7 @@
         },
         {
           "id": "guitarist",
+          "displayName": "Guitarist",
           "tags": ["gear", "bandmate", "production"],
           "availableWhen": { "type": "OwnedCountAtLeast", "generator": "bassist", "count": 5 },
           "costCurrency": "cash",
@@ -140,12 +225,14 @@
       "upgrades": [
         {
           "id": "stage_presence",
+          "displayName": "Stage Presence",
           "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 250 },
           "costCurrency": "cash",
           "cost": 250
         },
         {
           "id": "amp_strings",
+          "displayName": "New Strings",
           "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 500 },
           "costCurrency": "cash",
           "cost": 500,
@@ -155,6 +242,7 @@
         },
         {
           "id": "kit_upgrade",
+          "displayName": "Kit Upgrade",
           "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 5000 },
           "costCurrency": "cash",
           "cost": 5000,
@@ -164,6 +252,7 @@
         },
         {
           "id": "tight_set",
+          "displayName": "Tight Set",
           "gate": { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 30 },
           "costCurrency": "cash",
           "cost": 20000,
@@ -173,6 +262,7 @@
         },
         {
           "id": "play_for_crowd",
+          "displayName": "Play for a Crowd",
           "gate": { "type": "OwnedCountAtLeast", "generator": "drummer", "count": 1 },
           "costCurrency": "cash",
           "cost": 100,
@@ -182,6 +272,7 @@
         },
         {
           "id": "unlock_covers",
+          "displayName": "Learn Covers",
           "gate": { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 25 },
           "costCurrency": "cash",
           "cost": 200,
@@ -191,6 +282,7 @@
         },
         {
           "id": "cut_demo",
+          "displayName": "Time to Record",
           "gate": {
             "type": "All",
             "conditions": [
@@ -213,6 +305,7 @@
           "bars": [
             {
               "id": "cover_1",
+              "displayName": "Three-Chord Anthem",
               "fillCurrency": "rehearsal",
               "fillAmount": 100,
               "fillRate": 2,
@@ -222,6 +315,7 @@
             },
             {
               "id": "cover_2",
+              "displayName": "Parking-Lot Standard",
               "fillCurrency": "rehearsal",
               "fillAmount": 300,
               "fillRate": 2,
@@ -231,6 +325,7 @@
             },
             {
               "id": "cover_3",
+              "displayName": "The Crowd-Pleaser",
               "fillCurrency": "rehearsal",
               "fillAmount": 600,
               "fillRate": 2,
@@ -266,7 +361,18 @@
       "events": [
         {
           "id": "garage_jam_1",
-          "availableWhen": { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1 },
+          "displayName": "Garage Jam I",
+          "availableWhen": {
+            "type": "All",
+            "conditions": [
+              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1, "uiText": "1 Records" },
+              {
+                "type": "Not",
+                "uiText": "Already cleared",
+                "condition": { "type": "FlagSet", "flagId": "gj1_done" }
+              }
+            ]
+          },
           "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 150 },
           "timeLimitSeconds": 60,
           "handicaps": [
@@ -285,11 +391,17 @@
         },
         {
           "id": "garage_jam_2",
+          "displayName": "Garage Jam II",
           "availableWhen": {
             "type": "All",
             "conditions": [
-              { "type": "FlagSet", "flagId": "gj1_done" },
-              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 15 }
+              { "type": "FlagSet", "flagId": "gj1_done", "uiText": "Clear Garage Jam I first" },
+              {
+                "type": "Not",
+                "uiText": "Already cleared",
+                "condition": { "type": "FlagSet", "flagId": "gj2_done" }
+              },
+              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 15, "uiText": "15 Records" }
             ]
           },
           "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 300 },
@@ -311,11 +423,17 @@
         },
         {
           "id": "garage_jam_3",
+          "displayName": "Garage Jam III",
           "availableWhen": {
             "type": "All",
             "conditions": [
-              { "type": "FlagSet", "flagId": "gj2_done" },
-              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 30 }
+              { "type": "FlagSet", "flagId": "gj2_done", "uiText": "Clear Garage Jam II first" },
+              {
+                "type": "Not",
+                "uiText": "Already cleared",
+                "condition": { "type": "FlagSet", "flagId": "gj3_done" }
+              },
+              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 30, "uiText": "30 Records" }
             ]
           },
           "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 600 },
@@ -338,6 +456,7 @@
       ],
 
       "rung": {
+        "label": "Cut a Demo",
         "offerCondition": {
           "type": "All",
           "conditions": [

@@ -244,6 +244,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var def = ScriptableObject.CreateInstance<T>();
             def.EditorInit(id);
+            // A fixture default, so the closed-list name check (12.11) judges
+            // authored content and not the fixtures every suite builds.
+            def.displayName = id;
             return def;
         }
 
@@ -264,6 +267,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var def = ScriptableObject.CreateInstance<T>();
             def.EditorInit(id, tags);
+            // The same fixture default as MakeScope: the name check reads
+            // authored content, so a fixture never has to author one (12.11).
+            def.displayName = id;
             return def;
         }
     }

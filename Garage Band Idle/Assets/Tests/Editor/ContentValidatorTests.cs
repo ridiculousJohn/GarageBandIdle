@@ -69,6 +69,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Album = new Rung
             {
+                label = "Cut a Demo",
                 offerCondition = new All
                 {
                     conditions =
@@ -92,6 +93,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Capstone = new Rung
             {
+                label = "Play the Backyard Party",
                 offerCondition = new CurrencyAtLeast { currency = Ch1Records, threshold = 30 },
                 actions =
                 {
@@ -726,6 +728,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var inner = TestTree.MakeTier("tier_inner");
             inner.rung = new Rung
             {
+                label = "Play the Inner Set",
                 offerCondition = new CurrencyAtLeast { currency = f.Fans, threshold = 1 },
                 actions = { new AddCurrency { currencies = { f.Records }, amount = 1 } },
             };
@@ -747,6 +750,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var inner = TestTree.MakeTier("tier_inner");
             inner.rung = new Rung
             {
+                label = "Play the Inner Set",
                 offerCondition = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 },
                 actions = { new AddCurrency { currencies = { f.Records }, amount = 1 } },
             };
@@ -1415,7 +1419,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new ValidatorFixture();
             var sibling = f.AddSiblingChapter();
             sibling.Ch2.declaredFlags.Add("album");     // ch1 declares one of its own
-            sibling.Tier2.rung = new Rung { offerCondition = new Always(), actions = { new SetFlag { flagId = "album" } } };
+            sibling.Tier2.rung = new Rung { label = "Cut a Demo", offerCondition = new Always(), actions = { new SetFlag { flagId = "album" } } };
             AssertClean(f.Run());
         }
 
@@ -1617,5 +1621,227 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "BarsCompleted");
         }
 
+        // ---- the chapter's screen (12.11) ----
+
+        // Built the way import writes one: an open gate and a concrete scope on
+        // every module, so each test blanks exactly the field it is about.
+        private static UI.SectionDefinition Section(string title, ScopeDefinition scope,
+                                                    params UI.ModuleDefinition[] modules)
+        {
+            var section = new UI.SectionDefinition { title = title, visibleWhen = new Always(), scope = scope };
+            section.modules.AddRange(modules);
+            return section;
+        }
+
+        private static UI.ModuleDefinition Module(string prefabId, ScopeDefinition scope, Definition content = null) =>
+            new UI.ModuleDefinition { prefabId = prefabId, scope = scope, content = content };
+
+        // A chapter's section evaluating at a tier it encloses is the authored
+        // shape - the runtime reads the scope downward from the chapter node it
+        // already holds.
+        [Test]
+        public void Section_AtATierOfItsOwnChapter_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.sections.Add(Section("The Garage Floor", f.Tier1, Module("currency_line", f.Tier1, f.Cash)));
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void Section_AtASiblingChaptersScope_ScopeReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            f.Ch1.sections.Add(Section("The Garage Floor", sibling.Tier2));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
+                "evaluates at 'tier2', which is not 'ch1' or one of its descendants");
+        }
+
+        // The evaluation scope is what a gate reads outward from, so a
+        // chapter-scoped section cannot see a flag the tier below it declares.
+        [Test]
+        public void Section_GateReadingATierFlagFromTheChapter_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredFlags.Add("fans_revealed");
+            var section = Section("The Release", f.Ch1);
+            section.visibleWhen = new FlagSet { flagId = "fans_revealed" };
+            f.Ch1.sections.Add(section);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "FlagSet reads flag 'fans_revealed'");
+        }
+
+        [Test]
+        public void Section_GateReadingATierFlagFromTheTier_NoChainReach()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1.declaredFlags.Add("fans_revealed");
+            var section = Section("The Garage Floor", f.Tier1);
+            section.visibleWhen = new FlagSet { flagId = "fans_revealed" };
+            f.Ch1.sections.Add(section);
+            AssertNoFinding(f.Run(), ValidationCheck.ChainReach);
+        }
+
+        [Test]
+        public void Section_NullGate_Error()
+        {
+            var f = new ValidatorFixture();
+            var section = Section("The Garage Floor", f.Tier1);
+            section.visibleWhen = null;
+            f.Ch1.sections.Add(section);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "sections[0]: visibleWhen is unauthored");
+        }
+
+        [Test]
+        public void Section_EmptyTitle_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.sections.Add(Section("", f.Tier1));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "title is empty - the section's header is authored text");
+        }
+
+        [Test]
+        public void Section_AndModule_NullEntries_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.sections.Add(null);
+            f.Ch1.sections.Add(Section("The Garage Floor", f.Tier1, (UI.ModuleDefinition)null));
+            var report = f.Run();
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "chapter 'ch1' sections[0] is null.");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "chapter 'ch1' sections[1] modules[0] is null.");
+        }
+
+        // The runtime reads the binding outward from the MODULE's scope, so
+        // content the module cannot reach is a dark widget.
+        [Test]
+        public void Module_BoundContentOffItsOwnChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.sections.Add(Section("The Garage Floor", f.Tier1b, Module("currency_line", f.Tier1b, f.Cash)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "a module's bound content addresses 'cash' declared at 'tier1'");
+        }
+
+        [Test]
+        public void Module_BoundContentOnItsOwnChain_NoChainReach()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.sections.Add(Section("The Garage Floor", f.Tier1, Module("currency_line", f.Tier1, f.Cash)));
+            AssertNoFinding(f.Run(), ValidationCheck.ChainReach);
+        }
+
+        [Test]
+        public void Module_NoScope_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.sections.Add(Section("The Garage Floor", f.Tier1, Module("currency_line", null)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "import normalizes every module to a concrete scope");
+        }
+
+        [Test]
+        public void Module_EmptyPrefabId_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.sections.Add(Section("The Garage Floor", f.Tier1, Module("", f.Tier1)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "prefabId is empty - a module names its widget through the registry");
+        }
+
+        // Membership in the registry is the editor test's job; what a content
+        // check can answer is whether the key could be one at all.
+        [Test]
+        public void Module_PrefabIdOutsideTheGrammar_Error()
+        {
+            var f = new ValidatorFixture();
+            // The trailing newline is the case a $-anchored grammar lets through:
+            // the registry's exact lookup would never match it.
+            f.Ch1.sections.Add(Section("The Garage Floor", f.Tier1,
+                Module("Currency Line", f.Tier1), Module("currency_line\n", f.Tier1), Module("currency_line", f.Tier1)));
+            var report = f.Run();
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "prefabId 'Currency Line' is outside the grammar");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "prefabId 'currency_line\n' is outside the grammar");
+            Assert.AreEqual(2, report.OfCheck(ValidationCheck.UnresolvedReference).Count(),
+                $"the grammar key beside them is silent; got:\n{Dump(report)}");
+        }
+
+        // ---- displayName, on the closed list and nowhere else (12.11) ----
+
+        [Test]
+        public void DisplayName_MissingOnAClosedListFamily_Error()
+        {
+            var f = new ValidatorFixture();
+            var gig = f.AddGuardedEvent();
+            f.Cash.displayName = "";
+            f.Amp.displayName = "";
+            f.AmpStrings.displayName = "";
+            f.Cover1.displayName = "";
+            gig.displayName = "";
+            f.Ch1.displayName = "";
+            var report = f.Run();
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "CurrencyDefinition 'cash' at 'tier1' has no displayName");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "GeneratorDefinition 'practice_amp' at 'tier1' has no displayName");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "UpgradeDefinition 'amp_strings' at 'tier1' has no displayName");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "BarDefinition 'cover_1' at 'tier1' has no displayName");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "EventDefinition 'garage_jam' at 'tier1' has no displayName");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "ChapterDefinition 'ch1' at 'ch1' has no displayName");
+        }
+
+        // A name no widget renders is junk that reads as design intent, so the
+        // families off the list go unjudged.
+        [Test]
+        public void DisplayName_MissingOffTheClosedList_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.displayName = "";
+            f.Trigger.displayName = "";
+            f.Covers.displayName = "";
+            f.Root.displayName = "";
+            f.Tier1.displayName = "";
+            AssertClean(f.Run());
+        }
+
+        // The binding is the render site, so the requirement follows the
+        // binding rather than the family.
+        [Test]
+        public void DisplayName_MissingOnBoundContent_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.displayName = "";
+            f.Ch1.sections.Add(Section("The Garage Floor", f.Tier1, Module("jam_button", f.Tier1, f.Tap)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "binds 'tap_producer', which has no displayName");
+        }
+
+        [Test]
+        public void DisplayName_MissingOnAnUnboundProducer_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.displayName = "";
+            AssertClean(f.Run());
+        }
+
+        // Nothing else authored on the screen was ever going to reach that
+        // button, so the text is the rung's own content.
+        [Test]
+        public void Rung_EmptyLabel_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Album.label = "";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "label is empty - the rung button's text is the rung's own content");
+        }
     }
 }

@@ -33,8 +33,9 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public const string GroupName = "Content";
 
         // Ids become path segments, so the grammar is what keeps separators,
-        // "..", and case-games out of the filesystem.
-        private static readonly Regex IdGrammar = new("^[a-z0-9_]+$", RegexOptions.Compiled);
+        // "..", and case-games out of the filesystem. \z, not $: $ also matches
+        // before a final newline, and "cash\n" is a legal JSON string.
+        private static readonly Regex IdGrammar = new(@"\A[a-z0-9_]+\z", RegexOptions.Compiled);
 
         // The grammar alone does not keep RESERVED names out: Windows refuses
         // these as filenames even with an extension, so `aux.asset` passes every
@@ -278,7 +279,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     $"document '{Path.GetFileName(document.Path)}' declares a {dto.type} at the top; a document is the root or a chapter (12.14.5).");
 
             var scope = (ScopeDefinition)materialize(scopeType, ScopeAssetPath(options, document.Id, dto.id));
-            Init(build, scope, dto.id, dto.tags, ScopeAssetPath(options, document.Id, dto.id));
+            Init(build, scope, dto.id, dto.displayName, dto.tags, ScopeAssetPath(options, document.Id, dto.id));
             if (build.ScopesById.ContainsKey(dto.id))
                 throw new ContentImportException($"two scopes share the id '{dto.id}'; scope ids are tree-wide unique (12.3).");
             build.ScopesById[dto.id] = scope;
@@ -313,6 +314,12 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     throw new ContentImportException($"scope '{dto.id}' authors events; root cannot host one (12.3, 12.8).");
             }
 
+            // The key is real on every scope block, so a root or a tier
+            // authoring one names itself in the error rather than reading as a
+            // misspelling - the rung-on-root rule's shape (12.11).
+            if (scope is not ChapterDefinition && dto.sections.Count > 0)
+                throw new ContentImportException($"scope '{dto.id}' authors sections; only a chapter has a screen (12.11).");
+
             foreach (var currency in dto.currencies)
                 Declare<CurrencyDefinition>(build, scope, currency, document, options, materialize);
             foreach (var producer in dto.producers)
@@ -345,7 +352,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             RequireId(dto.id, typeof(T).Name);
             var path = AssetPath(options, document.Id, FamilyOf(typeof(T)), dto.id);
             var definition = (T)materialize(typeof(T), path);
-            Init(build, definition, dto.id, dto.tags, path);
+            Init(build, definition, dto.id, dto.displayName, dto.tags, path);
             var declared = build.Declared[scope];
             if (declared.ContainsKey(dto.id))
                 throw new ContentImportException($"scope '{scope.Id}' declares '{dto.id}' twice.");
@@ -353,9 +360,13 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             build.Built[dto] = definition;
         }
 
-        private static void Init(Build build, Definition definition, string id, List<string> tags, string path)
+        private static void Init(Build build, Definition definition, string id, string displayName,
+                                 List<string> tags, string path)
         {
             definition.EditorInit(id, tags == null ? Array.Empty<string>() : tags.ToArray());
+            // Not identity, so it is a plain field assign rather than part of
+            // EditorInit: the pass decides which families require one (12.11).
+            definition.displayName = displayName;
             build.Created.Add(definition);
             build.Paths[definition] = path;
         }
@@ -503,9 +514,37 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     ? null
                     : new Rung
                     {
+                        label = dto.rung.label,
                         offerCondition = BuildCondition(build, scope, dto.rung.offerCondition),
                         actions = dto.rung.actions.Select(a => BuildAction(build, scope, a)).ToList(),
                     };
+            }
+
+            // The screen, rebuilt wholesale like every other nested authored
+            // object: nothing outside references a section, so there is no
+            // identity to preserve across an import.
+            if (scope is ChapterDefinition chapter)
+            {
+                chapter.sections.Clear();
+                foreach (var sectionDto in dto.sections)
+                {
+                    // Tree-wide like ResetScope's: the runtime reads it downward
+                    // from the chapter node it already holds, and whether the
+                    // scope is legal from here is the pass's reach check (12.12).
+                    var sectionScope = ResolveScope(build, sectionDto.scopeId, "section scope");
+                    var section = new UI.SectionDefinition
+                    {
+                        title = sectionDto.title,
+                        // The gate's references resolve outward from the
+                        // section's own evaluation scope, which is what lets a
+                        // chapter's section read a tier-declared flag (12.11).
+                        visibleWhen = BuildCondition(build, sectionScope, sectionDto.visibleWhen),
+                        scope = sectionScope,
+                    };
+                    foreach (var moduleDto in sectionDto.modules)
+                        section.modules.Add(BuildModule(build, chapter, sectionScope, moduleDto));
+                    chapter.sections.Add(section);
+                }
             }
 
             foreach (var child in dto.children)
@@ -513,6 +552,48 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 scope.children.Add(build.ScopesById[child.id]);
                 WireScope(build, child);
             }
+        }
+
+        // One module, in the order that breaks the default's circularity: the
+        // content id wants a scope to resolve from, and the default scope comes
+        // from the content's own home (12.11). An authored scope wins; with
+        // none, the content resolves from the SECTION's scope and its home
+        // supplies the default; with neither, the section's scope stands. The
+        // result is NORMALIZED - every written module carries a concrete scope,
+        // so the runtime computes no default.
+        private static UI.ModuleDefinition BuildModule(Build build, ChapterDefinition chapter,
+                                                       ScopeDefinition sectionScope, ModuleDto dto)
+        {
+            ScopeDefinition moduleScope;
+            Definition content = null;
+            if (!string.IsNullOrEmpty(dto.scopeId))
+            {
+                moduleScope = ResolveScope(build, dto.scopeId, "module scope");
+                if (!string.IsNullOrEmpty(dto.contentId))
+                    content = Resolve<Definition>(build, moduleScope, dto.contentId, "module content");
+            }
+            else if (!string.IsNullOrEmpty(dto.contentId))
+            {
+                content = ResolveWithHome(build, sectionScope, dto.contentId, "module content", out var home);
+                // Root-owned content (Records) is readable from every chain, so
+                // a home outside this chapter's subtree lands the module on the
+                // chapter rather than off its own screen (12.11).
+                moduleScope = InSubtreeOf(build, chapter, home) ? home : chapter;
+            }
+            else
+            {
+                moduleScope = sectionScope;
+            }
+
+            return new UI.ModuleDefinition
+            {
+                prefabId = dto.prefabId,
+                content = content,
+                // Built once the scope is known: the gate reads outward from the
+                // module's own evaluation scope, not the section's.
+                visibleWhen = BuildCondition(build, moduleScope, dto.visibleWhen),
+                scope = moduleScope,
+            };
         }
 
         private static ProducesEntry Entry(Build build, ScopeDefinition scope, ProducesDto dto) => new()
@@ -632,13 +713,37 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         {
             if (string.IsNullOrEmpty(id))
                 return null;
+            var found = ResolveWithHome(build, from, id, use, out _);
+            return found as T
+                   ?? throw new ContentImportException(
+                       $"{use} at '{from.Id}' names '{id}', which is a {found.GetType().Name} and not a {typeof(T).Name}.");
+        }
+
+        // The one outward walk, reporting the scope that declared the hit. A
+        // module's default evaluation scope is its content's HOME, and the
+        // definition alone cannot say where that is (12.11).
+        private static Definition ResolveWithHome(Build build, ScopeDefinition from, string id, string use,
+                                                  out ScopeDefinition home)
+        {
             for (var scope = from; scope != null; scope = Parent(build, scope))
-                if (build.Declared[scope].TryGetValue(id, out var found))
-                    return found as T
-                           ?? throw new ContentImportException(
-                               $"{use} at '{from.Id}' names '{id}', which is a {found.GetType().Name} and not a {typeof(T).Name}.");
+            {
+                if (!build.Declared[scope].TryGetValue(id, out var found))
+                    continue;
+                home = scope;
+                return found;
+            }
             throw new ContentImportException(
                 $"{use} at '{from.Id}' names '{id}', which nothing on its chain declares (12.14.5).");
+        }
+
+        // The composed tree the pass walks does not exist during the build, so
+        // subtree membership is answered off the parent map the resolver uses.
+        private static bool InSubtreeOf(Build build, ScopeDefinition top, ScopeDefinition node)
+        {
+            for (var scope = node; scope != null; scope = Parent(build, scope))
+                if (scope == top)
+                    return true;
+            return false;
         }
 
         // SCOPE references resolve tree-wide: scope ids are tree-wide unique and

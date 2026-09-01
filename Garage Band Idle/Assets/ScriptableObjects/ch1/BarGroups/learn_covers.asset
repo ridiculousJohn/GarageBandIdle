@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.BarGroupDefinition
   id: learn_covers
   tags: []
+  displayName: 
   maxActive: 1
   bars:
   - {fileID: 11400000, guid: b2b3280b39b18c14c8aa98db70d86220, type: 2}

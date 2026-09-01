@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.BarDefinition
   id: cover_3
   tags: []
+  displayName: The Crowd-Pleaser
   fillCurrency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
   fillAmount:
     _value:
@@ -27,14 +28,14 @@ MonoBehaviour:
   availableWhen:
     rid: -2
   onComplete:
-  - rid: 367766467262545934
+  - rid: 7579425172932263938
   perFill: []
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766467262545934
+    - rid: 7579425172932263938
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}

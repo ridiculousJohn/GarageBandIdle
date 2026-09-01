@@ -323,23 +323,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // Each level gates on the previous one's completion flag AND a banked
         // Records threshold, which is what makes "come back later" the
-        // experience rather than a wall.
+        // experience rather than a wall. The exclusion leg is what keeps at
+        // most one jam startable at any moment - no selection rule anywhere.
         [Test]
         public void The_garage_jam_chain_ladders_on_the_previous_flag_and_records()
         {
-            Assert.AreEqual("balance records", Describe(Event("garage_jam_1").availableWhen));
-            Assert.AreEqual((BigNumber)1, Threshold(Event("garage_jam_1").availableWhen));
+            // Level one has no predecessor, so banked Records is the whole of
+            // its entry requirement.
+            var first = ((All)Event("garage_jam_1").availableWhen).conditions;
+            Assert.AreEqual(new[] { "balance records", "not flag gj1_done" }, first.Select(Describe).ToArray());
+            Assert.AreEqual((BigNumber)1, Threshold(first[0]));
+            // The uiText sits on the leg itself, which is what a disabled row
+            // lists (12.11).
+            Assert.AreEqual(new[] { "1 Records", "Already cleared" }, first.Select(c => c.uiText).ToArray());
 
-            var later = new (string id, string flag, double records)[]
+            var later = new (string id, string previousLeg, string ownLeg, double records, string previousText)[]
             {
-                ("garage_jam_2", "flag gj1_done", 15),
-                ("garage_jam_3", "flag gj2_done", 30),
+                ("garage_jam_2", "flag gj1_done", "not flag gj2_done", 15, "Clear Garage Jam I first"),
+                ("garage_jam_3", "flag gj2_done", "not flag gj3_done", 30, "Clear Garage Jam II first"),
             };
-            foreach (var (id, flag, records) in later)
+            foreach (var (id, previousLeg, ownLeg, records, previousText) in later)
             {
                 var legs = ((All)Event(id).availableWhen).conditions;
-                Assert.AreEqual(new[] { flag, "balance records" }, legs.Select(Describe).ToArray(), id);
-                Assert.AreEqual((BigNumber)records, Threshold(legs[1]), id);
+                Assert.AreEqual(new[] { previousLeg, ownLeg, "balance records" },
+                    legs.Select(Describe).ToArray(), id);
+                Assert.AreEqual((BigNumber)records, Threshold(legs[2]), id);
+                Assert.AreEqual(new[] { previousText, "Already cleared", $"{records} Records" },
+                    legs.Select(c => c.uiText).ToArray(), id);
             }
 
             var goals = new[] { 150, 300, 600 };
@@ -390,7 +400,116 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
+        // ---- section 12: the screen ----
+
+        // One name per family plus both button texts: nothing derives "Three-
+        // Chord Anthem" from `cover_3`, so a dropped name is invisible to every
+        // other check here (12.11).
+        [Test]
+        public void The_authored_names_and_rung_labels_match_the_content_doc()
+        {
+            Assert.AreEqual("The Garage", ch1.displayName);
+            Assert.AreEqual("Records", Find(root.declaredCurrencies, "records").displayName);
+            Assert.AreEqual("Garage Records", Find(ch1.declaredCurrencies, "ch1_records").displayName);
+            Assert.AreEqual("Cash", Find(tier1.declaredCurrencies, "cash").displayName);
+            // The Jam button binds the producer, and the binding is what
+            // requires the name - `band`, which nothing renders, stays unnamed.
+            Assert.AreEqual("Jam", Find(tier1.producers, "tap_producer").displayName);
+            Assert.AreEqual("Practice Amp", Find(tier1.generators, "practice_amp").displayName);
+            Assert.AreEqual("Time to Record", Find(tier1.upgrades, "cut_demo").displayName);
+            Assert.AreEqual("Three-Chord Anthem", Find(tier1.barGroups[0].bars, "cover_1").displayName);
+            Assert.AreEqual("Garage Jam I", Event("garage_jam_1").displayName);
+
+            Assert.AreEqual("Cut a Demo", tier1.rung.label);
+            Assert.AreEqual("Play the Backyard Party", ch1.rung.label);
+        }
+
+        [Test]
+        public void The_screen_is_the_seven_sections_of_the_content_doc()
+        {
+            Assert.AreEqual(7, ch1.sections.Count, "only a chapter has a screen, and this is all of it");
+            Assert.AreEqual(new[] { "The Garage Floor", "The Band", "The Gear", "The Rehearsal Space",
+                                    "The Release", "Garage Jam", "The Backyard Party" },
+                ch1.sections.Select(s => s.title).ToArray());
+
+            // Every gate is a flag or a monotonic fact - nothing here strobes
+            // with spending.
+            Assert.AreEqual(new[] { "Always", "earned cash", "earned cash", "flag rehearsal_revealed",
+                                    "flag album", "balance records", "flag album" },
+                ch1.sections.Select(s => Describe(s.visibleWhen)).ToArray());
+            Assert.AreEqual((BigNumber)100, Threshold(ch1.sections[1].visibleWhen));
+            Assert.AreEqual((BigNumber)250, Threshold(ch1.sections[2].visibleWhen));
+            Assert.AreEqual((BigNumber)1, Threshold(ch1.sections[5].visibleWhen));
+
+            // The two release regions evaluate at ch1, where the album flag
+            // lives; the rest read the tier's own facts.
+            Assert.AreEqual(new[] { "tier1", "tier1", "tier1", "tier1", "ch1", "tier1", "ch1" },
+                ch1.sections.Select(s => s.scope.Id).ToArray());
+        }
+
+        [Test]
+        public void Each_module_binds_its_content_and_carries_a_concrete_scope()
+        {
+            // The Records line is the one module whose content is ROOT-owned,
+            // so it normalizes onto the chapter instead of the section's tier.
+            Assert.AreEqual(new[]
+            {
+                "currency_line cash @tier1",
+                "currency_line fans @tier1",
+                "currency_line rehearsal @tier1",
+                "currency_line records @ch1",
+                "jam_button tap_producer @tier1",
+            }, Modules(0));
+
+            // A list module binds nothing - its content is the evaluation
+            // scope's own declaration lists - so it lands on its section.
+            Assert.AreEqual(new[] { "generator_list - @tier1" }, Modules(1));
+            Assert.AreEqual(new[] { "upgrade_list - @tier1" }, Modules(2));
+            Assert.AreEqual(new[] { "bar_group - @tier1" }, Modules(3));
+
+            // The release rung is TIER1's, so this module authors its scope
+            // even though the section around it evaluates at ch1.
+            Assert.AreEqual(new[] { "rung_button - @tier1" }, Modules(4));
+
+            // An event module binds one event: the header-line shape again.
+            Assert.AreEqual(new[]
+            {
+                "event_row garage_jam_1 @tier1",
+                "event_row garage_jam_2 @tier1",
+                "event_row garage_jam_3 @tier1",
+            }, Modules(5));
+
+            // The capstone button presses its own scope's rung, so the default
+            // - the section's ch1 - is what it wants.
+            Assert.AreEqual(new[] { "rung_button - @ch1" }, Modules(6));
+        }
+
+        // A reveal is the LINE module's gate: the renderer defines what
+        // appears, and the currency declares nothing about presentation.
+        [Test]
+        public void The_currency_header_lines_reveal_through_their_own_gates()
+        {
+            var lines = ch1.sections[0].modules;
+            Assert.IsNull(lines[0].visibleWhen, "cash is on screen from the first press");
+            Assert.AreEqual("flag fans_revealed", Describe(lines[1].visibleWhen));
+            Assert.AreEqual("flag rehearsal_revealed", Describe(lines[2].visibleWhen));
+            Assert.AreEqual("balance records", Describe(lines[3].visibleWhen));
+            Assert.AreEqual((BigNumber)1, Threshold(lines[3].visibleWhen));
+            Assert.IsNull(lines[4].visibleWhen, "the Jam button rides the section's own gate");
+
+            // All three jam rows are always visible, so once the section
+            // reveals it is never an empty box - a locked jam sits disabled.
+            Assert.IsTrue(ch1.sections[5].modules.All(m => m.visibleWhen == null));
+        }
+
         // ---- helpers ----
+
+        // "prefabId boundContent @normalizedScope" per module, in order - one
+        // string, because the three answers only mean anything together.
+        private static string[] Modules(int section) =>
+            ch1.sections[section].modules
+                .Select(m => $"{m.prefabId} {(m.content == null ? "-" : m.content.Id)} @{m.scope.Id}")
+                .ToArray();
 
         private static EventDefinition Event(string id) => Find(tier1.events, id);
 
@@ -423,6 +542,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             FlagSet c => $"flag {c.flagId}",
             BarsCompleted c => $"bars {c.group.Id} {c.count}",
             Not { condition: EventRewardPending pending } => $"not {pending.host.Id} reward pending",
+            Not { condition: FlagSet exclusion } => $"not flag {exclusion.flagId}",
             _ => condition.GetType().Name,
         };
 

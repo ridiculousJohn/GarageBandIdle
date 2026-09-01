@@ -14,8 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
   id: cut_demo
   tags: []
+  displayName: Time to Record
   gate:
-    rid: 367766467262545946
+    rid: 7579425172932263964
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   cost:
     _value:
@@ -23,22 +24,22 @@ MonoBehaviour:
       exponent: 0
   effects: []
   actions:
-  - rid: 367766467262545947
+  - rid: 7579425172932263965
   references:
     version: 2
     RefIds:
-    - rid: 367766467262545946
+    - rid: 7579425172932263964
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 367766467262545948
-        - rid: 367766467262545949
-    - rid: 367766467262545947
+        - rid: 7579425172932263966
+        - rid: 7579425172932263967
+    - rid: 7579425172932263965
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: album
-    - rid: 367766467262545948
+    - rid: 7579425172932263966
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -47,7 +48,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 1
-    - rid: 367766467262545949
+    - rid: 7579425172932263967
       type: {class: BarsCompleted, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

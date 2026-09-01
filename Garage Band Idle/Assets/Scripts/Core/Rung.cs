@@ -12,6 +12,11 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class Rung
     {
+        // The button's text ("Play the Backyard Party") - the rung's own
+        // content, since neither a section title nor any bound content was ever
+        // going to reach that button (12.11).
+        public string label;
+
         [SerializeReference, SubclassPicker] public Condition offerCondition;
         [SerializeReference, SubclassPicker] public List<GameAction> actions = new();
 

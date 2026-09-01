@@ -7,8 +7,8 @@
   "flags": ["ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen"],
 
   "currencies": [
-    { "id": "records" },
-    { "id": "roadies" }
+    { "id": "records", "displayName": "Records" },
+    { "id": "roadies", "displayName": "Roadies" }
   ],
 
   "modifiers": [

@@ -34,17 +34,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             GroupName = GroupName,
         };
 
+        // Every block on the closed list carries a displayName (12.11), so the
+        // preflight these fixtures all run through has nothing to say about the
+        // fixture itself - a producer stays unnamed, since only a binding would
+        // require one.
         private const string RootJson = @"{
             ""type"": ""RootDefinition"",
             ""id"": ""root"",
             ""declaredTags"": [""income""],
-            ""currencies"": [{ ""id"": ""records"" }]
+            ""currencies"": [{ ""id"": ""records"", ""displayName"": ""Records"" }]
         }";
 
         private const string ChapterJson = @"{
             ""type"": ""ChapterDefinition"",
             ""id"": ""ch1"",
-            ""currencies"": [{ ""id"": ""cash"", ""tags"": [""income""] }],
+            ""displayName"": ""The Garage"",
+            ""currencies"": [{ ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] }],
             ""producers"": [
                 { ""id"": ""tap"", ""produces"": [{ ""currency"": ""cash"", ""stat"": ""yield"", ""value"": 1 }] }
             ],
@@ -109,11 +114,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Write("ch1.json", @"{
                 ""type"": ""ChapterDefinition"",
                 ""id"": ""ch1"",
+                ""displayName"": ""The Garage"",
                 ""flags"": [""revealed""],
                 ""currencies"": [
-                    { ""id"": ""cash"", ""tags"": [""income""],
+                    { ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""],
                       ""activeWhen"": { ""type"": ""FlagSet"", ""flagId"": ""revealed"" } },
-                    { ""id"": ""plain"" }
+                    { ""id"": ""plain"", ""displayName"": ""Plain"" }
                 ],
                 ""children"": [{ ""type"": ""TierDefinition"", ""id"": ""tier1"" }]
             }");
@@ -199,8 +205,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // collision the runtime's own uniqueness rule refuses (12.12).
             Write("root.json", RootJson);
             Write("ch1.json", ChapterJson.Replace(
-                @"""currencies"": [{ ""id"": ""cash"", ""tags"": [""income""] }]",
-                @"""currencies"": [{ ""id"": ""cash"", ""tags"": [""income""] }, { ""id"": ""records"" }]"));
+                @"""currencies"": [{ ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] }]",
+                @"""currencies"": [{ ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] }, { ""id"": ""records"", ""displayName"": ""Records"" }]"));
 
             var thrown = Assert.Throws<ContentImportException>(Import);
             StringAssert.Contains("records", thrown.Message);
@@ -241,6 +247,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.Throws<ContentImportException>(Import);
         }
 
+        // A trailing newline is a legal JSON string, and a $-anchored grammar
+        // matches before it - the id would become a path segment and a runtime
+        // key that nothing typed by hand can ever name.
+        [Test]
+        public void An_id_with_a_trailing_newline_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ChapterJson.Replace(@"""id"": ""tap""", @"""id"": ""tap\n"""));
+
+            Assert.Throws<ContentImportException>(Import);
+        }
+
         // ---- the union contract ----
 
         [Test]
@@ -252,8 +270,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Root now names a kind with no class behind it. Nothing is written -
             // not root's assets, and not the chapter's either.
-            Write("root.json", RootJson.Replace(@"""currencies"": [{ ""id"": ""records"" }]",
-                @"""currencies"": [{ ""id"": ""records"" }], ""modifiers"": [{ ""id"": ""m"", ""appliesWhen"": { ""type"": ""Nope"" } }]"));
+            Write("root.json", RootJson.Replace(@"""currencies"": [{ ""id"": ""records"", ""displayName"": ""Records"" }]",
+                @"""currencies"": [{ ""id"": ""records"", ""displayName"": ""Records"" }], ""modifiers"": [{ ""id"": ""m"", ""appliesWhen"": { ""type"": ""Nope"" } }]"));
             Write("ch1.json", ChapterJson.Replace(@"""id"": ""tap""", @"""id"": ""tap_renamed"""));
 
             Assert.Throws<ContentImportException>(Import);
@@ -316,15 +334,190 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(before, after);
         }
 
+        // ---- the chapter's screen ----
+
+        // Two tiers deep on purpose: a module's default scope is its CONTENT's
+        // home (12.11), and only a home distinct from the section's own scope
+        // tells the two apart. The four modules are the three default branches
+        // plus an authored scope over the top of one.
+        private const string SectionsJson = @"{
+            ""type"": ""ChapterDefinition"",
+            ""id"": ""ch1"",
+            ""displayName"": ""The Garage"",
+            ""flags"": [""album""],
+            ""sections"": [
+                {
+                    ""title"": ""The Garage Floor"",
+                    ""visibleWhen"": { ""type"": ""Always"" },
+                    ""scopeId"": ""tier1a"",
+                    ""modules"": [
+                        { ""prefabId"": ""currency_line"", ""contentId"": ""cash"" },
+                        { ""prefabId"": ""currency_line"", ""contentId"": ""records"" },
+                        { ""prefabId"": ""generator_list"" },
+                        {
+                            ""prefabId"": ""rung_button"",
+                            ""scopeId"": ""tier1"",
+                            ""visibleWhen"": { ""type"": ""FlagSet"", ""flagId"": ""album"" }
+                        }
+                    ]
+                }
+            ],
+            ""children"": [
+                {
+                    ""type"": ""TierDefinition"",
+                    ""id"": ""tier1"",
+                    ""currencies"": [{ ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] }],
+                    ""children"": [{ ""type"": ""TierDefinition"", ""id"": ""tier1a"" }]
+                }
+            ]
+        }";
+
+        private static void WriteSectionsPair()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", SectionsJson);
+        }
+
+        [Test]
+        public void A_sections_block_imports_as_direct_references()
+        {
+            WriteSectionsPair();
+
+            Import();
+
+            var chapter = Load<ChapterDefinition>("ch1/ch1.asset");
+            var section = chapter.sections.Single();
+
+            Assert.AreEqual("The Garage Floor", section.title);
+            Assert.IsInstanceOf<Always>(section.visibleWhen, "Always is how an author says the gate is open");
+            Assert.AreSame(Load<TierDefinition>("ch1/tier1a.asset"), section.scope,
+                "the section's scope is the asset, not a copy");
+            Assert.AreEqual(new[] { "currency_line", "currency_line", "generator_list", "rung_button" },
+                section.modules.Select(m => m.prefabId).ToArray());
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/cash.asset"), section.modules[0].content,
+                "the binding is the asset the tier declares");
+            Assert.IsNull(section.modules[2].content, "a list module's content is its scope's own lists");
+            Assert.AreEqual("album", ((FlagSet)section.modules[3].visibleWhen).flagId,
+                "the module gate is built from the module's own scope, which reaches ch1's flag");
+        }
+
+        // Import NORMALIZES: every written module carries a concrete scope, so
+        // the runtime computes no default (12.11).
+        [Test]
+        public void Every_imported_module_carries_a_concrete_scope()
+        {
+            WriteSectionsPair();
+
+            Import();
+
+            var chapter = Load<ChapterDefinition>("ch1/ch1.asset");
+            var tier1 = Load<TierDefinition>("ch1/tier1.asset");
+            var modules = chapter.sections.Single().modules;
+
+            Assert.AreSame(tier1, modules[0].scope, "descendant content lands on its home, not the section's scope");
+            Assert.AreSame(chapter, modules[1].scope, "root-owned content lands on the chapter");
+            Assert.AreSame(Load<TierDefinition>("ch1/tier1a.asset"), modules[2].scope,
+                "a contentless module lands on its section's scope");
+            Assert.AreSame(tier1, modules[3].scope, "an authored scope wins over every default");
+        }
+
+        [Test]
+        public void An_unknown_key_in_a_section_block_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", SectionsJson.Replace(@"""title"": ""The Garage Floor""",
+                                                   @"""heading"": ""The Garage Floor"""));
+
+            Assert.Throws<ContentImportException>(Import);
+        }
+
+        [Test]
+        public void A_section_naming_a_scope_no_document_declares_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", SectionsJson.Replace(@"""scopeId"": ""tier1a""", @"""scopeId"": ""ghost_tier"""));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("section scope", thrown.Message);
+        }
+
+        [Test]
+        public void A_module_naming_content_nothing_declares_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", SectionsJson.Replace(@"""contentId"": ""cash""", @"""contentId"": ""ghost"""));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("module content", thrown.Message);
+        }
+
+        // The key is real on every scope block, so a scope that cannot hold one
+        // names itself in the error rather than reading as a misspelling.
+        [Test]
+        public void Sections_on_a_tier_or_on_the_root_abort()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ChapterJson.Replace(
+                @"{ ""type"": ""TierDefinition"", ""id"": ""tier1"" }",
+                @"{ ""type"": ""TierDefinition"", ""id"": ""tier1"", ""sections"": [{ ""title"": ""T"", ""visibleWhen"": { ""type"": ""Always"" }, ""scopeId"": ""tier1"" }] }"));
+
+            var onATier = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("scope 'tier1' authors sections", onATier.Message);
+
+            Write("root.json", RootJson.Replace(
+                @"""currencies"": [{ ""id"": ""records"", ""displayName"": ""Records"" }]",
+                @"""currencies"": [{ ""id"": ""records"", ""displayName"": ""Records"" }], ""sections"": [{ ""title"": ""T"", ""visibleWhen"": { ""type"": ""Always"" }, ""scopeId"": ""root"" }]"));
+            Write("ch1.json", ChapterJson);
+
+            var onTheRoot = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("scope 'root' authors sections", onTheRoot.Message);
+        }
+
+        // The importer copies prefabId as authored; the preflight is the one
+        // check, and it gates the writes before any of them happen.
+        [Test]
+        public void An_empty_prefab_id_aborts_through_the_preflight()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", SectionsJson.Replace(@"""prefabId"": ""generator_list""", @"""prefabId"": """""));
+            LogAssert.ignoreFailingMessages = true;   // the preflight logs every finding before it throws
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+
+            StringAssert.Contains("content validation failed", thrown.Message);
+            Assert.IsNull(Load<ChapterDefinition>("ch1/ch1.asset"), "nothing was written");
+        }
+
+        // Sections rebuild wholesale, so a second run appends nothing and the
+        // chapter keeps the guid every reference to it holds.
+        [Test]
+        public void A_second_import_rebuilds_the_sections_unchanged()
+        {
+            WriteSectionsPair();
+            Import();
+            var guid = AssetDatabase.AssetPathToGUID(ObjectRoot + "/ch1/ch1.asset");
+
+            Import();
+
+            var chapter = Load<ChapterDefinition>("ch1/ch1.asset");
+            var section = chapter.sections.Single();
+            Assert.AreEqual(guid, AssetDatabase.AssetPathToGUID(ObjectRoot + "/ch1/ch1.asset"));
+            Assert.AreEqual(4, section.modules.Count);
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/cash.asset"), section.modules[0].content);
+            Assert.AreSame(Load<TierDefinition>("ch1/tier1.asset"), section.modules[0].scope);
+        }
+
         // ---- authored numbers span what the runtime can compute ----
 
         private const string GeneratorJson = @"{
             ""type"": ""ChapterDefinition"",
             ""id"": ""ch1"",
-            ""currencies"": [{ ""id"": ""cash"", ""tags"": [""income""] }],
+            ""displayName"": ""The Garage"",
+            ""currencies"": [{ ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] }],
             ""generators"": [
                 {
                     ""id"": ""amp"",
+                    ""displayName"": ""Practice Amp"",
                     ""availableWhen"": { ""type"": ""Always"" },
                     ""costCurrency"": ""cash"",
                     ""baseCost"": 60,
@@ -417,8 +610,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void A_root_document_authoring_children_aborts()
         {
-            Write("root.json", RootJson.Replace(@"""currencies"": [{ ""id"": ""records"" }]",
-                @"""currencies"": [{ ""id"": ""records"" }], ""children"": [{ ""type"": ""ChapterDefinition"", ""id"": ""ch1"" }]"));
+            Write("root.json", RootJson.Replace(@"""currencies"": [{ ""id"": ""records"", ""displayName"": ""Records"" }]",
+                @"""currencies"": [{ ""id"": ""records"", ""displayName"": ""Records"" }], ""children"": [{ ""type"": ""ChapterDefinition"", ""id"": ""ch1"" }]"));
 
             var thrown = Assert.Throws<ContentImportException>(Import);
             StringAssert.Contains("roster", thrown.Message);

@@ -15,6 +15,7 @@ MonoBehaviour:
   id: tap_producer
   tags:
   - production
+  displayName: Jam
   produces:
   - currency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
     stat: yield
@@ -31,7 +32,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     condition:
-      rid: 367766467262545922
+      rid: 7579425172932263939
   - currency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
     stat: yield
     value:
@@ -53,7 +54,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766467262545922
+    - rid: 7579425172932263939
       type: {class: UpgradePurchased, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

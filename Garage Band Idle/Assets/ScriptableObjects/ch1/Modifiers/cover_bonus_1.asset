@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
   id: cover_bonus_1
   tags: []
+  displayName: 
   stacking: 0
   effects:
   - target: fans

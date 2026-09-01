@@ -769,9 +769,44 @@ namespace RidiculousGaming.GarageBandIdle
             var ctx = new ValidationContext(report, root, parentByScope,
                 declaringScopeByDefinition, treeScopes);
 
+            // A name the widgets put on screen by construction, which nothing
+            // derives from an id. The message sites itself, like the carried-tag
+            // findings, because this is a property of the asset and not of any
+            // container the walk is inside.
+            void RequireDisplayName(Definition definition, ScopeDefinition scope)
+            {
+                if (definition == null || !string.IsNullOrEmpty(definition.displayName))
+                    return;
+                report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
+                    $"{definition.GetType().Name} '{definition.Id}' at '{scope.Id}' has no displayName - a family the widgets render by construction needs its on-screen name (12.11).");
+            }
+
             // ---- container walk: every rung and trigger, in tree order ----
             foreach (var scope in treeScopes)
             {
+                // The CLOSED list (12.11): currencies, generators, upgrades,
+                // bars, events, and the chapter itself. Families off it go
+                // unjudged - a name no widget renders is junk that reads as
+                // design intent.
+                foreach (var named in scope.declaredCurrencies)
+                    RequireDisplayName(named, scope);
+                foreach (var named in scope.generators)
+                    RequireDisplayName(named, scope);
+                foreach (var named in scope.upgrades)
+                    RequireDisplayName(named, scope);
+                foreach (var namedGroup in scope.barGroups)
+                {
+                    if (namedGroup == null)
+                        continue;
+                    foreach (var named in namedGroup.bars)
+                        RequireDisplayName(named, scope);
+                }
+                if (scope is InteriorDefinition namedHost)
+                    foreach (var named in namedHost.events)
+                        RequireDisplayName(named, scope);
+                if (scope is ChapterDefinition namedChapter)
+                    RequireDisplayName(namedChapter, scope);
+
                 // A currency's activeWhen is judged at the currency's own home,
                 // which IS the scope declaring it - so the acting scope is this
                 // one, and its operands take the reach check from here (12.2).
@@ -801,6 +836,12 @@ namespace RidiculousGaming.GarageBandIdle
                             "offerCondition is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
                     else
                         interior.rung.offerCondition.Validate(ctx);
+                    // The button's text is the rung's own content (12.11):
+                    // nothing else authored on the screen reaches that button.
+                    ctx.SetSite($"scope '{scope.Id}' rung");
+                    if (string.IsNullOrEmpty(interior.rung.label))
+                        ctx.AddError(ValidationCheck.NullEntry,
+                            "label is empty - the rung button's text is the rung's own content (12.11).");
                     ValidateActionList(ctx, interior.rung.actions, $"scope '{scope.Id}' rung");
                 }
 
@@ -896,6 +937,110 @@ namespace RidiculousGaming.GarageBandIdle
                         continue;
                     }
                     ctx.RequireOnChain(permanent, "a permanent modifier entry");
+                }
+
+                // The chapter's screen (12.11). Each section and each module is
+                // its own container at its own evaluation scope, so a
+                // hand-authored asset's unreachable reference answers at boot
+                // and not only to the importer that happened not to write it.
+                if (scope is ChapterDefinition chapter)
+                {
+                    for (var i = 0; i < chapter.sections.Count; i++)
+                    {
+                        var section = chapter.sections[i];
+                        var siteBase = $"chapter '{chapter.Id}' sections[{i}]";
+                        if (section == null)
+                        {
+                            report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry, $"{siteBase} is null.");
+                            continue;
+                        }
+
+                        ctx.SetSite(siteBase);
+                        if (string.IsNullOrEmpty(section.title))
+                            ctx.AddError(ValidationCheck.NullEntry,
+                                "title is empty - the section's header is authored text (12.11).");
+
+                        // The evaluation scope is the chapter or one of its
+                        // descendants: the runtime reads it downward from the
+                        // chapter node the screen already holds.
+                        var sectionScopeUsable = false;
+                        if (section.scope == null)
+                            ctx.AddError(ValidationCheck.NullEntry, "names no evaluation scope.");
+                        else if (ctx.FindScope(section.scope) == null)
+                            ctx.AddError(ValidationCheck.UnresolvedReference,
+                                $"evaluates at '{section.scope.Id}', which is not a scope in this tree.");
+                        else if (!ctx.InSubtree(chapter, section.scope))
+                            ctx.AddError(ValidationCheck.ScopeReach,
+                                $"evaluates at '{section.scope.Id}', which is not '{chapter.Id}' or one of its descendants (12.11).");
+                        else
+                            sectionScopeUsable = true;
+
+                        if (section.visibleWhen == null)
+                            ctx.AddError(ValidationCheck.NullEntry,
+                                "visibleWhen is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
+                        else if (sectionScopeUsable)
+                        {
+                            ctx.EnterContainer(section.scope, $"section:{chapter.Id}[{i}]");
+                            ctx.SetSite($"{siteBase} visibleWhen");
+                            section.visibleWhen.Validate(ctx);
+                        }
+
+                        for (var j = 0; j < section.modules.Count; j++)
+                        {
+                            var module = section.modules[j];
+                            var site = $"{siteBase} modules[{j}]";
+                            if (module == null)
+                            {
+                                report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry, $"{site} is null.");
+                                continue;
+                            }
+
+                            ctx.SetSite(site);
+                            // Registry MEMBERSHIP is the editor test's job - the
+                            // registry is settings, not content. What is content
+                            // is whether the key can be one at all (12.11).
+                            if (string.IsNullOrEmpty(module.prefabId))
+                                ctx.AddError(ValidationCheck.NullEntry,
+                                    "prefabId is empty - a module names its widget through the registry (12.11).");
+                            else if (!UI.ModuleDefinition.PrefabIdGrammar.IsMatch(module.prefabId))
+                                ctx.AddError(ValidationCheck.UnresolvedReference,
+                                    $"prefabId '{module.prefabId}' is outside the grammar [a-z0-9_]+ - no registry entry can carry it (12.11).");
+
+                            var moduleScopeUsable = false;
+                            if (module.scope == null)
+                                ctx.AddError(ValidationCheck.NullEntry,
+                                    "names no evaluation scope - import normalizes every module to a concrete scope, so an empty one is hand-authoring that skipped the field (12.11).");
+                            else if (ctx.FindScope(module.scope) == null)
+                                ctx.AddError(ValidationCheck.UnresolvedReference,
+                                    $"evaluates at '{module.scope.Id}', which is not a scope in this tree.");
+                            else if (!ctx.InSubtree(chapter, module.scope))
+                                ctx.AddError(ValidationCheck.ScopeReach,
+                                    $"evaluates at '{module.scope.Id}', which is not '{chapter.Id}' or one of its descendants (12.11).");
+                            else
+                                moduleScopeUsable = true;
+                            if (!moduleScopeUsable)
+                                continue;
+
+                            ctx.EnterContainer(module.scope, $"module:{chapter.Id}[{i}][{j}]");
+                            ctx.SetSite(site);
+                            if (module.content != null)
+                            {
+                                // The runtime reads the binding outward from the
+                                // module's scope, so content off that chain is a
+                                // dark widget.
+                                ctx.RequireOnChain(module.content, "a module's bound content");
+                                if (string.IsNullOrEmpty(module.content.displayName))
+                                    ctx.AddError(ValidationCheck.NullEntry,
+                                        $"binds '{module.content.Id}', which has no displayName - the binding is the render site, so the requirement follows the binding (12.11).");
+                            }
+                            if (module.visibleWhen != null)
+                            {
+                                ctx.SetSite($"{site} visibleWhen");
+                                module.visibleWhen.Validate(ctx);
+                            }
+                        }
+                    }
+                    ctx.SetSite(null);
                 }
             }
 

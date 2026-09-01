@@ -14,12 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.CurrencyDefinition
   id: fans
   tags: []
+  displayName: Fans
   activeWhen:
-    rid: 367766467262545945
+    rid: 7579425172932263963
   references:
     version: 2
     RefIds:
-    - rid: 367766467262545945
+    - rid: 7579425172932263963
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

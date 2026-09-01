@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
   id: records_income
   tags: []
+  displayName: 
   stacking: 0
   effects:
   - target: income
@@ -24,7 +25,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 367766467262545970
+      rid: 7579425172932264001
   - target: income
     currencyId: 
     stat: yield
@@ -33,7 +34,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 367766467262545971
+      rid: 7579425172932264002
   appliesWhen:
     rid: -2
   references:
@@ -41,7 +42,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766467262545970
+    - rid: 7579425172932264001
       type: {class: LinearOnBalance, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         currency: {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}
@@ -49,7 +50,7 @@ MonoBehaviour:
           _value:
             mantissa: 2
             exponent: -2
-    - rid: 367766467262545971
+    - rid: 7579425172932264002
       type: {class: LinearOnBalance, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         currency: {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
   id: gj_tap_2
   tags: []
+  displayName: 
   stacking: 0
   effects:
   - target: tap_producer

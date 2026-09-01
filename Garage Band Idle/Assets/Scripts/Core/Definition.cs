@@ -13,6 +13,13 @@ namespace RidiculousGaming.GarageBandIdle
         [SerializeField] private string id;
         [SerializeField] private List<string> tags = new();
 
+        // The on-screen name, authored because nothing derives "Three-Chord
+        // Anthem" from `cover_3`. Required on the families the widgets render by
+        // construction and on any content a module binds; optional elsewhere
+        // (12.11). Public like every other authored member - only id and tags
+        // are private, because they are identity.
+        public string displayName;
+
         public string Id => id;
         public IReadOnlyList<string> Tags => tags;
 

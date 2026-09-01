@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ff77d597-62a9-412c-b32f-c1489e34fb56
-  modified: 2026-08-31T21:00:30.279Z
+  modified: 2026-09-01T19:10:42.714Z
 ---
 
 Verification loop for [[project-layout-and-workflow]], established during slice 3.5 (2026-07-21). Repo paths here are relative to the repo root as `<repo>/...`, since the checkout lives at a different absolute path on each of John's machines.
@@ -15,7 +15,7 @@ Resolve the editor rather than hardcoding it: read the version from `<repo>/Gara
 **Why:** Changes can be verified without John pressing Play: batchmode compiles the code, re-runs the JSON import, and runs the edit-mode suite. Only Play-mode behavior and inspector UI need his eyes.
 
 **How to apply:**
-- First check for a running **process named `Unity`** (`Unity Hub` and `Unity.Licensing.Client` are not it). If one exists his editor has the project open, batchmode aborts with "another Unity instance is running" and writes almost nothing; hand verification to him instead. **Ask before assuming he is not mid-test** - on 2026-08-12 he had the editor open to play the game while a batchmode run was fired at the same project.
+- First check for a running EDITOR process by executable PATH under `Hub\Editor` (`Get-Process | Where-Object { $_.Path -like '*Hub\Editor*' }`), never by name: the Unity CLI (`%LOCALAPPDATA%\Unity\bin\unity.exe`, left running as `unity mcp --project-path ...` by the unity-cli MCP server) is ALSO named `unity`, and on 2026-09-01 two of those read as an open editor and nearly blocked a verify run. `Unity Hub` and `Unity.Licensing.Client` are not it either. If a real editor exists his editor has the project open, batchmode aborts with "another Unity instance is running" and writes almost nothing; hand verification to him instead. **Ask before assuming he is not mid-test** - on 2026-08-12 he had the editor open to play the game while a batchmode run was fired at the same project.
 - **The lockfile is NOT that check.** `<repo>/Garage Band Idle/Temp/UnityLockfile` - ONE level down, not doubly nested (a stray empty `Garage Band Idle/Garage Band Idle/Logs/` exists and invites the wrong path) - is left behind by BATCHMODE too whenever it exits on compile errors, and the next run then aborts without writing a log - leaving the PREVIOUS run's log sitting there to be grepped as if it were this run's. That is how a false green happens: delete the log before launching and refuse any log whose timestamp predates the launch. Treating its presence as "the editor is open" stalls the loop; treating its absence as "safe to run" misses an editor that has not written it yet. Check the process, then delete a stale lockfile before launching.
 - **Unity batchmode is the ONLY compiler allowed here** (John, 2026-08-20). No Roslyn/csc, no
   dotnet, no hand-assembled reference list, ever, unless he asks for it by name. Its result is

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
   id: idle_base
   tags: []
+  displayName: 
   stacking: 0
   effects:
   - target: 
@@ -26,13 +27,13 @@ MonoBehaviour:
     formula:
       rid: -2
   appliesWhen:
-    rid: 367766467262545984
+    rid: 7579425172932264017
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 367766467262545984
+    - rid: 7579425172932264017
       type: {class: IdleAccumulation, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.CurrencyDefinition
   id: roadies
   tags: []
+  displayName: Roadies
   activeWhen:
     rid: -2
   references:

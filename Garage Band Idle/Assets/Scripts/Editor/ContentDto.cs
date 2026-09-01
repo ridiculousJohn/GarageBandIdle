@@ -194,6 +194,9 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     internal abstract class DefinitionDto
     {
         public string id;
+        // The on-screen name every Definition carries; required on the closed
+        // list of families the widgets render (12.11), judged by the pass.
+        public string displayName;
         public List<string> tags = new();
     }
 
@@ -291,18 +294,42 @@ namespace RidiculousGaming.GarageBandIdle.Editor
 
     internal class RungDto
     {
+        public string label;
         public ConditionDto offerCondition;
         public List<ActionDto> actions = new();
     }
 
+    // A section of a chapter's screen. `scopeId` is the evaluation scope its
+    // conditions read from, resolved tree-wide like every other scope
+    // reference (12.11).
+    internal class SectionDto
+    {
+        public string title;
+        public ConditionDto visibleWhen;
+        public string scopeId;
+        public List<ModuleDto> modules = new();
+    }
+
+    // One widget on a section. Both ids are optional: an absent scopeId is the
+    // authoring convenience the importer normalizes away, and an absent
+    // contentId is a list module, which binds its scope's own lists (12.11).
+    internal class ModuleDto
+    {
+        public string prefabId;
+        public string contentId;
+        public ConditionDto visibleWhen;
+        public string scopeId;
+    }
+
     // One block per scope, nesting as authored: a document IS its top scope
-    // block. `rung` and `events` are interior-only; a root document authoring
-    // one is an import error rather than an unknown key, since the key is real
-    // on every other scope.
+    // block. `rung` and `events` are interior-only and `sections` is a
+    // chapter's alone; a scope authoring one it cannot hold is an import error
+    // rather than an unknown key, since the key is real on every other scope.
     internal class ScopeDto
     {
         public string type;
         public string id;
+        public string displayName;
         public List<string> tags = new();
         public List<CurrencyDto> currencies = new();
         public List<string> flags = new();
@@ -316,6 +343,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public List<TriggerDto> triggers = new();
         public List<EventDto> events = new();
         public RungDto rung;
+        public List<SectionDto> sections = new();
         public List<ScopeDto> children = new();
     }
 
