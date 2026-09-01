@@ -835,7 +835,10 @@ namespace RidiculousGaming.GarageBandIdle
                         ctx.AddError(ValidationCheck.NullEntry,
                             "offerCondition is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
                     else
+                    {
                         interior.rung.offerCondition.Validate(ctx);
+                        ValidateGateText(ctx, interior.rung.offerCondition);
+                    }
                     // The button's text is the rung's own content (12.11):
                     // nothing else authored on the screen reaches that button.
                     ctx.SetSite($"scope '{scope.Id}' rung");
@@ -1106,6 +1109,7 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 ctx.SetSite($"{site} availableWhen");
                 evt.availableWhen.Validate(ctx);
+                ValidateGateText(ctx, evt.availableWhen);
             }
 
             ctx.SetSite($"{site} goal");
@@ -1322,6 +1326,98 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.SetSite($"{siteBase} actions[{i}] ({action.GetType().Name})", i);
                 action.Validate(ctx);
             }
+        }
+
+        // The screen renders a gate's legs through Text (12.11), and Text is
+        // context-free, so the load pass formats every leg here: an authored
+        // pattern string.Format refuses, or a default join over a child with no
+        // text, is a throw or a hole at first render otherwise. Legs only - the
+        // top-level All is rendered as rows, so its own uiText is inert.
+        private static void ValidateGateText(ValidationContext ctx, Condition gate)
+        {
+            if (gate is All all && !string.IsNullOrEmpty(all.uiText))
+                ctx.AddWarning(ValidationCheck.InertOperand,
+                    "uiText on the gate's top-level All is never rendered - the button renders its legs as rows (12.11).");
+
+            var legs = UI.GateFeedback.Legs(gate);
+            for (var i = 0; i < legs.Count; i++)
+                CheckText(ctx, legs[i]);
+        }
+
+        // One node of a leg's text, judged before any screen asks for it. The
+        // answer says whether the node's text is sound, so a parent that
+        // composes over a broken child re-reports nothing - one finding per
+        // fault (12.11).
+        private static bool CheckText(ValidationContext ctx, Condition node)
+        {
+            // What a compound composes over, and how it reads without a
+            // pattern. A leaf's text is its uiText raw: nothing composes, so
+            // nothing can fail. A null slot is already a NullEntry finding from
+            // the kind's own Validate.
+            IReadOnlyList<Condition> parts;
+            string kind;
+            var joins = false;
+            switch (node)
+            {
+                case All all:
+                    parts = all.conditions;
+                    kind = "All";
+                    joins = true;
+                    break;
+                case Any any:
+                    parts = any.conditions;
+                    kind = "Any";
+                    joins = true;
+                    break;
+                case Not negation:
+                    parts = new[] { negation.condition };
+                    kind = "Not";
+                    break;
+                default:
+                    return true;
+            }
+
+            var sound = true;
+            for (var i = 0; i < parts.Count; i++)
+                if (parts[i] != null && !CheckText(ctx, parts[i]))
+                    sound = false;
+            if (!sound)
+                return false;
+
+            // An authored pattern is the whole text, so what it does with its
+            // parts is between it and string.Format - formatting it once here is
+            // the only way to learn that it throws.
+            if (!string.IsNullOrEmpty(node.uiText))
+            {
+                try
+                {
+                    _ = node.Text;
+                }
+                catch (System.FormatException)
+                {
+                    ctx.AddError(ValidationCheck.UnresolvedReference,
+                        $"{kind} uiText '{node.uiText}' is not a format over its {parts.Count} part(s) - a placeholder must name a part by index, {{0}} to {{{parts.Count - 1}}}, and a literal brace is written doubled (12.11).");
+                    return false;
+                }
+                return true;
+            }
+
+            // The default join reads every part's text, so a part with none
+            // leaves a hole in the line. A Not has no default and renders empty:
+            // as a leg that is the author's choice, and nested, the parent's own
+            // hole check reports it.
+            if (!joins)
+                return true;
+            var whole = true;
+            for (var i = 0; i < parts.Count; i++)
+            {
+                if (parts[i] == null || !string.IsNullOrEmpty(parts[i].Text))
+                    continue;
+                ctx.AddError(ValidationCheck.NullEntry,
+                    $"{kind} composes its text from its parts, and conditions[{i}] has none - author uiText on it, or a pattern on the {kind} (12.11).");
+                whole = false;
+            }
+            return whole;
         }
 
         // Set-then-wiped (error) and formula-reads-cleared (warn), both

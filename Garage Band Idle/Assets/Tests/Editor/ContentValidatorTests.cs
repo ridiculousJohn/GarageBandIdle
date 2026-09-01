@@ -75,7 +75,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     conditions =
                     {
                         new CurrencyAtLeast { currency = Fans, threshold = 100, uiText = "Need 100 fans" },
-                        new BarsCompleted { group = Covers, count = 1 },
+                        new BarsCompleted { group = Covers, count = 1, uiText = "Learn a cover" },
                     }
                 },
                 actions =
@@ -1842,6 +1842,169 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Album.label = "";
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
                 "label is empty - the rung button's text is the rung's own content");
+        }
+
+        // ---- gate text (12.11) ----
+
+        [Test]
+        public void GateText_LegPatternPastItsParts_Error()
+        {
+            var f = new ValidatorFixture();
+            ((All)f.Album.offerCondition).conditions.Add(new Any
+            {
+                uiText = "{2}",
+                conditions =
+                {
+                    new CurrencyAtLeast { currency = f.Fans, threshold = 10, uiText = "10 fans" },
+                    new FlagSet { flagId = "album", uiText = "a demo" },
+                }
+            });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "is not a format over its 2 part(s)");
+        }
+
+        [Test]
+        public void GateText_LegPatternOverItsParts_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            ((All)f.Album.offerCondition).conditions.Add(new Any
+            {
+                uiText = "{0} or {1}",
+                conditions =
+                {
+                    new CurrencyAtLeast { currency = f.Fans, threshold = 10, uiText = "10 fans" },
+                    new FlagSet { flagId = "album", uiText = "a demo" },
+                }
+            });
+            AssertNoFinding(f.Run(), ValidationCheck.UnresolvedReference);
+        }
+
+        [Test]
+        public void GateText_LegJoinOverATextlessPart_Error()
+        {
+            var f = new ValidatorFixture();
+            // No pattern, so the leg reads its parts in order - and a part with
+            // no text leaves a hole in the line the button would render.
+            ((All)f.Album.offerCondition).conditions.Add(new Any
+            {
+                conditions =
+                {
+                    new CurrencyAtLeast { currency = f.Fans, threshold = 10, uiText = "10 fans" },
+                    new FlagSet { flagId = "album" },
+                }
+            });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "composes its text from its parts, and conditions[1] has none");
+        }
+
+        [Test]
+        public void GateText_LegJoinOverNamedParts_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            ((All)f.Album.offerCondition).conditions.Add(new Any
+            {
+                conditions =
+                {
+                    new CurrencyAtLeast { currency = f.Fans, threshold = 10, uiText = "10 fans" },
+                    new FlagSet { flagId = "album", uiText = "a demo" },
+                }
+            });
+            AssertNoFinding(f.Run(), ValidationCheck.NullEntry);
+        }
+
+        // The event row renders its gate through the same Text, so a leg
+        // string.Format refuses is the same finding at either site.
+        [Test]
+        public void GateText_EventGateLegPatternPastItsParts_Error()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent().availableWhen = new All
+            {
+                conditions =
+                {
+                    new All
+                    {
+                        uiText = "{2}",
+                        conditions =
+                        {
+                            new CurrencyAtLeast { currency = f.Fans, threshold = 10, uiText = "10 fans" },
+                            new FlagSet { flagId = "album", uiText = "a demo" },
+                        }
+                    }
+                }
+            };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "is not a format over its 2 part(s)");
+        }
+
+        [Test]
+        public void GateText_UiTextOnTheTopLevelAll_Warning()
+        {
+            var f = new ValidatorFixture();
+            ((All)f.Album.offerCondition).uiText = "Cut a demo once you are ready";
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.InertOperand, "never rendered");
+        }
+
+        [Test]
+        public void GateText_NoUiTextOnTheTopLevelAll_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            AssertNoFinding(f.Run(), ValidationCheck.InertOperand);
+        }
+
+        // The parent composes over a broken child, so its own join would fail
+        // too; the child's finding is the one the author can act on.
+        [Test]
+        public void GateText_NestedPatternFailure_ReportedOnce()
+        {
+            var f = new ValidatorFixture();
+            ((All)f.Album.offerCondition).conditions.Add(new All
+            {
+                conditions =
+                {
+                    new Any
+                    {
+                        uiText = "{5}",
+                        conditions =
+                        {
+                            new CurrencyAtLeast { currency = f.Fans, threshold = 10, uiText = "10 fans" },
+                            new FlagSet { flagId = "album", uiText = "a demo" },
+                        }
+                    }
+                }
+            });
+            var report = f.Run();
+            Assert.AreEqual(1, report.OfCheck(ValidationCheck.UnresolvedReference).Count(), Dump(report));
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "is not a format over its 2 part(s)");
+        }
+
+        // A Not has no default and renders empty (12.4), so at leg level the
+        // silence is the author's choice, like the capstone's threshold leg.
+        [Test]
+        public void GateText_TextlessNotAtLegLevel_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            ((All)f.Album.offerCondition).conditions.Add(new Not { condition = new FlagSet { flagId = "album" } });
+            AssertNoFinding(f.Run(), ValidationCheck.NullEntry);
+        }
+
+        [Test]
+        public void GateText_TextlessNotInsideAJoiningLeg_Error()
+        {
+            var f = new ValidatorFixture();
+            // Nested, the same silence is a hole: the parent's join reads every
+            // part, so the Not's empty text is the part with none.
+            ((All)f.Album.offerCondition).conditions.Add(new All
+            {
+                conditions =
+                {
+                    new CurrencyAtLeast { currency = f.Fans, threshold = 10, uiText = "10 fans" },
+                    new Not { condition = new FlagSet { flagId = "album" } },
+                }
+            });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "composes its text from its parts, and conditions[1] has none");
         }
     }
 }

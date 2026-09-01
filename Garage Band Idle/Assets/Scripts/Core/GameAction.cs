@@ -31,12 +31,16 @@ namespace RidiculousGaming.GarageBandIdle
         public BigNumber amount;
         [SerializeReference, SubclassPicker] public PayoutFormula formula;
 
+        // The single evaluation every tied target shares (design doc 5): the
+        // formula when one is authored, else the constant. Execute deposits it;
+        // the rung feedback contract previews it through the same call (12.11).
+        public BigNumber Compute(GameContext ctx) => formula != null ? formula.Compute(ctx) : amount;
+
         public override void Execute(GameContext ctx)
         {
             // One evaluation, and one all-or-nothing commit: the targets are
             // tied, so a refusal on the second may not leave the first paid.
-            BigNumber value = formula != null ? formula.Compute(ctx) : amount;
-            ctx.DepositAll(currencies, value);
+            ctx.DepositAll(currencies, Compute(ctx));
         }
 
         public override void Validate(ValidationContext ctx)

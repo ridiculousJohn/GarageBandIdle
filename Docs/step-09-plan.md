@@ -267,7 +267,15 @@ implementation of the leg rules:
 
 - **Unmet legs**: the gate's TOP-LEVEL legs are the `All`'s list when the gate is an `All`, else
   the single condition (12.11). Each leg evaluates individually; unmet legs report their
-  `uiText`.
+  `Text`.
+- **Text**: one rule for every node (12.4). A leaf's `Text` is its `uiText`; a compound formats
+  its `uiText` as a `string.Format` pattern over its children's texts, 0-indexed, so a pattern with
+  no placeholders is a whole override; with no `uiText` an `All` joins "A, B, and C", an `Any`
+  "A, B, or C", and a `Not` renders nothing, since prose does not negate mechanically. Context-free
+  by design, so the load pass formats every rendered gate's legs once: a pattern `string.Format`
+  refuses and a default join over a textless child are errors, `uiText` on the top-level `All`
+  warns as inert (12.12). The two rendered gates are the rung's `offerCondition` and the event's
+  `availableWhen`.
 - **Progress**: threshold kinds additionally expose current/target. A new virtual on `Condition`
   - `bool Progress(GameContext ctx, out BigNumber current, out BigNumber target)`, default false
   - overridden by `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, and
@@ -396,6 +404,10 @@ every nested authored object. `chapter-01.json` gains the seven sections of cont
   unjudged.
 - An empty `displayName` on content a module binds: error - the binding is the render site, so
   the requirement follows the binding, not the family. An empty `label` on any rung: error.
+- A rendered gate's legs (rung `offerCondition`, event `availableWhen`) formatted through `Text`
+  at load: a pattern `string.Format` refuses is an error, a default join over a textless child is
+  an error, `uiText` on the top-level `All` is an inert-operand warning. A textless leg at the top
+  level is not judged - the capstone's threshold leg renders as progress alone.
 
 ## Tests
 
@@ -410,7 +422,10 @@ every nested authored object. `chapter-01.json` gains the seven sections of cont
 - **`Chapter1ContentTests`**: the seven sections spot-checked - count, order, gate kinds and
   numbers against the content doc table.
 - **`GateFeedback`**: a met gate answers no unmet legs; an unmet `All` lists exactly the unmet
-  legs' uiText; `Progress` numbers for each threshold kind.
+  legs' uiText; `Progress` numbers for each threshold kind. `Text`: a leaf is its uiText; the
+  default joins for `All` and `Any` at one, two, and three parts; a pattern formats by index,
+  reorders, omits, and overrides whole; `Not` has no default and formats an authored pattern;
+  composition recurses; a bad index throws; the text is the same met or unmet.
 - **`RungFeedback`**: a met gate answers pressable; preview equals what execution deposits when
   the first action is an `AddCurrency` (walkthrough-1's release numbers); a rung opening with
   any other kind previews nothing (the capstone's shape), and a second `AddCurrency` behind the

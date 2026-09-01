@@ -925,7 +925,12 @@ always legal - it clears the record and pays the reward if the goal was reached.
 
 A condition may carry an optional **`uiText`** label ("Needs 50 fans", "Claim your event reward
 first") — pure presentation data, never read by evaluation, rendered by the rung feedback
-contract (§12.11).
+contract (§12.11). A condition's rendered **`Text`** follows one rule at every node: a leaf's is its
+`uiText`; a compound (`All`, `Any`, `Not`) formats its `uiText` as a `string.Format` pattern over its
+children's texts (`{0}`, `{1}`, ...), so a pattern with no placeholders is a whole override, and with
+no `uiText` an `All` reads "A, B, and C", an `Any` "A, B, or C", and a `Not` nothing, since prose does
+not negate mechanically. `Text` is context-free - it describes the requirement, and whether it is
+met is a per-leg judgment - which is what lets the load pass compute every gate's text once (12.12).
 
 **Every condition evaluates — and every action list executes — in an explicit scope**, supplied by
 `GameContext`, never inferred and never inherited from a caller: a rung, upgrade, bar, or trigger
@@ -1345,7 +1350,10 @@ callbacks (AdManager / IAPManager) mutate through their own equally fail-closed 
 a buff, double and settle the idle offer, write an entitlement, grant Roadies) — they are not UI paths.
 
 **A disarmed rung explains itself**: the rung-button widget evaluates its gate's top-level legs
-individually at the two refresh moments and lists the unmet legs' `uiText` (§12.4); threshold
+individually at the two refresh moments and lists the unmet legs' `Text` (§12.4) - a leg's own
+`uiText`, or for a compound leg the one composition rule, so an `Any` inside a gate explains itself
+without a hand-written line unless the author wants one; the gate's top-level `All` is rendered as
+those rows and never as a text of its own. Threshold
 kinds additionally expose current/target so a leg can render as progress ("37/50 fans"). The
 widget reads the same condition objects the operation enforces — one implementation, no drift,
 exactly as payout previews call the rung's own formula (§5). Feedback is per-condition, never
@@ -1461,6 +1469,11 @@ per-feature: any kind an author gates with explains itself for free.
   `offerCondition`, a trigger's condition. An unauthored gate is dead content, and `Always` is how
   an author says the gate is open. Filters keep their optional conditions - a bar's `availableWhen`
   and a `ProducesEntry.condition` both default to active, because neither is a gate.
+- A rendered gate's text is computed at load: the legs of a rung's `offerCondition` and an event's
+  `availableWhen` are formatted through `Text` (12.4). A pattern `string.Format` refuses is an
+  error; a default join over a child with no text is an error, a hole in the sentence; `uiText` on
+  the top-level `All` itself warns, since the button renders its legs as rows and never that text.
+  A textless leg at the top level is the author's choice - a threshold leg renders as progress alone.
 - A polymorphic kind in data with no class behind it is an import error.
 
 ### 12.13 File layout
@@ -1506,6 +1519,7 @@ Assets/Scripts/
     IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar
   UI/
     SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs
+    GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
     Widgets/ (GeneratorRowUI, BarGroupUI, RungButtonUI, CurrencyHeaderUI, JamButtonUI, ...)
     NumberFormatter.cs  StoryBeatUI.cs  CollectScreenUI.cs  RoadieAllocationUI.cs
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)

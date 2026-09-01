@@ -28,14 +28,14 @@ MonoBehaviour:
   availableWhen:
     rid: -2
   onComplete:
-  - rid: 7579425172932263969
+  - rid: 7579425175531421728
   perFill: []
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425172932263969
+    - rid: 7579425175531421728
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}

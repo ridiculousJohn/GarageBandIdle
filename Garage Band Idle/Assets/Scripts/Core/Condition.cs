@@ -16,6 +16,53 @@ namespace RidiculousGaming.GarageBandIdle
 
         public abstract bool Evaluate(GameContext ctx);
 
+        // Threshold kinds expose current/target so an unmet leg renders as
+        // progress ("37/50 fans", 12.11), read from the same fields Evaluate
+        // reads - one implementation, no drift. Kinds with no number keep the
+        // default.
+        public virtual bool Progress(GameContext ctx, out BigNumber current, out BigNumber target)
+        {
+            current = BigNumber.Zero;
+            target = BigNumber.Zero;
+            return false;
+        }
+
+        // What this condition asks of the player, as the button renders it
+        // (12.11). A leaf's text is its uiText; a compound formats its uiText as
+        // a string.Format pattern over its children's texts ({0}, {1}, ...), so
+        // one rule composes every gate - a pattern with no placeholders is a
+        // whole override, and the kind's default stands in when none is
+        // authored.
+        public virtual string Text => uiText;
+
+        // The compound rule All, Any and Not share. Context-free by design: the
+        // text describes the requirement and UnmetLegs judges it, which is what
+        // lets the load pass compute every gate's text once (12.12). A
+        // FormatException is left to propagate - that pass is where it surfaces.
+        protected static string FormatOver(string pattern, IReadOnlyList<Condition> children)
+        {
+            var texts = new object[children.Count];
+            for (var i = 0; i < children.Count; i++)
+                texts[i] = children[i]?.Text ?? string.Empty;
+            return string.Format(pattern, texts);
+        }
+
+        // The default when a compound authors no pattern: the list a player
+        // would read, in authored order - "A and B", "A, B, and C".
+        protected static string JoinWith(IReadOnlyList<Condition> children, string connector)
+        {
+            var texts = new string[children.Count];
+            for (var i = 0; i < children.Count; i++)
+                texts[i] = children[i]?.Text ?? string.Empty;
+            if (texts.Length == 0)
+                return string.Empty;
+            if (texts.Length == 1)
+                return texts[0];
+            if (texts.Length == 2)
+                return $"{texts[0]} {connector} {texts[1]}";
+            return string.Join(", ", texts, 0, texts.Length - 1) + ", " + connector + " " + texts[texts.Length - 1];
+        }
+
         // Load-time reference and reach checks (design doc 12.12), driven by
         // ContentValidator: each kind validates its own references against the
         // acting scope, so a new kind ships its checks with its class.
@@ -29,6 +76,14 @@ namespace RidiculousGaming.GarageBandIdle
         public BigNumber threshold;
 
         public override bool Evaluate(GameContext ctx) => ctx.GetBalance(currency.Id) >= threshold;
+
+        public override bool Progress(GameContext ctx, out BigNumber current, out BigNumber target)
+        {
+            current = ctx.GetBalance(currency.Id);
+            target = threshold;
+            return true;
+        }
+
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(currency, "CurrencyAtLeast");
     }
 
@@ -39,6 +94,14 @@ namespace RidiculousGaming.GarageBandIdle
         public BigNumber threshold;
 
         public override bool Evaluate(GameContext ctx) => ctx.GetEarnedTotal(currency.Id) >= threshold;
+
+        public override bool Progress(GameContext ctx, out BigNumber current, out BigNumber target)
+        {
+            current = ctx.GetEarnedTotal(currency.Id);
+            target = threshold;
+            return true;
+        }
+
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(currency, "EarnedTotalAtLeast");
     }
 
@@ -49,6 +112,13 @@ namespace RidiculousGaming.GarageBandIdle
         public int count;
 
         public override bool Evaluate(GameContext ctx) => ctx.GetOwnedCount(generator.Id) >= count;
+
+        public override bool Progress(GameContext ctx, out BigNumber current, out BigNumber target)
+        {
+            current = ctx.GetOwnedCount(generator.Id);
+            target = count;
+            return true;
+        }
 
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(generator, "OwnedCountAtLeast");
     }
@@ -93,13 +163,24 @@ namespace RidiculousGaming.GarageBandIdle
         public Economy.BarGroupDefinition group;
         public int count = 1;
 
-        public override bool Evaluate(GameContext ctx)
+        public override bool Evaluate(GameContext ctx) => Completed(ctx) >= count;
+
+        public override bool Progress(GameContext ctx, out BigNumber current, out BigNumber target)
+        {
+            current = Completed(ctx);
+            target = count;
+            return true;
+        }
+
+        // The gate's answer and the progress readout are the same count, so it
+        // has one implementation and the two can never disagree (12.11).
+        private int Completed(GameContext ctx)
         {
             var completed = 0;
             foreach (var bar in group.bars)
                 if (bar != null && ctx.GetBarProgress(bar.Id) >= bar.fillAmount)
                     completed++;
-            return completed >= count;
+            return completed;
         }
 
         // The count reads each bar's progress by walking OUTWARD from the
@@ -238,6 +319,8 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override bool Evaluate(GameContext ctx) => conditions.TrueForAll(c => c.Evaluate(ctx));
 
+        public override string Text => string.IsNullOrEmpty(uiText) ? JoinWith(conditions, "and") : FormatOver(uiText, conditions);
+
         public override void Validate(ValidationContext ctx)
         {
             for (var i = 0; i < conditions.Count; i++)
@@ -257,6 +340,8 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override bool Evaluate(GameContext ctx) => conditions.Any(c => c.Evaluate(ctx));
 
+        public override string Text => string.IsNullOrEmpty(uiText) ? JoinWith(conditions, "or") : FormatOver(uiText, conditions);
+
         public override void Validate(ValidationContext ctx)
         {
             for (var i = 0; i < conditions.Count; i++)
@@ -275,6 +360,10 @@ namespace RidiculousGaming.GarageBandIdle
         [UnityEngine.SerializeReference, SubclassPicker] public Condition condition;
 
         public override bool Evaluate(GameContext ctx) => condition != null && !condition.Evaluate(ctx);
+
+        // No default: prose does not negate mechanically (12.4), so an
+        // unauthored Not renders empty and an author writes the line.
+        public override string Text => string.IsNullOrEmpty(uiText) ? string.Empty : FormatOver(uiText, new[] { condition });
 
         public override void Validate(ValidationContext ctx)
         {
