@@ -4,6 +4,10 @@ Companion to `garage-band-idle-design.md`. Every shape here is a §12 shape; thi
 data. Numbers are tuning values — expected to churn — and this file is their single home. The old
 `chapter-01-garage.json` seeded names and curves; deltas from it are listed at the end.
 
+Quoted names beside ids throughout are the authored `displayName` strings (§12.11's naming pass);
+a section's quoted name is its `title`, a rung's its `label`. Names are tuning values like the
+numbers - expected to churn, and this file is their single home.
+
 ---
 
 ## 1. Pacing targets
@@ -29,7 +33,8 @@ root
 
 **Root content** (declared once, game-wide; listed here because Ch. 1 is the first consumer):
 
-- Currencies: `records`, `roadies` (both accumulate, never spent in Ch. 1), `discography` (list, Ch. 6+).
+- Currencies: `records` ("Records"), `roadies` ("Roadies") (both accumulate, never spent in
+  Ch. 1), `discography` ("Discography"; list, Ch. 6+).
 - Permanent modifiers (§12.5/§12.6 — root-declared, root-applied via `permanentModifiers`;
   formula-shaped effects that exist from minute one):
   - `records_income`: `{target: income, stat: rate, × (1 + 0.02 × records.balance)}` plus the same
@@ -54,10 +59,10 @@ root
 
 | Id | Declared in | Tags | activeWhen | Notes |
 |---|---|---|---|---|
-| `cash` | tier1 | `income` | - | The income tag is what the Records and Roadie modifiers target (§12.2). |
-| `fans` | tier1 | - | `FlagSet(fans_revealed)` | **Never income-tagged, never roadie-buffable** - the farm throttle (§8.2). |
-| `rehearsal` | tier1 | - | `FlagSet(rehearsal_revealed)` | Fill pool for the cover bars. |
-| `ch1_records` | ch1 | - | - | Capstone gate counter; fed by the release payout, zeroed by the capstone's own reset (§5). |
+| `cash` ("Cash") | tier1 | `income` | - | The income tag is what the Records and Roadie modifiers target (§12.2). |
+| `fans` ("Fans") | tier1 | - | `FlagSet(fans_revealed)` | **Never income-tagged, never roadie-buffable** - the farm throttle (§8.2). |
+| `rehearsal` ("Rehearsal") | tier1 | - | `FlagSet(rehearsal_revealed)` | Fill pool for the cover bars. |
+| `ch1_records` ("Garage Records") | ch1 | - | - | Capstone gate counter; fed by the release payout, zeroed by the capstone's own reset (§5). |
 
 The two reveals are declared on the CURRENCY, not on the entries that pay it (§12.2). Fans is why:
 its sources are `band` plus every bandmate generator, so the per-entry form is a rule each new source
@@ -89,10 +94,10 @@ band ("Local Buzz")  [production]:                       # nothing presents it; 
 
 | Id | Tags | Base cost | Produces (rate) | availableWhen |
 |---|---|---|---|---|
-| `practice_amp` | `gear`, `production` | 60 | cash 0.5 | `EarnedTotalAtLeast(cash, 100)` |
-| `drummer` | `gear`, `bandmate`, `production` | 250 | cash 3, fans 0.02 | `OwnedCountAtLeast(practice_amp, 3)` |
-| `bassist` | `gear`, `bandmate`, `production` | 4,000 | cash 20, fans 0.02 | `OwnedCountAtLeast(drummer, 5)` |
-| `guitarist` | `gear`, `bandmate`, `production` | 30,000 | cash 130, fans 0.02 | `OwnedCountAtLeast(bassist, 5)` |
+| `practice_amp` ("Practice Amp") | `gear`, `production` | 60 | cash 0.5 | `EarnedTotalAtLeast(cash, 100)` |
+| `drummer` ("Drummer") | `gear`, `bandmate`, `production` | 250 | cash 3, fans 0.02 | `OwnedCountAtLeast(practice_amp, 3)` |
+| `bassist` ("Bassist") | `gear`, `bandmate`, `production` | 4,000 | cash 20, fans 0.02 | `OwnedCountAtLeast(drummer, 5)` |
+| `guitarist` ("Guitarist") | `gear`, `bandmate`, `production` | 30,000 | cash 130, fans 0.02 | `OwnedCountAtLeast(bassist, 5)` |
 
 The `gear` tag exists for the event handicap (×0 = "generators paused"); `bandmate` is the §3 set;
 `production` is what the roadie active boost targets (§2), carried by every source so nothing is
@@ -110,18 +115,18 @@ root's, per §2, because sources in every chapter carry them.
 
 | Id | Cost | Gate | Carries |
 |---|---|---|---|
-| `stage_presence` | 250 | `EarnedTotalAtLeast(cash, 250)` | nothing — pure latch; tap_producer's conditioned entry reads it |
-| `amp_strings` | 500 | `EarnedTotalAtLeast(cash, 500)` | effect `{target: practice_amp, stat: rate, ×2}` |
-| `kit_upgrade` | 5,000 | `EarnedTotalAtLeast(cash, 5000)` | effect `{target: drummer, currencyId: cash, stat: rate, ×2}` — fans line untouched |
-| `tight_set` | 20,000 | `CurrencyAtLeast(fans, 30)` | effect `{target: cash, stat: rate, ×1.5}` — currency-total, declared at cash's home ✓ |
+| `stage_presence` ("Stage Presence") | 250 | `EarnedTotalAtLeast(cash, 250)` | nothing — pure latch; tap_producer's conditioned entry reads it |
+| `amp_strings` ("New Strings") | 500 | `EarnedTotalAtLeast(cash, 500)` | effect `{target: practice_amp, stat: rate, ×2}` |
+| `kit_upgrade` ("Kit Upgrade") | 5,000 | `EarnedTotalAtLeast(cash, 5000)` | effect `{target: drummer, currencyId: cash, stat: rate, ×2}` — fans line untouched |
+| `tight_set` ("Tight Set") | 20,000 | `CurrencyAtLeast(fans, 30)` | effect `{target: cash, stat: rate, ×1.5}` — currency-total, declared at cash's home ✓ |
 
 **Content unlocks** (each sets a flag; revealed content gates on it):
 
 | Id | Cost | Gate | Action |
 |---|---|---|---|
-| `play_for_crowd` | 100 | `OwnedCountAtLeast(drummer, 1)` | `SetFlag(fans_revealed)` |
-| `unlock_covers` | 200 | `CurrencyAtLeast(fans, 25)` | `SetFlag(rehearsal_revealed)` |
-| `cut_demo` | 0 | `All[CurrencyAtLeast(fans, 50), BarsCompleted(learn_covers, 1)]` | `SetFlag(album)` — flag at **ch1**, so the release region persists across runs; the row's module hides on `Not(FlagSet(album))` |
+| `play_for_crowd` ("Play for a Crowd") | 100 | `OwnedCountAtLeast(drummer, 1)` | `SetFlag(fans_revealed)` |
+| `unlock_covers` ("Learn Covers") | 200 | `CurrencyAtLeast(fans, 25)` | `SetFlag(rehearsal_revealed)` |
+| `cut_demo` ("Time to Record") | 0 | `All[CurrencyAtLeast(fans, 50), BarsCompleted(learn_covers, 1)]` | `SetFlag(album)` — flag at **ch1**, so the release region persists across runs; the row's module hides on `Not(FlagSet(album))` |
 
 The gear *region* has no unlock and no flag: it gates directly on `EarnedTotalAtLeast(cash, 250)` (§2).
 
@@ -189,15 +194,25 @@ release would, an unfinished one is discarded.
 
 | Event | availableWhen | Goal | Timer | rewards |
 |---|---|---|---|---|
-| `garage_jam_1` | `CurrencyAtLeast(records, 1)` | `CurrencyAtLeast(cash, 150)` | 60s | `[AddModifier(ch1, gj_tap_1), SetFlag(gj1_done)]` |
-| `garage_jam_2` | `All[FlagSet(gj1_done), CurrencyAtLeast(records, 15)]` | `CurrencyAtLeast(cash, 300)` | 90s | `[RemoveModifier(ch1, gj_tap_1), AddModifier(ch1, gj_tap_2), SetFlag(gj2_done)]` |
-| `garage_jam_3` | `All[FlagSet(gj2_done), CurrencyAtLeast(records, 30)]` | `CurrencyAtLeast(cash, 600)` | 90s | `[RemoveModifier(ch1, gj_tap_2), AddModifier(ch1, gj_tap_3), SetFlag(gj3_done)]` |
+| `garage_jam_1` ("Garage Jam I") | `All[CurrencyAtLeast(records, 1), Not(FlagSet(gj1_done))]` | `CurrencyAtLeast(cash, 150)` | 60s | `[AddModifier(ch1, gj_tap_1), SetFlag(gj1_done)]` |
+| `garage_jam_2` ("Garage Jam II") | `All[FlagSet(gj1_done), Not(FlagSet(gj2_done)), CurrencyAtLeast(records, 15)]` | `CurrencyAtLeast(cash, 300)` | 90s | `[RemoveModifier(ch1, gj_tap_1), AddModifier(ch1, gj_tap_2), SetFlag(gj2_done)]` |
+| `garage_jam_3` ("Garage Jam III") | `All[FlagSet(gj2_done), Not(FlagSet(gj3_done)), CurrencyAtLeast(records, 30)]` | `CurrencyAtLeast(cash, 600)` | 90s | `[RemoveModifier(ch1, gj_tap_2), AddModifier(ch1, gj_tap_3), SetFlag(gj3_done)]` |
 
 All three share `onEnd: [ResetScope(tier1)]`, which runs whether or not the goal was reached -
 dismissal pays the bonus if it was, then clears the sprint either way, and the next run starts fresh
 with whatever bonus was earned. Nothing pre-event is at stake: entry already banked the run through
 the release's own gate before wiping tier1, so a failed attempt only loses what the attempt itself
 built.
+The `Not(FlagSet(gjN_done))` legs make the three gates mutually exclusive: at most one jam is
+startable at any moment - no selection rule anywhere, §12's rows merely render the facts. A
+cleared jam stops being startable for the rest of the chapter cycle, which the reward lists
+already assume (each removes its predecessor's modifier; a re-clear would pay nothing under
+`Replace` stacking); the capstone's `ResetScope(ch1)` clears the flags and re-arms the whole
+ladder for the replay.
+Gate leg `uiText` (§12.11's unmet-legs contract, rendered on a disabled row):
+`CurrencyAtLeast(records, N)` reads "N Records" (1/15/30); `FlagSet(gj1_done)` "Clear Garage
+Jam I first"; `FlagSet(gj2_done)` "Clear Garage Jam II first"; each `Not(FlagSet(gjN_done))`
+"Already cleared".
 `gj*_done` flags and the reward modifiers live at **ch1** — they survive tier resets, die at the
 capstone (§12.12's set-then-wiped check holds: nothing in these lists resets ch1). Both rungs
 guard with `Not(EventRewardPending(tier1))` (§9), so no reset can destroy an armed, unclaimed
@@ -221,17 +236,39 @@ capstone beat while `All[FlagSet(ch1_complete), Not(FlagSet(story_ch1_end_seen))
 
 ## 12. UI sections (on `ChapterDefinition`, §12.11; scopeId = evaluation scope)
 
-| Section | visibleWhen | scopeId | Modules |
-|---|---|---|---|
-| `garage_floor` | always | tier1 | currency header, Jam button (`FireProducer(tap_producer)`) |
-| `the_band` | `EarnedTotalAtLeast(cash, 100)` | tier1 | generator list |
-| `the_gear` | `EarnedTotalAtLeast(cash, 250)` | tier1 | upgrade list |
-| `rehearsal_space` | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
-| `the_release` | `FlagSet(album)` | ch1 | release rung button (+ "would bank: N" preview via the same formula) |
-| `garage_jam` | `CurrencyAtLeast(records, 1)` | tier1 | event module (start/dismiss) |
-| `backyard_party` | `FlagSet(album)` | ch1 | capstone rung button + `ch1_records`/30 readout |
+| Section | title | visibleWhen | scopeId | Modules |
+|---|---|---|---|---|
+| `garage_floor` | "The Garage Floor" | always | tier1 | currency header lines (below), Jam button (`FireProducer(tap_producer)`) |
+| `the_band` | "The Band" | `EarnedTotalAtLeast(cash, 100)` | tier1 | generator list |
+| `the_gear` | "The Gear" | `EarnedTotalAtLeast(cash, 250)` | tier1 | upgrade list |
+| `rehearsal_space` | "The Rehearsal Space" | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
+| `the_release` | "The Release" | `FlagSet(album)` | ch1 | release rung button (+ "would bank: N" preview via the same formula) |
+| `garage_jam` | "Garage Jam" | `CurrencyAtLeast(records, 1)` | tier1 | three event rows, one per jam, all always-visible (below) |
+| `backyard_party` | "The Backyard Party" | `FlagSet(album)` | ch1 | capstone rung button + `ch1_records`/30 readout |
 
 Every gate above is a flag or a monotonic fact — nothing strobes with spending (§2).
+
+**The currency header's lines.** Each line is its own module binding one currency - the renderer
+defines what appears, the currency declares nothing about presentation - so a reveal is the line
+module's `visibleWhen`, the existing mechanism:
+
+| Binds | visibleWhen |
+|---|---|
+| `cash` | always |
+| `fans` | `FlagSet(fans_revealed)` |
+| `rehearsal` | `FlagSet(rehearsal_revealed)` |
+| `records` (root's) | `CurrencyAtLeast(records, 1)` |
+
+No `ch1_records` line - the `backyard_party` readout is that currency's one presentation.
+
+**An event module binds one event** - the header-line shape again. Whether a locked jam shows as
+a disabled row or not at all is that module's authored `visibleWhen`: Ch. 1 authors all three
+rows always-visible, so once the section reveals it is never an empty box - locked jams sit
+disabled showing their unmet gate legs' `uiText` (§10). Whether a row is ACTIVE (tier1's record
+names its event) or STARTABLE (its `availableWhen` passes - the same gate `StartEvent` enforces)
+is runtime fact, never a widget decision; the `Not(FlagSet(gjN_done))` legs (§10) keep at most
+one Start live at a time. A design that wants within-cycle re-clears later is reward lists
+authored for re-entry - content, no system change.
 
 ---
 

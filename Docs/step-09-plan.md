@@ -19,26 +19,41 @@ runtime grows two things behind that surface: the session takes over tick PACING
 accumulator, and the flush every command owes it - below), and the tick pipeline records the
 report interpolation feeds on.
 
-## Questions before the slices
+## Decisions (2026-09-01)
 
-1. **Framework: how does Ctrl C build its screens?** The design's own vocabulary is prefab-shaped
-   - `ModuleRegistry` maps prefab ids via Addressables, "a new widget type is a prefab plus an
-   entry" (12.11) - which reads as uGUI (in the project as ugui 2.0.0), not UI Toolkit. The
-   reference game decides; slices C-E are blocked on the answer, A and B are not.
-2. **Tick cadence.** The driver currently ticks every `Update`, so `Refreshed` fires per frame and
-   the "coarse" refresh (12.11) degenerates into a per-frame repaint - and interpolation would
-   have nothing to interpolate. 12.13 already calls `TickSystem` "fixed-interval". The mechanism
-   is below (the screen host section); the open part is the number: what interval for
-   `tickIntervalSeconds`, and what does Ctrl C use for its tick and repaint pacing?
-3. **Content doc section 12 underspecifies the modules** - findings to bring back to the content
-   doc, not silent fixes:
-   - What the `garage_floor` currency header actually lists, and how lines reveal - a module
-     `visibleWhen` per line is the existing mechanism, no new visibility rule.
-   - The event module's shape. The ladder's `availableWhen` gates are NOT exclusive: after
-     `gj1_done` with 15 Records, `garage_jam_1` and `_2` both pass their gates, and after
-     `gj2_done` with 30 all three do - no authored fact picks one offered event. Exclusion legs
-     (`Not(FlagSet(gjN_done))`), a module listing every available event (which would make
-     replays authorable), or a selection rule - the content doc decides which is the design.
+The three pre-slice questions are settled; nothing blocks any slice.
+
+1. **Framework: UI Toolkit.** Ctrl C could not decide it - a sim ticking once a second under
+   per-frame display interpolation and a sim ticking per frame are indistinguishable by watching,
+   so the reference observation discriminates nothing and the choice fell to this game's own
+   shape: minimalistic presentation - container regions, vertical scrolling, fades and slides -
+   is flex layout, ScrollView, and USS transitions; styling absorbs screen-shape variance; UXML
+   and USS are text assets that diff cleanly. The structural consequence that matters: a UXML
+   carries no behavior, so widget controllers are plain C# classes, not components - which
+   shrinks the untestable perimeter to the panel shell (the registry and widget sections below
+   carry the shape). The known cost, accepted: freeform juice (particles over widgets) composites
+   less freely than uGUI; nothing in chapter 1 needs it. 12.11's "prefab" vocabulary joins the
+   reference-spelling reconciliation on landing.
+2. **Tick cadence: `tickIntervalSeconds` defaults to 0.25.** The same observation point applies -
+   smoothness comes from interpolation regardless, so the interval only bounds the latency of
+   autonomous changes (threshold crossings, bar completions, buff expiries becoming visible;
+   commands flush and land instantly) and keeps `Refreshed` an order of magnitude coarser than
+   the frame rate. Anything in 0.1-0.5 satisfies both; 0.25 is the authored default and the knob
+   makes retuning content, not code. The mechanism (session-held sample, whole-accumulation
+   ticking, the command flush) stands as written below.
+3. **Content doc section 12 answers, landed 2026-09-01.** The `garage_floor` header is four line
+   modules - cash always, fans and rehearsal on their reveal flags, root's Records on
+   `CurrencyAtLeast(records, 1)`; no `ch1_records` line, the capstone readout is its one
+   presentation. An event module binds ONE event, the header-line shape: ch1's `garage_jam`
+   section authors three rows, and whether a locked jam shows disabled or not at all is that
+   module's authored `visibleWhen` (ch1 authors all three always-visible, so the section is
+   never an empty box). Active and startable are runtime facts - the record, and the
+   `availableWhen` that `StartEvent` enforces - never widget decisions; a row that is neither
+   renders its unmet legs' `uiText`. The jam gates gained `Not(FlagSet(gjN_done))` exclusion
+   legs, so at most one Start is live at any moment - no selection rule anywhere, replays living
+   where walkthrough 13.3 puts them (the capstone reset re-arms the ladder). The naming pass
+   landed with it: `displayName` beside every id the widgets render, section `title`s, rung
+   `label`s, the jam gate legs' `uiText` - the content doc is their home.
 
 ## Existing systems this builds on
 
@@ -98,9 +113,10 @@ spellings are the JSON's, and the doc gets reconciled on landing:
   resolves TREE-WIDE at import like `ResetScope` - the runtime reads it downward from a node it
   holds - and 12.12 owns the reach rule: the chapter itself or one of its descendants (12.11).
 - **`content`** (module, optional): a direct `Definition` field, base-typed because modules bind
-  different families (a producer for the Jam button, a currency for a header line). List modules
-  (generators, upgrades, bars, events) bind nothing: their content is the evaluation scope's own
-  declaration lists.
+  different families (a producer for the Jam button, a currency for a header line, an event for
+  a jam row). List modules (generators, upgrades, bars) bind nothing: their content is the
+  evaluation scope's own declaration lists. Event modules are NOT list modules - each binds its
+  one event, the header-line shape, so a row's presence on screen is authored per module.
 - **`prefabId`** stays a string: it names a widget through the `ModuleRegistry`, and the registry
   entry - not a content asset - is its authored home. "A new widget type is a prefab plus an
   entry" is the point of the indirection.
@@ -120,24 +136,43 @@ presses its evaluation scope's own rung, exactly as `TryRung` reads it.
 
 ## ModuleRegistry
 
-A ScriptableObject mapping `prefabId` to an Addressables `AssetReference` per widget prefab.
-Hand-made like `GameConfig`, never imported, referenced by the screen host. An authored
-`prefabId` the registry cannot answer throws at bind time in every build (requirement 7 - static
-content cannot legitimately be unresolvable), and an editor test crosses every authored
-`prefabId` in the composed content against the registry so the fault is caught at test time, not
-first render.
+A ScriptableObject mapping `prefabId` to a direct `VisualTreeAsset` reference (the UXML is the
+"prefab" of the UI Toolkit shape; the authored field keeps its name). Hand-made like
+`GameConfig`, never imported, referenced by the screen host - so the UXMLs load with the scene as
+the registry's own dependency graph, no per-widget async anywhere, and a widget can be
+instantiated synchronously mid-refresh the moment its module turns visible. If a load screen
+ever wants the UI assets behind it, the registry itself becomes one Addressables entry in boot's
+async phase and its whole graph rides that one handle - the widgets never know. An authored
+`prefabId` the
+registry cannot answer throws at bind time in every build (requirement 7 - static content cannot
+legitimately be unresolvable), and an editor test crosses every authored `prefabId` in the
+composed content against the registry so the fault is caught at test time, not first render.
 
-The mapping alone is not a contract - the host must hand a prefab its session, scope, content,
-and refresh wiring without switching on widget types. Every widget prefab's root carries a
-`ModuleWidget`: the abstract MonoBehaviour base with `Bind(session, scope, content)`,
-`Refresh()`, and `Interpolate(realDt)`. The host instantiates, binds, and refreshes through the
-base and knows no concrete widget; the registry cross-check test also asserts each entry's
-prefab root carries one.
+A UXML carries no behavior, so the view mapping alone is not a contract - the host must hand a
+widget its session, scope, content, and refresh wiring without switching on widget types. The
+behavior side is `ModuleWidget`: the abstract plain-C# base with
+`Bind(session, scope, content, clock)`, `Refresh()`, and `Interpolate()` - both read the bound
+clock - each concrete widget wrapping the element tree its UXML
+instantiates. Widget kinds are a closed, code-defined set, so a code-side factory keyed by the
+same `prefabId` constructs the controller - the registry SO stays the home of the assets, code
+stays the home of the behavior, and "a new widget type is a prefab plus an entry" becomes a UXML,
+a factory line, and a registry entry. The host instantiates the UXML, constructs the controller
+over it, binds, and refreshes through the base, knowing no concrete widget; the registry
+cross-check test also asserts the factory answers every entry's id.
 
 ## The screen host and refresh
 
-One `UIRoot` MonoBehaviour, bound by `GameManager` after boot with the session and the registry -
-an explicit `Bind(session, registry)` call, no singleton, no serialized session reference. It is
+One `UIRoot` MonoBehaviour holding the `UIDocument` (the one UI object in the Boot scene), bound
+by `GameManager` from `Start`, never from the boot path: boot runs in `Awake`, every `Awake`
+precedes every `OnEnable`, and the `UIDocument` builds its tree in its own `OnEnable` - so a bind
+issued during boot reads a panel that does not exist yet, while `Start` runs after every
+`OnEnable` and the unconditional first render below has a tree to land on. The `UIDocument`
+stays enabled for the app's life - nothing toggles it, and a design that ever does owes a
+rebind, since disabling clears the tree every controller wraps. The bind is an explicit
+`Bind(session, registry, clock)` call, no singleton, no serialized session reference. `UIRoot`
+has no `Update`: the driver's one `Update` advances the clock, accumulates the session, and
+drives `Interpolate()` on the visible widgets through the host - plain-C# controllers get their
+frame from there. It is
 the ONE `Refreshed` subscriber, full stop: widgets subscribe to nothing, and on each event the
 host evaluates visibility, then calls `Refresh` on every visible widget through the
 `ModuleWidget` base - one subscriber, one dispatch order, and a widget instantiated mid-refresh
@@ -166,6 +201,18 @@ On each refresh, by phase:
 Nothing polls per frame (requirement 3): between refreshes only interpolation advances, on the
 tick report's slopes.
 
+**Time comes from one place.** `GameClock`, driver-owned, advanced at the top of every driver
+entry point before any game code runs: `Update`, the pause/resume hooks, and quit. Suspension is
+entered and left through lifecycle hooks, not frames - a resume reading a clock last advanced in
+`Update` would compute a zero idle window from the stale time and then tick the whole suspended
+gap as live production, past the idle fraction, cap, and threshold. Three raw read-only values:
+`RealTimeUtc` (advances at every entry point - the session's sample below), `DeltaSeconds` (the
+frame's delta while live, zero while paused, zero at a lifecycle resample - the game's one
+pause-sensitive line), and `GameTimeSeconds` (accumulated `DeltaSeconds`; suspension is real
+time, never game time). Consumers read the clock, never `Time.*` or `DateTime`, so everything in
+a frame sees the same time and nothing depends on execution order. The values are raw:
+`game_speed` and every other scaling stays in the sim's normal means.
+
 **The cadence lives in the SESSION - the clock sample included**, because pacing and the
 command surface cannot have two owners: widgets call `GameSession` directly, and a mutating
 command must settle the pending window before it changes the state that window accrued against
@@ -174,8 +221,8 @@ accumulator - reopens the same defect at the seam: a command's timestamp lands a
 driver's last sample, so flushing "through the command" stamps the pending window forward onto
 time it did not cover, the next driver dt re-includes the pre-command gap against post-command
 state, and the stamped windows overlap. So the session holds `lastSampleUtc` and computes
-elapsed itself: the driver calls `session.Accumulate(nowUtc)` every `Update` and holds no clock
-state at all. The sample advances UNCONDITIONALLY on every `Accumulate` and every command -
+elapsed itself: the driver passes `GameClock.RealTimeUtc` to `session.Accumulate(nowUtc)` every
+`Update` and holds no pacing state at all. The sample advances UNCONDITIONALLY on every `Accumulate` and every command -
 only PENDING is conditional - which is `TickBaseline`'s advance rule absorbed whole: the
 baseline class retires, since keeping it would be a second copy of the same rule. The session
 ticks ONCE with the WHOLE accumulation ending at the sample when pending crosses
@@ -212,11 +259,12 @@ driver already produces and the session tolerates by design (monotonic stamps, r
 timers); the clear costs at most one sub-interval of real production, the same order the
 per-frame path discards around a rollback.
 
-## The rung feedback contract
+## The gate feedback contract
 
-A plain static helper (`RungFeedback`), because the behavior is testable logic, not rendering:
+Two plain static helpers, because the behavior is testable logic, not rendering. `GateFeedback`
+is the generic half, over any gate in a context - the rung buttons and the event rows share one
+implementation of the leg rules:
 
-- **Pressability** is `IsOffered` - the same object `TryRung` enforces.
 - **Unmet legs**: the gate's TOP-LEVEL legs are the `All`'s list when the gate is an `All`, else
   the single condition (12.11). Each leg evaluates individually; unmet legs report their
   `uiText`.
@@ -225,7 +273,11 @@ A plain static helper (`RungFeedback`), because the behavior is testable logic, 
   - overridden by `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, and
   `BarsCompleted`, computing from the same fields `Evaluate` reads: one implementation, no drift.
   The capstone's `ch1_records`/30 readout IS this contract on its gate leg - no bespoke readout
-  widget.
+  widget - and `EventUI` consumes it directly on `availableWhen`.
+
+`RungFeedback` layers the rung-specific rest over it:
+
+- **Pressability** is `IsOffered` - the same object `TryRung` enforces.
 - **Payout preview**: "would bank: N" computes the rung's FIRST action through the same
   `Compute` the execution runs (12.5, section 5), and only when that action is an `AddCurrency`.
   First-only is what makes parity hold by construction: nothing has mutated when the first
@@ -237,9 +289,11 @@ A plain static helper (`RungFeedback`), because the behavior is testable logic, 
 
 ## Widgets (Chapter 1's set)
 
-Thin MonoBehaviours under `UI/Widgets/`; whatever has behavior of its own (the feedback helper,
-the preview, offer-line text assembly) lives in plain testable C#, and the prefab binding stays
-untested by design, like the driver shell. The set the ch1 sections table needs:
+Thin plain-C# `ModuleWidget` controllers under `UI/Widgets/`, each over its own UXML; whatever
+has behavior beyond element wiring (the feedback helper, the preview, offer-line text assembly)
+lives in its own plain testable C#. Controllers being ordinary objects, the screen-host EditMode
+test can construct them over imported content headlessly - only the `UIDocument`/panel shell
+stays untested by design, like the driver shell. The set the ch1 sections table needs:
 
 - **`CurrencyHeaderUI`** - one line per bound currency: balance via `NumberFormatter`,
   interpolated between refreshes.
@@ -255,10 +309,12 @@ untested by design, like the driver shell. The set the ch1 sections table needs:
   bar slopes, selection through `SetActiveBars`, the Rehearsal readout beside it.
 - **`RungButtonUI`** - the release and the capstone: the rung's `label` as the button text,
   `RungFeedback` legs + progress + preview, `TryRung` on press.
-- **`EventUI`** - the Garage Jam module: the offered event or events (question 3 decides the
-  shape, since the authored gates alone do not pick one), start/dismiss through the event
-  operations, the timer from the record's `remainingSeconds`, goal progress, reward-pending
-  state.
+- **`EventUI`** - one bound event's row. Its state is runtime fact, never a widget decision:
+  ACTIVE when the scope's record names its event (timer from `remainingSeconds`, goal progress,
+  dismiss, reward-pending state), STARTABLE when its `availableWhen` passes - the same gate
+  `StartEvent` enforces, and the exclusion legs keep at most one Start live - else disabled,
+  rendering its unmet top-level legs' `uiText` through `GateFeedback`, the same implementation
+  the rung buttons use. Start/dismiss through the event operations.
 - **`CollectScreenUI`** - the idle dialog: the offer's lines (currency, amount - all references,
   formatted), OK settles via `ClaimIdle`. "Double it" ARRIVES with step 10's AdManager - the
   button only requests the ad, and doubling-and-settling is the callback's transaction (12.9), so
@@ -283,8 +339,11 @@ mutations out of the slope by construction: a bar completion's `onComplete` can 
 `AddCurrency`, and the transaction's closing sweep runs trigger payouts inside the same
 boundary - measured as a state delta both would extrapolate as if they repeated every second.
 A widget's slope is realized delta over dt; `game_speed` rides in for free because the realized
-numbers already contain it. Between refreshes widgets advance displayed values by slope
-times real elapsed and snap to truth on the next refresh. A NON-TICK transaction CLEARS the
+numbers already contain it. A snap stamps the clock's `GameTimeSeconds`; between refreshes a
+widget displays truth plus slope times (game time now minus the stamp). Frame-state subtraction
+is the whole mechanism: no consumer samples time, so refresh and interpolation order cannot
+double-count a frame, and pause freezes every widget for free because paused frames add nothing
+to game time. A NON-TICK transaction CLEARS the
 report: a command can invalidate every measured slope - an event start lands the gear x0
 handicap, a chapter switch changes whose subtree the slopes even describe - so widgets sit at
 truth until the next tick measures the new state, one frozen interval at most. And extrapolation
@@ -313,7 +372,7 @@ at import), `prefabId` a string kept as one, unknown keys abort. `displayName` j
 definition block (required on the closed list, per 12.12 below), `title` every section block,
 and `label` the rung block. Sections rebuild wholesale on re-import like
 every nested authored object. `chapter-01.json` gains the seven sections of content doc section
-12, authored after question 3's answers and the naming pass land in the content doc.
+12; decision 3's answers and the naming pass are in the content doc, so nothing blocks authoring.
 
 ## Validation growth (12.12)
 
@@ -350,11 +409,17 @@ every nested authored object. `chapter-01.json` gains the seven sections of cont
   chapter passes; a sibling chapter's scope fails).
 - **`Chapter1ContentTests`**: the seven sections spot-checked - count, order, gate kinds and
   numbers against the content doc table.
-- **`RungFeedback`**: met gate answers pressable and no legs; unmet `All` lists exactly the unmet
-  legs' uiText; `Progress` numbers for each threshold kind; preview equals what execution
-  deposits when the first action is an `AddCurrency` (walkthrough-1's release numbers); a rung
-  opening with any other kind previews nothing (the capstone's shape), and a second `AddCurrency`
-  behind the first is not previewed.
+- **`GateFeedback`**: a met gate answers no unmet legs; an unmet `All` lists exactly the unmet
+  legs' uiText; `Progress` numbers for each threshold kind.
+- **`RungFeedback`**: a met gate answers pressable; preview equals what execution deposits when
+  the first action is an `AddCurrency` (walkthrough-1's release numbers); a rung opening with
+  any other kind previews nothing (the capstone's shape), and a second `AddCurrency` behind the
+  first is not previewed.
+- **`GameClock`**: real time always advances; a paused frame contributes zero `DeltaSeconds` and
+  game time holds; game time equals the sum of live deltas; a lifecycle resample refreshes real
+  time and contributes zero delta, so a resume sees the true away window and game time unmoved.
+  The stamp regression: a snap and an interpolation in the same frame display exactly truth,
+  since the stamp equals the frame's game time.
 - **`GameBoot`**: no recorded chapter boots to `NoChapter` (the stopgap rows retire); recorded
   path unchanged.
 - **Session pacing**: a sub-interval `Accumulate` ticks nothing; crossing the interval ticks
@@ -377,12 +442,14 @@ every nested authored object. `chapter-01.json` gains the seven sections of cont
   not a balance delta). The display clamps get their regressions: a depleting pool never
   extrapolates below zero, a completed bar never past `fillAmount`.
 - **Registry cross-check** (editor): every authored `prefabId` in the composed content has a
-  registry entry, and each entry's prefab root carries a `ModuleWidget`.
+  registry entry, every entry's `VisualTreeAsset` is non-null, and the controller factory
+  answers every registry id.
 - **Screen host**: an EditMode test builds the section view over the imported content headlessly
   and asserts the fresh-state visible set (`garage_floor` alone) and the post-reveal set - the
   host's structure logic in plain C# so this needs no play mode. The regression: a module whose
   `visibleWhen` crosses into visibility during a transaction is created and receives its first
-  refresh in that same refresh pass. Prefab binding itself stays untested by design.
+  refresh in that same refresh pass. The `UIDocument`/panel shell itself stays untested by
+  design.
 
 ## Not in step 9
 
@@ -394,30 +461,29 @@ asked for (12.11).
 ## Docs on landing
 
 The build-plan status line. 12.11's reference spellings reconciled to the object-field shapes
-(the `scopeId`/`contentId` naming predates 12.14.5's direct-reference rule - a doc finding this
-plan surfaces, landed only if John agrees). Content doc section 12 gains question 3's answers
-and the doc gains the naming pass before the sections are authored. 12.13 already lists every
-file this step creates.
+(the `scopeId`/`contentId` naming predates 12.14.5's direct-reference rule), and its "prefab"
+and "via Addressables" vocabulary to the UI Toolkit shape (decision 1; the registry holds direct
+`VisualTreeAsset` references) - doc findings this plan surfaces, landed only if John agrees. Content doc section 12's answers and the naming pass landed 2026-09-01
+(decision 3). 12.13 already lists every file this step creates.
 
 ## Landing order
 
-Five changesets, each compiling and green on its own. A and B are headless and unblocked; C-E
-wait on questions 1 and 2.
+Five changesets, each compiling and green on its own; all unblocked (the decisions above).
 
 - **A. The definitions + schema + validation + ch1 sections**: `SectionDefinition` /
   `ModuleDefinition` on `ChapterDefinition`, `Definition.displayName`, the section `title` and
   the rung `label`, the DTOs, the resolution order with its import-time normalization, the 12.12
   checks, the
-  sections block in `chapter-01.json` (after question 3 and the naming pass), importer +
-  validator + `Chapter1ContentTests` growth.
-- **B. The feedback contract**: `Condition.Progress` on the four threshold kinds, `RungFeedback`,
-  the payout preview, their tests.
-- **C. The host + first widgets**: `ModuleRegistry` + its asset, the `ModuleWidget` base,
-  `UIRoot` bound from `GameManager` with the unconditional first render, the session's pacing
-  (`Accumulate(nowUtc)` with the session-held sample, the command flush,
-  `GameConfig.tickIntervalSeconds`) with the driver rewired onto it and `TickBaseline` retired,
-  the canvas in the Boot scene, header/Jam/generator/upgrade widgets - the pre-reveal game
-  playable.
+  sections block in `chapter-01.json` from the updated content doc, importer + validator +
+  `Chapter1ContentTests` growth.
+- **B. The feedback contract**: `Condition.Progress` on the four threshold kinds, `GateFeedback`
+  and `RungFeedback` over it, the payout preview, their tests.
+- **C. The host + first widgets**: `GameClock`, `ModuleRegistry` + its asset and the controller
+  factory, the `ModuleWidget` base, `UIRoot` with its `UIDocument` bound from `GameManager` with
+  the unconditional first render, the session's pacing (`Accumulate(nowUtc)` with the
+  session-held sample, the command flush, `GameConfig.tickIntervalSeconds` defaulting 0.25) with
+  the driver rewired onto it and `TickBaseline` retired, the `UIDocument` in the Boot scene,
+  header/Jam/generator/upgrade widgets - the pre-reveal game playable.
 - **D. The remaining modules**: bars, the two rung buttons over `RungFeedback`, the event module,
   the tick report and interpolation over it - the full ch1 loop playable.
 - **E. The select and the dialog**: `ChapterSelectUI`, `CollectScreenUI`, the `EntryChapter`

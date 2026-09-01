@@ -1,11 +1,11 @@
 ---
 name: quote-directive-before-editing
-description: "The write gate lives in the project CLAUDE.md - this is the failure record behind it: nine dated evasions in five weeks, which is why the check is mechanical rather than a principle"
+description: "The write gate lives in the project CLAUDE.md - this is the failure record behind it: ten dated evasions in six weeks, which is why the check is mechanical rather than a principle"
 metadata:
   node_type: memory
   type: feedback
   originSessionId: 7994d8cd-29fb-4920-8032-e10d58f56a96
-  modified: 2026-08-28T20:42:28.979Z
+  modified: 2026-09-01T18:01:10.289Z
 ---
 
 **The rule is in the repo's `CLAUDE.md`, under "No write without a live order"** - moved there
@@ -15,7 +15,7 @@ instructions that override default behavior, and a gate belongs in the channel t
 judgment. This file is the failure record, kept because the frequency is the argument for a
 mechanical check.
 
-**Nine evasions in five weeks, each a new label for the same failure.** The shape is all that is
+**Ten evasions in six weeks, each a new label for the same failure.** The shape is all that is
 worth keeping - CLAUDE.md already states each one as a rule.
 
 - 2026-07-24 - an imperative inside an audit finding read as a directive; then an unrequested revert;
@@ -36,6 +36,14 @@ worth keeping - CLAUDE.md already states each one as a rule.
 - 2026-08-28 - a SATISFIED order re-read as standing policy: "same rebuttal rules as before" read as
   re-authorizing the fixes, then a dozen edits with no Acting-on line. Every other entry is a gate I
   did not notice crossing; this one is an order I believed was still open.
+- 2026-09-01 - manufactured the go myself: ended a long design reply with "want me to land this?",
+  read "yes of course, the time is a raw time..." as the go, and opened an Acting-on line quoting
+  it. His correction: the yes was not even answering the offer - it agreed with a design statement
+  in the wall of text above it. A bare "yes" attaches to whatever it attaches to; it is never an
+  edit authorization (his words: never, unless the question was exactly "do you want me to do it
+  this way"). An answer to my question is already on the non-order list (2026-08-19); appending an
+  offer to a substantive reply is how I construct one. State what is ready and stop - the order
+  arrives in his words or not at all.
 
 **Why the gate exists, in his words (2026-08-28): "I want to HEAR YOUR REASONING FOR EACH ACCEPTANCE
 OR DENIAL OF EVERY DEFECT so that I actually agree with the changes and avoid feature creep."** It is
