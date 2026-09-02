@@ -58,6 +58,13 @@ namespace RidiculousGaming.GarageBandIdle
         // is never left exposed to an exit's undoubled settle.
         public IdleOffer CurrentOffer { get; private set; }
 
+        // The last tick's realized movement, held out for interpolation (12.11)
+        // and never serialized. Null after any NON-tick transaction: a command
+        // can invalidate every measured slope (an event start lands a x0
+        // handicap, a switch changes whose subtree the slopes even describe),
+        // so widgets sit at truth until the next tick measures the new state.
+        public TickReport LastTick { get; private set; }
+
         // The 12.11 hook, one per completed transaction and none on a refusal;
         // step 9's widgets subscribe. Unconditional where the sweep is not,
         // which is what repaints the claim dialog when a callback marks it
@@ -139,6 +146,7 @@ namespace RidiculousGaming.GarageBandIdle
                     Root.currentChapterId = chapter.ScopeId;   // the durable root fact boot returns to
                     Phase = EnterChapter(chapter, nowUtc);
                 }
+                LastTick = null;
                 CloseTransaction(nowUtc);
             }
             finally
@@ -165,6 +173,7 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 SettleOffer(ForegroundChapter, honorDoubled: true);
                 Phase = SessionPhase.Live;
+                LastTick = null;
                 CloseTransaction(nowUtc);
                 return true;
             }
@@ -322,7 +331,7 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 lastSampleUtc = nowUtc;
                 pendingSeconds = 0;
-                TickSystem.Tick(Root, ForegroundChapter, config, realSeconds, nowUtc);
+                LastTick = TickSystem.Tick(Root, ForegroundChapter, config, realSeconds, nowUtc);
                 CloseTransaction(nowUtc);
             }
             finally
@@ -380,6 +389,7 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 if (!command(ctx))
                     return false;
+                LastTick = null;
                 CloseTransaction(ctx.NowUtc);
                 return true;
             }

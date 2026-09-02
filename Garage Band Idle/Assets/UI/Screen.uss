@@ -49,3 +49,58 @@
 .row-buy {
     min-width: 120px;
 }
+
+.pool-readout {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.bar-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.bar-name {
+    min-width: 160px;
+}
+
+.bar-fill {
+    flex-grow: 1;
+    margin-left: 8px;
+    margin-right: 8px;
+}
+
+.bar-progress {
+    min-width: 96px;
+}
+
+.bar-select {
+    min-width: 96px;
+}
+
+.legs {
+    margin-top: 4px;
+}
+
+.leg {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.preview {
+    font-size: 12px;
+}
+
+.event-row {
+    margin-bottom: 8px;
+}
+
+.event-status {
+    font-size: 12px;
+}
+
+.event-buttons {
+    flex-direction: row;
+}

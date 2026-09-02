@@ -13,7 +13,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             prefabId == "currency_line"
             || prefabId == "jam_button"
             || prefabId == "generator_list"
-            || prefabId == "upgrade_list";
+            || prefabId == "upgrade_list"
+            || prefabId == "bar_group"
+            || prefabId == "rung_button"
+            || prefabId == "event_row";
 
         // Unknown ids throw for the registry's reason (requirement 7): the id is
         // authored content, and the editor cross-check catches a miss before a
@@ -30,6 +33,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     return new GeneratorListUI(root);
                 case "upgrade_list":
                     return new UpgradeListUI(root);
+                case "bar_group":
+                    return new BarGroupUI(root);
+                case "rung_button":
+                    return new RungButtonUI(root);
+                case "event_row":
+                    return new EventUI(root);
                 default:
                     throw new InvalidOperationException(
                         $"No widget controller answers prefabId '{prefabId}' (design doc 12.11).");

@@ -16,7 +16,7 @@ MonoBehaviour:
   tags: []
   displayName: Play for a Crowd
   gate:
-    rid: 7579425176880152655
+    rid: 7579425178049314894
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   cost:
     _value:
@@ -24,17 +24,17 @@ MonoBehaviour:
       exponent: 2
   effects: []
   actions:
-  - rid: 7579425176880152656
+  - rid: 7579425178049314895
   references:
     version: 2
     RefIds:
-    - rid: 7579425176880152655
+    - rid: 7579425178049314894
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         generator: {fileID: 11400000, guid: 5b005e8c874631040b8ac5ad50552de8, type: 2}
         count: 1
-    - rid: 7579425176880152656
+    - rid: 7579425178049314895
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: fans_revealed

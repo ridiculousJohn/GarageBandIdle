@@ -1,0 +1,11 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement name="event" class="event-row">
+        <ui:Label name="name" class="row-name" />
+        <ui:Label name="status" class="event-status" />
+        <ui:VisualElement name="legs" class="legs" />
+        <ui:VisualElement name="buttons" class="event-buttons">
+            <ui:Button name="start" />
+            <ui:Button name="dismiss" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

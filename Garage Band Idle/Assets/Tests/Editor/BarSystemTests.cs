@@ -109,7 +109,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public BarDemand Resolve() => BarSystem.ResolveDemand(Root, Now);
 
         public void Settle(BarDemand demand, double dt) =>
-            BarSystem.ConsumeAndSettle(demand, dt, Now.AddSeconds(dt));
+            BarSystem.ConsumeAndSettle(demand, dt, Now.AddSeconds(dt), new TickReport(dt));
 
         public void Segment(double dt) => Settle(Resolve(), dt);
     }

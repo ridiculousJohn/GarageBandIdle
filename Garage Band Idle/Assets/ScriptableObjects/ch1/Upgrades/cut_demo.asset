@@ -16,7 +16,7 @@ MonoBehaviour:
   tags: []
   displayName: Time to Record
   gate:
-    rid: 7579425176880152603
+    rid: 7579425178049314843
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   cost:
     _value:
@@ -24,22 +24,22 @@ MonoBehaviour:
       exponent: 0
   effects: []
   actions:
-  - rid: 7579425176880152604
+  - rid: 7579425178049314844
   references:
     version: 2
     RefIds:
-    - rid: 7579425176880152603
+    - rid: 7579425178049314843
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 7579425176880152605
-        - rid: 7579425176880152606
-    - rid: 7579425176880152604
+        - rid: 7579425178049314845
+        - rid: 7579425178049314846
+    - rid: 7579425178049314844
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: album
-    - rid: 7579425176880152605
+    - rid: 7579425178049314845
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -48,7 +48,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 1
-    - rid: 7579425176880152606
+    - rid: 7579425178049314846
       type: {class: BarsCompleted, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

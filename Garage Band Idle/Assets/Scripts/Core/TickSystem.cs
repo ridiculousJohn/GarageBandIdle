@@ -15,21 +15,26 @@ namespace RidiculousGaming.GarageBandIdle
         // Guarded like AdvanceTimers: a null chapter or nonpositive dt no-ops.
         // The config is fail-loud instead (requirement 7) - a bad ceiling is a
         // content or caller fault, not a state the tick can answer quietly.
-        public static void Tick(RootScopeState root, ChapterScopeState foregroundChapter,
-                                GameConfig config, double realSeconds, DateTime tickEndUtc)
+        public static TickReport Tick(RootScopeState root, ChapterScopeState foregroundChapter,
+                                      GameConfig config, double realSeconds, DateTime tickEndUtc)
         {
             GameConfig.Require(config);
             if (foregroundChapter == null || realSeconds <= 0)
-                return;
+                return new TickReport(0);
 
+            // What the tick actually moved, for interpolation to read (12.11).
+            // Every segment records into the ONE report, so a segmented tick
+            // reports its whole dt's movement over Seconds = realSeconds.
+            var report = new TickReport(realSeconds);
             var tickStartUtc = tickEndUtc.AddSeconds(-realSeconds);
             var segmentStartUtc = tickStartUtc;
             foreach (var edge in Boundaries(root, foregroundChapter, tickStartUtc, tickEndUtc))
             {
-                RunSegment(root, foregroundChapter, config, segmentStartUtc, edge);
+                RunSegment(root, foregroundChapter, config, segmentStartUtc, edge, report);
                 segmentStartUtc = edge;
             }
-            RunSegment(root, foregroundChapter, config, segmentStartUtc, tickEndUtc);
+            RunSegment(root, foregroundChapter, config, segmentStartUtc, tickEndUtc, report);
+            return report;
         }
 
         // Every expiry timestamp strictly inside the tick, sorted and
@@ -82,7 +87,8 @@ namespace RidiculousGaming.GarageBandIdle
         // segment snapshot: a multiplier or condition live at segment start
         // governs the whole segment, expiring only at its edge.
         private static void RunSegment(RootScopeState root, ChapterScopeState foregroundChapter,
-                                       GameConfig config, DateTime segmentStartUtc, DateTime segmentEndUtc)
+                                       GameConfig config, DateTime segmentStartUtc, DateTime segmentEndUtc,
+                                       TickReport report)
         {
             var realDt = (segmentEndUtc - segmentStartUtc).TotalSeconds;
             var liveCtx = new GameContext(foregroundChapter, segmentStartUtc);
@@ -111,12 +117,15 @@ namespace RidiculousGaming.GarageBandIdle
                 amounts.Add(Producer.GetRate(liveCtx, pair.currency) * effDt);
             for (var i = 0; i < pairs.Count; i++)
                 if (amounts[i] != BigNumber.Zero)
+                {
                     liveCtx.Rebase(pairs[i].home).DepositResolved(pairs[i].currency.Id, amounts[i]);
+                    report.RecordDeposit(pairs[i].home, pairs[i].currency.Id, amounts[i]);
+                }
 
             // Consumption on scaled time, settlement stamped at the segment's
             // real end; then wall clocks burn real seconds - game_speed never
             // touches a timer.
-            BarSystem.ConsumeAndSettle(demand, effDt, segmentEndUtc);
+            BarSystem.ConsumeAndSettle(demand, effDt, segmentEndUtc, report);
             EventSystem.AdvanceTimers(root, foregroundChapter, realDt, segmentEndUtc);
         }
     }

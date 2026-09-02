@@ -135,11 +135,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // that resets the host re-stamps lastActiveUtc, and one that starts an
         // event writes a real expiry. Real elapsed is unrecoverable from a scaled
         // dt whenever game_speed is not 1, so the two arrive separately.
-        public static void ConsumeAndSettle(BarDemand demand, double dtSeconds, DateTime settlementUtc)
+        //
+        // The report takes the DRAW's realized numbers (12.11) and not the
+        // settlement's: a completion is one-shot, and a slope measured with it
+        // in would extrapolate the payout as if it repeated every second.
+        public static void ConsumeAndSettle(BarDemand demand, double dtSeconds, DateTime settlementUtc,
+                                            TickReport report)
         {
             if (demand == null || dtSeconds <= 0)
                 return;
-            Draw(demand, dtSeconds, settlementUtc);
+            Draw(demand, dtSeconds, settlementUtc, report);
             Settle(demand, settlementUtc);
         }
 
@@ -148,7 +153,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // earlier bar's draw is visible to a later one and an empty pool stalls
         // the rest - no totals to compute and nothing to divide. The move is a
         // SPEND: earnedTotals is untouched, because a bar's fill is not income.
-        private static void Draw(BarDemand demand, double dtSeconds, DateTime settlementUtc)
+        private static void Draw(BarDemand demand, double dtSeconds, DateTime settlementUtc, TickReport report)
         {
             foreach (var entry in demand.bars)
             {
@@ -162,11 +167,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     if (want <= BigNumber.Zero)
                         continue;
                     poolCtx.Spend(entry.pool.Id, want);
+                    report.RecordDraw(entry.poolHome, entry.pool.Id, want);
                 }
                 entry.filled = want;
                 // Progress lands from the snapshot's pre-fill value, which is the
                 // same number the crossing test compares against.
                 entry.scope.barProgress[entry.bar.Id] = entry.progressBefore + want;
+                report.RecordFill(entry.scope, entry.bar.Id, want);
             }
         }
 

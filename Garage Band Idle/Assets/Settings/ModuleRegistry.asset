@@ -21,3 +21,9 @@ MonoBehaviour:
     prefab: {fileID: 9197481963319205126, guid: 40541fe4003f12a4b9bb5edc73523dad, type: 3}
   - prefabId: upgrade_list
     prefab: {fileID: 9197481963319205126, guid: 37468190635ea564ab03e34e04523d31, type: 3}
+  - prefabId: bar_group
+    prefab: {fileID: 9197481963319205126, guid: 98c68a1b8bc5f5b44bdfc75ff2291031, type: 3}
+  - prefabId: rung_button
+    prefab: {fileID: 9197481963319205126, guid: 0f70d898be43e2a44861591de3339d76, type: 3}
+  - prefabId: event_row
+    prefab: {fileID: 9197481963319205126, guid: 3d2563f730476ff4786cd31a85111d68, type: 3}

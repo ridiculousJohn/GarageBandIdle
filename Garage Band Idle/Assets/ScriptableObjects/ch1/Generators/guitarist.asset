@@ -19,7 +19,7 @@ MonoBehaviour:
   - production
   displayName: Guitarist
   availableWhen:
-    rid: 7579425176880152653
+    rid: 7579425178049314893
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   baseCost:
     _value:
@@ -51,7 +51,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425176880152653
+    - rid: 7579425178049314893
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

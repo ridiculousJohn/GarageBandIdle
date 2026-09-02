@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
+using RidiculousGaming.GarageBandIdle.Editor;
 using RidiculousGaming.GarageBandIdle.UI;
 using UnityEditor;
 
@@ -11,10 +12,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // survives until a render reads it - which is exactly the fault requirement
     // 7 refuses to let sit behind a blank widget.
     //
-    // The cross-check against every authored prefabId in the composed content
-    // waits for slice D: chapter 1 already authors bar_group, rung_button and
-    // event_row, and those have no controller yet, so a tree-wide sweep would
-    // fail on content that is correct.
+    // The cross-check runs the other way too: every prefabId chapter 1 authors
+    // has to resolve here and be answered by the factory, since a module's id
+    // is content and a miss surfaces only when the section holding it first
+    // becomes visible - which may be hours into a run.
     public class ModuleRegistryTests
     {
         private const string RegistryPath = "Assets/Settings/ModuleRegistry.asset";
@@ -24,7 +25,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // predicate cannot be enumerated.
         private static readonly string[] FactoryIds =
         {
-            "currency_line", "jam_button", "generator_list", "upgrade_list"
+            "currency_line", "jam_button", "generator_list", "upgrade_list",
+            "bar_group", "rung_button", "event_row"
         };
 
         private static ModuleRegistry Load()
@@ -74,6 +76,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 Assert.IsTrue(ModuleWidgetFactory.Answers(id), $"the factory no longer answers '{id}'");
                 Assert.IsNotNull(registry.Resolve(id), $"the registry resolves '{id}' to nothing");
+            }
+        }
+
+        // The authored half of the closed set, over the IMPORTED chapter: a
+        // prefabId is content, so an id no widget answers is a content fault
+        // that this pass catches instead of a first render.
+        [Test]
+        public void EveryPrefabIdChapterOneAuthorsResolvesAndIsAnswered()
+        {
+            var registry = Load();
+            var ch1 = AssetDatabase.LoadAssetAtPath<ChapterDefinition>(
+                ChapterJsonImporter.AssetRootPath + "/ch1/ch1.asset");
+            Assert.IsNotNull(ch1, "chapter-01.json has not been imported - run Garage Band Idle/Import Content.");
+
+            var authored = ch1.sections
+                .SelectMany(section => section.modules)
+                .Select(module => module.prefabId)
+                .Distinct()
+                .ToList();
+            Assert.IsNotEmpty(authored, "the chapter authors no modules at all");
+            foreach (var id in authored)
+            {
+                Assert.IsTrue(ModuleWidgetFactory.Answers(id),
+                    $"chapter 1 authors '{id}', which no widget controller answers");
+                Assert.IsNotNull(registry.Resolve(id),
+                    $"chapter 1 authors '{id}', which the registry resolves to nothing");
             }
         }
 
