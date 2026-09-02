@@ -16,7 +16,7 @@
 ## Gates
 - [Quote directive before editing](quote-directive-before-editing.md) - the rule is in the repo CLAUDE.md; this is the failure record: every evasion, and why the check is mechanical
 - [Commit means the whole tree](commit-means-the-whole-tree.md) - everything dirty, memory included; no AI attribution; small enough to read; no preference inferred from repo state
-- [Verify your own prior statements](verify-your-own-prior-statements.md) - do what I said I would do or stop and say why; read the record back before describing it
+- [Verify your own prior statements](verify-your-own-prior-statements.md) - do what I said I would do or stop and say why; read the record back before describing it; the code too, and an aside gets the same grep or is left out
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite it; it governs a different agent, and quoting it invents constraints John never set
 - [Asides do not close the main question](asides-do-not-close-the-main-question.md) - an aside resolves only itself; my own recommendation is never a decision John made
 - [No inaction epilogues](no-inaction-epilogues.md) - never narrate what you didn't do; repo state is a fact, restraint is not news

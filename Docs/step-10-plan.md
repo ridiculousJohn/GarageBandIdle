@@ -121,7 +121,7 @@ facts only John can settle, and none blocks a slice.
 
 ## Existing systems this builds on
 
-- **`ScopeFacts.timedBuffs`** (`{buffId, expiresAtUtc}`) on every payload; the doc places Encore's
+- **`ScopeFacts.timedBuffs`** (`{buffId, expiresAtUtc}`, the id a MODIFIER's) on every payload; the doc places Encore's
   at root. **`TickSystem.Boundaries`** already admits every buff expiry in the swept set as a
   segment edge and says so: "nothing reads or removes one until the timedBuffs gather row lands" -
   that comment is corrected with this step, since no gather row lands.
@@ -158,16 +158,21 @@ one modifier: a Pass owner applies it through the first leg, a free player with 
 through the second, and either way the membership is applied once, so no case exists in which the
 two could stack - the merge rule, the clamp, and a refusal are all beside the point.
 
-**The record.** One `TimedBuff` per buff id on the scope that holds it, `expiresAtUtc` absolute.
-Encore's lives at root because the ad callback writes it there; a chapter-scoped buff is a record
-on the chapter, which dies with the chapter's reset - lifetime is placement, as for every fact.
-The record is a FACT, like a flag: it is a source of nothing, and only a condition reads it. Its id is the id the
-condition names; by convention it is the modifier's, and the save filter drops a record whose id
-no `BuffActive` in the composed content names, with a warning, the same rule as an unknown flag.
+**The record.** A timed record is a MODIFIER's timer: `TimedBuff {buffId, expiresAtUtc}` keyed by
+the modifier's id, one per modifier on the scope that holds it, `expiresAtUtc` absolute. There is
+no buff kind in the system - `encore` is a modifier like every other, and the record is the one
+place a time attaches to a modifier id. Encore's lives at root because the ad callback writes it
+there; a chapter-scoped record sits on the chapter and dies with the chapter's reset - lifetime is
+placement, as for every fact. The record is a FACT, like a flag: it is a source of nothing, and
+only a condition reads it. Because its id is a modifier id, it resolves as one - outward from the
+scope holding it - and the save filter applies the modifier-stack rule it already has: a record
+whose id is not a modifier declared on the chain from its scope is dropped with a warning. No
+declaration home is in question, and nothing about a timed record waits on step 11.
 
-**`BuffActive(buffId)`**, the first of this step's two new condition kinds (`HasEntitlement` is the
-other, slice B): walks OUTWARD from the acting scope, like
-`FlagSet`, and is true at the first scope holding a record with that id (12.14 requirement 8 - no
+**`BuffActive(modifier)`**, the first of this step's two new condition kinds (`HasEntitlement` is the
+other, slice B): holds a `ModifierDefinition` reference, as `UpgradePurchased` holds an upgrade,
+walks OUTWARD from the acting scope like `FlagSet`, and is true at the first scope holding a record
+with that modifier's id (12.14 requirement 8 - no
 scope is named, root least of all) whose `expiresAtUtc` is later than `ctx.NowUtc` - the one
 comparison. Every condition evaluates against a context stamped at the moment being judged (12.4:
 every read runs at the clock's time), the tick's segment context is already stamped at the
@@ -177,9 +182,8 @@ dead, and a trigger or a module gate reading `BuffActive` sees the truth at the 
 is the timestamp, never the record's presence, so nothing depends on when a prune ran: a record
 past the cap, one expiring exactly at a tick's end, or one expiring under the dialog is dead the
 moment it is dead. (The first draft read presence and pruned at segment starts, which left each of
-those three cases answering true through a closing sweep - a review caught it.) `Validate`: the id must be named by some `BuffActive`...
-which is itself, so the check is the placement one every kind gets; the declaration home for a buff
-id is a question the orphan sweep (step 11) answers, since nothing declares one today. `Progress`:
+those three cases answering true through a closing sweep - a review caught it.) `Validate`: `RequireOnChain(modifier, "BuffActive")`, the check every kind holding a definition
+reference gets, so the condition names a modifier the acting chain declares. `Progress`:
 none - a timer is not a threshold the player approaches. Refused inside a currency's `activeWhen`
 for the same reason `IdleAccumulation` is: it would gate a currency's existence on a fact the
 claim's own pruning moves.
@@ -205,9 +209,10 @@ they boost the whole window) and 8.2's open retroactivity question are the same 
 claim takes it for Encore too. John, 2026-09-02: "do we even care?" - no. The case that occurs -
 one chapter, app closed, the buff expiring inside the window - is exact.
 
-**The extension**, `ExtendBuff(scope, buffId, seconds, nowUtc)`: a session command taking the
-record's home scope, as `AddModifier` takes its target - root for Encore, so the ad callback's call
-is root-owned. Finds the record by id on that scope; absent, creates it at `nowUtc + seconds`;
+**The extension**, `ExtendBuff(scope, modifier, seconds, nowUtc)`: a session command taking the
+record's home scope and the modifier whose timer it is, as `AddModifier` takes its target and its
+modifier - root and `encore` for Encore, so the ad callback's call is root-owned. Finds the record
+by the modifier's id on that scope; absent, creates it at `nowUtc + seconds`;
 present, sets
 `max(expiresAtUtc, nowUtc) + seconds`; then clamps remaining time to the config cap. **Legal in
 every phase**: it is an authenticated callback, and 12.9 already says those are always
@@ -465,9 +470,10 @@ top while `Live`. Overlays are host-owned like the select and the dialog; none i
 ## Validation additions
 
 The 12.12 pass grows: story beats (flag reach, setter accounting, gate kind placement),
-`BuffActive`'s placement (refused in `activeWhen`), and `HasEntitlement`'s id declared at root
-(the `entitlements` declaration list). The save filter grows: a buff record no `BuffActive` names;
-an entitlement id root does not declare.
+`BuffActive`'s reach (`RequireOnChain`) and placement (refused in `activeWhen`), and
+`HasEntitlement`'s id declared at root (the `entitlements` declaration list). The save filter
+grows: a timed record whose id is not a modifier declared on the chain from its scope (the
+modifier-stack rule, applied to `timedBuffs`); an entitlement id root does not declare.
 
 ## Tests
 
@@ -480,8 +486,10 @@ an entitlement id root does not declare.
   still 2x (one membership, one application); the record contributes nothing to yields or to a
   bar's fill rate directly (only through dt); a tick crossing the expiry pays the pre-expiry
   segment at 2x and the post-expiry at 1x (the boundary already exists - the test asserts the prune
-  makes it matter); an expired record is gone after the tick; a record no condition names is
-  dropped on load with a warning; `BuffActive` inside an `activeWhen` is a validation error; a
+  makes it matter); an expired record is gone after the tick; a record whose id is not a modifier
+  declared on its scope's chain is dropped on load with a warning; `BuffActive` inside an
+  `activeWhen` is a validation error, and one naming a modifier off the acting chain is a reach
+  error; a
   record written on a chapter is found from its tier's context, not from a sibling chapter's, and
   is gone after the chapter's reset.
 - **`ExtendBuff`**: absent creates at now plus duration; present extends from the later of expiry

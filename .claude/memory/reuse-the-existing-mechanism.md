@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: efd4f70d-d22b-4ea0-8736-2d55c0b412d5
-  modified: 2026-09-02T20:33:46.004Z
+  modified: 2026-09-02T21:06:14.304Z
 ---
 
 Before adding a field, a type, an id indirection, or any new mechanism, name the existing
@@ -69,3 +69,18 @@ windows (past the cap, exactly at a tick's end, under the dialog) answering true
 closing sweep. Every `GameContext` already carries `NowUtc`; `expiresAtUtc > ctx.NowUtc` closed
 all three and turned the prune into housekeeping. Truth is the timestamp the context already
 holds, never the presence of a record plus an ordering rule.
+
+**A field name is not a kind (2026-09-02, the sixth instance).** `TimedBuff.buffId` read as "a buff id",
+so the step 10 plan spelled `BuffActive(buffId)` over a free string, gave it no declaration home,
+deferred that to step 11, and then - implementing slice A - reached for a walk over every condition
+site in the content to find which `BuffActive` named a saved record, so the save filter could judge
+it. John: "isn't a buff Id just a modifier?" and "there is no formal 'buff' in the system, they're
+just modifiers, and we've gone to great pains to make sure those things scope properly." The record
+is a modifier id with an expiry; `BuffActive` holds a `ModifierDefinition` like `UpgradePurchased`
+holds an upgrade; validation is `RequireOnChain`; the save filter is the modifier-stack rule that
+already exists. Every piece of the invented machinery fell away the moment the thing was named as an
+instance of the family it belonged to. THE CHECK, before naming anything as its own kind: say which
+existing family it is an instance of. If the answer is a family that already scopes, validates, and
+filters, there is nothing to build. Six times now, five with his words attached; it is not a
+knowledge gap, it is starting from the name of the thing instead of from what the system already
+calls it.

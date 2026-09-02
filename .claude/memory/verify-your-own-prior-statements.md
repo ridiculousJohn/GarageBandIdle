@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: d18b9c74-7b7b-409d-8be5-c0566735af1c
-  modified: 2026-08-28T20:13:24.966Z
+  modified: 2026-09-02T21:10:54.906Z
 ---
 
 Do what I said I would do. If something makes that impossible, STOP and give the reason - never
@@ -37,3 +37,14 @@ check costs one tool call. If what I did diverges from what I committed to, say 
 sentence, before anything else - see [[never-cave-to-pressure]]. And nothing I hand him as
 verification is independent: a grep whose strings I chose, or a diff of my own work, proves nothing
 he should have to trust. Point at the artifact, not at my summary of it.
+
+**The same rule covers describing the CODE, and asides most of all (2026-09-02).** Asked "what
+downward?" about the two legitimate walks, I answered the question and then padded it with a list
+of `FindInSubtree` call sites from recall. One item, `AddModifier`, was wrong - it resolves outward
+with `FindOnChain`. The wrong item became the next question, and four turns went to untangling a
+claim nobody asked for. John: "so you're just making shit up again." The mechanism: I hold an aside
+to a lower standard than the main claim because it feels like decoration, not a statement. It is a
+statement, and it is the part he did not ask for, so it either gets the same grep as the main
+answer or it is left out - left out is the default. Any sentence naming which code does what is a
+claim about the file on disk; read the file first, every time, and "I remember this one" is not an
+exemption. See [[reuse-the-existing-mechanism]] for the same day's other failure.

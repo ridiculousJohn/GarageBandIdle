@@ -539,13 +539,15 @@ second vocabulary exists:
 
 Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
-**Encore (the accelerator).** A **game-speed multiplier**, not an income multiplier: a timed buff
-(`{buffId, expiresAt}` at root) read by an ordinary root permanent modifier: `encore` is
+**Encore (the accelerator).** A **game-speed multiplier**, not an income multiplier: an ordinary
+root permanent modifier with a timer. There is no buff kind - a timed record (`{buffId, expiresAt}`
+at root, the id a MODIFIER's) is the one place a time attaches to a modifier id, and `encore` is
 `{stat: game_speed, ×2}` with `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` -
 the same shape as the idle fraction, a membership that counts only while a fact holds. The record
-is that fact, a source of nothing, read by the `BuffActive` condition as a flag is read by
-`FlagSet` - resolved outward from the acting scope to the first scope holding a record with that
-id, so the record's placement is its lifetime and no scope is named. `game_speed` is a stat with exactly two consumers, the two
+is that fact, a source of nothing, read by the `BuffActive` condition, which names the modifier as
+`UpgradePurchased` names an upgrade and resolves outward from the acting scope to the first scope
+holding a record with that modifier's id - so the record's placement is its lifetime, no scope is
+named, and the id validates and filters as every modifier id does. `game_speed` is a stat with exactly two consumers, the two
 places real time becomes production: the tick - `effective dt = real dt x
 GetMultiplier(game_speed)` - so every rate, accrual, and bar fill in the live chapter speeds up
 automatically, and the idle claim, which scales each segment of the paid window the same way. For
@@ -845,7 +847,7 @@ class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these
     Dictionary<string, int>       fillCounts;       // repeating bars
     Dictionary<string, HashSet<string>> activeBars; // per group
     Dictionary<string, int>       modifierStacks;   // AddModifier grants, keyed like every other count
-    List<TimedBuff>               timedBuffs;       // {buffId, expiresAt} — Encore lives at root
+    List<TimedBuff>               timedBuffs;       // {buffId, expiresAt}, the id a modifier's: a modifier's timer; Encore lives at root
     List<SongEntry>               songs;            // tier = the run's Catalog; root = Discography (§7)
 }
 
@@ -1079,7 +1081,7 @@ it declares a definition rather than reading a named list off it. Across the tre
 |---|---|---|
 | Purchased upgrades | `purchasedUpgrades` set | the upgrade definition's `List<Effect>` |
 | Owned generators | `generatorCounts` | `produces` entries scaled by count (contributions, not effects) |
-| Timed buffs (Encore) | `{buffId, expiresAt}` list | none directly - a record is a FACT the `BuffActive` condition reads, and the modifier that wants it is a permanent membership with that condition in its `appliesWhen` (§9), the idle fraction's shape |
+| Timed records (Encore) | `{buffId, expiresAt}` list, the id a MODIFIER's | none directly - a record is a modifier's timer, a FACT the `BuffActive` condition reads by naming that modifier, and the modifier is a permanent membership with that condition in its `appliesWhen` (§9), the idle fraction's shape |
 | Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `barGroups` |
