@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: efd4f70d-d22b-4ea0-8736-2d55c0b412d5
-  modified: 2026-08-28T20:25:50.076Z
+  modified: 2026-09-02T18:19:41.223Z
 ---
 
 Before adding a field, a type, an id indirection, or any new mechanism, name the existing
@@ -52,3 +52,15 @@ test, or a runtime guard standing in for a type is the specific tell - the simpl
 always "add the class that was missing" ([[narrowing-a-member-type]] is the worked case). If the
 elaborate option is genuinely right, the reason has to be a constraint that breaks the simple one,
 not a benefit the elaborate one adds.
+
+**A doc row naming a mechanism is not a reason to build it (2026-09-02).** The 12.6 table listed
+timed buffs as a SOURCE of effects and a tick comment said "until the timedBuffs gather row lands",
+so the step 10 plan built a fifth gather loop, and the Pass's permanence then had nowhere to sit
+but on the modifier's `appliesWhen` - three exchanges deriving why that failed. John: "can't it be
+'Owns the pass' OR 'timer > 0'?" - `encore` as a permanent membership whose `appliesWhen` is
+`Any[FlagSet(pass), BuffActive(encore)]`, the `idle_base` shape one file away. A stored record is
+a FACT; facts are read by CONDITIONS; a modifier with an `appliesWhen` is already "effects while
+some fact holds". John: "why did you make that so complicated, again?" Before planning a new source
+of effects, ask whether a condition over the fact inside an existing `appliesWhen` says the same
+thing - the doc's own table was written before `appliesWhen` existed and describes the fact, not
+the only way to read it.

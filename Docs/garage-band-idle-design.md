@@ -540,8 +540,12 @@ second vocabulary exists:
 Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
 **Encore (the accelerator).** A **game-speed multiplier**, not an income multiplier: a timed buff
-(`{buffId, expiresAt}` at root) whose effect is `{stat: game_speed, ×2}`, the buff id naming an
-ordinary root `ModifierDefinition`. `game_speed` is a stat with exactly two consumers, the two
+(`{buffId, expiresAt}` at root) read by an ordinary root permanent modifier: `encore` is
+`{stat: game_speed, ×2}` with `appliesWhen: Any[FlagSet(backstage_pass), BuffActive(encore)]` -
+the same shape as the idle fraction, a membership that counts only while a fact holds. The record
+is that fact, a source of nothing, read by the `BuffActive` condition as a flag is read by
+`FlagSet` - resolved outward from the acting scope to the first scope holding a record with that
+id, so the record's placement is its lifetime and no scope is named. `game_speed` is a stat with exactly two consumers, the two
 places real time becomes production: the tick - `effective dt = real dt x
 GetMultiplier(game_speed)` - so every rate, accrual, and bar fill in the live chapter speeds up
 automatically, and the idle claim, which scales each segment of the paid window the same way. For
@@ -553,15 +557,17 @@ are (4 h away at 2x pays 8 h of base rate). Yields never scale (per-firing, no t
 seconds. The timer is an absolute expiry, so it counts down whether the app is open or closed, and
 a buff that expires inside the paid window scales only the segment it was live for. Rewarded ads
 add ~+4 h to the timer, repeatable, to a cap in `GameConfig`. The tick prunes an expired record at
-the segment start its expiry cuts; the gather reads the surviving records like granted stacks, the
-modifier resolving outward by id. Deferred: **Overdrive** ("Sold-Out Show"), a higher speed a
+its end as housekeeping; `BuffActive` judges a record by the context's own time
+(`expiresAtUtc > NowUtc`), so a segment, a closing sweep, or a module gate reads the truth at the
+moment it asks, and no answer depends on when a prune ran. Deferred: **Overdrive** ("Sold-Out Show"), a higher speed a
 sustained ad streak earns - if it is ever wanted it is the same one buff reporting 2x or 4x from
 its own remaining time through a formula-shaped effect, never a second buff relying on the clamp.
 
 **Backstage Pass** - lifetime IAP (~$5-10). Every reward the two ads give, without the ads, plus a
-raised idle cap: permanent Encore - the Encore modifier applied permanently on the entitlement (a
-permanent membership plus a granted application of a Replace-stacking modifier is one application,
-§12.5, so a Pass owner who also watches an Encore ad is still at 2x) - the idle claim always doubled
+raised idle cap: permanent Encore - the entitlement is the first leg of `encore`'s own
+`appliesWhen`, so a Pass owner applies the same one membership a free player's record applies, and
+the Encore window shows "Time remaining" as infinity with no ad button, the Pass superseding the
+timer - the idle claim always doubled
 (the offer's `doubled` flag set from the entitlement at computation, the same flag the ad callback
 sets, so the claim path is unchanged and no second idle modifier exists), and the cap raise on the
 config read. A free player who watches both ads reaches the same 4x on an offer; the Pass makes it
@@ -1073,7 +1079,7 @@ it declares a definition rather than reading a named list off it. Across the tre
 |---|---|---|
 | Purchased upgrades | `purchasedUpgrades` set | the upgrade definition's `List<Effect>` |
 | Owned generators | `generatorCounts` | `produces` entries scaled by count (contributions, not effects) |
-| Timed buffs (Encore) | `{buffId, expiresAt}` list | the buff definition's effects while unexpired |
+| Timed buffs (Encore) | `{buffId, expiresAt}` list | none directly - a record is a FACT the `BuffActive` condition reads, and the modifier that wants it is a permanent membership with that condition in its `appliesWhen` (§9), the idle fraction's shape |
 | Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `barGroups` |

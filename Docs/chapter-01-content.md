@@ -49,9 +49,10 @@ root
     narrowing is what keeps a bandmate's Fans line out of it.
 - Idle bases: fraction 0.5 authored as a root modifier `{stat: rate, ×0.5}` applying only during
   idle accumulation (`appliesWhen`, §12.5); cap 14400s (4h) and minimum-away threshold 180s are
-  `GameConfig` values. `game_speed` base 1; Encore is a root modifier `{stat: game_speed, ×2}`
-  applied by the timed buff record, or permanently by the Backstage Pass; read by the tick and the
-  idle claim, the claim over the real-time cap (§9). Overdrive `×4` is deferred.
+  `GameConfig` values. `game_speed` base 1; Encore is a root permanent modifier `{stat: game_speed,
+  ×2}` with `appliesWhen: Any[FlagSet(backstage_pass), BuffActive(encore)]` - the timed record or
+  the Pass, the idle fraction's shape; read by the tick and the idle claim, the claim over the
+  real-time cap (§9). Overdrive `×4` is deferred.
 - Flags: `ch1_complete`, `story_ch1_open_seen`, `story_ch1_end_seen`.
 - Tags: `income`, `production` - the declared vocabulary the modifiers above filter on (§12.2).
   Declared at root because they are game-wide words: every chapter's income currency and every
