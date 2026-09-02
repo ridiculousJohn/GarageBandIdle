@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de29a2ad62ccc8e46ac9e4b145b601f9, type: 3}
+  m_Name: ModuleRegistry
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.UI.ModuleRegistry
+  entries:
+  - prefabId: currency_line
+    prefab: {fileID: 9197481963319205126, guid: df9e9f89c55131e43a378ecf2381566e, type: 3}
+  - prefabId: jam_button
+    prefab: {fileID: 9197481963319205126, guid: 2ec63e7755e21eb419d0650a55722319, type: 3}
+  - prefabId: generator_list
+    prefab: {fileID: 9197481963319205126, guid: 40541fe4003f12a4b9bb5edc73523dad, type: 3}
+  - prefabId: upgrade_list
+    prefab: {fileID: 9197481963319205126, guid: 37468190635ea564ab03e34e04523d31, type: 3}

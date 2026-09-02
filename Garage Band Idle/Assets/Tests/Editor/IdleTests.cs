@@ -339,6 +339,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now.AddSeconds(50020));
             Assert.AreEqual(SessionPhase.Live, f.Session.Phase);
             Assert.IsNull(f.Session.CurrentOffer);
+            // No frame ran between the claim and the backgrounding, so nothing
+            // is banked for the switch to settle: the balance is the claim's.
             AssertClose(3600, f.Tree.Tier1.balances["cash"]);
         }
 

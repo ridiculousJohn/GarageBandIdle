@@ -222,9 +222,11 @@ driver's last sample, so flushing "through the command" stamps the pending windo
 time it did not cover, the next driver dt re-includes the pre-command gap against post-command
 state, and the stamped windows overlap. So the session holds `lastSampleUtc` and computes
 elapsed itself: the driver passes `GameClock.RealTimeUtc` to `session.Accumulate(nowUtc)` every
-`Update` and holds no pacing state at all. The sample advances UNCONDITIONALLY on every `Accumulate` and every command -
-only PENDING is conditional - which is `TickBaseline`'s advance rule absorbed whole: the
-baseline class retires, since keeping it would be a second copy of the same rule. The session
+`Update` and holds no pacing state at all. The FRAME is the only reader of the clock. The sample
+advances on every `Accumulate` - only PENDING is conditional - which is `TickBaseline`'s advance
+rule absorbed whole: the baseline class retires, since keeping it would be a second copy of the
+same rule. A chapter switch sets the sample to its own moment, since that is where a window
+starts, and boot switches before the first frame. The session
 ticks ONCE with the WHOLE accumulation ending at the sample when pending crosses
 `tickIntervalSeconds` (a `GameConfig` knob beside the idle thresholds, joining `Require`'s
 fail-loud checks as finite and positive - zero restores the per-frame ticking the knob exists
@@ -235,10 +237,10 @@ between windows and hands `TickSystem` boundary timestamps that never happened, 
 loop.
 
 **Every mutating command FLUSHES pending live time first**: inside the pipeline, before the
-mutation, the command advances the sample to its own timestamp - the command IS a clock
-sample - and ticks everything pending through it as a preceding tick transaction, then runs the
-mutation against settled state. The flush window is the real pre-command window, correctly
-stamped and contiguous with both neighbors, because one owner holds the clock. Without the
+mutation, the command ticks everything the frames have banked as a preceding tick transaction,
+then runs the mutation against settled state. The command reads no clock and measures nothing -
+a player action is live play by definition, and the frame it lands in has already sampled the
+time it stamps itself with. Without the
 flush the pending window is simulated AFTER the mutation, and the segment snapshots read
 post-mutation state for time that elapsed before it: a generator bought 0.9s into the window
 earns for 0.9s it did not exist, an event entry's `RestartScope` lets pre-reset time produce
@@ -249,8 +251,9 @@ Jam tap would starve rate production during exactly the play the rates exist for
 Only LIVE time accumulates: `Accumulate` under any other phase clears pending, below the
 threshold included - draining only at the crossing would let sub-interval dialog time ride
 into the first live tick, the pooling regression the unconditional sample advance exists to
-prevent, at smaller scale. A nonpositive elapsed also CLEARS pending - the sample follows a
-rolled-back clock exactly as the baseline did, and pending dies with the discontinuity:
+prevent, at smaller scale. A NEGATIVE elapsed also CLEARS pending - the sample follows a
+rolled-back clock exactly as the baseline did, and pending dies with the discontinuity (a zero
+elapsed is a frame that read the same time, and clears nothing):
 `Tick(dt, now)` promises `[now - dt, now]` is one contiguous clock interval, and a dt spanning
 the rollback would compute absolute-stamped boundaries (buff expiries) against wall positions
 that never held. Cross-TICK overlap after a rollback is a different thing - the next windows
@@ -440,13 +443,14 @@ every nested authored object. `chapter-01.json` gains the seven sections of cont
 - **Session pacing**: a sub-interval `Accumulate` ticks nothing; crossing the interval ticks
   once with the WHOLE accumulation, so consecutive windows are contiguous; a non-Live
   `Accumulate` clears pending below the threshold (0.4s under the dialog, claim, 0.6s live - the
-  tick carries 0.6, never 1.0); a nonpositive elapsed clears pending and stalls nothing (+0.8
+  tick carries 0.6, never 1.0); a negative elapsed clears pending and stalls nothing (+0.8
   then a 5s rollback leaves 0, and later samples tick normally on the rolled-back clock). The
   flush: a buy 0.9s into the window settles 0.9s of pre-purchase production before the
-  generator exists; a command whose timestamp lands AFTER the last `Accumulate` flushes through
-  its own timestamp - pending plus the gap, and the next window starts where the flush ended;
-  a switch flushes the outgoing chapter, so the incoming subtree inherits no pending time; a Jam
-  tap flushes rather than clears, so tapping through a whole interval loses no rate production.
+  generator exists; a command in the same frame as an `Accumulate` that banked a sub-interval
+  ticks that bank before it mutates (the same-frame regression - a zero elapsed is not a
+  discontinuity); a switch flushes the outgoing chapter, so the incoming subtree inherits no
+  pending time; a Jam tap flushes rather than clears, so tapping through a whole interval at
+  frame rate loses no rate production.
   The four `TickBaselineTests` retire into these rows with the class they tested.
 - **`GameConfig.Require`**: a zero, negative, or non-finite `tickIntervalSeconds` throws,
   alongside the existing knob rows.

@@ -1,0 +1,51 @@
+/* The screen's minimum legibility: a heading reads as a heading and a row
+   reads as a row. Nothing decorative - presentation tuning is content. */
+
+.screen {
+    flex-grow: 1;
+}
+
+.sections {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.section {
+    margin-bottom: 12px;
+}
+
+.section-title {
+    -unity-font-style: bold;
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+.currency-line {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.jam-button {
+    margin-top: 6px;
+}
+
+.row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.row-name {
+    flex-grow: 1;
+}
+
+.row-count {
+    min-width: 48px;
+}
+
+.row-buy {
+    min-width: 120px;
+}

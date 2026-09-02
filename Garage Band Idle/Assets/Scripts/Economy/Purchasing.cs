@@ -82,7 +82,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // Runtime backstop on the cost curve. Validation refuses a nonpositive
         // baseCost and a nonpositive growth, but that pass is dev-only, and
         // generator purchases REPEAT - a free one is an unbounded rate printer.
-        private static BigNumber CostOf(GeneratorDefinition generator, GameContext declaringCtx)
+        public static BigNumber CostOf(GeneratorDefinition generator, GameContext declaringCtx)
         {
             declaringCtx.Scope.generatorCounts.TryGetValue(generator.Id, out var owned);
             var cost = generator.CostAt(owned);

@@ -1,36 +1,11 @@
 using System;
 using System.IO;
 using RidiculousGaming.GarageBandIdle.Save;
+using RidiculousGaming.GarageBandIdle.UI;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
 {
-    // The tick clock the driver diffs real time against (design doc 12.9,
-    // requirement 2: real elapsed time, never frame time). Advance is
-    // UNCONDITIONAL - the baseline moves whether or not the session accepts
-    // the dt - so frames refused during AwaitingIdleClaim never pool up and
-    // dump into the first live tick through the same door. A backwards clock
-    // yields a nonpositive dt and passes through: the session already treats
-    // that as a no-op, and the moved baseline resumes live play from wherever
-    // the clock now claims to be.
-    public class TickBaseline
-    {
-        private DateTime lastUtc;
-
-        public TickBaseline(DateTime nowUtc) => lastUtc = nowUtc;
-
-        // Boot and both pause transitions: without the reset, a resume below
-        // the idle minimum replays the whole paused interval as live production.
-        public void Reset(DateTime nowUtc) => lastUtc = nowUtc;
-
-        public double Advance(DateTime nowUtc)
-        {
-            var dt = (nowUtc - lastUtc).TotalSeconds;
-            lastUtc = nowUtc;
-            return dt;
-        }
-    }
-
     // The headless boot: load outcome to tree-plus-session, plain C# so the
     // mapping is testable without a scene. The MonoBehaviour above it only
     // forwards lifecycle calls into these two.
@@ -76,14 +51,18 @@ namespace RidiculousGaming.GarageBandIdle
     // The thin driver (design doc 12.13): bootstrap, save/load, chapter
     // switching. Glue only - it holds the config reference and nothing the
     // session already owns, and the lifecycle forwarding here stays untested
-    // by design.
+    // by design. It advances the clock at the top of EVERY entry point before
+    // any game code runs (12.9), which is why it is the one place that reads
+    // Time.* and DateTime.UtcNow at all; the pacing state lives in the session.
     public class GameManager : MonoBehaviour
     {
         [SerializeField] private GameConfig config;
+        [SerializeField] private ModuleRegistry registry;
+        [SerializeField] private UIRoot uiRoot;
 
         private ContentDatabase database;
         private GameSession session;
-        private TickBaseline baseline;
+        private GameClock clock;
 
         // A FILE under persistentDataPath: handing LoadFromDisk the directory
         // would read every fresh install as Failed.
@@ -109,8 +88,20 @@ namespace RidiculousGaming.GarageBandIdle
             // nothing renders it until step 9, the session state is simply correct.
             booted.SwitchChapter(GameBoot.EntryChapter(booted.Root), now);
 
-            baseline = new TickBaseline(now);
+            clock = new GameClock(now);
             session = booted;               // the guard, published last
+        }
+
+        // The bind waits for Start: boot runs in Awake, every Awake precedes
+        // every OnEnable, and the UIDocument builds its tree in its own
+        // OnEnable - so a bind issued from the boot path would read a panel that
+        // does not exist yet. Start runs after every OnEnable, and Bind renders
+        // once unconditionally (12.11).
+        private void Start()
+        {
+            if (session == null)
+                return;
+            uiRoot.Bind(session, registry, clock);
         }
 
         // A boot failure leaves session null and its thrown error in the log;
@@ -120,8 +111,9 @@ namespace RidiculousGaming.GarageBandIdle
         {
             if (session == null)
                 return;
-            var now = DateTime.UtcNow;
-            session.Tick(baseline.Advance(now), now);
+            clock.Frame(DateTime.UtcNow, Time.unscaledDeltaTime);
+            session.Accumulate(clock.RealTimeUtc);
+            uiRoot.Interpolate();
         }
 
         // Backgrounding stamps the live chapter and preserves an unpaid window
@@ -131,8 +123,8 @@ namespace RidiculousGaming.GarageBandIdle
         {
             if (session == null)
                 return;
-            var now = DateTime.UtcNow;
-            baseline.Reset(now);
+            clock.Resample(DateTime.UtcNow);
+            var now = clock.RealTimeUtc;
             if (paused)
             {
                 session.SwitchChapter(null, now);
@@ -148,7 +140,8 @@ namespace RidiculousGaming.GarageBandIdle
         {
             if (session == null)
                 return;
-            var now = DateTime.UtcNow;
+            clock.Resample(DateTime.UtcNow);
+            var now = clock.RealTimeUtc;
             session.SwitchChapter(null, now);
             Save(now);
         }

@@ -69,6 +69,14 @@ namespace RidiculousGaming.GarageBandIdle
         // callback queue 12.9 describes is this flag's future consumer.
         private bool commandInProgress;
 
+        // The pacing state (12.9): the frame's clock sample and the live time
+        // banked since the last tick. The FRAME is the only reader of the clock;
+        // a player action settles the bank and measures nothing. The sample is
+        // set at every chapter switch, which is where a window starts, and
+        // boot switches before the first frame.
+        private DateTime lastSampleUtc;
+        private double pendingSeconds;
+
         public GameSession(RootScopeState root, GameConfig config)
         {
             GameConfig.Require(config);     // fail-loud at construction (requirement 7)
@@ -96,6 +104,12 @@ namespace RidiculousGaming.GarageBandIdle
             GuardReentrancy();
             if (chapter == ForegroundChapter)
                 return;
+            // The outgoing chapter's banked foreground time settles into the
+            // outgoing subtree, never the incoming one - and the incoming
+            // window starts here, with nothing banked.
+            FlushPending(nowUtc);
+            lastSampleUtc = nowUtc;
+            pendingSeconds = 0;
             commandInProgress = true;
             try
             {
@@ -244,10 +258,60 @@ namespace RidiculousGaming.GarageBandIdle
             return false;
         }
 
+        // ---- the cadence ----
+
+        // The driver's per-frame call (12.9): it holds no pacing state and only
+        // passes the clock's real time. The sample advances every frame and
+        // only the bank is conditional, so time under a dialog never pools up
+        // and dumps into the first live tick. One tick carries the WHOLE
+        // accumulation ending at the sample, which is what keeps the simulated
+        // windows contiguous and their timestamps exact - TickSystem already
+        // segments internally, so a hitch is one correct call.
+        public void Accumulate(DateTime nowUtc)
+        {
+            GuardReentrancy();
+            var elapsed = (nowUtc - lastSampleUtc).TotalSeconds;
+            lastSampleUtc = nowUtc;
+            // A backwards wall clock clears the bank with the discontinuity:
+            // Tick(dt, now) promises [now - dt, now] is one contiguous interval,
+            // and a dt spanning a rollback would judge absolute stamps against
+            // wall positions that never held. Zero elapsed is just a frame that
+            // read the same time.
+            if (Phase != SessionPhase.Live || elapsed < 0)
+            {
+                pendingSeconds = 0;
+                return;
+            }
+            pendingSeconds += elapsed;
+            if (pendingSeconds < config.tickIntervalSeconds)
+                return;
+            var dt = pendingSeconds;
+            pendingSeconds = 0;
+            Tick(dt, nowUtc);
+        }
+
+        // A player action settles the bank before it mutates: whatever the
+        // frames have banked since the last tick is simulated as a preceding
+        // tick transaction, so the mutation runs against settled state - a
+        // generator bought mid-window earns nothing for the time before it
+        // existed. The action reads no clock; the frame already did. Flush,
+        // never clear: FireProducer is a command, and clearing per Jam tap
+        // would starve the rate production the rates exist for.
+        private void FlushPending(DateTime nowUtc)
+        {
+            if (Phase != SessionPhase.Live || pendingSeconds <= 0)
+                return;
+            var dt = pendingSeconds;
+            pendingSeconds = 0;
+            Tick(dt, nowUtc);
+        }
+
         // Live only; TickSystem.Tick inside the same pipeline. Nonpositive dt
-        // is what a backwards mid-session clock produces when the driver diffs
-        // DateTimes, and it no-ops like a refusal - nothing mutated, nothing
-        // to sweep or repaint.
+        // no-ops like a refusal - nothing mutated, nothing to sweep or repaint.
+        // A tick that runs SETTLES the sample at its end with nothing pending:
+        // the world is simulated through nowUtc, so a command issued at that
+        // moment flushes nothing, rather than re-simulating the window a caller
+        // ticked by hand.
         public void Tick(double realSeconds, DateTime nowUtc)
         {
             GuardReentrancy();
@@ -256,6 +320,8 @@ namespace RidiculousGaming.GarageBandIdle
             commandInProgress = true;
             try
             {
+                lastSampleUtc = nowUtc;
+                pendingSeconds = 0;
                 TickSystem.Tick(Root, ForegroundChapter, config, realSeconds, nowUtc);
                 CloseTransaction(nowUtc);
             }
@@ -306,6 +372,9 @@ namespace RidiculousGaming.GarageBandIdle
             GuardReentrancy();
             if (Phase != SessionPhase.Live || !InForeground(ctx))
                 return false;
+            // Past the refusals, so a refused command runs no pipeline and
+            // flushes nothing; the mutation below sees settled state.
+            FlushPending(ctx.NowUtc);
             commandInProgress = true;
             try
             {

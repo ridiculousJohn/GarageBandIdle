@@ -232,39 +232,48 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
-        // Fires one producer: every yield entry resolved against PRE-FIRE state
-        // - conditions and amounts judged together, multipliers included - and
-        // only then deposited, so no output can flip a sibling output's
-        // condition mid-fire (design doc 12.2).
-        public static void FireProducer(GameContext ctx, ProducerDefinition producer)
+        // What one firing would pay against the given state: every yield
+        // currency in authored order with its resolved amount, multipliers
+        // included, zeros kept. The Jam button's preview reads this, so the
+        // preview and the execution are one implementation of the number rather
+        // than two that agree until they do not (design doc 12.5).
+        public static List<(CurrencyDefinition currency, BigNumber amount)> ResolveYield(
+            GameContext ctx, ProducerDefinition producer)
         {
             var declaring = DeclaringScope<ScopeState>(ctx.Scope, producer);
             var declaringCtx = ctx.Rebase(declaring);
 
-            // Every currency this firing pays, in authored order, resolved
-            // before any deposit lands.
             var currencies = new List<CurrencyDefinition>();
             foreach (var entry in producer.produces)
                 if (entry != null && entry.stat == Stat.Yield && entry.currency != null &&
                     !currencies.Contains(entry.currency))
                     currencies.Add(entry.currency);
 
-            var amounts = new List<BigNumber>(currencies.Count);
+            var yields = new List<(CurrencyDefinition currency, BigNumber amount)>(currencies.Count);
             foreach (var currency in currencies)
             {
                 var term = SourceTerm(declaringCtx, producer, producer.produces, 1, currency, Stat.Yield);
                 if (term == BigNumber.Zero)
                 {
-                    amounts.Add(BigNumber.Zero);
+                    yields.Add((currency, BigNumber.Zero));
                     continue;
                 }
                 var home = FindCurrencyHome(declaring, currency);
-                amounts.Add(term * CurrencyStage(declaringCtx.Rebase(home), currency, Stat.Yield));
+                yields.Add((currency, term * CurrencyStage(declaringCtx.Rebase(home), currency, Stat.Yield)));
             }
+            return yields;
+        }
 
-            for (var i = 0; i < currencies.Count; i++)
-                if (amounts[i] != BigNumber.Zero)
-                    declaringCtx.DepositResolved(currencies[i].Id, amounts[i]);
+        // Fires one producer: every yield entry resolved against PRE-FIRE state
+        // - conditions and amounts judged together, multipliers included - and
+        // only then deposited, so no output can flip a sibling output's
+        // condition mid-fire (design doc 12.2).
+        public static void FireProducer(GameContext ctx, ProducerDefinition producer)
+        {
+            var declaringCtx = ctx.Rebase(DeclaringScope<ScopeState>(ctx.Scope, producer));
+            foreach (var (currency, amount) in ResolveYield(ctx, producer))
+                if (amount != BigNumber.Zero)
+                    declaringCtx.DepositResolved(currency.Id, amount);
         }
 
         // ---- tree lookups ----

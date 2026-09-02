@@ -20,6 +20,13 @@ namespace RidiculousGaming.GarageBandIdle
         public double minimumAwaySeconds = 180;
         public double idleCapSeconds = 14400;
 
+        // The tick cadence (section 9): the session ticks ONCE with the whole
+        // accumulation when pending crosses this. Smoothness comes from
+        // interpolation, so the interval only bounds the latency of an
+        // autonomous change; zero would restore the per-frame ticking it exists
+        // to remove.
+        public double tickIntervalSeconds = 0.25;
+
         // Fail-loud at the consumers (requirement 7): the tick for direct use,
         // the session at construction. A bad ceiling would silently clamp the
         // clamp, so it throws instead; sub-1 is refused because the clamp's
@@ -37,6 +44,10 @@ namespace RidiculousGaming.GarageBandIdle
             if (double.IsNaN(config.idleCapSeconds) || double.IsInfinity(config.idleCapSeconds) || config.idleCapSeconds < 0)
                 throw new InvalidOperationException(
                     $"GameConfig: idleCapSeconds {config.idleCapSeconds} is not a finite nonnegative value.");
+            if (double.IsNaN(config.tickIntervalSeconds) || double.IsInfinity(config.tickIntervalSeconds)
+                || config.tickIntervalSeconds <= 0)
+                throw new InvalidOperationException(
+                    $"GameConfig: tickIntervalSeconds {config.tickIntervalSeconds} is not a finite positive value.");
         }
     }
 }

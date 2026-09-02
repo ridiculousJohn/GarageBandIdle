@@ -31,3 +31,4 @@
 ## Disagreement
 - [Never cave to pressure](never-cave-to-pressure.md) - the substance changes only when the facts do; and when I do concede, the concession leads
 - [Pushback means re-derive](pushback-means-rederive.md) - his dispute of my model of HIS design means produce a discriminator; on same-but-different, split the bundle
+- [Root cause means question the structure](root-cause-means-question-the-structure.md) - on "bandaid"/"root cause": derive from what the player is doing, question MY design's structure, give ONE simpler fix; never a menu

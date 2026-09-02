@@ -15,3 +15,4 @@ MonoBehaviour:
   maxGameSpeed: 4
   minimumAwaySeconds: 180
   idleCapSeconds: 14400
+  tickIntervalSeconds: 0.25

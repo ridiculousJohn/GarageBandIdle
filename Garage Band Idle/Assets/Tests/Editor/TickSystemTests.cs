@@ -265,6 +265,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             negativeAway.minimumAwaySeconds = -1;
             Assert.Throws<System.InvalidOperationException>(
                 () => TickSystem.Tick(tree.Root, tree.Ch1, negativeAway, 10, end));
+
+            // So is the tick cadence: zero would restore per-frame ticking, and
+            // a negative or non-finite interval is no cadence at all.
+            void RefusesInterval(double interval)
+            {
+                var config = Config();
+                config.tickIntervalSeconds = interval;
+                Assert.Throws<System.InvalidOperationException>(
+                    () => TickSystem.Tick(tree.Root, tree.Ch1, config, 10, end));
+            }
+
+            RefusesInterval(0);
+            RefusesInterval(-1);
+            RefusesInterval(double.NaN);
+            RefusesInterval(double.PositiveInfinity);
         }
     }
 }
