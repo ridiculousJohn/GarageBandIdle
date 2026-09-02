@@ -7,7 +7,7 @@
 - [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - names resolve outward from the acting scope; cross-chain aliasing is the feature
 - [Currency values are BigNumber](currency-values-are-bignumber.md) - anything the runtime could compute past a double, authored fields included; only counts and Pow's power are exempt
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20: venue assets and stationing caps deleted, payloads typed by authored kind, currencies by direct reference
-- [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from it; ask John how Ctrl C does it before reasoning from scratch
+- [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from it; ask John how Ctrl C does it before reasoning from scratch; its meta layer (two-pill top bar, Overclock, Pro Unlock, story buttons, granted counts) recorded 2026-09-02
 - [Closed sets are enums](closed-sets-are-enums.md) - code-defined vocabularies are C# enums; strings only for open designer ids
 - [Narrowing a member type](narrowing-a-member-type.md) - generic base class; covariant overrides don't compile in Unity (CS8831) and `new` hiding is rejected
 - [Step 9 open UI items](step-9-open-ui-items.md) - the digit font (measured: only "1" is narrower), the omitted group title and how to add one, the accepted chrome literals, bulk buy later
@@ -20,6 +20,7 @@
 - [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite it; it governs a different agent, and quoting it invents constraints John never set
 - [Asides do not close the main question](asides-do-not-close-the-main-question.md) - an aside resolves only itself; my own recommendation is never a decision John made
 - [No inaction epilogues](no-inaction-epilogues.md) - never narrate what you didn't do; repo state is a fact, restraint is not news
+- [External review verdicts](external-review-verdicts.md) - a pasted review gets confirm/deny per finding AND accept/reject per fix, checked against the code; no bandaids, no edit until "apply"
 
 ## Judgment
 - [Problems, not issues](problems-not-issues.md) - what breaks TODAY, not what is true; and a reason for NOT doing something gets checked like any other claim

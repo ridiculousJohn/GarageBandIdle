@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: efd4f70d-d22b-4ea0-8736-2d55c0b412d5
-  modified: 2026-09-02T18:19:41.223Z
+  modified: 2026-09-02T20:33:46.004Z
 ---
 
 Before adding a field, a type, an id indirection, or any new mechanism, name the existing
@@ -63,4 +63,9 @@ a FACT; facts are read by CONDITIONS; a modifier with an `appliesWhen` is alread
 some fact holds". John: "why did you make that so complicated, again?" Before planning a new source
 of effects, ask whether a condition over the fact inside an existing `appliesWhen` says the same
 thing - the doc's own table was written before `appliesWhen` existed and describes the fact, not
-the only way to read it.
+the only way to read it. Same day, same plan: the `BuffActive` condition first read a record's
+PRESENCE and relied on the tick pruning expired records at segment starts, which left three
+windows (past the cap, exactly at a tick's end, under the dialog) answering true through a
+closing sweep. Every `GameContext` already carries `NowUtc`; `expiresAtUtc > ctx.NowUtc` closed
+all three and turned the prune into housekeeping. Truth is the timestamp the context already
+holds, never the presence of a record plus an ordering rule.
