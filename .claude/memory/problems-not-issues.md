@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 7994d8cd-29fb-4920-8032-e10d58f56a96
-  modified: 2026-08-28T20:49:39.690Z
+  modified: 2026-09-02T21:40:23.422Z
 ---
 
 **Before fixing a finding, ask what breaks today** - not whether the finding is true. A finding is a
@@ -41,6 +41,30 @@ of mine in one session, 2026-07-31). Name the specific mechanism and go read it.
 ask whether anything would actually break if it were lifted, or whether it merely reflects how the
 code used to be organized: defending an inherited restriction as if it were a decision is the "this
 is how it is now" pattern John's normalization work exists to remove.
+
+**A question I raise gets the same check as a finding (2026-09-02).** Listing what code changes
+when the stranded-reward guard moved from the chapter's gate into the tier's own answer, I ended
+with "the one design point that is yours: whether the refusal is on any armed reward, as the old
+guard was, or on any record at all" - and then wrote a paragraph weighing the two. The rule being
+moved was `Not(EventRewardPending)`. Its scope was an armed reward. Nothing about relocating the
+judgment reopened what it judges; the neighboring kind `EventRecordExists` sat in the file and I
+asked "which one" instead of "what is being replaced". John: "we moved how that's evaluated and you
+think we have to relitigate WHAT it's checking?" and "you make shit up and raise an issue based on
+what you made up. had I not flagged it, you'd then go write code and change things based on the
+issue you raised." That is the chain: a manufactured question becomes an "open design point" in
+the plan, the plan goes to an agent, the agent picks one, and the code carries a decision nobody
+made about a rule that never changed. Every link after the first looks like diligence. THE CHECK
+at the first link: before writing "this one is yours", name the FACT that changed and made it a
+question. If the mechanism moved and the rule did not, there is no question - state the rule as
+inherited and move on.
+
+**A defect in live code and shipping content lands before new work, and dependency is not the
+criterion (2026-09-02).** Asked whether the event-record correction had to precede step 10, I led
+with "nothing in step 10 depends on it" and then recommended landing it first anyway. John: "it's a
+problem in the code with existing content and functionality and you're saying leave it in while we
+build slice A forward?" Whether downstream work depends on a defect is irrelevant to when it gets
+fixed; a known defect in the live path is fixed before anything is built on top of it, and "nothing
+depends on it" only describes how cheap that is right now. Never open with the dependency framing.
 
 **How to apply:**
 - Sort findings before starting: what runs today, what runs never, what a later step will write.

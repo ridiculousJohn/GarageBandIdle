@@ -23,7 +23,7 @@
 - [External review verdicts](external-review-verdicts.md) - a pasted review gets confirm/deny per finding AND accept/reject per fix, checked against the code; no bandaids, no edit until "apply"
 
 ## Judgment
-- [Problems, not issues](problems-not-issues.md) - what breaks TODAY, not what is true; and a reason for NOT doing something gets checked like any other claim
+- [Problems, not issues](problems-not-issues.md) - what breaks TODAY, not what is true; a reason for NOT doing something gets checked like any other claim; and a question I raise needs a fact that changed behind it, or it is not a question
 - [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - name the primitive that already covers it, and when two shapes both work take the smaller one
 - [No spec accumulation](no-spec-accumulation.md) - answer a finding by deleting the mechanism, not by adding a paragraph; cut argument, never a named check; two rounds on one operand means delete it
 - [Tests exercise runtime code](tests-exercise-runtime-code.md) - fixtures are fine, a second implementation of runtime behavior is not; convert the call sites instead

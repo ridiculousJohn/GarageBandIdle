@@ -552,8 +552,29 @@ carry the content.
 
 ## Landing order
 
-Five changesets, each compiling and green on its own, and nothing blocks any of them: the
-entitlement spelling and the Encore window's placement settled 2026-09-02 (the decisions above).
+Five changesets, each compiling and green on its own, preceded by one correction to step 6 that is
+not part of this step and lands first. Nothing blocks any of the five: the entitlement spelling and
+the Encore window's placement settled 2026-09-02 (the decisions above).
+
+- **0. The event-record correction**, before A - a step 6 defect in live code and shipping
+  content, its own changeset with a build-plan correction row. `EventRecordExists` and
+  `EventRewardPending` lose `host` and read outward from the acting scope to the first interior
+  scope holding a record, like `FlagSet`; the two DTOs and the importer's two `BuildCondition`
+  cases drop `host` with them. `FinalizeStrandedReward`, `CollectRequiredGuards`, and
+  `ValidationCheck.StrandedReward` are deleted, not replaced. The refusal moves to the reset: a
+  scope holding an armed, unclaimed reward refuses to be cleared, judged from its own facts, asked
+  down the target subtree by `ResetScope` and `RestartScope`; `Rung.IsOffered` asks it of every
+  reset in its list so the button closes before any action runs, a forced execute throws, and
+  `GateFeedback` renders the refusal as a leg naming the event by `displayName`. Chapter 1's
+  capstone rung loses its `EventRewardPending` leg; the tier's rung keeps its own as a self read,
+  without `host`. The content doc's rung specs, its 12.12 note, and the walkthrough mentions
+  follow the JSON. Tests: the eighteen sites drop `host`, the two `StrandedReward` rows go, and
+  new rows cover the outward read from a tier finding its own and its chapter's record, a reset
+  over an armed reward refused at the gate and throwing when forced, and the capstone button
+  disarming with the event's name. Why (John, 2026-09-02): the chapter's rung read a child's
+  private record and the validator required it - "now you've effectively allowed cross-tree
+  references". A parent informs its subtree and the subtree answers; a parent never reads a
+  child's fact.
 
 - **A. Encore in the runtime**: root.json's `encore` with the TIMED leg alone
   (`appliesWhen: BuffActive(encore)` - the Pass leg joins in B with `HasEntitlement`, so A stays

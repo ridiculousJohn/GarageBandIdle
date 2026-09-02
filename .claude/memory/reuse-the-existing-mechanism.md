@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: efd4f70d-d22b-4ea0-8736-2d55c0b412d5
-  modified: 2026-09-02T21:06:14.304Z
+  modified: 2026-09-02T21:27:38.449Z
 ---
 
 Before adding a field, a type, an id indirection, or any new mechanism, name the existing
@@ -84,3 +84,17 @@ existing family it is an instance of. If the answer is a family that already sco
 filters, there is nothing to build. Six times now, five with his words attached; it is not a
 knowledge gap, it is starting from the name of the thing instead of from what the system already
 calls it.
+
+**A walk is the tell, downward included (2026-09-02, same day).** Every fact is READ one way:
+outward from the acting scope to the first scope holding it. `EventRecordExists` /
+`EventRewardPending` got a `host` parameter with self-or-enclosed reach - a condition looking DOWN
+into a child - and the stranded-reward validation check then REQUIRED that downward read on any
+rung whose reset reaches an event host. Chapter 1's capstone rung reads tier1's private event record
+because of it. John: "the chapter digging down into one of its children's private events is a
+pretty stupid design. now you've effectively allowed cross-tree references" and "the flaw stems from
+you yet again adding a tree walk somewhere where it wasn't necessary. you seem to like them." A
+reset walking down is a parent INFORMING children of an event, no knowledge of what is inside; a
+condition walking down is the parent KNOWING a child's fact. Before adding any traversal that does
+not start at the acting scope and go outward, stop: it is either a propagation the child answers
+(legitimate, rare, and already exists as reset) or a read that belongs at the scope that owns the
+fact. Never a third thing.

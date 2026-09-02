@@ -344,7 +344,7 @@ IS the host and the outward walk recovers it, exactly as for every other content
   reward - exactly as 50 Fans arms the release button - and fires nothing by itself. `DismissEvent`
   **removes the record first**, then runs `rewards` if the goal was reached, then runs `onEnd`
   either way. Removing first is what opens a rung guarded by
-  `Not(EventRewardPending(host))` so that an `onEnd` carrying `[RestartScope(tier)]` can actually
+  `Not(EventRewardPending)` so that an `onEnd` carrying `[RestartScope(tier)]` can actually
   bank. Nothing in an action list can observe the record's absence: handicaps are
   multipliers on production, and rewards read balances.
 - **Two ending lists, because failure has an ending too.** `rewards` runs only on success and holds
@@ -948,14 +948,16 @@ Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, 
 a scaling goal or reward curve reading a per-clear counter, §8.1). Records need no special kind:
 they are a currency.
 
-The two event kinds read a named host's record state, holding a direct scope reference like
-`ResetScope`: `EventRecordExists(host)` - any record
-(running, expired-undismissed, or goal-reached-undismissed); `EventRewardPending(host)` - a record
-whose `goalReached` is set. Both are pure fact reads: nothing evaluates a goal at read time. Unlike ordinary reads they may name the acting scope **or a scope it encloses** - their
-guard use is a rung refusing to reset over a pending reward (§12.12), and a guard must see the
-hosts its own reset closure contains. Composed with `Not`, they are how a rung disarms while an
-event runs or a reward waits; the player is never wedged, because dismissal stays one tap away and
-always legal - it clears the record and pays the reward if the goal was reached.
+The two event kinds read a record the way `FlagSet` reads a flag: outward from the acting scope to
+the first interior scope holding one, no scope named. `EventRecordExists` - any record (running,
+expired-undismissed, or goal-reached-undismissed); `EventRewardPending` - a record whose
+`goalReached` is set. Both are pure fact reads: nothing evaluates a goal at read time, and neither
+looks down. A scope's record is visible to that scope and to the scopes inside it, never to its
+parent - a parent knows nothing of what its children host. Composed with `Not`, they are how a
+scope's OWN rung disarms while an event runs or a reward waits; the player is never wedged, because
+dismissal stays one tap away and always legal - it clears the record and pays the reward if the
+goal was reached. A reset from above authors no such leg and cannot: protecting an armed reward
+from a parent's clear is the reset's own refusal (12.5).
 
 A condition may carry an optional **`uiText`** label ("Needs 50 fans", "Claim your event reward
 first") — pure presentation data, never read by evaluation, rendered by the rung feedback
@@ -1003,6 +1005,14 @@ they mutated is what gets saved.
 
 **`ResetScope`** clears the referenced scope and everything inside it (downward-closed). It only clears —
 it never executes nested lists — so no recursion exists via resets.
+The clear is a parent INFORMING its subtree of an event, never a read of it - and the subtree
+answers. A scope holding an armed, unclaimed reward (a record with `goalReached` set) refuses to be
+cleared, judged from its own facts, and the refusal comes back up the walk the clear goes down. A
+rung asks that question of every reset in its list as part of `IsOffered`, so its button closes
+before any action runs and a list never half-executes; the gate feedback renders the refusal as a
+leg naming the event by its `displayName`. A reset forced past a refusal throws (requirement 7).
+`DismissEvent` removes the record before running `onEnd`, so a restart from an ending list is never
+refused by its own event.
 
 **`AddModifier`** counts a stack under the modifier's id in the target scope's
 `modifierStacks`. A modifier is declared content like everything else — `ScopeDefinition.modifiers` —
@@ -1226,7 +1236,7 @@ the empty host, runs `onEntry`, then creates the record - after the list, so an 
 resets the host puts the record in the fresh payload. Dismiss checks that the host holds a record
 **for the named event** - a sibling's record is an ordinary refusal, not a licence to pay this
 event's reward - then **removes it first**, then runs `rewards` if `goalReached` was set, then runs `onEnd` either way.
-Removing first is what opens a rung gated on `Not(EventRewardPending(host))`, so an `onEnd`
+Removing first is what opens a rung gated on `Not(EventRewardPending)`, so an `onEnd`
 carrying `[RestartScope(tier)]` banks instead of silently no-oping. Nothing in an
 action list can observe the record's absence: handicaps multiply production, and rewards read
 balances. Record removal is therefore the operation's job and never the author's.
@@ -1474,13 +1484,10 @@ per-feature: any kind an author gates with explains itself for free.
   (reads zeros); reference cycles across ALL nested action references - `ExecuteRung`,
   `RestartScope`, and trigger lists - are errors. A rung on the root needs no check: the field is on
   `InteriorDefinition` (§12.3), so there is nowhere to author one.
-- A rung whose reset closure contains an event host, and whose offer condition carries no REQUIRED
-  `Not(EventRewardPending(host))` - the whole condition, or a conjunct reached through `All` alone -
-  warns (stranded reward: an armed, unclaimed reward would die with the record). Requiredness is the
-  test, not the mere presence of the leg: a positive leg means the opposite, and one under an `Any`
-  is satisfied by its sibling branch. A warn, not an error: resetting over cheap disposable events
-  is authorable on purpose. `EventRewardPending` / `EventRecordExists` reach is validated like every
-  scope reference: the acting scope or a scope it encloses.
+- A rung that would reset over an armed, unclaimed reward is refused at its gate by the scope
+  holding the record (12.5). No load-time check stands in for that and none could: a guard authored
+  on the parent would be a read down the tree, which the event kinds do not express - they read
+  outward only, like every other fact (12.4).
 - Scope references are checked for reach: `ResetScope` may target the acting scope, a scope it
   encloses — never a peer, the root, an ancestor, or an unrelated subtree. Peers are cleared by the
   scope that CONTAINS them, since resetting it is downward-closed. `ExecuteRung` may
@@ -1658,7 +1665,8 @@ Content/                 // the authored JSON the importer reads
    scope and stopping at the first scope that declares it. There is no catalogue, no id index, and
    no "find all X" pass. Two walks are legitimate, because both start from a scope the caller
    already holds: outward along the chain (resolution), and downward through ONE named subtree
-   (aggregation like `GetRate`, and the downward-closed clear of `ResetScope`). What is forbidden is
+   (aggregation like `GetRate`, and the downward-closed clear of `ResetScope` - a parent informing
+   its subtree, which answers, never a parent reading a child's fact). What is forbidden is
    resolving a name from anywhere else - a global map, a scan of every scope, or any search that
    leaves the acting chain. Validation is the exception and the reason the rule holds: it audits the
    whole tree at load, once, which is what lets every runtime walk assume its own chain is enough.
