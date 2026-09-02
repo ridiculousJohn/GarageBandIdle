@@ -541,7 +541,7 @@ Idle income is themed as streaming/radio royalties and is largest at the Radio c
 
 **Encore (the accelerator).** A **game-speed multiplier**, not an income multiplier: a timed buff
 (`{buffId, expiresAt}` at root) read by an ordinary root permanent modifier: `encore` is
-`{stat: game_speed, ×2}` with `appliesWhen: Any[FlagSet(backstage_pass), BuffActive(encore)]` -
+`{stat: game_speed, ×2}` with `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` -
 the same shape as the idle fraction, a membership that counts only while a fact holds. The record
 is that fact, a source of nothing, read by the `BuffActive` condition as a flag is read by
 `FlagSet` - resolved outward from the acting scope to the first scope holding a record with that
@@ -857,7 +857,7 @@ class InteriorFacts : ScopeFacts     // every scope inside another: chapters and
 class RootFacts : ScopeFacts        // the root scope's payload, and no other
 {
     Dictionary<string, int>       roadieAllocation; // chapterId → stationed count (§8)
-    HashSet<string>               entitlements;     // store-written (backstage_pass)
+    HashSet<string>               entitlements;     // store-written; the ids root DECLARES on its own entitlements list (backstage_pass), read by HasEntitlement (§12.4), never a flag
     string                        currentChapterId; // where play left off; boot returns here (§12.9)
 }
 

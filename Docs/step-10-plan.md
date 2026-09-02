@@ -22,7 +22,8 @@ computes. Both walkthrough tests that today poke facts directly - 13.3's allocat
 The command surface grows, for the first time since step 7, and only by root-owned commands and
 authenticated callbacks (12.11's list): `SetRoadieAllocation`, `AcknowledgeStory`, and the callback
 operations - extend Encore, double and settle the offer, write an entitlement, grant Roadies. No
-chapter-local mechanic changes. The condition family grows one kind (a live buff record), the tick
+chapter-local mechanic changes. The condition family grows two kinds (a live buff record, a held
+entitlement), the tick
 one housekeeping prune, the claim one factor; the gather grows nothing. Nothing here invents a vocabulary: every
 new number is an ordinary root modifier and every new fact already has a field in `RootFacts` or
 `ScopeFacts`.
@@ -33,7 +34,7 @@ Settled in conversation and landed in the design doc the same day (commit `bb1f6
 
 1. **Encore is an ordinary root permanent modifier whose `appliesWhen` reads a timed record.**
    `encore` is `{stat: game_speed, x2}` in root.json's `permanentModifiers` with
-   `appliesWhen: Any[FlagSet(backstage_pass), BuffActive(encore)]` - the `idle_base` shape, a
+   `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` - the `idle_base` shape, a
    membership that counts only while a fact holds. The `TimedBuff` record is that fact, resolved
    outward from the acting scope and read by a condition exactly as a flag is; it is NOT a source of effects, and no gather row exists for
    it. A rewarded ad adds four hours to the record, repeatable, to a `GameConfig` cap. John, on
@@ -88,23 +89,30 @@ Settled in conversation and landed in the design doc the same day (commit `bb1f6
 
 ## Questions before the slices
 
-Each is a design fact only John can settle. None blocks slice A.
+Two were settled after the first draft and are recorded here as decided; the rest are design
+facts only John can settle, and none blocks a slice.
 
-- **The entitlement's spelling as a fact.** `RootFacts.entitlements` (a store-written set) exists
-  with no reader. A permanent modifier gated on it needs a condition kind over the set
-  (`HasEntitlement`, one new kind). The alternative is the entitlement as a ROOT FLAG the store
-  callback sets - `FlagSet` already exists, the modifier needs nothing new, and the set field goes
-  unused. Recommended: the flag, since the store's own ids are strings root.json can declare and
-  the only reads are boolean; the set is deleted from the schema with it, or kept for receipts if
-  John wants one. Either way the session's two code reads (the cap raise, the doubled flag) name
-  the Pass id in one constant.
+- **Decided (2026-09-02): the entitlement is the `RootFacts.entitlements` set, read by
+  `HasEntitlement(id)`.** The flag spelling was considered and rejected by John: a flag says
+  nothing about where it came from, so a store product would sit beside `ch1_complete` with only
+  its name saying the store owns it. The set already exists (12.3 lists it as store-written), and
+  keeping it is smaller once everything is counted: root.json declares `entitlements:
+  ["backstage_pass"]` beside its flags, so the closed set of store products is content and the
+  save filter drops an id no content declares; the read is one condition kind in the `FlagSet`
+  shape; the store callback is the only writer by definition, so no setter check applies - which
+  deletes the code-set flag marker the flag spelling would have needed, since the story flags get
+  their setter from the beat definition. The session's two code reads (the cap raise, the doubled
+  flag) name the Pass id in one constant.
 - **"Unlocked chapters only"** (12.11's `SetRoadieAllocation` rule). No chapter unlock condition
   exists: the select renders root's whole roster, and section 2 says a cleared chapter stays
   available. Until a chapter authors an unlock gate, the constraint is "a chapter on root's
   roster", which is also the save filter's rule for the map's keys.
-- **Where the Encore window opens from.** Ctrl C's Overclock window shows "While active, yields of
-  all generators is 2.0x. Time remaining HH:MM:SS" with the two boost buttons. Whether Ctrl C
-  reaches it from the top bar, settings, or a chapter module is unknown - ask before slice D.
+- **Decided (2026-09-02, from John's screenshots): the Encore widget is the top bar's LEFT pill.**
+  Ctrl C's top bar is two pills above every chapter's content. The left pill is the Overclock
+  widget itself - a stopwatch icon and the remaining time inline ("5:15:03"), the infinity symbol
+  when the Pro Unlock makes it permanent - and tapping it opens the window ("While active, yields
+  of all generators is 2.0x. Time remaining HH:MM:SS") with the two boost buttons. The right pill
+  is three icon buttons: story beat selector, chapter selector, settings, in that order.
 - **Settings' contents.** Assumed: the Roadies entry alone this step.
 - **The story log's timing.** The "conversation" screen is small once beats are definitions (a
   downward walk over root's roster reading root flags). In step 10 or later.
@@ -143,7 +151,7 @@ Each is a design fact only John can settle. None blocks slice A.
 ## Encore
 
 **The modifier.** root.json declares `encore` in `modifiers` - `{stat: game_speed, multiplier: 2}`,
-`stacking: Replace`, `appliesWhen: Any[FlagSet(backstage_pass), BuffActive(encore)]` - and lists
+`stacking: Replace`, `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` - and lists
 it in `permanentModifiers`. The two `game_speed` shape warnings (12.12) already cover it: wildcard,
 root-declared. The Pass's permanence and the ad's four hours are the two legs of one condition on
 one modifier: a Pass owner applies it through the first leg, a free player with a live record
@@ -157,7 +165,8 @@ The record is a FACT, like a flag: it is a source of nothing, and only a conditi
 condition names; by convention it is the modifier's, and the save filter drops a record whose id
 no `BuffActive` in the composed content names, with a warning, the same rule as an unknown flag.
 
-**`BuffActive(buffId)`**, the one new condition kind: walks OUTWARD from the acting scope, like
+**`BuffActive(buffId)`**, the first of this step's two new condition kinds (`HasEntitlement` is the
+other, slice B): walks OUTWARD from the acting scope, like
 `FlagSet`, and is true at the first scope holding a record with that id (12.14 requirement 8 - no
 scope is named, root least of all) whose `expiresAtUtc` is later than `ctx.NowUtc` - the one
 comparison. Every condition evaluates against a context stamped at the moment being judged (12.4:
@@ -215,8 +224,8 @@ banks time only while Live. It is the ad callback's whole Encore job; the fake a
 
 **The window** (UI, slice D): "Time remaining HH:MM:SS" computed from the record against the
 clock per frame (display, not truth), "Boost for 4 hours" requesting the ad, "Boost forever"
-requesting the Pass; a Pass owner sees the remaining time as infinity and no ad button. Where it
-opens from is the open question above.
+requesting the Pass; a Pass owner sees the remaining time as infinity and no ad button. It opens
+from the top bar's left pill, which shows the same remaining time inline (the chrome section).
 
 **Config**: `encoreAdSeconds` (14400), `encoreCapSeconds`; `Require` rejects zero, negative, or
 non-finite, and a cap below the ad duration. The other knobs this step adds get their rows in the
@@ -258,10 +267,14 @@ runtime-code rule.
 
 ## Entitlements and the Pass
 
-The three benefits, each on an existing mechanism once the spelling question is answered:
+The fact is the `RootFacts.entitlements` set, declared in root.json as `entitlements:
+["backstage_pass"]` and read by **`HasEntitlement(id)`**, the second new condition kind of this
+step, in the `FlagSet` shape: true while the acting chain's root set holds the id. Its `Validate`
+requires the id declared at root; the store callback is its only writer, so no setter rule
+applies. The three benefits, each on an existing mechanism:
 
-- **Permanent Encore**: the first leg of `encore`'s own `appliesWhen` (`FlagSet(backstage_pass)`
-  under the recommended spelling). No second modifier, no refusal.
+- **Permanent Encore**: the first leg of `encore`'s own `appliesWhen`
+  (`HasEntitlement(backstage_pass)`). No second modifier, no refusal.
 - **The claim always doubled**: `EnterChapter` sets `doubled` from the entitlement.
 - **The raised cap**: the window computation reads `backstagePassIdleCapSeconds` instead of
   `idleCapSeconds` while it holds.
@@ -281,7 +294,7 @@ window exists only on a new device or after the kill above; every ordinary launc
 save.
 
 The 12.10 filter: an entitlement id no content declares (a store product dropped from root.json) is
-dropped with a warning, like any unknown flag.
+dropped with a warning, like any other unknown id.
 
 ## Store and ad seams
 
@@ -356,14 +369,9 @@ block with ch1's two beats and content doc section 11's text.
 **Validation** (12.12): `seenFlag` must resolve on the beat's chain (a home outside it is the
 error the setter rule already names, since the write could never reach it); the beat counts as
 that flag's setter, which retires the two `FlagNoSetter` warnings the content test asserts today;
-`availableWhen` gets the kind placement checks every gate gets. The Pass flag, under the recommended spelling, needs the same
-allowance and needs it first (slice B): a code-set flag declared at root is legitimate, and the
-validator needs to know which.
-The smallest spelling is a `setBy: code` marker on the flag declaration... which is a new field for
-a two-flag problem. Alternative: `FlagNoSetter` stays a warning and the two are accepted as known
-warnings - but the validator's report is printed at boot, so a known warning is noise John reads
-every launch. Recommended: the marker, one optional field on the flag entry, refused on any flag
-content also sets.
+`availableWhen` gets the kind placement checks every gate gets. With the beat as setter, no
+code-set flag remains: the Pass is an entitlement, not a flag, so the marker the flag spelling
+would have needed does not exist.
 
 **`AcknowledgeStory(ctx, beat)`**: a root-owned session command on the root-command pipeline -
 reentrancy guard, `Live` required (a card opens only over a live chapter), the flush, refused when
@@ -441,11 +449,14 @@ with the overlay.
 
 ## The chrome
 
-A top bar above the sections in `Screen.uxml`, visible while `Live`: the chapter selector (opens
-the existing select as an overlay - `SwitchChapter` from a live chapter is already legal and
-settles the outgoing offer), the story log (or a placeholder until the log lands), and settings.
-`SettingsUI` is an overlay with one row this step, Roadies, opening the allocation screen. The
-Encore window hangs wherever the open question lands.
+A top bar above the sections in `Screen.uxml`, visible while `Live`, as two pills (Ctrl C's, from
+John's screenshots). **The left pill is the Encore widget**: an icon and the remaining time
+inline, computed per frame from the root record against the clock (display, not truth), the
+infinity symbol under the Pass, and a tap opens the Encore window. **The right pill is three
+buttons**: the story log (or a placeholder until the log lands), the chapter selector (opens the
+existing select as an overlay - `SwitchChapter` from a live chapter is already legal and settles
+the outgoing offer), and settings. `SettingsUI` is an overlay with one row this step, Roadies,
+opening the allocation screen.
 
 The host's `Render` grows from three phases to a small overlay stack: the phase screens as today,
 plus at most one requested overlay (settings, allocation, the story card, the Encore window) on
@@ -453,10 +464,10 @@ top while `Live`. Overlays are host-owned like the select and the dialog; none i
 
 ## Validation additions
 
-The 12.12 pass grows: story beats (flag reach, setter accounting, gate kind placement), the
-code-set flag marker, `BuffActive`'s placement (refused in `activeWhen`), and the entitlement
-flag's declaration. The save filter grows: a buff record no `BuffActive` names; unknown
-entitlement flags (if a flag, the existing flag drop covers it).
+The 12.12 pass grows: story beats (flag reach, setter accounting, gate kind placement),
+`BuffActive`'s placement (refused in `activeWhen`), and `HasEntitlement`'s id declared at root
+(the `entitlements` declaration list). The save filter grows: a buff record no `BuffActive` names;
+an entitlement id root does not declare.
 
 ## Tests
 
@@ -525,23 +536,24 @@ The build-plan status line. 12.13's file list (`Meta/RoadieAllocation.cs`, `Mone
 story family files, `StoryBeatUI` / `StoryLogUI` / `RoadieAllocationUI` / `SettingsUI` / the top
 bar, the Encore window). The design doc: `TickSystem`'s "gather row" comment retired; 8.2's
 retroactivity question closed; 12.11's entry-point list gaining
-the callback operations by name; 12.3's `entitlements` line following the spelling decision; 12.9
+the callback operations by name; 12.3's `entitlements` line gaining its root declaration list and
+`HasEntitlement` joining 12.4's condition kinds beside `BuffActive`; 12.9
 naming the shared segment walk. The content doc: section 11's beats as authored definitions,
 section 12's story rows, walkthrough 13.4's Encore variant. `root.json` and `chapter-01.json`
 carry the content.
 
 ## Landing order
 
-Five changesets, each compiling and green on its own. A is unblocked; B waits on the entitlement
-spelling; D on the Encore window's placement.
+Five changesets, each compiling and green on its own, and nothing blocks any of them: the
+entitlement spelling and the Encore window's placement settled 2026-09-02 (the decisions above).
 
 - **A. Encore in the runtime**: root.json's `encore` with the TIMED leg alone
-  (`appliesWhen: BuffActive(encore)` - the Pass leg joins in B, so A imports, validates, and stays
-  green without the spelling decision), `BuffActive`, the prune, `ExtendBuff` with the
+  (`appliesWhen: BuffActive(encore)` - the Pass leg joins in B with `HasEntitlement`, so A stays
+  a one-kind changeset), `BuffActive`, the prune, `ExtendBuff` with the
   root-command pipeline variant and the config knobs, the claim's segmented window over the shared
   boundary code, the save filter's buff row, the tests.
-- **B. Entitlements, the Pass, and the seams**: the entitlement spelling, its validation, and the
-  code-set flag marker (needed here first, for `backstage_pass`; the story flags reuse it in C),
+- **B. Entitlements, the Pass, and the seams**: `HasEntitlement`, root.json's `entitlements`
+  declaration list with its validation and save-filter rows,
   `encore`'s `appliesWhen` becoming the two-leg `Any`, the two interfaces and their fakes,
   `AdManager` / `IAPManager` with the grant-save-acknowledge order, the callback commands, the
   Pass's three benefits, the dialog's Double It and Pass buttons, 13.4 converted.

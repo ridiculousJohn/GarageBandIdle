@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e6b3ee4e-601a-46e9-8b69-94d55b6fad6a
-  modified: 2026-09-02T18:02:34.853Z
+  modified: 2026-09-02T20:12:30.405Z
 ---
 
 Ctrl C is John's strong reference for Garage Band Idle. The design doc was built against it across
@@ -49,6 +49,27 @@ Where it survives in writing (thin, which is why this memory exists):
   buff: 2x extends in time per ad up to a cap, then further ads add a shorter 4x - and said that
   if we ever do it, it should be ONE buff reporting 2x or 4x from its remaining time, never two
   buffs relying on the clamp. Deferred, not planned.
+
+- 2026-09-02, two screenshots from John (chapter 2 "Money"/"Assets" and chapter 1 "Lines"): the top
+  bar is TWO pills above the content, on every chapter. Left pill: the Overclock widget - a
+  stopwatch icon plus the remaining time inline ("5:15:03"), or the infinity symbol when the Pro
+  Unlock makes it permanent; tapping it opens the Overclock window with the boost buttons. Right
+  pill: three icon buttons - story beat selector (phone icon), chapter selector (building icon),
+  settings (gear). The header shows the rate under the total ("Lines: 7.79e17" / "(4.42e13/s)");
+  the Money chapter shows no rate line. Generator rows: "Mouse (0+5)" / "100.00 lines => 8.65e9
+  lines" / "+1" "+76" - the count is "(bought + granted)": the second number is the count given by
+  OTHER generators or buffs, since Ctrl C lets a generator generate count for another generator
+  and shows the two separately. John will likely want it, and it is authored, not built: a
+  currency the feeding generator pays (never spent, its balance IS the granted count) plus a
+  permanent modifier `{target: <fed generator id or tag>, stat: rate, formula:
+  LinearOnBalance(<currency>, k)}` - the `records_income` shape with a generator as the target.
+  Decided 2026-09-02: if that currency is ALSO spendable, the boost shrinking on spend is the
+  intended trade-off, so no earned-total formula is needed. The buy buttons are +1 and +max-affordable. The Money chapter has no rate
+  line because nothing produces Money per second: its loop is accrue Asset currencies through the
+  generators, then "Liquidate" the section (a prestige, our tier release rung) to convert them to
+  Money - our fans-to-records shape. The prestige button: "Liquidate (Gain
+  1.19e26 Money)" over "Currently: 2.01e19 Money" with a Confirm - the "would bank" preview. Tap
+  producers are three big orange keys: "Ctrl", "C", "V".
 
 **Why:** the doc names it once, as a parenthetical about one formula, so nothing tells a fresh
 session that the whole design descends from it. Without that, design questions get answered from
