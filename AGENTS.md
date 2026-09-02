@@ -14,6 +14,10 @@ This rule overrides cleanup preferences, test-artifact cleanup, assumptions abou
 
 Never run Unity tests or request approval to run Unity tests unless John explicitly instructs Codex to run them in the current task.
 
+# Review Rule
+
+For every review, report defects grounded in a realistic current or future use of the actual product. Future chapters and planned features count when they exercise the documented mechanics. Do not manufacture sequences that the product's UI or lifecycle cannot permit merely because public APIs could be called that way. Every finding must identify the plausible product path and its observable incorrect consequence; speculative risks and implementation preferences are not defects.
+
 # Remember Rule
 
 When John says to "remember" an instruction, persist it in this `AGENTS.md` file during the same response. Acknowledging or promising to follow it only in the current conversation does not satisfy the request.
