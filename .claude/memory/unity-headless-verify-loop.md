@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ff77d597-62a9-412c-b32f-c1489e34fb56
-  modified: 2026-09-01T19:10:42.714Z
+  modified: 2026-09-02T03:22:43.585Z
 ---
 
 Verification loop for [[project-layout-and-workflow]], established during slice 3.5 (2026-07-21). Repo paths here are relative to the repo root as `<repo>/...`, since the checkout lives at a different absolute path on each of John's machines.
@@ -33,3 +33,31 @@ Resolve the editor rather than hardcoding it: read the version from `<repo>/Gara
 - Any change to a definition class's serialized fields REQUIRES re-running the import: old assets deserialize stale/default values until rewritten (enum renumbering, renamed fields). Boot validation flagging `None`/unknown ids after a schema change usually means "reimport not run yet".
 - **What a reimport does to the diff, so it is not mistaken for content change.** Two mechanical effects, both Unity's serializer rather than the importer. (1) `SerializeReference` `rid` values REGENERATE on every import, so every asset holding a Condition, GameAction or formula shows as modified with no semantic change - `git diff` on one shows only the rid pair. Say so when reporting a dirty tree, or John reads a 40-file diff as 40 changes. (2) An empty serialized string is emitted as `uiText: ` WITH a trailing space, so `git diff --check` flags whatever generated assets a diff happens to touch. It is in every committed asset carrying a Condition, nothing enforces it (no `core.whitespace`, no CI, LFS is the only hook), and hand-stripping it is undone by the next import. It was raised as a review finding on 2026-08-28 and rejected on those grounds; check `git grep 'uiText: $' HEAD` before accepting it as one again.
 - Run import before tests: Chapter1ContentTests validates the imported assets against the JSON.
+
+**When John's editor IS open (2026-09-02):** the `unity-editor-mcp` tools reach it (`editor_status`,
+`eval`, `recompile`/`recompile_status`, `run_tests`, `get_console_logs`, `capture_game_view`), and
+the Unity CLI `unity status` / `unity command` sees the same Pipeline server. Rules learned:
+- The editor does NOT see files edited from outside until it refreshes, and auto-refresh runs
+  only on focus. After editing, run `eval` with `UnityEditor.AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport)`,
+  then poll `recompile_status` until `completed`; `recompile` alone answers `up_to_date` against
+  stale files. A `run_tests` fired before that runs the OLD assemblies and reports the old case
+  list as green - compare the assembly timestamps under `Library/ScriptAssemblies` to the edited
+  sources, or eval the changed method, before trusting a run.
+- `eval` compiles the text as a method body: no `using` lines, fully qualified names
+  (`UnityEngine.UIElements.UQueryExtensions.Q<Label>(root, "name", new string[0])` - the
+  `params` overload is ambiguous with `string`), `return` for the answer. `EditorApplication.update`
+  callbacks installed from eval keep running across frames, which is how a per-frame probe of a
+  label's text or layout gets recorded and then `Debug.Log`ged for `get_console_logs`.
+- `run_tests` returns 160 KB; the tool saves it to a file - summarize with a python one-liner
+  over `Summary` and the non-Passed `Results`, never read it whole.
+- **The driven runner fails fifteen `ChapterImporterTests` rows every time** ("the WRITTEN content
+  fails validation" - the sandbox assets it just wrote read back with empty ids), and the same
+  rows pass headless. It is that runner's asset pipeline (tests run inside an
+  `EditorApplication.update` callback), not the code; batchmode is the verdict. Do not chase it.
+  Those runs also dirty `AddressableAssetSettings.asset` (a dangling sandbox group guid) - the next
+  headless import writes it back clean.
+- Two console errors are EXPECTED from a full in-editor run: Unity's "Unknown error occurred while
+  loading .../cash.asset" from the test that plants a junk file (not ours to quiet). Since
+  2026-09-02 our own validator prints nothing on a refusal - a third red line there is a defect.
+- `verify.ps1` lives in the session scratchpad (paths above); it is recreated per session from
+  this memory, and John has not asked for it in the repo.

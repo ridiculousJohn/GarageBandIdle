@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e6b3ee4e-601a-46e9-8b69-94d55b6fad6a
-  modified: 2026-08-24T18:13:53.524Z
+  modified: 2026-09-02T03:22:49.586Z
 ---
 
 Ctrl C is John's strong reference for Garage Band Idle. The design doc was built against it across
@@ -22,6 +22,15 @@ Where it survives in writing (thin, which is why this memory exists):
   timer pauses while unfocused.
 - 2026-08-24: untimed events accruing idle earnings is "all but required" in Ctrl C, which settled
   the no-idle-earnings rule as applying to TIMED events only.
+
+- 2026-09-02, from John's own play of it: numbers render in FIXED SLOTS (two decimals below 1000,
+  one below 10000, then a two-decimal mantissa plus exponent) so a counting value churns in place;
+  a generator row reads "cost => per-unit yield" ("6.99e21 Money => 0.38 Prdty"), the yield being
+  ONE unit's contribution, not the owned total; most generators offer a buy mode of "+1" and "+N"
+  where N is the most the player can afford, with the cost summed over the rising per-unit series
+  (not yet built here - `Purchasing.CostOf` is one unit, the sum is the geometric series from it);
+  he knows of no Ctrl C generator paying two currencies, so our bandmates (cash + fans) extend it;
+  he does not know what font it uses.
 
 **Why:** the doc names it once, as a parenthetical about one formula, so nothing tells a fresh
 session that the whole design descends from it. Without that, design questions get answered from

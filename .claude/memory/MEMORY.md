@@ -10,6 +10,7 @@
 - [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from it; ask John how Ctrl C does it before reasoning from scratch
 - [Closed sets are enums](closed-sets-are-enums.md) - code-defined vocabularies are C# enums; strings only for open designer ids
 - [Narrowing a member type](narrowing-a-member-type.md) - generic base class; covariant overrides don't compile in Unity (CS8831) and `new` hiding is rejected
+- [Step 9 open UI items](step-9-open-ui-items.md) - the digit font (measured: only "1" is narrower), the omitted group title and how to add one, the accepted chrome literals, bulk buy later
 - [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) - merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
 
 ## Gates
