@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -18,11 +17,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public void Bind(GameSession session, ModuleRegistry registry, GameClock clock)
         {
-            var container = document.rootVisualElement.Q<VisualElement>("sections");
-            if (container == null)
-                throw new InvalidOperationException(
-                    "The UIDocument's tree has no element named 'sections' (design doc 12.11).");
-            host = new ScreenHost(container, registry, session, clock);
+            host = new ScreenHost(document.rootVisualElement, registry, session, clock);
             host.Render();          // unconditional, because a fresh game runs no transaction
         }
 

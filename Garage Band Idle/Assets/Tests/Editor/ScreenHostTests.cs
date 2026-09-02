@@ -54,6 +54,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly TierScopeState Tier1;
             public readonly GameSession Session;
             public readonly GameClock Clock;
+            public readonly VisualElement Screen;
             public readonly VisualElement Container;
             public readonly ScreenHost Host;
 
@@ -96,8 +97,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     "Assets/Settings/ModuleRegistry.asset is missing - it is hand-made settings.");
 
                 Clock = new GameClock(Now);
-                Container = new VisualElement();
-                Host = new ScreenHost(Container, registry, Session, Clock);
+                // The shipping screen itself, so the rows drive the real
+                // Screen.uxml: the host requires its three named elements from
+                // this tree, and the select and the dialog are authored in it.
+                var screen = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screen.uxml");
+                Assert.IsNotNull(screen, "Assets/UI/Screen.uxml is missing");
+                Screen = screen.Instantiate();
+                Container = Screen.Q<VisualElement>("sections");
+                Host = new ScreenHost(Screen, registry, Session, Clock);
             }
 
             private static T Find<T>(IEnumerable<T> definitions, string id) where T : Definition =>
@@ -130,17 +137,104 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     .Where(leg => leg.style.display.value == DisplayStyle.Flex)
                     .Select(leg => ((Label)leg).text)
                     .ToArray();
+
+            // Which of the three screens is up: the host toggles a whole screen
+            // by display, so the question has one answer per element.
+            public static bool Shown(VisualElement e) => e.style.display.value == DisplayStyle.Flex;
         }
 
+        // The roster is root's children in composition order, named from
+        // content, and only a fresh game ever reaches this screen: boot enters a
+        // recorded chapter, and a save with no record owes no idle (12.9).
         [Test]
-        public void NoChapterRendersNothing()
+        public void NoChapterRendersTheSelectOverRootsRoster()
         {
             var fx = new Fixture();
             fx.Host.Render();
 
             Assert.AreEqual(SessionPhase.NoChapter, fx.Session.Phase);
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("select")), "the select is the screen");
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("collect")), "nothing is owed, so no dialog");
             Assert.AreEqual(0, fx.Host.Sections.Count, "a chapterless session has no sections");
             Assert.AreEqual(0, fx.Container.childCount, "nothing was added to the container");
+
+            var buttons = fx.Screen.Q<VisualElement>("chapters")
+                .Query<Button>(className: "select-chapter").ToList();
+            Assert.AreEqual(1, buttons.Count, "one button per chapter in root's roster");
+            Assert.AreEqual("The Garage", buttons[0].text, "ch1's authored displayName");
+        }
+
+        // The pick is the switch the button makes, and the switch's own refresh
+        // is what repaints: the select goes down and the chapter comes up in one
+        // pass, with no render of the test's own (12.9).
+        [Test]
+        public void ThePickHidesTheSelectAndBuildsTheChapter()
+        {
+            var fx = new Fixture();
+            fx.Host.Render();
+            // The switch is what the select's button calls; a headless test has
+            // no pointer to press with.
+            fx.Enter();
+
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("select")),
+                "a chapter is entered, so the select is down");
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("collect")),
+                "the entry stamps at now, so no window is owed");
+            Assert.AreEqual(7, fx.Host.Sections.Count, "the authored section count");
+            Assert.IsTrue(fx.Host.Sections[GarageFloor].Visible, "the garage floor is gated Always");
+        }
+
+        // A return with an unpaid window (12.9): the dialog is the whole screen
+        // and the sections stay down beneath it, because a phase that never
+        // ticks must not interpolate a display on a report measured before the
+        // switch. The dialog shows what the session holds and computes nothing.
+        [Test]
+        public void AReturnWithAnUnpaidWindowShowsTheOfferAndHidesTheSections()
+        {
+            var fx = new Fixture();
+            fx.Tier1.generatorCounts["practice_amp"] = 1;
+            fx.Ch1.lastActiveUtc = fx.Now.AddSeconds(-1000);
+            fx.Session.SwitchChapter(fx.Ch1, fx.Now);
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, fx.Session.Phase);
+
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("collect")), "the unpaid window is the screen");
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("select")), "a chapter is entered");
+            Assert.AreEqual(0, fx.Host.Sections.Count, "the sections stay down under the dialog");
+
+            var lines = fx.Screen.Q<VisualElement>("lines");
+            Assert.AreEqual(fx.Session.CurrentOffer.lines.Count, lines.childCount,
+                "one row per line the offer holds");
+            // Fans and rehearsal sit behind reveal flags a fresh state lacks, so
+            // an inactive currency takes nothing from any source and the amp's
+            // cash is the whole offer.
+            Assert.AreEqual(1, lines.childCount, "the amp's cash is the only line");
+
+            var labels = lines.Children().Single().Query<Label>().ToList();
+            Assert.AreEqual("Cash", labels[0].text, "the currency's authored name");
+            Assert.AreEqual("+250.00", labels[1].text,
+                "one amp pays 0.5 cash/s, root's authored idle base halves it, over 1000s");
+        }
+
+        // OK settles (12.9): the claim pays the stored lines and advances the
+        // stamp in one transaction, and its own refresh is what takes the dialog
+        // down and brings the chapter up already holding what was offered.
+        [Test]
+        public void OkSettlesTheOfferAndTheChapterComesUpPaid()
+        {
+            var fx = new Fixture();
+            fx.Tier1.generatorCounts["practice_amp"] = 1;
+            fx.Ch1.lastActiveUtc = fx.Now.AddSeconds(-1000);
+            fx.Session.SwitchChapter(fx.Ch1, fx.Now);
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, fx.Session.Phase);
+
+            // What OK calls; a headless test has no pointer to press with.
+            Assert.IsTrue(fx.Session.ClaimIdle(fx.Now), "the claim settled");
+
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("collect")),
+                "the offer is paid, so the dialog is down");
+            Assert.AreEqual(7, fx.Host.Sections.Count, "the chapter came up in the claim's own refresh");
+            Assert.AreEqual("250.00", Fixture.Text(fx.Host.Sections[GarageFloor].Modules[CashLine], "value"),
+                "what the dialog offered is what the balance holds");
         }
 
         [Test]

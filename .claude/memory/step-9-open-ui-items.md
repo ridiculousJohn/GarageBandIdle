@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-02T03:23:02.335Z
 ---
 
-State after commit 857bedc (2026-09-02), the slice D playthrough:
+State after the slice D playthrough and slice E's landing (2026-09-02):
 
 - **Open: a font with equal-width digits.** Measured in John's editor: the default runtime theme's
   numerals share one advance width EXCEPT "1" (33.33 vs 35.04 panel units for a five-glyph string
@@ -27,9 +27,14 @@ State after commit 857bedc (2026-09-02), the slice D playthrough:
   "cost => yield" (generator). John saw them and raised no objection; every NAME is content.
 - **Future: bulk buy** ("+1"/"+N") on the generator row, per Ctrl C - see
   [[ctrl-c-is-the-reference-game]].
-- Slice E (select, collect dialog, `EntryChapter` stopgap removal) is the last step 9 changeset;
-  until it lands a boot more than 180s after the last exit with any rate production renders a blank
-  screen (AwaitingIdleClaim has no widget). John deleted his save once to get past it.
+- **Decided (slice E, 2026-09-02): the sections stay down under the collect dialog.** The plan's
+  phrase was "the collect dialog over the chapter screen", but a phase that never ticks would
+  interpolate the header on a report measured before the switch (pause/resume keeps `LastTick`),
+  so the dialog and the select are whole screens and `ScreenHost.Render` clears the sections for
+  both. Flagged to John in the slice E report; if he wants the chapter visible beneath, the fix is
+  in the host's Render guard plus a no-interpolate rule for non-Live phases, never in the session.
+- The chrome literals slice E added: "Choose a chapter", "While you were away", "OK". Ctrl C's
+  wording for either screen is unknown - ask John before restyling.
 
 **How to apply:** when the font comes up, start from the measurement above, not from the display
-format. When slice E's plan is written, the blank-screen note is its motivating symptom.
+format.

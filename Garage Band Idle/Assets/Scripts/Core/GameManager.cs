@@ -27,17 +27,14 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // Where play resumes: the recorded chapter resolved over root's direct
-        // children - the load-boundary name resolution, one scan (12.3). A
-        // fresh game has no record and step 9 owns the chapter select, so until
-        // then boot enters the FIRST chapter by id - deterministic because
-        // composition sorts the roster (12.14.5), and the sole authored chapter
-        // while Chapter 1 stands alone. An explicit stopgap, removed when the
-        // select exists.
+        // children - the load-boundary name resolution, one scan (12.3). A fresh
+        // game has no record and answers null: boot stays NoChapter and the select
+        // is the first screen, which is the one state the select exists for (12.9).
         public static ChapterScopeState EntryChapter(RootScopeState root)
         {
             var recorded = root.currentChapterId;
             if (string.IsNullOrEmpty(recorded))
-                return (ChapterScopeState)root.Children[0];
+                return null;
             foreach (var child in root.Children)
                 if (child.ScopeId == recorded)
                     return (ChapterScopeState)child;
@@ -95,8 +92,9 @@ namespace RidiculousGaming.GarageBandIdle
             // its actions, so a refused payout persists the latch without its
             // reward.
             var booted = GameBoot.Load(database.Root, SavePath, config);
-            // Entering re-offers any unpaid window as the idle dialog phase;
-            // nothing renders it until step 9, the session state is simply correct.
+            // Entering re-offers any unpaid window as the idle dialog phase; a fresh
+            // game has no record, so the switch is a no-op and the select is the first
+            // screen (12.9).
             booted.SwitchChapter(GameBoot.EntryChapter(booted.Root), now);
 
             clock = new GameClock(now);
@@ -129,7 +127,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Backgrounding stamps the live chapter and preserves an unpaid window
         // (SwitchChapter(null) is the backgrounding rule); the return re-enters
-        // the recorded chapter, which is where the away window recomputes.
+        // the recorded chapter, which is where the away window recomputes. A
+        // player who backgrounds on the select has no record, and the null
+        // re-entry is a no-op.
         private void OnApplicationPause(bool paused)
         {
             if (session == null)

@@ -4,10 +4,12 @@ using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // The screen's structure logic (design doc 12.11), plain C# so an EditMode
-    // test builds it over imported content with no panel; UIRoot is the
-    // MonoBehaviour shell around it. This is the ONE Refreshed subscriber -
-    // widgets subscribe to nothing, so there is one dispatch order.
+    // The screen's structure logic (design doc 12.11) - the authored sections
+    // while Live, the select while NoChapter, the collect dialog while
+    // AwaitingIdleClaim - plain C# so an EditMode test builds it over imported
+    // content with no panel; UIRoot is the MonoBehaviour shell around it. This
+    // is the ONE Refreshed subscriber - widgets subscribe to nothing, so there
+    // is one dispatch order.
     public sealed class ScreenHost : IDisposable
     {
         // One module and the widget standing for it. The host owns these views,
@@ -68,6 +70,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly ModuleRegistry registry;
         private readonly GameSession session;
         private readonly GameClock clock;
+        private readonly ChapterSelectUI select;
+        private readonly CollectScreenUI collect;
         private readonly List<SectionView> sections = new();
 
         // The chapter the section views describe. Identity, not id: a switch
@@ -77,12 +81,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public IReadOnlyList<SectionView> Sections => sections;
 
-        public ScreenHost(VisualElement container, ModuleRegistry registry, GameSession session, GameClock clock)
+        // Over the screen's own root: the host owns all three screens, so it is
+        // the one place that knows which named elements Screen.uxml promises.
+        public ScreenHost(VisualElement screenRoot, ModuleRegistry registry, GameSession session, GameClock clock)
         {
-            this.container = container;
+            container = Require<VisualElement>(screenRoot, "sections");
             this.registry = registry;
             this.session = session;
             this.clock = clock;
+            select = new ChapterSelectUI(Require<VisualElement>(screenRoot, "select"), session, clock);
+            collect = new CollectScreenUI(Require<VisualElement>(screenRoot, "collect"), session, clock);
             session.Refreshed += Render;
         }
 
@@ -91,11 +99,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // first event would leave the screen permanently blank (12.11).
         public void Render()
         {
+            var phase = session.Phase;
+            select.Root.style.display = phase == SessionPhase.NoChapter ? DisplayStyle.Flex : DisplayStyle.None;
+            collect.Root.style.display = phase == SessionPhase.AwaitingIdleClaim ? DisplayStyle.Flex : DisplayStyle.None;
+            if (phase == SessionPhase.AwaitingIdleClaim)
+                collect.Refresh();
+
             var chapter = session.ForegroundChapter;
-            if (session.Phase != SessionPhase.Live || chapter == null)
+            if (phase != SessionPhase.Live || chapter == null)
             {
-                // AwaitingIdleClaim and NoChapter render nothing here; the
-                // dialog and the select are their own screens.
+                // The select and the dialog are whole screens of their own, and
+                // the sections stay down under the dialog: a phase that never
+                // ticks must not interpolate a display on a report measured
+                // before the switch.
                 container.Clear();
                 sections.Clear();
                 builtFor = null;
@@ -206,6 +222,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     $"Evaluation scope '{(scope == null ? "<none>" : scope.Id)}' is not inside chapter "
                     + $"'{chapter.ScopeId}' (design doc 12.11).");
             return found;
+        }
+
+        // The named element Screen.uxml promises, for the host and for the two
+        // screen classes it owns. Static content cannot legitimately be
+        // unresolvable (requirement 7), so a miss names the element rather than
+        // leaving a null to surface later.
+        internal static T Require<T>(VisualElement root, string name) where T : VisualElement
+        {
+            var element = root.Q<T>(name);
+            if (element == null)
+                throw new InvalidOperationException(
+                    $"Screen.uxml has no {typeof(T).Name} named '{name}' (design doc 12.11).");
+            return element;
         }
     }
 }

@@ -1535,7 +1535,8 @@ Assets/Scripts/
     GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorListUI  GeneratorRowUI
               UpgradeListUI  UpgradeRowUI  BarGroupUI  BarRowUI  RungButtonUI  EventUI
-    NumberFormatter.cs  StoryBeatUI.cs  CollectScreenUI.cs  RoadieAllocationUI.cs
+    ChapterSelectUI.cs  CollectScreenUI.cs        // the app's own screens for NoChapter and AwaitingIdleClaim, over root's roster and the session's offer
+    NumberFormatter.cs  StoryBeatUI.cs  RoadieAllocationUI.cs
 Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
 Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)

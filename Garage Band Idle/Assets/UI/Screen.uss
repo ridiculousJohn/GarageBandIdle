@@ -104,3 +104,63 @@
 .event-buttons {
     flex-direction: row;
 }
+
+/* The select and the collect dialog are whole screens: each covers the panel,
+   so the ScrollView's layout beneath never matters. */
+
+.overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.select {
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+}
+
+.select-title {
+    -unity-font-style: bold;
+    font-size: 24px;
+    margin-bottom: 16px;
+}
+
+.select-chapters {
+    min-width: 320px;
+}
+
+.select-chapter {
+    margin-bottom: 8px;
+    font-size: 18px;
+}
+
+/* The scrim is what makes this read as a dialog and what absorbs input to
+   anything beneath. */
+.collect {
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+.collect-panel {
+    min-width: 480px;
+    padding: 24px;
+    background-color: rgb(32, 32, 32);
+}
+
+.collect-title {
+    -unity-font-style: bold;
+    font-size: 20px;
+    margin-bottom: 12px;
+}
+
+.collect-lines {
+    margin-bottom: 12px;
+}
+
+.collect-ok {
+    margin-top: 8px;
+}

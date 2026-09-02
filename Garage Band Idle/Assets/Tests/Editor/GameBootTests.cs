@@ -102,23 +102,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("ch2", GameBoot.EntryChapter(root).ScopeId);
         }
 
-        // The stopgap: a fresh game has no record and step 9 owns the chapter
-        // select, so until then boot enters the first chapter by id - which the
-        // sorted roster makes deterministic, and which is the sole authored
-        // chapter while Chapter 1 stands alone.
+        // A fresh game has no record, and boot does not pick for the player: the
+        // select is the screen, and only a fresh game ever sees it (12.9).
         [Test]
-        public void An_unrecorded_chapter_falls_back_to_the_first_chapter_by_id()
+        public void An_unrecorded_chapter_answers_null_and_the_session_stays_NoChapter()
         {
             var tree = new TestTree();
+            var session = new GameSession(tree.Root, Config());
 
-            Assert.AreSame(tree.Ch1, GameBoot.EntryChapter(tree.Root));
+            var entered = GameBoot.EntryChapter(tree.Root);
+            session.SwitchChapter(entered, BootUtc);
+
+            Assert.IsNull(entered);
+            Assert.AreEqual(SessionPhase.NoChapter, session.Phase);
+            Assert.IsNull(session.Root.currentChapterId, "nothing was recorded on the player's behalf");
         }
 
         // A chapter authored SINCE the save was written arrives freshly built -
         // the load leaves content it has no node for that way on purpose - so it
-        // reaches entry with no stamp. Here the recorded chapter is gone from
-        // content too, which clears the record and sends the fallback straight
-        // into the new one. Its starter rate is the shape that would otherwise
+        // reaches entry with no stamp, whoever enters it. Here the recorded
+        // chapter is gone from content too, so the record clears and the entry is
+        // the player's pick. Its starter rate is the shape that would otherwise
         // bill the player for two millennia; Chapter 1 masks that only because
         // every fresh rate there happens to be zero.
         [Test]
@@ -140,10 +144,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var session = GameBoot.Load(
                 ComposedContent.Compose(TestTree.MakeRoot("root"), new[] { newChapter }),
                 SavePath, Config());
-            var entered = GameBoot.EntryChapter(session.Root);
+            Assert.IsNull(GameBoot.EntryChapter(session.Root), "the stale record cleared, so the select is the screen");
+            var entered = (ChapterScopeState)session.Root.Children[0];   // the player's pick from the select
             session.SwitchChapter(entered, BootUtc);
 
-            Assert.AreEqual("ch_new", entered.ScopeId, "the stale record cleared and the fallback took over");
+            Assert.AreEqual("ch_new", entered.ScopeId, "the roster holds only the new chapter");
             Assert.AreEqual(SessionPhase.Live, session.Phase, "a chapter never left owes no idle");
             Assert.IsNull(session.CurrentOffer);
             Assert.AreEqual(BootUtc, entered.lastActiveUtc, "entry stamped what it found unstamped");

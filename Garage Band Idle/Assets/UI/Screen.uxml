@@ -3,4 +3,15 @@
     <ui:ScrollView name="screen" class="screen">
         <ui:VisualElement name="sections" class="sections" />
     </ui:ScrollView>
+    <ui:VisualElement name="select" class="overlay select" style="display: none;">
+        <ui:Label text="Choose a chapter" class="select-title" />
+        <ui:VisualElement name="chapters" class="select-chapters" />
+    </ui:VisualElement>
+    <ui:VisualElement name="collect" class="overlay collect" style="display: none;">
+        <ui:VisualElement class="collect-panel">
+            <ui:Label text="While you were away" class="collect-title" />
+            <ui:VisualElement name="lines" class="collect-lines" />
+            <ui:Button name="ok" text="OK" class="collect-ok" />
+        </ui:VisualElement>
+    </ui:VisualElement>
 </ui:UXML>
