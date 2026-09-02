@@ -1,3 +1,4 @@
+using System.Text;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine.UIElements;
 
@@ -49,8 +50,24 @@ namespace RidiculousGaming.GarageBandIdle.UI
             nameLabel.text = generator.displayName;
             countLabel.text = "x" + ctx.GetOwnedCount(generator.Id);
             buyButton.text = NumberFormatter.Format(Purchasing.CostOf(generator, ctx))
-                + " " + generator.costCurrency.displayName;
+                + " " + generator.costCurrency.displayName + UnitRateText(ctx);
             buyButton.SetEnabled(Purchasing.CanBuy(ctx, generator));
+        }
+
+        // "cost => yield", the reference game's row: what one more unit pays,
+        // through the same resolution the tick sums (12.5). A currency the unit
+        // pays nothing is not a line, and a unit paying nothing has no arrow.
+        private string UnitRateText(GameContext ctx)
+        {
+            var text = new StringBuilder();
+            foreach (var (currency, amount) in Producer.UnitRate(ctx, generator))
+            {
+                if (amount == BigNumber.Zero)
+                    continue;
+                text.Append(text.Length == 0 ? " => " : ", ");
+                text.Append(NumberFormatter.Format(amount)).Append(" ").Append(currency.displayName);
+            }
+            return text.ToString();
         }
 
         private GameContext Context() => new GameContext(scope, clock.RealTimeUtc);

@@ -59,10 +59,10 @@ namespace RidiculousGaming.GarageBandIdle
         public IdleOffer CurrentOffer { get; private set; }
 
         // The last tick's realized movement, held out for interpolation (12.11)
-        // and never serialized. Null after any NON-tick transaction: a command
-        // can invalidate every measured slope (an event start lands a x0
-        // handicap, a switch changes whose subtree the slopes even describe),
-        // so widgets sit at truth until the next tick measures the new state.
+        // and never serialized. The tick is its only writer: a command owns its
+        // mutation and the flush before it, and the flush IS a tick, so the
+        // report a command's refresh renders was measured against the state the
+        // command found. Null only before the first tick.
         public TickReport LastTick { get; private set; }
 
         // The 12.11 hook, one per completed transaction and none on a refusal;
@@ -146,7 +146,6 @@ namespace RidiculousGaming.GarageBandIdle
                     Root.currentChapterId = chapter.ScopeId;   // the durable root fact boot returns to
                     Phase = EnterChapter(chapter, nowUtc);
                 }
-                LastTick = null;
                 CloseTransaction(nowUtc);
             }
             finally
@@ -173,7 +172,6 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 SettleOffer(ForegroundChapter, honorDoubled: true);
                 Phase = SessionPhase.Live;
-                LastTick = null;
                 CloseTransaction(nowUtc);
                 return true;
             }
@@ -389,7 +387,6 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 if (!command(ctx))
                     return false;
-                LastTick = null;
                 CloseTransaction(ctx.NowUtc);
                 return true;
             }

@@ -74,7 +74,18 @@ namespace RidiculousGaming.GarageBandIdle
             // The manager retains the database and releases it in OnDestroy -
             // the Addressables handles need an owner, and nothing else can - so
             // this field publishes first, before anything below can throw past it.
-            database = ContentDatabase.LoadRoot(ContentDatabase.RootAddress, ContentDatabase.ChapterLabel);
+            try
+            {
+                database = ContentDatabase.LoadRoot(ContentDatabase.RootAddress, ContentDatabase.ChapterLabel);
+            }
+            catch (ContentValidationException e)
+            {
+                // The driver is where a person is watching, so the driver prints
+                // the findings; the load only refuses with them.
+                e.Report.LogAll();
+                throw;
+            }
+            database.Report?.LogAll();      // a development build's warnings; null in release
 
             // Built into locals, and the session field publishes LAST, because
             // it is the guard every lifecycle hook tests: nothing added between

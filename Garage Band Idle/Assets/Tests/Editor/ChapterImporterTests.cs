@@ -480,11 +480,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             Write("root.json", RootJson);
             Write("ch1.json", SectionsJson.Replace(@"""prefabId"": ""generator_list""", @"""prefabId"": """""));
-            LogAssert.ignoreFailingMessages = true;   // the preflight logs every finding before it throws
 
+            // No LogAssert here: an expected refusal prints nothing, and an
+            // unexpected error log would fail the row on its own. The findings
+            // ride the exception instead.
             var thrown = Assert.Throws<ContentImportException>(Import);
 
             StringAssert.Contains("content validation failed", thrown.Message);
+            Assert.IsTrue(thrown.Report.OfCheck(ValidationCheck.NullEntry).Any(), "the refusal carries its findings");
             Assert.IsNull(Load<ChapterDefinition>("ch1/ch1.asset"), "nothing was written");
         }
 

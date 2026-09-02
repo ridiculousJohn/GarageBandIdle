@@ -29,9 +29,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         }
 
         // The refresh: truth, the report's realized slope, and the game-time
-        // stamp the interpolation measures from. A null report is a NON-tick
-        // transaction, which invalidates every measured slope - the display
-        // sits at truth until the next tick measures the new state.
+        // stamp the interpolation measures from. A null report means no tick has
+        // run yet, so there is no slope and the display sits at truth.
         public void Snap(GameContext ctx, TickReport report, double gameTimeSeconds)
         {
             truth = ctx.GetBalance(currency.Id);

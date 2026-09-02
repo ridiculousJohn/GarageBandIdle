@@ -557,8 +557,19 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     {
         public bool AssetsMutated { get; }
 
+        // The validation findings behind a refusal, when validation is what
+        // refused; the import prints nothing itself, so the entry point that a
+        // person is watching prints these.
+        public ValidationReport Report { get; }
+
         public ContentImportException(string message, bool assetsMutated = false) : base(message)
         {
+            AssetsMutated = assetsMutated;
+        }
+
+        public ContentImportException(string message, ValidationReport report, bool assetsMutated = false) : base(message)
+        {
+            Report = report;
             AssetsMutated = assetsMutated;
         }
 

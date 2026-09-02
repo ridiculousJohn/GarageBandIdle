@@ -38,8 +38,10 @@ namespace RidiculousGaming.GarageBandIdle
         // broken content.
         //
         // The 12.12 pass runs HERE in development builds and fails loudly, on
-        // the one production load path, so no boot code can forget it. Release
-        // builds ship dev-validated content and skip the cost.
+        // the one production load path, so no boot code can forget it - the
+        // findings ride out on the exception, or on Report when the load goes
+        // through, for the driver to print. Release builds ship dev-validated
+        // content and skip the cost.
         public static ContentDatabase LoadRoot(object rootKey, object chapterLabel)
         {
             var database = new ContentDatabase();
@@ -71,16 +73,20 @@ namespace RidiculousGaming.GarageBandIdle
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             var report = database.Validate();
-            report.LogAll();
             if (report.HasErrors)
             {
                 database.Release();
-                throw new InvalidOperationException(
-                    "content validation failed - see the logged errors (12.12).");
+                throw new ContentValidationException("content validation failed (12.12).", report);
             }
+            database.Report = report;
 #endif
             return database;
         }
+
+        // The pass's findings on a load that went through - warnings only, since
+        // errors refuse the load. Null in release builds, which run no pass. The
+        // driver prints it; the load itself prints nothing.
+        public ValidationReport Report { get; private set; }
 
         public ValidationReport Validate() => ContentValidator.Validate(Root);
 

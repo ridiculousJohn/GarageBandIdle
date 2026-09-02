@@ -76,13 +76,28 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             }
         }
 
-        // The -executeMethod entry point. It THROWS on any preflight failure and
-        // on a post-write report with ERRORS, so the batchmode process exits
-        // nonzero: an import that aborted by logging would leave yesterday's
-        // assets testing green.
-        public static void ImportAll() => Import(new Options());
+        // The -executeMethod entry point and the menu item's body. It THROWS on
+        // any preflight failure and on a post-write report with ERRORS, so the
+        // batchmode process exits nonzero: an import that aborted by logging
+        // would leave yesterday's assets testing green. A person is watching
+        // here, so this is where the findings PRINT - the import itself only
+        // returns them or refuses with them.
+        public static void ImportAll()
+        {
+            try
+            {
+                Import(new Options()).LogAll();
+            }
+            catch (ContentImportException e)
+            {
+                e.Report?.LogAll();
+                throw;
+            }
+        }
 
-        internal static void Import(Options options)
+        // Answers the written content's validation report, warnings included;
+        // a refusal carries its report on the exception. Prints nothing.
+        internal static ValidationReport Import(Options options)
         {
             var documents = ParseAll(options.ContentDirectory);
             if (documents.Count == 0)
@@ -98,10 +113,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 BuildUnion(transient, documents, options, (type, _) => (Definition)ScriptableObject.CreateInstance(type));
                 LintPaths(transient, options);
                 var preflight = ContentValidator.Validate(transient.Content);
-                preflight.LogAll();
                 if (preflight.HasErrors)
                     throw new ContentImportException(
-                        "content validation failed on the assembled documents - nothing was written (12.12).");
+                        "content validation failed on the assembled documents - nothing was written (12.12).",
+                        preflight);
             }
             finally
             {
@@ -120,7 +135,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             // inherits the answer.
             try
             {
-                Write(documents, options);
+                return Write(documents, options);
             }
             catch (Exception e)
             {
@@ -132,7 +147,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
 
         // Everything that can change what is on disk, in one place: this
         // method's body IS the mutating phase the caller's catch marks.
-        private static void Write(List<Document> documents, Options options)
+        private static ValidationReport Write(List<Document> documents, Options options)
         {
             // The same build as the preflight, against persisted assets.
             var written = new Build();
@@ -159,10 +174,11 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             // broken - exactly worth failing on.
             var loaded = LoadPersisted(options);
             var report = ContentValidator.Validate(loaded);
-            report.LogAll();
             if (report.HasErrors)
                 throw new ContentImportException(
-                    "the WRITTEN content fails validation - the writer disagreed with the preflight (12.14.5).", true);
+                    "the WRITTEN content fails validation - the writer disagreed with the preflight (12.14.5).",
+                    report, true);
+            return report;
         }
 
         // ---- parsing ----

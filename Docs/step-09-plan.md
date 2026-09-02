@@ -311,7 +311,9 @@ stays untested by design, like the driver shell. The set the ch1 sections table 
 - **`JamButtonUI`** - `FireProducer` on the bound producer; yield preview from the same
   resolution `FireProducer` uses.
 - **`GeneratorRowUI`** + list module - rows from the scope's `generators` gated by
-  `availableWhen`; cost, owned count, `CanBuy` pressability, `TryBuy` on press.
+  `availableWhen`; owned count, `CanBuy` pressability, `TryBuy` on press, and the button reads
+  "cost => yield" as the reference game's does - what one more unit pays per second, through
+  `Producer.UnitRate`, the same per-unit resolution the Jam preview runs over the rate entries.
 - **`UpgradeRowUI`** + list module - same shape over `upgrades`, and the list additionally
   filters out purchased ones on the purchased fact (`IsUpgradePurchased`, the same fact
   `Purchasing.CanBuy` enforces): ch1's authored gates are progression conditions that never
@@ -354,10 +356,12 @@ numbers already contain it. A snap stamps the clock's `GameTimeSeconds`; between
 widget displays truth plus slope times (game time now minus the stamp). Frame-state subtraction
 is the whole mechanism: no consumer samples time, so refresh and interpolation order cannot
 double-count a frame, and pause freezes every widget for free because paused frames add nothing
-to game time. A NON-TICK transaction CLEARS the
-report: a command can invalidate every measured slope - an event start lands the gear x0
-handicap, a chapter switch changes whose subtree the slopes even describe - so widgets sit at
-truth until the next tick measures the new state, one frozen interval at most. And extrapolation
+to game time. The report stands until the next tick replaces it, and no command touches it: a
+command owns its mutation and the flush that settles banked time before it, and the flush IS a
+tick, so the report a command's refresh renders was measured against the state the command
+found. A command's own effect on a rate - an event start landing the gear x0 handicap, a bought
+generator - reaches the slope at the next tick, one interval at most; a tap, the most frequent
+action, snaps its yield in and keeps counting. And extrapolation
 never leaves the legal range: currency displays clamp at zero (a draining pool's negative slope
 is honest motion, a negative balance is not) and bar displays clamp to [0, fillAmount]. No
 gather ever runs per frame.
@@ -456,8 +460,8 @@ every nested authored object. `chapter-01.json` gains the seven sections of cont
   alongside the existing knob rows.
 - **The tick report**: the pool-limited cover case - rehearsal produced at 0.5/s against a 2/s
   bar - reports a near-zero rehearsal net and a 0.5/s bar slope, the numbers the gross gathers
-  get wrong; a plain production tick reports rate times dt; a non-tick transaction clears the
-  report; a bar completion payout moves truth and leaves the report untouched (site recording,
+  get wrong; a plain production tick reports rate times dt; a command leaves the report standing
+  and the display keeps counting; a bar completion payout moves truth and leaves the report untouched (site recording,
   not a balance delta). The display clamps get their regressions: a depleting pool never
   extrapolates below zero, a completed bar never past `fillAmount`.
 - **Registry cross-check** (editor): every authored `prefabId` in the composed content has a

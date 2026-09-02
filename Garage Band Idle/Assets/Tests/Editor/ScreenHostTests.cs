@@ -195,7 +195,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var cash = fx.Host.Sections[GarageFloor].Modules[CashLine];
             Assert.AreEqual("Cash", Fixture.Text(cash, "name"));
-            Assert.AreEqual("0", Fixture.Text(cash, "value"));
+            Assert.AreEqual("0.00", Fixture.Text(cash, "value"));
         }
 
         [Test]
@@ -206,7 +206,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
             // No Render call here: the transaction's refresh is what repaints.
-            Assert.AreEqual("1", Fixture.Text(fx.Host.Sections[GarageFloor].Modules[CashLine], "value"));
+            Assert.AreEqual("1.00", Fixture.Text(fx.Host.Sections[GarageFloor].Modules[CashLine], "value"));
         }
 
         [Test]
@@ -227,7 +227,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The regression: a widget created mid-pass is refreshed by the pass
             // that created it, so the label is never blank for one transaction.
             Assert.AreEqual("Fans", Fixture.Text(fans, "name"));
-            Assert.AreEqual("0", Fixture.Text(fans, "value"));
+            Assert.AreEqual("0.00", Fixture.Text(fans, "value"));
         }
 
         [Test]
@@ -254,6 +254,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 .ToArray();
             CollectionAssert.AreEqual(new[] { "Practice Amp" }, shown,
                 "only practice_amp is available at 100 earned cash - the drummer wants three amps");
+
+            // The button is the reference game's line: the first amp's authored
+            // 60 cash, then what one amp pays per second.
+            var buy = rows.Children().First(row => row.style.display.value == DisplayStyle.Flex)
+                .Q<Button>(className: "row-buy");
+            Assert.AreEqual("60.00 Cash => 0.50 Cash", buy.text);
         }
 
         [Test]
@@ -282,7 +288,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 rows.Select(row => row.Q<Label>(className: "bar-name").text).ToArray(),
                 "the authored bar order and names");
             CollectionAssert.AreEqual(
-                new[] { "0 / 100", "0 / 300", "0 / 600" },
+                new[] { "0.00 / 100.00", "0.00 / 300.00", "0.00 / 600.00" },
                 rows.Select(row => row.Q<Label>(className: "bar-progress").text).ToArray(),
                 "the authored fill amounts, none of them started");
             foreach (var row in rows)
@@ -333,12 +339,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(3, module.Widget.Root.Q<VisualElement>("legs").childCount,
                 "one label per authored leg, built once and toggled");
             CollectionAssert.AreEqual(
-                new[] { "50 fans (0/50)", "Learn a cover (0/1)" }, Fixture.VisibleLegs(module),
+                new[] { "50 fans (0.00/50.00)", "Learn a cover (0.00/1.00)" }, Fixture.VisibleLegs(module),
                 "the two unmet legs; nothing is pending, so the reward leg holds and stays hidden");
 
             var preview = module.Widget.Root.Q<Label>("preview");
             Assert.AreEqual(DisplayStyle.Flex, preview.style.display.value, "the rung opens with an AddCurrency");
-            Assert.AreEqual("Would bank: +0 Records, Garage Records", preview.text,
+            Assert.AreEqual("Would bank: +0.00 Records, Garage Records", preview.text,
                 "the payout at zero fans, over both tied currencies' authored names");
         }
 
@@ -358,7 +364,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The threshold leg carries no uiText, so it renders as its
             // progress alone - the capstone's whole readout.
-            CollectionAssert.AreEqual(new[] { "0/30" }, Fixture.VisibleLegs(module));
+            CollectionAssert.AreEqual(new[] { "0.00/30.00" }, Fixture.VisibleLegs(module));
             Assert.AreEqual(DisplayStyle.None,
                 module.Widget.Root.Q<Label>("preview").style.display.value,
                 "the capstone opens with ExecuteRung, which previews no number rather than a wrong one");
@@ -389,7 +395,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var second = section.Modules[1];
             Assert.IsFalse(second.Widget.Root.Q<Button>("start").enabledSelf);
             CollectionAssert.AreEqual(
-                new[] { "Clear Garage Jam I first", "15 Records (1/15)" }, Fixture.VisibleLegs(second),
+                new[] { "Clear Garage Jam I first", "15 Records (1.00/15.00)" }, Fixture.VisibleLegs(second),
                 "the unmet legs in authored order; jam II is uncleared, so its own already-cleared leg holds");
         }
 
@@ -413,7 +419,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsEmpty(Fixture.VisibleLegs(first), "a running attempt has no gate to explain");
             // The onEntry restarted tier1, so the cash the tap earned is gone
             // and the goal reads from zero.
-            Assert.AreEqual("60s left - Goal 0/150", Fixture.Text(first, "status"));
+            Assert.AreEqual("60s left - Goal 0.00/150.00", Fixture.Text(first, "status"));
 
             for (var i = 1; i < section.Modules.Count; i++)
                 Assert.IsFalse(section.Modules[i].Widget.Root.Q<Button>("start").enabledSelf,

@@ -6,18 +6,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 {
     public class NumberFormatterTests
     {
-        [TestCase(0, "0")]
-        [TestCase(5, "5")]
-        [TestCase(5.5, "5.5")]
+        [TestCase(0, "0.00")]
+        [TestCase(5, "5.00")]
+        [TestCase(5.5, "5.50")]          // the slots are fixed, so the zero stays
         [TestCase(5.25, "5.25")]
-        [TestCase(5.10, "5.1")]          // trailing fractional zeros dropped
         [TestCase(5.256, "5.26")]        // rounded to two decimals
-        [TestCase(999.99, "999.99")]     // last plain value
-        [TestCase(1000, "1.00e3")]       // first scientific value
-        [TestCase(1234, "1.23e3")]
+        [TestCase(999.99, "999.99")]     // last two-decimal value
+        [TestCase(1000, "1000.0")]       // first one-decimal value
+        [TestCase(1234.56, "1234.6")]
+        [TestCase(9999.9, "9999.9")]     // last plain value
+        [TestCase(10000, "1.00e4")]      // first scientific value
+        [TestCase(12345, "1.23e4")]
         [TestCase(1000000, "1.00e6")]
-        [TestCase(-5.5, "-5.5")]
-        [TestCase(-1000, "-1.00e3")]
+        [TestCase(-5.5, "-5.50")]
+        [TestCase(-10000, "-1.00e4")]
         public void Format_follows_the_display_rules(double value, string expected)
         {
             Assert.AreEqual(expected, NumberFormatter.Format(value));

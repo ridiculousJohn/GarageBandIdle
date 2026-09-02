@@ -238,30 +238,45 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // preview and the execution are one implementation of the number rather
         // than two that agree until they do not (design doc 12.5).
         public static List<(CurrencyDefinition currency, BigNumber amount)> ResolveYield(
-            GameContext ctx, ProducerDefinition producer)
+            GameContext ctx, ProducerDefinition producer) =>
+            ResolveUnit(ctx, producer, producer.produces, Stat.Yield);
+
+        // What ONE unit of a generator pays per second against the given state:
+        // the generator row's "cost => yield" line (12.11). The same resolution
+        // as a firing's, over the rate entries with a count of one; nothing in
+        // the effect vocabulary reads the owned count, so one unit's term is
+        // also what the next unit adds.
+        public static List<(CurrencyDefinition currency, BigNumber amount)> UnitRate(
+            GameContext ctx, GeneratorDefinition generator) =>
+            ResolveUnit(ctx, generator, generator.produces, Stat.Rate);
+
+        // One source's per-unit payment for one stat: every matching currency in
+        // authored order with its resolved amount, both stages, zeros kept.
+        private static List<(CurrencyDefinition currency, BigNumber amount)> ResolveUnit(
+            GameContext ctx, Definition source, List<ProducesEntry> entries, string stat)
         {
-            var declaring = DeclaringScope<ScopeState>(ctx.Scope, producer);
+            var declaring = DeclaringScope<ScopeState>(ctx.Scope, source);
             var declaringCtx = ctx.Rebase(declaring);
 
             var currencies = new List<CurrencyDefinition>();
-            foreach (var entry in producer.produces)
-                if (entry != null && entry.stat == Stat.Yield && entry.currency != null &&
+            foreach (var entry in entries)
+                if (entry != null && entry.stat == stat && entry.currency != null &&
                     !currencies.Contains(entry.currency))
                     currencies.Add(entry.currency);
 
-            var yields = new List<(CurrencyDefinition currency, BigNumber amount)>(currencies.Count);
+            var amounts = new List<(CurrencyDefinition currency, BigNumber amount)>(currencies.Count);
             foreach (var currency in currencies)
             {
-                var term = SourceTerm(declaringCtx, producer, producer.produces, 1, currency, Stat.Yield);
+                var term = SourceTerm(declaringCtx, source, entries, 1, currency, stat);
                 if (term == BigNumber.Zero)
                 {
-                    yields.Add((currency, BigNumber.Zero));
+                    amounts.Add((currency, BigNumber.Zero));
                     continue;
                 }
                 var home = FindCurrencyHome(declaring, currency);
-                yields.Add((currency, term * CurrencyStage(declaringCtx.Rebase(home), currency, Stat.Yield)));
+                amounts.Add((currency, term * CurrencyStage(declaringCtx.Rebase(home), currency, stat)));
             }
-            return yields;
+            return amounts;
         }
 
         // Fires one producer: every yield entry resolved against PRE-FIRE state

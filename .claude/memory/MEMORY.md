@@ -25,10 +25,11 @@
 - [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - name the primitive that already covers it, and when two shapes both work take the smaller one
 - [No spec accumulation](no-spec-accumulation.md) - answer a finding by deleting the mechanism, not by adding a paragraph; cut argument, never a named check; two rounds on one operand means delete it
 - [Tests exercise runtime code](tests-exercise-runtime-code.md) - fixtures are fine, a second implementation of runtime behavior is not; convert the call sites instead
+- [Slice landing updates the docs](slice-landing-updates-the-docs.md) - the build-plan status line and 12.13's file list are part of EVERY slice; John ordered it once and does not repeat it
 - [Doc decisions land when made](doc-decisions-land-when-made.md) - a settled decision goes in the design doc immediately; only code-describing edits wait for the code
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - "did you miss anything?" is a command to grep; Scripts, Tests, the live docs, the chapter JSON
 
 ## Disagreement
 - [Never cave to pressure](never-cave-to-pressure.md) - the substance changes only when the facts do; and when I do concede, the concession leads
 - [Pushback means re-derive](pushback-means-rederive.md) - his dispute of my model of HIS design means produce a discriminator; on same-but-different, split the bundle
-- [Root cause means question the structure](root-cause-means-question-the-structure.md) - on "bandaid"/"root cause": derive from what the player is doing, question MY design's structure, give ONE simpler fix; never a menu
+- [Root cause means question the structure](root-cause-means-question-the-structure.md) - on "bandaid"/"root cause": derive from what the player is doing, question MY design's structure, give ONE simpler fix; never a menu. RULE, broken twice in one day: a command owns its mutation and the flush and touches NOTHING the tick owns (clock, sample, bank, report) - check every command site and every "guard" sentence before a contract ships

@@ -36,6 +36,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(0.37, Producer.GetRate(tree.Ctx(tree.Ch1), tree.Fans), "0.35 base plus the drummer's 0.02");
         }
 
+        // What one more unit adds, per currency in authored order, with both
+        // stages riding in - the generator row's yield line (12.11).
+        [Test]
+        public void A_units_rate_is_its_own_term_under_the_multipliers_that_reach_it()
+        {
+            var tree = new TestTree();
+            var ctx = tree.Ctx(tree.Tier1);
+
+            var amp = Producer.UnitRate(ctx, tree.PracticeAmp);
+            Assert.AreEqual(1, amp.Count);
+            Assert.AreSame(tree.Cash, amp[0].currency);
+            AssertClose(0.5, amp[0].amount, "one amp's authored rate");
+
+            var drummer = Producer.UnitRate(ctx, tree.Drummer);
+            Assert.AreEqual(2, drummer.Count, "a bandmate pays two currencies");
+            Assert.AreSame(tree.Cash, drummer[0].currency);
+            AssertClose(3, drummer[0].amount);
+            Assert.AreSame(tree.Fans, drummer[1].currency);
+            AssertClose(0.02, drummer[1].amount);
+
+            // amp_strings is a stage-1 factor on the amp alone; records_income
+            // is stage 2 on the income tag, so it lifts both cash terms and
+            // leaves the drummer's fans line alone.
+            tree.Tier1.purchasedUpgrades.Add("amp_strings");
+            tree.Root.balances["records"] = 50;                  // 1 + 0.02 * 50 = x2
+            AssertClose(2, Producer.UnitRate(ctx, tree.PracticeAmp)[0].amount, "0.5 x 2 x 2");
+            AssertClose(6, Producer.UnitRate(ctx, tree.Drummer)[0].amount, "3 x 2");
+            AssertClose(0.02, Producer.UnitRate(ctx, tree.Drummer)[1].amount, "fans carry no income tag");
+        }
+
         // The gate rides SourceTerm, which the yield path shares, so one
         // firing pays its ungated currency and withholds its gated one.
         [Test]

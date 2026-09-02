@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -70,8 +71,10 @@ namespace RidiculousGaming.GarageBandIdle
         internal void Add(ValidationSeverity severity, ValidationCheck check, string message) =>
             findings.Add(new ValidationFinding(severity, check, message));
 
-        // The fail-loudly surface (design doc 12.14.6). The boot call site lands
-        // with GameManager; development builds treat HasErrors as fatal.
+        // Prints the findings for a person watching: the import entry points and
+        // the boot driver call it. Nothing on a refusal path does - a refusal is
+        // a return value, and whether someone sees the findings is the caller's
+        // decision, so a test asserting an expected refusal makes no noise.
         public void LogAll()
         {
             foreach (var finding in findings)
@@ -81,6 +84,19 @@ namespace RidiculousGaming.GarageBandIdle
                 else
                     Debug.LogWarning(finding.ToString());
             }
+        }
+    }
+
+    // A load refused on validation findings (design doc 12.14.6: fail loudly at
+    // boot in development builds). The report rides out on the exception rather
+    // than being printed at the refusal, for the reason LogAll gives.
+    public class ContentValidationException : InvalidOperationException
+    {
+        public ValidationReport Report { get; }
+
+        public ContentValidationException(string message, ValidationReport report) : base(message)
+        {
+            Report = report;
         }
     }
 

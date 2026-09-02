@@ -59,8 +59,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void RevealRehearsal() => Tree.Tier1.flags.Add("rehearsal_revealed");
 
             // Selection written as a FACT, bypassing the entry point: a report
-            // test is not a SetActiveBars test, and the command would clear the
-            // very report the row wants to read.
+            // test is not a SetActiveBars test.
             public void SelectCover1() =>
                 Tree.Tier1.activeBars[Tree.LearnCovers.Id] = new HashSet<string> { Tree.Cover1.Id };
 
@@ -136,18 +135,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(report, f.Session.LastTick, "the session holds the tick's own report");
         }
 
-        // ---- what clears it ----
+        // ---- what replaces it ----
 
         [Test]
-        public void A_non_tick_transaction_clears_the_report()
+        public void A_command_leaves_the_report_standing()
         {
             var f = new Fixture();
-            Assert.IsNotNull(f.Tick(1));
+            var report = f.Tick(1);
 
-            // A command can invalidate every measured slope, so the session
-            // sits at truth until the next tick measures the new state.
+            // The tick is the report's only writer. A tap owns its deposit and
+            // nothing the tick owns, so the slope the amp earned is still there
+            // for the display to keep counting on.
             Assert.IsTrue(f.Session.FireProducer(f.Ctx(1), f.Tree.TapProducer));
-            Assert.IsNull(f.Session.LastTick);
+            Assert.AreSame(report, f.Session.LastTick);
+            AssertClose(0.5, f.Session.LastTick.CurrencySlope(f.Tree.Tier1, "cash"));
         }
 
         [Test]

@@ -1314,14 +1314,23 @@ delta (device clock moved backwards) clamps elapsed time to zero — rollback ca
 
 ### 12.11 UI
 
-**Authored layout**: a chapter's screen is an ordered list of `SectionDefinition {visibleWhen,
-scopeId, modules}`; a `ModuleDefinition {prefabId, contentId, visibleWhen?, scopeId?}` binds a
-widget prefab to content by id. A section's `scopeId` is its **evaluation scope** — the context its
-conditions read from, which is how a chapter-owned section legally gates on a tier-declared flag; a
-module defaults to the home scope of its bound content **when that home lies within the chapter's
-subtree, else to the chapter itself** (root-owned content like Records is readable from any
-context — root is on every chain). Validated at load: the chapter itself or one of its descendants. A `ModuleRegistry` maps prefab ids via Addressables — a new widget type is
-a prefab plus an entry. Sections live on the `ChapterDefinition`.
+**Authored layout**: a chapter's screen is an ordered list of `SectionDefinition {title,
+visibleWhen, scope, modules}`; a `ModuleDefinition {prefabId, content?, visibleWhen?, scope}` binds
+a widget to content. Both are inline serialized data on the `ChapterDefinition`, and both reference
+by direct object field (12.14.5): `scope` is a `ScopeDefinition`, `content` a base-typed
+`Definition` (a producer, a currency, an event), and only `prefabId` stays a string, since it names
+a widget through the registry rather than a content asset. A section's `scope` is its **evaluation
+scope** - the context its conditions read from, which is how a chapter-owned section legally gates
+on a tier-declared flag. A module's `scope` is always concrete: the JSON may omit it, and the
+importer normalizes to the home scope of the bound content **when that home lies within the
+chapter's subtree, else to the chapter itself** (root-owned content like Records is readable from
+any context - root is on every chain), so the runtime computes no default. Validated at load: the
+chapter itself or one of its descendants. The `ModuleRegistry` is a hand-made ScriptableObject
+mapping each `prefabId` to a `VisualTreeAsset` held by direct reference - the UXML is the UI
+Toolkit shape's "prefab" - so the widgets load with the scene as the registry's own dependency
+graph and instantiate synchronously mid-refresh; the behavior is a plain C# `ModuleWidget`
+controller a code-side factory constructs for the same id. A new widget type is a UXML, a factory
+line, and a registry entry.
 
 **Refresh** is coarse, on two triggers: after each tick of the foreground chapter, and after every
 **completed command transaction** (nested Actions never refresh individually — the outer
@@ -1483,8 +1492,10 @@ Assets/Scripts/
   Core/
     GameManager.cs          // bootstrap, save/load, chapter switching
     GameSession.cs          // transient orchestration: foreground chapter, phase, the idle offer, command guard — never serialized
-    TickSystem.cs           // fixed-interval tick on real (DateTime) time
-    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds
+    TickSystem.cs           // the segmented tick over one real-time window; returns the TickReport
+    TickReport.cs           // what ONE tick moved, recorded at the mutation sites; interpolation's slopes
+    GameClock.cs            // the one time source: driver-owned, advanced at every entry point
+    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds, tickIntervalSeconds
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root + labeled chapter roots, composes the pair, runs the §12.12 pass
@@ -1519,9 +1530,14 @@ Assets/Scripts/
     IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar
   UI/
     SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs
+    ModuleWidget.cs  ModuleWidgetFactory.cs   // the plain-C# controller base and the closed prefabId switch
+    ScreenHost.cs  UIRoot.cs                  // the structure logic (the ONE Refreshed subscriber) and its MonoBehaviour shell
     GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
-    Widgets/ (GeneratorRowUI, BarGroupUI, RungButtonUI, CurrencyHeaderUI, JamButtonUI, ...)
+    Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorListUI  GeneratorRowUI
+              UpgradeListUI  UpgradeRowUI  BarGroupUI  BarRowUI  RungButtonUI  EventUI
     NumberFormatter.cs  StoryBeatUI.cs  CollectScreenUI.cs  RoadieAllocationUI.cs
+Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
+Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)
   root/                  // the document's own top scope id
     root.asset           // the scope sits at its document root
