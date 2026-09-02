@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e6b3ee4e-601a-46e9-8b69-94d55b6fad6a
-  modified: 2026-09-02T03:22:49.586Z
+  modified: 2026-09-02T18:02:34.853Z
 ---
 
 Ctrl C is John's strong reference for Garage Band Idle. The design doc was built against it across
@@ -31,6 +31,24 @@ Where it survives in writing (thin, which is why this memory exists):
   (not yet built here - `Purchasing.CostOf` is one unit, the sum is the geometric series from it);
   he knows of no Ctrl C generator paying two currencies, so our bandmates (cash + fans) extend it;
   he does not know what font it uses.
+
+- 2026-09-02, the meta layer, from John's play (step 10's references): every chapter has a TOP
+  BAR with three buttons - a chapter selector, a "conversation" button listing the story beats
+  seen so far from every chapter, and settings. Settings holds many things; one is "Completion
+  tokens" (their Roadies), which opens the allocation menu - so our Roadie allocation lives under
+  settings, not on the chapter screen. Story beats appear at some cadence: some just show when
+  available, some show the goal to reach first; a watched beat's button stays active for a
+  rewatch. Their "Overclock" (our Encore) window: "While active, yields of all generators is
+  2.0x. Time remaining HH:MM:SS", with "Boost for 4 hours" (an ad, repeatable, cap unknown) and
+  "Boost forever" (buy "Pro Unlock"); note it is worded as a generator YIELD multiplier, while our
+  Encore is game_speed - John confirmed switching is a one-field content change. Their idle
+  window: the yield, then "Double this" (ad) and "Double All" (buy Pro Unlock). With Pro Unlock:
+  Overclock shows "Time remaining" as infinity, and the idle window shows the already-doubled
+  amount with a "Great!" button. John does NOT know whether Ctrl C's idle accrual includes the
+  Overclock buff; Cells to Singularity's does. He also described Cells to Singularity's stacking
+  buff: 2x extends in time per ad up to a cap, then further ads add a shorter 4x - and said that
+  if we ever do it, it should be ONE buff reporting 2x or 4x from its remaining time, never two
+  buffs relying on the clamp. Deferred, not planned.
 
 **Why:** the doc names it once, as a parenthetical about one formula, so nothing tells a fresh
 session that the whole design descends from it. Without that, design questions get answered from

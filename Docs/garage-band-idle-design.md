@@ -488,14 +488,21 @@ unpaid window; a
 global save never touches dormant chapters' stamps, or it would truncate their idle. **The stamp IS
 the pending claim**: everything specific about an offer is computed from it, and nothing about an
 offer is ever saved. **Switching into a chapter** computes, for each
-of its currencies, `idleRate × min(elapsed, cap)` — `idleRate` is the ordinary rate gather run
+of its currencies, `idleRate x game_speed x paid time` - the paid window is the first
+`min(elapsed, cap)` REAL seconds after the stamp, segmented at the buff expiries inside it exactly as
+the tick segments (12.9), each segment paying its length times the rate and speed live in it;
+`idleRate` and `game_speed` are the ordinary gathers run
 under the idle-accumulation context (§12.5), so the ×0.5 base joins and live-only buffs excuse
-themselves — from *current* state, so Records earned
-elsewhere while away correctly boost the payout — into a **transient offer** (the lines, the
+themselves - from *current* state, so Records earned
+elsewhere while away correctly boost the payout - into a **transient offer** (the lines, the
 window's end, a doubled flag; session-held, dead with the process), presented as the **idle
 dialog**: the amount earned, plus "Double it" (a rewarded
-ad that doubles *this offer*); a Backstage Pass owner sees the already-doubled amount and just OKs
-it. The offer deposits on dismissal or chapter switch — or, doubled, in the ad
+ad that doubles *this offer*) and a Backstage Pass purchase button (buying it HERE doubles this
+offer and pays it out in the store callback's own transaction, closing the dialog - the ad's
+callback plus the entitlement write); a Backstage Pass owner's offer is computed with `doubled`
+already set from the entitlement, so the dialog shows the doubled amount and just OKs it. Both
+buttons only REQUEST; the payout is the callback's. The offer deposits on dismissal or chapter
+switch — or, doubled, in the ad or store
 callback's own transaction (§12.9) — while backgrounding instead drops it and leaves the window
 unpaid; settling always advances the
 stamp to the window it paid. A kill with the dialog up saves nothing: the stamp never moved, so the
@@ -519,30 +526,47 @@ earns nothing — the system self-regulates without a rule.
 are two different kinds of number. The cap and the threshold are **seconds** — thresholds, not
 multipliers — and live in `GameConfig`. The fraction IS a multiplier, and it is an ordinary rate
 effect: a root modifier `{stat: rate, ×0.5}` that **applies only during idle accumulation**
-(`appliesWhen`, §12.5). The claim runs the same rate gather the tick runs, under an
-idle-accumulation context, so idle-only factors join, live-only buffs excuse themselves, and no
+(`appliesWhen`, §12.5). The claim runs the same rate and `game_speed` gathers the tick runs, under
+an idle-accumulation context, so idle-only factors join, live-only buffs excuse themselves, and no
 second vocabulary exists:
 
 | Player | Idle payout | How |
 |---|---|---|
 | Free, no action | 50% | Claimed from the idle dialog on switch-in |
-| Free, watches ad | 100% (2×) for that offer | "Double it" doubles and settles the offer in the callback's own transaction (§12.9) |
-| Backstage Pass owner | 100% (2×) always | A permanent idle-only modifier `{stat: rate, ×2}` derived from the entitlement; the cap raise is entitlement plumbing on the config read |
+| Free, watches ad | 100% (2x) for that offer | "Double it" doubles and settles the offer in the callback's own transaction (§12.9) |
+| Free, Encore running | 2x on the part of the paid window the buff covers | The buff burns real time while away; the claim segments the paid window at its expiry, so 1 h of Encore left and 4 h away pays 1 h at 2x and 3 h at 1x |
+| Backstage Pass owner | 4x always (both ads' rewards, no ad), and a higher cap | Permanent Encore (the same modifier, applied permanently on the entitlement, below) scales the window; the offer is computed with `doubled` set from the entitlement, so the existing claim path pays it; the cap raise is entitlement plumbing on the config read |
 
 Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
 **Encore (the accelerator).** A **game-speed multiplier**, not an income multiplier: a timed buff
-(`{buffId, expiresAt}` in state) whose effect is `{stat: game_speed, ×2}`. `game_speed` is a
-stat whose sole consumer is the tick — `effective dt = real dt ×
-GetMultiplier(game_speed)` — so every rate, accrual, and bar fill in the live chapter speeds up
-automatically. Yields never scale (per-firing, no time component), and **wall-clock decrements
-never scale**: event `remainingSeconds` and buff expirations burn real seconds. The timer is an
-absolute expiry, so it counts down whether the app is open or closed. Rewarded ads add ~+4 h to the
-timer; sustained use escalates to **4× ("Overdrive" / "Sold-Out Show")**, also capped.
+(`{buffId, expiresAt}` at root) whose effect is `{stat: game_speed, ×2}`, the buff id naming an
+ordinary root `ModifierDefinition`. `game_speed` is a stat with exactly two consumers, the two
+places real time becomes production: the tick - `effective dt = real dt x
+GetMultiplier(game_speed)` - so every rate, accrual, and bar fill in the live chapter speeds up
+automatically, and the idle claim, which scales each segment of the paid window the same way. For
+idle the two levers are one: nothing but rate accrues while away, so 2x speed over the paid window
+IS 2x rate over it - except that the cap is REAL time, so the player accrues for the first `cap`
+seconds after the stamp and Encore multiplies what those seconds pay, never how many of them there
+are (4 h away at 2x pays 8 h of base rate). Yields never scale (per-firing, no time component), and
+**wall-clock decrements never scale**: event `remainingSeconds` and buff expirations burn real
+seconds. The timer is an absolute expiry, so it counts down whether the app is open or closed, and
+a buff that expires inside the paid window scales only the segment it was live for. Rewarded ads
+add ~+4 h to the timer, repeatable, to a cap in `GameConfig`. The tick prunes an expired record at
+the segment start its expiry cuts; the gather reads the surviving records like granted stacks, the
+modifier resolving outward by id. Deferred: **Overdrive** ("Sold-Out Show"), a higher speed a
+sustained ad streak earns - if it is ever wanted it is the same one buff reporting 2x or 4x from
+its own remaining time through a formula-shaped effect, never a second buff relying on the clamp.
 
-**Backstage Pass** — lifetime IAP (~$5–10). Permanently doubles idle earnings, raises the idle cap,
-and keeps Encore permanently active at Overdrive (4× speed). Since ads are opt-in, the Pass's value
-is convenience.
+**Backstage Pass** - lifetime IAP (~$5-10). Every reward the two ads give, without the ads, plus a
+raised idle cap: permanent Encore - the Encore modifier applied permanently on the entitlement (a
+permanent membership plus a granted application of a Replace-stacking modifier is one application,
+§12.5, so a Pass owner who also watches an Encore ad is still at 2x) - the idle claim always doubled
+(the offer's `doubled` flag set from the entitlement at computation, the same flag the ad callback
+sets, so the claim path is unchanged and no second idle modifier exists), and the cap raise on the
+config read. A free player who watches both ads reaches the same 4x on an offer; the Pass makes it
+automatic. Should Overdrive land, the Pass applies it permanently. Since ads are opt-in, the Pass's
+value is convenience.
 
 **Buy Roadies** — consumable, repeatable IAP. Bought Roadies are identical to earned ones. No
 purchase cap; throttled by escalating bundle price. (Allocation concavity punishes stacking one
@@ -584,8 +608,9 @@ Two structural properties keep pacing stable against players with strong income 
 - Fan rate is tuned loosely relative to Cash, so income alone does not shortcut the album payout.
 
 Tuning must hold at both ends: an unbuffed player's pace is doable and never feels impossible, and
-a permanent-Overdrive player (4× game speed, plus Roadie and Catalog multipliers) still takes
-meaningful play time per chapter and breaks nothing. Timed events feel Overdrive fully — speed
+a permanent-Encore player (2x game speed, `maxGameSpeed` 4x should Overdrive land, plus Roadie and
+Catalog multipliers) still takes
+meaningful play time per chapter and breaks nothing. Timed events feel Encore fully — speed
 scales production but never timers (§9), so a 4× player meets a timed goal in a quarter of the
 clock; author timed goals with that end in mind.
 
@@ -744,8 +769,9 @@ currencies carry it (Ch. 1: cash), the Records and Roadie modifiers of §3/§8 f
 later income stream joins the stack by carrying the tag.
 
 **Consumer-owned stats:** `game_speed` (§9) — a stat in the same open vocabulary as `rate` and
-`yield`, read by exactly one system (the tick, which scales the production dt; wall-clock
-decrements never scale). Nothing marks it special: the stat vocabulary is open precisely so a new
+`yield`, read by exactly two systems, the two that turn real time into production (the tick, which
+scales the production dt, and the idle claim, which scales each segment of the paid window;
+wall-clock decrements never scale). Nothing marks it special: the stat vocabulary is open precisely so a new
 consumer adds its name and its own query, no new machinery. The idle fraction is deliberately NOT
 a stat: idle pay is the live rate gathered under an idle-accumulation context (§9, §12.9), so its
 factors are ordinary rate effects on modifiers that apply only then (`appliesWhen`, §12.5) —
@@ -763,8 +789,8 @@ yield alike" is two entries, an empty stat is a load-time error, and at runtime 
 the wildcard: "every currency."** It applies at the currency stage — one stage per effect, since
 root sits on both gather walks and a stage-less wildcard there would be collected twice — so
 `{stat: rate, ×2}` speeds every currency's rate (bar fills excluded, as with any currency-stage
-effect), and `{stat: game_speed, ×2}` — Encore — is a wildcard read owner-less by the tick, which
-matches wildcards only. `currencyId` matches an id or a tag, exactly as
+effect), and `{stat: game_speed, ×2}` — Encore — is a wildcard read owner-less by the tick and the
+idle claim, which match wildcards only. `currencyId` matches an id or a tag, exactly as
 `target` does, so "every rate entry paying an income currency" is one effect rather than one per
 currency — and a currency stays out of it by not carrying the tag (§8.2's fans rule). **Where matches are gathered from is two
 explicit stages**, which is what keeps sibling scopes isolated (§12.3):
@@ -1230,8 +1256,11 @@ foreground chapter only and only while Live, on save (a save under the dialog mu
 unpaid window); every write is monotonic (max), so a rolled-back clock can delay
 a stamp but never regress one. **The stamp IS the pending claim** — nothing about an offer is ever
 saved. Switch-in computes
-`idleRate × min(elapsed, cap)` per currency at current rates — `idleRate` being the ordinary rate
-gather under the idle-accumulation context — skipped below the minimum-away
+`idleRate x game_speed x paid time` per currency at current rates over the paid window - the first
+`min(elapsed, cap)` REAL seconds after the stamp, segmented at the root buff expiries inside it as
+the tick segments, each segment paying its own length at the rate and speed live in it; the cap
+bounds real seconds, and speed multiplies what they pay - `idleRate` and `game_speed` being the
+ordinary gathers under the idle-accumulation context - skipped below the minimum-away
 threshold and skipped entirely while that chapter holds a record for an event that blocks idle
 (§6.1: `blocksIdle` is derived from the event carrying a timer, and the idle path asks the event
 rather than inspecting one) - into a **transient offer** for the idle dialog: the lines
@@ -1247,7 +1276,7 @@ SETTLED window ends at B: time past B is foreground presence, never idle — the
 stamps over it.
 The idle fraction rides the rate gather via `appliesWhen` (§12.5), the cap is a
 `GameConfig` threshold beside the minimum-away one, and `game_speed` is gathered once per
-segment — the same gather as everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
+segment, by the tick and the claim alike — the same gather as everything else. Triggers (§12.5) are swept inside each transaction — after its mutation, before
 commit — for ticks and commands alike; live scopes only, single pass. The sweep is conditional on
 the transaction's RESULTING phase: only a transaction ending in `Live` sweeps. One ending in
 `AwaitingIdleClaim` or `NoChapter` commits and refreshes without sweeping — an offer awaits its
@@ -1278,8 +1307,14 @@ conditional on the resulting phase like every transaction's. The idle double is 
 settlement: the rewarded-ad callback doubles and claims in one transaction — recomputing from the
 stamp first when no offer is live (the mid-ad kill) — so a doubled offer never sits exposed to an
 exit's undoubled settle or a backgrounding's drop, and the transaction ends in `Live` and sweeps
-like any claim. A callback that leaves the phase alone (a store entitlement written mid-dialog)
-sweeps nothing yet still repaints the dialog, because the refresh is unconditional.
+like any claim. A Backstage Pass bought FROM the dialog is the same callback with one more write:
+record the entitlement, mark the offer doubled, claim - one transaction ending `Live`, so the
+dialog closes with the phase, and a kill between the store's confirmation and the claim leaves the
+stamp unmoved, the entitlement to be restored from the store, and the next offer doubled by it. A
+callback that leaves the phase alone (an entitlement written mid-dialog by any other path)
+sweeps nothing yet still repaints the dialog, because the refresh is unconditional: the offer it
+shows stays what was computed and is what OK pays - shown and paid never differ - and only the
+button set changes.
 Callbacks are not UI commands (§12.11). **The session also draws the
 command boundary**: **every chapter-local mutation** — `TryBuy`, `FireProducer`, `TryRung`,
 `SetActiveBars`, the event operations, the song operations, and any future mechanic command — is
@@ -1351,8 +1386,9 @@ one returns - static content cannot legitimately be in that state, so those thro
 upgrade)`, `FireProducer(producer)`, `SetActiveBars(group, set)`, the event operations
 `StartEvent / DismissEvent (event)`, `SwitchChapter(chapterId)` (stamps
 `lastActiveUtc`, computes the idle offer, §12.9), `ClaimIdle(chapterId)` (settle the
-offer, §9 — the dialog's double button only *requests* the rewarded ad; doubling and settling the
-offer is AdManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked chapters only), the Ch. 6 song operations (write / name), and
+offer, §9 — the dialog's double button only *requests* the rewarded ad and its Backstage Pass button
+only *requests* the purchase; doubling and settling the
+offer is AdManager's or IAPManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked chapters only), the Ch. 6 song operations (write / name), and
 `AcknowledgeStory(storyId)` (sets the root `storyN_seen` latch, §10). All fail-closed — each checks
 its own gate. Ad and store
 callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations (extend
@@ -1450,9 +1486,10 @@ per-feature: any kind an author gates with explains itself for free.
 - Effect PLACEMENT is not validated (§12.2). Where an effect is applied decides which definitions
   walk up and meet it, and an effect nothing meets is content with no takers rather than a defect.
   Judging it would mean enumerating an effect's possible askers - a downward search, and the exact
-  inversion of how the gather works. The exception is a stat with ONE consumer whose gather origin is
+  inversion of how the gather works. The exception is a stat whose gather origin is
   fixed in CODE rather than by content: `game_speed` is read once per segment by an owner-less,
-  currency-less query originating at the foreground chapter (§9), so an effect carrying any narrowing
+  currency-less query originating at the foreground chapter - the tick's, and the idle claim's over
+  the chapter being entered (§9) - so an effect carrying any narrowing
   can never be passed a coordinate to match, and one applied below chapter level is never on that
   walk. Both are warnings, and both are answered by the site's own KIND with nothing enumerated -
   which is what makes them checks where the general case is not one.
@@ -1664,9 +1701,11 @@ Content/                 // the authored JSON the importer reads
   as the idle dialog — the stamp IS the pending claim, the ad callback doubles and settles
   atomically, a plain dismissal deposits the base, settlement advances the stamp; app close is not
   special; yields and bar progress never accrue.
-- **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2×/Overdrive 4×
-  (`game_speed` stat, tick-consumed; wall clocks never scale); Backstage Pass (lifetime,
-  permanent Overdrive); Buy Roadies (repeatable); Tip Jar; no subscriptions.
+- **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2x, a timed root
+  buff ads extend (`game_speed` stat, consumed by the tick and the idle claim over a real-time cap;
+  wall clocks never scale; Overdrive 4x deferred, one buff reporting its speed from remaining time);
+  Backstage Pass (lifetime: permanent Encore, the idle claim always doubled through the offer's
+  existing flag, and a raised idle cap); Buy Roadies (repeatable); Tip Jar; no subscriptions.
 - **Engine:** Unity; break_infinity numbers; DateTime ticks; checksummed JSON save of the state tree;
   boot composes the root address plus the `chapter` label into the tree, each chapter's direct
   references carrying its subtree; load-time validation of all authored data.
