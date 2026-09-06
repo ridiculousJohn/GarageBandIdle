@@ -552,9 +552,16 @@ carry the content.
 
 ## Landing order
 
-Five changesets, each compiling and green on its own, and nothing blocks any of them: the
+Six changesets, each compiling and green on its own, and nothing blocks any of them: the
 entitlement spelling and the Encore window's placement settled 2026-09-02 (the decisions above).
 
+- **0. Scope references resolve at load, not by search**: `EventRecordExists` and
+  `EventRewardPending` hold a direct reference to the host scope's definition, but at every
+  evaluation they search the tree from the acting scope (`FindInSubtree`) to find that scope's
+  runtime node. `ResetScope`, `RestartScope` and `ExecuteRung` search the same way to find their
+  targets. That is wrong: the reference already names the node. Resolving the definition to its
+  runtime node belongs at load, once, and Evaluate and Execute read the resolved node. The
+  design of that resolution is open (2026-09-06).
 - **A. Encore in the runtime**: root.json's `encore` with the TIMED leg alone
   (`appliesWhen: BuffActive(encore)` - the Pass leg joins in B with `HasEntitlement`, so A stays
   a one-kind changeset), `BuffActive`, the prune, `ExtendBuff` with the
