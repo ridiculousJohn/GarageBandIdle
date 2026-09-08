@@ -85,17 +85,19 @@ store the node. `Execute` reads `ctx.Scope.Link(this)` and acts on that node: `R
 included) then `ClearSubtree`; `ExecuteRung` runs the rung rebased to the node through `TryExecute`.
 
 The two subtree operations a reset performs - clear every node below, and ask every node below
-whether it refuses - are SCOPE operations and live on `ScopeState`, beside `Clear` and
-`RefusesClear`: `ClearSubtree(DateTime nowUtc)` and `RefusalInSubtree(ScopeState ignoring = null)`,
-each a recursion over `Children`, self first. `ignoring` is the one node whose own record is not
-asked (its children still are); it exists for dismissal, below, and nothing else passes it. That is
-the parent informing its subtree and the subtree answering, not resolution. An action calls them;
-no action carries the walk.
+whether it refuses - are SCOPE operations and live on `ScopeState`, beside `Clear`:
+`ClearSubtree(DateTime nowUtc)` and `RefusalInSubtree(ScopeState ignoring = null)`, each a
+recursion over `Children`, self first. Both are new, as is the per-node answer they recurse over,
+`RefusesClear` (below); today the clear recursion is a static on `ResetScope` and nothing asks a
+node whether it refuses. `ignoring` is the one node whose own record is not asked (its children
+still are); it exists for dismissal, below, and nothing else passes it. That is the parent informing
+its subtree and the subtree answering, not resolution. An action calls them; no action carries the
+walk.
 
 `Refusal` is a sealed class in `Core/ScopeState.cs` beside `ActiveEvent`: the refusing
 `InteriorScopeState`, its `ActiveEvent` record, and the `EventDefinition` the record names, read
 from the host's own `events` list (null only for a record the save filter should have dropped).
-`InteriorScopeState.RefusesClear` is the only constructor call.
+`InteriorScopeState.RefusesClear`, new in this changeset, is the only constructor call.
 
 ### The reset's own refusal
 
@@ -125,8 +127,8 @@ nowhere else. There is exactly one such place.
   site keeps a `foreach (action) action.Execute(ctx)` of its own, and no site asks `Refuses` on an
   action directly. Each site's existing guard gets the runner's answer folded in:
   1. `Rung.IsOffered` = `offerCondition != null && offerCondition.Evaluate(ctx) &&
-     ActionList.Refuses(actions, ctx) == null`. `Rung.Execute` = `ActionList.Run`. `Rung.Refusals`
-     (for feedback) is deleted; feedback reads `ActionList.Refuses(rung.actions, ctx)` itself.
+     ActionList.Refuses(actions, ctx) == null`. `Rung.Execute` = `ActionList.Run`. The rung gains
+     no refusal accessor of its own; feedback reads `ActionList.Refuses(rung.actions, ctx)` itself.
   2. `EventSystem.CanStart` additionally requires `Refuses(evt.onEntry, hostCtx) == null`; `Start`
      runs `onEntry` through the runner.
   3. `EventSystem.CanDismiss` additionally requires both ending lists unrefused: `Refuses(rewards,
