@@ -86,8 +86,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fresh.Cover1.repeating = true;
             Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.Content, out var root));
 
-            var tier1 = (TierScopeState)root.FindInSubtree(fresh.Tier1Def);
-            var ch1 = (ChapterScopeState)root.FindInSubtree(fresh.Ch1Def);
+            var tier1 = (TierScopeState)TestNavigation.Node(root, fresh.Tier1Def);
+            var ch1 = (ChapterScopeState)TestNavigation.Node(root, fresh.Ch1Def);
             Assert.AreEqual((BigNumber)123.45, tier1.balances["cash"]);
             Assert.AreEqual((BigNumber)300, tier1.earnedTotals["cash"]);
             Assert.AreEqual(BigNumber.FromMantissaExponent(1.5, 320), tier1.balances["fans"]);
@@ -122,7 +122,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             TestTree.DeclareCurrency(tier2, "merch");
             oldTree.Ch1Def.children.Add(tier2);
             var oldRoot = ScopeState.Build(oldTree.Content);
-            oldRoot.FindInSubtree(tier2).balances["merch"] = 5;
+            TestNavigation.Node(oldRoot, tier2).balances["merch"] = 5;
             var json = SaveSystem.Serialize(oldRoot);
 
             var newTree = new TestTree();
@@ -133,8 +133,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("tier2"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.Content, out var root));
 
-            Assert.IsNull(root.FindInSubtree(tier2));
-            Assert.AreEqual(BigNumber.Zero, root.FindInSubtree(tier3).balances["vinyl"]);
+            Assert.IsNull(TestNavigation.Node(root, tier2));
+            Assert.AreEqual(BigNumber.Zero, TestNavigation.Node(root, tier3).balances["vinyl"]);
         }
 
         [Test]
@@ -155,7 +155,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cash'"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.Content, out var root));
 
-            var tier1 = root.FindInSubtree(newTree.Tier1Def);
+            var tier1 = TestNavigation.Node(root, newTree.Tier1Def);
             Assert.IsFalse(tier1.balances.ContainsKey("cash"));
             Assert.IsFalse(tier1.flags.Contains("fans_revealed"));
             Assert.AreEqual(BigNumber.Zero, tier1.balances["vinyl"]);
@@ -302,7 +302,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var trigger = TestTree.MakeDefinition<TriggerDefinition>("t1");
             savedTree.Tier1Def.triggers.Add(trigger);
             var savedRoot = ScopeState.Build(savedTree.Content);
-            var tier1 = savedRoot.FindInSubtree(savedTree.Tier1Def);
+            var tier1 = TestNavigation.Node(savedRoot, savedTree.Tier1Def);
             tier1.firedTriggers.Add("t1");
             tier1.firedTriggers.Add("ghost_trigger");
             savedRoot.roadieAllocation["ch1"] = 1;
@@ -318,7 +318,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_trigger"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.Content, out var root));
 
-            var loadedTier1 = root.FindInSubtree(newTree.Tier1Def);
+            var loadedTier1 = TestNavigation.Node(root, newTree.Tier1Def);
             Assert.IsTrue(loadedTier1.firedTriggers.Contains("t1"));
             Assert.IsFalse(loadedTier1.firedTriggers.Contains("ghost_trigger"));
             Assert.AreEqual(1, root.roadieAllocation["ch1"]);
@@ -334,7 +334,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_event"));
             Assert.IsTrue(Load(json, out var root, out var loaded));
-            var tier1 = (TierScopeState)root.FindInSubtree(loaded.Tier1Def);
+            var tier1 = (TierScopeState)TestNavigation.Node(root, loaded.Tier1Def);
             Assert.IsNull(tier1.activeEvent);
         }
 
@@ -346,13 +346,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var saved = new TestTree();
             saved.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 9999 };
             Assert.IsTrue(Load(SaveSystem.Serialize(saved.Root), out var root, out var loaded));
-            var tier1 = (TierScopeState)root.FindInSubtree(loaded.Tier1Def);
+            var tier1 = (TierScopeState)TestNavigation.Node(root, loaded.Tier1Def);
             Assert.AreEqual(300, tier1.activeEvent.remainingSeconds);    // timed_gig's limit
 
             saved = new TestTree();
             saved.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = -5 };
             Assert.IsTrue(Load(SaveSystem.Serialize(saved.Root), out root, out loaded));
-            tier1 = (TierScopeState)root.FindInSubtree(loaded.Tier1Def);
+            tier1 = (TierScopeState)TestNavigation.Node(root, loaded.Tier1Def);
             Assert.AreEqual(0, tier1.activeEvent.remainingSeconds);
         }
 
@@ -375,12 +375,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_generator"));
             Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            var tier1 = root.FindInSubtree(loaded.Tier1Def);
+            var tier1 = TestNavigation.Node(root, loaded.Tier1Def);
             Assert.AreEqual(3, tier1.generatorCounts["drummer"]);
             Assert.IsFalse(tier1.generatorCounts.ContainsKey("ghost_generator"));
             Assert.IsTrue(tier1.purchasedUpgrades.Contains("amp_strings"));
             Assert.IsFalse(tier1.purchasedUpgrades.Contains("ghost_upgrade"));
-            var ch1 = root.FindInSubtree(loaded.Ch1Def);
+            var ch1 = TestNavigation.Node(root, loaded.Ch1Def);
             Assert.AreEqual(1, ch1.modifierStacks.Count);
             Assert.IsTrue(ch1.modifierStacks.ContainsKey("gj_tap_1"));
         }
@@ -401,7 +401,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("group 'ghost_group' is not declared"));
             Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            var tier1 = root.FindInSubtree(loaded.Tier1Def);
+            var tier1 = TestNavigation.Node(root, loaded.Tier1Def);
             Assert.AreEqual((BigNumber)40, tier1.barProgress["cover_1"]);
             Assert.AreEqual(1, tier1.barProgress.Count);
             Assert.AreEqual(new HashSet<string> { "cover_1" }, tier1.activeBars["learn_covers"]);
@@ -420,7 +420,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not declared"));
             Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            Assert.IsEmpty(root.FindInSubtree(loaded.Tier1Def).fillCounts);
+            Assert.IsEmpty(TestNavigation.Node(root, loaded.Tier1Def).fillCounts);
         }
 
         [Test]
@@ -436,7 +436,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("holds 2 active bars of at most 1 - cleared"));
             Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            Assert.IsEmpty(root.FindInSubtree(loaded.Tier1Def).activeBars["learn_covers"]);
+            Assert.IsEmpty(TestNavigation.Node(root, loaded.Tier1Def).activeBars["learn_covers"]);
         }
 
         [Test]
@@ -454,8 +454,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(Load(json, out var root, out var loaded));
 
             Assert.IsEmpty(root.roadieAllocation);
-            Assert.IsEmpty(root.FindInSubtree(loaded.Ch1Def).modifierStacks);
-            Assert.IsEmpty(root.FindInSubtree(loaded.Tier1Def).generatorCounts);
+            Assert.IsEmpty(TestNavigation.Node(root, loaded.Ch1Def).modifierStacks);
+            Assert.IsEmpty(TestNavigation.Node(root, loaded.Tier1Def).generatorCounts);
         }
 
         [Test]
@@ -529,6 +529,76 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("checksum"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("checksum"));
             Assert.AreEqual(LoadOutcome.Failed, LoadDisk(out _));
+        }
+
+        // ---- the load path builds a LINKED tree ----
+
+        // Build runs the link pass and hydration comes after it, which is why
+        // the two never interfere: a link holds a NODE and a save holds a
+        // payload, so loading facts leaves every link where the pass put it.
+        [Test]
+        public void A_save_loads_onto_a_linked_tree()
+        {
+            var saved = new TestTree();
+            saved.Tier1.balances["fans"] = 60;
+            saved.Ch1.balances["ch1_records"] = 4;
+            var json = SaveSystem.Serialize(saved.Root);
+
+            var fresh = new TestTree();
+            fresh.Tier1Def.rung = new Rung
+            {
+                offerCondition = new CurrencyAtLeast { currency = fresh.Fans, threshold = 50 },
+                actions =
+                {
+                    new AddCurrency { currencies = { fresh.Ch1Records }, amount = 1 },
+                    new ResetScope { scope = fresh.Tier1Def }
+                }
+            };
+            Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.Content, out var root));
+
+            var tier1 = (TierScopeState)TestNavigation.Node(root, fresh.Tier1Def);
+            var ch1 = (ChapterScopeState)TestNavigation.Node(root, fresh.Ch1Def);
+            Assert.AreEqual((BigNumber)60, tier1.balances["fans"], "the save hydrated");
+
+            Assert.IsTrue(fresh.Tier1Def.rung.TryExecute(new GameContext(tier1, fresh.Now)));
+            Assert.AreEqual((BigNumber)5, ch1.balances["ch1_records"]);
+            Assert.AreEqual(BigNumber.Zero, tier1.balances["fans"],
+                "the reset acted on the LOADED tree's node, which is what its link named");
+
+            // A hydrated record refuses the same clear a live one does: the
+            // reset asks the node, and the node reads whatever payload it holds.
+            tier1.balances["fans"] = 60;
+            tier1.activeEvent = new ActiveEvent { eventId = "open_mic", goalReached = true };
+            Assert.IsFalse(fresh.Tier1Def.rung.IsOffered(new GameContext(tier1, fresh.Now)));
+        }
+
+        // Build moved OUT of the broad catch that turns any failure into "try
+        // the backup". A content fault is not a corrupt save: the file is fine,
+        // the second read would fault identically, and starting the game on the
+        // backup would hide a broken build. The absence of a "backup" warning
+        // here is the assertion - an unexpected log fails the test.
+        [Test]
+        public void A_content_fault_in_Build_propagates_and_the_backup_is_not_tried()
+        {
+            var tree = new TestTree();
+            tree.Root.balances["records"] = 1;
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);
+            tree.Root.balances["records"] = 2;
+            SaveSystem.WriteAtomic(SavePath, tree.Root, tree.Content);   // a good primary AND a good backup
+
+            // The CONTENT is what is broken: a reset reaching across to a peer.
+            var broken = new TestTree();
+            var tier2Def = TestTree.MakeTier("tier2");
+            broken.Ch1Def.children.Add(tier2Def);
+            var trigger = TestTree.MakeDefinition<TriggerDefinition>("bad_reset");
+            trigger.condition = new Always();
+            trigger.actions.Add(new ResetScope { scope = tier2Def });
+            broken.Tier1Def.triggers.Add(trigger);
+
+            Assert.Throws<InvalidOperationException>(
+                () => SaveSystem.TryDeserialize(File.ReadAllText(SavePath), broken.Content, out _));
+            Assert.Throws<InvalidOperationException>(
+                () => SaveSystem.LoadFromDisk(SavePath, broken.Content, out _));
         }
 
         // Flips the stored checksum so verification must fail.

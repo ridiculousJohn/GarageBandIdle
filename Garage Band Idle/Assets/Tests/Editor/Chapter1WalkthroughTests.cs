@@ -5,6 +5,7 @@ using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Editor;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.UI;
 using UnityEditor;
 using UnityEngine;
 
@@ -102,8 +103,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 GarageJam1 = Find(Tier1Def.events, "garage_jam_1");
 
                 Root = ScopeState.Build(ComposedContent.Compose(RootDef, new[] { Ch1Def }));
-                Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);
-                Tier1 = (TierScopeState)Root.FindInSubtree(Tier1Def);
+                Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
+                Tier1 = (TierScopeState)TestNavigation.Node(Root, Tier1Def);
                 Session = new GameSession(Root, Config());
             }
 
@@ -442,6 +443,68 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Root.roadieAllocation.Clear();
             Assert.AreEqual(f.Rate(f.Fans), boosted, "the roadie reaches cash and never fans");
             AssertClose(0.37, boosted);
+        }
+
+        // The capstone's side of 13.2's armed reward. Its gate carries no
+        // armed-reward leg and could not: a parent knows nothing of what its
+        // children host (12.4). What closes the button is tier1's own refusal
+        // to be cleared, asked by the action-list runner before the capstone's
+        // list runs - and the button says so by naming the event.
+        [Test]
+        public void The_capstone_closes_over_an_armed_tier1_reward_and_opens_after_dismissal()
+        {
+            var f = new Chapter1();
+            f.Enter();
+            f.SeedRun(records: 32, fans: 70);
+            f.Ch1.flags.Add("album");
+            var atCh1 = f.Ctx(f.Ch1);
+
+            Assert.IsTrue(f.Ch1Def.rung.IsOffered(atCh1), "32 banked records clears the gate of 30");
+
+            // The jam's entry restart banks the live run first, so the gate
+            // stays met while the attempt runs.
+            Assert.IsTrue(f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1));
+            AssertClose(35, f.Balance(f.Root, f.Records), "32 + floor(sqrt(70/5))");
+            f.Ctx(f.Tier1).Deposit("cash", 150);
+            f.Tick(1);
+            Assert.IsTrue(f.Tier1.activeEvent.goalReached, "the sweep latched the goal");
+
+            // Every leg of the capstone's own gate holds; the refusal is the
+            // only thing left, and it comes from the tier below.
+            Assert.IsEmpty(GateFeedback.UnmetLegs(f.Ch1Def.rung.offerCondition, f.Ctx(f.Ch1)));
+            Assert.IsFalse(f.Ch1Def.rung.IsOffered(f.Ctx(f.Ch1)),
+                "no reset may destroy an armed, unclaimed reward");
+
+            var refusal = ActionList.Refuses(f.Ch1Def.rung.actions, f.Ctx(f.Ch1));
+            Assert.IsNotNull(refusal);
+            Assert.AreSame(f.Tier1, refusal.Host, "the tier holding the record, not the chapter");
+            Assert.AreEqual("Claim your Garage Jam I reward first", RungFeedback.RefusalText(refusal));
+
+            // A refused list runs nothing at all - not even the ExecuteRung it
+            // opens with.
+            Assert.IsFalse(f.Session.TryRung(f.Ctx(f.Ch1)));
+            AssertClose(35, f.Balance(f.Root, f.Records), "nothing banked");
+            AssertClose(0, f.Balance(f.Root, f.Roadies));
+            Assert.IsFalse(f.Root.flags.Contains("ch1_complete"));
+            AssertClose(35, f.Balance(f.Ch1, f.Ch1Records), "and nothing cleared");
+
+            // One tap of dismissal takes the reward and reopens the button.
+            Assert.IsTrue(f.Session.TryDismissEvent(f.Ctx(f.Tier1), f.GarageJam1));
+            Assert.AreEqual(1, f.Ch1.modifierStacks[f.GjTap1.Id], "the reward was paid, not stranded");
+            Assert.IsTrue(f.Ch1Def.rung.IsOffered(f.Ctx(f.Ch1)));
+
+            // And the payouts are 13.3's, unchanged: the live run banks through
+            // the release's own gate, the roadie is the constant 1, and
+            // ResetScope(ch1) is downward closed.
+            f.SeedRun(records: 35, fans: 70);
+            Assert.IsTrue(f.Session.TryRung(f.Ctx(f.Ch1)));
+
+            AssertClose(38, f.Balance(f.Root, f.Records), "35 + floor(sqrt(70/5))");
+            AssertClose(1, f.Balance(f.Root, f.Roadies), "chapter 1's reward formula is the constant 1");
+            Assert.IsTrue(f.Root.flags.Contains("ch1_complete"));
+            AssertClose(0, f.Balance(f.Ch1, f.Ch1Records), "the gate counter zeroes");
+            Assert.IsEmpty(f.Ch1.modifierStacks, "and the chapter's own grants go with it");
+            f.AssertTierIsFresh();
         }
 
         // ---- 13.4 four-hour idle claim ----

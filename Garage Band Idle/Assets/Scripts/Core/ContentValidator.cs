@@ -30,12 +30,7 @@ namespace RidiculousGaming.GarageBandIdle
         ScopeReach,             // ResetScope / RestartScope / ExecuteRung / modifier-grant reach rules
         ChainReach,             // ordinary reads and writes address only the acting chain
         FlagNoSetter,           // a declared flag nothing sets (warn)
-        SetThenWiped,           // a list sets a fact, then resets the scope declaring it
-        FormulaReadsCleared,    // a formula-driven grant after a reset clearing its inputs (warn)
-        StrandedValue,          // a rung resets a subtree holding a payout rung it never invokes (warn)
-        StrandedReward,         // a rung's reset closure holds an event host its own gate does not guard (warn)
         BalanceGoalWithoutReset,// an event balance goal whose onEntry never resets the host (warn)
-        ReferenceCycle,         // cycles across nested action references
         RemoveWithoutGrant,     // RemoveModifier naming a stack nothing grants there (warn)
         UnconsumedStat,         // a stat outside its site's vocabulary (warn) - the typo guard a named vocabulary lacks
         NumericRange            // an authored number outside its legal range: NaN, infinity, wrong sign
@@ -140,74 +135,6 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
-    internal readonly struct RungEdgeRecord
-    {
-        public readonly string FromKey;
-        public readonly string ToKey;
-        public readonly int Index;
-        public readonly string Site;
-
-        public RungEdgeRecord(string fromKey, string toKey, int index, string site)
-        {
-            FromKey = fromKey;
-            ToKey = toKey;
-            Index = index;
-            Site = site;
-        }
-    }
-
-    internal readonly struct FactWriteRecord
-    {
-        public readonly string ContainerKey;
-        public readonly int Index;
-        public readonly string Description;
-        public readonly ScopeDefinition Home;
-        public readonly string Site;
-
-        public FactWriteRecord(string containerKey, int index, string description, ScopeDefinition home, string site)
-        {
-            ContainerKey = containerKey;
-            Index = index;
-            Description = description;
-            Home = home;
-            Site = site;
-        }
-    }
-
-    internal readonly struct FormulaReadRecord
-    {
-        public readonly string ContainerKey;
-        public readonly int Index;
-        public readonly string CurrencyId;
-        public readonly ScopeDefinition Home;
-        public readonly string Site;
-
-        public FormulaReadRecord(string containerKey, int index, string currencyId, ScopeDefinition home, string site)
-        {
-            ContainerKey = containerKey;
-            Index = index;
-            CurrencyId = currencyId;
-            Home = home;
-            Site = site;
-        }
-    }
-
-    internal readonly struct ResetRecord
-    {
-        public readonly string ContainerKey;
-        public readonly int Index;
-        public readonly ScopeDefinition Target;
-        public readonly string Site;
-
-        public ResetRecord(string containerKey, int index, ScopeDefinition target, string site)
-        {
-            ContainerKey = containerKey;
-            Index = index;
-            Target = target;
-            Site = site;
-        }
-    }
-
     // What a kind's Validate sees: the acting scope, definition lookup, tree
     // queries mirroring the runtime walks, finding sinks, and the ledgers the
     // cross-container checks read after the walk. The walker (ContentValidator)
@@ -223,8 +150,6 @@ namespace RidiculousGaming.GarageBandIdle
         private readonly List<ScopeDefinition> treeScopes;
 
         private string site;
-        private string containerKey;
-        private int actionIndex = -1;
 
         // True only while validating a site the runtime can evaluate under the
         // claim's idle-accumulation context: a modifier's appliesWhen, and a
@@ -242,10 +167,6 @@ namespace RidiculousGaming.GarageBandIdle
         internal List<FlagSetterRecord> FlagSetters { get; } = new();
         internal List<ModifierGrantRecord> ModifierGrants { get; } = new();
         internal List<ModifierRemoveRecord> ModifierRemoves { get; } = new();
-        internal List<RungEdgeRecord> RungEdges { get; } = new();
-        internal List<FactWriteRecord> FactWrites { get; } = new();
-        internal List<FormulaReadRecord> FormulaReads { get; } = new();
-        internal List<ResetRecord> Resets { get; } = new();
 
         internal ValidationContext(
             ValidationReport report,
@@ -261,25 +182,20 @@ namespace RidiculousGaming.GarageBandIdle
             this.treeScopes = treeScopes;
         }
 
-        internal static string RungKey(string scopeId) => "rung:" + scopeId;
-
-        internal void EnterContainer(ScopeDefinition actingScope, string key)
+        // Where the reads and writes below this point walk outward FROM. Every
+        // check the pass still runs asks its question from the acting scope, so
+        // positioning the walk is the whole of what the walker does here.
+        internal void EnterScope(ScopeDefinition actingScope)
         {
             ActingScope = actingScope;
-            containerKey = key;
             SetSite(null);
         }
 
-        internal void SetSite(string newSite, int index = -1)
-        {
-            site = newSite;
-            actionIndex = index;
-        }
+        internal void SetSite(string newSite) => site = newSite;
 
         internal void ClearSite()
         {
             ActingScope = null;
-            containerKey = null;
             SetSite(null);
         }
 
@@ -339,15 +255,11 @@ namespace RidiculousGaming.GarageBandIdle
         // True when node is top or sits anywhere inside top's subtree. The graph
         // is known to be a tree before a context exists - Validate refuses a
         // second parent or a parented root and returns - so this walk ends.
-        public bool InSubtree(ScopeDefinition top, ScopeDefinition node)
-        {
-            if (top == null || node == null)
-                return false;
-            for (var current = node; current != null; current = Parent(current))
-                if (current == top)
-                    return true;
-            return false;
-        }
+        // The rule itself is ScopeLinker.Encloses, shared with the link pass:
+        // this half supplies the parent map, the link pass supplies
+        // ScopeState.Parent, and there is one walk between them.
+        public bool InSubtree(ScopeDefinition top, ScopeDefinition node) =>
+            ScopeLinker.Encloses(top, node, Parent);
 
         // The runtime read/write walk: the acting scope or an ancestor of it.
         public bool OnActingChain(ScopeDefinition scope) => InSubtree(scope, ActingScope);
@@ -442,26 +354,7 @@ namespace RidiculousGaming.GarageBandIdle
         public void RecordModifierRemove(Economy.ModifierDefinition modifier, ScopeDefinition target) =>
             ModifierRemoves.Add(new ModifierRemoveRecord(modifier, target, site));
 
-        public void RecordRungInvocation(ScopeDefinition target) =>
-            RungEdges.Add(new RungEdgeRecord(containerKey, RungKey(target.Id), actionIndex, site));
-
-        public void RecordFactWrite(string description, ScopeDefinition home) =>
-            FactWrites.Add(new FactWriteRecord(containerKey, actionIndex, description, home, site));
-
-        public void RecordFormulaRead(string currencyId, ScopeDefinition home) =>
-            FormulaReads.Add(new FormulaReadRecord(containerKey, actionIndex, currencyId, home, site));
-
-        public void RecordReset(ScopeDefinition target) =>
-            Resets.Add(new ResetRecord(containerKey, actionIndex, target, site));
-
         internal IReadOnlyList<ScopeDefinition> TreeScopes => treeScopes;
-
-        internal IEnumerable<ScopeDefinition> ScopesInSubtree(ScopeDefinition top)
-        {
-            foreach (var scope in treeScopes)
-                if (InSubtree(top, scope))
-                    yield return scope;
-        }
     }
 
     // The content-load validation pass (design doc 12.12, hosted alongside
@@ -830,7 +723,7 @@ namespace RidiculousGaming.GarageBandIdle
                 {
                     if (currency == null || currency.activeWhen == null)
                         continue;
-                    ctx.EnterContainer(scope, "currency:" + currency.Id);
+                    ctx.EnterScope(scope);
                     ctx.SetSite($"currency '{currency.Id}' activeWhen");
                     ctx.CurrencyGate = true;
                     currency.activeWhen.Validate(ctx);
@@ -842,7 +735,7 @@ namespace RidiculousGaming.GarageBandIdle
                 // field, so "no rung on the root" needs no check here.
                 if (scope is InteriorDefinition interior && interior.rung != null)
                 {
-                    ctx.EnterContainer(scope, ValidationContext.RungKey(scope.Id));
+                    ctx.EnterScope(scope);
                     ctx.SetSite($"scope '{scope.Id}' rung offer");
                     // A gate may not be null (12.12): the runtime refuses one
                     // fail-closed either way, and Always is how an author says
@@ -861,14 +754,13 @@ namespace RidiculousGaming.GarageBandIdle
                     if (string.IsNullOrEmpty(interior.rung.label))
                         ctx.AddError(ValidationCheck.NullEntry,
                             "label is empty - the rung button's text is the rung's own content (12.11).");
-                    ValidateActionList(ctx, interior.rung.actions, $"scope '{scope.Id}' rung");
                 }
 
                 foreach (var trigger in scope.triggers)
                 {
                     if (trigger == null)
                         continue;
-                    ctx.EnterContainer(scope, "trigger:" + trigger.Id);
+                    ctx.EnterScope(scope);
                     ctx.SetSite($"trigger '{trigger.Id}' condition");
                     // Same gate rule: the sweep treats a null condition as
                     // closed and never dereferences it, but load refuses it.
@@ -877,7 +769,6 @@ namespace RidiculousGaming.GarageBandIdle
                             "condition is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
                     else
                         trigger.condition.Validate(ctx);
-                    ValidateActionList(ctx, trigger.actions, $"trigger '{trigger.Id}'");
                 }
 
                 if (scope is InteriorDefinition eventHost)
@@ -894,7 +785,7 @@ namespace RidiculousGaming.GarageBandIdle
                 {
                     if (producer == null)
                         continue;
-                    ctx.EnterContainer(scope, "producer:" + producer.Id);
+                    ctx.EnterScope(scope);
                     ValidateProducesEntries(ctx, producer.produces, $"producer '{producer.Id}'");
                 }
 
@@ -902,7 +793,7 @@ namespace RidiculousGaming.GarageBandIdle
                 {
                     if (generator == null)
                         continue;
-                    ctx.EnterContainer(scope, "generator:" + generator.Id);
+                    ctx.EnterScope(scope);
                     ValidateGenerator(ctx, generator);
                 }
 
@@ -910,16 +801,13 @@ namespace RidiculousGaming.GarageBandIdle
                 {
                     if (group == null)
                         continue;
-                    ctx.EnterContainer(scope, "barGroup:" + group.Id);
+                    ctx.EnterScope(scope);
                     ValidateBarGroup(ctx, group);
                     foreach (var bar in group.bars)
                     {
                         if (bar == null)
                             continue;
-                        // Each bar is its own container: its completion list
-                        // carries the same set-then-wiped, flag-setter and cycle
-                        // bookkeeping every other action list does.
-                        ctx.EnterContainer(scope, "bar:" + bar.Id);
+                        ctx.EnterScope(scope);
                         ValidateBar(ctx, bar, scope);
                     }
                 }
@@ -928,8 +816,18 @@ namespace RidiculousGaming.GarageBandIdle
                 {
                     if (upgrade == null)
                         continue;
-                    ctx.EnterContainer(scope, "upgrade:" + upgrade.Id);
+                    ctx.EnterScope(scope);
                     ValidateUpgrade(ctx, upgrade, scope);
+                }
+
+                // Every action list this scope declares, from the definition's
+                // OWN enumeration (ScopeDefinition.ActionLists) - the same one
+                // the link pass walks. Nothing here spells a site out, so a new
+                // kind of list is validated the moment the definition names it.
+                foreach (var list in scope.ActionLists())
+                {
+                    ctx.EnterScope(scope);
+                    ValidateActionList(ctx, list.Actions, list.Site);
                 }
 
                 // Usage, not declaration: each entry must reference a modifier
@@ -942,7 +840,7 @@ namespace RidiculousGaming.GarageBandIdle
                 for (var i = 0; i < scope.permanentModifiers.Count; i++)
                 {
                     var permanent = scope.permanentModifiers[i];
-                    ctx.EnterContainer(scope, "permanent:" + scope.Id);
+                    ctx.EnterScope(scope);
                     ctx.SetSite($"scope '{scope.Id}' permanentModifiers[{i}]");
                     if (permanent == null)
                     {
@@ -999,7 +897,7 @@ namespace RidiculousGaming.GarageBandIdle
                                 "visibleWhen is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
                         else if (sectionScopeUsable)
                         {
-                            ctx.EnterContainer(section.scope, $"section:{chapter.Id}[{i}]");
+                            ctx.EnterScope(section.scope);
                             ctx.SetSite($"{siteBase} visibleWhen");
                             section.visibleWhen.Validate(ctx);
                         }
@@ -1040,7 +938,7 @@ namespace RidiculousGaming.GarageBandIdle
                             if (!moduleScopeUsable)
                                 continue;
 
-                            ctx.EnterContainer(module.scope, $"module:{chapter.Id}[{i}][{j}]");
+                            ctx.EnterScope(module.scope);
                             ctx.SetSite(site);
                             if (module.content != null)
                             {
@@ -1065,12 +963,8 @@ namespace RidiculousGaming.GarageBandIdle
 
             // ---- cross-container checks over the ledgers ----
             ctx.ClearSite();
-            FinalizeListChecks(ctx);
-            FinalizeStrandedValue(ctx);
-            FinalizeStrandedReward(ctx);
             FinalizeFlagChecks(ctx);
             FinalizeModifierChecks(ctx);
-            FinalizeCycles(ctx);
 
             return report;
         }
@@ -1107,16 +1001,14 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // An event's own shape plus its two ledger containers (12.12): onEntry
-        // stands alone; rewards and onEnd are ONE container in that order,
-        // because they run back to back in a single transaction - a flag set in
-        // rewards and wiped by onEnd's reset is exactly what set-then-wiped
-        // exists to catch. Gates, goal, and handicaps are judged in the HOST's
-        // scope (12.4), which the container's acting scope already is.
+        // An event's own shape: its gate, goal, timer, and handicaps, judged in
+        // the HOST's scope (12.4), which the acting scope already is. The three
+        // action lists are walked with every other list, from the definition's
+        // own enumeration.
         private static void ValidateEvent(ValidationContext ctx, Events.EventDefinition evt, ScopeDefinition scope)
         {
             var site = $"event '{evt.Id}'";
-            ctx.EnterContainer(scope, "event:" + evt.Id + " entry");
+            ctx.EnterScope(scope);
             ctx.SetSite(site);
             if (evt.availableWhen == null)
                 ctx.AddError(ValidationCheck.NullEntry,
@@ -1151,14 +1043,6 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.AddWarning(ValidationCheck.BalanceGoalWithoutReset,
                     "a balance goal on an event whose onEntry never resets the host is met by whatever the player already holds.");
             }
-
-            ValidateActionList(ctx, evt.onEntry, $"{site} onEntry");
-
-            ctx.EnterContainer(scope, "event:" + evt.Id + " end");
-            var ending = new List<GameAction>(evt.rewards.Count + evt.onEnd.Count);
-            ending.AddRange(evt.rewards);
-            ending.AddRange(evt.onEnd);
-            ValidateActionList(ctx, ending, $"{site} rewards+onEnd");
         }
 
         // Whether a condition reads a live balance anywhere in its tree.
@@ -1231,16 +1115,6 @@ namespace RidiculousGaming.GarageBandIdle
             // grant site.
             for (var i = 0; i < upgrade.effects.Count; i++)
                 ValidateEffect(ctx, upgrade.effects[i], $"{site} effects[{i}]", scope);
-
-            // The purchase latch is a fact write at index -1: it lands before
-            // actions[0], so a payload that resets the latch's own scope trips
-            // set-then-wiped instead of yielding a repeatably-purchasable
-            // upgrade. Only actions record fact writes, so -1 collides with
-            // nothing.
-            ctx.SetSite($"{site} purchase latch");
-            ctx.RecordFactWrite($"the purchase latch of upgrade '{upgrade.Id}'", scope);
-
-            ValidateActionList(ctx, upgrade.actions, site);
         }
 
         // A group holds bars and caps how many run at once. That is the whole
@@ -1312,23 +1186,10 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.SetSite(site);
                 ValidateEffect(ctx, entry.effect, $"{site} perFill[{i}]", scope);
             }
-
-            // The fill count is a fact write at index -1, exactly as the upgrade
-            // latch is: it lands before actions[0], so a completion list that
-            // resets the scope homing the count its own cascade reads trips
-            // set-then-wiped instead of quietly never accumulating. A bar with no
-            // cascade records nothing, so ordinary "fill, then reset the tier"
-            // authoring stays clean.
-            if (bar.repeating && bar.perFill.Count > 0)
-            {
-                ctx.SetSite($"{site} fill count");
-                ctx.RecordFactWrite($"the fill count of bar '{bar.Id}'", scope);
-            }
-
-            ValidateActionList(ctx, bar.onComplete, site);
         }
 
-        private static void ValidateActionList(ValidationContext ctx, List<GameAction> actions, string siteBase)
+        private static void ValidateActionList(ValidationContext ctx, IReadOnlyList<GameAction> actions,
+                                               string siteBase)
         {
             for (var i = 0; i < actions.Count; i++)
             {
@@ -1339,7 +1200,7 @@ namespace RidiculousGaming.GarageBandIdle
                     ctx.AddError(ValidationCheck.NullEntry, "null action entry.");
                     continue;
                 }
-                ctx.SetSite($"{siteBase} actions[{i}] ({action.GetType().Name})", i);
+                ctx.SetSite($"{siteBase} actions[{i}] ({action.GetType().Name})");
                 action.Validate(ctx);
             }
         }
@@ -1436,138 +1297,11 @@ namespace RidiculousGaming.GarageBandIdle
             return whole;
         }
 
-        // Set-then-wiped (error) and formula-reads-cleared (warn), both
-        // list-order questions within one container (12.12).
-        private static void FinalizeListChecks(ValidationContext ctx)
-        {
-            foreach (var reset in ctx.Resets)
-            {
-                foreach (var write in ctx.FactWrites)
-                    if (write.ContainerKey == reset.ContainerKey && write.Index < reset.Index &&
-                        ctx.InSubtree(reset.Target, write.Home))
-                        ctx.AddError(ValidationCheck.SetThenWiped,
-                            $"{write.Site}: {write.Description} is set here and wiped by the ResetScope of '{reset.Target.Id}' at actions[{reset.Index}] (set-then-wiped, 12.12).");
-
-                foreach (var read in ctx.FormulaReads)
-                    if (read.ContainerKey == reset.ContainerKey && reset.Index < read.Index &&
-                        ctx.InSubtree(reset.Target, read.Home))
-                        ctx.AddWarning(ValidationCheck.FormulaReadsCleared,
-                            $"{read.Site}: the formula reads currency '{read.CurrencyId}' after actions[{reset.Index}] resets '{reset.Target.Id}', which holds it - the grant reads zeros (12.12).");
-            }
-        }
-
-        // A rung that resets a scope containing payout rungs it never invokes
-        // warns - the value those rungs would cash dies with the reset (12.12:
-        // stranded value). Payout today means a top-level AddCurrency in the
-        // rung's list. "Invokes" is transitive: an ExecuteRung issued before
-        // the reset executes the target rung's whole list at that moment,
-        // including its own ExecuteRungs, so nested ladders cash through the
-        // chain - only the first hop needs to precede the reset. A RestartScope
-        // records its rung edge and its reset at the SAME index, and the bank
-        // runs before the clear inside the one action, so the seed takes an
-        // edge at the reset's own index too. The acting
-        // rung itself is exempt: payout-before-clear is list order, and
-        // set-then-wiped covers the misordering. The doc bullet names rungs,
-        // so trigger resets are not judged here.
-        private static void FinalizeStrandedValue(ValidationContext ctx)
-        {
-            foreach (var reset in ctx.Resets)
-            {
-                if (!reset.ContainerKey.StartsWith("rung:"))
-                    continue;
-
-                // Everything reachable through rung invocations issued before
-                // this reset. Visited-set traversal: a cycle (its own error)
-                // cannot loop it.
-                var reached = new HashSet<string>();
-                var frontier = new Stack<string>();
-                foreach (var edge in ctx.RungEdges)
-                    if (edge.FromKey == reset.ContainerKey && edge.Index <= reset.Index && reached.Add(edge.ToKey))
-                        frontier.Push(edge.ToKey);
-                while (frontier.Count > 0)
-                {
-                    var key = frontier.Pop();
-                    foreach (var edge in ctx.RungEdges)
-                        if (edge.FromKey == key && reached.Add(edge.ToKey))
-                            frontier.Push(edge.ToKey);
-                }
-
-                foreach (var scope in ctx.ScopesInSubtree(reset.Target))
-                {
-                    if (scope is not InteriorDefinition interior || interior.rung == null)
-                        continue;
-                    var rungKey = ValidationContext.RungKey(scope.Id);
-                    if (rungKey == reset.ContainerKey)
-                        continue;
-                    if (!interior.rung.actions.Any(a => a is AddCurrency))
-                        continue;
-                    if (!reached.Contains(rungKey))
-                        ctx.AddWarning(ValidationCheck.StrandedValue,
-                            $"{reset.Site}: resets '{reset.Target.Id}', which contains the payout rung at '{scope.Id}' with no ExecuteRung before the reset - stranded value (12.12).");
-                }
-            }
-        }
-
-        // A rung whose reset closure contains an event host must REQUIRE that
-        // host to hold no armed reward, or firing it destroys an unclaimed
-        // reward with the record (12.12: stranded reward). Required means the
-        // whole condition or a conjunct reached through All alone: a leg under
-        // an Any is satisfied by its sibling branch, and a positive leg means
-        // the opposite. A warn, not an error: resetting over cheap disposable
-        // events is authorable on purpose.
-        private static void FinalizeStrandedReward(ValidationContext ctx)
-        {
-            foreach (var reset in ctx.Resets)
-            {
-                if (!reset.ContainerKey.StartsWith("rung:"))
-                    continue;
-                Rung rung = null;
-                foreach (var scope in ctx.TreeScopes)
-                {
-                    if (scope is InteriorDefinition owner && owner.rung != null
-                        && ValidationContext.RungKey(scope.Id) == reset.ContainerKey)
-                    {
-                        rung = owner.rung;
-                        break;
-                    }
-                }
-                if (rung == null)
-                    continue;
-
-                var guarded = new HashSet<ScopeDefinition>();
-                CollectRequiredGuards(rung.offerCondition, guarded);
-                foreach (var scope in ctx.ScopesInSubtree(reset.Target))
-                {
-                    if (scope is not InteriorDefinition host)
-                        continue;
-                    var hostsAnEvent = false;
-                    foreach (var evt in host.events)
-                    {
-                        if (evt != null)
-                        {
-                            hostsAnEvent = true;
-                            break;
-                        }
-                    }
-                    if (!hostsAnEvent || guarded.Contains(scope))
-                        continue;
-                    ctx.AddWarning(ValidationCheck.StrandedReward,
-                        $"{reset.Site}: resets '{reset.Target.Id}', which contains the event host '{scope.Id}', and the rung's offer condition carries no required Not(EventRewardPending('{scope.Id}')) - an armed, unclaimed reward dies with the record (stranded reward, 12.12).");
-                }
-            }
-        }
-
-        // The hosts guarded as a REQUIRED conjunct: the whole condition, or a
-        // leg reached through All alone.
-        private static void CollectRequiredGuards(Condition condition, HashSet<ScopeDefinition> guarded)
-        {
-            if (condition is Not not && not.condition is EventRewardPending pending && pending.host != null)
-                guarded.Add(pending.host);
-            else if (condition is All all)
-                foreach (var leg in all.conditions)
-                    if (leg != null)
-                        CollectRequiredGuards(leg, guarded);
-        }
+        // No load-time check stands in for the reset's own refusal (12.12), and
+        // none could: a guard authored on the parent would be a read down the
+        // tree, which the event kinds do not express. The scope holding the
+        // armed reward refuses the clear at the moment it is asked (12.5), and
+        // the action-list runner asks before any list runs.
 
         // Every declaration is its own flag, so the no-setter question is asked
         // once per declaring scope: a setter counts for THIS scope only when its
@@ -1628,7 +1362,7 @@ namespace RidiculousGaming.GarageBandIdle
         private static void ValidateModifierAtSite(ValidationContext ctx, Economy.ModifierDefinition modifier,
                                                    ScopeDefinition home, string at)
         {
-            ctx.EnterContainer(home, "modifier:" + modifier.Id);
+            ctx.EnterScope(home);
             for (var i = 0; i < modifier.effects.Count; i++)
             {
                 var effectSite = $"modifier '{modifier.Id}'{at} effects[{i}]";
@@ -1706,56 +1440,6 @@ namespace RidiculousGaming.GarageBandIdle
             else if (home is not ChapterDefinition && home is not RootDefinition)
                 ctx.AddWarning(ValidationCheck.InertOperand,
                     $"{site}: a game_speed effect at '{home.Id}' is never gathered - the tick reads from the foreground chapter outward, so it must live at a chapter or the root (12.2).");
-        }
-
-        // Cycles across nested action references are errors (12.12). The edges
-        // are the rung invocations ExecuteRung and RestartScope record, from
-        // rungs and trigger lists; the event lifecycle operations are commands
-        // and stay out of the graph.
-        private static void FinalizeCycles(ValidationContext ctx)
-        {
-            var adjacency = new Dictionary<string, List<RungEdgeRecord>>();
-            foreach (var edge in ctx.RungEdges)
-            {
-                if (!adjacency.TryGetValue(edge.FromKey, out var bucket))
-                    adjacency[edge.FromKey] = bucket = new List<RungEdgeRecord>();
-                bucket.Add(edge);
-            }
-
-            var state = new Dictionary<string, int>(); // 0 unvisited, 1 on stack, 2 done
-            var stack = new List<string>();
-            void Visit(string node)
-            {
-                state[node] = 1;
-                stack.Add(node);
-                if (adjacency.TryGetValue(node, out var edges))
-                {
-                    foreach (var edge in edges)
-                    {
-                        state.TryGetValue(edge.ToKey, out var toState);
-                        if (toState == 1)
-                        {
-                            var start = stack.IndexOf(edge.ToKey);
-                            var path = string.Join(" -> ", stack.Skip(start).Append(edge.ToKey));
-                            ctx.AddError(ValidationCheck.ReferenceCycle,
-                                $"{edge.Site}: rung invocation cycle: {path} (12.12).");
-                        }
-                        else if (toState == 0)
-                        {
-                            Visit(edge.ToKey);
-                        }
-                    }
-                }
-                stack.RemoveAt(stack.Count - 1);
-                state[node] = 2;
-            }
-
-            foreach (var node in adjacency.Keys.ToList())
-            {
-                state.TryGetValue(node, out var nodeState);
-                if (nodeState == 0)
-                    Visit(node);
-            }
         }
     }
 }

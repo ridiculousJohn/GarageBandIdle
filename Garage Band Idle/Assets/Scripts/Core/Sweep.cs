@@ -27,11 +27,15 @@ namespace RidiculousGaming.GarageBandIdle
                 if (scope is InteriorScopeState host)
                     EventSystem.LatchGoal(host, nowUtc);
 
-            // 2. Collect eligible triggers - condition holds, id not latched -
-            // capturing each scope's payload identity. Nothing executes during
-            // collection, which is what makes a trigger armed by an earlier
-            // trigger in this pass wait for the next sweep. A null condition is
-            // closed and never dereferenced; validation refuses it at load.
+            // 2. Collect eligible triggers - condition holds, id not latched,
+            // and the list unrefused - capturing each scope's payload identity.
+            // The refusal is judged at collection time exactly as the condition
+            // is (12.5): a refused trigger is neither latched nor run, and
+            // fires on a later pass once the refusal lifts. Nothing executes
+            // during collection, which is what makes a trigger armed by an
+            // earlier trigger in this pass wait for the next sweep. A null
+            // condition is closed and never dereferenced; validation refuses it
+            // at load.
             var eligible = new List<(ScopeState scope, ScopeFacts facts, TriggerDefinition trigger)>();
             foreach (var scope in swept)
             {
@@ -42,7 +46,7 @@ namespace RidiculousGaming.GarageBandIdle
                         continue;
                     if (scope.firedTriggers.Contains(trigger.Id))
                         continue;
-                    if (trigger.condition.Evaluate(ctx))
+                    if (trigger.condition.Evaluate(ctx) && ActionList.Refuses(trigger.actions, ctx) == null)
                         eligible.Add((scope, scope.facts, trigger));
                 }
             }
@@ -56,9 +60,7 @@ namespace RidiculousGaming.GarageBandIdle
                 if (facts != scope.facts)
                     continue;
                 scope.firedTriggers.Add(trigger.Id);
-                var ctx = new GameContext(scope, nowUtc);
-                foreach (var action in trigger.actions)
-                    action?.Execute(ctx);
+                ActionList.Run(trigger.actions, new GameContext(scope, nowUtc));
             }
 
             void AddSubtree(ScopeState node)

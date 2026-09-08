@@ -21,5 +21,25 @@ namespace RidiculousGaming.GarageBandIdle
         // The base answers for the common lists; events exist only here.
         internal override bool Declares(Definition definition) =>
             base.Declares(definition) || Holds(events, definition);
+
+        // The two list kinds only an interior scope has, added to the base's
+        // enumeration: the rung, and each event's three lists.
+        public override IEnumerable<ActionListSite> ActionLists()
+        {
+            if (rung != null)
+                yield return new ActionListSite(rung.actions, $"scope '{Id}' rung");
+
+            foreach (var entry in base.ActionLists())
+                yield return entry;
+
+            foreach (var evt in events)
+            {
+                if (evt == null)
+                    continue;
+                yield return new ActionListSite(evt.onEntry, $"event '{evt.Id}' onEntry");
+                yield return new ActionListSite(evt.rewards, $"event '{evt.Id}' rewards");
+                yield return new ActionListSite(evt.onEnd, $"event '{evt.Id}' onEnd");
+            }
+        }
     }
 }

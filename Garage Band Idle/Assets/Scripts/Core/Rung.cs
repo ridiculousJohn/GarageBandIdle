@@ -20,11 +20,17 @@ namespace RidiculousGaming.GarageBandIdle
         [SerializeReference, SubclassPicker] public Condition offerCondition;
         [SerializeReference, SubclassPicker] public List<GameAction> actions = new();
 
-        // True when the offer condition holds in the rung's own scope. A null
-        // condition never offers - the fail-closed backstop behind the load-time
-        // check, which refuses a null gate outright (12.12).
+        // True when the offer condition holds in the rung's own scope AND
+        // nothing in the list refuses. A null condition never offers - the
+        // fail-closed backstop behind the load-time check, which refuses a null
+        // gate outright (12.12). The refusal half is the runner's answer, asked
+        // here exactly as every other list site asks it (12.5), so the button
+        // closes before any action runs and the list never half-executes. The
+        // rung keeps no refusal accessor of its own: feedback asks the runner
+        // the same question.
         public bool IsOffered(GameContext ctx) =>
-            offerCondition != null && offerCondition.Evaluate(ctx);
+            offerCondition != null && offerCondition.Evaluate(ctx)
+            && ActionList.Refuses(actions, ctx) == null;
 
         // Runs the action list. Calling this while the gate is closed is a
         // caller bug - every path is fail-closed, so ask IsOffered first.
@@ -33,8 +39,7 @@ namespace RidiculousGaming.GarageBandIdle
         {
             if (!IsOffered(ctx))
                 throw new InvalidOperationException("Rung.Execute called while the offer condition is unmet - ask IsOffered first.");
-            foreach (var action in actions)
-                action.Execute(ctx);
+            ActionList.Run(actions, ctx);
         }
 
         // Convenience over the two: runs the list iff the gate holds, and

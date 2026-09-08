@@ -907,9 +907,16 @@ carry only a tag some scope on its own chain declares. Stat names and the `Effec
 a reference to one thing - all of these are vocabulary, not things.
 
 **A scope is addressed by reference too.** An action or condition that names a scope holds the
-`ScopeDefinition` itself, and getting from it to live state is a walk that compares assets, not
-ids: there is one state node per definition and neither points at the other, so the walk is the
-only link, but what it matches on is the reference the caller already holds. The only scope NAMES belong
+`ScopeDefinition` itself, and getting from it to live state is a LINK resolved when the tree is
+built, never a search: there is one state node per definition, and `ScopeState.Build` ends with one
+pass that walks the new tree and writes onto the runtime nodes what each static reference means in
+THIS tree (12.14.8). The pass resolves through a definition-to-node map `Build` keeps for
+construction and drops when it returns - a map that outlived construction would be the id index
+nothing may hold. A link is keyed by the static object that HOLDS the reference (a `ResetScope`
+instance, a `SectionDefinition`) and stored at the node where that object executes or is evaluated,
+so the read is `node.Link(holder)`, a dictionary read at a node the caller already has, and a miss
+throws: construction omitted a site, and nothing falls back to a search. Nothing is written into an
+asset, so two trees built from one content set hold their own links. The only scope NAMES belong
 to stored facts (the roadie allocation map, the recorded current chapter), because a save holds text and
 nothing else: a name enters at the load boundary, resolves there, and travels no further. A scope
 id is therefore never how running code finds a scope, which is what keeps tree-wide id uniqueness a
@@ -1007,9 +1014,11 @@ they mutated is what gets saved.
 it never executes nested lists — so no recursion exists via resets.
 The clear is a parent INFORMING its subtree of an event, never a read of it - and the subtree
 answers. A scope holding an armed, unclaimed reward (a record with `goalReached` set) refuses to be
-cleared, judged from its own facts, and the refusal comes back up the walk the clear goes down. A
-rung asks that question of every reset in its list as part of `IsOffered`, so its button closes
-before any action runs and a list never half-executes; the gate feedback renders the refusal as a
+cleared, judged from its own facts, and the refusal comes back up the walk the clear goes down. The
+rule is about RUNNING AN ACTION LIST, so the one runner every authored list executes through asks
+that question before any list runs - a rung, an event's entry and its ending lists, a trigger, an
+upgrade payload, a bar completion alike - and a list runs whole or not at all, so each site's guard
+closes before any action runs and no list half-executes; the gate feedback renders the refusal as a
 leg naming the event by its `displayName`. A reset forced past a refusal throws (requirement 7).
 `DismissEvent` removes the record before running `onEnd`, so a restart from an ending list is never
 refused by its own event.
@@ -1378,7 +1387,11 @@ on a tier-declared flag. A module's `scope` is always concrete: the JSON may omi
 importer normalizes to the home scope of the bound content **when that home lies within the
 chapter's subtree, else to the chapter itself** (root-owned content like Records is readable from
 any context - root is on every chain), so the runtime computes no default. Validated at load: the
-chapter itself or one of its descendants. The `ModuleRegistry` is a hand-made ScriptableObject
+chapter itself or one of its descendants. A section's and a module's scope is LINKED at the chapter
+node when the tree is built (12.3), keyed by the `SectionDefinition` or `ModuleDefinition`, and
+that reach rule is checked at the link rather than thrown at a chapter build; `ScreenHost` reads
+`chapter.Link(section)` and builds over the node it names.
+The `ModuleRegistry` is a hand-made ScriptableObject
 mapping each `prefabId` to a `VisualTreeAsset` held by direct reference - the UXML is the UI
 Toolkit shape's "prefab" - so the widgets load with the scene as the registry's own dependency
 graph and instantiate synchronously mid-refresh; the behavior is a plain C# `ModuleWidget`
@@ -1479,11 +1492,8 @@ per-feature: any kind an author gates with explains itself for free.
   no static check on an `AddCurrency` naming a gated currency: whether the gate holds at that site
   when the action actually fires is a runtime question this pass cannot decide, and `Deposit`
   throwing is the answer - loud, at the moment it matters.
-- A rung that resets a scope containing tier rungs with unreferenced payout actions warns
-  (stranded value); a formula-driven grant placed after a `ResetScope` that clears its inputs warns
-  (reads zeros); reference cycles across ALL nested action references - `ExecuteRung`,
-  `RestartScope`, and trigger lists - are errors. A rung on the root needs no check: the field is on
-  `InteriorDefinition` (§12.3), so there is nowhere to author one.
+- A rung on the root needs no check: the field is on `InteriorDefinition` (§12.3), so there is
+  nowhere to author one.
 - A rung that would reset over an armed, unclaimed reward is refused at its gate by the scope
   holding the record (12.5). No load-time check stands in for that and none could: a guard authored
   on the parent would be a read down the tree, which the event kinds do not express - they read
@@ -1511,15 +1521,11 @@ per-feature: any kind an author gates with explains itself for free.
 - A bar group's `maxActive` is at least 1, and it lists no null bars. A bar's `fillAmount` and
   `fillRate` are positive - a nonpositive threshold is an unbounded settlement loop, and a zero rate
   is a bar no multiplier can move - and a named `fillCurrency` must be reachable on its own chain
-  (none is legal: it fills from time). `perFill` on a NON-REPEATING bar is an error (12.6). A
-  repeating bar carrying `perFill` records its fill-count write ahead of `onComplete`, so a
-  completion list resetting the scope that homes its own count trips set-then-wiped. `BarsCompleted`
-  reaches like every other scope-attached read: the group's declaring scope is the acting scope or an
-  ancestor. A group is not an effect target (§12.7), but nothing checks a selector for naming one:
+  (none is legal: it fills from time). `perFill` on a NON-REPEATING bar is an error (12.6).
+  `BarsCompleted` reaches like every other scope-attached read: the group's declaring scope is the
+  acting scope or an ancestor. A group is not an effect target (§12.7), but nothing checks a
+  selector for naming one:
   that would mean interpreting the word, which is the search this pass does not do.
-- An action list that sets a fact and later resets the scope declaring it errors (set-then-wiped —
-  e.g. an event's `event_tierN_done` flag must be declared outside the scope its own `onEnd`
-  resets).
 - A balance goal on an event whose `onEntry` never resets the host scope warns.
 - An event on the root scope needs no check. `events` is declared on `InteriorDefinition` (§12.3),
   so root has no field to hold one: handicaps gathering into every chapter's outward walk and a
@@ -1555,6 +1561,8 @@ Assets/Scripts/
     InteriorDefinition.cs   // chapters and tiers: the rung and the events list
     RootDefinition.cs  ChapterDefinition.cs  TierDefinition.cs   // one file each - Unity binds one ScriptableObject per script, by file name
     ScopeState.cs           // the base, ScopeState<TFacts>, the three state classes and their payloads
+    ScopeLinks.cs           // the one post-construction pass: what each static reference means in THIS tree, keyed by its holder
+    ActionList.cs           // the one runner an authored list executes through: Refuses / TryRun / Run, whole or not at all
     Condition.cs  Action.cs  PayoutFormula.cs  Trigger.cs   // the class families (+ kind classes)
     Effect.cs               // the flat struct
     GameContext.cs          // read access for Evaluate/Execute: state chain + defs
@@ -1668,8 +1676,12 @@ Content/                 // the authored JSON the importer reads
    (aggregation like `GetRate`, and the downward-closed clear of `ResetScope` - a parent informing
    its subtree, which answers, never a parent reading a child's fact). What is forbidden is
    resolving a name from anywhere else - a global map, a scan of every scope, or any search that
-   leaves the acting chain. Validation is the exception and the reason the rule holds: it audits the
-   whole tree at load, once, which is what lets every runtime walk assume its own chain is enough.
+   leaves the acting chain. An EXPLICIT scope reference takes neither walk: it names exactly one
+   node the moment the tree exists, so the link pass resolves it once at load and every execution
+   afterward reads it by reference (12.3) - no runtime execution searches for a named node, and a
+   reference that failed to resolve is a content fault at load rather than a miss mid-tick.
+   Validation is the exception and the reason the rule holds: it audits the whole tree at load,
+   once, which is what lets every runtime walk assume its own chain is enough.
    Content that seems to need a registry is content that has not been placed on a scope yet.
 
 ---

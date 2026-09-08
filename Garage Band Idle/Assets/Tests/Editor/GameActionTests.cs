@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle;
 using RidiculousGaming.GarageBandIdle.Economy;
+using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.UI;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -9,6 +12,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 {
     public class GameActionTests
     {
+        // The runner takes a list, so a single action is handed to it as one.
+        private static IReadOnlyList<GameAction> Only(params GameAction[] actions) => actions;
+
         [Test]
         public void AddCurrency_pays_every_target_from_one_evaluation()
         {
@@ -121,6 +127,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ResetScope_clears_everything_and_reinitializes()
         {
             var tree = new TestTree();
+            // Authored, not loose: nothing links an action the tree was never
+            // built over, and the link is what Execute reads.
+            var reset = tree.Author(tree.Tier1Def, new ResetScope { scope = tree.Tier1Def });
             var ctx = tree.Ctx(tree.Tier1);
             ctx.Deposit("cash", 300);
             tree.Tier1.flags.Add("fans_revealed");
@@ -128,7 +137,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["drummer"] = 2;
             tree.Tier1.barProgress["cover_1"] = 100;
 
-            new ResetScope { scope = tree.Tier1Def }.Execute(ctx);
+            reset.Execute(ctx);
 
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);       // key kept, value zeroed
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.earnedTotals["cash"]);   // gear region re-hides
@@ -142,51 +151,52 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void ResetScope_is_downward_closed()
         {
             var tree = new TestTree();
+            var reset = tree.Author(tree.Ch1Def, new ResetScope { scope = tree.Ch1Def });
             tree.Ctx(tree.Tier1).Deposit("cash", 100);
             tree.Ctx(tree.Ch1).Deposit("ch1_records", 30);
             tree.Ctx(tree.Root).Deposit("records", 30);
 
-            new ResetScope { scope = tree.Ch1Def }.Execute(tree.Ctx(tree.Ch1));
+            reset.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual(BigNumber.Zero, tree.Ch1.balances["ch1_records"]);
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);       // reached downward
             Assert.AreEqual((BigNumber)30, tree.Root.balances["records"]);      // never reached upward
         }
 
+        // Reach is settled once, when the tree is built: the link pass resolves
+        // the reference and refuses it there, so a peer or an ancestor never
+        // reaches the point of having a link to read.
         [Test]
-        public void ResetScope_reaches_what_it_encloses_but_never_a_peer_or_an_ancestor()
+        public void ResetScope_reaches_what_it_encloses_but_never_a_peer()
         {
             var tree = new TestTree();
             var tier2Def = TestTree.MakeTier("tier2");
             tree.Ch1Def.children.Add(tier2Def);
-            var root = ScopeState.Build(tree.Content);   // rebuild with the sibling
-            var tier1 = root.FindInSubtree(tree.Tier1Def);
-            var tier2 = root.FindInSubtree(tier2Def);
-            tier2.balances["merch"] = 5;
 
             // A peer is the parent's to clear, so tier1 cannot reach tier2.
-            Assert.Throws<System.InvalidOperationException>(
-                () => new ResetScope { scope = tier2Def }.Execute(new GameContext(tier1, tree.Now)));
-            Assert.AreEqual((BigNumber)5, tier2.balances["merch"]);
+            Assert.Throws<InvalidOperationException>(
+                () => tree.Author(tree.Tier1Def, new ResetScope { scope = tier2Def }));
+        }
 
-            Assert.Throws<System.InvalidOperationException>(
-                () => new ResetScope { scope = tree.Ch1Def }.Execute(new GameContext(tier1, tree.Now)));
+        [Test]
+        public void ResetScope_never_reaches_an_ancestor()
+        {
+            var tree = new TestTree();
+
+            Assert.Throws<InvalidOperationException>(
+                () => tree.Author(tree.Tier1Def, new ResetScope { scope = tree.Ch1Def }));
         }
 
         [Test]
         public void ResetScope_refuses_the_root_even_from_a_root_context()
         {
             var tree = new TestTree();
-            tree.Ctx(tree.Root).Deposit("records", 30);
-            tree.Root.flags.Add("ch1_complete");
 
             // A root-declared trigger is a legitimate root acting context; the
-            // refusal is structural (12.12: "never the root"), not reach math.
-            Assert.Throws<System.InvalidOperationException>(
-                () => new ResetScope { scope = tree.RootDef }.Execute(tree.Ctx(tree.Root)));
-
-            Assert.AreEqual((BigNumber)30, tree.Root.balances["records"]);
-            Assert.IsTrue(tree.Root.flags.Contains("ch1_complete"));
+            // refusal is structural (12.12: "never the root"), not reach math -
+            // and it lands when the reference is resolved, not when it runs.
+            Assert.Throws<InvalidOperationException>(
+                () => tree.Author(tree.RootDef, new ResetScope { scope = tree.RootDef }));
         }
 
         [Test]
@@ -239,9 +249,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     new ResetScope { scope = tree.Tier1Def }
                 }
             };
+            var fire = tree.Author(tree.Ch1Def, new ExecuteRung { tier = tree.Tier1Def });
             tree.Tier1.balances["fans"] = 60;
 
-            new ExecuteRung { tier = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
+            fire.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual((BigNumber)3, tree.Root.balances["records"]);
             Assert.AreEqual((BigNumber)3, tree.Ch1.balances["ch1_records"]);
@@ -257,9 +268,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
                 actions = { new AddCurrency { currencies = { tree.Records }, amount = 99 } }
             };
+            var fire = tree.Author(tree.Ch1Def, new ExecuteRung { tier = tree.Tier1Def });
             tree.Tier1.balances["fans"] = 10;
 
-            new ExecuteRung { tier = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
+            fire.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual(BigNumber.Zero, tree.Root.balances["records"]);     // no payout without the gate
             Assert.AreEqual((BigNumber)10, tree.Tier1.balances["fans"]);        // untouched; a later reset discards
@@ -304,6 +316,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     new ResetScope { scope = tree.Ch1Def }
                 }
             };
+            tree.Ch1Def.rung = capstone;
+            tree.Rebuild();   // both rungs were authored after construction
             tree.Ch1.balances["ch1_records"] = 29;
             tree.Tier1.balances["fans"] = 60;
 
@@ -328,10 +342,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
                 actions = { new AddCurrency { currencies = { tree.Records }, amount = 3 } }
             };
+            var restart = tree.Author(tree.Ch1Def, new RestartScope { scope = tree.Tier1Def });
             tree.Tier1.balances["fans"] = 60;
             tree.Tier1.balances["cash"] = 500;
 
-            new RestartScope { scope = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
+            restart.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual((BigNumber)3, tree.Root.balances["records"]);       // banked
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["fans"]);       // then cleared
@@ -347,9 +362,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
                 actions = { new AddCurrency { currencies = { tree.Records }, amount = 3 } }
             };
+            var restart = tree.Author(tree.Ch1Def, new RestartScope { scope = tree.Tier1Def });
             tree.Tier1.balances["fans"] = 10;
 
-            new RestartScope { scope = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
+            restart.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual(BigNumber.Zero, tree.Root.balances["records"]);     // gate unmet, no payout
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["fans"]);       // the clear still ran
@@ -359,42 +375,151 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void RestartScope_on_a_scope_with_no_rung_just_clears()
         {
             var tree = new TestTree();
+            var restart = tree.Author(tree.Ch1Def, new RestartScope { scope = tree.Tier1Def });
             tree.Ctx(tree.Tier1).Deposit("cash", 300);
 
-            new RestartScope { scope = tree.Tier1Def }.Execute(tree.Ctx(tree.Ch1));
+            restart.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);
         }
 
         [Test]
-        public void RestartScope_reaches_what_it_encloses_but_never_a_peer_or_an_ancestor()
+        public void RestartScope_reaches_what_it_encloses_but_never_a_peer()
         {
             var tree = new TestTree();
             var tier2Def = TestTree.MakeTier("tier2");
             tree.Ch1Def.children.Add(tier2Def);
-            var root = ScopeState.Build(tree.Content);   // rebuild with the sibling
-            var tier1 = root.FindInSubtree(tree.Tier1Def);
-            var tier2 = root.FindInSubtree(tier2Def);
-            tier2.balances["merch"] = 5;
 
-            Assert.Throws<System.InvalidOperationException>(
-                () => new RestartScope { scope = tier2Def }.Execute(new GameContext(tier1, tree.Now)));
-            Assert.AreEqual((BigNumber)5, tier2.balances["merch"]);
+            Assert.Throws<InvalidOperationException>(
+                () => tree.Author(tree.Tier1Def, new RestartScope { scope = tier2Def }));
+        }
 
-            Assert.Throws<System.InvalidOperationException>(
-                () => new RestartScope { scope = tree.Ch1Def }.Execute(new GameContext(tier1, tree.Now)));
+        [Test]
+        public void RestartScope_never_reaches_an_ancestor()
+        {
+            var tree = new TestTree();
+
+            Assert.Throws<InvalidOperationException>(
+                () => tree.Author(tree.Tier1Def, new RestartScope { scope = tree.Ch1Def }));
         }
 
         [Test]
         public void RestartScope_refuses_the_root_even_from_a_root_context()
         {
             var tree = new TestTree();
-            tree.Ctx(tree.Root).Deposit("records", 30);
 
-            Assert.Throws<System.InvalidOperationException>(
-                () => new RestartScope { scope = tree.RootDef }.Execute(tree.Ctx(tree.Root)));
+            Assert.Throws<InvalidOperationException>(
+                () => tree.Author(tree.RootDef, new RestartScope { scope = tree.RootDef }));
+        }
 
-            Assert.AreEqual((BigNumber)30, tree.Root.balances["records"]);
+        // ---- the link, and the reset's own refusal ----
+
+        // Each of the three acts on the node its LINK names, resolved once when
+        // the tree was built. The acting scope holds several candidates below
+        // it; nothing searches for one at execution time.
+        [Test]
+        public void The_three_actions_act_on_the_node_the_link_names()
+        {
+            var tree = new TestTree();
+            var tier2Def = TestTree.MakeTier("tier2");
+            TestTree.DeclareCurrency(tier2Def, "merch");
+            tree.Ch1Def.children.Add(tier2Def);
+            tree.Tier1Def.rung = new Rung
+            {
+                offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
+                actions = { new AddCurrency { currencies = { tree.Ch1Records }, amount = 7 } }
+            };
+            var reset = tree.Author(tree.Ch1Def, new ResetScope { scope = tree.Tier1Def });
+            var fire = tree.Author(tree.Ch1Def, new ExecuteRung { tier = tree.Tier1Def });
+            var restart = tree.Author(tree.Ch1Def, new RestartScope { scope = tree.Tier1Def });
+            var tier2 = TestNavigation.Node(tree.Root, tier2Def);
+            var ctx = tree.Ctx(tree.Ch1);
+
+            tree.Tier1.balances["fans"] = 60;
+            tier2.balances["merch"] = 5;
+
+            fire.Execute(ctx);
+            Assert.AreEqual((BigNumber)7, tree.Ch1.balances["ch1_records"], "the rung the link named ran");
+            Assert.AreEqual((BigNumber)60, tree.Tier1.balances["fans"], "and it banked without clearing");
+
+            reset.Execute(ctx);
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["fans"]);
+            Assert.AreEqual((BigNumber)5, tier2.balances["merch"], "the peer the link never named");
+
+            tree.Tier1.balances["fans"] = 60;
+            restart.Execute(ctx);
+            Assert.AreEqual((BigNumber)14, tree.Ch1.balances["ch1_records"], "banked again");
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["fans"], "then cleared");
+            Assert.AreEqual((BigNumber)5, tier2.balances["merch"]);
+        }
+
+        // 12.5: a scope holding an armed, unclaimed reward refuses to be
+        // cleared, judged from its own facts, and the refusal comes back up the
+        // walk the clear goes down.
+        [Test]
+        public void A_reset_over_an_armed_reward_is_refused_and_the_refusal_names_the_event()
+        {
+            var tree = new TestTree();
+            var reset = tree.Author(tree.Ch1Def, new ResetScope { scope = tree.Ch1Def });
+            tree.Ctx(tree.Tier1).Deposit("cash", 300);
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic", goalReached = true };
+            var ctx = tree.Ctx(tree.Ch1);
+
+            var refusal = ActionList.Refuses(Only(reset), ctx);
+            Assert.IsNotNull(refusal, "the armed reward below refuses the chapter's clear");
+            Assert.AreSame(tree.Tier1, refusal.Host, "the refusing scope is the one holding the record");
+            Assert.AreSame(tree.Tier1.activeEvent, refusal.Record);
+            Assert.AreSame(tree.OpenMic, refusal.Event, "read from that host's own events list");
+            Assert.AreEqual("Claim your open_mic reward first", RungFeedback.RefusalText(refusal));
+
+            Assert.IsFalse(ActionList.TryRun(Only(reset), ctx));
+            Assert.AreEqual((BigNumber)300, tree.Tier1.balances["cash"], "a refused list moves nothing");
+        }
+
+        // Requirement 7: forced past a refusal, both the runner and a reset run
+        // outside any list throw. A reset is as fail-closed alone as in a list.
+        [Test]
+        public void A_forced_reset_over_an_armed_reward_throws()
+        {
+            var tree = new TestTree();
+            var reset = tree.Author(tree.Tier1Def, new ResetScope { scope = tree.Tier1Def });
+            tree.Ctx(tree.Tier1).Deposit("cash", 300);
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic", goalReached = true };
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.Throws<InvalidOperationException>(() => ActionList.Run(Only(reset), ctx));
+            Assert.Throws<InvalidOperationException>(() => reset.Execute(ctx));
+            Assert.AreEqual((BigNumber)300, tree.Tier1.balances["cash"]);
+
+            // A record with no latch is not a refusal: only an ARMED reward is.
+            tree.Tier1.activeEvent.goalReached = false;
+            Assert.IsNull(ActionList.Refuses(Only(reset), ctx));
+            reset.Execute(ctx);
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);
+        }
+
+        [Test]
+        public void A_restart_over_an_armed_reward_is_refused_the_same_way()
+        {
+            var tree = new TestTree();
+            tree.Tier1Def.rung = new Rung
+            {
+                offerCondition = new Always(),
+                actions = { new AddCurrency { currencies = { tree.Ch1Records }, amount = 3 } }
+            };
+            var restart = tree.Author(tree.Ch1Def, new RestartScope { scope = tree.Tier1Def });
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic", goalReached = true };
+            var ctx = tree.Ctx(tree.Ch1);
+
+            Assert.IsNotNull(ActionList.Refuses(Only(restart), ctx));
+            Assert.IsFalse(ActionList.TryRun(Only(restart), ctx));
+            Assert.AreEqual(BigNumber.Zero, tree.Ch1.balances["ch1_records"],
+                "the bank half never ran either - a list runs whole or not at all");
+            Assert.Throws<InvalidOperationException>(() => restart.Execute(ctx));
+
+            EventSystem.Dismiss(tree.Ctx(tree.Tier1), tree.OpenMic);
+            Assert.IsTrue(ActionList.TryRun(Only(restart), ctx));
+            Assert.AreEqual((BigNumber)3, tree.Ch1.balances["ch1_records"]);
         }
     }
 }

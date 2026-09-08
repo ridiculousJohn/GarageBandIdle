@@ -13,6 +13,18 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public abstract void Execute(GameContext ctx);
 
+        // Load-time wiring (design doc 12.14.8), driven by ScopeLinker when a
+        // tree is built: a kind holding a scope reference resolves it once,
+        // checks it, and files the node under itself. Defaults to nothing -
+        // most kinds reference no scope at all, and a kind that does not store
+        // a link is a kind that never reads one.
+        public virtual void Link(LinkContext ctx) { }
+
+        // Whether this action refuses to run against the state it would act on
+        // (design doc 12.5). Asked by ActionList and by nothing else; null is
+        // "no reason of mine", which is every kind but the two resets.
+        public virtual Refusal Refuses(GameContext ctx, ScopeState ignoring) => null;
+
         // Load-time reference and reach checks (design doc 12.12), driven by
         // ContentValidator: each kind validates its own references against the
         // acting scope and records into the context's ledgers what the
@@ -46,11 +58,7 @@ namespace RidiculousGaming.GarageBandIdle
         public override void Validate(ValidationContext ctx)
         {
             foreach (var currency in currencies)
-            {
-                var home = ctx.RequireOnChain(currency, "AddCurrency");
-                if (home != null)
-                    ctx.RecordFactWrite($"currency '{currency.Id}'", home);
-            }
+                ctx.RequireOnChain(currency, "AddCurrency");
             // A grant is never negative: Deposit moves the earned total too, and
             // section 2's strobe-proofing stands on that only ever rising.
             if (amount < BigNumber.Zero)
@@ -85,7 +93,6 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             }
             ctx.RecordFlagSetter(flagId);
-            ctx.RecordFactWrite($"flag '{flagId}'", home);
         }
     }
 
@@ -135,7 +142,6 @@ namespace RidiculousGaming.GarageBandIdle
             // above it, or the grant would contribute nothing.
             ctx.RequireDeclaredFor(target, modifier, "AddModifier");
             ctx.RecordModifierGrant(modifier, target);
-            ctx.RecordFactWrite($"modifier '{modifier.Id}' stack", target);
         }
     }
 
@@ -194,23 +200,34 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public ScopeDefinition scope;
 
-        public override void Execute(GameContext ctx)
+        // The reference names one node the moment the tree exists, so it is
+        // resolved and checked here rather than searched for at every firing.
+        public override void Link(LinkContext ctx)
         {
-            var target = ctx.Scope.FindInSubtree(scope)
-                ?? throw new InvalidOperationException(
-                    $"ResetScope: '{scope.Id}' is not the acting scope or enclosed by '{ctx.Scope.ScopeId}'.");
+            var target = ctx.ResolveEnclosed(scope, "ResetScope");
             if (target.Parent == null)
                 // The root is structurally unresettable (12.12: "never the
                 // root") - nothing exists outside it for a fact to survive into.
                 throw new InvalidOperationException("ResetScope: the root scope is never resettable.");
-            ClearRecursive(target, ctx.NowUtc);
+            ctx.Store(this, target);
         }
 
-        internal static void ClearRecursive(ScopeState scope, DateTime nowUtc)
+        // The subtree's own answer, asked of the node this reference names
+        // (design doc 12.5). The walk lives on ScopeState; the action calls it.
+        public override Refusal Refuses(GameContext ctx, ScopeState ignoring) =>
+            ctx.Scope.Link(this).RefusalInSubtree(ignoring);
+
+        public override void Execute(GameContext ctx)
         {
-            scope.Clear(nowUtc);
-            foreach (var child in scope.Children)
-                ClearRecursive(child, nowUtc);
+            var target = ctx.Scope.Link(this);
+            // Asked here too, so a reset run outside any list is as fail-closed
+            // as one inside: a clear forced past a refusal throws (requirement
+            // 7) rather than destroying the reward it was refused over.
+            var refusal = target.RefusalInSubtree();
+            if (refusal != null)
+                throw new InvalidOperationException(
+                    $"ResetScope of '{target.ScopeId}' was forced past a refusal: scope '{refusal.Host.ScopeId}' holds an unclaimed reward (design doc 12.5).");
+            target.ClearSubtree(ctx.NowUtc);
         }
 
         public override void Validate(ValidationContext ctx)
@@ -229,9 +246,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (!ctx.InActingSubtree(target))
             {
                 ctx.AddError(ValidationCheck.ScopeReach, $"ResetScope may target the acting scope or a scope it encloses (12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
-                return;
             }
-            ctx.RecordReset(target);
         }
     }
 
@@ -244,15 +259,16 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public InteriorDefinition tier;
 
-        public override void Execute(GameContext ctx)
+        public override void Link(LinkContext ctx)
         {
-            var target = ctx.Scope.FindInSubtree(tier)
-                ?? throw new InvalidOperationException(
-                    $"ExecuteRung: scope '{tier.Id}' is not within '{ctx.Scope.ScopeId}'.");
+            var target = ctx.ResolveEnclosed(tier, "ExecuteRung");
             if (tier.rung == null)
                 throw new InvalidOperationException($"ExecuteRung: scope '{tier.Id}' declares no rung.");
-            tier.rung.TryExecute(ctx.Rebase(target));
+            ctx.Store(this, target);
         }
+
+        public override void Execute(GameContext ctx) =>
+            tier.rung.TryExecute(ctx.Rebase(ctx.Scope.Link(this)));
 
         public override void Validate(ValidationContext ctx)
         {
@@ -270,9 +286,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (tier.rung == null)
             {
                 ctx.AddError(ValidationCheck.UnresolvedReference, $"ExecuteRung targets scope '{target.Id}', which declares no rung.");
-                return;
             }
-            ctx.RecordRungInvocation(target);
         }
     }
 
@@ -285,19 +299,35 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public ScopeDefinition scope;
 
-        public override void Execute(GameContext ctx)
+        public override void Link(LinkContext ctx)
         {
-            var target = ctx.Scope.FindInSubtree(scope)
-                ?? throw new InvalidOperationException(
-                    $"RestartScope: '{scope.Id}' is not the acting scope or enclosed by '{ctx.Scope.ScopeId}'.");
+            var target = ctx.ResolveEnclosed(scope, "RestartScope");
             if (target.Parent == null)
                 throw new InvalidOperationException("RestartScope: the root scope is never resettable.");
+            ctx.Store(this, target);
+        }
+
+        // The same answer a bare reset gives: the clear is the half that can be
+        // refused, and it is downward-closed either way (design doc 12.5).
+        public override Refusal Refuses(GameContext ctx, ScopeState ignoring) =>
+            ctx.Scope.Link(this).RefusalInSubtree(ignoring);
+
+        public override void Execute(GameContext ctx)
+        {
+            var target = ctx.Scope.Link(this);
+            // Before the bank as well as the clear: a refused restart changes
+            // nothing at all, which is what "fail-closed" means outside a list
+            // too (requirement 7).
+            var refusal = target.RefusalInSubtree();
+            if (refusal != null)
+                throw new InvalidOperationException(
+                    $"RestartScope of '{target.ScopeId}' was forced past a refusal: scope '{refusal.Host.ScopeId}' holds an unclaimed reward (design doc 12.5).");
             // Bank first, through the same gate check every invocation gets: an
             // unmet gate is the ordinary no-op, and the run's leavings are
             // cleared either way.
             if (scope is InteriorDefinition interior && interior.rung != null)
                 interior.rung.TryExecute(ctx.Rebase(target));
-            ResetScope.ClearRecursive(target, ctx.NowUtc);
+            target.ClearSubtree(ctx.NowUtc);
         }
 
         public override void Validate(ValidationContext ctx)
@@ -316,15 +346,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (!ctx.InActingSubtree(target))
             {
                 ctx.AddError(ValidationCheck.ScopeReach, $"RestartScope may target the acting scope or a scope it encloses (12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
-                return;
             }
-            // An ExecuteRung and a ResetScope in one action, so BOTH ledgers
-            // record at this index - registering only the cycle edge would let
-            // set-then-wiped, reads-zeros, stranded value and stranded reward
-            // all step straight over the clear.
-            if (target is InteriorDefinition interior && interior.rung != null)
-                ctx.RecordRungInvocation(target);
-            ctx.RecordReset(target);
         }
     }
 }

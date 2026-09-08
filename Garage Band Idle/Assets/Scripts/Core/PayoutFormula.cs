@@ -44,9 +44,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Validate(ValidationContext ctx)
         {
-            var home = ctx.RequireOnChain(currency, "RootCurveFormula");
-            if (home != null)
-                ctx.RecordFormulaRead(currency.Id, home); // input for the reads-zeros warn (12.12)
+            ctx.RequireOnChain(currency, "RootCurveFormula");
             // A negative exponent makes 0^n infinite, and the balance IS zero on
             // the first read after a reset - BigNumber refuses infinities at
             // construction, so this would throw on the first payout.

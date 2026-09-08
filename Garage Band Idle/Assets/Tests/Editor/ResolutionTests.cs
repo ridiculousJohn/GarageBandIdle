@@ -531,9 +531,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tierBDef.generators.Add(genB);
 
             var root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { chapterDef }));
-            var chapter = root.FindInSubtree(chapterDef);
-            var tierA = root.FindInSubtree(tierADef);
-            var tierB = root.FindInSubtree(tierBDef);
+            var chapter = TestNavigation.Node(root, chapterDef);
+            var tierA = TestNavigation.Node(root, tierADef);
+            var tierB = TestNavigation.Node(root, tierBDef);
             tierA.generatorCounts["gen_a"] = 1;
             tierB.generatorCounts["gen_b"] = 1;
             tierA.purchasedUpgrades.Add("boost_a");
@@ -647,8 +647,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             chapterADef.permanentModifiers.Add(chapterBoost);
 
             var root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { chapterADef, chapterBDef }));
-            var tierA = root.FindInSubtree(tierADef);
-            var tierB = root.FindInSubtree(tierBDef);
+            var tierA = TestNavigation.Node(root, tierADef);
+            var tierB = TestNavigation.Node(root, tierBDef);
             tierA.generatorCounts["gen_a"] = 1;
             tierB.generatorCounts["gen_b"] = 1;
 
@@ -786,8 +786,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 rootDef.permanentModifiers.Add(active);
 
                 Root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { chapterADef, chapterBDef }));
-                TierA = Root.FindInSubtree(tierADef);
-                TierB = Root.FindInSubtree(tierBDef);
+                TierA = TestNavigation.Node(Root, tierADef);
+                TierB = TestNavigation.Node(Root, tierBDef);
                 Root.generatorCounts["gen_root"] = 1;
                 TierA.generatorCounts["gen_a"] = 1;
                 TierB.generatorCounts["gen_b"] = 1;

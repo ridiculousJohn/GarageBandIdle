@@ -32,17 +32,7 @@
 
   "rung": {
     "label": "Play the Backyard Party",
-    "offerCondition": {
-      "type": "All",
-      "conditions": [
-        { "type": "CurrencyAtLeast", "currency": "ch1_records", "threshold": 30 },
-        {
-          "type": "Not",
-          "uiText": "Claim your Garage Jam reward first",
-          "condition": { "type": "EventRewardPending", "host": "tier1" }
-        }
-      ]
-    },
+    "offerCondition": { "type": "CurrencyAtLeast", "currency": "ch1_records", "threshold": 30 },
     "actions": [
       { "type": "ExecuteRung", "tier": "tier1" },
       { "type": "AddCurrency", "currencies": ["roadies"], "amount": 1 },
@@ -465,7 +455,7 @@
             {
               "type": "Not",
               "uiText": "Claim your Garage Jam reward first",
-              "condition": { "type": "EventRewardPending", "host": "tier1" }
+              "condition": { "type": "EventRewardPending" }
             }
           ]
         },

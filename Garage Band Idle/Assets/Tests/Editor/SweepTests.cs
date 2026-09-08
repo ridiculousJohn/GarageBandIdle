@@ -24,6 +24,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             tree.Tier1Trigger.condition = new Always();
             tree.Tier1Trigger.actions.Add(new AddCurrency { currencies = { tree.Ch1Records }, amount = 1 });
+            var reset = tree.Author(tree.Tier1Def, new ResetScope { scope = tree.Tier1Def });
 
             Sweep.Run(tree.Root, tree.Ch1, tree.Now);
             Sweep.Run(tree.Root, tree.Ch1, tree.Now);
@@ -31,7 +32,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(BigNumber.One, tree.Ch1.balances["ch1_records"]);   // the latch held the second pass
             Assert.IsTrue(tree.Tier1.firedTriggers.Contains("tier1_trigger"));
 
-            new ResetScope { scope = tree.Tier1Def }.Execute(tree.Ctx(tree.Tier1));
+            reset.Execute(tree.Ctx(tree.Tier1));
             Sweep.Run(tree.Root, tree.Ch1, tree.Now);
 
             Assert.AreEqual((BigNumber)2, tree.Ch1.balances["ch1_records"]);    // the fresh life re-armed it
@@ -44,6 +45,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1Trigger.condition = new Always();
             tree.Tier1Trigger.actions.Add(new AddCurrency { currencies = { tree.Ch1Records }, amount = 1 });
             tree.Tier1Trigger.actions.Add(new ResetScope { scope = tree.Tier1Def });
+            tree.Rebuild();
 
             Sweep.Run(tree.Root, tree.Ch1, tree.Now);
 
@@ -124,6 +126,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             tree.Tier1Trigger.condition = new Always();
             tree.Tier1Trigger.actions.Add(new AddCurrency { currencies = { tree.Ch1Records }, amount = 1 });
+            tree.Rebuild();
 
             Sweep.Run(tree.Root, tree.Ch1, tree.Now);
             Assert.AreEqual(BigNumber.Zero, tree.Ch1.balances["ch1_records"]);   // skipped, not run
@@ -145,8 +148,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ch2Def.triggers.Add(lurker);
             tree.Chapters.Add(ch2Def);
             var root = ScopeState.Build(tree.Content);   // rebuild with the sibling
-            var ch1 = (ChapterScopeState)root.FindInSubtree(tree.Ch1Def);
-            var ch2 = (ChapterScopeState)root.FindInSubtree(ch2Def);
+            var ch1 = (ChapterScopeState)TestNavigation.Node(root, tree.Ch1Def);
+            var ch2 = (ChapterScopeState)TestNavigation.Node(root, ch2Def);
 
             Sweep.Run(root, ch1, tree.Now);
 
@@ -180,13 +183,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             // The goal holds at sweep start but nothing has latched it yet; the
             // trigger's gate reads the armed reward. Latch-before-collect is
-            // what lets it fire in the same pass the goal lands.
+            // what lets it fire in the same pass the goal lands. The herald is
+            // declared at the HOST: a record is read outward, so a chapter
+            // trigger could never see one its tier holds (12.4).
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic" };
             tree.Ctx(tree.Tier1).Deposit("fans", 50);
             var herald = TestTree.MakeDefinition<TriggerDefinition>("herald");
-            herald.condition = new EventRewardPending { host = tree.Tier1Def };
-            herald.actions.Add(new SetFlag { flagId = "gj1_done" });
-            tree.Ch1Def.triggers.Add(herald);
+            herald.condition = new EventRewardPending();
+            herald.actions.Add(new SetFlag { flagId = "gj1_done" });   // homed at ch1, written outward
+            tree.Tier1Def.triggers.Add(herald);
 
             Sweep.Run(tree.Root, tree.Ch1, tree.Now);
 

@@ -31,7 +31,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var grant = new AddModifier { scope = rootDef, modifier = boost };
 
             var root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { chapterDef }));
-            var tier1 = root.FindInSubtree(tierDef);
+            var tier1 = TestNavigation.Node(root, tierDef);
 
             grant.Execute(new GameContext(tier1, new DateTime(2026, 8, 27, 12, 0, 0, DateTimeKind.Utc)));
 

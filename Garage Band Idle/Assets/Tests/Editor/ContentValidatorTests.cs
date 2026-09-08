@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.UI;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -184,10 +186,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The authored event shape: gated, a balance goal over a fresh run
-        // (onEntry resets the host), timed, handicapped - and BOTH resetting
-        // rungs gain the required Not(EventRewardPending) guard, since each
-        // one's reset closure contains the host. This is the shape the event
-        // checks accept clean.
+        // (onEntry resets the host), timed, handicapped - and the HOST's own
+        // rung carrying Not(EventRewardPending), which reads its own record
+        // outward and names no scope. No load-time check stands in for the
+        // reset's own refusal and none could (12.12), so the capstone above
+        // authors nothing: a parent cannot read a child's record. This is the
+        // shape the event checks accept clean.
         public EventDefinition AddGuardedEvent()
         {
             var gig = TestTree.MakeDefinition<EventDefinition>("garage_jam");
@@ -201,11 +205,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Album.offerCondition = new All
             {
-                conditions = { Album.offerCondition, new Not { condition = new EventRewardPending { host = Tier1 } } }
-            };
-            Capstone.offerCondition = new All
-            {
-                conditions = { Capstone.offerCondition, new Not { condition = new EventRewardPending { host = Tier1 } } }
+                conditions = { Album.offerCondition, new Not { condition = new EventRewardPending() } }
             };
             return gig;
         }
@@ -455,7 +455,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "ResetScope names no scope");
         }
 
-        // ---- ExecuteRung reach and cycles ----
+        // ---- ExecuteRung reach ----
 
         [Test]
         public void ExecuteRung_OutsideSubtree_Error()
@@ -471,14 +471,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new ValidatorFixture();
             f.Capstone.actions.Add(new ExecuteRung { tier = f.Tier1b });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "declares no rung");
-        }
-
-        [Test]
-        public void ExecuteRung_SelfInvocation_CycleError()
-        {
-            var f = new ValidatorFixture();
-            f.Album.actions.Add(new ExecuteRung { tier = f.Tier1 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ReferenceCycle, "rung invocation cycle");
         }
 
         [Test]
@@ -682,106 +674,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "RootCurveFormula names nothing");
         }
 
-        // ---- list-order checks ----
-
-        [Test]
-        public void SetThenWiped_FlagInsideResetClosure_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Tier1.declaredFlags.Add("temp");
-            f.Album.actions.Insert(2, new SetFlag { flagId = "temp" });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped, "flag 'temp'");
-        }
-
-        [Test]
-        public void SetThenWiped_CurrencyInsideResetClosure_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Album.actions.Insert(0, new AddCurrency { currencies = { f.Cash }, amount = 10 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped, "currency 'cash'");
-        }
-
-        [Test]
-        public void StrandedValue_ResetOverUninvokedPayoutRung_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Capstone.actions.RemoveAt(0); // drop the ExecuteRung(tier1)
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedValue, "payout rung at 'tier1'");
-        }
-
-        [Test]
-        public void StrandedValue_RungAfterReset_StillWarns()
-        {
-            var f = new ValidatorFixture();
-            f.Capstone.actions.RemoveAt(0);
-            f.Capstone.actions.Add(new ExecuteRung { tier = f.Tier1 }); // after the reset - too late
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedValue, "payout rung at 'tier1'");
-        }
-
-        // A nested ladder cashes transitively: the capstone rungs the album,
-        // whose own list rungs the inner payout - nothing is stranded even
-        // though the capstone never names the inner rung directly.
-        [Test]
-        public void StrandedValue_NestedLadder_TransitiveRung_NoFindings()
-        {
-            var f = new ValidatorFixture();
-            var inner = TestTree.MakeTier("tier_inner");
-            inner.rung = new Rung
-            {
-                label = "Play the Inner Set",
-                offerCondition = new CurrencyAtLeast { currency = f.Fans, threshold = 1 },
-                actions = { new AddCurrency { currencies = { f.Records }, amount = 1 } },
-            };
-            f.Tier1.children.Add(inner);
-            f.Album.actions.Insert(0, new ExecuteRung { tier = inner });
-            AssertClean(f.Run());
-        }
-
-        // RestartScope records the reset ledger at its own index: a deeper
-        // payout rung nothing invokes dies with its clear, exactly as it would
-        // with a bare ResetScope. The rung lives under the RUNGLESS sibling and
-        // the capstone's own ResetScope is the action replaced, so this reset
-        // is the only one that reaches it - the finding exists iff RestartScope
-        // recorded it.
-        [Test]
-        public void RestartScope_RecordsTheReset_StrandedValue_Warning()
-        {
-            var f = new ValidatorFixture();
-            var inner = TestTree.MakeTier("tier_inner");
-            inner.rung = new Rung
-            {
-                label = "Play the Inner Set",
-                offerCondition = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 },
-                actions = { new AddCurrency { currencies = { f.Records }, amount = 1 } },
-            };
-            f.Tier1b.children.Add(inner);
-            f.Capstone.actions[3] = new RestartScope { scope = f.Tier1b };  // in place of the ResetScope
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedValue,
-                "resets 'tier1b', which contains the payout rung at 'tier_inner'");
-        }
-
-        // ...and the rung ledger at the same index: the rung it fires itself is
-        // invoked before the clear by construction, so it is never stranded.
-        [Test]
-        public void RestartScope_InvokesItsOwnRung_NoStrandedValue()
-        {
-            var f = new ValidatorFixture();
-            f.Capstone.actions[0] = new RestartScope { scope = f.Tier1 };   // in place of the ExecuteRung
-            AssertNoFinding(f.Run(), ValidationCheck.StrandedValue);
-        }
-
-        [Test]
-        public void RestartScope_RecordsTheReset_SetThenWiped_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Tier1.declaredFlags.Add("run_done");
-            f.Trigger.actions.Clear();
-            f.Trigger.actions.Add(new SetFlag { flagId = "run_done" });
-            f.Trigger.actions.Add(new RestartScope { scope = f.Tier1 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped,
-                "flag 'run_done' is set here and wiped by the ResetScope of 'tier1'");
-        }
-
         // ---- events ----
 
         [Test]
@@ -840,21 +732,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "'cash' is declared twice on the chain at 'tier1'");
         }
 
-        // rewards and onEnd validate as ONE container in that order: a flag set
-        // by the reward and wiped by onEnd's reset is exactly the misordering
-        // set-then-wiped exists to catch.
-        [Test]
-        public void Event_RewardsAndOnEnd_AreOneContainer_SetThenWiped_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Tier1.declaredFlags.Add("gig_done");
-            var gig = f.AddGuardedEvent();
-            gig.rewards.Add(new SetFlag { flagId = "gig_done" });
-            gig.onEnd.Add(new ResetScope { scope = f.Tier1 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped,
-                "flag 'gig_done' is set here and wiped by the ResetScope of 'tier1'");
-        }
-
         [Test]
         public void Event_BalanceGoalWithoutEntryReset_Warning()
         {
@@ -864,73 +741,41 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "a balance goal on an event whose onEntry never resets the host");
         }
 
+        // There is no operand to check, so the only question left is where the
+        // condition is EVALUATED: root's chain is root alone and root holds no
+        // record field, so a condition acting there reads false forever.
         [Test]
-        public void StrandedReward_UnguardedResettingRung_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.AddGuardedEvent();
-            // Unwrap the album's guard; the capstone stays guarded, so the one
-            // finding is the album's own reset over its host.
-            f.Album.offerCondition = ((All)f.Album.offerCondition).conditions[0];
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedReward,
-                "resets 'tier1', which contains the event host 'tier1'");
-        }
-
-        // Requiredness is the test: a guard reachable only through an Any is
-        // satisfied by its sibling branch, so it does not count.
-        [Test]
-        public void StrandedReward_GuardUnderAny_StillWarns()
-        {
-            var f = new ValidatorFixture();
-            f.AddGuardedEvent();
-            var albumGate = (All)f.Album.offerCondition;
-            albumGate.conditions[1] = new Any
-            {
-                conditions = { albumGate.conditions[1], new FlagSet { flagId = "album" } }
-            };
-            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.StrandedReward,
-                "resets 'tier1', which contains the event host 'tier1'");
-        }
-
-        // Root passes the subtree check from root-owned content but holds no
-        // record field at all, so a root host is a permanently closed gate.
-        [Test]
-        public void EventConditionHost_CannotHostAnEvent_ScopeReach_Error()
+        public void EventCondition_EvaluatedAtRoot_ScopeReach_Error()
         {
             var f = new ValidatorFixture();
             var trigger = TestTree.MakeDefinition<TriggerDefinition>("root_trigger");
-            trigger.condition = new EventRecordExists { host = f.Root };
+            trigger.condition = new EventRecordExists();
             f.Root.triggers.Add(trigger);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
-                "EventRecordExists names 'root', which cannot host an event");
+                "EventRecordExists");
         }
 
         [Test]
-        public void EventConditionHost_OffTheActingSubtree_ScopeReach_Error()
+        public void EventRewardPending_EvaluatedAtRoot_ScopeReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var trigger = TestTree.MakeDefinition<TriggerDefinition>("root_trigger");
+            trigger.condition = new EventRewardPending();
+            f.Root.triggers.Add(trigger);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
+                "EventRewardPending");
+        }
+
+        // An interior acting scope is legal wherever it sits: the read walks
+        // outward from there and stops at the first record, so a tier gating on
+        // one it may or may not be holding is ordinary authoring.
+        [Test]
+        public void EventCondition_EvaluatedAtATier_IsClean()
         {
             var f = new ValidatorFixture();
             f.AddGuardedEvent();
-            // The trigger acts at tier1; ch1 is an ancestor, not enclosed.
-            f.Trigger.condition = new EventRecordExists { host = f.Ch1 };
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
-                "EventRecordExists may name the acting scope or a scope it encloses");
-        }
-
-        [Test]
-        public void FormulaAfterReset_ReadsZeros_Warning()
-        {
-            var f = new ValidatorFixture();
-            f.Album.actions.Clear();
-            f.Album.actions.Add(new ResetScope { scope = f.Tier1 });
-            f.Album.actions.Add(new AddCurrency
-            {
-                currencies = { f.Records, f.Ch1Records },
-                formula = new RootCurveFormula { currency = f.Fans, divisor = 5, exponent = 0.5 },
-            });
-            f.Album.actions.Add(new SetFlag { flagId = "album" });
-            var report = f.Run();
-            AssertFinding(report, ValidationSeverity.Warning, ValidationCheck.FormulaReadsCleared, "reads zeros");
-            AssertNoFinding(report, ValidationCheck.SetThenWiped);
+            f.Trigger.condition = new EventRecordExists();
+            AssertNoFinding(f.Run(), ValidationCheck.ScopeReach);
         }
 
         // ---- effect selectors are never checked (12.12) ----
@@ -1063,16 +908,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new ValidatorFixture();
             f.AmpStrings.cost = 0;                                   // cut_demo is authored at 0
             AssertNoFinding(f.Run(), ValidationCheck.NumericRange);
-        }
-
-        // The purchase latch is a fact write BEFORE actions[0], so a payload
-        // resetting the latch's own scope would make the upgrade repeatable.
-        [Test]
-        public void Upgrade_PayloadResettingItsOwnScope_SetThenWiped_Error()
-        {
-            var f = new ValidatorFixture();
-            f.AmpStrings.actions.Add(new ResetScope { scope = f.Tier1 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped, "purchase latch of upgrade 'amp_strings'");
         }
 
         [Test]
@@ -1578,29 +1413,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "null perFill entry");
         }
 
-        // The implicit fill-count write: a cascade whose own completion list
-        // resets the scope homing the count it reads would never accumulate.
-        [Test]
-        public void Bar_CascadeWhoseCompletionResetsItsOwnCount_SetThenWiped_Error()
-        {
-            var f = new ValidatorFixture();
-            f.Cover1.repeating = true;
-            f.Cover1.perFill.Add(new PerFillEntry { effect = new Effect { target = "fans", stat = Stat.Rate, multiplier = 1.1 } });
-            f.Cover1.onComplete.Add(new ResetScope { scope = f.Tier1 });
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.SetThenWiped,
-                "fill count of bar 'cover_1'");
-        }
-
-        // A bar with no cascade records nothing, so ordinary "fill, then reset
-        // the tier" authoring stays clean.
-        [Test]
-        public void Bar_CascadeFreeCompletionMayResetItsOwnScope_NoFindings()
-        {
-            var f = new ValidatorFixture();
-            f.Cover1.onComplete.Add(new ResetScope { scope = f.Tier1 });
-            AssertNoFinding(f.Run(), ValidationCheck.SetThenWiped);
-        }
-
         [Test]
         public void Bar_CompletionListJoinsTheSharedLedgers_Error()
         {
@@ -2005,6 +1817,77 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
                 "composes its text from its parts, and conditions[1] has none");
+        }
+
+        // ---- the link pass ----
+
+        // The validation pass is dev-only, so the same reach rules stand a
+        // second time where they cannot be skipped: the link pass resolves each
+        // scope reference when the tree is built, and a failure is a content
+        // fault that throws in every build (12.14.7). The report and the throw
+        // read the same rule from the same predicate.
+        [Test]
+        public void LinkTime_ResetScopeAcrossASibling_IsAContentFaultFromBuild()
+        {
+            var f = new ValidatorFixture();
+            ((ResetScope)f.Album.actions[2]).scope = f.Tier1b;   // tier1's peer
+
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
+                "ResetScope may target the acting scope or a scope it encloses");
+            var thrown = Assert.Throws<InvalidOperationException>(() => ScopeState.Build(f.Content));
+            StringAssert.Contains("tier1b", thrown.Message);
+        }
+
+        [Test]
+        public void LinkTime_ResetScopeOnAnAncestor_IsAContentFaultFromBuild()
+        {
+            var f = new ValidatorFixture();
+            ((ResetScope)f.Album.actions[2]).scope = f.Ch1;      // tier1's parent
+
+            Assert.Throws<InvalidOperationException>(() => ScopeState.Build(f.Content));
+        }
+
+        [Test]
+        public void LinkTime_ExecuteRungOutsideTheActingScope_IsAContentFaultFromBuild()
+        {
+            var f = new ValidatorFixture();
+            f.Tier1b.rung = new Rung
+            {
+                offerCondition = new Always(),
+                actions = { new AddCurrency { currencies = { f.Records }, amount = 1 } }
+            };
+            // The album acts at tier1; tier1b is a peer, not a rung within it.
+            f.Album.actions.Add(new ExecuteRung { tier = f.Tier1b });
+
+            Assert.Throws<InvalidOperationException>(() => ScopeState.Build(f.Content));
+        }
+
+        [Test]
+        public void LinkTime_ASectionScopeOutsideTheChapter_IsAContentFaultFromBuild()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            f.Ch1.sections.Add(new SectionDefinition
+            {
+                title = "Elsewhere",
+                visibleWhen = new Always(),
+                scope = sibling.Tier2,
+            });
+
+            var thrown = Assert.Throws<InvalidOperationException>(() => ScopeState.Build(f.Content));
+            StringAssert.Contains("tier2", thrown.Message);
+        }
+
+        // The clean fixture builds: every reference it authors resolves, so the
+        // pass is exercised by every test that touches a tree rather than only
+        // by the ones that break it.
+        [Test]
+        public void LinkTime_TheCleanFixtureBuilds()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent();
+
+            Assert.DoesNotThrow(() => ScopeState.Build(f.Content));
         }
     }
 }

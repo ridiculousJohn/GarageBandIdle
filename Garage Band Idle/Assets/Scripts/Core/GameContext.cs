@@ -72,6 +72,19 @@ namespace RidiculousGaming.GarageBandIdle
             return false;
         }
 
+        // The record this scope sees, read the way a flag is (design doc 12.4):
+        // outward to the first interior scope holding one, no scope named. A
+        // scope's record is visible to that scope and to the scopes inside it,
+        // never to its parent - which is exactly what an outward walk gives,
+        // and why neither event condition names a host.
+        public ActiveEvent EventRecord()
+        {
+            for (var node = Scope; node != null; node = node.Parent)
+                if (node is InteriorScopeState interior && interior.activeEvent != null)
+                    return interior.activeEvent;
+            return null;
+        }
+
         public bool IsUpgradePurchased(string upgradeId)
         {
             for (var node = Scope; node != null; node = node.Parent)

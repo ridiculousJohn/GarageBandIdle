@@ -67,14 +67,14 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public int count = 1;
     }
 
+    // No operand: both kinds read the record OUTWARD from the acting scope
+    // (12.4), so there is no host to author.
     internal class EventRecordExistsDto : ConditionDto
     {
-        public string host;
     }
 
     internal class EventRewardPendingDto : ConditionDto
     {
-        public string host;
     }
 
     internal class AlwaysDto : ConditionDto

@@ -102,6 +102,8 @@ namespace RidiculousGaming.GarageBandIdle.Save
             var rootDefinition = content.Root;
             if (rootDefinition == null)
                 throw new ArgumentNullException(nameof(content), "SaveSystem: loading requires the content tree.");
+
+            SaveNode rootNode;
             try
             {
                 var envelope = JObject.Parse(json);
@@ -132,16 +134,12 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     version++;
                 }
 
-                var rootNode = payload.ToObject<SaveNode>(JsonSerializer.Create(MakeSettings()));
+                rootNode = payload.ToObject<SaveNode>(JsonSerializer.Create(MakeSettings()));
                 if (rootNode == null || rootNode.scopeId != rootDefinition.Id)
                 {
                     Debug.LogWarning("SaveSystem: payload root does not match the content tree's root - refused.");
                     return false;
                 }
-
-                root = ScopeState.Build(content);
-                Apply(rootNode, root);
-                return true;
             }
             catch (Exception e)
             {
@@ -149,6 +147,26 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 root = null;
                 return false;
             }
+
+            // OUTSIDE the payload's catch. Build reads the CONTENT, not the
+            // save: its failures are content faults (12.14.7), and answering
+            // one with "try the backup" would load the backup against the same
+            // broken content and report a corrupt save instead.
+            root = ScopeState.Build(content);
+
+            try
+            {
+                Apply(rootNode, root);
+            }
+            catch (Exception e)
+            {
+                // A payload fault again, so it keeps the primary/backup
+                // behavior the parse above has.
+                Debug.LogWarning($"SaveSystem: failed to apply save - {e.Message}");
+                root = null;
+                return false;
+            }
+            return true;
         }
 
         private static void Apply(SaveNode node, ScopeState state)

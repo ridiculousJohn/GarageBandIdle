@@ -168,13 +168,12 @@ Cover bonuses are three distinct ids, so all three stack multiplicatively (×1.5
 tier1.release ("Cut a Demo"):
   offerCondition: All[ CurrencyAtLeast(fans, 50),             # uiText "50 fans"
                        BarsCompleted(learn_covers, 1),        # uiText "Learn a cover"
-                       Not(EventRewardPending(tier1)) ]       # uiText "Claim your Garage Jam reward first"
+                       Not(EventRewardPending) ]              # uiText "Claim your Garage Jam reward first"
   rungActions:    [ AddCurrency([records, ch1_records], floor((fans/5)^0.5)),   # one evaluation, both targets
                     ResetScope(tier1) ]
 
 ch1.capstone ("Play the Backyard Party"):
-  offerCondition: All[ CurrencyAtLeast(ch1_records, 30),      # same gate, first clear and every replay
-                       Not(EventRewardPending(tier1)) ]       # uiText "Claim your Garage Jam reward first"
+  offerCondition: CurrencyAtLeast(ch1_records, 30)        # same gate, first clear and every replay
   rungActions:    [ ExecuteRung(tier1),                   # cut the album if its own gate holds
                     AddCurrency(roadies, 1),              # Ch. 1's reward formula: the constant 1
                     SetFlag(ch1_complete),                # root
@@ -184,9 +183,13 @@ ch1.capstone ("Play the Backyard Party"):
 Payout examples: 50 fans → 3, 125 → 5, 500 → 10, 2000 → 20. The concave curve rewards frequent
 releases over hoarding (2× the fans in one press pays ~1.41×, not 2×).
 
-The `EventRewardPending` legs are the §12.12 stranded-reward guard: no reset can destroy an armed,
-unclaimed Garage Jam reward, and the disarmed button lists the reason per §12.11 - the player
-dismisses with one tap, taking the reward, and presses again.
+The release's `EventRewardPending` leg reads tier1's OWN record, outward from the acting scope and
+naming no host (§12.4). It is the author's early explanation, not the protection: what stops any
+reset from destroying an armed, unclaimed Garage Jam reward is tier1's own refusal, which the
+action-list runner asks before any list runs (§12.5) - so the capstone needs no leg of its own and
+could not read one, a parent knowing nothing of what its children host. Either way the disarmed
+button lists the reason per §12.11 - the player dismisses with one tap, taking the reward, and
+presses again.
 
 ## 10. Events — the Garage Jam chain (host: tier1)
 
@@ -217,9 +220,12 @@ Gate leg `uiText` (§12.11's unmet-legs contract, rendered on a disabled row):
 Jam I first"; `FlagSet(gj2_done)` "Clear Garage Jam II first"; each `Not(FlagSet(gjN_done))`
 "Already cleared".
 `gj*_done` flags and the reward modifiers live at **ch1** — they survive tier resets, die at the
-capstone (§12.12's set-then-wiped check holds: nothing in these lists resets ch1). Both rungs
-guard with `Not(EventRewardPending(tier1))` (§9), so no reset can destroy an armed, unclaimed
-reward. Goals scale with banked Records (tap yield rides the `income` multiplier); feasibility
+capstone (§12.12's set-then-wiped check holds: nothing in these lists resets ch1). Neither rung's
+reset can destroy an armed, unclaimed reward: tier1 refuses to be cleared while it holds one, and
+the runner asks before either list runs (§12.5). The release carries
+`Not(EventRewardPending)` (§9) on top of that, reading its own record and saying so early; the
+capstone carries no such leg, since a parent cannot read a child's record.
+Goals scale with banked Records (tap yield rides the `income` multiplier); feasibility
 math in Walkthrough 2.
 
 ## 11. Triggers & story
@@ -317,9 +323,9 @@ untouched by every income multiplier — keeps each cycle ≥ ~2.5 min, so the f
 6. `DismissEvent(garage_jam_1)`: the record is removed first, then `rewards` runs because
    `goalReached` was set - `AddModifier(ch1, gj_tap_1)` (+25% tap for the rest of the chapter) and
    `SetFlag(gj1_done)` - then `onEnd` runs `ResetScope(tier1)`. A fresh run starts with the bonus
-   live. Delaying the dismissal is safe: the release disarms on its `EventRewardPending` leg
-   ("Claim your Garage Jam reward first") until the record is gone, and removing the record first is
-   what lets that guard reopen.
+   live. Delaying the dismissal is safe: tier1 refuses to be cleared while the reward sits armed, so
+   the release and the capstone both close and both explain themselves with "Claim your Garage Jam
+   reward first" until the record is gone. Removing the record first is what lets them reopen.
 7. If the timer had expired first: the record persists - the `gear` handicap keeps applying, the
    host stays occupied and `StartEvent` refuses - until the player dismisses it or a reset reaches
    tier1. Dismissal then runs `onEnd` alone: no bonus, tier1 wiped, and nothing lost that the

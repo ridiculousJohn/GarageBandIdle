@@ -98,3 +98,11 @@ condition walking down is the parent KNOWING a child's fact. Before adding any t
 not start at the acting scope and go outward, stop: it is either a propagation the child answers
 (legitimate, rare, and already exists as reset) or a read that belongs at the scope that owns the
 fact. Never a third thing.
+
+**"Smaller" means the smaller MECHANISM, never the smaller EDIT (2026-09-08).** Defending a test
+change, I justified the placement with "it was the smaller edit." John: any time he reads that, he
+reads feature creep. The edit-size axis measures how little I touched today; the mechanism axis
+measures what shape the code has afterward. Only the second is a design reason. When two shapes both
+work, choose by which one the design already implies (here: under 12.4 the event host is the scope
+that reads its record, so the trigger belongs at the host) and say that. If the only argument for a
+choice is diff size, there is no argument yet.

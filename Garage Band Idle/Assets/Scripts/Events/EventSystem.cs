@@ -15,26 +15,31 @@ namespace RidiculousGaming.GarageBandIdle.Events
     {
         // Start refuses an occupied host - ANY record, running or expired-but-
         // undismissed, blocks entry (12.8) - and a closed gate; a null gate
-        // refuses, the fail-closed backstop behind the load-time check.
+        // refuses, the fail-closed backstop behind the load-time check. The
+        // entry list takes the runner's question like every other list (12.5):
+        // an onEntry that would clear a scope holding an armed reward closes
+        // the Start button rather than half-running.
         public static bool CanStart(GameContext ctx, EventDefinition evt)
         {
             var host = Producer.DeclaringScope<InteriorScopeState>(ctx.Scope, evt);
-            return host.activeEvent == null && evt.IsAvailable(ctx.Rebase(host));
+            var hostCtx = ctx.Rebase(host);
+            return host.activeEvent == null && evt.IsAvailable(hostCtx)
+                && ActionList.Refuses(evt.onEntry, hostCtx) == null;
         }
 
         public static void Start(GameContext ctx, EventDefinition evt)
         {
             var host = Producer.DeclaringScope<InteriorScopeState>(ctx.Scope, evt);
             var hostCtx = ctx.Rebase(host);
-            if (host.activeEvent != null || !evt.IsAvailable(hostCtx))
+            if (host.activeEvent != null || !evt.IsAvailable(hostCtx)
+                || ActionList.Refuses(evt.onEntry, hostCtx) != null)
                 throw new InvalidOperationException(
                     $"Start: event '{evt.Id}' is not currently startable - ask CanStart first.");
 
             // onEntry first, the record after: an entry list that resets the
             // host swaps the payload, and writing through the accessor then is
             // what puts the record in the fresh one (6.1's banked run).
-            foreach (var action in evt.onEntry)
-                action?.Execute(hostCtx);
+            ActionList.Run(evt.onEntry, hostCtx);
             host.activeEvent = new ActiveEvent { eventId = evt.Id, remainingSeconds = evt.timeLimitSeconds };
         }
 
@@ -48,34 +53,49 @@ namespace RidiculousGaming.GarageBandIdle.Events
 
         // Dismiss needs a record FOR THIS EVENT: a sibling's record is an
         // ordinary refusal, since which event is running is state the player
-        // produced (12.8).
+        // produced (12.8). Both ending lists take the runner's question, asked
+        // as if this host's record were already GONE - dismissal removes it
+        // before either list runs, so asking with it still there would refuse
+        // an ending on the very reward it is about to pay. `ignoring: host` is
+        // that, and it is the only place the argument is ever non-null.
         public static bool CanDismiss(GameContext ctx, EventDefinition evt)
         {
             var host = Producer.DeclaringScope<InteriorScopeState>(ctx.Scope, evt);
-            return host.activeEvent != null && host.activeEvent.eventId == evt.Id;
+            var record = host.activeEvent;
+            return record != null && record.eventId == evt.Id && EndingsRun(ctx, evt, host, record);
+        }
+
+        // Whether the two ending lists would both run: rewards only when the
+        // goal latched, onEnd always.
+        private static bool EndingsRun(GameContext ctx, EventDefinition evt, InteriorScopeState host, ActiveEvent record)
+        {
+            var hostCtx = ctx.Rebase(host);
+            if (record.goalReached && ActionList.Refuses(evt.rewards, hostCtx, ignoring: host) != null)
+                return false;
+            return ActionList.Refuses(evt.onEnd, hostCtx, ignoring: host) == null;
         }
 
         public static void Dismiss(GameContext ctx, EventDefinition evt)
         {
             var host = Producer.DeclaringScope<InteriorScopeState>(ctx.Scope, evt);
             var record = host.activeEvent;
-            if (record == null || record.eventId != evt.Id)
+            // A refused dismissal changes nothing, which is why the whole guard
+            // is answered before the record is touched.
+            if (record == null || record.eventId != evt.Id || !EndingsRun(ctx, evt, host, record))
                 throw new InvalidOperationException(
-                    $"Dismiss: event '{evt.Id}' holds no record at its host - ask CanDismiss first.");
+                    $"Dismiss: event '{evt.Id}' is not currently dismissable at its host - ask CanDismiss first.");
 
-            // Remove FIRST (12.8): it opens a rung gated on
-            // Not(EventRewardPending(host)), so an onEnd carrying
-            // RestartScope(host) banks instead of no-oping against its own
-            // reward. Nothing can observe the gap - no action reads a
-            // multiplier, and starting is a command no list can reach.
+            // Remove FIRST (12.8): it opens a rung whose own list clears this
+            // host, so an onEnd carrying RestartScope(host) banks instead of
+            // being refused by its own reward. Nothing can observe the gap - no
+            // action reads a multiplier, and starting is a command no list can
+            // reach. The record is gone, so the lists run with no exclusion.
             var goalReached = record.goalReached;
             host.activeEvent = null;
             var hostCtx = ctx.Rebase(host);
             if (goalReached)
-                foreach (var action in evt.rewards)
-                    action?.Execute(hostCtx);
-            foreach (var action in evt.onEnd)
-                action?.Execute(hostCtx);
+                ActionList.Run(evt.rewards, hostCtx);
+            ActionList.Run(evt.onEnd, hostCtx);
         }
 
         public static bool TryDismiss(GameContext ctx, EventDefinition evt)

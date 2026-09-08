@@ -3,6 +3,20 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
 {
+    // One authored action list of a scope, as everything that walks lists sees
+    // it: the actions, and the site text a finding names them by.
+    public readonly struct ActionListSite
+    {
+        public readonly IReadOnlyList<GameAction> Actions;
+        public readonly string Site;
+
+        public ActionListSite(IReadOnlyList<GameAction> actions, string site)
+        {
+            Actions = actions;
+            Site = site;
+        }
+    }
+
     // A scope's authored shape: what it declares, its children, and (for tiers
     // and chapters) its rung. Lifetime is placement - a fact survives a reset by
     // being declared further out (design doc 12.3).
@@ -75,6 +89,33 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         public bool DeclaresFlag(string flagId) => declaredFlags.Contains(flagId);
+
+        // Every action list this scope declares, ONCE, in one place
+        // (InteriorDefinition adds its own). The link pass iterates this and so
+        // does the validator's action-list walk; no executor and no pass spells
+        // the sites out by hand, so a new kind of list is added here and
+        // nowhere else - which is what leaves no second site to forget. The
+        // order is the kinds in declaration order: triggers, bar completions,
+        // then upgrade payloads.
+        public virtual IEnumerable<ActionListSite> ActionLists()
+        {
+            foreach (var trigger in triggers)
+                if (trigger != null)
+                    yield return new ActionListSite(trigger.actions, $"trigger '{trigger.Id}'");
+
+            foreach (var group in barGroups)
+            {
+                if (group == null)
+                    continue;
+                foreach (var bar in group.bars)
+                    if (bar != null)
+                        yield return new ActionListSite(bar.onComplete, $"bar '{bar.Id}'");
+            }
+
+            foreach (var upgrade in upgrades)
+                if (upgrade != null)
+                    yield return new ActionListSite(upgrade.actions, $"upgrade '{upgrade.Id}'");
+        }
 
         // The state node this definition stands for, holding the payload this
         // kind of scope holds. Authoring picks the class, so nothing infers a

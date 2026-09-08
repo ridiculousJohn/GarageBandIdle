@@ -198,71 +198,42 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
-    // Any record at the named host - running, expired-undismissed, or armed
-    // (design doc 12.4). The host is a direct scope reference like
-    // ResetScope.scope, reached self-or-enclosed, and the read is a pure fact.
+    // Any record the acting scope can see - running, expired-undismissed, or
+    // armed (design doc 12.4). No operand: the read walks OUTWARD to the first
+    // interior scope holding one, exactly as FlagSet reads a flag, so a scope's
+    // record is visible to it and to the scopes inside it and never to its
+    // parent. Protecting an armed reward from a parent's clear is the reset's
+    // own refusal (12.5), not a leg authored on the parent.
     [Serializable]
     public class EventRecordExists : Condition
     {
-        public ScopeDefinition host;
+        public override bool Evaluate(GameContext ctx) => ctx.EventRecord() != null;
 
-        public override bool Evaluate(GameContext ctx) =>
-            ctx.Scope.FindInSubtree(host) is InteriorScopeState interior && interior.activeEvent != null;
+        public override void Validate(ValidationContext ctx) => RequireHostableActor(ctx, "EventRecordExists");
 
-        public override void Validate(ValidationContext ctx)
+        // The one check either kind has, shared: there is no operand to
+        // resolve, so what is left is where the condition is EVALUATED. Root's
+        // chain is root alone and root holds no record field, so a condition
+        // acting there reads false forever - a permanently closed gate.
+        internal static void RequireHostableActor(ValidationContext ctx, string kind)
         {
-            var target = ctx.FindScope(host);
-            if (target == null)
-            {
-                ctx.AddError(ValidationCheck.NullEntry, "EventRecordExists names no scope.");
+            if (ctx.ActingScope is InteriorDefinition)
                 return;
-            }
-            if (!ctx.InActingSubtree(target))
-            {
-                ctx.AddError(ValidationCheck.ScopeReach,
-                    $"EventRecordExists may name the acting scope or a scope it encloses (12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
-                return;
-            }
-            // Root holds no record field at all, so a root host reads false
-            // forever - a permanently closed gate the load pass refuses.
-            if (target is not InteriorDefinition)
-                ctx.AddError(ValidationCheck.ScopeReach,
-                    $"EventRecordExists names '{target.Id}', which cannot host an event - the condition can never hold (12.12).");
+            ctx.AddError(ValidationCheck.ScopeReach,
+                $"{kind} is evaluated at '{ctx.ActingScope.Id}', which cannot host an event and has no interior scope on its chain - the condition can never hold (12.12).");
         }
     }
 
     // A record whose goal latched, still undismissed - the reward is armed and
-    // waiting (design doc 12.4). Negated, this is the guard the stranded-reward
-    // check requires of a rung whose reset would reach the host.
+    // waiting (design doc 12.4). Read outward with no operand, like the kind
+    // above; a scope's OWN rung disarms with it, composed with Not.
     [Serializable]
     public class EventRewardPending : Condition
     {
-        public ScopeDefinition host;
+        public override bool Evaluate(GameContext ctx) => ctx.EventRecord()?.goalReached == true;
 
-        public override bool Evaluate(GameContext ctx) =>
-            ctx.Scope.FindInSubtree(host) is InteriorScopeState interior
-            && interior.activeEvent != null && interior.activeEvent.goalReached;
-
-        public override void Validate(ValidationContext ctx)
-        {
-            var target = ctx.FindScope(host);
-            if (target == null)
-            {
-                ctx.AddError(ValidationCheck.NullEntry, "EventRewardPending names no scope.");
-                return;
-            }
-            if (!ctx.InActingSubtree(target))
-            {
-                ctx.AddError(ValidationCheck.ScopeReach,
-                    $"EventRewardPending may name the acting scope or a scope it encloses (12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
-                return;
-            }
-            // Root holds no record field at all, so a root host reads false
-            // forever - a permanently closed gate the load pass refuses.
-            if (target is not InteriorDefinition)
-                ctx.AddError(ValidationCheck.ScopeReach,
-                    $"EventRewardPending names '{target.Id}', which cannot host an event - the condition can never hold (12.12).");
-        }
+        public override void Validate(ValidationContext ctx) =>
+            EventRecordExists.RequireHostableActor(ctx, "EventRewardPending");
     }
 
     // The open gate. A gate may not be null (12.12), so an author says

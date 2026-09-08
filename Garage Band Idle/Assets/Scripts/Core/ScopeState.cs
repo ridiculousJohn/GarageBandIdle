@@ -12,6 +12,28 @@ namespace RidiculousGaming.GarageBandIdle
         public bool goalReached;
     }
 
+    // Why a clear was refused (design doc 12.5): the scope holding an armed,
+    // unclaimed reward, the record itself, and the event that record names,
+    // read from the HOST's own events list - the same declaration read every
+    // other record question takes. Built by InteriorScopeState.RefusesClear and
+    // nowhere else, so holding one means a scope was asked.
+    public sealed class Refusal
+    {
+        public readonly InteriorScopeState Host;
+        public readonly ActiveEvent Record;
+
+        // Null only for a record naming an event its host does not declare,
+        // which the save filter drops at load (12.10).
+        public readonly Events.EventDefinition Event;
+
+        internal Refusal(InteriorScopeState host, ActiveEvent record, Events.EventDefinition evt)
+        {
+            Host = host;
+            Record = record;
+            Event = evt;
+        }
+    }
+
     // A timed buff (Encore) - absolute expiry, burns real time app-closed (design doc 9).
     public class TimedBuff
     {
@@ -155,12 +177,25 @@ namespace RidiculousGaming.GarageBandIdle
         {
             var root = content.Root.CreateRoot();
             root.InitializeDeclared();
+
+            // Construction-only: the link pass resolves every static scope
+            // reference through this map and it is dropped when Build returns.
+            // A map that survived would be the id index nothing may hold
+            // (12.14.8) - what makes it legal is that it never outlives the
+            // construction it serves.
+            var nodes = new Dictionary<ScopeDefinition, ScopeState> { { content.Root, root } };
             foreach (var chapterDefinition in content.Chapters)
-                BuildChild(chapterDefinition, root);
+                BuildChild(chapterDefinition, root, nodes);
+
+            // Every node exists and its declared facts are seeded, so the
+            // static wiring resolves here, once, in every build - it is wiring
+            // and not diagnosis, and its failures are content faults (12.14.7).
+            ScopeLinker.Link(root, nodes);
             return root;
         }
 
-        private static ScopeState BuildChild(ScopeDefinition definition, ScopeState parent)
+        private static ScopeState BuildChild(ScopeDefinition definition, ScopeState parent,
+                                             Dictionary<ScopeDefinition, ScopeState> nodes)
         {
             // Seeding is its own step, after the node exists: the declared
             // facts a subclass adds are read through a virtual, and nothing
@@ -168,8 +203,9 @@ namespace RidiculousGaming.GarageBandIdle
             var state = definition.CreateState(parent);
             state.InitializeDeclared();
             parent.Children.Add(state);
+            nodes[definition] = state;
             foreach (var childDefinition in definition.children)
-                BuildChild(childDefinition, state);
+                BuildChild(childDefinition, state, nodes);
             return state;
         }
 
@@ -253,10 +289,14 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // Whether a modifier applies under this gather's circumstance, judged
-        // against the ORIGIN context - the same evaluation-context ruling
-        // formulas follow. Absent means always (design doc 12.5).
-        private static bool Applies(Economy.ModifierDefinition modifier, GameContext origin) =>
-            modifier.appliesWhen == null || modifier.appliesWhen.Evaluate(origin);
+        // at the node the modifier is APPLIED to - this one, which holds the
+        // stack or the permanent membership - by rebasing the origin context
+        // onto it. That is the site validation judges the gate from
+        // (FinalizeModifierChecks), so execution and the load pass agree. The
+        // circumstance and the clock ride the rebase; effect formulas keep the
+        // origin context (12.5/12.6). Absent means always.
+        private bool Applies(Economy.ModifierDefinition modifier, GameContext origin) =>
+            modifier.appliesWhen == null || modifier.appliesWhen.Evaluate(origin.Rebase(this));
 
         // The rate this scope's own sources pay into one currency, before the
         // currency stage. Asked of every node in a subtree walk, same contract
@@ -300,8 +340,8 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Reset semantics (design doc 12.3): swap in a fresh payload - complete
         // by construction - and re-initialize declared currency entries.
-        // Downward closure is the CALLER's job (ResetScope recurses); this
-        // clears one scope. The root refusal lives HERE, on the primitive, so no
+        // Downward closure is ClearSubtree's, below; this clears one scope. The
+        // root refusal lives HERE, on the primitive, so no
         // caller can bypass it (12.12: "never the root"); reaching it is a code
         // bug, hence the throw rather than the action layer's log-and-refuse.
         public virtual void Clear(DateTime nowUtc)
@@ -312,23 +352,62 @@ namespace RidiculousGaming.GarageBandIdle
             InitializeDeclared();
         }
 
-        // The node standing for this definition, searched downward from here
-        // (self included). A definition and its state never point at each other,
-        // so the walk is the only link - but what it matches on is the asset the
-        // caller already holds, which is why nothing here depends on ids being
-        // unique. A scope has no lookup BY NAME at all: the save owns its own,
-        // privately, because a file holds text and nothing else (12.3).
-        public ScopeState FindInSubtree(ScopeDefinition scope)
+        // The downward-closed clear (design doc 12.5), self first: a parent
+        // INFORMING its subtree, which resolves nothing - so it is a scope
+        // operation and an action calls it rather than carrying the walk.
+        public void ClearSubtree(DateTime nowUtc)
         {
-            if (Definition == scope)
-                return this;
+            Clear(nowUtc);
+            foreach (var child in Children)
+                child.ClearSubtree(nowUtc);
+        }
+
+        // The answer coming back up that same walk (design doc 12.5): the first
+        // scope at or below here refusing to be cleared, or null when none
+        // does. `ignoring` is the one node whose OWN record is not asked - its
+        // children still are - which is what lets a dismissal ask as if the
+        // record it is about to remove were already gone (12.8). Nothing else
+        // passes it.
+        public Refusal RefusalInSubtree(ScopeState ignoring = null)
+        {
+            if (this != ignoring && this is InteriorScopeState host)
+            {
+                var refusal = host.RefusesClear();
+                if (refusal != null)
+                    return refusal;
+            }
             foreach (var child in Children)
             {
-                var found = child.FindInSubtree(scope);
-                if (found != null)
-                    return found;
+                var refusal = child.RefusalInSubtree(ignoring);
+                if (refusal != null)
+                    return refusal;
             }
             return null;
+        }
+
+        // What each static reference held at this node means in THIS tree,
+        // written by the link pass at Build and never afterward (12.14.8).
+        // Keyed by the object HOLDING the reference - a ResetScope instance, a
+        // SectionDefinition - so a read is a dictionary hit at a node the
+        // caller already has, and two trees built from one content set hold
+        // separate links. Lazily allocated: most nodes hold none.
+        private Dictionary<object, ScopeState> links;
+
+        internal void StoreLink(object holder, ScopeState node)
+        {
+            links ??= new Dictionary<object, ScopeState>();
+            links[holder] = node;
+        }
+
+        // The node a static reference names, resolved when this tree was built.
+        // A miss means construction omitted a site - a code bug, not content -
+        // so it throws and nothing falls back to a search (12.14.8).
+        public ScopeState Link(object holder)
+        {
+            if (links != null && links.TryGetValue(holder, out var node))
+                return node;
+            throw new InvalidOperationException(
+                $"Scope '{ScopeId}' holds no link for a {(holder == null ? "<null>" : holder.GetType().Name)} - the link pass never visited this site.");
         }
 
         // Self or an ancestor standing for this definition; null when it is not
@@ -373,6 +452,29 @@ namespace RidiculousGaming.GarageBandIdle
         {
             get => ((InteriorFacts)facts).activeEvent;
             set => ((InteriorFacts)facts).activeEvent = value;
+        }
+
+        // Whether this scope refuses to be cleared, judged from its OWN facts
+        // (design doc 12.5): an armed, unclaimed reward would die with the
+        // record, so the scope holding one says no and the answer travels back
+        // up the walk the clear came down. The event is read through this
+        // host's declaration list, like every other record read - a stray id
+        // leaves the refusal's event null, which the save filter already drops.
+        // The only place a Refusal is constructed.
+        public Refusal RefusesClear()
+        {
+            var record = activeEvent;
+            if (record == null || !record.goalReached)
+                return null;
+            Events.EventDefinition named = null;
+            foreach (var evt in ((InteriorDefinition)Definition).events)
+            {
+                if (evt == null || evt.Id != record.eventId)
+                    continue;
+                named = evt;
+                break;
+            }
+            return new Refusal(this, record, named);
         }
 
         // Handicaps ride on the record EXISTING - no expiry check, because a

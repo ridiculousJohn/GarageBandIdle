@@ -82,10 +82,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Tree.Chapters.Add(ch2Def);
 
                 Root = ScopeState.Build(Tree.Content);
-                Ch1 = (ChapterScopeState)Root.FindInSubtree(Tree.Ch1Def);
-                Tier1 = Root.FindInSubtree(Tree.Tier1Def);
-                Ch2 = (ChapterScopeState)Root.FindInSubtree(ch2Def);
-                Tier2 = Root.FindInSubtree(tier2Def);
+                Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Tree.Ch1Def);
+                Tier1 = TestNavigation.Node(Root, Tree.Tier1Def);
+                Ch2 = (ChapterScopeState)TestNavigation.Node(Root, ch2Def);
+                Tier2 = TestNavigation.Node(Root, tier2Def);
                 Tier1.generatorCounts["practice_amp"] = 1;
                 Ch1.lastActiveUtc = Tree.Now;
                 Session = new GameSession(Root, Config());

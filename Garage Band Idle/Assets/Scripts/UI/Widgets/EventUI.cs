@@ -29,6 +29,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private EventDefinition evt;
 
+        // The refusal leg, created and removed per refresh exactly as the rung
+        // button's is (12.5/12.11): a refused start and a refused ending are
+        // rendered the same way, by the same sentence.
+        private Label refusalLabel;
+
         // The host, resolved once: the record lives at the scope that DECLARES
         // the event, and declaration is ownership (12.3/12.8).
         private InteriorScopeState host;
@@ -75,9 +80,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 // A running attempt has no gate left to explain, and its one
                 // button is the ending - which pays when the goal latched.
                 dismiss.text = record.goalReached ? "Claim reward" : "Dismiss";
+                dismiss.SetEnabled(EventSystem.CanDismiss(ctx, evt));
                 statusLabel.text = Status(record, hostCtx);
                 foreach (var (_, label) in legViews)
                     label.style.display = DisplayStyle.None;
+                ShowRefusal(EndingRefusal(hostCtx, record));
                 return;
             }
 
@@ -91,6 +98,37 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 if (visible)
                     label.text = GateFeedback.LegText(condition, hostCtx);
             }
+            // The other half of what closed the Start button: the entry list
+            // takes the runner's question like every other list (12.5).
+            ShowRefusal(ActionList.Refuses(evt.onEntry, hostCtx));
+        }
+
+        // What would refuse the ending, asked the way Dismiss asks it: this
+        // host's own record is excluded, because dismissal removes it before
+        // either list runs (12.8).
+        private Refusal EndingRefusal(GameContext hostCtx, ActiveEvent record)
+        {
+            if (record.goalReached)
+            {
+                var refused = ActionList.Refuses(evt.rewards, hostCtx, ignoring: host);
+                if (refused != null)
+                    return refused;
+            }
+            return ActionList.Refuses(evt.onEnd, hostCtx, ignoring: host);
+        }
+
+        private void ShowRefusal(Refusal refusal)
+        {
+            if (refusalLabel != null)
+            {
+                legs.Remove(refusalLabel);
+                refusalLabel = null;
+            }
+            if (refusal == null)
+                return;
+            refusalLabel = new Label(RungFeedback.RefusalText(refusal));
+            refusalLabel.AddToClassList("leg");
+            legs.Add(refusalLabel);
         }
 
         // The attempt as the player reads it: the timer when the event is

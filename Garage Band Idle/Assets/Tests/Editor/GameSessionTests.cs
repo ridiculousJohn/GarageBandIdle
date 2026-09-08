@@ -136,9 +136,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch2Def = TestTree.MakeChapter("ch2");
             tree.Chapters.Add(ch2Def);
             var root = ScopeState.Build(tree.Content);
-            var ch1 = (ChapterScopeState)root.FindInSubtree(tree.Ch1Def);
-            var tier1 = root.FindInSubtree(tree.Tier1Def);
-            var ch2 = (ChapterScopeState)root.FindInSubtree(ch2Def);
+            var ch1 = (ChapterScopeState)TestNavigation.Node(root, tree.Ch1Def);
+            var tier1 = TestNavigation.Node(root, tree.Tier1Def);
+            var ch2 = (ChapterScopeState)TestNavigation.Node(root, ch2Def);
             var session = new GameSession(root, Config());
             session.SwitchChapter(ch1, tree.Now);
 

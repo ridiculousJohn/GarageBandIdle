@@ -656,8 +656,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     { upgrade = Resolve<UpgradeDefinition>(build, scope, d.upgrade, "UpgradePurchased") },
                 BarsCompletedDto d => new BarsCompleted
                     { group = Resolve<BarGroupDefinition>(build, scope, d.group, "BarsCompleted"), count = d.count },
-                EventRecordExistsDto d => new EventRecordExists { host = ResolveScope(build, d.host, "EventRecordExists") },
-                EventRewardPendingDto d => new EventRewardPending { host = ResolveScope(build, d.host, "EventRewardPending") },
+                EventRecordExistsDto => new EventRecordExists(),
+                EventRewardPendingDto => new EventRewardPending(),
                 AlwaysDto => new Always(),
                 IdleAccumulationDto => new IdleAccumulation(),
                 AllDto d => new All { conditions = d.conditions.Select(c => BuildCondition(build, scope, c)).ToList() },
@@ -762,10 +762,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             return false;
         }
 
-        // SCOPE references resolve tree-wide: scope ids are tree-wide unique and
-        // the runtime reads them downward (FindInSubtree), so the capstone's
-        // ExecuteRung(tier1) points at a child. Whether the named scope is legal
-        // from that site is each class's own 12.12 reach check, not this.
+        // SCOPE references resolve tree-wide: scope ids are tree-wide unique, so
+        // the capstone's ExecuteRung(tier1) names a child from the union.
+        // Whether the named scope is legal from that site is each class's own
+        // 12.12 reach check, not this.
         private static ScopeDefinition ResolveScope(Build build, string id, string use)
         {
             if (string.IsNullOrEmpty(id))

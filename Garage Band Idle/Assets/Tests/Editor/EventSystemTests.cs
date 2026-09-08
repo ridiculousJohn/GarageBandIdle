@@ -82,12 +82,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var innerDef = TestTree.MakeTier("tier_inner");
             tree.Tier1Def.children.Add(innerDef);
-            var root = ScopeState.Build(tree.Content);   // rebuild with the child
-            var inner = (TierScopeState)root.FindInSubtree(innerDef);
-            var tier1 = (TierScopeState)root.FindInSubtree(tree.Tier1Def);
             // Only the rebase to the resolved host makes this reset legal:
-            // tier1 is not in the acting scope's subtree.
+            // tier1 is not in the acting scope's subtree. It is linked at the
+            // host, which is where the entry list executes.
             tree.TimedGig.onEntry.Add(new ResetScope { scope = tree.Tier1Def });
+            tree.Rebuild();   // rebuild with the child, and link the entry list
+            var inner = (TierScopeState)TestNavigation.Node(tree.Root, innerDef);
+            var tier1 = tree.Tier1;
             tier1.flags.Add("fans_revealed");
 
             EventSystem.Start(new GameContext(inner, tree.Now), tree.TimedGig);
@@ -102,6 +103,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.TimedGig.onEntry.Add(new ResetScope { scope = tree.Tier1Def });
+            tree.Rebuild();
             tree.Tier1.flags.Add("fans_revealed");
             var oldFacts = tree.Tier1.facts;
 
@@ -122,6 +124,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 actions = { new AddCurrency { currencies = { tree.Ch1Records }, amount = 3 } }
             };
             tree.TimedGig.onEntry.Add(new RestartScope { scope = tree.Tier1Def });
+            tree.Rebuild();
             var ctx = tree.Ctx(tree.Tier1);
             tree.Tier1.balances["fans"] = 60;
 
@@ -274,11 +277,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // remove-first lets either one through.
             tree.Tier1Def.rung = new Rung
             {
-                offerCondition = new Not { condition = new EventRecordExists { host = tree.Tier1Def } },
+                offerCondition = new Not { condition = new EventRecordExists() },
                 actions = { new AddCurrency { currencies = { tree.Ch1Records }, amount = 1 } }
             };
             tree.TimedGig.rewards.Add(new ExecuteRung { tier = tree.Tier1Def });
             tree.TimedGig.onEnd.Add(new ExecuteRung { tier = tree.Tier1Def });
+            tree.Rebuild();
             var ctx = tree.Ctx(tree.Tier1);
             EventSystem.Start(ctx, tree.TimedGig);
             tree.Tier1.activeEvent.goalReached = true;
@@ -292,8 +296,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void An_onEnd_restart_banks_through_a_reward_pending_guard()
         {
             var tree = new TestTree();
-            // The rung shape the stranded-reward check wants: its restart
-            // cannot fire while a reward sits armed. Remove-first is what lets
+            // The rung shape the release authors: its restart cannot fire while
+            // a reward sits armed, by its own leg AND by the host's refusal.
+            // Remove-first, plus `ignoring: host` on the question, is what lets
             // the dismissal's own restart bank the run it is ending.
             tree.Tier1Def.rung = new Rung
             {
@@ -302,12 +307,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     conditions =
                     {
                         new CurrencyAtLeast { currency = tree.Fans, threshold = 50 },
-                        new Not { condition = new EventRewardPending { host = tree.Tier1Def } }
+                        new Not { condition = new EventRewardPending() }
                     }
                 },
                 actions = { new AddCurrency { currencies = { tree.Ch1Records }, amount = 3 } }
             };
             tree.TimedGig.onEnd.Add(new RestartScope { scope = tree.Tier1Def });
+            tree.Rebuild();
             var ctx = tree.Ctx(tree.Tier1);
             EventSystem.Start(ctx, tree.TimedGig);
             tree.Tier1.balances["fans"] = 60;
@@ -340,9 +346,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_reset_from_above_kills_the_record()
         {
             var tree = new TestTree();
+            var reset = tree.Author(tree.Ch1Def, new ResetScope { scope = tree.Ch1Def });
             EventSystem.Start(tree.Ctx(tree.Tier1), tree.TimedGig);
 
-            new ResetScope { scope = tree.Ch1Def }.Execute(tree.Ctx(tree.Ch1));
+            // The goal never latched, so nothing below refuses the clear.
+            reset.Execute(tree.Ctx(tree.Ch1));
 
             Assert.IsNull(tree.Tier1.activeEvent);
             Assert.IsTrue(EventSystem.CanStart(tree.Ctx(tree.Tier1), tree.TimedGig));   // the host is free again

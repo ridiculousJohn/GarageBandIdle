@@ -123,6 +123,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return false;
             if (!bar.repeating && progress >= bar.fillAmount)
                 return false;
+            // A refused completion list excludes the bar from the WHOLE segment
+            // (12.5): it draws nothing from the pool, its progress does not
+            // move, and it resumes on the first segment after the refusal
+            // lifts. Whether it would complete is not decidable before the fill
+            // math, which is why the exclusion is decided before it. The ctx is
+            // the bar's declaring node, which is where a completion runs.
+            if (ActionList.Refuses(bar.onComplete, ctx) != null)
+                return false;
             // A null gate on a bar is OPEN, the opposite of a purchase gate:
             // fail-closed binds entry points that create value out of a spend,
             // and a bar's availability is a selection filter (12.7).
@@ -351,11 +359,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return false;
         }
 
-        private static void Execute(BarFill entry, BarDefinition bar, DateTime settlementUtc)
-        {
-            var ctx = new GameContext(entry.scope, settlementUtc);
-            foreach (var action in bar.onComplete)
-                action?.Execute(ctx);
-        }
+        private static void Execute(BarFill entry, BarDefinition bar, DateTime settlementUtc) =>
+            ActionList.Run(bar.onComplete, new GameContext(entry.scope, settlementUtc));
     }
 }

@@ -88,8 +88,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 GarageJam1 = Find(Tier1Def.events, "garage_jam_1");
 
                 var root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { Ch1Def }));
-                Ch1 = (ChapterScopeState)root.FindInSubtree(Ch1Def);
-                Tier1 = (TierScopeState)root.FindInSubtree(Tier1Def);
+                Ch1 = (ChapterScopeState)TestNavigation.Node(root, Ch1Def);
+                Tier1 = (TierScopeState)TestNavigation.Node(root, Tier1Def);
                 Session = new GameSession(root, Config());
 
                 var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
@@ -528,6 +528,72 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsNotNull(fx.Host.Sections[GarageFloor].Modules[CashLine].Widget, "a widget is present to interpolate");
             Assert.DoesNotThrow(() => fx.Host.Interpolate());
+        }
+
+        // ---- layout scopes are linked at the chapter (12.11) ----
+
+        // Build reads chapter.Link(section) and chapter.Link(module): the node
+        // each one evaluates in was resolved when the tree was built, so the
+        // build is a dictionary read per view and never a subtree search.
+        [Test]
+        public void EverySectionAndModuleEvaluatesInANodeInsideTheChapter()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            Assert.AreEqual(7, fx.Host.Sections.Count);
+            foreach (var section in fx.Host.Sections)
+            {
+                Assert.AreSame(section.Definition.scope, section.Scope.Definition,
+                    $"section '{section.Definition.title}' evaluates in its authored scope");
+                Assert.IsNotNull(TestNavigation.Node(fx.Ch1, section.Definition.scope),
+                    "which is the chapter or one of its descendants");
+                foreach (var module in section.Modules)
+                {
+                    Assert.AreSame(module.Definition.scope, module.Scope.Definition,
+                        $"module '{module.Definition.prefabId}' evaluates in its authored scope");
+                    Assert.IsNotNull(TestNavigation.Node(fx.Ch1, module.Definition.scope));
+                }
+            }
+        }
+
+        // The 12.11 reach rule moved from a runtime throw at each chapter build
+        // to the link pass, so a screen naming a scope outside its chapter is a
+        // content fault the tree refuses to build at all.
+        [Test]
+        public void AModuleScopeOutsideTheChapterFailsAtBuild()
+        {
+            var tree = new TestTree();
+            var ch2Def = TestTree.MakeChapter("ch2");
+            var tier2Def = TestTree.MakeTier("tier2");
+            ch2Def.children.Add(tier2Def);
+            tree.Chapters.Add(ch2Def);
+            tree.Ch1Def.sections.Add(new SectionDefinition
+            {
+                title = "The Garage Floor",
+                visibleWhen = new Always(),
+                scope = tree.Tier1Def,
+                modules = { new ModuleDefinition { prefabId = "currency_line", content = tree.Cash, scope = tier2Def } }
+            });
+
+            var thrown = Assert.Throws<InvalidOperationException>(() => tree.Rebuild());
+            StringAssert.Contains("tier2", thrown.Message);
+        }
+
+        [Test]
+        public void ASectionScopeOutsideTheChapterFailsAtBuild()
+        {
+            var tree = new TestTree();
+            var ch2Def = TestTree.MakeChapter("ch2");
+            tree.Chapters.Add(ch2Def);
+            tree.Ch1Def.sections.Add(new SectionDefinition
+            {
+                title = "Elsewhere",
+                visibleWhen = new Always(),
+                scope = ch2Def,
+            });
+
+            Assert.Throws<InvalidOperationException>(() => tree.Rebuild());
         }
     }
 }

@@ -29,5 +29,21 @@ namespace RidiculousGaming.GarageBandIdle.UI
             currencies = payout.currencies;
             return true;
         }
+
+        // A refusal as the player reads it (design doc 12.5/12.11): the event
+        // by its displayName, in the one sentence every site uses - the rung
+        // button and the event row render the same line, because it explains
+        // the same fact. Naming the event is the whole point of the leg, so a
+        // refusal whose record names an event its host does not declare is a
+        // fault rather than a line with a hole in it: the save filter drops
+        // such a record at load, so reaching this means the state was built
+        // some other way (requirement 7).
+        public static string RefusalText(Refusal refusal)
+        {
+            if (refusal.Event == null)
+                throw new System.InvalidOperationException(
+                    $"A refusal at scope '{refusal.Host.ScopeId}' names event '{refusal.Record.eventId}', which that scope does not declare.");
+            return string.Format("Claim your {0} reward first", refusal.Event.displayName);
+        }
     }
 }

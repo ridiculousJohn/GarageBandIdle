@@ -24,6 +24,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private Rung rung;
 
+        // The refusal leg (design doc 12.5/12.11), created and removed per
+        // refresh rather than built once and toggled: the condition legs are a
+        // fixed authored list, while WHETHER anything refuses - and which event
+        // it names - is state. It lands after the condition legs, so a rung
+        // with nothing refused shows exactly its condition legs.
+        private Label refusalLabel;
+
         public RungButtonUI(VisualElement root) : base(root)
         {
             press = Require<Button>(root, "press", "RungButton.uxml");
@@ -65,7 +72,27 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 if (visible)
                     label.text = GateFeedback.LegText(condition, ctx);
             }
+            ShowRefusal(ctx);
             ShowPreview(ctx);
+        }
+
+        // The other half of what closed the button: GateFeedback stays the pure
+        // condition half, and the refusal comes from the same runner IsOffered
+        // asked (12.5) - one implementation, so what the button explains is
+        // what refused.
+        private void ShowRefusal(GameContext ctx)
+        {
+            if (refusalLabel != null)
+            {
+                legs.Remove(refusalLabel);
+                refusalLabel = null;
+            }
+            var refusal = ActionList.Refuses(rung.actions, ctx);
+            if (refusal == null)
+                return;
+            refusalLabel = new Label(RungFeedback.RefusalText(refusal));
+            refusalLabel.AddToClassList("leg");
+            legs.Add(refusalLabel);
         }
 
         // The payout preview, through the rung's own first action - so a rung

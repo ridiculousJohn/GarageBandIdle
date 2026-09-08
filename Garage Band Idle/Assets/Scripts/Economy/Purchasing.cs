@@ -22,12 +22,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 && declaringCtx.CanSpend(generator.costCurrency.Id, CostOf(generator, declaringCtx));
         }
 
+        // The payload takes the action-list runner's question like every other
+        // list (12.5): an upgrade whose actions would clear a scope holding an
+        // armed reward is unbuyable rather than half-applied.
         public static bool CanBuy(GameContext ctx, UpgradeDefinition upgrade)
         {
             var declaringCtx = ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade));
             return upgrade.IsOffered(declaringCtx)
                 && !declaringCtx.Scope.purchasedUpgrades.Contains(upgrade.Id)   // the latch IS the one-shot; a reset re-arms it
-                && declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost);
+                && declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost)
+                && ActionList.Refuses(upgrade.actions, declaringCtx) == null;
         }
 
         // Performs the purchase. Calling either when Can answers false is a
@@ -50,7 +54,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade);
             var declaringCtx = ctx.Rebase(declaring);
             if (!upgrade.IsOffered(declaringCtx) || declaring.purchasedUpgrades.Contains(upgrade.Id)
-                || !declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost))
+                || !declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost)
+                || ActionList.Refuses(upgrade.actions, declaringCtx) != null)
                 throw new InvalidOperationException($"Buy: upgrade '{upgrade.Id}' is not currently buyable - ask CanBuy first.");
 
             declaringCtx.Spend(upgrade.costCurrency.Id, upgrade.cost);
@@ -59,8 +64,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // read, and a payload resetting the latch's own scope is refused at
             // load (set-then-wiped) rather than silently re-armed here.
             declaring.purchasedUpgrades.Add(upgrade.Id);
-            foreach (var action in upgrade.actions)
-                action?.Execute(declaringCtx);
+            ActionList.Run(upgrade.actions, declaringCtx);
         }
 
         public static bool TryBuy(GameContext ctx, GeneratorDefinition generator)

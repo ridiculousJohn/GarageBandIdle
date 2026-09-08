@@ -27,13 +27,13 @@ MonoBehaviour:
     formula:
       rid: -2
   appliesWhen:
-    rid: 7579425180848226385
+    rid: 2509765236301234254
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425180848226385
+    - rid: 2509765236301234254
       type: {class: IdleAccumulation, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

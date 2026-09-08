@@ -43,8 +43,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Build()
         {
             Root = ScopeState.Build(ComposedContent.Compose(RootDef, Chapters));
-            Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);
-            Tier1 = Root.FindInSubtree(Tier1Def);
+            Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
+            Tier1 = TestNavigation.Node(Root, Tier1Def);
         }
 
         // A bar names what it drinks. Most tests give a group's bars the same
@@ -470,9 +470,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
             var first = f.Bar(group, "first", 5, 10);
             var second = f.Bar(group, "second", 5, 10);
-            f.Build();
+            // Authored before the build, like every scope reference: the link
+            // pass resolves it there and Execute reads the link.
             first.onComplete.Add(new ResetScope { scope = f.Tier1Def });
             CountFires(second, f.Shared);          // homed at root, so it survives the reset
+            f.Build();
             f.Pour(f.Tier1, f.Rehearsal, 1000);
             f.Select(f.Tier1, group, first, second);
 
@@ -519,8 +521,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new BarFixture();
             var group = f.Group(f.Ch1Def, "covers", f.Shared);
             var bar = f.Bar(group, "cover_a", 5, 5);
-            f.Build();
             bar.onComplete.Add(new ResetScope { scope = f.Ch1Def });
+            f.Build();
             f.Pour(f.Root, f.Shared, 1000);
             f.Ch1.lastActiveUtc = f.Now.AddHours(-4);
             f.Select(f.Ch1, group, bar);

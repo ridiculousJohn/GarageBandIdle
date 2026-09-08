@@ -71,25 +71,64 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(new BarsCompleted { group = tree.LearnCovers, count = 2 }.Evaluate(ctx));
         }
 
-        // Both kinds are pure fact reads over the named host's record, reached
-        // downward from the acting scope like ResetScope's reference.
+        // Both kinds are pure fact reads with NO operand: outward from the
+        // acting scope to the first interior scope holding a record, the way
+        // FlagSet reads a flag (12.4). Nothing looks down.
         [Test]
-        public void The_event_kinds_read_the_named_hosts_record()
+        public void The_event_kinds_read_the_first_record_outward()
         {
             var tree = new TestTree();
-            var fromCh1 = tree.Ctx(tree.Ch1);
-            var exists = new EventRecordExists { host = tree.Tier1Def };
-            var pending = new EventRewardPending { host = tree.Tier1Def };
+            var exists = new EventRecordExists();
+            var pending = new EventRewardPending();
+            var atTier1 = tree.Ctx(tree.Tier1);
 
-            Assert.IsFalse(exists.Evaluate(fromCh1));
-            Assert.IsFalse(pending.Evaluate(fromCh1));
+            Assert.IsFalse(exists.Evaluate(atTier1));
+            Assert.IsFalse(pending.Evaluate(atTier1));
 
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 0 };
-            Assert.IsTrue(exists.Evaluate(fromCh1));       // expired still exists
-            Assert.IsFalse(pending.Evaluate(fromCh1));     // armed only by the latch
+            Assert.IsTrue(exists.Evaluate(atTier1));       // expired still exists
+            Assert.IsFalse(pending.Evaluate(atTier1));     // armed only by the latch
 
             tree.Tier1.activeEvent.goalReached = true;
-            Assert.IsTrue(pending.Evaluate(fromCh1));
+            Assert.IsTrue(pending.Evaluate(atTier1));
+        }
+
+        // Root's chain is root alone, and root holds no record field at all -
+        // so neither kind can ever hold there, whatever any chapter is hosting.
+        [Test]
+        public void The_event_kinds_are_false_on_roots_chain()
+        {
+            var tree = new TestTree();
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", goalReached = true };
+            var atRoot = tree.Ctx(tree.Root);
+
+            Assert.IsFalse(new EventRecordExists().Evaluate(atRoot));
+            Assert.IsFalse(new EventRewardPending().Evaluate(atRoot));
+        }
+
+        // A scope's record is visible to that scope and to the scopes inside
+        // it, never to its parent: a parent knows nothing of what its children
+        // host (12.4).
+        [Test]
+        public void A_tiers_record_is_visible_to_the_tier_and_not_to_its_chapter()
+        {
+            var tree = new TestTree();
+            var exists = new EventRecordExists();
+            var pending = new EventRewardPending();
+
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", goalReached = true };
+
+            Assert.IsTrue(exists.Evaluate(tree.Ctx(tree.Tier1)));
+            Assert.IsTrue(pending.Evaluate(tree.Ctx(tree.Tier1)));
+            Assert.IsFalse(exists.Evaluate(tree.Ctx(tree.Ch1)), "the chapter cannot read down");
+            Assert.IsFalse(pending.Evaluate(tree.Ctx(tree.Ch1)));
+
+            // The chapter's OWN record is what the chapter reads, and the tier
+            // still stops at its own - the first one outward wins.
+            tree.Ch1.activeEvent = new ActiveEvent { eventId = "showcase" };
+            Assert.IsTrue(exists.Evaluate(tree.Ctx(tree.Ch1)));
+            Assert.IsFalse(pending.Evaluate(tree.Ctx(tree.Ch1)), "the chapter's own record is not armed");
+            Assert.IsTrue(pending.Evaluate(tree.Ctx(tree.Tier1)), "and the tier never saw it");
         }
 
         [Test]

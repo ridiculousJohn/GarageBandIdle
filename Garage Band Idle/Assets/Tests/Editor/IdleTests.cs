@@ -33,8 +33,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly TestTree Tree = new();
             public readonly GameSession Session;
 
-            public Fixture(GameConfig config = null)
+            // `author` runs against the DEFINITIONS before the tree is built,
+            // so a test whose content names a scope gets the link pass over it
+            // - and the session holds the tree that pass ran on.
+            public Fixture(GameConfig config = null, System.Action<TestTree> author = null)
             {
+                author?.Invoke(Tree);
+                Tree.Rebuild();
                 Tree.Tier1.generatorCounts["practice_amp"] = 1;
                 Session = new GameSession(Tree.Root, config != null ? config : Config());
             }
@@ -61,9 +66,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Tree.Chapters.Add(ch2Def);
 
                 Root = ScopeState.Build(Tree.Content);
-                Ch1 = (ChapterScopeState)Root.FindInSubtree(Tree.Ch1Def);
-                Tier1 = Root.FindInSubtree(Tree.Tier1Def);
-                Ch2 = (ChapterScopeState)Root.FindInSubtree(ch2Def);
+                Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Tree.Ch1Def);
+                Tier1 = TestNavigation.Node(Root, Tree.Tier1Def);
+                Ch2 = (ChapterScopeState)TestNavigation.Node(Root, ch2Def);
                 Tier1.generatorCounts["practice_amp"] = 1;
                 Session = new GameSession(Root, Config());
             }
@@ -349,16 +354,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void No_sweep_runs_during_the_switch_that_creates_an_offer()
         {
-            var f = new Fixture();
             // The dangerous shape: a root trigger legally resetting the
             // descendant chapter - a sweep during the switch would re-stamp
             // the unpaid window away before the dialog presents it.
-            var rootTrigger = TestTree.MakeDefinition<TriggerDefinition>("root_reset");
-            rootTrigger.condition = new Always();
-            rootTrigger.actions.Add(new ResetScope { scope = f.Tree.Ch1Def });
-            f.Tree.RootDef.triggers.Add(rootTrigger);
-            f.Tree.Tier1Trigger.condition = new Always();
-            f.Tree.Tier1Trigger.actions.Add(new SetFlag { flagId = "fans_revealed" });
+            var f = new Fixture(author: tree =>
+            {
+                var rootTrigger = TestTree.MakeDefinition<TriggerDefinition>("root_reset");
+                rootTrigger.condition = new Always();
+                rootTrigger.actions.Add(new ResetScope { scope = tree.Ch1Def });
+                tree.RootDef.triggers.Add(rootTrigger);
+                tree.Tier1Trigger.condition = new Always();
+                tree.Tier1Trigger.actions.Add(new SetFlag { flagId = "fans_revealed" });
+            });
             AddRecordsPress(f.Tree, 1);   // a root-homed line survives the reset the claim's sweep runs
             f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
 
@@ -438,8 +445,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // of the offer; the relaunch recomputes over the grown window.
             var json = SaveSystem.Serialize(f.Tree.Root);
             Assert.IsTrue(SaveSystem.TryDeserialize(json, f.Tree.Content, out var loaded));
-            var loadedCh1 = (ChapterScopeState)loaded.FindInSubtree(f.Tree.Ch1Def);
-            var loadedTier1 = loaded.FindInSubtree(f.Tree.Tier1Def);
+            var loadedCh1 = (ChapterScopeState)TestNavigation.Node(loaded, f.Tree.Ch1Def);
+            var loadedTier1 = TestNavigation.Node(loaded, f.Tree.Tier1Def);
             Assert.AreEqual(f.Tree.Now.AddSeconds(-1000), loadedCh1.lastActiveUtc);
 
             var session = new GameSession(loaded, Config());

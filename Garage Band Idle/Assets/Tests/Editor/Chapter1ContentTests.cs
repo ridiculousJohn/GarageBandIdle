@@ -293,7 +293,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(tier1, ((ResetScope)release.actions[1]).scope, "the payout banks before the clear");
 
             var legs = ((All)release.offerCondition).conditions;
-            Assert.AreEqual(new[] { "balance fans", "bars learn_covers 1", "not tier1 reward pending" },
+            Assert.AreEqual(new[] { "balance fans", "bars learn_covers 1", "not reward pending" },
                 legs.Select(Describe).ToArray());
             Assert.AreEqual((BigNumber)50, Threshold(legs[0]));
         }
@@ -303,11 +303,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var capstone = ch1.rung;
 
-            var legs = ((All)capstone.offerCondition).conditions;
-            Assert.AreEqual(new[] { "balance ch1_records", "not tier1 reward pending" },
-                legs.Select(Describe).ToArray());
+            // One leg, so the gate is that leg and not an All wrapping it: a
+            // parent cannot read a child's record, and the armed-reward guard
+            // is the reset's own refusal rather than anything authored here.
+            Assert.AreEqual("balance ch1_records", Describe(capstone.offerCondition));
             // The primary pacing knob (section 11).
-            Assert.AreEqual((BigNumber)30, Threshold(legs[0]));
+            Assert.AreEqual((BigNumber)30, Threshold(capstone.offerCondition));
 
             Assert.AreEqual(tier1, ((ExecuteRung)capstone.actions[0]).tier,
                 "the live run banks through the release's own gate before the wipe");
@@ -541,7 +542,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             OwnedCountAtLeast c => $"owned {c.generator.Id} {c.count}",
             FlagSet c => $"flag {c.flagId}",
             BarsCompleted c => $"bars {c.group.Id} {c.count}",
-            Not { condition: EventRewardPending pending } => $"not {pending.host.Id} reward pending",
+            Not { condition: EventRewardPending } => "not reward pending",
             Not { condition: FlagSet exclusion } => $"not flag {exclusion.flagId}",
             _ => condition.GetType().Name,
         };

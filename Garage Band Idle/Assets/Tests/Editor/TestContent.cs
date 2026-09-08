@@ -24,9 +24,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // (12.14.5), so a test adding a sibling chapter adds it here and
         // rebuilds from Content.
         public readonly List<ChapterDefinition> Chapters = new();
-        public readonly RootScopeState Root;
-        public readonly ChapterScopeState Ch1;
-        public readonly TierScopeState Tier1;
+
+        // Not readonly: Rebuild replaces the whole tree, which is what a test
+        // authoring a scope-referencing action after construction needs - the
+        // link pass runs inside Build, so an action filed afterward has no link
+        // until the tree is built again.
+        public RootScopeState Root { get; private set; }
+        public ChapterScopeState Ch1 { get; private set; }
+        public TierScopeState Tier1 { get; private set; }
 
         public readonly CurrencyDefinition Cash;
         public readonly CurrencyDefinition Fans;
@@ -209,10 +214,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             OpenMic.handicaps.Add(new Effect { target = "fans", stat = Stat.Rate, multiplier = 0.5 });
             Tier1Def.events.Add(OpenMic);
 
-            Root = ScopeState.Build(Content);
-            Ch1 = (ChapterScopeState)Root.FindInSubtree(Ch1Def);
-            Tier1 = (TierScopeState)Root.FindInSubtree(Tier1Def);
+            Rebuild();
         }
+
+        // The tree from the definitions AS THEY NOW STAND. Build runs the link
+        // pass, so anything a test authored after construction - a rung, an
+        // event list, a trigger, a section - is wired only once this has run.
+        public void Rebuild()
+        {
+            Root = ScopeState.Build(Content);
+            Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
+            Tier1 = (TierScopeState)TestNavigation.Node(Root, Tier1Def);
+        }
+
+        // Files a would-be LOOSE action as authored content so it gets a link.
+        // Nothing links `new ResetScope { ... }.Execute(ctx)`, and nothing
+        // should: the closed trigger (Not(Always)) is a real declaration at the
+        // acting scope that the sweep can never fire, so the action is linked
+        // and reach-checked by Build exactly as authored content is - and a
+        // reach fault surfaces from Build rather than from the call.
+        public T Author<T>(ScopeDefinition actingScope, T action) where T : GameAction
+        {
+            var trigger = MakeDefinition<TriggerDefinition>($"authored_{++authored}");
+            trigger.condition = new Not { condition = new Always() };
+            trigger.actions.Add(action);
+            actingScope.triggers.Add(trigger);
+            Rebuild();
+            return action;
+        }
+
+        private int authored;
 
         // One cover and the modifier its completion grants. Both are filed at
         // tier1, so a run reset clears the bonus along with the progress.
@@ -271,6 +302,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // authored content, so a fixture never has to author one (12.11).
             def.displayName = id;
             return def;
+        }
+    }
+
+    // Test-only navigation to the node a definition stands for, downward from a
+    // node the caller already holds. The runtime has no such search: a scope
+    // reference is resolved ONCE by the link pass and read by reference after
+    // (12.14.8), so this is a fixture over Children rather than a copy of
+    // anything production does. Tests hold definitions and need the nodes they
+    // built; production holds links.
+    public static class TestNavigation
+    {
+        public static ScopeState Node(ScopeState top, ScopeDefinition definition)
+        {
+            if (top == null)
+                return null;
+            if (top.Definition == definition)
+                return top;
+            foreach (var child in top.Children)
+            {
+                var found = Node(child, definition);
+                if (found != null)
+                    return found;
+            }
+            return null;
         }
     }
 }

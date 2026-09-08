@@ -48,6 +48,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Tier1Def.rung = Release(tree);
+            tree.Rebuild();   // the rung's reset is linked when the tree is built
             tree.Tier1.balances["fans"] = 60;
             tree.Tier1.barProgress[tree.Cover1.Id] = 100;
             var ctx = tree.Ctx(tree.Tier1);
@@ -61,6 +62,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             tree.Tier1Def.rung = Release(tree);
+            tree.Rebuild();
             tree.Tier1.balances["fans"] = 37;
             tree.Tier1.barProgress[tree.Cover1.Id] = 100;
             var ctx = tree.Ctx(tree.Tier1);
@@ -83,6 +85,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var rung = Release(tree);
             tree.Tier1Def.rung = rung;
+            tree.Rebuild();
             tree.Tier1.balances["fans"] = 60;
             tree.Tier1.barProgress[tree.Cover1.Id] = 100;
             var ctx = tree.Ctx(tree.Tier1);
@@ -109,6 +112,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             var rung = Release(tree);
             tree.Tier1Def.rung = rung;
+            tree.Rebuild();
             tree.Tier1.balances["fans"] = 37;
             var ctx = tree.Ctx(tree.Tier1);
 
@@ -139,6 +143,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 }
             };
             tree.Ch1Def.rung = capstone;
+            tree.Rebuild();
             var ctx = tree.Ctx(tree.Ch1);
 
             Assert.IsFalse(RungFeedback.TryPreviewPayout(capstone, ctx, out var amount, out var currencies));
@@ -171,6 +176,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 }
             };
             tree.Tier1Def.rung = rung;
+            tree.Rebuild();
             tree.Tier1.balances["fans"] = 20;
             var ctx = tree.Ctx(tree.Tier1);
 
@@ -183,6 +189,35 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // action reads what the first deposited, which is why the preview
             // stops at the first and never sums the list.
             AssertClose(27, tree.Tier1.balances["fans"], "fans after both actions");
+        }
+
+        // The refusal is not a condition, so it is not a GateFeedback leg: the
+        // widget adds it after the condition legs, reading the runner's own
+        // answer (12.5/12.11). With every condition met, the closed button has
+        // exactly one thing left to say, and it names the event.
+        [Test]
+        public void A_rung_refused_by_an_armed_reward_explains_itself_by_naming_the_event()
+        {
+            var tree = new TestTree();
+            tree.Tier1Def.rung = Release(tree);
+            tree.Rebuild();
+            tree.Tier1.balances["fans"] = 60;
+            tree.Tier1.barProgress[tree.Cover1.Id] = 100;
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic", goalReached = true };
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.IsFalse(tree.Tier1Def.rung.IsOffered(ctx));
+            Assert.IsEmpty(GateFeedback.UnmetLegs(tree.Tier1Def.rung.offerCondition, ctx),
+                "no condition refuses - the gate half has nothing to report");
+
+            var refusal = ActionList.Refuses(tree.Tier1Def.rung.actions, ctx);
+            Assert.IsNotNull(refusal);
+            Assert.AreEqual("Claim your open_mic reward first", RungFeedback.RefusalText(refusal));
+
+            tree.Tier1.activeEvent = null;
+            Assert.IsTrue(tree.Tier1Def.rung.IsOffered(ctx));
+            Assert.IsNull(ActionList.Refuses(tree.Tier1Def.rung.actions, ctx),
+                "and a rung with nothing refused shows exactly its condition legs");
         }
     }
 }

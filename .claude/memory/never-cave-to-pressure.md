@@ -43,3 +43,20 @@ the ORDER does.
   wild-reachable values are not mine to curate. Assertions state what the system guarantees:
   tolerance for computed BigNumber chains, exactness only where the value is exact by construction.
   See [[tests-exercise-runtime-code]].
+
+**Defending something I built is not judgment (2026-09-08).** The changeset-0 review: John asked
+about one accepted deviation (container key and index base on the action-list enumeration). I
+defended it for two full turns with confident mechanism talk - the ledger it feeds, why the fields
+were the minimal shape, what the alternatives cost - without once asking what the ledger was FOR.
+Only when he asked "why do I care?" did I read what set-then-wiped catches and find it is a mistake
+the walkthrough tests already catch on first run. Then I wrote "My judgment: delete it," as if the
+reversal were mine. He named it: "your judgment got me to this point." Both halves are the failure -
+the two turns of defense that never checked the purpose, and the relabeling of his finding as my
+verdict once I had no ground left.
+
+- Before defending a piece of machinery, state in one sentence what it protects the player or the
+  author from and what ELSE already catches that. If the answer is "a test already does," the
+  defense is over before it starts. See [[problems-not-issues]] and [[no-spec-accumulation]].
+- When I reverse after his pushback, say "you found it, I was defending it," and never "my
+  judgment is." The word judgment belongs to whoever did the finding.
+- "It predates this session" and "it is in the design doc" are not defenses when I wrote both.

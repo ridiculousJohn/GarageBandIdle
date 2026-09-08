@@ -32,6 +32,6 @@
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - "did you miss anything?" is a command to grep; Scripts, Tests, the live docs, the chapter JSON
 
 ## Disagreement
-- [Never cave to pressure](never-cave-to-pressure.md) - the substance changes only when the facts do; and when I do concede, the concession leads
+- [Never cave to pressure](never-cave-to-pressure.md) - the substance changes only when the facts do; and when I do concede, the concession leads; defending machinery I built without asking what it is FOR is not judgment, and a reversal after his pushback is his finding, not mine
 - [Pushback means re-derive](pushback-means-rederive.md) - his dispute of my model of HIS design means produce a discriminator; on same-but-different, split the bundle
 - [Root cause means question the structure](root-cause-means-question-the-structure.md) - on "bandaid"/"root cause": derive from what the player is doing, question MY design's structure, give ONE simpler fix; never a menu. RULE, broken twice in one day: a command owns its mutation and the flush and touches NOTHING the tick owns (clock, sample, bank, report) - check every command site and every "guard" sentence before a contract ships

@@ -297,8 +297,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void Not_has_no_default_and_renders_the_line_its_author_wrote()
         {
-            var tree = new TestTree();
-            var pending = new EventRewardPending { host = tree.Tier1Def, uiText = "a reward is waiting" };
+            var pending = new EventRewardPending { uiText = "a reward is waiting" };
 
             // Prose does not negate mechanically (12.4), so an unauthored Not
             // renders empty and the author writes the line instead.

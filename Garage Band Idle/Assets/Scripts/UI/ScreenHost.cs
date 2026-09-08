@@ -151,10 +151,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Dispose() => session.Refreshed -= Render;
 
         // The chapter's authored sections, in order, hidden until the pass
-        // below judges them. Every scope resolves downward through the one
-        // named subtree from the chapter node the host already holds - the
-        // legitimate walk (12.14.8) - and a miss throws, since validated
-        // content cannot address a scope outside the chapter.
+        // below judges them. Every evaluation scope was resolved when the tree
+        // was built and is READ off the chapter node by the section or module
+        // that names it (12.11/12.14.8) - the 12.11 reach check lives at the
+        // link, so nothing is searched for here and a rebuild costs a
+        // dictionary hit per view.
         private void Build(ChapterScopeState chapter)
         {
             container.Clear();
@@ -163,9 +164,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             foreach (var section in ((ChapterDefinition)chapter.Definition).sections)
             {
-                var view = new SectionView(section, Resolve(chapter, section.scope));
+                var view = new SectionView(section, chapter.Link(section));
                 foreach (var module in section.modules)
-                    view.AddModule(new ModuleView(module, Resolve(chapter, module.scope)));
+                    view.AddModule(new ModuleView(module, chapter.Link(module)));
                 view.Root.style.display = DisplayStyle.None;
                 container.Add(view.Root);
                 sections.Add(view);
@@ -212,16 +213,6 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 if (section.Modules[i].Widget != null)
                     placed++;
             return placed;
-        }
-
-        private static ScopeState Resolve(ChapterScopeState chapter, ScopeDefinition scope)
-        {
-            var found = scope == null ? null : chapter.FindInSubtree(scope);
-            if (found == null)
-                throw new InvalidOperationException(
-                    $"Evaluation scope '{(scope == null ? "<none>" : scope.Id)}' is not inside chapter "
-                    + $"'{chapter.ScopeId}' (design doc 12.11).");
-            return found;
         }
 
         // The named element Screen.uxml promises, for the host and for the two
