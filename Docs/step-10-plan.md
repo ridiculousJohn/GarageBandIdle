@@ -552,29 +552,11 @@ carry the content.
 
 ## Landing order
 
-Six changesets, each compiling and green on its own, and nothing blocks any of them: the
+Five changesets, each compiling and green on its own, and nothing blocks any of them: the
 entitlement spelling and the Encore window's placement settled 2026-09-02 (the decisions above).
+The scope-reference and gather refactor that briefly sat here as a changeset 0 is its own
+build-plan step, `load-linking-plan.md` (2026-09-08), and lands before slice A.
 
-- **0. Scope references resolve at load, not by search**: `EventRecordExists` and
-  `EventRewardPending` hold a direct reference to the host scope's definition, but at every
-  evaluation they search the tree from the acting scope (`FindInSubtree`) to find that scope's
-  runtime node. `ResetScope`, `RestartScope` and `ExecuteRung` search the same way to find their
-  targets. That is wrong: the reference already names the node. Resolving the definition to its
-  runtime node belongs at load, once, and Evaluate and Execute read the resolved node. The
-  design of that resolution is open (2026-09-06).
-  A modifier's `appliesWhen` is part of the same correction. Today the validator judges it from
-  the modifier's declaring scope and the runtime judges it at the gathering origin, which agree
-  on nothing. The right scope is the node the modifier is APPLIED to - the node holding the
-  stack or the permanent membership, which is `this` in `MultiplierFor` - so one modifier applied
-  to two tiers reads each tier's flags and can answer differently. That loses nothing: a grant
-  targets the acting scope or an ancestor and the modifier is declared at the target or above,
-  so the applied node's outward view contains the declaring node's. Evaluation becomes
-  `origin.Rebase(this)`, the idle circumstance riding the rebase; validation runs once per
-  applied node, all of which are known at load (the `AddModifier` grant ledger and the
-  `permanentModifiers` lists); the gate's scope references resolve on each applied node - a
-  permanent membership is that node's own content, a granted modifier's gate is resolved on the
-  grant's target, found outward at load by the node holding the grant. One behavior change and
-  no content depends on it: a chapter stack's gate reads chapter facts, not the gathering tier's.
 - **A. Encore in the runtime**: root.json's `encore` with the TIMED leg alone
   (`appliesWhen: BuffActive(encore)` - the Pass leg joins in B with `HasEntitlement`, so A stays
   a one-kind changeset), `BuffActive`, the prune, `ExtendBuff` with the
