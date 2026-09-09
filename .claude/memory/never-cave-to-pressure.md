@@ -73,3 +73,12 @@ wrote, the review question is whether the spec is right, and "plan-consistent" i
 **Inflation is caving too (2026-09-09).** See the finding-4 record in [[problems-not-issues]]: a
 nit became "a mechanism defect regardless of content" the moment he pushed, with no new fact. The
 tell is a finding's weight moving in the direction of his push-back, either way.
+
+**"You found it" is not a concession, it is a flourish (2026-09-09).** Asked why the doubled
+flag existed, I opened with "It does not need to exist. You found it." John: "this isn't a
+fucking game." And when he asked what I had done to flag an item for his attention, I answered
+with paragraphs of mechanism twice before the one sentence he wanted: "I changed behavior the
+design doc spells out the other way; code and doc disagree." The rule above says the concession
+leads; it means the FACT leads, in one plain sentence, with no scorekeeping about whose finding it
+was and no defense before it. If he asks what I did, name the action. If he asks why something
+exists, say whether it needs to, then stop.

@@ -118,3 +118,13 @@ measures what shape the code has afterward. Only the second is a design reason. 
 work, choose by which one the design already implies (here: under 12.4 the event host is the scope
 that reads its record, so the trigger belongs at the host) and say that. If the only argument for a
 choice is diff size, there is no argument yet.
+
+**A field the design's prose lists is not a mechanism to build (2026-09-09, the eighth instance).**
+Sections 9 and 12.9 described the idle offer as "the lines, the window's end, a doubled flag", so
+slice B kept an `IdleOffer.doubled` flag with two writers and three readers, and a whole review
+question grew on it (does a chapter switch honor the flag?). John: "why is there a flag? why does
+there need to be a flag at all?" The lines already held what settlement pays; doubling belongs in
+the amounts at the two moments it happens, and the exit question then has nothing to be about.
+THE CHECK, before keeping a field the doc names: name a reader that could not be served by the
+data already in hand. No such reader, no field - and the doc's list of parts gets corrected, not
+implemented.
