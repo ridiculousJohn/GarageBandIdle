@@ -1053,6 +1053,16 @@ a refusal nested in a named rung closes the outer list rather than reading as a 
 down. `DismissEvent` removes the record before running `onEnd`, so a restart from an ending list is
 never refused by its own event.
 
+A scope never clears an ancestor (§12.12), so a moment INSIDE a scope that is meant to end an
+enclosing lifetime is authored on the scope that owns that lifetime. The child writes a fact
+outward - a flag it can reach, a currency total - and the owning scope declares the trigger or the
+event whose list carries the `ResetScope` or `RestartScope` of itself, gated on that fact. The sweep
+runs inside the same transaction as the child's write, in tree order, so the clear lands in the same
+command. Chapter 1 is the worked case: the Garage Jam is hosted at tier1 and its `onEnd` restarts
+tier1, rather than anything below the tier reaching up. Wanting a child to reset its parent is the
+signal that the moment belongs one level up; the child's condition gets there as a fact, never as a
+reference.
+
 **`AddModifier`** counts a stack under the modifier's id in the target scope's
 `modifierStacks`. A modifier is declared content like everything else — `ScopeDefinition.modifiers` —
 and a grant may only name one the target scope can reach outward, so the read resolves the stored id
