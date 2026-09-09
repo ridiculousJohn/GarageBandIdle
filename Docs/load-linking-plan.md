@@ -268,10 +268,14 @@ So changeset 1 compiles two things, and only two:
    "stage-1 plan", "currency-stage plan", "bar plan", or "game_speed plan": those are the same plan
    asked with a different owner, and naming them separately is naming instances instead of the
    thing.
-2. **A chapter's contributor plan** - which sources in the chapter's subtree pay which currency at
-   `Stat.Rate`, in what order, and where each currency is homed; and the chapter's bars in
+2. **A scope's contributor plan** - which sources in the scope's subtree pay which currency at
+   `Stat.Rate`, in what order, and where each currency is homed; and the subtree's bars in
    settlement order with their groups and pool homes. This is the aggregation `RatePairs` and
-   `BarSystem.ResolveDemand` rediscover every segment by walking the subtree.
+   `BarSystem.ResolveDemand` rediscover every segment by walking the subtree. Every scope holds
+   one over its own subtree (12.14.8's downward walk is legitimate from any held scope, and no
+   kind of scope is special to the economy); the tick asks the foreground chapter because that is
+   what ticks, which is a session choice. Landed per scope 2026-09-08 after a chapter-only first
+   cut was corrected.
 
 Nothing else is compiled. What is dynamic stays dynamic: entry conditions, `appliesWhen`,
 `activeWhen`, purchased latches, stack counts, fill counts, event records, formula factors. A plan
@@ -342,10 +346,10 @@ throws as for every other link:
 The store's value type widens from `ScopeState` to `object` for this; `Link<T>(holder)` casts and
 throws on a wrong kind, which is a code bug like a miss.
 
-### Compiling a chapter's contributor plan
+### Compiling a scope's contributor plan
 
-At each chapter node, stored under the chapter's own definition: for each currency any source in
-the subtree pays at `Stat.Rate`, the contributors as (node, source, its rate-entry plans) in tree
+At every node, stored under the node's own definition, over that node's subtree: for each currency
+any source in the subtree pays at `Stat.Rate`, the contributors as (node, source, its rate-entry plans) in tree
 order (parent before child) then `Sources()` order, and the currency's home node found outward from
 the paying node. And the bars in the subtree in settlement order - scopes parent before child, then
 `barGroups` in declaration order, then bars in declaration order - each with its node, group, pool
@@ -358,18 +362,20 @@ chain, iterates a subtree, or compares a string.
 
 - `Producer.SourceTerm` - the entry's stage-1 plan at the declaring node.
 - `Producer.CurrencyStage` - the currency's stage-2 plan at its home.
-- `Producer.GetRate` - the chapter's contributor plan for the currency: sum each contributor's term,
-  times the currency stage.
+- `Producer.GetRate` - the contributor plan of the node it is asked at, for the currency: sum each
+  contributor's term, times the currency stage.
 - `Producer.RatePairs` - the contributor plan's currency list; it no longer walks.
 - `Producer.ResolveUnit` (`ResolveYield`, `UnitRate`, `FireProducer`) - the source's entry plans
   and the currency stage plans.
-- `BarSystem.ResolveDemand` - the chapter's bar order from the contributor plan.
+- `BarSystem.ResolveDemand` - the bar order from the contributor plan of the node it is asked at.
 - `BarSystem.Rate` - the bar's coordinate plan.
 - `TickSystem` - the chapter's `GameSpeed` plan, `RatePairs`, `ResolveDemand`.
 - `GameSession`'s idle offer - `RatePairs` and `GetRate` under the idle context; the circumstance
   rides the context into every `Factor` call.
-- `CurrencyReadout` (UI) - binds to a currency's home; it takes the home from the contributor plan
-  of the chapter it renders, so the bind is a plan read and not a walk.
+- `CurrencyReadout` (UI) - binds to a currency's home by the OUTWARD walk to the declaring scope
+  (`Producer.DeclaringScope`), as every command does; that walk is the legitimate resolution of
+  12.14.8 and was never what this changeset removes. (A first cut read it off a contributor plan;
+  corrected 2026-09-08.)
 - `SourceTerm`'s `activeWhen` check - the home node is on the entry's plan.
 
 ### Runtime deletions

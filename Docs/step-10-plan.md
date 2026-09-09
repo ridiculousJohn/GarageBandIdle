@@ -125,9 +125,10 @@ facts only John can settle, and none blocks a slice.
   at root. **`TickSystem.Boundaries`** already admits every buff expiry in the swept set as a
   segment edge and says so: "nothing reads or removes one until the timedBuffs gather row lands" -
   that comment is corrected with this step, since no gather row lands.
-- **`ScopeState.MultiplierFor`**: the permanent-membership loop already applies a modifier only
-  while `Applies(modifier, origin)` holds - `idle_base` counts only under the idle context by
-  exactly this. Encore adds nothing to the gather: its `appliesWhen` is a compound over two
+- **`EffectLink.Factor`** (load-linking changeset 1; `ScopeState.MultiplierFor` is deleted): a
+  permanent-membership link already contributes only while the modifier's `appliesWhen` holds,
+  judged at the link's own node - `idle_base` counts only under the idle context by exactly
+  this. Encore adds nothing to the gather: its `appliesWhen` is a compound over two
   facts, and `Any` already exists.
 - **`Condition`**: the family a new kind joins (`FlagSet` is the model - a fact keyed by id,
   resolved outward from the acting scope, with `Validate` and `Progress`).

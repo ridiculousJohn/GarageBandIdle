@@ -48,3 +48,13 @@ statement, and it is the part he did not ask for, so it either gets the same gre
 answer or it is left out - left out is the default. Any sentence naming which code does what is a
 claim about the file on disk; read the file first, every time, and "I remember this one" is not an
 exemption. See [[reuse-the-existing-mechanism]] for the same day's other failure.
+
+**2026-09-08 - a plan I wrote is not the design.** Four times in one day I reviewed agent code for
+"matches the plan, numbers unchanged" and passed it, and four times the plan sentence was the thing
+that was wrong: a validator ledger the tests already covered, a chapter-only restriction on an
+economy read, a fault deferred to first use instead of Build, a readout converted from the legitimate
+outward walk to a plan read. Each was caught only when John made me derive it from the design doc
+rule instead of from my own text. The review step that was missing: for every sentence in the plan
+that the diff implements, name the design rule it follows (12.14.8's two walks, 12.14.7's throw at
+the boundary, 12.12's checks) - and if the sentence cannot be traced to a rule, the sentence is the
+defect, not the code. The plan is my prior statement, and this file's rule applies to it.
