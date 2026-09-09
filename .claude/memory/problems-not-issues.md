@@ -106,3 +106,9 @@ turns before I said "nothing changed here". Before an item goes on that list: na
 and who would notice. If there is no second option or nobody would notice, it is not a decision - it
 is filler that will be read as a claim of work, and it will be defended out of habit. Filter agent
 line items; do not pass them through.
+
+2026-09-09, on "what's next": after correctly reporting that the plan had already been retargeted
+(a commit did it and a grep confirmed it), I closed with "one thing worth a look before slice A
+starts" and then said in the same paragraph it was "likely a wording check rather than a design
+problem". Check the 'one thing' against the actual project before reporting it.  If nothing
+actually has to be done, then there is nothing to report.
