@@ -6,6 +6,8 @@
 
   "flags": ["ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen"],
 
+  "entitlements": ["backstage_pass"],
+
   "currencies": [
     { "id": "records", "displayName": "Records" },
     { "id": "roadies", "displayName": "Roadies" }
@@ -57,7 +59,13 @@
     },
     {
       "id": "encore",
-      "appliesWhen": { "type": "BuffActive", "modifier": "encore" },
+      "appliesWhen": {
+        "type": "Any",
+        "conditions": [
+          { "type": "HasEntitlement", "entitlementId": "backstage_pass" },
+          { "type": "BuffActive", "modifier": "encore" }
+        ]
+      },
       "effects": [
         { "stat": "game_speed", "multiplier": 2 }
       ]

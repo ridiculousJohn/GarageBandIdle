@@ -17,7 +17,7 @@ the stubbed ad, and another doubled by buying the Pass from the dialog; the open
 fresh install and the capstone beat after the first clear, both rewatchable from the log; a
 replay with one Roadie stationed on ch1 through the allocation screen, ~1.87x as walkthrough 13.3
 computes. Both walkthrough tests that today poke facts directly - 13.3's allocation map write and
-13.4's `doubled = true` - convert to the commands that now own those writes.
+13.4's hand-doubled offer - convert to the commands that now own those writes.
 
 The command surface grows, for the first time since step 7, and only by root-owned commands and
 authenticated callbacks (12.11's list): `SetRoadieAllocation`, `AcknowledgeStory`, and the callback
@@ -53,7 +53,7 @@ Settled in conversation and landed in the design doc the same day (commit `bb1f6
    rate accrues while away.
 3. **The Backstage Pass is every reward the two ads give, without the ads, plus a raised cap**:
    permanent Encore, the claim always doubled, the higher idle cap. The doubling is the offer's
-   existing `doubled` flag set from the entitlement at computation - no second idle modifier,
+   lines computed at twice the amount, as the ad callback doubles them - no second idle modifier,
    which is what made the earlier design read as one lever pulled twice. A free player watching
    both ads reaches the same 4x on an offer; the Pass makes it automatic (Ctrl C's Pro Unlock:
    "Double All", the idle window showing the doubled amount with "Great!").
@@ -102,7 +102,7 @@ facts only John can settle, and none blocks a slice.
   shape; the store callback is the only writer by definition, so no setter check applies - which
   deletes the code-set flag marker the flag spelling would have needed, since the story flags get
   their setter from the beat definition. The session's two code reads (the cap raise, the doubled
-  flag) name the Pass id in one constant.
+  lines) name the Pass id in one constant.
 - **"Unlocked chapters only"** (12.11's `SetRoadieAllocation` rule). No chapter unlock condition
   exists: the select renders root's whole roster, and section 2 says a cleared chapter stays
   available. Until a chapter authors an unlock gate, the constraint is "a chapter on root's
@@ -137,7 +137,7 @@ facts only John can settle, and none blocks a slice.
 - **`Condition`**: the family a new kind joins (`FlagSet` is the model - a fact keyed by id,
   resolved outward from the acting scope, with `Validate` and `Progress`).
 - **`GameSession.EnterChapter`**: computes the offer once over `[stamp, nowUtc]` at current state
-  under the idle context; `SettleOffer` pays the stored lines, x2 when `doubled`. `RunCommand` is
+  under the idle context; `SettleOffer` pays the stored lines as they stand. `RunCommand` is
   the pipeline every command runs: guards, flush, mutation, conditional sweep, one refresh.
   Root-owned commands take "the exception path 12.9 names and arrive with their step" - this one.
 - **`RootFacts`**: `roadieAllocation` (read by `RoadieTotalBoost` / `RoadieActiveBoost`, both
@@ -270,8 +270,8 @@ loop over the paid window's segments, the tick's own shape:
 The `idle_base` x0.5 rides the rate gather as before; a live-only speed buff excuses itself by
 `appliesWhen: Not(IdleAccumulation)` with the vocabulary that exists. The Pass's cap raise is the
 one entitlement read in the window computation: `idleCapSeconds` becomes the Pass's larger knob
-when the entitlement holds. The Pass's doubling is the other: `offer.doubled = true` at
-computation when the entitlement holds, so `SettleOffer` changes nothing and the dialog shows what
+when the entitlement holds. The Pass's doubling is the other: the lines are computed at twice the
+amount when the entitlement holds, so `SettleOffer` changes nothing and the dialog shows what
 OK pays.
 
 `TickSystem.Boundaries` and the segment walk get factored so the claim calls the same code the tick
@@ -288,13 +288,13 @@ applies. The three benefits, each on an existing mechanism:
 
 - **Permanent Encore**: the first leg of `encore`'s own `appliesWhen`
   (`HasEntitlement(backstage_pass)`). No second modifier, no refusal.
-- **The claim always doubled**: `EnterChapter` sets `doubled` from the entitlement.
+- **The claim always doubled**: `EnterChapter` computes the lines doubled when the entitlement holds.
 - **The raised cap**: the window computation reads `backstagePassIdleCapSeconds` instead of
   `idleCapSeconds` while it holds.
 
 **The write**, `GrantEntitlement(id, nowUtc)`: a root-owned session command the store callback
 completes into - sets the fact and runs the pipeline. From the idle dialog it is
-`PurchasePassFromDialog(nowUtc)`: the entitlement write, `doubled = true`, and the claim in one
+`PurchasePassFromDialog(nowUtc)`: the entitlement write, the offer doubled, and the claim in one
 transaction ending `Live` (decision 4). A kill between the store's confirmation and the claim
 leaves the stamp unmoved and the entitlement to be restored from the store. Restoration is the
 store seam's `RestoreEntitlements` completing into the same write for each id, asynchronously, on
@@ -343,10 +343,12 @@ callers of the callback commands: `ExtendBuff` and `DoubleAndClaimIdle(nowUtc)` 
 `GrantEntitlement` / `PurchasePassFromDialog`, `GrantRoadies(count, nowUtc)` (a root-context
 deposit into `roadies`, the currency's `activeWhen` honored), and a no-op transaction for a Tip Jar
 purchase from the store. **The drop rule is `IdleDouble`'s alone.** An `IdleDouble` request
-records the chapter it was made for; its result is dropped only when the foreground chapter is no
-longer that one (the player switched under the dialog, which settled that offer undoubled on the
-way out) - for the same chapter, a live offer is doubled and settled, and with none live the
-callback recomputes from the stamp first, 12.9's mid-ad kill rule. An `EncoreExtension` result has
+records the chapter it was made for; its result is dropped only when a DIFFERENT chapter is in the
+foreground (the player switched under the dialog, which settled that offer as it stood on the way
+out); with no chapter in front it waits, because backgrounding drops the offer and keeps the stamp
+and the resume re-enters the recorded chapter and recomputes it - for the same chapter, a live offer is doubled and settled, and with none live there is
+nothing to pay (a kill mid-ad takes the callback with the process, and the unmoved stamp re-offers
+the window on the next launch). An `EncoreExtension` result has
 no offer to lose and its command is legal in every phase, so a Rewarded result ALWAYS reaches
 `ExtendBuff` and the save, after a backgrounding or a chapter change alike; a watched ad is never
 discarded. **A Rewarded result
@@ -354,8 +356,8 @@ saves after its grant**, through the same one save site the store path uses: the
 pause and quit today, an ad network never replays a watched ad, and a crash after `ExtendBuff` or
 `DoubleAndClaimIdle` would otherwise take the reward off disk. Aborted and Failed save nothing.
 
-`DoubleAndClaimIdle` is `ClaimIdle` with `doubled = true` set first, one transaction. When no offer
-is live (the mid-ad kill), it recomputes from the stamp first - 12.9's sentence, now code.
+`DoubleAndClaimIdle` is `ClaimIdle` with the lines doubled first, one transaction; with no offer
+standing it is refused like `ClaimIdle`.
 
 The fakes complete on the main thread on the next frame, through the driver's `Update`, so the
 asynchrony is real enough to catch a callback landing under a changed phase but never interleaves
@@ -523,14 +525,14 @@ list through a resolve the pass checked, so the command asks nothing of its own.
   scripted to kill between grant and acknowledge leaves the transaction unacknowledged.
 - **The claim**: 13.4's numbers unchanged with no buff; with one hour of Encore left and four away,
   cash = 84 x (3600 x 2 + 10800 x 1) x 0.5; a buff expired before the stamp changes nothing; away
-  time past the cap pays the cap; a Pass owner's offer is `doubled` and computed over the larger
+  time past the cap pays the cap; a Pass owner's offer is computed doubled and over the larger
   cap; the segment code is the tick's (a shared method, asserted by the call, not by a copy).
 - **Callbacks**: an `EncoreExtension` Rewarded result reaches `ExtendBuff` after a backgrounding
   and after a chapter change, and only an `IdleDouble` result for a chapter no longer in the
   foreground is dropped; `DoubleAndClaimIdle` pays x2 and advances the stamp in one transaction, and
-  recomputes from the stamp when no offer is live; `PurchasePassFromDialog` writes the entitlement,
+  is refused when no offer is live; `PurchasePassFromDialog` writes the entitlement,
   pays x2, ends `Live`; a fake ad scripted to abort leaves the offer undoubled and the dialog up; a
-  fake purchase scripted to fail writes nothing; `GrantRoadies` deposits into root's `roadies`. 13.4's `doubled = true` converts to the
+  fake purchase scripted to fail writes nothing; `GrantRoadies` deposits into root's `roadies`. 13.4's hand-doubled offer converts to the
   fake ad's callback.
 - **Story**: the opener is available on a fresh chapter and unseen; `AcknowledgeStory` sets the
   root flag and the row reads seen; the capstone beat is unavailable before `ch1_complete` and its
@@ -585,8 +587,9 @@ build-plan step, `load-linking-plan.md` (2026-09-08), and lands before slice A.
   `encore`'s `appliesWhen` becoming the two-leg `Any`, the two interfaces and their fakes,
   `AdManager` / `IAPManager` with the grant-save-acknowledge order, the callback commands, the
   Pass's three benefits, the dialog's Double It and Pass buttons, 13.4 converted; `CodeReferences`
-  with the entries for `AdManager`, `IAPManager` and the session's Pass id, and the shared `encore`
-  resolve they read.
+  with its first three entries - the `Encore`, `BackstagePass` and `Roadies` statics, each owning
+  the id the code names, its resolve and its check - which `AdManager`, `IAPManager` and the session
+  read.
 - **C. Story beats**: the family with the pop mark, the importer and validator rows,
   `AcknowledgeStory`, `story_row` with the factory's opener parameter, the card and the marked-beat
   walk in the host, ch1's two beats and their `garage_floor` rows (placement settled above, so C

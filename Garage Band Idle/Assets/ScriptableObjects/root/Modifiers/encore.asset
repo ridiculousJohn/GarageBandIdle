@@ -27,13 +27,25 @@ MonoBehaviour:
     formula:
       rid: -2
   appliesWhen:
-    rid: 7579425352975646720
+    rid: 7579425355617271808
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425352975646720
+    - rid: 7579425355617271808
+      type: {class: Any, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        conditions:
+        - rid: 7579425355617271809
+        - rid: 7579425355617271810
+    - rid: 7579425355617271809
+      type: {class: HasEntitlement, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        entitlementId: backstage_pass
+    - rid: 7579425355617271810
       type: {class: BuffActive, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

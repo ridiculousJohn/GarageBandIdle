@@ -11,6 +11,8 @@
         <ui:VisualElement class="collect-panel">
             <ui:Label text="While you were away" class="collect-title" />
             <ui:VisualElement name="lines" class="collect-lines" />
+            <ui:Button name="double" text="Double It" class="collect-double" />
+            <ui:Button name="pass" text="Backstage Pass" class="collect-pass" />
             <ui:Button name="ok" text="OK" class="collect-ok" />
         </ui:VisualElement>
     </ui:VisualElement>

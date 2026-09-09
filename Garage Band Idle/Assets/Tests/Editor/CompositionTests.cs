@@ -60,6 +60,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var rootDef = TestTree.MakeRoot("root");
             TestTree.DeclareCurrency(rootDef, "records");
+            // The pass ends by asking root for what the code names (12.12), so
+            // even a chapterless root declares those three to come back clean.
+            TestTree.DeclareCodeReferences(rootDef);
 
             var content = ComposedContent.Compose(rootDef);
 

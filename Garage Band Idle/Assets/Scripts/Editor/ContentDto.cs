@@ -66,6 +66,13 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public string modifier;
     }
 
+    // The id stays an id here and there both: an entitlement has no asset to
+    // reference, exactly as a flag has none (12.3).
+    internal class HasEntitlementDto : ConditionDto
+    {
+        public string entitlementId;
+    }
+
     internal class BarsCompletedDto : ConditionDto
     {
         public string group;
@@ -338,6 +345,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public List<string> tags = new();
         public List<CurrencyDto> currencies = new();
         public List<string> flags = new();
+        public List<string> entitlements = new();
         public List<string> declaredTags = new();
         public List<ProducerDto> producers = new();
         public List<GeneratorDto> generators = new();
@@ -365,6 +373,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             { nameof(FlagSet), typeof(FlagSetDto) },
             { nameof(UpgradePurchased), typeof(UpgradePurchasedDto) },
             { nameof(BuffActive), typeof(BuffActiveDto) },
+            { nameof(HasEntitlement), typeof(HasEntitlementDto) },
             { nameof(BarsCompleted), typeof(BarsCompletedDto) },
             { nameof(EventRecordExists), typeof(EventRecordExistsDto) },
             { nameof(EventRewardPending), typeof(EventRewardPendingDto) },

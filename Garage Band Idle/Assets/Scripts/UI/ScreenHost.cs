@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RidiculousGaming.GarageBandIdle.Monetization;
 using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
@@ -83,14 +84,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         // Over the screen's own root: the host owns all three screens, so it is
         // the one place that knows which named elements Screen.uxml promises.
-        public ScreenHost(VisualElement screenRoot, ModuleRegistry registry, GameSession session, GameClock clock)
+        public ScreenHost(VisualElement screenRoot, ModuleRegistry registry, GameSession session, GameClock clock,
+                          AdManager ads, IAPManager store)
         {
             container = Require<VisualElement>(screenRoot, "sections");
             this.registry = registry;
             this.session = session;
             this.clock = clock;
             select = new ChapterSelectUI(Require<VisualElement>(screenRoot, "select"), session, clock);
-            collect = new CollectScreenUI(Require<VisualElement>(screenRoot, "collect"), session, clock);
+            collect = new CollectScreenUI(Require<VisualElement>(screenRoot, "collect"), session, clock, ads, store);
             session.Refreshed += Render;
         }
 

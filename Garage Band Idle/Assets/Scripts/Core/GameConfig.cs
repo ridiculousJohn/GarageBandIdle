@@ -26,6 +26,19 @@ namespace RidiculousGaming.GarageBandIdle
         public double encoreAdSeconds = 14400;   // one rewarded ad's extension
         public double encoreCapSeconds = 86400;  // the most remaining Encore a record may hold
 
+        // The Pass's idle cap (section 9), a placeholder like the thresholds
+        // above. Require refuses one below the base cap: a malformed Pass cap
+        // must fail at boot, never shrink a paid claim.
+        public double backstagePassIdleCapSeconds = 28800;
+
+        // The Roadie bundles the store sells (section 9): counts, since Roadies
+        // are counted, and placeholders until tuning cares. Require refuses a
+        // nonpositive one - a store that has already reported success must
+        // never meet a grant that throws.
+        public int roadieBundleSmall = 1;
+        public int roadieBundleMedium = 5;
+        public int roadieBundleLarge = 15;
+
         // The tick cadence (section 9): the session ticks ONCE with the whole
         // accumulation when pending crosses this. Smoothness comes from
         // interpolation, so the interval only bounds the latency of an
@@ -61,10 +74,26 @@ namespace RidiculousGaming.GarageBandIdle
             if (config.encoreCapSeconds < config.encoreAdSeconds)
                 throw new InvalidOperationException(
                     $"GameConfig: encoreCapSeconds {config.encoreCapSeconds} is below encoreAdSeconds {config.encoreAdSeconds} - a cap under one ad's grant would clamp every ad short.");
+            if (double.IsNaN(config.backstagePassIdleCapSeconds) || double.IsInfinity(config.backstagePassIdleCapSeconds)
+                || config.backstagePassIdleCapSeconds < config.idleCapSeconds)
+                throw new InvalidOperationException(
+                    $"GameConfig: backstagePassIdleCapSeconds {config.backstagePassIdleCapSeconds} is not a finite value of at least idleCapSeconds {config.idleCapSeconds}.");
+            RequirePositiveCount(config.roadieBundleSmall, nameof(config.roadieBundleSmall));
+            RequirePositiveCount(config.roadieBundleMedium, nameof(config.roadieBundleMedium));
+            RequirePositiveCount(config.roadieBundleLarge, nameof(config.roadieBundleLarge));
             if (double.IsNaN(config.tickIntervalSeconds) || double.IsInfinity(config.tickIntervalSeconds)
                 || config.tickIntervalSeconds <= 0)
                 throw new InvalidOperationException(
                     $"GameConfig: tickIntervalSeconds {config.tickIntervalSeconds} is not a finite positive value.");
+        }
+
+        // The three bundles take one rule, so they ask it in one place: a
+        // bundle is a count of Roadies, and a nonpositive one is a purchase
+        // that delivers nothing.
+        private static void RequirePositiveCount(int value, string name)
+        {
+            if (value <= 0)
+                throw new InvalidOperationException($"GameConfig: {name} {value} is not a positive count.");
         }
     }
 }

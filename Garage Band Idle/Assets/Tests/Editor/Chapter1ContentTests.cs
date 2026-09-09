@@ -76,6 +76,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             Assert.AreEqual(new[] { "records", "roadies" }, Ids(root.declaredCurrencies));
             Assert.AreEqual(new[] { "income", "production" }, root.declaredTags.ToArray());
+            // The store's products, declared like flags and root's alone (12.3).
+            Assert.AreEqual(new[] { "backstage_pass" }, root.entitlements.ToArray());
 
             Assert.AreEqual(new[] { "ch1_records" }, Ids(ch1.declaredCurrencies));
             Assert.AreEqual(new[] { "album", "gj1_done", "gj2_done", "gj3_done" }, ch1.declaredFlags.ToArray());
@@ -402,8 +404,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // Encore is one ordinary root modifier with a timer (section 9): a
-        // wildcard game_speed x2, applied permanently, whose membership is the
-        // presence of a live record carrying its own id.
+        // wildcard game_speed x2, applied permanently, whose membership counts
+        // two ways in - the Pass, or a live record carrying its own id. One
+        // membership, so a Pass owner holding a record is still x2.
         [Test]
         public void Root_declares_encore_as_a_permanent_game_speed_membership()
         {
@@ -414,8 +417,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)2, effect.multiplier);
             Assert.IsTrue(string.IsNullOrEmpty(effect.target), "game_speed addresses no owner");
             Assert.IsTrue(string.IsNullOrEmpty(effect.currencyId), "and no currency");
-            Assert.AreSame(encore, ((BuffActive)encore.appliesWhen).modifier,
-                "the modifier's own record is what switches it on");
+
+            var legs = ((Any)encore.appliesWhen).conditions;
+            Assert.AreEqual(2, legs.Count);
+            Assert.AreEqual("backstage_pass", ((HasEntitlement)legs[0]).entitlementId,
+                "the Pass supersedes the timer, so its leg comes first");
+            Assert.AreSame(encore, ((BuffActive)legs[1]).modifier,
+                "and the modifier's own record is the other way in");
             Assert.IsTrue(root.permanentModifiers.Contains(encore));
         }
 

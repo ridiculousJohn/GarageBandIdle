@@ -5,6 +5,7 @@ using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Editor;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.Monetization;
 using RidiculousGaming.GarageBandIdle.UI;
 using UnityEditor;
 using UnityEngine;
@@ -58,6 +59,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly TierScopeState Tier1;
             public readonly GameSession Session;
 
+            // The knobs the session was built on, held so a row that builds a
+            // manager over this session hands it the same asset.
+            public readonly GameConfig ConfigAsset;
+
             public DateTime Now = Start;
 
             // The real asset's numbers (section 9); the asset itself is
@@ -105,7 +110,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Root = ScopeState.Build(ComposedContent.Compose(RootDef, new[] { Ch1Def }));
                 Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
                 Tier1 = (TierScopeState)TestNavigation.Node(Root, Tier1Def);
-                Session = new GameSession(Root, Config());
+                ConfigAsset = Config();
+                Session = new GameSession(Root, ConfigAsset);
             }
 
             private static T Find<T>(IEnumerable<T> definitions, string id) where T : Definition =>
@@ -528,12 +534,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(3600, Line(f, f.Rehearsal).amount, "rehearsal");
             Assert.AreEqual((BigNumber)0, f.Balance(f.Tier1, f.Cash), "an offer deposits nothing until it settles");
 
-            // The ad callback's write; settlement doubles and stamps in one
-            // transaction, which is the whole exactly-once mechanism.
-            f.Session.CurrentOffer.doubled = true;
+            // "Double it" only REQUESTS; the rewarded ad's callback doubles and
+            // settles in ONE transaction, which is the whole exactly-once
+            // mechanism, and saves after the grant so a crash cannot take the
+            // reward off disk.
             var windowEnd = f.Session.CurrentOffer.windowEndUtc;
-            Assert.IsTrue(f.Session.ClaimIdle(f.Now));
+            var ads = new FakeAdService();
+            var saves = 0;
+            var manager = new AdManager(f.Session, ads, f.ConfigAsset, () => saves++);
 
+            manager.RequestIdleDouble();
+            Assert.AreEqual((BigNumber)0, f.Balance(f.Tier1, f.Cash), "a request pays nothing");
+            manager.Update(f.Now);
+
+            Assert.AreEqual(new[] { AdPlacement.IdleDouble }, ads.Shown.ToArray());
+            Assert.AreEqual(1, saves, "the grant is on disk before the frame ends");
             AssertClose(1209600, f.Balance(f.Tier1, f.Cash));
             AssertClose(9331.56, f.Balance(f.Tier1, f.Fans));
             AssertClose(7200, f.Balance(f.Tier1, f.Rehearsal));

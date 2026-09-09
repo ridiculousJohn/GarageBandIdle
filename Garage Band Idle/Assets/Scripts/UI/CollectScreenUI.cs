@@ -1,14 +1,15 @@
+using RidiculousGaming.GarageBandIdle.Meta;
+using RidiculousGaming.GarageBandIdle.Monetization;
 using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
     // The idle dialog (design doc 12.9): the offer's lines - currency name and
-    // amount, all references, formatted - and OK, which settles through
-    // ClaimIdle. The dialog shows what the session holds and computes nothing:
-    // what is shown is what is paid, because only one offer is ever alive.
-    // "Double it" arrives with the AdManager; the button only requests the ad
-    // and the callback's own transaction doubles and settles, so the dialog is
-    // OK-only until then.
+    // amount, all references, formatted - and three actions. OK settles through
+    // ClaimIdle; Double It and Backstage Pass only REQUEST, and the payout is
+    // the ad's or the store's own callback transaction (12.11). The dialog
+    // shows what the session holds and computes nothing: what is shown is what
+    // is paid, because only one offer is ever alive.
     public sealed class CollectScreenUI
     {
         public VisualElement Root { get; }
@@ -16,11 +17,21 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly GameSession session;
         private readonly VisualElement lines;
 
-        public CollectScreenUI(VisualElement root, GameSession session, GameClock clock)
+        // Held so Refresh can hide them: a Pass owner already has both rewards,
+        // so the dialog is OK alone (section 9).
+        private readonly Button doubleButton;
+        private readonly Button passButton;
+
+        public CollectScreenUI(VisualElement root, GameSession session, GameClock clock,
+                               AdManager ads, IAPManager store)
         {
             Root = root;
             this.session = session;
             lines = ScreenHost.Require<VisualElement>(root, "lines");
+            doubleButton = ScreenHost.Require<Button>(root, "double");
+            doubleButton.clicked += ads.RequestIdleDouble;
+            passButton = ScreenHost.Require<Button>(root, "pass");
+            passButton.clicked += () => store.RequestPurchase(ProductId.BackstagePass);
             var ok = ScreenHost.Require<Button>(root, "ok");
             ok.clicked += () => session.ClaimIdle(clock.RealTimeUtc);
         }
@@ -32,6 +43,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Refresh()
         {
             lines.Clear();
+            // Both requests buy what the Pass already gives, so an owner's
+            // dialog is OK alone (section 9). Judged before the offer, because
+            // the button set is a fact of the entitlement and not of the offer.
+            var owned = BackstagePass.Owned(session.Root);
+            doubleButton.style.display = owned ? DisplayStyle.None : DisplayStyle.Flex;
+            passButton.style.display = owned ? DisplayStyle.None : DisplayStyle.Flex;
+
             var offer = session.CurrentOffer;
             // The host shows this screen only in AwaitingIdleClaim, where the
             // offer is non-null by the session's rule; the guard is for a

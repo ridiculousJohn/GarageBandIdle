@@ -172,6 +172,33 @@ namespace RidiculousGaming.GarageBandIdle
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(modifier, "BuffActive");
     }
 
+    // A held store product (design doc 12.3): the set is root's alone, so the
+    // read is the chain's root and the id is one root declares on its own
+    // entitlements list. The store callback is the only writer, so no setter
+    // rule applies; the id validates the way a flag's does.
+    [Serializable]
+    public class HasEntitlement : Condition
+    {
+        public string entitlementId;
+
+        public override bool Evaluate(GameContext ctx) => ctx.HasEntitlement(entitlementId);
+
+        // Root is on every chain, so there is no reach variant of the miss: an
+        // id root does not declare is unresolvable from everywhere at once.
+        public override void Validate(ValidationContext ctx)
+        {
+            if (string.IsNullOrEmpty(entitlementId))
+            {
+                ctx.AddError(ValidationCheck.NullEntry, "HasEntitlement names no entitlement.");
+                return;
+            }
+            if (ctx.RootScope is RootDefinition root && root.DeclaresEntitlement(entitlementId))
+                return;
+            ctx.AddError(ValidationCheck.UnresolvedReference,
+                $"HasEntitlement references entitlement '{entitlementId}', which root does not declare (12.3).");
+        }
+    }
+
     // Counts the group's bars at full: completion is derived, progress >= the
     // bar's fillAmount, never stored (design doc 12.7).
     [Serializable]

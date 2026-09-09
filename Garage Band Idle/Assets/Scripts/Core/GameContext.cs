@@ -106,6 +106,10 @@ namespace RidiculousGaming.GarageBandIdle
             return false;
         }
 
+        // Root's set, reached by the chain walk like every other read: root is
+        // the top of every chain, and the entitlements are root's alone (12.3).
+        public bool HasEntitlement(string entitlementId) => Scope.Root().entitlements.Contains(entitlementId);
+
         public BigNumber GetBarProgress(string barId)
         {
             for (var node = Scope; node != null; node = node.Parent)

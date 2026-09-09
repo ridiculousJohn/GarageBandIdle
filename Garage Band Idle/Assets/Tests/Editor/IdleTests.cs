@@ -116,21 +116,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(BigNumber.Zero, w.Ch2.balances["merch"], "nothing accrued for a chapter never played");
         }
 
+        // Settlement pays the lines as they stand (section 9): a Pass owner's
+        // offer is computed doubled at entry, so an exit pays what the dialog
+        // was showing - shown and paid never differ. The ad callback's doubling
+        // is never met here, because it settles in the same transaction.
         [Test]
-        public void Switch_away_settles_the_offer_undoubled_and_stamps_its_window()
+        public void Switch_away_settles_a_Pass_owners_doubled_offer_and_stamps_its_window()
         {
             var w = new TwoChapters();
+            w.Root.entitlements.Add("backstage_pass");
             w.Ch1.lastActiveUtc = w.Tree.Now.AddSeconds(-1000);
             w.Session.SwitchChapter(w.Ch1, w.Tree.Now);
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, w.Session.Phase);
-            // The ad callback's write - an exit path pays the undoubled value.
-            w.Session.CurrentOffer.doubled = true;
+            AssertClose(500, w.Session.CurrentOffer.lines[0].amount, "0.25/s x 1000, computed doubled");
 
             var later = w.Tree.Now.AddSeconds(60);
             w.Ch2.lastActiveUtc = later;   // the incoming side stays quiet
             w.Session.SwitchChapter(w.Ch2, later);
 
-            AssertClose(250, w.Tier1.balances["cash"]);                       // 0.25/s x 1000, x1 not x2
+            AssertClose(500, w.Tier1.balances["cash"]);                       // 0.25/s x 1000, doubled
             Assert.AreEqual(w.Tree.Now, w.Ch1.lastActiveUtc);                 // the window's end, not the switch moment
             Assert.AreEqual(SessionPhase.Live, w.Session.Phase);
             Assert.IsNull(w.Session.CurrentOffer);
@@ -416,26 +420,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- settlement ----
 
         [Test]
-        public void ClaimIdle_pays_the_stored_lines_doubled_when_marked_and_stamps_the_window()
+        public void ClaimIdle_pays_the_stored_lines_and_stamps_the_window()
         {
             var f = new Fixture();
             f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
-            f.Session.CurrentOffer.doubled = true;
 
             // Claimed well after the offer was computed: the deposit is the
             // stored amount, and the stamp advances to the window's end, not
             // the claim moment.
             Assert.IsTrue(f.Session.ClaimIdle(f.Tree.Now.AddSeconds(300)));
 
-            AssertClose(500, f.Tree.Tier1.balances["cash"]);   // 250 x2
+            AssertClose(250, f.Tree.Tier1.balances["cash"]);   // 0.25/s x 1000
             Assert.AreEqual(f.Tree.Now, f.Tree.Ch1.lastActiveUtc);
             Assert.AreEqual(SessionPhase.Live, f.Session.Phase);
             Assert.IsNull(f.Session.CurrentOffer);
 
             // Replay is refused by phase, and nothing re-deposits.
             Assert.IsFalse(f.Session.ClaimIdle(f.Tree.Now.AddSeconds(300)));
-            AssertClose(500, f.Tree.Tier1.balances["cash"]);
+            AssertClose(250, f.Tree.Tier1.balances["cash"]);
         }
 
         [Test]

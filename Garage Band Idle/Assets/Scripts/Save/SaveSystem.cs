@@ -298,6 +298,18 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 Debug.LogWarning($"SaveSystem: flag '{flagId}' is not declared by scope '{definition.Id}' - dropped.");
                 return true;
             });
+
+            // An entitlement is declared on root exactly as a flag is declared
+            // on its home (12.3), so a store product dropped from root.json
+            // goes the way every other unknown id goes (12.10).
+            if (facts is RootFacts entitlementFacts && definition is RootDefinition entitlementRoot)
+                entitlementFacts.entitlements.RemoveWhere(id =>
+                {
+                    if (entitlementRoot.DeclaresEntitlement(id))
+                        return false;
+                    Debug.LogWarning($"SaveSystem: entitlement '{id}' is not declared by root - dropped.");
+                    return true;
+                });
             facts.firedTriggers.RemoveWhere(triggerId =>
             {
                 foreach (var trigger in definition.triggers)

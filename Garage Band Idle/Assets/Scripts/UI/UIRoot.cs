@@ -1,3 +1,4 @@
+using RidiculousGaming.GarageBandIdle.Monetization;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -15,9 +16,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private ScreenHost host;
 
-        public void Bind(GameSession session, ModuleRegistry registry, GameClock clock)
+        public void Bind(GameSession session, ModuleRegistry registry, GameClock clock,
+                         AdManager ads, IAPManager store)
         {
-            host = new ScreenHost(document.rootVisualElement, registry, session, clock);
+            host = new ScreenHost(document.rootVisualElement, registry, session, clock, ads, store);
             host.Render();          // unconditional, because a fresh game runs no transaction
         }
 

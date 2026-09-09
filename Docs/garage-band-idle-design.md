@@ -494,13 +494,13 @@ the tick segments (12.9), each segment paying its length times the rate and spee
 `idleRate` and `game_speed` are the ordinary gathers run
 under the idle-accumulation context (§12.5), so the ×0.5 base joins and live-only buffs excuse
 themselves - from *current* state, so Records earned
-elsewhere while away correctly boost the payout - into a **transient offer** (the lines, the
-window's end, a doubled flag; session-held, dead with the process), presented as the **idle
+elsewhere while away correctly boost the payout - into a **transient offer** (the lines, holding
+what settlement pays, and the window's end; session-held, dead with the process), presented as the **idle
 dialog**: the amount earned, plus "Double it" (a rewarded
 ad that doubles *this offer*) and a Backstage Pass purchase button (buying it HERE doubles this
 offer and pays it out in the store callback's own transaction, closing the dialog - the ad's
-callback plus the entitlement write); a Backstage Pass owner's offer is computed with `doubled`
-already set from the entitlement, so the dialog shows the doubled amount and just OKs it. Both
+callback plus the entitlement write); a Backstage Pass owner's offer is computed already
+doubled - the screen enters as if the ad had been watched - so the dialog shows the doubled amount and just OKs it. Both
 buttons only REQUEST; the payout is the callback's. The offer deposits on dismissal or chapter
 switch — or, doubled, in the ad or store
 callback's own transaction (§12.9) — while backgrounding instead drops it and leaves the window
@@ -535,7 +535,7 @@ second vocabulary exists:
 | Free, no action | 50% | Claimed from the idle dialog on switch-in |
 | Free, watches ad | 100% (2x) for that offer | "Double it" doubles and settles the offer in the callback's own transaction (§12.9) |
 | Free, Encore running | 2x on the part of the paid window the buff covers | The buff burns real time while away; the claim segments the paid window at its expiry, so 1 h of Encore left and 4 h away pays 1 h at 2x and 3 h at 1x |
-| Backstage Pass owner | 4x always (both ads' rewards, no ad), and a higher cap | Permanent Encore (the same modifier, applied permanently on the entitlement, below) scales the window; the offer is computed with `doubled` set from the entitlement, so the existing claim path pays it; the cap raise is entitlement plumbing on the config read |
+| Backstage Pass owner | 4x always (both ads' rewards, no ad), and a higher cap | Permanent Encore (the same modifier, applied permanently on the entitlement, below) scales the window; the offer's lines are computed already doubled, so the existing claim path pays them as they stand; the cap raise is entitlement plumbing on the config read |
 
 Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
@@ -570,8 +570,8 @@ raised idle cap: permanent Encore - the entitlement is the first leg of `encore`
 `appliesWhen`, so a Pass owner applies the same one membership a free player's record applies, and
 the Encore window shows "Time remaining" as infinity with no ad button, the Pass superseding the
 timer - the idle claim always doubled
-(the offer's `doubled` flag set from the entitlement at computation, the same flag the ad callback
-sets, so the claim path is unchanged and no second idle modifier exists), and the cap raise on the
+(the offer's lines computed at twice the amount, exactly what the ad callback does to them before
+it settles, so the claim path is unchanged and no second idle modifier exists), and the cap raise on the
 config read. A free player who watches both ads reaches the same 4x on an offer; the Pass makes it
 automatic. Should Overdrive land, the Pass applies it permanently. Since ads are opt-in, the Pass's
 value is convenience.
@@ -976,7 +976,7 @@ public abstract class Condition
 ```
 
 Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, `UpgradePurchased`,
-`BuffActive`, `BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `Always`, `All`, `Any`, `Not` (the story gate
+`BuffActive`, `HasEntitlement`, `BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `Always`, `All`, `Any`, `Not` (the story gate
 `chapterN_complete && !storyN_seen` is
 `All[FlagSet, Not[FlagSet]]`), plus a formula-threshold kind (threshold computed from state — e.g.
 a scaling goal or reward curve reading a per-clear counter, §8.1). Records need no special kind:
@@ -984,7 +984,10 @@ they are a currency.
 
 `BuffActive` names a modifier as `UpgradePurchased` names an upgrade and reads that modifier's timed
 record outward from the acting scope, true while the record's `expiresAtUtc` is later than the
-context's own time - never by the record's presence (section 9). The two event kinds read a record the way `FlagSet` reads a flag: outward from the acting scope to
+context's own time - never by the record's presence (section 9). `HasEntitlement` names a store
+product root declares on its `entitlements` list (12.3) and is true while root's set holds it: the
+read is the chain's root, the id is validated against root's own list, and the store callback is
+its only writer. The two event kinds read a record the way `FlagSet` reads a flag: outward from the acting scope to
 the first interior scope holding one, no scope named. `EventRecordExists` - any record (running,
 expired-undismissed, or goal-reached-undismissed); `EventRewardPending` - a record whose
 `goalReached` is set. Both are pure fact reads: nothing evaluates a goal at read time, and neither
@@ -1351,10 +1354,10 @@ ordinary gathers under the idle-accumulation context - skipped below the minimum
 threshold and skipped entirely while that chapter holds a record for an event that blocks idle
 (§6.1: `blocksIdle` is derived from the event carrying a timer, and the idle path asks the event
 rather than inspecting one) - into a **transient offer** for the idle dialog: the lines
-(currency, home, amount — all references), the window's end B, and a `doubled` flag, computed once
-over the explicit window [stamp, B], held by the session, never serialized. The claim never
-computes anything: deposit pays the stored lines — ×2 when the ad callback marked the offer
-`doubled` — and advances the stamp to B, the window actually paid, in one transaction. That is the
+(currency, home, amount — all references) and the window's end B, computed once
+over the explicit window [stamp, B], held by the session, never serialized. The lines hold what is
+paid: a Pass owner's are computed doubled, and the ad callback doubles them before it settles. The claim never
+computes anything: deposit pays the stored lines as they stand and advances the stamp to B, the window actually paid, in one transaction. That is the
 whole exactly-once mechanism: the save is the tree, so a kill anywhere keeps both writes or
 neither. A kill or backgrounding with the dialog up destroys the offer and leaves the stamp, so
 the next entry recomputes from the same window start — the unpaid window simply stays open,
@@ -1391,11 +1394,11 @@ reset away an unpaid window; settling flips the session to `Live`. Authenticated
 callbacks are always **phase-eligible, never reentrant**: a callback is a serialized mutation
 transaction — queued behind `commandInProgress`, then the same pipeline as any command, its sweep
 conditional on the resulting phase like every transaction's. The idle double is ATOMIC with its
-settlement: the rewarded-ad callback doubles and claims in one transaction — recomputing from the
-stamp first when no offer is live (the mid-ad kill) — so a doubled offer never sits exposed to an
-exit's undoubled settle or a backgrounding's drop, and the transaction ends in `Live` and sweeps
+settlement: the rewarded-ad callback doubles and claims in one transaction, so a doubled offer never sits
+exposed to a backgrounding's drop (a kill mid-ad takes the callback with the process; the stamp
+never moved, so the next launch offers the window again), and the transaction ends in `Live` and sweeps
 like any claim. A Backstage Pass bought FROM the dialog is the same callback with one more write:
-record the entitlement, mark the offer doubled, claim - one transaction ending `Live`, so the
+record the entitlement, double the offer, claim - one transaction ending `Live`, so the
 dialog closes with the phase, and a kill between the store's confirmation and the claim leaves the
 stamp unmoved, the entitlement to be restored from the store, and the next offer doubled by it. A
 callback that leaves the phase alone (an entitlement written mid-dialog by any other path)
@@ -1410,7 +1413,8 @@ tree-wide, but reachable is not the same as mutable. Root-owned commands
 (`SetRoadieAllocation`, `AcknowledgeStory`) and the session commands (`SwitchChapter`, `ClaimIdle`)
 are the exceptions. This guard is orchestration — it lives here, never in chapters or scopes.
 **Switching away settles first**: the switch transaction deposits the outgoing chapter's
-outstanding offer at its undoubled value (switching is an exit path, §9), advancing the stamp to
+outstanding offer as it stands (switching is an exit path, §9: a free player's was never doubled, a
+Pass owner's was computed so), advancing the stamp to
 the offer's window; leaving a live chapter just stamps out at now. Backgrounding is the exception:
 it drops the offer and leaves the stamp, so backgrounding and an app kill behave identically and
 pending dialogs never accumulate across chapters.
@@ -1482,8 +1486,9 @@ only *requests* the purchase; doubling and settling the
 offer is AdManager's or IAPManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked chapters only), the Ch. 6 song operations (write / name), and
 `AcknowledgeStory(storyId)` (sets the root `storyN_seen` latch, §10). All fail-closed — each checks
 its own gate. Ad and store
-callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations (extend
-a buff, double and settle the idle offer, write an entitlement, grant Roadies) — they are not UI paths.
+callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations -
+`ExtendBuff(scope, modifier, seconds)`, `DoubleAndClaimIdle()`, `GrantEntitlement(id)` and
+`PurchasePassFromDialog()`, `GrantRoadies(count)` - they are not UI paths.
 
 **A disarmed rung explains itself**: the rung-button widget evaluates its gate's top-level legs
 individually at the two refresh moments and lists the unmet legs' `Text` (§12.4) - a leg's own
@@ -1663,6 +1668,9 @@ Assets/Scripts/
     EventDefinition.cs  EventSystem.cs
   Meta/
     RoadieAllocation.cs    // SetRoadieAllocation; the boost arithmetic is Economy's
+    Encore.cs              // the encore id the code names: the resolve off root's own modifier list and its CodeReferences check
+    BackstagePass.cs       // the backstage_pass entitlement id, the one Owned(root) read, and its CodeReferences check
+    Roadies.cs             // the roadies currency id and its CodeReferences check
   Content/
     SongDefinition.cs      // Catalog (run) + Discography (root)
   Save/
@@ -1674,8 +1682,11 @@ Assets/Scripts/
   Utilities/
     SingletonManager/      // SingletonManager.cs + SingletonPropertyAttribute.cs: scene-lifetime singleton plumbing, independent of the game
   Monetization/
-    AdManager.cs           // rewarded only (Encore top-up + Double it)
-    IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar
+    IAdService.cs          // AdPlacement, AdResult, the request-now-result-later seam a rewarded-ad SDK presents
+    IStoreService.cs       // ProductId, PurchaseOutcome, PurchaseResult; Purchase / Acknowledge / RestoreEntitlements
+    FakeAdService.cs  FakeStoreService.cs   // the seams until a real SDK: scripted outcomes, recorded calls
+    AdManager.cs           // rewarded only (Encore top-up + Double it); polls its requests from the driver's Update
+    IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar; grant, save, acknowledge in that order
   UI/
     SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs
     ModuleWidget.cs  ModuleWidgetFactory.cs   // the plain-C# controller base and the closed prefabId switch
@@ -1820,8 +1831,8 @@ Content/                 // the authored JSON the importer reads
 - **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2x, a timed root
   buff ads extend (`game_speed` stat, consumed by the tick and the idle claim over a real-time cap;
   wall clocks never scale; Overdrive 4x deferred, one buff reporting its speed from remaining time);
-  Backstage Pass (lifetime: permanent Encore, the idle claim always doubled through the offer's
-  existing flag, and a raised idle cap); Buy Roadies (repeatable); Tip Jar; no subscriptions.
+  Backstage Pass (lifetime: permanent Encore, the idle claim computed already doubled, and a
+  raised idle cap); Buy Roadies (repeatable); Tip Jar; no subscriptions.
 - **Engine:** Unity; break_infinity numbers; DateTime ticks; checksummed JSON save of the state tree;
   boot composes the root address plus the `chapter` label into the tree, each chapter's direct
   references carrying its subtree; load-time validation of all authored data.

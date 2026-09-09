@@ -5,6 +5,7 @@ using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Editor;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.Monetization;
 using RidiculousGaming.GarageBandIdle.UI;
 using UnityEditor;
 using UnityEngine;
@@ -50,6 +51,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly BarDefinition Cover1;
             public readonly EventDefinition GarageJam1;
 
+            public readonly RootScopeState Root;
             public readonly ChapterScopeState Ch1;
             public readonly TierScopeState Tier1;
             public readonly GameSession Session;
@@ -57,6 +59,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly VisualElement Screen;
             public readonly VisualElement Container;
             public readonly ScreenHost Host;
+
+            // The seams the dialog's two request buttons call into. Fakes, so a
+            // press is a recorded request and the payout stays the callback's.
+            public readonly FakeAdService Ads = new();
+            public readonly FakeStoreService Store = new();
+            public readonly AdManager AdManager;
+            public readonly IAPManager IAPManager;
+            public int Saves;
 
             public DateTime Now = Start;
 
@@ -87,10 +97,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Cover1 = Find(LearnCovers.bars, "cover_1");
                 GarageJam1 = Find(Tier1Def.events, "garage_jam_1");
 
-                var root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { Ch1Def }));
-                Ch1 = (ChapterScopeState)TestNavigation.Node(root, Ch1Def);
-                Tier1 = (TierScopeState)TestNavigation.Node(root, Tier1Def);
-                Session = new GameSession(root, Config());
+                Root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { Ch1Def }));
+                Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
+                Tier1 = (TierScopeState)TestNavigation.Node(Root, Tier1Def);
+                var config = Config();
+                Session = new GameSession(Root, config);
+                AdManager = new AdManager(Session, Ads, config, () => Saves++);
+                IAPManager = new IAPManager(Session, Store, config, () => Saves++);
 
                 var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
                 Assert.IsNotNull(registry,
@@ -104,7 +117,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsNotNull(screen, "Assets/UI/Screen.uxml is missing");
                 Screen = screen.Instantiate();
                 Container = Screen.Q<VisualElement>("sections");
-                Host = new ScreenHost(Screen, registry, Session, Clock);
+                Host = new ScreenHost(Screen, registry, Session, Clock, AdManager, IAPManager);
             }
 
             private static T Find<T>(IEnumerable<T> definitions, string id) where T : Definition =>
@@ -213,6 +226,51 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("Cash", labels[0].text, "the currency's authored name");
             Assert.AreEqual("+250.00", labels[1].text,
                 "one amp pays 0.5 cash/s, root's authored idle base halves it, over 1000s");
+        }
+
+        // The dialog's three actions (12.11): OK settles, and the two request
+        // buttons only ask - the payout is the callback's own transaction. A
+        // free player is offered both.
+        [Test]
+        public void TheDialogOffersBothRequestsToAFreePlayer()
+        {
+            var fx = new Fixture();
+            fx.Tier1.generatorCounts["practice_amp"] = 1;
+            fx.Ch1.lastActiveUtc = fx.Now.AddSeconds(-400);
+            fx.Session.SwitchChapter(fx.Ch1, fx.Now);
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, fx.Session.Phase);
+
+            var collect = fx.Screen.Q<VisualElement>("collect");
+            Assert.IsTrue(Fixture.Shown(collect.Q<Button>("double")), "the rewarded ad is on offer");
+            Assert.IsTrue(Fixture.Shown(collect.Q<Button>("pass")), "and so is the Pass");
+            Assert.IsTrue(Fixture.Shown(collect.Q<Button>("ok")));
+
+            var labels = fx.Screen.Q<VisualElement>("lines").Children().Single().Query<Label>().ToList();
+            Assert.AreEqual("+100.00", labels[1].text,
+                "one amp pays 0.5 cash/s, root's authored idle base halves it, over 400s");
+        }
+
+        // A Pass owner reaches the same 4x with no ad and nothing to buy, so the
+        // dialog is OK alone: permanent Encore doubles the window's speed and
+        // the entitlement doubled the lines at computation, and what is shown is
+        // what OK pays (section 9).
+        [Test]
+        public void APassOwnersDialogIsOkAloneAndReadsTheDoubledOffer()
+        {
+            var fx = new Fixture();
+            fx.Root.entitlements.Add("backstage_pass");
+            fx.Tier1.generatorCounts["practice_amp"] = 1;
+            fx.Ch1.lastActiveUtc = fx.Now.AddSeconds(-400);
+            fx.Session.SwitchChapter(fx.Ch1, fx.Now);
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, fx.Session.Phase);
+
+            var collect = fx.Screen.Q<VisualElement>("collect");
+            Assert.IsFalse(Fixture.Shown(collect.Q<Button>("double")), "the Pass already gives the ad's reward");
+            Assert.IsFalse(Fixture.Shown(collect.Q<Button>("pass")), "and there is nothing left to buy");
+            Assert.IsTrue(Fixture.Shown(collect.Q<Button>("ok")));
+
+            var labels = fx.Screen.Q<VisualElement>("lines").Children().Single().Query<Label>().ToList();
+            Assert.AreEqual("+400.00", labels[1].text, "the free player's 100 at 4x");
         }
 
         // OK settles (12.9): the claim pays the stored lines and advances the

@@ -43,3 +43,5 @@ MonoBehaviour:
   generators: []
   barGroups: []
   upgrades: []
+  entitlements:
+  - backstage_pass

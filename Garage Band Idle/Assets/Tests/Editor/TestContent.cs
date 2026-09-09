@@ -88,6 +88,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Roadies = DeclareCurrency(RootDef, "roadies");
             RootDef.declaredFlags.Add("ch1_complete");
             RootDef.declaredTags.AddRange(new[] { "income", "production" });
+            // The store product root declares (12.3). The save filter drops an
+            // entitlement root does not declare, so a fixture that round-trips
+            // one has to declare it here.
+            RootDef.entitlements.Add("backstage_pass");
             Chapters.Add(Ch1Def);
 
             // The Jam: two cash yield entries (the second reads the upgrade
@@ -292,6 +296,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var currency = MakeDefinition<CurrencyDefinition>(id, tags);
             scope.declaredCurrencies.Add(currency);
             return currency;
+        }
+
+        // The three ids the CODE names, which CodeReferences asks root for at
+        // the end of every validation pass (12.12): the Encore modifier the ad
+        // callback extends, the Backstage Pass entitlement the session reads,
+        // and the roadies currency the store's bundle grant deposits into. A
+        // fixture root that is expected to validate declares all three, and the
+        // Encore asset comes back so a test can address it.
+        public static ModifierDefinition DeclareCodeReferences(RootDefinition root)
+        {
+            DeclareCurrency(root, "roadies");
+            root.entitlements.Add("backstage_pass");
+            var encore = MakeDefinition<ModifierDefinition>("encore");
+            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            // One membership, two ways in (section 9): the Pass leg first, the
+            // timed record second.
+            encore.appliesWhen = new Any
+            {
+                conditions =
+                {
+                    new HasEntitlement { entitlementId = "backstage_pass" },
+                    new BuffActive { modifier = encore },
+                }
+            };
+            root.modifiers.Add(encore);
+            root.permanentModifiers.Add(encore);
+            return encore;
         }
 
         public static T MakeDefinition<T>(string id, params string[] tags) where T : Definition

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using RidiculousGaming.GarageBandIdle.Monetization;
 using RidiculousGaming.GarageBandIdle.Save;
 using RidiculousGaming.GarageBandIdle.UI;
 using UnityEngine;
@@ -61,6 +62,11 @@ namespace RidiculousGaming.GarageBandIdle
         private GameSession session;
         private GameClock clock;
 
+        // The two callback surfaces (12.11), owned here because the driver owns
+        // the frame they deliver on and the one save site they call.
+        private AdManager ads;
+        private IAPManager store;
+
         // A FILE under persistentDataPath: handing LoadFromDisk the directory
         // would read every fresh install as Failed.
         private static string SavePath => Path.Combine(Application.persistentDataPath, "save.json");
@@ -98,7 +104,17 @@ namespace RidiculousGaming.GarageBandIdle
             booted.SwitchChapter(GameBoot.EntryChapter(booted.Root), now);
 
             clock = new GameClock(now);
+            // The one save site, handed to the managers so a grant is on disk
+            // before the store is told it landed.
+            ads = new AdManager(booted, new FakeAdService(), config, () => Save(clock.RealTimeUtc));
+            store = new IAPManager(booted, new FakeStoreService(), config, () => Save(clock.RealTimeUtc));
             session = booted;               // the guard, published last
+
+            // Restoration lands on a frame AFTER boot, so the first offer is
+            // already computed undoubled at the base cap and a restored
+            // entitlement applies from the next one. A launch gated on a
+            // network restore is a worse product than one undoubled offer.
+            store.RequestRestore();
         }
 
         // The bind waits for Start: boot runs in Awake, every Awake precedes
@@ -110,7 +126,7 @@ namespace RidiculousGaming.GarageBandIdle
         {
             if (session == null)
                 return;
-            uiRoot.Bind(session, registry, clock);
+            uiRoot.Bind(session, registry, clock, ads, store);
         }
 
         // A boot failure leaves session null and its thrown error in the log;
@@ -122,6 +138,10 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             clock.Frame(DateTime.UtcNow, Time.unscaledDeltaTime);
             session.Accumulate(clock.RealTimeUtc);
+            // After the accumulation, so a callback's transaction always lands
+            // between the frame's tick and the repaint - never inside one.
+            ads.Update(clock.RealTimeUtc);
+            store.Update(clock.RealTimeUtc);
             uiRoot.Interpolate();
         }
 

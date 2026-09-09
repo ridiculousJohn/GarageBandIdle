@@ -333,6 +333,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(root.roadieAllocation.ContainsKey("ghost_chapter"));
         }
 
+        // An entitlement id is root's like any other saved id, so a store
+        // product dropped from root.json takes the 12.10 rule: unknown, so
+        // dropped with a warning. Populate's round trip covers the survivor.
+        [Test]
+        public void An_entitlement_root_does_not_declare_is_dropped()
+        {
+            var saved = new TestTree();
+            saved.Root.entitlements.Add("backstage_pass");   // declared - survives
+            saved.Root.entitlements.Add("ghost_pass");
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("entitlement 'ghost_pass'"));
+            Assert.IsTrue(Load(json, out var root));
+
+            Assert.IsTrue(root.entitlements.Contains("backstage_pass"));
+            Assert.IsFalse(root.entitlements.Contains("ghost_pass"));
+        }
+
         [Test]
         public void An_event_record_the_scope_never_declares_is_dropped()
         {

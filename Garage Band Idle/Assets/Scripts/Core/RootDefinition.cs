@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle
@@ -10,6 +11,13 @@ namespace RidiculousGaming.GarageBandIdle
     [CreateAssetMenu(menuName = "Garage Band Idle/Scope/Root")]
     public class RootDefinition : ScopeDefinition
     {
+        // Store products, declared like flags: bare strings, because an
+        // entitlement has no data beyond its own existence (12.3). Root-only by
+        // placement - the field lives here and on no other kind.
+        public List<string> entitlements = new();
+
+        public bool DeclaresEntitlement(string entitlementId) => entitlements.Contains(entitlementId);
+
         // Typed, because the tree build must hand back a RootScopeState and the
         // polymorphic entry point can only promise a ScopeState.
         internal RootScopeState CreateRoot() => new RootScopeState(this);

@@ -192,6 +192,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, tree.Root.timedBuffs.Count, "presence is not truth - nothing removed it");
         }
 
+        // An entitlement has no data beyond its own existence (12.3), so the
+        // condition is presence in root's set and nothing else.
+        [Test]
+        public void HasEntitlement_is_true_only_while_root_holds_the_id()
+        {
+            var tree = new TestTree();
+            var pass = new HasEntitlement { entitlementId = "backstage_pass" };
+            var atTier1 = tree.Ctx(tree.Tier1);
+
+            Assert.IsFalse(pass.Evaluate(atTier1), "declared by root, held by nobody");
+
+            tree.Root.entitlements.Add("backstage_pass");
+
+            Assert.IsTrue(pass.Evaluate(atTier1));
+            Assert.IsFalse(new HasEntitlement { entitlementId = "ghost_pass" }.Evaluate(atTier1));
+        }
+
+        // The set is root's alone, so the read is the chain's root rather than
+        // an outward walk that could stop early - every depth gets one answer.
+        [Test]
+        public void GameContext_HasEntitlement_reads_root_from_any_depth()
+        {
+            var tree = new TestTree();
+            tree.Root.entitlements.Add("backstage_pass");
+
+            Assert.IsTrue(tree.Ctx(tree.Tier1).HasEntitlement("backstage_pass"));
+            Assert.IsTrue(tree.Ctx(tree.Ch1).HasEntitlement("backstage_pass"));
+            Assert.IsTrue(tree.Ctx(tree.Root).HasEntitlement("backstage_pass"));
+        }
+
         [Test]
         public void Always_holds()
         {

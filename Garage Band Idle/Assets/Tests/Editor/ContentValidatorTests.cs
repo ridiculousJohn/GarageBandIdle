@@ -27,6 +27,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly UpgradeDefinition StagePresence;
         public readonly UpgradeDefinition AmpStrings;
         public readonly ModifierDefinition RecordsIncome;
+
+        // The Encore modifier root declares for the code side (12.12), kept so
+        // a row can break it and read the CodeReferences finding back.
+        public readonly ModifierDefinition Encore;
         public readonly CurrencyDefinition Cash;
         public readonly CurrencyDefinition Fans;
         public readonly CurrencyDefinition Records;
@@ -49,6 +53,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Ch1.children.Add(Tier1b);
 
             Records = TestTree.DeclareCurrency(Root, "records");
+            // What the code names from root: without these three the pass ends
+            // in three UnresolvedReference errors and no row here would be
+            // reading its own break (12.12).
+            Encore = TestTree.DeclareCodeReferences(Root);
             Root.declaredFlags.Add("ch1_complete");
             // income is a game-wide word, so root declares it; gear is only ever
             // carried by tier1's generators, so tier1 is high enough (12.2).
@@ -652,6 +660,58 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertNoFinding(f.Run(), ValidationCheck.ChainReach);
         }
 
+        // The set is root's alone (12.3), so the id is judged against root's own
+        // entitlements list and there is no reach variant to report.
+        [Test]
+        public void HasEntitlement_UndeclaredId_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Trigger.condition = new HasEntitlement { entitlementId = "ghost_pass" };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "HasEntitlement references entitlement 'ghost_pass'");
+        }
+
+        [Test]
+        public void HasEntitlement_DeclaredId_Clean()
+        {
+            var f = new ValidatorFixture();
+            f.Trigger.condition = new HasEntitlement { entitlementId = "backstage_pass" };
+            AssertClean(f.Run());
+        }
+
+        // ---- the code side's content references (12.12) ----
+
+        // The pass runs the code's own existence checks after the tree walk, so
+        // a content set that drops one of the three ids the code names is
+        // refused at import and at boot rather than throwing at the callback.
+        [Test]
+        public void CodeReference_RootDeclaresNoEncoreModifier_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Root.permanentModifiers.Remove(f.Encore);
+            f.Root.modifiers.Remove(f.Encore);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "root declares no modifier 'encore'");
+        }
+
+        [Test]
+        public void CodeReference_RootDeclaresNoBackstagePass_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Root.entitlements.Remove("backstage_pass");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "root declares no entitlement 'backstage_pass'");
+        }
+
+        [Test]
+        public void CodeReference_RootDeclaresNoRoadies_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Root.declaredCurrencies.RemoveAll(c => c != null && c.Id == "roadies");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "root declares no currency 'roadies'");
+        }
+
         // The site it belongs at is untouched.
         [Test]
         public void ModifierAppliesWhen_Idle_Clean()
@@ -1019,9 +1079,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Effect_BareGameSpeed_AtChapterOrRoot_NoFindings()
         {
             var f = new ValidatorFixture();
-            var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
-            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
-            f.Root.modifiers.Add(encore);
+            // Root's own bare game_speed carrier already exists as the Encore
+            // the code names, so this second one takes a word nothing claims.
+            var rootHaste = TestTree.MakeDefinition<ModifierDefinition>("root_haste");
+            rootHaste.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            f.Root.modifiers.Add(rootHaste);
             var haste = TestTree.MakeDefinition<ModifierDefinition>("ch1_haste");
             haste.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
             f.Ch1.modifiers.Add(haste);
@@ -1251,6 +1313,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(report, ValidationSeverity.Error, ValidationCheck.NullEntry, "triggers[1] is null");
         }
 
+        // An entitlement is a bare string, so the declaration list has no asset
+        // to be null - an empty slot is the whole of what can go wrong there.
+        [Test]
+        public void EmptyEntitlementEntry_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Root.entitlements.Add("");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "entitlements[1] is empty");
+        }
+
         [Test]
         public void Not_NullOperand_Error()
         {
@@ -1341,8 +1414,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void AncestorTagCollidingWithADescendantId_Error()
         {
             var f = new ValidatorFixture();
-            f.Root.declaredTags.Add("encore");
-            TestTree.DeclareCurrency(f.Tier1, "encore");
+            f.Root.declaredTags.Add("showtime");
+            TestTree.DeclareCurrency(f.Tier1, "showtime");
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.TagIdCollision,
                 "declared tag at 'root' and CurrencyDefinition at 'tier1'");
         }

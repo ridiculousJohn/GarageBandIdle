@@ -330,6 +330,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     throw new ContentImportException($"scope '{dto.id}' authors events; root cannot host one (12.3, 12.8).");
             }
 
+            if (!isRoot && dto.entitlements.Count > 0)
+                throw new ContentImportException(
+                    $"scope '{dto.id}' authors entitlements; only the root declares store products (12.3).");
+
             // The key is real on every scope block, so a root or a tier
             // authoring one names itself in the error rather than reading as a
             // misspelling - the rung-on-root rule's shape (12.11).
@@ -416,6 +420,13 @@ namespace RidiculousGaming.GarageBandIdle.Editor
 
             scope.declaredFlags.AddRange(dto.flags);
             scope.declaredTags.AddRange(dto.declaredTags);
+            // Root's alone, so the wiring is typed rather than cleared with the
+            // lists every scope carries (12.3).
+            if (scope is RootDefinition rootDefinition)
+            {
+                rootDefinition.entitlements.Clear();
+                rootDefinition.entitlements.AddRange(dto.entitlements);
+            }
 
             foreach (var currencyDto in dto.currencies)
             {
@@ -656,6 +667,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     { upgrade = Resolve<UpgradeDefinition>(build, scope, d.upgrade, "UpgradePurchased") },
                 BuffActiveDto d => new BuffActive
                     { modifier = Resolve<ModifierDefinition>(build, scope, d.modifier, "BuffActive") },
+                HasEntitlementDto d => new HasEntitlement { entitlementId = d.entitlementId },
                 BarsCompletedDto d => new BarsCompleted
                     { group = Resolve<BarGroupDefinition>(build, scope, d.group, "BarsCompleted"), count = d.count },
                 EventRecordExistsDto => new EventRecordExists(),

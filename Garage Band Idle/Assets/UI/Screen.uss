@@ -161,6 +161,10 @@
     margin-bottom: 12px;
 }
 
+.collect-double, .collect-pass {
+    margin-top: 8px;
+}
+
 .collect-ok {
     margin-top: 8px;
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.Meta;
 
 namespace RidiculousGaming.GarageBandIdle
 {
@@ -27,15 +28,15 @@ namespace RidiculousGaming.GarageBandIdle
     }
 
     // The transient idle offer (design doc 12.9): computed once over the
-    // explicit window [stamp, windowEndUtc], held by the session, marked by the
-    // ad callback, paid by settlement, dead with the process. THE STAMP IS THE
-    // PENDING CLAIM - a kill with the dialog up saves nothing, and the next
-    // entry recomputes from the stamp it never advanced.
+    // explicit window [stamp, windowEndUtc], held by the session, dead with the
+    // process. The lines hold what settlement pays - a Pass owner's are computed
+    // doubled at entry, and the ad callback doubles them before it settles. THE
+    // STAMP IS THE PENDING CLAIM - a kill with the dialog up saves nothing, and
+    // the next entry recomputes from the stamp it never advanced.
     public class IdleOffer
     {
         public DateTime windowEndUtc;
         public List<IdleOfferLine> lines = new();
-        public bool doubled;
     }
 
     // The transient execution context (design doc 12.9): plain C#, never
@@ -53,9 +54,9 @@ namespace RidiculousGaming.GarageBandIdle
         public SessionPhase Phase { get; private set; } = SessionPhase.NoChapter;
 
         // The outstanding idle offer - non-null exactly while the phase is
-        // AwaitingIdleClaim. Step 9's dialog renders it; step 10's ad callback
-        // doubles AND settles it in one transaction (12.9), so a doubled offer
-        // is never left exposed to an exit's undoubled settle.
+        // AwaitingIdleClaim. The dialog renders it; the ad callback doubles its
+        // lines and settles them in one transaction (12.9), and a Pass owner's
+        // is computed doubled.
         public IdleOffer CurrentOffer { get; private set; }
 
         // The last tick's realized movement, held out for interpolation (12.11)
@@ -67,8 +68,8 @@ namespace RidiculousGaming.GarageBandIdle
 
         // The 12.11 hook, one per completed transaction and none on a refusal;
         // step 9's widgets subscribe. Unconditional where the sweep is not,
-        // which is what repaints the claim dialog when a callback marks it
-        // doubled without sweeping.
+        // which is what repaints the claim dialog when an entitlement written
+        // under it changes only the button set (12.9).
         public event Action Refreshed;
 
         // The reentrancy guard: a command issued from inside a transaction (a
@@ -98,8 +99,8 @@ namespace RidiculousGaming.GarageBandIdle
         // success that runs no pipeline: the stamp is old during a live
         // session, and recomputing here would mint an offer covering time the
         // player spent playing. A live outgoing chapter stamps at now; one
-        // with an offer up settles it undoubled on a chapter-to-chapter switch
-        // (an exit path, section 9) and DROPS it on backgrounding - the stamp
+        // with an offer up settles it on a chapter-to-chapter switch (an exit
+        // path, section 9) and DROPS it on backgrounding - the stamp
         // stays, so the unpaid window recomputes on return and backgrounding
         // and an app kill behave identically. Entering Live directly makes
         // this transaction's closing sweep the deferred "first live sweep
@@ -126,7 +127,7 @@ namespace RidiculousGaming.GarageBandIdle
                     if (CurrentOffer != null)
                     {
                         if (chapter != null)
-                            SettleOffer(outgoing, honorDoubled: false);
+                            SettleOffer(outgoing);
                         else
                             CurrentOffer = null;
                     }
@@ -155,14 +156,26 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // AwaitingIdleClaim only. Pure settlement - the claim never computes
-        // anything: the stored lines deposit at their held homes, x2 when the
-        // ad callback marked the offer doubled, and the stamp advances in the
-        // same transaction, which is the whole exactly-once mechanism (12.9) -
-        // the save is the tree, so a kill keeps both writes or neither. This
-        // transaction's sweep - root plus the now-live foreground - is the
-        // deferred one: a threshold crossed while away, by the switch's own
-        // settle-out, or by this deposit fires here, root triggers included.
-        public bool ClaimIdle(DateTime nowUtc)
+        // anything: the stored lines deposit at their held homes as they stand,
+        // and the stamp advances in the same transaction, which is the whole
+        // exactly-once mechanism (12.9) - the save is the tree, so a kill keeps
+        // both writes or neither. This transaction's sweep - root plus the
+        // now-live foreground - is the deferred one: a threshold crossed while
+        // away, by the switch's own settle-out, or by this deposit fires here,
+        // root triggers included.
+        public bool ClaimIdle(DateTime nowUtc) => Claim(nowUtc, doubled: false);
+
+        // The rewarded ad's callback: doubles the offer's lines and settles them
+        // in the SAME transaction (12.9), so a doubled offer is never left
+        // standing. Refused like ClaimIdle when no offer stands - a kill mid-ad
+        // takes the callback with the process, and the unmoved stamp re-offers
+        // the window on the next launch.
+        public bool DoubleAndClaimIdle(DateTime nowUtc) => Claim(nowUtc, doubled: true);
+
+        // The pipeline the OK button and the ad callback share: the doubling, if
+        // any, is inside the transaction with the settlement, so no phase and
+        // no exit can ever see a doubled offer standing.
+        private bool Claim(DateTime nowUtc, bool doubled)
         {
             GuardReentrancy();
             if (Phase != SessionPhase.AwaitingIdleClaim)
@@ -170,7 +183,9 @@ namespace RidiculousGaming.GarageBandIdle
             commandInProgress = true;
             try
             {
-                SettleOffer(ForegroundChapter, honorDoubled: true);
+                if (doubled)
+                    DoubleOffer();
+                SettleOffer(ForegroundChapter);
                 Phase = SessionPhase.Live;
                 CloseTransaction(nowUtc);
                 return true;
@@ -179,6 +194,15 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 commandInProgress = false;
             }
+        }
+
+        // The x2 written INTO the lines, because the lines are what settlement
+        // pays and what the dialog shows - one amount, no second reader to keep
+        // in step.
+        private void DoubleOffer()
+        {
+            foreach (var line in CurrentOffer.lines)
+                line.amount *= 2;
         }
 
         // The incoming chapter's phase (12.9's point 4). The offer is computed
@@ -213,7 +237,13 @@ namespace RidiculousGaming.GarageBandIdle
             if (elapsed < config.minimumAwaySeconds || BlockedByEvent(chapter))
                 return SessionPhase.Live;
 
-            var paidSeconds = Math.Min(elapsed, config.idleCapSeconds);
+            // Two of the Pass's three benefits are the entitlement read at
+            // COMPUTATION (section 9): the raised cap, and an offer computed
+            // already doubled - the screen enters as if the ad had been
+            // watched. The third, permanent Encore, is content - the first leg
+            // of encore's own appliesWhen - so no code here knows about it.
+            var owner = BackstagePass.Owned(Root);
+            var paidSeconds = Math.Min(elapsed, owner ? config.backstagePassIdleCapSeconds : config.idleCapSeconds);
             var windowStartUtc = chapter.lastActiveUtc;
             var windowEndUtc = windowStartUtc.AddSeconds(paidSeconds);
             var pairs = Producer.RatePairs(chapter);
@@ -245,7 +275,11 @@ namespace RidiculousGaming.GarageBandIdle
                 if (amounts[i] == BigNumber.Zero)
                     continue;
                 offer.lines.Add(new IdleOfferLine
-                    { currency = pairs[i].currency, home = pairs[i].home, amount = amounts[i] });
+                {
+                    currency = pairs[i].currency,
+                    home = pairs[i].home,
+                    amount = owner ? amounts[i] * 2 : amounts[i]
+                });
             }
             if (offer.lines.Count == 0)
                 return SessionPhase.Live;
@@ -254,22 +288,25 @@ namespace RidiculousGaming.GarageBandIdle
             return SessionPhase.AwaitingIdleClaim;
         }
 
-        // Settlement pays the stored lines through their held references -
-        // nothing resolves a name here - and advances the stamp to the window
-        // actually paid, never the settlement moment. Time past the window's
-        // end is foreground presence, never idle: the next live exit stamps
-        // over it. Then the offer dies.
-        private void SettleOffer(ChapterScopeState chapter, bool honorDoubled)
+        // Settlement pays the stored lines as they stand, through their held
+        // references - nothing resolves a name here - and advances the stamp to
+        // the window actually paid, never the settlement moment. Time past the
+        // window's end is foreground presence, never idle: the next live exit
+        // stamps over it. Then the offer dies.
+        //
+        // Both doublings - the Pass at computation, the ad callback before it
+        // settles - are already in the amounts, so an exit and OK pay the same
+        // number the dialog showed, which is what section 9 requires.
+        private void SettleOffer(ChapterScopeState chapter)
         {
             var offer = CurrentOffer;
             foreach (var line in offer.lines)
             {
-                var amount = honorDoubled && offer.doubled ? line.amount * 2 : line.amount;
                 // Resolved: the line's currency was judged active by the gather
                 // that built the offer, under the claim's own circumstance. A
                 // re-ask here would run under a live context instead and could
                 // refuse a line the offer already promised, mid-settlement.
-                new GameContext(line.home, offer.windowEndUtc).DepositResolved(line.currency.Id, amount);
+                new GameContext(line.home, offer.windowEndUtc).DepositResolved(line.currency.Id, line.amount);
             }
             chapter.StampActive(offer.windowEndUtc);
             CurrentOffer = null;
@@ -441,6 +478,50 @@ namespace RidiculousGaming.GarageBandIdle
                 if (buff != null && buff.buffId == modifierId)
                     return buff;
             return null;
+        }
+
+        // The store callback's write for a restored or otherwise granted
+        // entitlement: legal in every phase, and under the dialog it sweeps
+        // nothing and repaints only the button set - the offer stays what was
+        // computed and is what OK pays (12.9).
+        public void GrantEntitlement(string entitlementId, DateTime nowUtc) =>
+            RunRootCommand(nowUtc, () => WriteEntitlement(entitlementId));
+
+        // The store callback for a Pass purchase (12.9): the entitlement write,
+        // and when an offer stands - bought FROM the dialog - the offer doubled
+        // and settled in the same transaction, ending Live so the dialog closes
+        // with the phase. Bought anywhere else, the write is the whole command.
+        public void PurchasePassFromDialog(DateTime nowUtc) =>
+            RunRootCommand(nowUtc, () =>
+            {
+                WriteEntitlement(BackstagePass.EntitlementId);
+                if (Phase != SessionPhase.AwaitingIdleClaim)
+                    return;
+                DoubleOffer();
+                SettleOffer(ForegroundChapter);
+                Phase = SessionPhase.Live;
+            });
+
+        // Writes at root, and only an id root declares: the save filter would
+        // drop an undeclared one on the next load, so a write of one is a
+        // silent loss - the SetFlag rule (12.3), a throw.
+        private void WriteEntitlement(string entitlementId)
+        {
+            if (!Root.DefinitionAs<RootDefinition>().DeclaresEntitlement(entitlementId))
+                throw new InvalidOperationException(
+                    $"GrantEntitlement for '{entitlementId}': root declares no such entitlement (12.3).");
+            Root.entitlements.Add(entitlementId);
+        }
+
+        // The store's bundle grant: a root-context deposit into roadies through
+        // the AUTHORED write, so the currency's activeWhen is honored (12.2). A
+        // nonpositive count is a caller bug, not a smaller bundle -
+        // GameConfig.Require refuses one before any store can report success.
+        public void GrantRoadies(int count, DateTime nowUtc)
+        {
+            if (count <= 0)
+                throw new InvalidOperationException($"GrantRoadies: {count} is not a positive count.");
+            RunRootCommand(nowUtc, () => new GameContext(Root, nowUtc).Deposit(Roadies.CurrencyId, count));
         }
 
         // ---- the pipeline ----

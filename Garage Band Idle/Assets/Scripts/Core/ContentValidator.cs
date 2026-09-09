@@ -544,6 +544,15 @@ namespace RidiculousGaming.GarageBandIdle
                 CollectDeclared(scope, scope.upgrades, "upgrades");
                 if (scope is InteriorDefinition interiorScope)
                     CollectDeclared(scope, interiorScope.events, "events");
+                // Root's store products are bare strings for the reason flags
+                // are (12.3), so their slot check is the string one. Nothing
+                // else about the list is checked: no mechanism reads a
+                // duplicate or a stray id wrong.
+                if (scope is RootDefinition entitlementHost)
+                    for (var i = 0; i < entitlementHost.entitlements.Count; i++)
+                        if (string.IsNullOrEmpty(entitlementHost.entitlements[i]))
+                            report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
+                                $"scope '{scope.Id}' entitlements[{i}] is empty.");
             }
 
             // ---- ids are unique along a CHAIN, not tree-wide ----
@@ -965,6 +974,10 @@ namespace RidiculousGaming.GarageBandIdle
             ctx.ClearSite();
             FinalizeFlagChecks(ctx);
             FinalizeModifierChecks(ctx);
+
+            // Validation's second input (12.12): the code side's own content
+            // references, after the tree walk, at import and at boot alike.
+            CodeReferences.Validate(ctx);
 
             return report;
         }
