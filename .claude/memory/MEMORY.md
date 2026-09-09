@@ -11,6 +11,7 @@
 - [Closed sets are enums](closed-sets-are-enums.md) - code-defined vocabularies are C# enums; strings only for open designer ids
 - [Narrowing a member type](narrowing-a-member-type.md) - generic base class; covariant overrides don't compile in Unity (CS8831) and `new` hiding is rejected
 - [Step 9 open UI items](step-9-open-ui-items.md) - the digit font (measured: only "1" is narrower), the omitted group title and how to add one, the accepted chrome literals, bulk buy later
+- [Orchestrated slice workflow](orchestrated-slice-workflow.md) - John: I orchestrate, Opus agents code, I review and approve; fixed API contract, runtime and tests agents in parallel, I run Unity, review traces each diff to a design rule not a plan sentence
 - [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) - merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
 
 ## Gates
@@ -25,9 +26,9 @@
 ## Judgment
 - [Problems, not issues](problems-not-issues.md) - what breaks TODAY, not what is true, where "today" means PATHS that run and never the inputs content happens to supply; a reason for NOT doing something gets checked like any other claim; a question I raise needs a fact that changed behind it; a landing report lists only decisions with a second option someone would notice; a finding's weight is his call and does not move under pressure; a "one thing" gets checked against the actual project before it is reported, and if nothing has to be done there is nothing to report
 - [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - name the primitive that already covers it, and when two shapes both work take the smaller MECHANISM - never the smaller edit; diff size is not a design reason; proposals and explanations pick the elaborate option too - answer "what is it" in domain words and propose the smallest change that makes the finding false
-- [No spec accumulation](no-spec-accumulation.md) - answer a finding by deleting the mechanism, not by adding a paragraph; cut argument, never a named check; two rounds on one operand means delete it
+- [No spec accumulation](no-spec-accumulation.md) - answer a finding by deleting the mechanism, not by adding a paragraph; cut argument, never a named check; two rounds on one operand means delete it; a restriction needs a mechanism it prevents from going wrong today, or it goes - a plan sentence is not a mechanism
 - [Tests exercise runtime code](tests-exercise-runtime-code.md) - fixtures are fine, a second implementation of runtime behavior is not; convert the call sites instead
-- [Slice landing updates the docs](slice-landing-updates-the-docs.md) - the build-plan status line and 12.13's file list are part of EVERY slice; John ordered it once and does not repeat it
+- [Slice landing updates the docs](slice-landing-updates-the-docs.md) - the build-plan status line and 12.13's file list are part of EVERY slice; John ordered it once and does not repeat it; the 12.13 walk is a find against the list, run before the landing report
 - [Doc decisions land when made](doc-decisions-land-when-made.md) - a settled decision goes in the design doc immediately; only code-describing edits wait for the code
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - "did you miss anything?" is a command to grep; Scripts, Tests, the live docs, the chapter JSON
 

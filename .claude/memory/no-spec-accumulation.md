@@ -41,3 +41,12 @@ mechanism probably is too. Magic constants (a fills-per-settlement backstop), sa
 policies, and warnings on fields no behavior reads are the usual tells. Unauthored config
 fields (`autoAdvance` with no chapter granting it) are content, not architecture: they wait.
 Related: [[reuse-the-existing-mechanism]].
+
+**A restriction needs a reason or it goes (John, 2026-09-09).** Slice A shipped a validator refusal
+of `BuffActive` inside a currency's `activeWhen` because the plan listed it. The plan's reason - a
+prune moving the fact - had died in a review the same day the plan was written, when truth became
+the timestamp; the sentence survived and I copied it into the agent's contract. John: "if there's no
+reason to restrict it then restricting it is limiting capability that is not needed to be limited.
+delete it." The check to run on every refusal, validator error, or guard before it ships: name the
+mechanism it prevents from going wrong TODAY. No mechanism, no restriction - and a plan sentence is
+not a mechanism ([[verify-your-own-prior-statements]]).

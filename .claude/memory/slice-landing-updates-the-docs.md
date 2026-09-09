@@ -23,3 +23,8 @@ rule for the artifact, and John does not expect to repeat it.
 build-plan step's status line with the slice, date, test count and the review corrections, and
 walk `Assets/Scripts` against 12.13's file list. Both are part of the slice, under the slice's
 order. See [[doc-decisions-land-when-made]].
+
+**2026-09-09, slice A:** I reported the slice done without walking `Assets/Scripts` against 12.13,
+and did the walk only when a later edit touched the list - it found twelve unlisted files. The walk
+is a command to run, not a line to remember: `find Scripts -name "*.cs"` against the 12.13 block,
+before the landing report, every slice.
