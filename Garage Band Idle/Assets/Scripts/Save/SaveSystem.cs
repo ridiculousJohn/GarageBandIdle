@@ -276,15 +276,16 @@ namespace RidiculousGaming.GarageBandIdle.Save
 
         // Unknown ids from removed content are dropped with a warning (12.10).
         // Filtered here: the families a scope DECLARES (currencies, flags,
-        // triggers, generators, upgrades) plus the modifier stacks, whose ids
-        // name declared content too - a modifier is declared on a scope, and a
-        // stack's id resolves by walking outward from the scope holding it.
+        // triggers, generators, upgrades) plus the modifier stacks and the timed
+        // records, whose ids name declared content too - a modifier is declared
+        // on a scope, and a stack's or a record's id resolves by walking outward
+        // from the scope holding it.
         // Bar facts come through here too: a bar's home is its GROUP's home,
         // so a scope's own groups are the whole question. The roadie allocation
         // and the recorded current chapter validate against the tree instead
-        // (above). Event ids, buff ids, and song ids gain their filters WITH
-        // their definition families - the same incremental contract as the
-        // validation pass.
+        // (above). Event ids and song ids gain their filters WITH their
+        // definition families - the same incremental contract as the validation
+        // pass.
         private static void FilterToDeclared(ScopeFacts facts, ScopeState state)
         {
             var definition = state.Definition;
@@ -445,6 +446,18 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 foreach (var key in staleStacks)
                     facts.modifierStacks.Remove(key);
             }
+
+            // A timed record is a MODIFIER's timer, so its id takes the same
+            // rule the stacks do. An EXPIRED record is KEPT: a dormant chapter's
+            // unpaid window still cuts its boundary at that expiry, and removal
+            // belongs to the tick's end.
+            facts.timedBuffs.RemoveAll(buff =>
+            {
+                if (buff != null && DeclaresModifierOnChain(state, buff.buffId))
+                    return false;
+                Debug.LogWarning($"SaveSystem: timed buff '{buff?.buffId}' is not a modifier declared on the chain from '{state.ScopeId}' - dropped.");
+                return true;
+            });
 
             // The event record is the interior payload's single field. A record
             // for an event this scope never declares is dropped, and a timer is

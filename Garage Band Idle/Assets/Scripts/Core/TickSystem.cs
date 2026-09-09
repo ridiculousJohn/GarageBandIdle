@@ -27,23 +27,71 @@ namespace RidiculousGaming.GarageBandIdle
             // reports its whole dt's movement over Seconds = realSeconds.
             var report = new TickReport(realSeconds);
             var tickStartUtc = tickEndUtc.AddSeconds(-realSeconds);
-            var segmentStartUtc = tickStartUtc;
-            foreach (var edge in Boundaries(root, foregroundChapter, tickStartUtc, tickEndUtc))
+            foreach (var (start, end) in Segments(root, foregroundChapter, tickStartUtc, tickEndUtc))
+                RunSegment(root, foregroundChapter, config, start, end, report);
+            PruneExpiredBuffs(root, foregroundChapter, tickEndUtc);
+            return report;
+        }
+
+        // The consecutive segments of [startUtc, endUtc], cut at every boundary
+        // inside it. The idle claim walks the paid window through this same
+        // method, so neither consumer can divide a window the other way.
+        public static IEnumerable<(DateTime start, DateTime end)> Segments(
+            RootScopeState root, ChapterScopeState chapter, DateTime startUtc, DateTime endUtc)
+        {
+            if (startUtc >= endUtc)
+                yield break;
+            var segmentStartUtc = startUtc;
+            foreach (var edge in Boundaries(root, chapter, startUtc, endUtc))
             {
-                RunSegment(root, foregroundChapter, config, segmentStartUtc, edge, report);
+                yield return (segmentStartUtc, edge);
                 segmentStartUtc = edge;
             }
-            RunSegment(root, foregroundChapter, config, segmentStartUtc, tickEndUtc, report);
-            return report;
+            yield return (segmentStartUtc, endUtc);
+        }
+
+        // game_speed, read off the chapter's own compiled plan - the owner-less,
+        // currency-less query 12.2 describes, compiled at every chapter node
+        // because the tick's origin is fixed in code - and CLAMPED here, at the
+        // ONE place the stat is read: section 9 describes the caps but nothing
+        // else enforces one - unclamped authoring could stall time (a x0
+        // wildcard) or stack carriers past the ceiling. The floor of 1 also
+        // forbids an authored slow-time mechanic; nothing designs one, and it is
+        // one constant if that ever changes.
+        public static double GameSpeed(GameContext ctx, ChapterScopeState chapter, GameConfig config) =>
+            Math.Clamp(
+                Producer.GetMultiplier(ctx, chapter.Link<CoordinatePlan>(GatherCompiler.GameSpeed)).ToDouble(),
+                1, config.maxGameSpeed);
+
+        // Housekeeping, and only that: BuffActive judges a record against the
+        // asking context's time, so a missed prune changes no answer. Removal
+        // waits for the tick's end because the record has to survive the tick
+        // that crosses its expiry - it cuts that tick's own boundary (design
+        // doc 9).
+        private static void PruneExpiredBuffs(RootScopeState root, ChapterScopeState foregroundChapter,
+                                              DateTime tickEndUtc)
+        {
+            Prune(root);
+            Walk(foregroundChapter);
+
+            void Walk(ScopeState node)
+            {
+                Prune(node);
+                foreach (var child in node.Children)
+                    Walk(child);
+            }
+
+            void Prune(ScopeState node) =>
+                node.timedBuffs.RemoveAll(buff => buff == null || buff.expiresAtUtc <= tickEndUtc);
         }
 
         // Every expiry timestamp strictly inside the tick, sorted and
         // deduplicated (12.9): each running timed record in the foreground
         // subtree expires at tick start plus its remaining seconds, and every
         // timed buff in the swept set - root plus the subtree - at its own
-        // stamp. Buffs contribute boundaries only; nothing reads or removes one
-        // until the timedBuffs gather row lands. An expiry AT an edge of the
-        // tick is not a boundary - it would cut an empty segment.
+        // stamp. Buffs contribute boundaries, the BuffActive condition reads
+        // them, and the tick's end prunes the expired. An expiry AT an edge of
+        // the tick is not a boundary - it would cut an empty segment.
         //
         // Why an event expiry is a boundary when handicaps ride on the record
         // existing: the latch. "A goal first met after expiry never latches"
@@ -93,19 +141,9 @@ namespace RidiculousGaming.GarageBandIdle
             var realDt = (segmentEndUtc - segmentStartUtc).TotalSeconds;
             var liveCtx = new GameContext(foregroundChapter, segmentStartUtc);
 
-            // game_speed, read off the chapter's own compiled plan - the
-            // owner-less, currency-less query 12.2 describes, compiled at every
-            // chapter node because the tick's origin is fixed in code - and
-            // CLAMPED at the consumer: section 9
-            // describes the caps but nothing else enforces one - unclamped
-            // authoring could stall time (a x0 wildcard) or stack carriers past
-            // the ceiling. The floor of 1 also forbids an authored slow-time
-            // mechanic; nothing designs one, and it is one constant if that
-            // ever changes. effDt stays a double - ConsumeAndSettle and the
-            // timer decrement take doubles, and the clamp bounds it.
-            var speed = Producer.GetMultiplier(
-                liveCtx, foregroundChapter.Link<CoordinatePlan>(GatherCompiler.GameSpeed)).ToDouble();
-            var effDt = realDt * Math.Clamp(speed, 1, config.maxGameSpeed);
+            // effDt stays a double - ConsumeAndSettle and the timer decrement
+            // take doubles, and the clamp inside GameSpeed bounds it.
+            var effDt = realDt * GameSpeed(liveCtx, foregroundChapter, config);
 
             // Bar demand BEFORE the deposits, per the snapshot rule: resolving
             // it after would let this segment's own production open a bar's

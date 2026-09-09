@@ -61,6 +61,11 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public string upgrade;
     }
 
+    internal class BuffActiveDto : ConditionDto
+    {
+        public string modifier;
+    }
+
     internal class BarsCompletedDto : ConditionDto
     {
         public string group;
@@ -359,6 +364,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             { nameof(OwnedCountAtLeast), typeof(OwnedCountAtLeastDto) },
             { nameof(FlagSet), typeof(FlagSetDto) },
             { nameof(UpgradePurchased), typeof(UpgradePurchasedDto) },
+            { nameof(BuffActive), typeof(BuffActiveDto) },
             { nameof(BarsCompleted), typeof(BarsCompletedDto) },
             { nameof(EventRecordExists), typeof(EventRecordExistsDto) },
             { nameof(EventRewardPending), typeof(EventRewardPendingDto) },

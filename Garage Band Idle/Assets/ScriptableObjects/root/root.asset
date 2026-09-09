@@ -33,11 +33,13 @@ MonoBehaviour:
   - {fileID: 11400000, guid: febf3aa60793e9544a202353a3bb505a, type: 2}
   - {fileID: 11400000, guid: efc843a56e2cf86449ecc8265b0ffa91, type: 2}
   - {fileID: 11400000, guid: 7a6736d7cc6bcd649bc0c1ae88800f32, type: 2}
+  - {fileID: 11400000, guid: 9702dbdcd1196d842af078dd2ddd6246, type: 2}
   permanentModifiers:
   - {fileID: 11400000, guid: f3eda54f7bc829744becbf48edef47f9, type: 2}
   - {fileID: 11400000, guid: febf3aa60793e9544a202353a3bb505a, type: 2}
   - {fileID: 11400000, guid: efc843a56e2cf86449ecc8265b0ffa91, type: 2}
   - {fileID: 11400000, guid: 7a6736d7cc6bcd649bc0c1ae88800f32, type: 2}
+  - {fileID: 11400000, guid: 9702dbdcd1196d842af078dd2ddd6246, type: 2}
   generators: []
   barGroups: []
   upgrades: []

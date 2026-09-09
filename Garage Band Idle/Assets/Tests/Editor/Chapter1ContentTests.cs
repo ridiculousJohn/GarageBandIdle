@@ -401,6 +401,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
+        // Encore is one ordinary root modifier with a timer (section 9): a
+        // wildcard game_speed x2, applied permanently, whose membership is the
+        // presence of a live record carrying its own id.
+        [Test]
+        public void Root_declares_encore_as_a_permanent_game_speed_membership()
+        {
+            var encore = Find(root.modifiers, "encore");
+            var effect = encore.effects.Single();
+
+            Assert.AreEqual(Stat.GameSpeed, effect.stat);
+            Assert.AreEqual((BigNumber)2, effect.multiplier);
+            Assert.IsTrue(string.IsNullOrEmpty(effect.target), "game_speed addresses no owner");
+            Assert.IsTrue(string.IsNullOrEmpty(effect.currencyId), "and no currency");
+            Assert.AreSame(encore, ((BuffActive)encore.appliesWhen).modifier,
+                "the modifier's own record is what switches it on");
+            Assert.IsTrue(root.permanentModifiers.Contains(encore));
+        }
+
         // ---- section 12: the screen ----
 
         // One name per family plus both button texts: nothing derives "Three-

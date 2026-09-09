@@ -155,6 +155,23 @@ namespace RidiculousGaming.GarageBandIdle
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(upgrade, "UpgradePurchased");
     }
 
+    // A timed record is a MODIFIER's timer, and the condition names the
+    // modifier as UpgradePurchased names an upgrade (design doc 9). The record
+    // is a fact read outward from the acting scope exactly as a flag is, and
+    // truth is the timestamp against the context's OWN time, never the record's
+    // presence - so no answer depends on when a prune ran.
+    [Serializable]
+    public class BuffActive : Condition
+    {
+        public Economy.ModifierDefinition modifier;
+
+        public override bool Evaluate(GameContext ctx) => ctx.IsBuffActive(modifier.Id);
+
+        // No Progress override: a timer is not a threshold the player
+        // approaches, so the default stands.
+        public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(modifier, "BuffActive");
+    }
+
     // Counts the group's bars at full: completion is derived, progress >= the
     // bar's fillAmount, never stored (design doc 12.7).
     [Serializable]

@@ -654,6 +654,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 FlagSetDto d => new FlagSet { flagId = d.flagId },
                 UpgradePurchasedDto d => new UpgradePurchased
                     { upgrade = Resolve<UpgradeDefinition>(build, scope, d.upgrade, "UpgradePurchased") },
+                BuffActiveDto d => new BuffActive
+                    { modifier = Resolve<ModifierDefinition>(build, scope, d.modifier, "BuffActive") },
                 BarsCompletedDto d => new BarsCompleted
                     { group = Resolve<BarGroupDefinition>(build, scope, d.group, "BarsCompleted"), count = d.count },
                 EventRecordExistsDto => new EventRecordExists(),

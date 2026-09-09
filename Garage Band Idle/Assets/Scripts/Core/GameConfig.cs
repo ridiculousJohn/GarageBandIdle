@@ -20,6 +20,12 @@ namespace RidiculousGaming.GarageBandIdle
         public double minimumAwaySeconds = 180;
         public double idleCapSeconds = 14400;
 
+        // Encore's two knobs (section 9), seconds like the thresholds above and
+        // placeholders in the same way. The cap bounds REMAINING time, so a
+        // repeatable grant runs into it rather than accumulating past it.
+        public double encoreAdSeconds = 14400;   // one rewarded ad's extension
+        public double encoreCapSeconds = 86400;  // the most remaining Encore a record may hold
+
         // The tick cadence (section 9): the session ticks ONCE with the whole
         // accumulation when pending crosses this. Smoothness comes from
         // interpolation, so the interval only bounds the latency of an
@@ -44,6 +50,17 @@ namespace RidiculousGaming.GarageBandIdle
             if (double.IsNaN(config.idleCapSeconds) || double.IsInfinity(config.idleCapSeconds) || config.idleCapSeconds < 0)
                 throw new InvalidOperationException(
                     $"GameConfig: idleCapSeconds {config.idleCapSeconds} is not a finite nonnegative value.");
+            if (double.IsNaN(config.encoreAdSeconds) || double.IsInfinity(config.encoreAdSeconds)
+                || config.encoreAdSeconds <= 0)
+                throw new InvalidOperationException(
+                    $"GameConfig: encoreAdSeconds {config.encoreAdSeconds} is not a finite positive value.");
+            if (double.IsNaN(config.encoreCapSeconds) || double.IsInfinity(config.encoreCapSeconds)
+                || config.encoreCapSeconds <= 0)
+                throw new InvalidOperationException(
+                    $"GameConfig: encoreCapSeconds {config.encoreCapSeconds} is not a finite positive value.");
+            if (config.encoreCapSeconds < config.encoreAdSeconds)
+                throw new InvalidOperationException(
+                    $"GameConfig: encoreCapSeconds {config.encoreCapSeconds} is below encoreAdSeconds {config.encoreAdSeconds} - a cap under one ad's grant would clamp every ad short.");
             if (double.IsNaN(config.tickIntervalSeconds) || double.IsInfinity(config.tickIntervalSeconds)
                 || config.tickIntervalSeconds <= 0)
                 throw new InvalidOperationException(

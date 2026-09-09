@@ -93,6 +93,19 @@ namespace RidiculousGaming.GarageBandIdle
             return false;
         }
 
+        // A live record for the modifier anywhere on the chain, judged against
+        // THIS context's time (design doc 9): a record is a modifier's timer,
+        // read outward like a flag, and truth is expiresAtUtc > NowUtc - never
+        // presence.
+        public bool IsBuffActive(string modifierId)
+        {
+            for (var node = Scope; node != null; node = node.Parent)
+                foreach (var buff in node.timedBuffs)
+                    if (buff != null && buff.buffId == modifierId && buff.expiresAtUtc > NowUtc)
+                        return true;
+            return false;
+        }
+
         public BigNumber GetBarProgress(string barId)
         {
             for (var node = Scope; node != null; node = node.Parent)

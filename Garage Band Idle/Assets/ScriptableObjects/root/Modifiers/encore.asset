@@ -10,33 +10,31 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c35210d72fdb0f1449ed7fe2ca7504a1, type: 3}
-  m_Name: roadie_active
+  m_Name: encore
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
-  id: roadie_active
+  id: encore
   tags: []
   displayName: 
   stacking: 0
   effects:
-  - target: production
-    currencyId: income
-    stat: rate
+  - target: 
+    currencyId: 
+    stat: game_speed
     multiplier:
       _value:
-        mantissa: 1
+        mantissa: 2
         exponent: 0
     formula:
-      rid: 7579425352975646803
+      rid: -2
   appliesWhen:
-    rid: -2
+    rid: 7579425352975646720
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425352975646803
-      type: {class: RoadieActiveBoost, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
+    - rid: 7579425352975646720
+      type: {class: BuffActive, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        perRoadie:
-          _value:
-            mantissa: 5
-            exponent: -2
+        uiText: 
+        modifier: {fileID: 11400000}

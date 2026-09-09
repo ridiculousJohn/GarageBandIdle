@@ -546,6 +546,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsEmpty(f.Tier1.barProgress);
         }
 
+        // The same four hours with an hour of Encore left on them. The buff
+        // burns real time while away, so the claim cuts the paid window at the
+        // expiry and pays 18000 rate-seconds over 14400 real ones - the cap
+        // bounds the seconds, and speed multiplies what they pay.
+        [Test]
+        public void Walkthrough_4_an_hour_of_encore_pays_that_hour_at_twice_the_speed()
+        {
+            var f = new Chapter1();
+            f.SeedIdleState();
+
+            var stamp = f.Now.AddSeconds(-14400);
+            f.Ch1.lastActiveUtc = stamp;
+            f.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = stamp.AddSeconds(3600) });
+            f.Session.SwitchChapter(f.Ch1, f.Now);
+
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase);
+            AssertClose(756000, Line(f, f.Cash).amount, "cash - 84/s over 18000 rate-seconds, halved");
+            AssertClose(5832.225, Line(f, f.Fans).amount, "fans");
+            AssertClose(4500, Line(f, f.Rehearsal).amount, "rehearsal");
+
+            // The walk judged the record segment by segment and removed
+            // nothing; the next tick's end is what collects it.
+            Assert.AreEqual(1, f.Root.timedBuffs.Count);
+        }
+
         [Test]
         public void Walkthrough_4_a_running_timed_gig_offers_nothing()
         {

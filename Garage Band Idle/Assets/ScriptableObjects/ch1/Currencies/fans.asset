@@ -16,11 +16,11 @@ MonoBehaviour:
   tags: []
   displayName: Fans
   activeWhen:
-    rid: 2509765238408609819
+    rid: 7579425352975646748
   references:
     version: 2
     RefIds:
-    - rid: 2509765238408609819
+    - rid: 7579425352975646748
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

@@ -70,7 +70,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Ch1.flags.Add("album");
             tree.Ch1.lastActiveUtc = new DateTime(2026, 8, 18, 9, 0, 0, DateTimeKind.Utc);
             tree.Root.balances["records"] = 20;
-            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = new DateTime(2026, 8, 19, 0, 0, 0, DateTimeKind.Utc) });
+            // A timed record is a MODIFIER's timer, so a legal one names a
+            // modifier the holding scope's chain declares; root's own is what
+            // this fixture has.
+            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "records_income", expiresAtUtc = new DateTime(2026, 8, 19, 0, 0, 0, DateTimeKind.Utc) });
             tree.Root.roadieAllocation["ch1"] = 1;
             tree.Root.entitlements.Add("backstage_pass");
             return tree;
@@ -388,6 +391,41 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestNavigation.Node(root, loaded.Ch1Def);
             Assert.AreEqual(1, ch1.modifierStacks.Count);
             Assert.IsTrue(ch1.modifierStacks.ContainsKey("gj_tap_1"));
+        }
+
+        // A record's id is a modifier's, so it takes the rule the stacks take:
+        // one no scope on the chain declares can never be read and is dropped.
+        [Test]
+        public void A_timed_record_naming_no_modifier_on_the_chain_is_dropped()
+        {
+            var expiry = new DateTime(2026, 8, 19, 0, 0, 0, DateTimeKind.Utc);
+            var saved = new TestTree();
+            saved.Root.timedBuffs.Add(new TimedBuff { buffId = "records_income", expiresAtUtc = expiry });
+            saved.Root.timedBuffs.Add(new TimedBuff { buffId = "ghost_buff", expiresAtUtc = expiry });
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("timed buff 'ghost_buff'"));
+            Assert.IsTrue(Load(json, out var root));
+
+            Assert.AreEqual(1, root.timedBuffs.Count);
+            Assert.AreEqual("records_income", root.timedBuffs[0].buffId);
+            Assert.AreEqual(expiry, root.timedBuffs[0].expiresAtUtc, "the timestamp is the whole record");
+        }
+
+        // Removal is the tick's end, never the load: a dormant chapter's unpaid
+        // window still has to cut its boundary at an expiry already past.
+        [Test]
+        public void An_expired_record_for_a_declared_modifier_survives_the_load()
+        {
+            var expiry = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var saved = new TestTree();
+            saved.Root.timedBuffs.Add(new TimedBuff { buffId = "records_income", expiresAtUtc = expiry });
+            var json = SaveSystem.Serialize(saved.Root);
+
+            Assert.IsTrue(Load(json, out var root));
+
+            Assert.AreEqual(1, root.timedBuffs.Count);
+            Assert.AreEqual(expiry, root.timedBuffs[0].expiresAtUtc);
         }
 
         [Test]

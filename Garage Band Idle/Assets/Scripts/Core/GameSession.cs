@@ -182,12 +182,16 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // The incoming chapter's phase (12.9's point 4). The offer is computed
-        // once over the explicit window [stamp, nowUtc] at current state, so
-        // Records earned while away boost it, under the idle-accumulation
-        // circumstance - the authored root base joins the gather and live-only
-        // modifiers excuse themselves - and skipped entirely when the away
-        // time is under the minimum, a blocking record holds, every line
-        // computes zero, or the chapter has never been left.
+        // once over the paid window [stamp, stamp + min(elapsed, cap)] at
+        // current state, so Records earned while away boost it, under the
+        // idle-accumulation circumstance - the authored root base joins the
+        // gather and live-only modifiers excuse themselves. The window is
+        // segmented at the buff expiries inside it exactly as the tick segments,
+        // each segment paying its own length at the rate and speed live in it:
+        // the cap bounds REAL seconds and speed multiplies what they pay.
+        // Skipped entirely when the away time is under the minimum, a blocking
+        // record holds, every line computes zero, or the chapter has never been
+        // left.
         private SessionPhase EnterChapter(ChapterScopeState chapter, DateTime nowUtc)
         {
             // A chapter never LEFT owes no idle (12.3). The stamp means "when I
@@ -209,15 +213,39 @@ namespace RidiculousGaming.GarageBandIdle
             if (elapsed < config.minimumAwaySeconds || BlockedByEvent(chapter))
                 return SessionPhase.Live;
 
-            var seconds = Math.Min(elapsed, config.idleCapSeconds);
-            var idleCtx = new GameContext(chapter, nowUtc, idleAccumulation: true);
-            var offer = new IdleOffer { windowEndUtc = nowUtc };
-            foreach (var (currency, home) in Producer.RatePairs(chapter))
+            var paidSeconds = Math.Min(elapsed, config.idleCapSeconds);
+            var windowStartUtc = chapter.lastActiveUtc;
+            var windowEndUtc = windowStartUtc.AddSeconds(paidSeconds);
+            var pairs = Producer.RatePairs(chapter);
+            var amounts = new BigNumber[pairs.Count];
+            for (var i = 0; i < amounts.Length; i++)
+                amounts[i] = BigNumber.Zero;
+
+            // The tick's own segmentation, over the tick's own code: each
+            // segment is stamped at its start, so a record that expires inside
+            // the window is live before its edge and dead after it. Nothing is
+            // removed from any timedBuffs list here - a record removed before
+            // the walk would delete the boundary and pay the whole window at 1x
+            // - and the next tick's end collects the expired one.
+            foreach (var (start, end) in TickSystem.Segments(Root, chapter, windowStartUtc, windowEndUtc))
             {
-                var amount = Producer.GetRate(idleCtx, currency) * seconds;
-                if (amount == BigNumber.Zero)
+                var segCtx = new GameContext(chapter, start, idleAccumulation: true);
+                var effSeconds = (end - start).TotalSeconds * TickSystem.GameSpeed(segCtx, chapter, config);
+                for (var i = 0; i < pairs.Count; i++)
+                    amounts[i] += Producer.GetRate(segCtx, pairs[i].currency) * effSeconds;
+            }
+
+            // The offer's window ends at NOW even though the payment covers the
+            // capped window: the stamp advances to the window PRESENTED, and
+            // time past the cap is a lost window either way (12.9's settled-
+            // window rule), so nothing about settlement changes.
+            var offer = new IdleOffer { windowEndUtc = nowUtc };
+            for (var i = 0; i < pairs.Count; i++)
+            {
+                if (amounts[i] == BigNumber.Zero)
                     continue;
-                offer.lines.Add(new IdleOfferLine { currency = currency, home = home, amount = amount });
+                offer.lines.Add(new IdleOfferLine
+                    { currency = pairs[i].currency, home = pairs[i].home, amount = amounts[i] });
             }
             if (offer.lines.Count == 0)
                 return SessionPhase.Live;
@@ -367,6 +395,54 @@ namespace RidiculousGaming.GarageBandIdle
         public bool TryDismissEvent(GameContext ctx, EventDefinition evt) =>
             RunCommand(ctx, c => EventSystem.TryDismiss(c, evt));
 
+        // Extends the timer of the modifier whose record lives at `scope` - root
+        // and encore for the ad callback, as AddModifier takes a target and a
+        // modifier. Legal in EVERY phase (12.9: an authenticated callback is
+        // always phase-eligible). The dialog's refusal of ordinary commands
+        // exists so a sweep cannot reset away an unpaid window, and a root
+        // record write sweeps nothing there, since the sweep is conditional on
+        // the resulting phase; refusing would discard a watched ad whenever the
+        // app resumed into the dialog before the callback landed.
+        public void ExtendBuff(ScopeState scope, ModifierDefinition modifier, double seconds, DateTime nowUtc)
+        {
+            // A grant only ever moves an expiry LATER, so a nonpositive or
+            // non-finite duration is a caller bug and not a shorter buff.
+            if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds <= 0)
+                throw new InvalidOperationException(
+                    $"ExtendBuff for '{modifier.Id}': {seconds} is not a finite positive number of seconds.");
+            RunRootCommand(nowUtc, () =>
+            {
+                var record = FindBuff(scope, modifier.Id);
+                if (record == null)
+                {
+                    record = new TimedBuff { buffId = modifier.Id, expiresAtUtc = nowUtc.AddSeconds(seconds) };
+                    scope.timedBuffs.Add(record);
+                }
+                else
+                {
+                    // From the later of the expiry and now: a record already
+                    // dead is no credit toward the next grant.
+                    record.expiresAtUtc =
+                        (record.expiresAtUtc > nowUtc ? record.expiresAtUtc : nowUtc).AddSeconds(seconds);
+                }
+                // The cap bounds REMAINING time, so it is measured from now and
+                // clamps the grant rather than refusing it.
+                var ceiling = nowUtc.AddSeconds(config.encoreCapSeconds);
+                if (record.expiresAtUtc > ceiling)
+                    record.expiresAtUtc = ceiling;
+            });
+        }
+
+        // One record per modifier id per scope, so the first match IS the
+        // record; null means the scope holds none for that modifier yet.
+        private static TimedBuff FindBuff(ScopeState scope, string modifierId)
+        {
+            foreach (var buff in scope.timedBuffs)
+                if (buff != null && buff.buffId == modifierId)
+                    return buff;
+            return null;
+        }
+
         // ---- the pipeline ----
 
         // Guards - mutation - conditional sweep - commit - one refresh
@@ -389,6 +465,29 @@ namespace RidiculousGaming.GarageBandIdle
                     return false;
                 CloseTransaction(ctx.NowUtc);
                 return true;
+            }
+            finally
+            {
+                commandInProgress = false;
+            }
+        }
+
+        // The root-owned pipeline: RunCommand without the phase test and the
+        // foreground test, which are the chapter-local boundary a root command
+        // is 12.9's exception to. The flush stays - a command owns its mutation
+        // and the flush before it - and outside Live it is a no-op of its own
+        // accord, since the session banks time only while it ticks. No phase
+        // logic is added anywhere: CloseTransaction still sweeps only when the
+        // resulting phase is Live.
+        private void RunRootCommand(DateTime nowUtc, Action command)
+        {
+            GuardReentrancy();
+            FlushPending(nowUtc);
+            commandInProgress = true;
+            try
+            {
+                command();
+                CloseTransaction(nowUtc);
             }
             finally
             {

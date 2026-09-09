@@ -628,6 +628,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.KindPlacement, "IdleAccumulation");
         }
 
+        // The record resolves outward from the acting scope like every other
+        // fact, so a modifier a sibling chapter declares can never be read.
+        [Test]
+        public void BuffActive_ModifierOnASiblingChapter_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            sibling.Tier2.modifiers.Add(encore);
+
+            f.Trigger.condition = new BuffActive { modifier = encore };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "BuffActive addresses 'encore' declared at 'tier2'");
+        }
+
+        [Test]
+        public void BuffActive_RootModifierFromATier_Clean()
+        {
+            var f = new ValidatorFixture();
+            f.Trigger.condition = new BuffActive { modifier = f.RecordsIncome };
+            AssertNoFinding(f.Run(), ValidationCheck.ChainReach);
+        }
+
         // The site it belongs at is untouched.
         [Test]
         public void ModifierAppliesWhen_Idle_Clean()

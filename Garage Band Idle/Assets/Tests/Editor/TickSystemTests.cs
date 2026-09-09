@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle;
 using RidiculousGaming.GarageBandIdle.Economy;
@@ -46,6 +47,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             foreach (var id in ids)
                 tree.Ch1.modifierStacks[id] = 1;
         }
+
+        // Encore's own shape: a wildcard game_speed carrier declared and applied
+        // at ROOT whose membership is a record with its own id. The tick reads
+        // speed from the foreground chapter outward, so a root record reaches
+        // whichever chapter is in front.
+        private static void DeclareEncore(TestTree tree)
+        {
+            var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            encore.appliesWhen = new BuffActive { modifier = encore };
+            tree.RootDef.modifiers.Add(encore);
+            tree.RootDef.permanentModifiers.Add(encore);
+        }
+
+        private static void Record(TestTree tree, double expiresInSeconds) =>
+            tree.Root.timedBuffs.Add(new TimedBuff
+                { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(expiresInSeconds) });
 
         // ---- rate production ----
 
@@ -252,6 +270,123 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(tree.Tier1.activeEvent.goalReached);
         }
 
+        // ---- the record as a speed membership ----
+
+        [Test]
+        public void A_live_root_record_doubles_the_effective_dt()
+        {
+            var tree = new TestTree();
+            AddRateSource(tree.Tier1Def, "riff_press", tree.Fans, 0.5);
+            DeclareEncore(tree);
+            tree.Rebuild();
+            Record(tree, 3600);
+
+            TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
+
+            Assert.AreEqual((BigNumber)10, tree.Tier1.balances["fans"]);
+        }
+
+        [Test]
+        public void A_tick_crossing_the_expiry_pays_each_segment_at_its_own_speed()
+        {
+            // The expiry at +4 cuts the tick: 4 seconds of doubled dt and 6 of
+            // real dt, at 0.5/s.
+            var crossed = new TestTree();
+            AddRateSource(crossed.Tier1Def, "riff_press", crossed.Fans, 0.5);
+            DeclareEncore(crossed);
+            crossed.Rebuild();
+            Record(crossed, 4);
+            TickSystem.Tick(crossed.Root, crossed.Ch1, Config(), 10, crossed.Now.AddSeconds(10));
+            Assert.AreEqual((BigNumber)7, crossed.Tier1.balances["fans"]);
+            Assert.IsEmpty(crossed.Root.timedBuffs, "the tick's end collects what it expired");
+
+            // An expiry AT the tick's end is not a boundary - it would cut an
+            // empty segment - so the whole tick is doubled, and the prune still
+            // takes the record.
+            var edge = new TestTree();
+            AddRateSource(edge.Tier1Def, "riff_press", edge.Fans, 0.5);
+            DeclareEncore(edge);
+            edge.Rebuild();
+            Record(edge, 10);
+            TickSystem.Tick(edge.Root, edge.Ch1, Config(), 10, edge.Now.AddSeconds(10));
+            Assert.AreEqual((BigNumber)10, edge.Tier1.balances["fans"]);
+            Assert.IsEmpty(edge.Root.timedBuffs);
+
+            // One second of life past the end keeps it.
+            var surviving = new TestTree();
+            AddRateSource(surviving.Tier1Def, "riff_press", surviving.Fans, 0.5);
+            DeclareEncore(surviving);
+            surviving.Rebuild();
+            Record(surviving, 11);
+            TickSystem.Tick(surviving.Root, surviving.Ch1, Config(), 10, surviving.Now.AddSeconds(10));
+            Assert.AreEqual((BigNumber)10, surviving.Tier1.balances["fans"]);
+            Assert.AreEqual(1, surviving.Root.timedBuffs.Count);
+        }
+
+        // The record reaches production only through dt, exactly as a granted
+        // carrier does: a bar's fill doubles with it, and a yield - which has no
+        // time component at all - does not.
+        [Test]
+        public void A_live_record_scales_a_bars_fill_through_dt_and_never_a_yield()
+        {
+            var tree = new TestTree();
+            DeclareEncore(tree);
+            var drill = TestTree.MakeDefinition<BarDefinition>("drill");
+            drill.fillAmount = 1000;
+            drill.fillRate = 1;
+            tree.LearnCovers.bars.Add(drill);
+            tree.Rebuild();
+            Record(tree, 3600);
+            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "drill" };
+
+            TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
+            Assert.AreEqual((BigNumber)20, tree.Tier1.barProgress["drill"]);
+
+            // The Jam's flat cash line, fired under the same live record.
+            Producer.FireProducer(new GameContext(tree.Tier1, tree.Now.AddSeconds(10)), tree.TapProducer);
+            Assert.AreEqual(BigNumber.One, tree.Tier1.balances["cash"]);
+        }
+
+        // Truth is the timestamp, never presence, so a record nothing pruned is
+        // dead the moment it is dead.
+        [Test]
+        public void A_missed_prune_changes_no_answer()
+        {
+            var tree = new TestTree();
+            AddRateSource(tree.Tier1Def, "riff_press", tree.Fans, 0.5);
+            DeclareEncore(tree);
+            tree.Rebuild();
+            Record(tree, -1);
+
+            TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
+
+            Assert.AreEqual((BigNumber)5, tree.Tier1.balances["fans"]);
+        }
+
+        // The window's own edges are not boundaries; only the expiries strictly
+        // inside it are, and the segments they cut cover the window end to end.
+        [Test]
+        public void Segments_cuts_the_window_at_the_interior_expiries_only()
+        {
+            var tree = new TestTree();
+            var start = tree.Now;
+            var end = tree.Now.AddSeconds(10);
+            // Segments reads the stamps and nothing else, so these stand as four
+            // separate records rather than one modifier's timer.
+            foreach (var (id, at) in new[] { ("at_start", 0d), ("cut_a", 3d), ("cut_b", 7d), ("at_end", 10d) })
+                tree.Root.timedBuffs.Add(new TimedBuff { buffId = id, expiresAtUtc = start.AddSeconds(at) });
+
+            var segments = TickSystem.Segments(tree.Root, tree.Ch1, start, end).ToList();
+
+            Assert.AreEqual(3, segments.Count);
+            Assert.AreEqual((start, start.AddSeconds(3)), segments[0]);
+            Assert.AreEqual((start.AddSeconds(3), start.AddSeconds(7)), segments[1]);
+            Assert.AreEqual((start.AddSeconds(7), end), segments[2]);
+
+            Assert.IsEmpty(TickSystem.Segments(tree.Root, tree.Ch1, start, start), "an empty window");
+            Assert.IsEmpty(TickSystem.Segments(tree.Root, tree.Ch1, end, start), "an inverted one");
+        }
+
         // ---- guards ----
 
         [Test]
@@ -305,6 +440,45 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             RefusesInterval(-1);
             RefusesInterval(double.NaN);
             RefusesInterval(double.PositiveInfinity);
+        }
+
+        // The Encore knobs take the same Require. The cap bounds remaining time
+        // and the ad grants it, so a cap below one grant would clamp every ad
+        // short - a tuning fault that has to fail at boot rather than quietly.
+        [Test]
+        public void The_encore_knobs_must_be_finite_positive_and_a_cap_at_least_the_grant()
+        {
+            var tree = new TestTree();
+            var end = tree.Now.AddSeconds(10);
+
+            Assert.DoesNotThrow(() => TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, end),
+                "the authored defaults are a legal pair");
+
+            void RefusesAd(double seconds)
+            {
+                var config = Config();
+                config.encoreAdSeconds = seconds;
+                Assert.Throws<System.InvalidOperationException>(
+                    () => TickSystem.Tick(tree.Root, tree.Ch1, config, 10, end));
+            }
+
+            void RefusesCap(double seconds)
+            {
+                var config = Config();
+                config.encoreCapSeconds = seconds;
+                Assert.Throws<System.InvalidOperationException>(
+                    () => TickSystem.Tick(tree.Root, tree.Ch1, config, 10, end));
+            }
+
+            RefusesAd(0);
+            RefusesAd(-1);
+            RefusesAd(double.NaN);
+            RefusesAd(double.PositiveInfinity);
+            RefusesCap(0);
+            RefusesCap(-1);
+            RefusesCap(double.NaN);
+            RefusesCap(double.PositiveInfinity);
+            RefusesCap(3600);   // finite and positive, but under the 14400 one ad grants
         }
     }
 }

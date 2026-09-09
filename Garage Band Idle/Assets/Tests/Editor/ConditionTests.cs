@@ -132,6 +132,66 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(pending.Evaluate(tree.Ctx(tree.Tier1)), "and the tier never saw it");
         }
 
+        // A record is a MODIFIER's timer and truth is the timestamp against the
+        // asking context's own time, so the same record answers differently to
+        // two contexts and the comparison is strict at the expiry itself.
+        [Test]
+        public void BuffActive_judges_the_record_by_the_contexts_own_time()
+        {
+            var tree = new TestTree();
+            var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            tree.RootDef.modifiers.Add(encore);
+            tree.Rebuild();
+            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(3600) });
+            var live = new BuffActive { modifier = encore };
+
+            Assert.IsTrue(live.Evaluate(tree.Ctx(tree.Tier1)));
+            Assert.IsFalse(live.Evaluate(new GameContext(tree.Tier1, tree.Now.AddSeconds(3600))),
+                "the expiry moment itself is already dead");
+            Assert.IsFalse(live.Evaluate(new GameContext(tree.Tier1, tree.Now.AddSeconds(3601))));
+        }
+
+        // Placement is lifetime: the record resolves outward like a flag, so a
+        // sibling chapter never sees it and the chapter's own reset takes it
+        // with the rest of the payload.
+        [Test]
+        public void BuffActive_reads_outward_and_dies_with_the_scope_holding_the_record()
+        {
+            var tree = new TestTree();
+            var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            tree.Ch1Def.modifiers.Add(encore);
+            var ch2Def = TestTree.MakeChapter("ch2");
+            TestTree.DeclareCurrency(ch2Def, "merch");
+            tree.Chapters.Add(ch2Def);
+            tree.Rebuild();
+            var ch2 = TestNavigation.Node(tree.Root, ch2Def);
+            tree.Ch1.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(3600) });
+            var live = new BuffActive { modifier = encore };
+
+            Assert.IsTrue(live.Evaluate(tree.Ctx(tree.Tier1)), "the tier reads its chapter's record");
+            Assert.IsTrue(live.Evaluate(tree.Ctx(tree.Ch1)));
+            Assert.IsFalse(live.Evaluate(tree.Ctx(ch2)), "a sibling chapter is off the chain");
+
+            tree.Ch1.ClearSubtree(tree.Now);
+            Assert.IsFalse(live.Evaluate(tree.Ctx(tree.Tier1)), "the payload swap took the record");
+        }
+
+        [Test]
+        public void A_record_past_its_expiry_reads_false_with_no_prune_having_run()
+        {
+            var tree = new TestTree();
+            var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            tree.RootDef.modifiers.Add(encore);
+            tree.Rebuild();
+            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(-1) });
+
+            Assert.IsFalse(new BuffActive { modifier = encore }.Evaluate(tree.Ctx(tree.Tier1)));
+            Assert.AreEqual(1, tree.Root.timedBuffs.Count, "presence is not truth - nothing removed it");
+        }
+
         [Test]
         public void Always_holds()
         {

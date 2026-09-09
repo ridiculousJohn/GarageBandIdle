@@ -363,6 +363,12 @@ settlement is exactly once and advances the stamp. Bar progress moved zero — t
 banked instead, so the returning player insta-pours covers at their 2/s rate. Had a timed Garage Jam
 been running, the claim would be zero (§9).
 
+**Encore variant:** the same state with an hour of Encore left at switch-away (the root record
+expiring one hour after the stamp). The paid window is cut at the expiry, so 3,600 s pay at 2x and
+10,800 s at 1x - 18,000 rate-seconds over 14,400 real ones: **cash 756,000; fans 5,832; rehearsal
+4,500**. The record stays in the list through the claim (it is what cuts the boundary) and the next
+tick's end collects it.
+
 **Tuning observation, no action needed:** a doubled 4h fan claim (9,332 fans) releases for
 `floor((9332/5)^0.5)` = 43 records — the whole capstone gate in one press. This is *not* the strong
 path: the concave payout makes cycling ~10× more record-efficient per fan (100 active cycles in

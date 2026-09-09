@@ -54,8 +54,15 @@
       "effects": [
         { "stat": "rate", "multiplier": 0.5 }
       ]
+    },
+    {
+      "id": "encore",
+      "appliesWhen": { "type": "BuffActive", "modifier": "encore" },
+      "effects": [
+        { "stat": "game_speed", "multiplier": 2 }
+      ]
     }
   ],
 
-  "permanentModifiers": ["records_income", "roadie_total", "roadie_active", "idle_base"]
+  "permanentModifiers": ["records_income", "roadie_total", "roadie_active", "idle_base", "encore"]
 }
