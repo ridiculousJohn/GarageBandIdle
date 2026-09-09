@@ -118,6 +118,10 @@ facts only John can settle, and none blocks a slice.
   downward walk over root's roster reading root flags). In step 10 or later.
 - **The numbers**, all `GameConfig` placeholders until tuning cares: the Encore ad duration
   (14400 s), the Encore cap, the Pass's idle cap, the Roadie bundle sizes.
+- **Decided (2026-09-09): Encore's shared resolve is an `Encore` static**, not a member of any
+  screen - the id constant, the root-list resolve and the existence check `CodeReferences` runs.
+  The pill, the window and `AdManager` all read it, none owns it, and it is not UI-specific. John:
+  "probably static, it's not UI specific and might be useful at other times."
 
 ## Existing systems this builds on
 
@@ -185,9 +189,10 @@ past the cap, one expiring exactly at a tick's end, or one expiring under the di
 moment it is dead. (The first draft read presence and pruned at segment starts, which left each of
 those three cases answering true through a closing sweep - a review caught it.) `Validate`: `RequireOnChain(modifier, "BuffActive")`, the check every kind holding a definition
 reference gets, so the condition names a modifier the acting chain declares. `Progress`:
-none - a timer is not a threshold the player approaches. Refused inside a currency's `activeWhen`
-for the same reason `IdleAccumulation` is: it would gate a currency's existence on a fact the
-claim's own pruning moves.
+none - a timer is not a threshold the player approaches. Legal inside a currency's `activeWhen`
+like any other fact read: a timer lapsing is a `CurrencyAtLeast` gate lapsing on a spend, and
+since truth is the timestamp no prune can move the answer under the claim (John, 2026-09-09: a
+restriction with no reason limits capability that need not be limited).
 
 **The prune is housekeeping.** Since `Boundaries` already cuts a segment at each expiry inside the
 tick and `BuffActive` judges by the segment's time, a buff live at segment start governs the whole
@@ -212,7 +217,9 @@ one chapter, app closed, the buff expiring inside the window - is exact.
 
 **The extension**, `ExtendBuff(scope, modifier, seconds, nowUtc)`: a session command taking the
 record's home scope and the modifier whose timer it is, as `AddModifier` takes its target and its
-modifier - root and `encore` for Encore, so the ad callback's call is root-owned. Finds the record
+modifier - root and `encore` for Encore, so the ad callback's call is root-owned; the `encore`
+asset itself comes off root's own modifier list through the shared resolve `CodeReferences`
+validates (below), never from a string the command re-reads. Finds the record
 by the modifier's id on that scope; absent, creates it at `nowUtc + seconds`;
 present, sets
 `max(expiresAtUtc, nowUtc) + seconds`; then clamps remaining time to the config cap. **Legal in
@@ -471,10 +478,20 @@ top while `Live`. Overlays are host-owned like the select and the dialog; none i
 ## Validation additions
 
 The 12.12 pass grows: story beats (flag reach, setter accounting, gate kind placement),
-`BuffActive`'s reach (`RequireOnChain`) and placement (refused in `activeWhen`), and
+`BuffActive`'s reach (`RequireOnChain`), and
 `HasEntitlement`'s id declared at root (the `entitlements` declaration list). The save filter
 grows: a timed record whose id is not a modifier declared on the chain from its scope (the
 modifier-stack rule, applied to `timedBuffs`); an entitlement id root does not declare.
+
+Validation's second input lands with this step (12.12): `CodeReferences`, the explicit list of
+code-side existence checks. Every class that names content from code - the Encore pill and window,
+`AdManager`, `IAPManager`, the allocation screen, the session's Pass id, the widget factory - states
+what it needs as a static `Validate(ValidationContext)` asking root's declaration lists through
+`RequireOnChain`, the pass runs the list after the tree walk at import and at boot, and the runtime
+resolves the same reference off root's own list and holds the asset, throwing on a miss the pass
+already refused. The `ModuleRegistry` cross-check test becomes the factory's entry on the list. This
+is what makes `ExtendBuff`'s arguments validated wiring: the `encore` it is handed came off root's
+list through a resolve the pass checked, so the command asks nothing of its own.
 
 ## Tests
 
@@ -488,8 +505,8 @@ modifier-stack rule, applied to `timedBuffs`); an entitlement id root does not d
   bar's fill rate directly (only through dt); a tick crossing the expiry pays the pre-expiry
   segment at 2x and the post-expiry at 1x (the boundary already exists - the test asserts the prune
   makes it matter); an expired record is gone after the tick; a record whose id is not a modifier
-  declared on its scope's chain is dropped on load with a warning; `BuffActive` inside an
-  `activeWhen` is a validation error, and one naming a modifier off the acting chain is a reach
+  declared on its scope's chain is dropped on load with a warning; a `BuffActive` naming a
+  modifier off the acting chain is a reach
   error; a
   record written on a chapter is found from its tier's context, not from a sibling chapter's, and
   is gone after the chapter's reset.
@@ -567,11 +584,14 @@ build-plan step, `load-linking-plan.md` (2026-09-08), and lands before slice A.
   declaration list with its validation and save-filter rows,
   `encore`'s `appliesWhen` becoming the two-leg `Any`, the two interfaces and their fakes,
   `AdManager` / `IAPManager` with the grant-save-acknowledge order, the callback commands, the
-  Pass's three benefits, the dialog's Double It and Pass buttons, 13.4 converted.
+  Pass's three benefits, the dialog's Double It and Pass buttons, 13.4 converted; `CodeReferences`
+  with the entries for `AdManager`, `IAPManager` and the session's Pass id, and the shared `encore`
+  resolve they read.
 - **C. Story beats**: the family with the pop mark, the importer and validator rows,
   `AcknowledgeStory`, `story_row` with the factory's opener parameter, the card and the marked-beat
   walk in the host, ch1's two beats and their `garage_floor` rows (placement settled above, so C
   waits on nothing), the content doc.
 - **D. Allocation and the chrome**: `SetRoadieAllocation`, the top bar, settings, the allocation
-  screen, the Encore window, 13.3 converted.
+  screen, the Encore window, 13.3 converted; the `CodeReferences` entries for the pill, the window,
+  the allocation screen and the widget factory, the registry cross-check test folding into the last.
 - **E. The story log**, if in step, and the hand playthrough of every shape above.

@@ -976,13 +976,15 @@ public abstract class Condition
 ```
 
 Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, `UpgradePurchased`,
-`BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `Always`, `All`, `Any`, `Not` (the story gate
+`BuffActive`, `BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `Always`, `All`, `Any`, `Not` (the story gate
 `chapterN_complete && !storyN_seen` is
 `All[FlagSet, Not[FlagSet]]`), plus a formula-threshold kind (threshold computed from state — e.g.
 a scaling goal or reward curve reading a per-clear counter, §8.1). Records need no special kind:
 they are a currency.
 
-The two event kinds read a record the way `FlagSet` reads a flag: outward from the acting scope to
+`BuffActive` names a modifier as `UpgradePurchased` names an upgrade and reads that modifier's timed
+record outward from the acting scope, true while the record's `expiresAtUtc` is later than the
+context's own time - never by the record's presence (section 9). The two event kinds read a record the way `FlagSet` reads a flag: outward from the acting scope to
 the first interior scope holding one, no scope named. `EventRecordExists` - any record (running,
 expired-undismissed, or goal-reached-undismissed); `EventRewardPending` - a record whose
 `goalReached` is set. Both are pure fact reads: nothing evaluates a goal at read time, and neither
@@ -1070,9 +1072,12 @@ by the same walk every reference gets. The numbers stay in the `ModifierDefiniti
 **`stacking` enum: `Replace | Linear | Multiply`**. `Replace`: a re-grant keeps count at 1;
 `Linear` / `Multiply`: a re-grant increments count, and the name picks the count-scaling formula
 (`1 + (m−1)·n` vs. `m^n`) — duplicate-grant policy and growth are one closed choice. A modifier may
-also declare an optional **`appliesWhen`** condition, judged at gather time against the QUERYING
-context (the origin — the same evaluation-context ruling formulas follow): a modifier excuses
-itself from circumstances it does not apply to — a live-only buff, or §9's idle fraction, which
+also declare an optional **`appliesWhen`** condition, judged at gather time at the node the modifier
+is APPLIED to - the link's own node, the one holding the stack or the permanent membership, which is
+the site validation judges it from - with the querying context's circumstance and clock riding the
+rebase (formulas are the opposite: they compute against the origin, since a multiplier is addressed
+to a number whose identity includes its chain, 12.6): a modifier excuses
+itself from circumstances it does not apply to - a live-only buff, or section 9's idle fraction, which
 applies only during idle accumulation. Absent means always; the Effects themselves stay
 unconditional, the timing lives on the carrier. The entry is
 the fact, saved and cleared with its scope. Reserved for grants from
@@ -1337,8 +1342,10 @@ unpaid window); every write is monotonic (max), so a rolled-back clock can delay
 a stamp but never regress one. **The stamp IS the pending claim** — nothing about an offer is ever
 saved. Switch-in computes
 `idleRate x game_speed x paid time` per currency at current rates over the paid window - the first
-`min(elapsed, cap)` REAL seconds after the stamp, segmented at the root buff expiries inside it as
-the tick segments, each segment paying its own length at the rate and speed live in it; the cap
+`min(elapsed, cap)` REAL seconds after the stamp, segmented at the buff expiries inside it by the
+tick's own segment walk (`TickSystem.Segments`, the one place a window is divided) and reading
+`game_speed` through the tick's own clamped read, each segment paying its own length at the rate
+and speed live in it; the cap
 bounds real seconds, and speed multiplies what they pay - `idleRate` and `game_speed` being the
 ordinary gathers under the idle-accumulation context - skipped below the minimum-away
 threshold and skipped entirely while that chapter holds a record for an event that blocks idle
@@ -1597,6 +1604,18 @@ per-feature: any kind an author gates with explains itself for free.
   the top-level `All` itself warns, since the button renders its legs as rows and never that text.
   A textless leg at the top level is the author's choice - a threshold leg renders as progress alone.
 - A polymorphic kind in data with no class behind it is an import error.
+- **Validation has a second input beside the content tree: the code side's own references.** A
+  screen, a manager, or the session that names content from code - a modifier (`encore`), a currency
+  (`roadies`), an entitlement id (`backstage_pass`), a widget id the factory must answer - states
+  what it needs as a static check on the class holding the reference, asking existence with the
+  same primitives a definition uses (`RequireOnChain` from root, the declaration lists).
+  `CodeReferences` lists every such check explicitly, the way the kind registry lists every kind and
+  the widget factory every `prefabId`, and the pass runs the list after the tree walk, at import and
+  at boot alike. Nothing is constructed to ask: a check reads only the composed content. At runtime
+  the class resolves the same reference off root's own declaration list and holds the asset - a miss
+  there is a throw, not a guard, because the pass already answered. A class left off the list is what
+  the factory-registry cross-check catches. This is not a content lookup (12.14.8): it enumerates
+  code, inside the one pass that audits the whole tree.
 
 ### 12.13 File layout
 
@@ -1608,19 +1627,25 @@ Assets/Scripts/
     TickSystem.cs           // the segmented tick over one real-time window; returns the TickReport
     TickReport.cs           // what ONE tick moved, recorded at the mutation sites; interpolation's slopes
     GameClock.cs            // the one time source: driver-owned, advanced at every entry point
-    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds, tickIntervalSeconds
+    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds, tickIntervalSeconds, the Encore ad grant and cap
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root + labeled chapter roots, composes the pair, runs the §12.12 pass
+    ComposedContent.cs      // the runtime content set: the root asset plus the chapter roster (12.14.5)
+    ContentValidator.cs     // the 12.12 pass: the check enum, the ValidationContext, one member per check family
+    CodeReferences.cs       // validation's second input: every code-side content reference, one static existence check per class, run by the pass after the tree walk
     ScopeDefinition.cs      // the abstract base: declaration lists + the permanentModifiers usage list, Declares, CreateState
     InteriorDefinition.cs   // chapters and tiers: the rung and the events list
     RootDefinition.cs  ChapterDefinition.cs  TierDefinition.cs   // one file each - Unity binds one ScriptableObject per script, by file name
     ScopeState.cs           // the base, ScopeState<TFacts>, the three state classes and their payloads
+    ScopeStateExtensions.cs // chain walks answering with a typed scope (Root(), Chapter()); the base names no derived class
     ScopeLinks.cs           // the one post-construction pass: what each static reference means in THIS tree, keyed by its holder
     GatherCompiler.cs       // the gather's static half, compiled in that pass: a coordinate plan per authored query, a contributor plan per scope
     EffectLink.cs           // one (carrier, effect, node) a plan holds: Factor reads its own fact at its own node, or One
     ActionList.cs           // the one runner an authored list executes through: Refuses / TryRun / Run, whole or not at all
-    Condition.cs  Action.cs  PayoutFormula.cs  Trigger.cs   // the class families (+ kind classes)
+    Condition.cs  GameAction.cs  PayoutFormula.cs  TriggerDefinition.cs   // the class families (+ kind classes); GameAction because System.Action shadows the doc's name
+    Rung.cs                 // offer condition + action list: the album release and the capstone (12.5)
+    SubclassPickerAttribute.cs   // marks a [SerializeReference] field for the inspector's concrete-type popup
     Effect.cs               // the flat struct
     GameContext.cs          // read access for Evaluate/Execute: state chain + defs
     Sweep.cs                // the trigger sweep: latch event goals, collect eligible triggers, run them in order
@@ -1642,6 +1667,12 @@ Assets/Scripts/
     SongDefinition.cs      // Catalog (run) + Discography (root)
   Save/
     SaveSystem.cs          // JSON + checksum; serializes the ScopeState tree
+  Editor/
+    ChapterJsonImporter.cs // the authoring importer: JSON documents in, ScriptableObject assets out, preflight and post-write validation (12.14.5)
+    ContentDto.cs          // the authored JSON shape, strict, plus the kind registries the importer maps `type` through
+    SubclassPickerDrawer.cs   // the inspector popup behind [SubclassPicker]
+  Utilities/
+    SingletonManager/      // SingletonManager.cs + SingletonPropertyAttribute.cs: scene-lifetime singleton plumbing, independent of the game
   Monetization/
     AdManager.cs           // rewarded only (Encore top-up + Double it)
     IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar
