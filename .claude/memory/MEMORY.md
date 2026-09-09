@@ -3,7 +3,7 @@
 ## The project
 - [Project layout and workflow](project-layout-and-workflow.md) - a rewind doesn't revert the filesystem; heredocs mangle C#; old commits are a dead architecture
 - [Design review revisions](design-review-revisions.md) - register of designs the twelve review passes DELETED, plus the deferred questions; the doc cannot show an absence
-- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when the editor is closed; exit 0 proves nothing, grep for `error CS`; a reimport churns rids and trailing whitespace
+- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when the editor is closed; the script is COPIED from this file, never retyped; process checks by PATH, foreground run, read the log while it runs; exit 0 proves nothing, grep for `error CS`; a reimport churns rids and trailing whitespace
 - [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - names resolve outward from the acting scope; cross-chain aliasing is the feature; a node-kind restriction on an economy read ("only chapters") is a deviation even when my own plan wrote it
 - [Currency values are BigNumber](currency-values-are-bignumber.md) - anything the runtime could compute past a double, authored fields included; only counts and Pow's power are exempt
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20: venue assets and stationing caps deleted, payloads typed by authored kind, currencies by direct reference
@@ -23,8 +23,8 @@
 - [External review verdicts](external-review-verdicts.md) - a pasted review gets confirm/deny per finding AND accept/reject per fix, checked against the code; no bandaids, no edit until "apply"
 
 ## Judgment
-- [Problems, not issues](problems-not-issues.md) - what breaks TODAY, not what is true; a reason for NOT doing something gets checked like any other claim; and a question I raise needs a fact that changed behind it, or it is not a question; a landing report lists only decisions with a second option someone would notice
-- [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - name the primitive that already covers it, and when two shapes both work take the smaller MECHANISM - never the smaller edit; diff size is not a design reason
+- [Problems, not issues](problems-not-issues.md) - what breaks TODAY, not what is true, where "today" means PATHS that run and never the inputs content happens to supply; a reason for NOT doing something gets checked like any other claim; a question I raise needs a fact that changed behind it; a landing report lists only decisions with a second option someone would notice; a finding's weight is his call and does not move under pressure
+- [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - name the primitive that already covers it, and when two shapes both work take the smaller MECHANISM - never the smaller edit; diff size is not a design reason; proposals and explanations pick the elaborate option too - answer "what is it" in domain words and propose the smallest change that makes the finding false
 - [No spec accumulation](no-spec-accumulation.md) - answer a finding by deleting the mechanism, not by adding a paragraph; cut argument, never a named check; two rounds on one operand means delete it
 - [Tests exercise runtime code](tests-exercise-runtime-code.md) - fixtures are fine, a second implementation of runtime behavior is not; convert the call sites instead
 - [Slice landing updates the docs](slice-landing-updates-the-docs.md) - the build-plan status line and 12.13's file list are part of EVERY slice; John ordered it once and does not repeat it
@@ -32,6 +32,6 @@
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - "did you miss anything?" is a command to grep; Scripts, Tests, the live docs, the chapter JSON
 
 ## Disagreement
-- [Never cave to pressure](never-cave-to-pressure.md) - the substance changes only when the facts do; and when I do concede, the concession leads; defending machinery I built without asking what it is FOR is not judgment, and a reversal after his pushback is his finding, not mine
+- [Never cave to pressure](never-cave-to-pressure.md) - the substance changes only when the facts do; and when I do concede, the concession leads; defending machinery I built without asking what it is FOR is not judgment, and a reversal after his pushback is his finding, not mine; inflating a finding under pressure is caving too; "consistent with the plan I wrote" is never a verdict
 - [Pushback means re-derive](pushback-means-rederive.md) - his dispute of my model of HIS design means produce a discriminator; on same-but-different, split the bundle
 - [Root cause means question the structure](root-cause-means-question-the-structure.md) - on "bandaid"/"root cause": derive from what the player is doing, question MY design's structure, give ONE simpler fix; never a menu. RULE, broken twice in one day: a command owns its mutation and the flush and touches NOTHING the tick owns (clock, sample, bank, report) - check every command site and every "guard" sentence before a contract ships

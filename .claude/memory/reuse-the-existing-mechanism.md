@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: efd4f70d-d22b-4ea0-8736-2d55c0b412d5
-  modified: 2026-09-02T21:27:38.449Z
+  modified: 2026-09-09T17:17:55.924Z
 ---
 
 Before adding a field, a type, an id indirection, or any new mechanism, name the existing
@@ -98,6 +98,18 @@ condition walking down is the parent KNOWING a child's fact. Before adding any t
 not start at the acting scope and go outward, stop: it is either a propagation the child answers
 (legitimate, rare, and already exists as reset) or a read that belongs at the scope that owns the
 fact. Never a third thing.
+
+**The elaborate option wins the EXPLANATION too (2026-09-09, the seventh instance).** Asked to fix
+the gather compiler building one plan per entry instead of per coordinate, I proposed a grouping
+method on `ScopeSource`, an `Entries` list on `CoordinatePlan`, and rewrites of both readers. John,
+twice: "overly complicated." Then: "what is being grouped?" - and the honest answer was
+"lines on a producer that pay the same currency", and the fix was a lookback over the entries already
+done in the same loop, four lines, readers untouched. Two lessons. First, when he asks what a thing
+IS, answer in the domain's words (a line on a producer, a currency, a stat), never in the
+architecture's (a coordinate, a holder, a plan) - the architecture words are what hide the four-line
+answer. Second, the reviewing-and-proposing register has the same selection defect as the
+implementing one: describe the smallest change that makes the finding false, and let him ask for
+more shape if he wants it.
 
 **"Smaller" means the smaller MECHANISM, never the smaller EDIT (2026-09-08).** Defending a test
 change, I justified the placement with "it was the smaller edit." John: any time he reads that, he

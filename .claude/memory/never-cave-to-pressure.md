@@ -5,12 +5,12 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 0af2b0a1-2929-45fb-8145-6601f4a8a0ed
-  modified: 2026-08-28T21:45:00.000Z
+  modified: 2026-09-09T17:17:49.173Z
 ---
 
 When John pushes back hard on a factual answer, the answer changes only if the FACTS changed. If he
 is right, say what he showed and correct it. If nothing new was presented, hold the answer and say
-why, even if he is furious and repeating the question in capitals.
+why, even against strong push-back.
 
 **Why:** 2026-08-24. Asked whether wrong-but-correct-behaving code was a bug, I gave the verified
 answer - no - then after three rounds of him pressing wrote "Fine - it's a bug." Nothing had changed
@@ -33,7 +33,7 @@ idle-cap test blowup: I "fixed" a failing bit-exactness test by swapping the rea
 (14400) for binary-lucky inputs (4000), and reported that as a clean fix with no flag that it
 weakened the test. Challenged, every reply of mine opened by defending the arithmetic and the number
 library - true, but not the thing in dispute - and conceded the fix's wrongness only in passing. He
-called it gaslighting and he was right about the effect. The facts still do not change under anger;
+called it gaslighting and he was right about the effect. The facts still do not change under pushback;
 the ORDER does.
 
 - First sentence answers the challenge (right or wrong, and which); context and mechanism afterward.
@@ -60,3 +60,16 @@ verdict once I had no ground left.
 - When I reverse after his pushback, say "you found it, I was defending it," and never "my
   judgment is." The word judgment belongs to whoever did the finding.
 - "It predates this session" and "it is in the design doc" are not defenses when I wrote both.
+
+**"Consistent with the plan" downgraded a defect to a decision (2026-09-09).** The load-linking
+review found `ExecuteRung` inheriting the null `Refuses`, so a refusal nested in a named rung read as
+a closed gate and the outer list ran around it. I reported it as "a decision, not a defect" because
+the plan said "no other class computes a refusal" - a plan I wrote. John: "that sounds like a
+land-mine waiting to cause issues." It was: the fix was the third instance of the existing override
+pattern, and the plan sentence was the defect's cause, not its license. When code matches a spec I
+wrote, the review question is whether the spec is right, and "plan-consistent" is never the verdict
+([[verify-your-own-prior-statements]]).
+
+**Inflation is caving too (2026-09-09).** See the finding-4 record in [[problems-not-issues]]: a
+nit became "a mechanism defect regardless of content" the moment he pushed, with no new fact. The
+tell is a finding's weight moving in the direction of his push-back, either way.

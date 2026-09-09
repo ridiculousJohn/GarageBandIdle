@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 7994d8cd-29fb-4920-8032-e10d58f56a96
-  modified: 2026-09-02T21:40:23.422Z
+  modified: 2026-09-09T17:17:42.477Z
 ---
 
 **Before fixing a finding, ask what breaks today** - not whether the finding is true. A finding is a
@@ -49,7 +49,7 @@ guard was, or on any record at all" - and then wrote a paragraph weighing the tw
 moved was `Not(EventRewardPending)`. Its scope was an armed reward. Nothing about relocating the
 judgment reopened what it judges; the neighboring kind `EventRecordExists` sat in the file and I
 asked "which one" instead of "what is being replaced". John: "we moved how that's evaluated and you
-think we have to relitigate WHAT it's checking?" and "you make shit up and raise an issue based on
+think we have to relitigate WHAT it's checking?" and "you make things up and raise an issue based on
 what you made up. had I not flagged it, you'd then go write code and change things based on the
 issue you raised." That is the chain: a manufactured question becomes an "open design point" in
 the plan, the plan goes to an agent, the agent picks one, and the code carries a decision nobody
@@ -75,6 +75,26 @@ depends on it" only describes how cheap that is right now. Never open with the d
   before writing anything ([[reuse-the-existing-mechanism]]).
 - Reporting an issue as an issue is the deliverable. It is not a lesser answer than fixing it, and
   it is all a review authorizes - [[quote-directive-before-editing]] owns that gate.
+
+**"Nothing reaches it" is about PATHS, never about inputs (2026-09-09).** Reviewing the gather
+compiler, I found it compiling an identical plan once per entry where entries share a coordinate,
+and downgraded it with "today no chapter 1 source has two entries on one coordinate." John: "I don't
+care about today no chapter 1 source has two entries." The "what breaks today" rule
+above is about code paths nothing executes - a validator check for content that does not exist, a
+system a later step writes. `CompileCoordinates` runs on every Build. Whether current content
+supplies the input that makes the waste visible changes the COUNT, not whether the mechanism is
+built wrong. A mechanism in the live path is judged on its structure; content only ever decides how
+often a structural fault fires. Never argue a live-path finding down by what the assets happen to
+hold.
+
+**The weight of a finding is his call, and it does not move under pressure (2026-09-09).** The
+same finding went nit, then "mechanism defect regardless of content" when he pushed on the content
+qualifier, then "withdrawn, not worth a change" when he asked what was being grouped. John: "it's not
+your call to determine if it's not worth a change. Duplicated work is duplicated work
+and you seem to have thought it was a problem until I pushed back." Both moves were
+caving ([[never-cave-to-pressure]]): inflating under pressure and withdrawing under pressure are the
+same failure with opposite signs. The deliverable is the finding and its fix, stated once at the
+weight the facts support; whether it lands is his.
 
 **2026-09-08 - a landing report lists only decisions that could have gone another way.** The
 changeset-1 report had six "judgments outside the plan". Three were non-events copied from agent
