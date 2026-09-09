@@ -785,9 +785,10 @@ a stat: idle pay is the live rate gathered under an idle-accumulation context (�
 factors are ordinary rate effects on modifiers that apply only then (`appliesWhen`, §12.5) —
 "rate but idle" is a circumstance of one gather, never a second vocabulary.
 
-`GetMultiplier(owner, currencyId, stat)` answers one question: *which factors apply to this
-number?* A number is identified by its owner and coordinates — a `produces` entry by
-(source, currencyId, stat), a consumer-owned stat by its name alone. An effect matches when its
+Every multiplier the game computes answers one question, asked at one node: *at this origin, for this
+owner, this currency, and this stat, which factors apply to this number?* A number is identified by
+its owner and coordinates — a `produces` entry by (source, currencyId, stat), a consumer-owned stat
+by its name alone. An effect matches when its
 `target` names the owner (by id or any of its tags), its `stat` names the queried stat EXACTLY,
 and the optional `currencyId` agrees — empty matches everything the owner has, set narrows by id
 or tag. **The stat is required**: a query resolves one number and a number always has a stat, so a
@@ -813,6 +814,32 @@ A currency-targeted effect must therefore be applied at the currency's home scop
 descendant scope wanting a local boost targets its producer, generator, or a source tag instead.
 That is a placement rule rather than a load-time check: an effect nobody walks up to meet simply has
 no takers, which is also what a root buff looks like before any chapter carrying its tag is loaded.
+
+**Both stages are compiled, once, when the tree is built.** Everything above but liveness is authored
+and validated, so the load pass (12.14.8) asks the question for every coordinate the content authors
+and files the answer, at the node it will be asked from, as a **coordinate plan**: walk outward from
+the origin, take each scope's carriers in the order it declares them, and keep every effect the match
+rule above accepts. The kept effects, chain order then carrier order, ARE the plan, each held as a
+link to the node whose fact decides it (12.6); `GetMultiplier(origin, plan)` multiplies those links,
+and the selector never runs again. There is no separate stage-1, currency-stage, bar or `game_speed`
+plan: those are the same plan asked with a different owner. The queries compiled are exactly the ones
+the content authors - each source entry at its declaring scope (stage 1), each currency at its home
+for `rate` and `yield` (stage 2, the currency its own owner, so its own tags match), each bar at its
+declaring scope for its fill rate (stage 1 only, 12.7), and `game_speed` at each chapter. A
+coordinate no content authors has no plan, and a consumer asking for one throws rather than
+answering 1x.
+
+**The aggregation is compiled the same way**, as one **contributor plan** per scope, held at every
+node over its own subtree: for each currency any source in that subtree pays at `rate`, its
+contributors in tree order (parent before child) then declaration order, each with the scope it sits
+at and the stage-1 plan its entries share, plus the currency's home resolved outward from a paying
+scope; and that subtree's bars in settlement order - scopes parent before child, then bar groups,
+then bars, each in declaration order - with each bar's group, pool home, and fill-rate plan.
+`GetRate` sums that list and applies the currency stage, `RatePairs` is its currency column, bar
+settlement is its bar list. None of them walks the
+subtree, and each is asked at the scope whose subtree is meant; the tick asks the foreground chapter
+because that is what ticks (12.9), which is a session choice and not an economy rule.
+
 That is the entire modifier system.
 
 ### 12.3 Scopes: state containers
@@ -1087,14 +1114,25 @@ auto-finishing challenge is a trigger, not an event — events keep claimed comp
 
 ### 12.6 Where effects come from
 
-`GetMultiplier(owner, currencyId, stat)` walks the chain outward and multiplies what each scope
-returns **for itself**. The walk names no source: a scope composes its own factor from the facts it
-holds, so a kind of scope with a source the others lack adds it in one override rather than as
-another read inside the walk. That is what lets `events` live on `InteriorDefinition` (§12.3) with
+**The candidates for every multiplier are fixed when the tree is built; only liveness is read at
+gather time.** Which effects can ever apply to a number - this owner, this currency, this stat, from
+this origin - is authored and validated, so the load pass answers it once and files the answer as a
+coordinate plan at the node the question is asked from (12.2, 12.14.8). `GetMultiplier(origin, plan)`
+multiplies the plan's links in the order the compiler fixed: no chain is walked and no selector is
+compared at gather time. What each link reads every time is the FACT - purchased, stacked, filled,
+recorded, `appliesWhen` holding - which is exactly the fact column of the table below, and exactly
+the half a plan does not fix.
+
+A scope names its own carriers in ONE enumeration, and that order IS the multiplication order at a
+node: upgrades, permanent modifiers, granted modifiers, bar cascades, then handicaps, each kind in
+declaration order and effects in declaration order within a carrier. The enumeration names no source
+from outside, so a kind of scope with a source the others lack adds it in one override rather than as
+another read inside a walk. That is what lets `events` live on `InteriorDefinition` (§12.3) with
 nothing on the base naming them - the interior scope folds its handicaps in, and root, having no
-override, contributes none. The same shape covers the other two walks: the rate walk sums what each
-scope returns for its own producers and generators, and the declaration walk asks each scope whether
-it declares a definition rather than reading a named list off it. Across the tree the sources are:
+override, contributes none. The same shape covers what else is compiled off a scope: the sources it
+declares are one enumeration too, each producer and generator carried with the count fact that scales
+it, and the declaration walk asks each scope whether it declares a definition rather than reading a
+named list off it. Across the tree the sources are:
 
 | Source | The fact (stored) | The effects (derived on read) |
 |---|---|---|
@@ -1562,6 +1600,8 @@ Assets/Scripts/
     RootDefinition.cs  ChapterDefinition.cs  TierDefinition.cs   // one file each - Unity binds one ScriptableObject per script, by file name
     ScopeState.cs           // the base, ScopeState<TFacts>, the three state classes and their payloads
     ScopeLinks.cs           // the one post-construction pass: what each static reference means in THIS tree, keyed by its holder
+    GatherCompiler.cs       // the gather's static half, compiled in that pass: a coordinate plan per authored query, a contributor plan per scope
+    EffectLink.cs           // one (carrier, effect, node) a plan holds: Factor reads its own fact at its own node, or One
     ActionList.cs           // the one runner an authored list executes through: Refuses / TryRun / Run, whole or not at all
     Condition.cs  Action.cs  PayoutFormula.cs  Trigger.cs   // the class families (+ kind classes)
     Effect.cs               // the flat struct
@@ -1569,7 +1609,7 @@ Assets/Scripts/
     Sweep.cs                // the trigger sweep: latch event goals, collect eligible triggers, run them in order
   Economy/
     CurrencyDefinition.cs  ProducerDefinition.cs
-    Producer.cs             // stateless resolution: Σ matching produces entries × Π multipliers + GetMultiplier
+    Producer.cs             // stateless resolution: a source's entries summed, times the product of its coordinate plan's links; GetRate and RatePairs read the contributor plan of the node they are asked at
     GeneratorDefinition.cs  UpgradeDefinition.cs
     Purchasing.cs           // TryBuy(generator | upgrade): fail-closed gate, spend, count or latch, payload
     MultiplierFormula.cs    // the formula family an Effect's factor can compute from

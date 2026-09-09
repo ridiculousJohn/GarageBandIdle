@@ -11,9 +11,9 @@ namespace RidiculousGaming.GarageBandIdle
     // runtime nodes, so two games built from the same assets hold their own.
     public static class ScopeLinker
     {
-        // The one post-construction step Build takes. Scope references first;
-        // changeset 1 compiles the gather after them, over a tree whose links
-        // already exist.
+        // The one post-construction step Build takes. Scope references first,
+        // then the gather compiles over a tree whose links already exist - so
+        // there is one pass to call and one order to it.
         public static void Link(ScopeState root, IReadOnlyDictionary<ScopeDefinition, ScopeState> nodes)
         {
             if (root == null)
@@ -21,6 +21,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (nodes == null)
                 throw new ArgumentNullException(nameof(nodes));
             Visit(root);
+            GatherCompiler.Compile(root);
 
             void Visit(ScopeState node)
             {

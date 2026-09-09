@@ -93,14 +93,18 @@ namespace RidiculousGaming.GarageBandIdle
             var realDt = (segmentEndUtc - segmentStartUtc).TotalSeconds;
             var liveCtx = new GameContext(foregroundChapter, segmentStartUtc);
 
-            // game_speed, gathered once and CLAMPED at the consumer: section 9
+            // game_speed, read off the chapter's own compiled plan - the
+            // owner-less, currency-less query 12.2 describes, compiled at every
+            // chapter node because the tick's origin is fixed in code - and
+            // CLAMPED at the consumer: section 9
             // describes the caps but nothing else enforces one - unclamped
             // authoring could stall time (a x0 wildcard) or stack carriers past
             // the ceiling. The floor of 1 also forbids an authored slow-time
             // mechanic; nothing designs one, and it is one constant if that
             // ever changes. effDt stays a double - ConsumeAndSettle and the
             // timer decrement take doubles, and the clamp bounds it.
-            var speed = Producer.GetMultiplier(liveCtx, null, null, Stat.GameSpeed).ToDouble();
+            var speed = Producer.GetMultiplier(
+                liveCtx, foregroundChapter.Link<CoordinatePlan>(GatherCompiler.GameSpeed)).ToDouble();
             var effDt = realDt * Math.Clamp(speed, 1, config.maxGameSpeed);
 
             // Bar demand BEFORE the deposits, per the snapshot rule: resolving

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 
@@ -13,6 +15,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static void AssertClose(double expected, BigNumber actual, string what = null) =>
             Assert.AreEqual(expected, actual.ToDouble(), 1e-9, what ?? string.Empty);
+
+        // A multiplier is a PLAN read now: the candidates for one coordinate are
+        // compiled when the tree is built and the gather only asks each one
+        // whether it is live (12.6). A plan is read off the node holding it,
+        // keyed by the authored object it was filed under - a source's entry for
+        // a stage-1 number, the currency itself for a stage-2 one.
+        //
+        // Picking the entry out of a source's own authored list is a fixture
+        // over content the test already holds, like TestNavigation: production
+        // holds the plan and never looks for one. The FIRST entry of a
+        // coordinate is as good as any - entries naming one currency and stat
+        // share a coordinate, so they share the plan.
+        private static CoordinatePlan Stage1(ScopeState node, List<ProducesEntry> entries,
+                                             CurrencyDefinition currency, string stat) =>
+            node.Link<CoordinatePlan>(entries.First(entry => entry.currency == currency && entry.stat == stat));
+
+        private static CoordinatePlan Stage2(ScopeState home, CurrencyDefinition currency, string stat) =>
+            home.Link<CurrencyPlans>(currency).For(stat);
 
         // ---- the currency gate (12.2) ----
 
@@ -126,7 +146,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var bar = MakeCascadeBar(tree, 1.1, growth);
             tree.Tier1.fillCounts[bar.Id] = 3;
 
-            AssertClose(expected, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
+            AssertClose(expected, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)));
         }
 
         // Reduced to nothing is a semantic; reduced past nothing is not one, and
@@ -138,7 +158,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var bar = MakeCascadeBar(tree, 0.5, GrowthKind.Linear);
             tree.Tier1.fillCounts[bar.Id] = 5;      // 1 + (-0.5) * 5 = -1.5
 
-            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
+            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)));
         }
 
         // Read through the DECLARATION list, like a purchased upgrade: a count
@@ -150,7 +170,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             MakeCascadeBar(tree, 1.1, GrowthKind.Multiply);
             tree.Tier1.fillCounts["ghost_bar"] = 10;
 
-            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)));
         }
 
         // ---- the active-event row (12.6) ----
@@ -163,13 +183,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void An_event_record_applies_its_handicaps_and_expiry_does_not_lift_them()
         {
             var tree = new TestTree();
-            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "no record");
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)), "no record");
 
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 100 };
-            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "running");
+            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)), "running");
 
             tree.Tier1.activeEvent.remainingSeconds = 0;
-            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "expired");
+            AssertClose(0, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)), "expired");
         }
 
         // Read through the DECLARATION list, like an upgrade latch: a record
@@ -180,7 +200,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "ghost_event", remainingSeconds = 100 };
 
-            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate));
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)));
         }
 
         // ---- the match rule ----
@@ -198,6 +218,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var byNothing = TestTree.MakeDefinition<ModifierDefinition>("by_nothing");
             tree.Tier1Def.modifiers.Add(byNothing);
             byNothing.effects.Add(new Effect { target = "bassist", stat = Stat.Rate, multiplier = 5 });
+            tree.Rebuild();
 
             var ctx = tree.Ctx(tree.Tier1);
             tree.Tier1.modifierStacks["by_id"] = 1;
@@ -206,9 +227,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // practice_amp is hit by the id AND the gear tag; drummer carries the
             // tag only; nothing matches an id the owner does not answer to.
-            AssertClose(6, Producer.GetMultiplier(ctx, tree.PracticeAmp, tree.Cash, Stat.Rate), "practice_amp");
-            AssertClose(3, Producer.GetMultiplier(ctx, tree.Drummer, tree.Cash, Stat.Rate), "drummer");
-            AssertClose(1, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Rate), "tap_producer");
+            AssertClose(6, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)), "practice_amp");
+            AssertClose(3, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.Drummer.produces, tree.Cash, Stat.Rate)), "drummer");
+            // The tap's own rate coordinate is the rehearsal one - a query is a
+            // number the content authors, so that is where "an id the owner
+            // does not answer to" is asked.
+            AssertClose(1, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Rehearsal, Stat.Rate)), "tap_producer");
         }
 
         [Test]
@@ -227,6 +251,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var exactly = TestTree.MakeDefinition<ModifierDefinition>("exactly");
             tree.Tier1Def.modifiers.Add(exactly);
             exactly.effects.Add(new Effect { target = "tap_producer", currencyId = "rehearsal", stat = Stat.Rate, multiplier = 7 });
+            tree.Rebuild();
 
             var ctx = tree.Ctx(tree.Tier1);
             foreach (var id in new[] { "every_yield", "just_cash", "every_rate", "exactly" })
@@ -234,9 +259,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The stat is exact and required; the optional currency coordinate
             // narrows within it, from every entry of that stat down to one.
-            AssertClose(2 * 3, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "cash yield");
-            AssertClose(5 * 7, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Rehearsal, Stat.Rate), "rehearsal rate");
-            AssertClose(2, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Rehearsal, Stat.Yield), "rehearsal yield");
+            AssertClose(2 * 3, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "cash yield");
+            AssertClose(5 * 7, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Rehearsal, Stat.Rate)), "rehearsal rate");
+            AssertClose(2, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Rehearsal, Stat.Yield)), "rehearsal yield");
         }
 
         // ---- the wildcard and the consumer-owned stats (12.2) ----
@@ -248,6 +273,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var everyCurrency = TestTree.MakeDefinition<ModifierDefinition>("every_currency");
             everyCurrency.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });
             tree.RootDef.modifiers.Add(everyCurrency);
+            tree.Rebuild();
             tree.Root.modifierStacks["every_currency"] = 1;
             tree.Tier1.generatorCounts["practice_amp"] = 4;
             tree.Tier1.flags.Add("fans_revealed");
@@ -257,7 +283,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // yield stays out of it.
             AssertClose(0.5 * 4 * 2, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
             AssertClose(0.35 * 2, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Fans), "every currency");
-            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cash, tree.Cash, Stat.Yield), "the stat is exact");
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage2(tree.Tier1, tree.Cash, Stat.Yield)), "the stat is exact");
         }
 
         [Test]
@@ -267,11 +293,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var everyCurrency = TestTree.MakeDefinition<ModifierDefinition>("every_currency");
             everyCurrency.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });
             tree.RootDef.modifiers.Add(everyCurrency);
+            tree.Rebuild();
             tree.Root.modifierStacks["every_currency"] = 1;
 
             // A bar consumes: its rate resolves stage 1 only, with the bar as
             // the owner, which a currency-stage wildcard never matches.
-            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cover1, tree.Rehearsal, Stat.Rate));
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1),
+                tree.Tier1.Link<CoordinatePlan>(tree.Cover1)));
         }
 
         [Test]
@@ -281,14 +309,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var cashOnly = TestTree.MakeDefinition<ModifierDefinition>("cash_only");
             cashOnly.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 0.5 });
             tree.RootDef.modifiers.Add(cashOnly);
+            tree.Rebuild();
             tree.Root.modifierStacks["cash_only"] = 1;
 
             // The currency coordinate narrows the wildcard's "every currency"
             // down to one; the stat stays exact.
             var ctx = tree.Ctx(tree.Tier1);
-            AssertClose(0.5, Producer.GetMultiplier(ctx, tree.Cash, tree.Cash, Stat.Rate), "cash rate");
-            AssertClose(1, Producer.GetMultiplier(ctx, tree.Fans, tree.Fans, Stat.Rate), "fans untouched");
-            AssertClose(1, Producer.GetMultiplier(ctx, tree.Cash, tree.Cash, Stat.Yield), "yield untouched");
+            AssertClose(0.5, Producer.GetMultiplier(ctx, Stage2(tree.Tier1, tree.Cash, Stat.Rate)), "cash rate");
+            AssertClose(1, Producer.GetMultiplier(ctx, Stage2(tree.Tier1, tree.Fans, Stat.Rate)), "fans untouched");
+            AssertClose(1, Producer.GetMultiplier(ctx, Stage2(tree.Tier1, tree.Cash, Stat.Yield)), "yield untouched");
         }
 
         [Test]
@@ -301,11 +330,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             targeted.effects.Add(new Effect { target = "tap_producer", stat = Stat.GameSpeed, multiplier = 3 });
             tree.RootDef.modifiers.Add(encore);
             tree.RootDef.modifiers.Add(targeted);
+            tree.Rebuild();
             tree.Root.modifierStacks["encore"] = 1;
             tree.Root.modifierStacks["targeted"] = 1;
 
             // The tick's read: no owner, no currency, matched by name alone.
-            AssertClose(2, Producer.GetMultiplier(new GameContext(tree.Ch1, Now), null, null, Stat.GameSpeed));
+            AssertClose(2, Producer.GetMultiplier(new GameContext(tree.Ch1, Now),
+                tree.Ch1.Link<CoordinatePlan>(GatherCompiler.GameSpeed)));
         }
 
         // Load-refused content, but the runtime backstop is what keeps a
@@ -318,11 +349,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var statless = TestTree.MakeDefinition<ModifierDefinition>("statless");
             statless.effects.Add(new Effect { target = "cash", multiplier = 2 });
             tree.Tier1Def.modifiers.Add(statless);
+            tree.Rebuild();
             tree.Tier1.modifierStacks["statless"] = 1;
 
             var ctx = tree.Ctx(tree.Tier1);
-            AssertClose(1, Producer.GetMultiplier(ctx, tree.Cash, tree.Cash, Stat.Rate), "matches no rate");
-            AssertClose(1, Producer.GetMultiplier(ctx, tree.Cash, tree.Cash, Stat.Yield), "matches no yield");
+            AssertClose(1, Producer.GetMultiplier(ctx, Stage2(tree.Tier1, tree.Cash, Stat.Rate)), "matches no rate");
+            AssertClose(1, Producer.GetMultiplier(ctx, Stage2(tree.Tier1, tree.Cash, Stat.Yield)), "matches no yield");
         }
 
         [Test]
@@ -341,21 +373,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1Def.modifiers.Add(multiply);
             multiply.stacking = StackingKind.Multiply;
             multiply.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = 2 });
+            tree.Rebuild();
 
             var ctx = tree.Ctx(tree.Tier1);
             tree.Tier1.modifierStacks["replace_boost"] = 3;
 
             // Replace ignores the count entirely - AddModifier holds it at 1, and
             // a count on disk never buys extra.
-            AssertClose(2, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "replace");
+            AssertClose(2, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "replace");
 
             tree.Tier1.modifierStacks.Remove("replace_boost");
             tree.Tier1.modifierStacks["linear_boost"] = 3;
-            AssertClose(4, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "linear");
+            AssertClose(4, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "linear");
 
             tree.Tier1.modifierStacks.Remove("linear_boost");
             tree.Tier1.modifierStacks["multiply_boost"] = 3;
-            AssertClose(8, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "multiply");
+            AssertClose(8, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "multiply");
         }
 
         [Test]
@@ -366,6 +399,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1Def.modifiers.Add(decay);
             decay.stacking = StackingKind.Linear;
             decay.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = 0.5 });
+            tree.Rebuild();
 
             var ctx = tree.Ctx(tree.Tier1);
             tree.Tier1.modifierStacks["decay"] = 1;
@@ -373,11 +407,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // A debuff that decays linearly is legal authoring, and 1 + (m-1)*n
             // crosses zero at n = 2 - beyond which a raw formula would run
             // production backwards.
-            AssertClose(0.5, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "one stack");
+            AssertClose(0.5, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "one stack");
             tree.Tier1.modifierStacks["decay"] = 2;
-            AssertClose(0, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "two stacks");
+            AssertClose(0, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "two stacks");
             tree.Tier1.modifierStacks["decay"] = 5;
-            AssertClose(0, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "five stacks");
+            AssertClose(0, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "five stacks");
         }
 
         // Count scaling happens in BigNumber, not in double arithmetic that
@@ -391,11 +425,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1Def.modifiers.Add(huge);
             huge.stacking = StackingKind.Linear;
             huge.effects.Add(new Effect { target = "tap_producer", stat = Stat.Yield, multiplier = double.MaxValue });
+            tree.Rebuild();
             tree.Tier1.modifierStacks["huge"] = 2;
 
             // Past double range without ever having been an infinity: the
             // constructor would have thrown on the way through.
-            var product = Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.TapProducer, tree.Cash, Stat.Yield);
+            var product = Producer.GetMultiplier(tree.Ctx(tree.Tier1),
+                Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield));
             Assert.IsTrue(product > (BigNumber)double.MaxValue, $"expected a value past double range, got {product}");
         }
 
@@ -466,7 +502,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(0.5 * 4 * 1.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
 
             // ...and leaves the tap yield alone.
-            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cash, tree.Cash, Stat.Yield), "cash yield");
+            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage2(tree.Tier1, tree.Cash, Stat.Yield)), "cash yield");
         }
 
         [Test]
@@ -556,7 +592,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // stat leg is exact, so walkthrough 13.2's "alike" is one entry per
             // stat, both on the income tag.
             AssertClose(0.5 * 4 * 1.4, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
-            AssertClose(1.4, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.Cash, tree.Cash, Stat.Yield), "cash yield");
+            AssertClose(1.4, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage2(tree.Tier1, tree.Cash, Stat.Yield)), "cash yield");
 
             // Fans are never income-tagged: the farm throttle stands on it.
             tree.Tier1.flags.Add("fans_revealed");
@@ -613,15 +649,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             scaled.effects.Add(new Effect { target = "practice_amp", stat = Stat.Rate,
                 formula = new LinearOnBalance { currency = tree.Cash, coefficient = 0.1 } });
             tree.Tier1Def.modifiers.Add(scaled);
+            tree.Rebuild();
             tree.Tier1.modifierStacks["scaled"] = 1;
             tree.Tier1.balances["cash"] = 5;
 
             // 1 + 0.1 x 5, read off the origin's chain like every formula.
-            AssertClose(1.5, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "one stack");
+            AssertClose(1.5, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)), "one stack");
 
             // Count scaling composes on the COMPUTED value: 1 + (1.5 - 1) x 2.
             tree.Tier1.modifierStacks["scaled"] = 2;
-            AssertClose(2, Producer.GetMultiplier(tree.Ctx(tree.Tier1), tree.PracticeAmp, tree.Cash, Stat.Rate), "two stacks");
+            AssertClose(2, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)), "two stacks");
         }
 
         [Test]
@@ -666,6 +703,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             standing.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
             tree.Ch1Def.modifiers.Add(standing);
             tree.Ch1Def.permanentModifiers.Add(standing);
+            tree.Rebuild();
             tree.Tier1.generatorCounts["practice_amp"] = 1;
 
             AssertClose(1, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "applies");
@@ -686,21 +724,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1Def.modifiers.Add(linear);
             tree.Tier1Def.permanentModifiers.Add(linear);
 
-            // Permanent membership alone is one application.
-            var ctx = tree.Ctx(tree.Tier1);
-            AssertClose(2, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "implicit 1");
-
-            // Granted stacks MERGE with the implicit 1: count 3, 1 + (2-1) x 3.
-            tree.Tier1.modifierStacks["both_linear"] = 2;
-            AssertClose(4, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Yield), "1 + 2 stacks");
-
-            // Replace means permanent-plus-granted is still ONE application.
+            // The Replace half, authored in the same breath: the gather is
+            // compiled at build, so both carriers are declared before the one
+            // rebuild and only their FACTS move afterward. It answers for the
+            // rate stat, which the yield assertions below never ask.
             var replace = TestTree.MakeDefinition<ModifierDefinition>("both_replace");
             replace.effects.Add(new Effect { target = "tap_producer", stat = Stat.Rate, multiplier = 3 });
             tree.Tier1Def.modifiers.Add(replace);
             tree.Tier1Def.permanentModifiers.Add(replace);
+            tree.Rebuild();
+
+            // Permanent membership alone is one application.
+            var ctx = tree.Ctx(tree.Tier1);
+            AssertClose(2, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "implicit 1");
+
+            // Granted stacks MERGE with the implicit 1: count 3, 1 + (2-1) x 3.
+            tree.Tier1.modifierStacks["both_linear"] = 2;
+            AssertClose(4, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Cash, Stat.Yield)), "1 + 2 stacks");
+
+            // Replace means permanent-plus-granted is still ONE application.
+            // The tap's authored rate coordinate is the rehearsal one, which is
+            // where a tap-targeted rate effect is asked for.
             tree.Tier1.modifierStacks["both_replace"] = 5;
-            AssertClose(3, Producer.GetMultiplier(ctx, tree.TapProducer, tree.Cash, Stat.Rate), "replace stays one");
+            AssertClose(3, Producer.GetMultiplier(ctx, Stage1(tree.Tier1, tree.TapProducer.produces, tree.Rehearsal, Stat.Rate)),
+                "replace stays one");
         }
 
         // ---- appliesWhen (12.5) ----
@@ -714,6 +761,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             idleOnly.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 0.5 });
             tree.RootDef.modifiers.Add(idleOnly);
             tree.RootDef.permanentModifiers.Add(idleOnly);
+            tree.Rebuild();
             tree.Tier1.generatorCounts["practice_amp"] = 1;
 
             // The authored idle base (x0.5) joins every idle gather, so the
@@ -732,6 +780,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             liveOnly.appliesWhen = new Not { condition = new IdleAccumulation() };
             liveOnly.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
             tree.Tier1Def.modifiers.Add(liveOnly);
+            tree.Rebuild();
             tree.Tier1.modifierStacks["live_only"] = 1;
             tree.Tier1.generatorCounts["practice_amp"] = 1;
 
@@ -811,6 +860,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             });
             group.bars.Add(bar);
             tree.Tier1Def.barGroups.Add(group);
+            // The gather is compiled when the tree is built, so a cascade
+            // authored afterward joins a plan only once the tree is rebuilt.
+            tree.Rebuild();
             return bar;
         }
 

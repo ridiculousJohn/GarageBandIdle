@@ -25,7 +25,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 2509765236301234258
+      rid: 2509765238408609874
   appliesWhen:
     rid: -2
   references:
@@ -33,7 +33,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 2509765236301234258
+    - rid: 2509765238408609874
       type: {class: RoadieActiveBoost, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         perRoadie:

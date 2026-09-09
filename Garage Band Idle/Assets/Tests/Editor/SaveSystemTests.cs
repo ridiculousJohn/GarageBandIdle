@@ -141,22 +141,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Removed_ids_drop_with_warnings_and_new_declarations_start_at_zero()
         {
             var saved = new TestTree();
-            saved.Tier1.balances["cash"] = 100;
+            saved.Ch1.balances["ch1_records"] = 100;
             saved.Tier1.flags.Add("fans_revealed");
             var json = SaveSystem.Serialize(saved.Root);
 
-            // Same tree shape, but tier1 no longer declares cash or the flag,
-            // and now declares a new currency.
+            // Same tree shape, but ch1 no longer declares ch1_records, tier1 no
+            // longer declares the flag, and tier1 now declares a new currency.
+            // The withdrawn declaration is one NOTHING in the fixture pays: a
+            // produces entry or a bar naming a currency no scope on its chain
+            // declares is invalid content that Build refuses (12.14.7), so the
+            // removal has to leave the tree buildable to test the load at all.
             var newTree = new TestTree();
-            newTree.Tier1Def.declaredCurrencies.RemoveAll(c => c != null && c.Id == "cash");
+            newTree.Ch1Def.declaredCurrencies.RemoveAll(c => c != null && c.Id == "ch1_records");
             newTree.Tier1Def.declaredFlags.Remove("fans_revealed");
             TestTree.DeclareCurrency(newTree.Tier1Def, "vinyl");
 
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cash'"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ch1_records'"));
             Assert.IsTrue(SaveSystem.TryDeserialize(json, newTree.Content, out var root));
 
+            var ch1 = TestNavigation.Node(root, newTree.Ch1Def);
             var tier1 = TestNavigation.Node(root, newTree.Tier1Def);
-            Assert.IsFalse(tier1.balances.ContainsKey("cash"));
+            Assert.IsFalse(ch1.balances.ContainsKey("ch1_records"));
             Assert.IsFalse(tier1.flags.Contains("fans_revealed"));
             Assert.AreEqual(BigNumber.Zero, tier1.balances["vinyl"]);
         }

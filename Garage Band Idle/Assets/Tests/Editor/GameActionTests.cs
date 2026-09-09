@@ -77,6 +77,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var linear = TestTree.MakeDefinition<ModifierDefinition>("linear_mod");
             linear.stacking = StackingKind.Linear;
             tree.Ch1Def.modifiers.AddRange(new[] { replaceMod, linear });
+            tree.Rebuild();
             var ctx = tree.Ctx(tree.Tier1);
 
             var grantReplace = new AddModifier { scope = tree.Ch1Def, modifier = replaceMod };
@@ -99,6 +100,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var linear = TestTree.MakeDefinition<ModifierDefinition>("linear_mod");
             linear.stacking = StackingKind.Linear;
             tree.Ch1Def.modifiers.Add(linear);
+            tree.Rebuild();
             var ctx = tree.Ctx(tree.Tier1);
             var grant = new AddModifier { scope = tree.Ch1Def, modifier = linear };
             var remove = new RemoveModifier { scope = tree.Ch1Def, modifier = linear };

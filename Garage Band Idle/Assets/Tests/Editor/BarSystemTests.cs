@@ -85,13 +85,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             scope.activeBars[group.Id] = set;
         }
 
-        public void Grant(ScopeState scope, string target, double multiplier)
+        // Declared BEFORE the build, because the gather is compiled when the
+        // tree is built: a modifier authored afterward sits on no plan. The
+        // stack is a FACT, so Stack writes it once the nodes exist.
+        public ModifierDefinition Declare(ScopeDefinition scope, string target, double multiplier)
         {
             var modifier = TestTree.MakeDefinition<ModifierDefinition>("mod_" + target + "_" + multiplier);
             modifier.effects.Add(new Effect { target = target, stat = Stat.Rate, multiplier = multiplier });
-            scope.Definition.modifiers.Add(modifier);
-            scope.modifierStacks[modifier.Id] = 1;
+            scope.modifiers.Add(modifier);
+            return modifier;
         }
+
+        public void Stack(ScopeState scope, ModifierDefinition modifier) =>
+            scope.modifierStacks[modifier.Id] = 1;
 
         public void Pour(ScopeState home, CurrencyDefinition currency, double amount) =>
             home.balances[currency.Id] = amount;
@@ -261,10 +267,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
             var bar = f.Bar(group, "cover_a", 1000, 2);
+            var buff = f.Declare(f.Tier1Def, "cover_a", 3);
             f.Build();
             f.Pour(f.Tier1, f.Rehearsal, 1000);
             f.Select(f.Tier1, group, bar);
-            f.Grant(f.Tier1, "cover_a", 3);
+            f.Stack(f.Tier1, buff);
 
             f.Segment(1);
             AssertClose(6, f.Progress(f.Tier1, bar), "per-bar speed is buffable by id or tag");
@@ -276,10 +283,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
             var bar = f.Bar(group, "cover_a", 1000, 2);
+            var poolBuff = f.Declare(f.Tier1Def, "rehearsal", 3);
             f.Build();
             f.Pour(f.Tier1, f.Rehearsal, 1000);
             f.Select(f.Tier1, group, bar);
-            f.Grant(f.Tier1, "rehearsal", 3);       // an effect on the POOL currency's total
+            f.Stack(f.Tier1, poolBuff);             // an effect on the POOL currency's total
 
             f.Segment(1);
 
@@ -298,13 +306,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var drinker = f.Bar(poured, "drinker", 1000, 2);
             var timed = f.Group(f.Tier1Def, "timed", null);
             var ticker = f.Bar(timed, "ticker", 1000, 2);
-            f.Build();
             var modifier = TestTree.MakeDefinition<ModifierDefinition>("narrowed");
             modifier.effects.Add(new Effect { target = "rehearsal_fill", currencyId = "rehearsal", stat = Stat.Rate, multiplier = 4 });
             f.Tier1Def.declaredTags.Add("rehearsal_fill");
             drinker.EditorInit("drinker", "rehearsal_fill");
             ticker.EditorInit("ticker", "rehearsal_fill");
             f.Tier1Def.modifiers.Add(modifier);
+            // The tags decide what MATCHES, and matching is compile time: the
+            // whole selector has to stand before the tree is built.
+            f.Build();
             f.Tier1.modifierStacks[modifier.Id] = 1;
             f.Pour(f.Tier1, f.Rehearsal, 1000);
             f.Select(f.Tier1, poured, drinker);
@@ -589,10 +599,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
             var bar = f.Bar(group, "cover_a", 100, 2);
+            var silence = f.Declare(f.Tier1Def, "cover_a", 0);   // an event handicap is x0, and x0 is legal
             f.Build();
             f.Pour(f.Tier1, f.Rehearsal, 50);
             f.Select(f.Tier1, group, bar);
-            f.Grant(f.Tier1, "cover_a", 0);         // an event handicap is x0, and x0 is legal
+            f.Stack(f.Tier1, silence);
 
             f.Segment(1);
 

@@ -44,68 +44,61 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // coupling the snapshot rule exists to forbid.
     //
     // Everything here is stateless over an explicit subtree root, exactly like
-    // GetRate; the tick that calls the two halves in phase order is step 7's.
+    // GetRate - and, like GetRate, it reads that node's compiled contributor
+    // plan rather than rediscovering the bars every segment (12.2/12.14.8); the
+    // tick that calls the two halves in phase order is step 7's.
     public static class BarSystem
     {
-        // The segment's drawing bars. Walks the subtree in settlement order and
-        // mutates nothing. `segmentStartUtc` is real time - it is what the
-        // condition reads are judged against.
+        // The segment's drawing bars, in the settlement order the subtree root's
+        // contributor plan fixed when the tree was built - scopes parent before
+        // child, then groups, then bars, in declaration order. Mutates nothing.
+        // `segmentStartUtc` is real time - it is what the condition reads are
+        // judged against.
         public static BarDemand ResolveDemand(ScopeState subtreeRoot, DateTime segmentStartUtc)
         {
             var demand = new BarDemand();
-            if (subtreeRoot != null)
-                Walk(subtreeRoot);
-            return demand;
+            if (subtreeRoot == null)
+                return demand;
 
-            void Walk(ScopeState node)
+            var planned = ContributorPlan.At(subtreeRoot).Bars;
+            for (var i = 0; i < planned.Count; i++)
             {
+                var entry = planned[i];
+                var node = entry.Node;
                 var ctx = new GameContext(node, segmentStartUtc);
-                foreach (var group in node.Definition.barGroups)
+                var progress = node.barProgress.TryGetValue(entry.Bar.Id, out var stored) ? stored : BigNumber.Zero;
+                if (!Drawing(node, ctx, entry.Group, entry.Bar, progress))
+                    continue;
+                demand.bars.Add(new BarFill
                 {
-                    if (group == null)
-                        continue;
-                    foreach (var bar in group.bars)
-                    {
-                        if (bar == null)
-                            continue;
-                        var progress = node.barProgress.TryGetValue(bar.Id, out var stored) ? stored : BigNumber.Zero;
-                        if (!Drawing(node, ctx, group, bar, progress))
-                            continue;
-                        demand.bars.Add(new BarFill
-                        {
-                            scope = node,
-                            facts = node.facts,
-                            group = group,
-                            bar = bar,
-                            pool = bar.fillCurrency,
-                            poolHome = bar.fillCurrency == null
-                                ? null
-                                : Producer.FindCurrencyHome(node, bar.fillCurrency),
-                            rate = Rate(ctx, bar),
-                            progressBefore = progress,
-                        });
-                    }
-                }
-                foreach (var child in node.Children)
-                    Walk(child);
+                    scope = node,
+                    facts = node.facts,
+                    group = entry.Group,
+                    bar = entry.Bar,
+                    pool = entry.Bar.fillCurrency,
+                    poolHome = entry.PoolHome,
+                    rate = Rate(ctx, entry.Rate, entry.Bar),
+                    progressBefore = progress,
+                });
             }
+            return demand;
         }
 
         // A fill rate is an ordinary produced number, so it goes through the
-        // multiplier gather - but STAGE 1 ONLY. Stage 2 is "effects on this
-        // currency's total production", and a bar consumes rather than produces:
-        // letting a currency-total buff through would mean records_income speeds
-        // the drain on Rehearsal as well as its supply, which is not what either
-        // buff means. The bar's own currency is passed as the coordinate so an
-        // effect may narrow to it; a bar that fills from time passes null, which
-        // no narrowing effect matches.
+        // multiplier gather - but STAGE 1 ONLY, which is what the bar's own
+        // compiled plan is: owner the bar, coordinate its fill currency, stat
+        // rate, with no currency stage. Stage 2 is "effects on this currency's
+        // total production", and a bar consumes rather than produces: letting a
+        // currency-total buff through would mean records_income speeds the drain
+        // on Rehearsal as well as its supply, which is not what either buff
+        // means. A bar that fills from time was compiled with no currency
+        // coordinate, which no narrowing effect matches.
         //
         // Clamped at zero. Every factor the gather can apply is validated
         // nonnegative and linear growth saturates, but that pass is dev-only,
         // and a negative rate here would turn a draw into a mint.
-        private static BigNumber Rate(GameContext ctx, BarDefinition bar) =>
-            BigNumber.Max(BigNumber.Zero,
-                bar.fillRate * Producer.GetMultiplier(ctx, bar, bar.fillCurrency, Stat.Rate));
+        private static BigNumber Rate(GameContext ctx, CoordinatePlan plan, BarDefinition bar) =>
+            BigNumber.Max(BigNumber.Zero, bar.fillRate * Producer.GetMultiplier(ctx, plan));
 
         // The demand-side test, judged once in the snapshot: the player selected
         // it, it is available, and it has somewhere to fill to. The fillAmount

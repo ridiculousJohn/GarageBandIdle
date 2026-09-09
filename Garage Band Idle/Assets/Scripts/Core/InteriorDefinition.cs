@@ -41,5 +41,24 @@ namespace RidiculousGaming.GarageBandIdle
                 yield return new ActionListSite(evt.onEnd, $"event '{evt.Id}' onEnd");
             }
         }
+
+        // The one carrier kind only an interior scope has, added AFTER the
+        // base's: handicaps multiply last at a node (design doc 12.6). Root has
+        // no events field at all, so it contributes none - the reason the
+        // enumeration is a virtual rather than a check.
+        public override IEnumerable<CarrierEffect> EffectCarriers(
+            IReadOnlyList<Economy.ModifierDefinition> grantable)
+        {
+            foreach (var carrier in base.EffectCarriers(grantable))
+                yield return carrier;
+
+            foreach (var evt in events)
+            {
+                if (evt == null)
+                    continue;
+                foreach (var effect in evt.handicaps)
+                    yield return new CarrierEffect(LivenessKind.Handicap, evt, effect);
+            }
+        }
     }
 }

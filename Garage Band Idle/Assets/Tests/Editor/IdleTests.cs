@@ -56,7 +56,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly ChapterScopeState Ch2;
             public readonly GameSession Session;
 
-            public TwoChapters()
+            // `author` runs against the DEFINITIONS before the tree is built,
+            // for the same reason Fixture takes one: the gather is compiled at
+            // build, so a modifier authored afterward sits on no plan.
+            public TwoChapters(System.Action<TestTree> author = null)
             {
                 var ch2Def = TestTree.MakeChapter("ch2");
                 var merch = TestTree.DeclareCurrency(ch2Def, "merch");
@@ -64,6 +67,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 merchPress.produces.Add(TestTree.Entry(merch, Stat.Rate, 2));
                 ch2Def.producers.Add(merchPress);
                 Tree.Chapters.Add(ch2Def);
+                author?.Invoke(Tree);
 
                 Root = ScopeState.Build(Tree.Content);
                 Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Tree.Ch1Def);
@@ -232,8 +236,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void Switch_in_computes_rate_under_the_idle_circumstance_per_paid_currency()
         {
-            var f = new Fixture();
-            AddRecordsPress(f.Tree, 1);
+            var f = new Fixture(author: tree => AddRecordsPress(tree, 1));
             f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
 
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
@@ -266,12 +269,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void A_live_only_modifier_contributes_nothing_to_the_offer()
         {
-            var f = new Fixture();
-            var liveOnly = TestTree.MakeDefinition<ModifierDefinition>("live_only");
-            liveOnly.appliesWhen = new Not { condition = new IdleAccumulation() };
-            liveOnly.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
-            f.Tree.RootDef.modifiers.Add(liveOnly);
-            f.Tree.RootDef.permanentModifiers.Add(liveOnly);
+            var f = new Fixture(author: tree =>
+            {
+                var liveOnly = TestTree.MakeDefinition<ModifierDefinition>("live_only");
+                liveOnly.appliesWhen = new Not { condition = new IdleAccumulation() };
+                liveOnly.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
+                tree.RootDef.modifiers.Add(liveOnly);
+                tree.RootDef.permanentModifiers.Add(liveOnly);
+            });
             f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
 
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
@@ -365,8 +370,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 tree.RootDef.triggers.Add(rootTrigger);
                 tree.Tier1Trigger.condition = new Always();
                 tree.Tier1Trigger.actions.Add(new SetFlag { flagId = "fans_revealed" });
+                // A root-homed line survives the reset the claim's sweep runs.
+                AddRecordsPress(tree, 1);
             });
-            AddRecordsPress(f.Tree, 1);   // a root-homed line survives the reset the claim's sweep runs
             f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
 
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
@@ -435,8 +441,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void A_relaunch_reoffers_from_the_saved_stamp()
         {
-            var f = new Fixture();
-            AddRecordsPress(f.Tree, 1);
+            var f = new Fixture(author: tree => AddRecordsPress(tree, 1));
             f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             Assert.IsNotNull(f.Session.CurrentOffer);
@@ -466,13 +471,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void A_currency_narrowed_idle_only_effect_scales_only_its_currencys_line()
         {
-            var f = new Fixture();
-            AddRecordsPress(f.Tree, 2);
-            var cashIdle = TestTree.MakeDefinition<ModifierDefinition>("cash_idle");
-            cashIdle.appliesWhen = new IdleAccumulation();
-            cashIdle.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
-            f.Tree.RootDef.modifiers.Add(cashIdle);
-            f.Tree.RootDef.permanentModifiers.Add(cashIdle);
+            var f = new Fixture(author: tree =>
+            {
+                AddRecordsPress(tree, 2);
+                var cashIdle = TestTree.MakeDefinition<ModifierDefinition>("cash_idle");
+                cashIdle.appliesWhen = new IdleAccumulation();
+                cashIdle.effects.Add(new Effect { currencyId = "cash", stat = Stat.Rate, multiplier = 2 });
+                tree.RootDef.modifiers.Add(cashIdle);
+                tree.RootDef.permanentModifiers.Add(cashIdle);
+            });
             f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
 
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
@@ -484,12 +491,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void A_chapter_declared_idle_only_modifier_scales_only_its_own_chapters_offer()
         {
-            var w = new TwoChapters();
-            var ch1Idle = TestTree.MakeDefinition<ModifierDefinition>("ch1_idle");
-            ch1Idle.appliesWhen = new IdleAccumulation();
-            ch1Idle.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });   // wildcard, chapter-placed
-            w.Tree.Ch1Def.modifiers.Add(ch1Idle);
-            w.Tree.Ch1Def.permanentModifiers.Add(ch1Idle);
+            var w = new TwoChapters(author: tree =>
+            {
+                var ch1Idle = TestTree.MakeDefinition<ModifierDefinition>("ch1_idle");
+                ch1Idle.appliesWhen = new IdleAccumulation();
+                ch1Idle.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });   // wildcard, chapter-placed
+                tree.Ch1Def.modifiers.Add(ch1Idle);
+                tree.Ch1Def.permanentModifiers.Add(ch1Idle);
+            });
             w.Ch1.lastActiveUtc = w.Tree.Now.AddSeconds(-1000);
             w.Ch2.lastActiveUtc = w.Tree.Now.AddSeconds(-1000);
 

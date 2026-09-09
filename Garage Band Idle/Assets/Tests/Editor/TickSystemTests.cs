@@ -29,14 +29,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return producer;
         }
 
-        // A wildcard game_speed carrier granted at the chapter - the tick's
-        // owner-less read collects it from the foreground chain.
-        private static void GrantSpeed(TestTree tree, string id, double multiplier)
+        // A wildcard game_speed carrier DECLARED at the chapter - the tick's
+        // owner-less read collects it from the foreground chain. Declaration
+        // and grant are two steps because the gather is compiled when the tree
+        // is built: the carrier has to stand before the rebuild, and the stack
+        // is a fact written onto the node that rebuild left.
+        private static void DeclareSpeed(TestTree tree, string id, double multiplier)
         {
             var carrier = TestTree.MakeDefinition<ModifierDefinition>(id);
             carrier.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = multiplier });
             tree.Ch1Def.modifiers.Add(carrier);
-            tree.Ch1.modifierStacks[id] = 1;
+        }
+
+        private static void StackSpeed(TestTree tree, params string[] ids)
+        {
+            foreach (var id in ids)
+                tree.Ch1.modifierStacks[id] = 1;
         }
 
         // ---- rate production ----
@@ -47,6 +55,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "tier_press", tree.Fans, 0.5);
             AddRateSource(tree.Ch1Def, "ch1_press", tree.Ch1Records, 2);
+            tree.Rebuild();
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
 
@@ -62,6 +71,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AddRateSource(tree.Tier1Def, "base_press", tree.Fans, 1);
             AddRateSource(tree.Tier1Def, "bonus_press", tree.Fans, 1,
                 new EarnedTotalAtLeast { currency = tree.Fans, threshold = 5 });
+            tree.Rebuild();
 
             // The base entry's own deposit crosses the threshold mid-tick, but
             // the gated entry was judged at segment start and pays nothing yet.
@@ -79,6 +89,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "riff_press", tree.Rehearsal, 1);
+            tree.Rebuild();
             tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
 
             // The pool starts empty; the bar drinks this tick's own deposit.
@@ -94,6 +105,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "riff_press", tree.Rehearsal, 1);
             tree.Cover1.availableWhen = new CurrencyAtLeast { currency = tree.Rehearsal, threshold = 1 };
+            tree.Rebuild();
             tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
 
             // The gate this tick's deposits open was judged closed in the
@@ -114,15 +126,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "riff_press", tree.Fans, 1);
-            GrantSpeed(tree, "encore_x2", 2);
+            DeclareSpeed(tree, "encore_x2", 2);
 
             // A time-filled bar shows the scaled dt with no pool in the way.
             var drill = TestTree.MakeDefinition<BarDefinition>("drill");
             drill.fillAmount = 1000;
             drill.fillRate = 1;
             tree.LearnCovers.bars.Add(drill);
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "drill" };
+            tree.Rebuild();
 
+            StackSpeed(tree, "encore_x2");
+            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "drill" };
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 300 };
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
@@ -138,15 +152,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // A x0 wildcard would stall time; the floor runs the segment at x1.
             var stalled = new TestTree();
             AddRateSource(stalled.Tier1Def, "riff_press", stalled.Fans, 1);
-            GrantSpeed(stalled, "dead_air", 0);
+            DeclareSpeed(stalled, "dead_air", 0);
+            stalled.Rebuild();
+            StackSpeed(stalled, "dead_air");
             TickSystem.Tick(stalled.Root, stalled.Ch1, Config(), 10, stalled.Now.AddSeconds(10));
             Assert.AreEqual((BigNumber)10, stalled.Tier1.balances["fans"]);
 
             // Stacked carriers multiply to x9; the ceiling caps the segment at 4.
             var capped = new TestTree();
             AddRateSource(capped.Tier1Def, "riff_press", capped.Fans, 1);
-            GrantSpeed(capped, "opener", 3);
-            GrantSpeed(capped, "headliner", 3);
+            DeclareSpeed(capped, "opener", 3);
+            DeclareSpeed(capped, "headliner", 3);
+            capped.Rebuild();
+            StackSpeed(capped, "opener", "headliner");
             TickSystem.Tick(capped.Root, capped.Ch1, Config(), 10, capped.Now.AddSeconds(10));
             Assert.AreEqual((BigNumber)40, capped.Tier1.balances["fans"]);
         }
@@ -162,6 +180,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "riff_press", tree.Fans, 1);
+            tree.Rebuild();
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 50 };
 
             // The expiry at +50 is a segment edge: the first segment earns 50
@@ -179,6 +198,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "riff_press", tree.Fans, 1);
+            tree.Rebuild();
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 150 };
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 300, tree.Now.AddSeconds(300));
@@ -192,6 +212,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "riff_press", tree.Fans, 1);
+            tree.Rebuild();
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 100 };
 
             // Earned hits exactly 100 at the edge that also expires the timer;
@@ -220,6 +241,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     new Not { condition = new CurrencyAtLeast { currency = tree.Fans, threshold = 60 } },
                 }
             };
+            // The handicap is an effect carrier, so clearing it is content: it
+            // has to stand before the build that compiles the plans.
+            tree.Rebuild();
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic", remainingSeconds = 0 };
             tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(50) });
 
@@ -235,6 +259,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "riff_press", tree.Fans, 1);
+            tree.Rebuild();
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 300 };
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 0, tree.Now);

@@ -44,9 +44,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void FlagSet_and_UpgradePurchased_read_the_chain()
         {
             var tree = new TestTree();
-            tree.Ch1.flags.Add("album");
             var cutDemo = TestTree.MakeDefinition<UpgradeDefinition>("cut_demo");
             tree.Ch1Def.upgrades.Add(cutDemo);
+            tree.Rebuild();
+            tree.Ch1.flags.Add("album");
             tree.Ch1.purchasedUpgrades.Add("cut_demo");
             var ctx = tree.Ctx(tree.Tier1);
 

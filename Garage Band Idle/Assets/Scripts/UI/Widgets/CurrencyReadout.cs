@@ -12,9 +12,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly Label label;
         private readonly CurrencyDefinition currency;
 
-        // The home is resolved once, since the tick report is keyed by it: a
-        // currency has exactly one home on this chain, and two chapters may
-        // both declare a same-named one (12.3).
+        // The scope declaring this currency, resolved once by the outward walk
+        // (12.3), since the tick report is keyed by it: a currency has exactly
+        // one home on this chain, and two chapters may both declare a
+        // same-named one.
         private readonly ScopeState home;
 
         private BigNumber truth = BigNumber.Zero;
@@ -25,7 +26,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             this.label = label;
             this.currency = currency;
-            home = Producer.FindCurrencyHome(scope, currency);
+            home = Producer.DeclaringScope<ScopeState>(scope, currency);
         }
 
         // The refresh: truth, the report's realized slope, and the game-time

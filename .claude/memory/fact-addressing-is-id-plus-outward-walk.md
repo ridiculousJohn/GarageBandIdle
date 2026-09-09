@@ -40,3 +40,16 @@ trusting the scoped lookup. See [[reuse-the-existing-mechanism]] and [[no-spec-a
 sufficient and identity machinery is redundant. Ask also whether the failing case is content the
 validator already refuses - if so, the fix belongs at load, not at every read. A rule that must be
 re-applied at each call site is not an invariant.
+
+**2026-09-08 - the compiled gather was written chapter-only, against the rule.** The load-linking
+plan I wrote said "a chapter's contributor plan," the compiler stored the subtree-aggregation list at
+chapter nodes only, and GetRate / RatePairs / ResolveDemand threw at any other node. Section 12.14.8
+names the downward walk through ONE named subtree as legitimate at any held scope and gives GetRate
+as its example; Producer.cs's own comment says the foreground chapter is a session concept, not an
+economy one. When a test agent proposed the per-scope version, I rejected it as test convenience and
+had 34 correct tests rewritten to fit my sentence; asked to defend it, I invented an idle-at-root bug
+it "prevented". John: the scoping design is not to be deviated from without his authority, and he has
+been pounding that in. **A node-kind restriction on an economy read ("only chapters", "only tiers")
+is a deviation, whoever wrote it, even if it is in a plan I authored.** Every aggregation compiles per
+scope under that scope's own definition; the session decides which scope to ask. See
+[[reuse-the-existing-mechanism]] and [[never-cave-to-pressure]] (defending my own spec is not judgment).

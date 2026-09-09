@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using RidiculousGaming.GarageBandIdle.Economy;
 
 namespace RidiculousGaming.GarageBandIdle
 {
@@ -209,122 +208,6 @@ namespace RidiculousGaming.GarageBandIdle
             return state;
         }
 
-        // This scope's own factor for one number (design doc 12.6). The caller
-        // multiplies what each scope on the chain returns and never learns what
-        // a factor is made of, so a kind of scope that has a source the others
-        // do not adds it here rather than in the walk.
-        internal virtual BigNumber MultiplierFor(GameContext origin, Definition owner,
-                                                 CurrencyDefinition currency, string stat)
-        {
-            var product = BigNumber.One;
-
-            // Purchased upgrades, read through the DECLARATION list: the order
-            // is the authored one, and a latch for an upgrade this scope never
-            // declared cannot contribute.
-            foreach (var upgrade in Definition.upgrades)
-            {
-                if (upgrade == null || !purchasedUpgrades.Contains(upgrade.Id))
-                    continue;
-                foreach (var effect in upgrade.effects)
-                    if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                        product *= Producer.FactorOf(effect, origin);
-            }
-
-            // Permanent memberships contribute an implicit application count of
-            // 1, MERGED with this scope's stored stacks for the same modifier
-            // and resolved through the modifier's own stacking kind - Replace
-            // means permanent-plus-granted is still one application, so the two
-            // paths can never double-apply outside the vocabulary (12.5). Ids
-            // are chain-unique, so the stack's id names this same asset.
-            foreach (var modifier in Definition.permanentModifiers)
-            {
-                if (modifier == null || !Applies(modifier, origin))
-                    continue;
-                modifierStacks.TryGetValue(modifier.Id, out var stacks);
-                foreach (var effect in modifier.effects)
-                    if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                        product *= Producer.Stacked(Producer.FactorOf(effect, origin), 1 + stacks, modifier.stacking);
-            }
-
-            // Granted modifier stacks: the stored count scales the effect by the
-            // definition's own stacking kind (design doc 12.5). The stack is a
-            // count here; the definition resolves OUTWARD, since a chapter's
-            // modifier can be granted anywhere inside it (design doc 8.2/12.5).
-            foreach (var pair in modifierStacks)
-            {
-                var modifier = Producer.FindModifier(this, pair.Key);
-                if (Definition.permanentModifiers.Contains(modifier))
-                    continue;                       // merged into the permanent application above
-                if (!Applies(modifier, origin))
-                    continue;
-                foreach (var effect in modifier.effects)
-                    if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                        product *= Producer.Stacked(Producer.FactorOf(effect, origin), pair.Value, modifier.stacking);
-            }
-
-            // Repeating-bar cascades: a completed fill applies the carrying
-            // entry's effect again, scaled by the entry's own growth kind
-            // (design doc 12.6/12.7). Read through the DECLARATION list, like
-            // upgrades: a stray fillCount for a bar this scope never declared
-            // cannot contribute.
-            foreach (var group in Definition.barGroups)
-            {
-                if (group == null)
-                    continue;
-                foreach (var bar in group.bars)
-                {
-                    if (bar == null || !fillCounts.TryGetValue(bar.Id, out var fills) || fills <= 0)
-                        continue;
-                    foreach (var entry in bar.perFill)
-                    {
-                        if (entry == null)
-                            continue;
-                        if (Producer.Matches(entry.effect.target, entry.effect.currencyId, entry.effect.stat, owner, currency, stat))
-                            product *= Producer.Grown(Producer.FactorOf(entry.effect, origin), fills, entry.growth);
-                    }
-                }
-            }
-
-            return product;
-        }
-
-        // Whether a modifier applies under this gather's circumstance, judged
-        // at the node the modifier is APPLIED to - this one, which holds the
-        // stack or the permanent membership - by rebasing the origin context
-        // onto it. That is the site validation judges the gate from
-        // (FinalizeModifierChecks), so execution and the load pass agree. The
-        // circumstance and the clock ride the rebase; effect formulas keep the
-        // origin context (12.5/12.6). Absent means always.
-        private bool Applies(Economy.ModifierDefinition modifier, GameContext origin) =>
-            modifier.appliesWhen == null || modifier.appliesWhen.Evaluate(origin.Rebase(this));
-
-        // The rate this scope's own sources pay into one currency, before the
-        // currency stage. Asked of every node in a subtree walk, same contract
-        // as MultiplierFor: the caller sums, the scope decides what it has. The
-        // context rebases rather than being rebuilt, so the circumstance rides
-        // through to every entry condition and gather it implies.
-        internal virtual BigNumber SourceTermsFor(GameContext ctx, CurrencyDefinition currency, string stat)
-        {
-            var declaringCtx = ctx.Rebase(this);
-            var sum = BigNumber.Zero;
-
-            foreach (var producer in Definition.producers)
-            {
-                if (producer == null)
-                    continue;
-                sum += Producer.SourceTerm(declaringCtx, producer, producer.produces, 1, currency, stat);
-            }
-            foreach (var generator in Definition.generators)
-            {
-                if (generator == null)
-                    continue;
-                if (!generatorCounts.TryGetValue(generator.Id, out var owned) || owned <= 0)
-                    continue;
-                sum += Producer.SourceTerm(declaringCtx, generator, generator.produces, owned, currency, stat);
-            }
-            return sum;
-        }
-
         // Declared currencies get their balance and earned-total entries at the
         // home scope; a chain walk finds the holder by key presence. Virtual
         // because Clear re-runs it: a derived payload with its own keys seeds
@@ -385,30 +268,40 @@ namespace RidiculousGaming.GarageBandIdle
             return null;
         }
 
-        // What each static reference held at this node means in THIS tree,
-        // written by the link pass at Build and never afterward (12.14.8).
-        // Keyed by the object HOLDING the reference - a ResetScope instance, a
-        // SectionDefinition - so a read is a dictionary hit at a node the
-        // caller already has, and two trees built from one content set hold
-        // separate links. Lazily allocated: most nodes hold none.
-        private Dictionary<object, ScopeState> links;
+        // What each static reference and each compiled plan held at this node
+        // means in THIS tree, written by the link pass at Build and never
+        // afterward (12.14.8). Keyed by the object HOLDING the reference - a
+        // ResetScope instance, a SectionDefinition, a ProducesEntry, a
+        // CurrencyDefinition, GatherCompiler.GameSpeed - so a read is a
+        // dictionary hit at a node the caller already has, and two trees built
+        // from one content set hold separate links. Lazily allocated: most
+        // nodes hold none.
+        private Dictionary<object, object> links;
 
-        internal void StoreLink(object holder, ScopeState node)
+        internal void StoreLink(object holder, object value)
         {
-            links ??= new Dictionary<object, ScopeState>();
-            links[holder] = node;
+            links ??= new Dictionary<object, object>();
+            links[holder] = value;
         }
 
-        // The node a static reference names, resolved when this tree was built.
-        // A miss means construction omitted a site - a code bug, not content -
-        // so it throws and nothing falls back to a search (12.14.8).
-        public ScopeState Link(object holder)
+        // What a static reference names, resolved when this tree was built. A
+        // miss means construction omitted a site - a code bug, not content - so
+        // it throws and nothing falls back to a search (12.14.8). A link of the
+        // wrong kind is the same bug seen from the reading end.
+        public T Link<T>(object holder) where T : class
         {
-            if (links != null && links.TryGetValue(holder, out var node))
-                return node;
-            throw new InvalidOperationException(
-                $"Scope '{ScopeId}' holds no link for a {(holder == null ? "<null>" : holder.GetType().Name)} - the link pass never visited this site.");
+            if (links == null || !links.TryGetValue(holder, out var value))
+                throw new InvalidOperationException(
+                    $"Scope '{ScopeId}' holds no {typeof(T).Name} link for a {(holder == null ? "<null>" : holder.GetType().Name)} - the link pass never visited this site.");
+            if (value is not T typed)
+                throw new InvalidOperationException(
+                    $"Scope '{ScopeId}' links a {value.GetType().Name} for a {holder.GetType().Name}, not a {typeof(T).Name}.");
+            return typed;
         }
+
+        // The node a static scope reference names - the shape every scope
+        // reference takes, since a link that is a node is the common case.
+        public ScopeState Link(object holder) => Link<ScopeState>(holder);
 
         // Self or an ancestor standing for this definition; null when it is not
         // on the chain.
@@ -439,7 +332,9 @@ namespace RidiculousGaming.GarageBandIdle
 
     // A scope that can host an event - the walk's answer when a caller needs a
     // host, so root is excluded by type rather than by a check (12.8). Holds
-    // the record accessor and folds handicaps into the multiplier gather.
+    // the record accessor and the refusal it implies; the handicaps that record
+    // carries reach a gather as compiled links, since InteriorDefinition is
+    // what names them (12.6).
     public abstract class InteriorScopeState : ScopeState
     {
         protected InteriorScopeState(InteriorDefinition definition, ScopeState parent, InteriorFacts payload)
@@ -475,29 +370,6 @@ namespace RidiculousGaming.GarageBandIdle
                 break;
             }
             return new Refusal(this, record, named);
-        }
-
-        // Handicaps ride on the record EXISTING - no expiry check, because a
-        // failed attempt sits one tap from a reset and briefly lifting the
-        // handicap there would be the worse state (12.8). Read through the
-        // declaration list, like upgrades: a stray record id contributes
-        // nothing. No count scaling - there is one record.
-        internal override BigNumber MultiplierFor(GameContext origin, Definition owner,
-                                                  CurrencyDefinition currency, string stat)
-        {
-            var product = base.MultiplierFor(origin, owner, currency, stat);
-            var record = activeEvent;
-            if (record == null)
-                return product;
-            foreach (var evt in ((InteriorDefinition)Definition).events)
-            {
-                if (evt == null || evt.Id != record.eventId)
-                    continue;
-                foreach (var effect in evt.handicaps)
-                    if (Producer.Matches(effect.target, effect.currencyId, effect.stat, owner, currency, stat))
-                        product *= Producer.FactorOf(effect, origin);
-            }
-            return product;
         }
     }
 

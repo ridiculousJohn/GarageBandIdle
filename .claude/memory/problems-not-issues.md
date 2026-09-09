@@ -75,3 +75,14 @@ depends on it" only describes how cheap that is right now. Never open with the d
   before writing anything ([[reuse-the-existing-mechanism]]).
 - Reporting an issue as an issue is the deliverable. It is not a lesser answer than fixing it, and
   it is all a review authorizes - [[quote-directive-before-editing]] owns that gate.
+
+**2026-09-08 - a landing report lists only decisions that could have gone another way.** The
+changeset-1 report had six "judgments outside the plan". Three were non-events copied from agent
+reports: GetRate returning zero for an unpaid currency (a sum with no terms), an unreachable stack
+state changing from throw to no-op (the save filter drops it first), and granted stacks visited in
+declaration order (commutative). Two were defects I had accepted and reported as decisions. One was
+a design deviation. John asked "explain and defend" on each, and every non-event cost three to six
+turns before I said "nothing changed here". Before an item goes on that list: name the second option
+and who would notice. If there is no second option or nobody would notice, it is not a decision - it
+is filler that will be read as a claim of work, and it will be defended out of habit. Filter agent
+line items; do not pass them through.

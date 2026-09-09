@@ -15,32 +15,36 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     //
     // The two stages are what keep sibling scopes isolated (12.3), and the
     // stage-2 walk is why a currency-total effect must sit at the currency's
-    // home or above it (validated, 12.12). Nothing here stores a derived value:
+    // home or above it (validated, 12.12). Both walks happen ONCE, when the tree
+    // is built: GatherCompiler turns each stage into a CoordinatePlan and every
+    // read here is a plan read (12.6/12.14.8). Nothing stores a derived value:
     // GetMultiplier is a pure read, and FireProducer's deposit is the only write.
     public static class Producer
     {
         // ---- multiplier gathering ----
 
-        // Every factor applying to one number, gathered from the origin scope
-        // outward to the root. The origin IS one stage's gather origin: the
-        // source's declaring scope for stage 1, the currency's home for stage 2,
-        // and the acting scope for an owner-less consumer-stat read (the tick's
-        // game_speed), which matches wildcard effects only. Effect formulas and
-        // appliesWhen conditions are judged against this context, per the
-        // ruling on MultiplierFormula.
-        public static BigNumber GetMultiplier(GameContext origin, Definition owner, CurrencyDefinition currency, string stat)
+        // Every factor applying to one number: the plan's links, in the order
+        // the compiler fixed, each answering with its own fact. The plan already
+        // IS the chain walk - the source's declaring scope outward for stage 1,
+        // the currency's home outward for stage 2, the chapter for the tick's
+        // owner-less game_speed read - so nothing here walks or matches. Effect
+        // formulas are judged against this context, per the ruling on
+        // MultiplierFormula; appliesWhen is judged at each link's own node.
+        public static BigNumber GetMultiplier(GameContext origin, CoordinatePlan plan)
         {
-            // Each scope on the chain composes its own factor however it likes;
-            // this only multiplies what comes back.
             var product = BigNumber.One;
-            for (var node = origin.Scope; node != null; node = node.Parent)
-                product *= node.MultiplierFor(origin, owner, currency, stat);
+            var links = plan.Links;
+            for (var i = 0; i < links.Count; i++)
+                product *= links[i].Factor(origin);
             return product;
         }
 
         // An effect matches an owner plus coordinates when its target names the
         // owner - by id or by any of its tags - the queried stat is EXACTLY its
         // stat, and the optional currency coordinate agrees (design doc 12.2).
+        // COMPILE TIME ONLY: GatherCompiler is the one caller, because which
+        // effects can ever match a coordinate is authored and validated, and a
+        // gather that re-asked would be re-deriving the static half every read.
         // The stat leg is required: a query resolves one number and a number
         // always has a stat, so a stat-less effect would claim to answer
         // questions of different kinds with one factor - "rate and yield alike"
@@ -119,117 +123,89 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // ---- composed numbers ----
 
-        // One source's term: the sum of its matching entries whose conditions
-        // hold, times the stored count that scales it (1 for a producer), times
-        // the stage-1 product. Conditions are judged in the declaring scope.
-        internal static BigNumber SourceTerm(GameContext declaringCtx, Definition source,
-                                            List<ProducesEntry> entries, int countScale,
-                                            CurrencyDefinition currency, string stat)
+        // One source's term for ONE coordinate: the sum of the entries the
+        // compiler grouped under it whose conditions hold, times the stored
+        // count that scales it (1 for a producer), times the stage-1 product the
+        // plan holds. The entries arrive already selected, so nothing here
+        // re-asks which coordinate they name. Conditions are judged in the
+        // declaring scope.
+        internal static BigNumber SourceTerm(GameContext declaringCtx, IReadOnlyList<ProducesEntry> entries,
+                                             int countScale, CoordinatePlan plan)
         {
             var baseSum = BigNumber.Zero;
-            foreach (var entry in entries)
+            for (var i = 0; i < entries.Count; i++)
             {
-                if (entry == null || entry.currency != currency || entry.stat != stat)
-                    continue;
-                if (!entry.Holds(declaringCtx))
-                    continue;
-                baseSum += entry.value;
+                var entry = entries[i];
+                if (entry != null && entry.Holds(declaringCtx))
+                    baseSum += entry.value;
             }
             if (baseSum == BigNumber.Zero)
                 return BigNumber.Zero;      // nothing contributes, and no factor changes that
             // An inactive currency takes nothing from any source (12.2). Asked
             // AFTER the entry sum, so a source paying this currency nothing
-            // never pays for the home walk. Zeroing the term rather than
+            // never pays for the gate at all. Zeroing the term rather than
             // refusing the deposit is what keeps a per-source readout, the
             // total, and the balance agreeing - and what lets the tick stay
             // quiet, since a zero amount is never handed to Deposit at all.
-            if (!currency.IsActive(declaringCtx.Rebase(FindCurrencyHome(declaringCtx.Scope, currency))))
+            //
+            // The gate is asked at the currency's HOME, which is on the plan.
+            if (!plan.Currency.IsActive(declaringCtx.Rebase(plan.Home)))
                 return BigNumber.Zero;
-            return baseSum * countScale * GetMultiplier(declaringCtx, source, currency, stat);
+            return baseSum * countScale * GetMultiplier(declaringCtx, plan);
         }
 
-        // The stage-2 product for one currency, gathered from its home outward.
-        // The currency's own definition is the owner, so its tags match - which
-        // is how the income tag carries the Records and Roadie factors (design
-        // doc 8.2).
+        // The stage-2 product for one currency, from the pair of plans compiled
+        // at its home. The currency's own definition is the owner, so its tags
+        // match - which is how the income tag carries the Records and Roadie
+        // factors (design doc 8.2).
         private static BigNumber CurrencyStage(GameContext atHome, CurrencyDefinition currency, string stat) =>
-            GetMultiplier(atHome, currency, currency, stat);
+            GetMultiplier(atHome, atHome.Scope.Link<CurrencyPlans>(currency).For(stat));
 
         // The rate one subtree pays into one currency, per second of production
-        // time. Enumerates the subtree's declared producers and generators,
-        // applies both stages, and sums. The tick and the idle claim consume
-        // this; the context carries the walk root explicitly - "the foreground
-        // chapter" is a session concept, not an economy one - along with the
-        // timestamp and the circumstance, so the idle claim's gather differs
-        // from the tick's only in the context it hands over.
+        // time: the subtree root's compiled contributors, both stages, summed.
+        // The tick and the idle claim consume this; the context carries the
+        // subtree root explicitly - "the foreground chapter" is a session
+        // concept, not an economy one - along with the timestamp and the
+        // circumstance, so the idle claim's gather differs from the tick's only
+        // in the context it hands over.
         public static BigNumber GetRate(GameContext ctx, CurrencyDefinition currency)
         {
+            // No entry is the plan's ANSWER, not a miss: nothing in this subtree
+            // pays this currency at rate, which is a rate of zero.
+            var paying = ContributorPlan.At(ctx.Scope).For(currency);
+            if (paying == null)
+                return BigNumber.Zero;
+
             var sum = BigNumber.Zero;
-            ScopeState home = null;
-            Accumulate(ctx.Scope);
+            var contributors = paying.Contributors;
+            for (var i = 0; i < contributors.Count; i++)
+            {
+                var contributor = contributors[i];
+                // An unowned generator scales its entries by zero, so it is
+                // skipped rather than summed as a zero term.
+                var count = contributor.Source.CountAt(contributor.Node);
+                if (count <= 0)
+                    continue;
+                sum += SourceTerm(ctx.Rebase(contributor.Node), contributor.Entries, count, contributor.Plan);
+            }
             if (sum == BigNumber.Zero)
                 return BigNumber.Zero;
-            return sum * CurrencyStage(ctx.Rebase(home), currency, Stat.Rate);
-
-            void Accumulate(ScopeState node)
-            {
-                Add(node, node.SourceTermsFor(ctx, currency, Stat.Rate));
-                foreach (var child in node.Children)
-                    Accumulate(child);
-            }
-
-            // The home is resolved from a CONTRIBUTING scope, never from the
-            // subtree root: the currency may be homed below where the walk
-            // started (fans at a tier, asked for across the chapter), and every
-            // contributor has it on its own outward chain by validation.
-            void Add(ScopeState node, BigNumber term)
-            {
-                if (term == BigNumber.Zero)
-                    return;
-                sum += term;
-                home ??= FindCurrencyHome(node, currency);
-            }
+            return sum * CurrencyStage(ctx.Rebase(paying.Home), currency, Stat.Rate);
         }
 
         // The unique (currency, home) pairs one subtree's sources pay at
         // Stat.Rate, in tree order then declaration order - GetRate's sibling,
-        // enumerating what it sums. The home is resolved from a CONTRIBUTING
-        // scope's chain, exactly as GetRate resolves it, and the pair is the
-        // point: the tick deposits through the home reference and the idle
-        // claim's lines retain it, so neither consumer looks anything up twice.
+        // enumerating what it sums, and now a projection of the contributor plan
+        // rather than a walk. The pair is the point: the tick deposits through
+        // the home reference and the idle claim's lines retain it, so neither
+        // consumer looks anything up twice.
         public static List<(CurrencyDefinition currency, ScopeState home)> RatePairs(ScopeState subtreeRoot)
         {
-            var pairs = new List<(CurrencyDefinition currency, ScopeState home)>();
-            Walk(subtreeRoot);
+            var currencies = ContributorPlan.At(subtreeRoot).Currencies;
+            var pairs = new List<(CurrencyDefinition currency, ScopeState home)>(currencies.Count);
+            for (var i = 0; i < currencies.Count; i++)
+                pairs.Add((currencies[i].Currency, currencies[i].Home));
             return pairs;
-
-            void Walk(ScopeState node)
-            {
-                foreach (var producer in node.Definition.producers)
-                    if (producer != null)
-                        Collect(node, producer.produces);
-                foreach (var generator in node.Definition.generators)
-                    if (generator != null)
-                        Collect(node, generator.produces);
-                foreach (var child in node.Children)
-                    Walk(child);
-            }
-
-            // Declaration-shaped on purpose: whether an entry contributes right
-            // now (a condition, an unowned generator) is GetRate's question,
-            // asked per segment - a pair whose rate is zero simply deposits
-            // nothing.
-            void Collect(ScopeState node, List<ProducesEntry> entries)
-            {
-                foreach (var entry in entries)
-                {
-                    if (entry == null || entry.currency == null || entry.stat != Stat.Rate)
-                        continue;
-                    if (pairs.Exists(pair => pair.currency == entry.currency))
-                        continue;
-                    pairs.Add((entry.currency, FindCurrencyHome(node, entry.currency)));
-                }
-            }
         }
 
         // What one firing would pay against the given state: every yield
@@ -252,6 +228,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // One source's per-unit payment for one stat: every matching currency in
         // authored order with its resolved amount, both stages, zeros kept.
+        // Grouping the entries by currency is reading the AUTHORED shape, which
+        // is what the plans are keyed by; the gather itself asks nothing.
         private static List<(CurrencyDefinition currency, BigNumber amount)> ResolveUnit(
             GameContext ctx, Definition source, List<ProducesEntry> entries, string stat)
         {
@@ -259,22 +237,35 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var declaringCtx = ctx.Rebase(declaring);
 
             var currencies = new List<CurrencyDefinition>();
+            var grouped = new List<List<ProducesEntry>>();
             foreach (var entry in entries)
-                if (entry != null && entry.stat == stat && entry.currency != null &&
-                    !currencies.Contains(entry.currency))
+            {
+                if (entry == null || entry.currency == null || entry.stat != stat)
+                    continue;
+                var index = currencies.IndexOf(entry.currency);
+                if (index < 0)
+                {
                     currencies.Add(entry.currency);
+                    grouped.Add(new List<ProducesEntry>());
+                    index = currencies.Count - 1;
+                }
+                grouped[index].Add(entry);
+            }
 
             var amounts = new List<(CurrencyDefinition currency, BigNumber amount)>(currencies.Count);
-            foreach (var currency in currencies)
+            for (var i = 0; i < currencies.Count; i++)
             {
-                var term = SourceTerm(declaringCtx, source, entries, 1, currency, stat);
+                // Entries naming one coordinate share one plan, so the first of
+                // the group names it for all of them.
+                var plan = declaring.Link<CoordinatePlan>(grouped[i][0]);
+                var term = SourceTerm(declaringCtx, grouped[i], 1, plan);
                 if (term == BigNumber.Zero)
                 {
-                    amounts.Add((currency, BigNumber.Zero));
+                    amounts.Add((currencies[i], BigNumber.Zero));
                     continue;
                 }
-                var home = FindCurrencyHome(declaring, currency);
-                amounts.Add((currency, term * CurrencyStage(declaringCtx.Rebase(home), currency, stat)));
+                amounts.Add((currencies[i],
+                    term * CurrencyStage(declaringCtx.Rebase(plan.Home), currencies[i], stat)));
             }
             return amounts;
         }
@@ -291,43 +282,31 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     declaringCtx.DepositResolved(currency.Id, amount);
         }
 
-        // ---- tree lookups ----
-
-        // The currency's home: the first scope OUTWARD from here that DECLARES
-        // this exact asset. Placement is the whole lookup - a currency off this
-        // chain is content the validator refuses, so failing to find one is a
-        // bug, not a branch. Matching the id instead would answer with a
-        // same-named currency from another chapter.
-        internal static ScopeState FindCurrencyHome(ScopeState from, CurrencyDefinition currency) =>
-            DeclaringScope<ScopeState>(from, currency);
-
-        // A granted stack names its modifier by id, because the save is ids;
-        // the definition is found by walking outward to the scope declaring it,
-        // which is the same lookup every other reference gets.
-        internal static ModifierDefinition FindModifier(ScopeState from, string modifierId)
-        {
-            for (var node = from; node != null; node = node.Parent)
-                foreach (var modifier in node.Definition.modifiers)
-                    if (modifier != null && modifier.Id == modifierId)
-                        return modifier;
-            throw new InvalidOperationException(
-                $"No scope on the chain from '{from.ScopeId}' declares modifier '{modifierId}'.");
-        }
+        // ---- the outward walk ----
 
         // Declaration is ownership (design doc 12.3): a definition's declaring
         // scope is the one whose list holds the reference, found by walking
-        // OUTWARD from the acting scope. Anything off that chain is unreachable
-        // at runtime and refused at load, so a miss is a bug.
+        // OUTWARD from the acting scope. The one walk, with two answers - this
+        // one for the compiler, which resolves a home for a plan and throws at
+        // build when there is none (requirement 12.14.7); DeclaringScope below
+        // for every command, where a miss is a code bug.
         // The type parameter is the OTHER half of the question: an event is
-        // declared by a scope that can host one, so the search says so and root
-        // is not a candidate rather than being skipped by a check.
-        internal static T DeclaringScope<T>(ScopeState from, Definition definition) where T : ScopeState
+        // declared by a scope that can host one, so the walk says so and root is
+        // not a candidate rather than being skipped by a check.
+        internal static T FindDeclaringScope<T>(ScopeState from, Definition definition) where T : ScopeState
         {
             for (var node = from; node != null; node = node.Parent)
                 if (node is T typed && typed.Definition.Declares(definition))
                     return typed;
-            throw new InvalidOperationException(
-                $"No {typeof(T).Name} on the chain from '{from.ScopeId}' declares '{definition.Id}'.");
+            return null;
         }
+
+        // The declaring scope where there has to be one: anything off the acting
+        // chain is unreachable at runtime and refused at load, so a miss is a
+        // bug (requirement 7). Every command starts here.
+        internal static T DeclaringScope<T>(ScopeState from, Definition definition) where T : ScopeState =>
+            FindDeclaringScope<T>(from, definition)
+            ?? throw new InvalidOperationException(
+                $"No {typeof(T).Name} on the chain from '{from.ScopeId}' declares '{definition.Id}'.");
     }
 }

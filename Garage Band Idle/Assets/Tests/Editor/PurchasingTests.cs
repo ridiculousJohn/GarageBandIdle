@@ -12,9 +12,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(expected, actual.ToDouble(), 1e-9, what ?? string.Empty);
 
         // Affordable and gate-open, so a test only has to break one thing.
-        private static TestTree Ready()
+        // `author` runs against the DEFINITIONS before the rebuild, because the
+        // gather is compiled when the tree is built: a source or an upgrade
+        // authored afterward sits on no plan. The balances are FACTS, so they
+        // are poured onto the nodes the rebuild left.
+        private static TestTree Ready(System.Action<TestTree> author = null)
         {
             var tree = new TestTree();
+            if (author != null)
+            {
+                author(tree);
+                tree.Rebuild();
+            }
             tree.Tier1.balances["cash"] = 1000;
             tree.Tier1.earnedTotals["cash"] = 1000;
             return tree;
@@ -64,13 +73,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void An_unauthored_gate_is_closed_not_open()
         {
-            var tree = Ready();
-            var gateless = TestTree.MakeDefinition<GeneratorDefinition>("gateless_gear");
-            gateless.costCurrency = tree.Cash;
-            gateless.baseCost = 10;
-            gateless.growth = 1.15;
-            gateless.produces.Add(TestTree.Entry(tree.Cash, Stat.Rate, 1));
-            tree.Tier1Def.generators.Add(gateless);
+            GeneratorDefinition gateless = null;
+            var tree = Ready(t =>
+            {
+                gateless = TestTree.MakeDefinition<GeneratorDefinition>("gateless_gear");
+                gateless.costCurrency = t.Cash;
+                gateless.baseCost = 10;
+                gateless.growth = 1.15;
+                gateless.produces.Add(TestTree.Entry(t.Cash, Stat.Rate, 1));
+                t.Tier1Def.generators.Add(gateless);
+            });
 
             Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), gateless));
             AssertClose(1000, tree.Tier1.balances["cash"], "balance");
@@ -90,14 +102,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void A_computed_cost_of_zero_is_refused_at_runtime()
         {
-            var tree = Ready();
-            var free = TestTree.MakeDefinition<GeneratorDefinition>("free_gear");
-            free.availableWhen = new CurrencyAtLeast { currency = tree.Cash, threshold = 0 };
-            free.costCurrency = tree.Cash;
-            free.baseCost = 0;                                  // validation refuses this; release builds still run
-            free.growth = 1.15;
-            free.produces.Add(TestTree.Entry(tree.Cash, Stat.Rate, 1));
-            tree.Tier1Def.generators.Add(free);
+            GeneratorDefinition free = null;
+            var tree = Ready(t =>
+            {
+                free = TestTree.MakeDefinition<GeneratorDefinition>("free_gear");
+                free.availableWhen = new CurrencyAtLeast { currency = t.Cash, threshold = 0 };
+                free.costCurrency = t.Cash;
+                free.baseCost = 0;                              // validation refuses this; release builds still run
+                free.growth = 1.15;
+                free.produces.Add(TestTree.Entry(t.Cash, Stat.Rate, 1));
+                t.Tier1Def.generators.Add(free);
+            });
 
             // A repeatable free purchase is an unbounded rate printer, and a
             // malformed cost curve is content, not an answer about state.
@@ -109,12 +124,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void A_negative_cost_is_refused_rather_than_paid_out()
         {
-            var tree = Ready();
-            var paying = TestTree.MakeDefinition<UpgradeDefinition>("paying_upgrade");
-            paying.gate = new CurrencyAtLeast { currency = tree.Cash, threshold = 0 };
-            paying.costCurrency = tree.Cash;
-            paying.cost = -500;                                 // validation refuses it; release builds still run
-            tree.Tier1Def.upgrades.Add(paying);
+            UpgradeDefinition paying = null;
+            var tree = Ready(t =>
+            {
+                paying = TestTree.MakeDefinition<UpgradeDefinition>("paying_upgrade");
+                paying.gate = new CurrencyAtLeast { currency = t.Cash, threshold = 0 };
+                paying.costCurrency = t.Cash;
+                paying.cost = -500;                             // validation refuses it; release builds still run
+                t.Tier1Def.upgrades.Add(paying);
+            });
 
             // Without the guard the affordability check passes and the
             // subtraction ADDS, minting 500 cash out of malformed content.
@@ -138,13 +156,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void Buying_an_upgrade_spends_adds_the_latch_and_runs_the_payload()
         {
-            var tree = Ready();
-            var unlock = TestTree.MakeDefinition<UpgradeDefinition>("play_for_crowd");
-            unlock.gate = new EarnedTotalAtLeast { currency = tree.Cash, threshold = 100 };
-            unlock.costCurrency = tree.Cash;
-            unlock.cost = 100;
-            unlock.actions.Add(new SetFlag { flagId = "fans_revealed" });
-            tree.Tier1Def.upgrades.Add(unlock);
+            UpgradeDefinition unlock = null;
+            var tree = Ready(t =>
+            {
+                unlock = TestTree.MakeDefinition<UpgradeDefinition>("play_for_crowd");
+                unlock.gate = new EarnedTotalAtLeast { currency = t.Cash, threshold = 100 };
+                unlock.costCurrency = t.Cash;
+                unlock.cost = 100;
+                unlock.actions.Add(new SetFlag { flagId = "fans_revealed" });
+                t.Tier1Def.upgrades.Add(unlock);
+            });
 
             Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), unlock));
 
@@ -156,13 +177,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void A_zero_cost_upgrade_is_legal()
         {
-            var tree = Ready();
-            var free = TestTree.MakeDefinition<UpgradeDefinition>("cut_demo");
-            free.gate = new CurrencyAtLeast { currency = tree.Fans, threshold = 0 };
-            free.costCurrency = tree.Cash;
-            free.cost = 0;
-            free.actions.Add(new SetFlag { flagId = "album" });
-            tree.Tier1Def.upgrades.Add(free);
+            UpgradeDefinition free = null;
+            var tree = Ready(t =>
+            {
+                free = TestTree.MakeDefinition<UpgradeDefinition>("cut_demo");
+                free.gate = new CurrencyAtLeast { currency = t.Fans, threshold = 0 };
+                free.costCurrency = t.Cash;
+                free.cost = 0;
+                free.actions.Add(new SetFlag { flagId = "album" });
+                t.Tier1Def.upgrades.Add(free);
+            });
 
             // One-shot, so a free upgrade is bounded - unlike a generator's.
             Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), free));

@@ -107,6 +107,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             jam.produces.Add(TestTree.Entry(tree.Rehearsal, Stat.Yield, 5,
                 new EarnedTotalAtLeast { currency = tree.Cash, threshold = 100 }));
             tree.Tier1Def.producers.Add(jam);
+            tree.Rebuild();
 
             Producer.FireProducer(tree.Ctx(tree.Tier1), jam);
 
