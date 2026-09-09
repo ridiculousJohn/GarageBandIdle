@@ -79,8 +79,9 @@ today" is never the answer to anything below.
 ### The three actions
 
 `ResetScope`, `RestartScope`, and `ExecuteRung` implement `Link`: resolve the referenced definition,
-check reach (self or enclosed; never root for the two resets; a rung present for `ExecuteRung`),
-store the node. `Execute` reads `ctx.Scope.Link(this)` and acts on that node: `ResetScope` calls
+check reach (self or enclosed; never root for the two resets; a rung present for `ExecuteRung`; for
+the two that run a rung, never the rung the action's own list belongs to - the one cycle the
+downward reach leaves possible, added 2026-09-09 on review), store the node. `Execute` reads `ctx.Scope.Link(this)` and acts on that node: `ResetScope` calls
 `ClearSubtree`; `RestartScope` runs the node's rung through `TryExecute` (its own gate, refusals
 included) then `ClearSubtree`; `ExecuteRung` runs the rung rebased to the node through `TryExecute`.
 
@@ -119,8 +120,11 @@ nowhere else. There is exactly one such place.
   `ignoring` is passed straight through to each action; only dismissal ever sets it.
 - **The answer.** `GameAction.Refuses(GameContext ctx, ScopeState ignoring)`, virtual, default
   null. `ResetScope` and `RestartScope` answer `ctx.Scope.Link(this).RefusalInSubtree(ignoring)`.
-  `InteriorScopeState.RefusesClear` answers for its own record: `activeEvent != null &&
-  activeEvent.goalReached` refuses. No other class computes a refusal. `Execute` on the two resets
+  `ExecuteRung` answers `ActionList.Refuses` of the rung it names, rebased to its linked node, with
+  `ignoring` passed through (added 2026-09-09 on review: without it a nested refusal read as a
+  closed gate and the outer list ran around it). `InteriorScopeState.RefusesClear` answers for its
+  own record: `activeEvent != null && activeEvent.goalReached` refuses. No other class computes a
+  refusal. `Execute` on the two resets
   asks `RefusalInSubtree()` itself before clearing and throws on an answer, so a reset run outside
   any list is as fail-closed as one inside.
 - **The six sites.** Every place that runs an action list calls the runner and NOTHING else - no

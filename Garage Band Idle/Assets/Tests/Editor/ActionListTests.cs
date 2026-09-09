@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.UI;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
@@ -235,6 +236,56 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(ActionList.TryRun(tree.Tier1Trigger.actions, ctx));
             Assert.AreEqual((BigNumber)5, tree.Ch1.balances["ch1_records"]);
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"], "and the whole list ran");
+        }
+
+        // ---- 8. a rung named from a list ----
+
+        // ExecuteRung answers with the list it would run, so a refusal nested
+        // in the named rung closes the OUTER list - it does not read as a closed
+        // gate one level down while the outer list runs "whole" around it. The
+        // payout sits first so the all-or-nothing contract is what is tested.
+        [Test]
+        public void An_outer_list_is_refused_through_the_rung_it_names()
+        {
+            var tree = new TestTree();
+            tree.Tier1Def.rung = new Rung
+            {
+                offerCondition = new Always(),
+                actions =
+                {
+                    new AddCurrency { currencies = { tree.Ch1Records }, amount = 3 },
+                    new ResetScope { scope = tree.Tier1Def }
+                }
+            };
+            var outer = TestTree.MakeDefinition<TriggerDefinition>("outer");
+            outer.condition = new Not { condition = new Always() };   // never swept; run by hand
+            outer.actions.Add(new AddCurrency { currencies = { tree.Ch1Records }, amount = 5 });
+            outer.actions.Add(new ExecuteRung { tier = tree.Tier1Def });
+            tree.Ch1Def.triggers.Add(outer);
+            tree.Rebuild();
+            tree.Ctx(tree.Tier1).Deposit("cash", 42);
+            Arm(tree);
+            var ctx = tree.Ctx(tree.Ch1);
+
+            var refusal = ActionList.Refuses(outer.actions, ctx);
+            Assert.IsNotNull(refusal, "the named rung's reset is refused, and the outer list hears it");
+            Assert.AreSame(tree.Tier1, refusal.Host);
+            Assert.AreEqual("Claim your open_mic reward first", RungFeedback.RefusalText(refusal));
+            Assert.IsFalse(ActionList.TryRun(outer.actions, ctx));
+            Assert.AreEqual(BigNumber.Zero, tree.Ch1.balances["ch1_records"], "the outer payout never happened");
+            Assert.AreEqual((BigNumber)42, tree.Tier1.balances["cash"], "and nothing was cleared");
+
+            Dismiss(tree);
+            Assert.IsTrue(ActionList.TryRun(outer.actions, ctx));
+            Assert.AreEqual((BigNumber)8, tree.Ch1.balances["ch1_records"], "outer 5, then the rung's 3");
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"], "and the rung's reset ran");
+
+            // An UNMET gate on the named rung is still the ordinary no-op: no
+            // refusal, the outer list runs, the rung contributes nothing.
+            tree.Tier1Def.rung.offerCondition = new CurrencyAtLeast { currency = tree.Fans, threshold = 50 };
+            Assert.IsNull(ActionList.Refuses(outer.actions, ctx));
+            Assert.IsTrue(ActionList.TryRun(outer.actions, ctx));
+            Assert.AreEqual((BigNumber)13, tree.Ch1.balances["ch1_records"], "outer 5 only");
         }
     }
 }

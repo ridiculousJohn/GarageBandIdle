@@ -220,7 +220,8 @@ Gate leg `uiText` (§12.11's unmet-legs contract, rendered on a disabled row):
 Jam I first"; `FlagSet(gj2_done)` "Clear Garage Jam II first"; each `Not(FlagSet(gjN_done))`
 "Already cleared".
 `gj*_done` flags and the reward modifiers live at **ch1** — they survive tier resets, die at the
-capstone (§12.12's set-then-wiped check holds: nothing in these lists resets ch1). Neither rung's
+capstone (nothing in these lists resets ch1, so a jam's flags and modifiers outlive the run that
+paid them). Neither rung's
 reset can destroy an armed, unclaimed reward: tier1 refuses to be cleared while it holds one, and
 the runner asks before either list runs (§12.5). The release carries
 `Not(EventRewardPending)` (§9) on top of that, reading its own record and saying so early; the

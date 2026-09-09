@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ff77d597-62a9-412c-b32f-c1489e34fb56
-  modified: 2026-09-02T03:22:43.585Z
+  modified: 2026-09-09T17:10:48.928Z
 ---
 
 Verification loop for [[project-layout-and-workflow]], established during slice 3.5 (2026-07-21). Repo paths here are relative to the repo root as `<repo>/...`, since the checkout lives at a different absolute path on each of John's machines.
@@ -16,6 +16,11 @@ Resolve the editor rather than hardcoding it: read the version from `<repo>/Gara
 
 **How to apply:**
 - First check for a running EDITOR process by executable PATH under `Hub\Editor` (`Get-Process | Where-Object { $_.Path -like '*Hub\Editor*' }`), never by name: the Unity CLI (`%LOCALAPPDATA%\Unity\bin\unity.exe`, left running as `unity mcp --project-path ...` by the unity-cli MCP server) is ALSO named `unity`, and on 2026-09-01 two of those read as an open editor and nearly blocked a verify run. `Unity Hub` and `Unity.Licensing.Client` are not it either. If a real editor exists his editor has the project open, batchmode aborts with "another Unity instance is running" and writes almost nothing; hand verification to him instead. **Ask before assuming he is not mid-test** - on 2026-08-12 he had the editor open to play the game while a batchmode run was fired at the same project.
+  **Broken 2026-09-09 after reading this file in the same task:** the verify script's wait loop was
+  `Get-Process -Name 'Unity'`, matched the CLI MCP process, and spun for sixteen minutes over a
+  compile error the log had shown in the first minute. The wait loop and the pre-check are the SAME
+  predicate - path under `Hub\Editor` - and the log gets read while the run is in progress, never
+  waited on. Reading the rule is not applying it: check the script against this file before launching.
 - **The lockfile is NOT that check.** `<repo>/Garage Band Idle/Temp/UnityLockfile` - ONE level down, not doubly nested (a stray empty `Garage Band Idle/Garage Band Idle/Logs/` exists and invites the wrong path) - is left behind by BATCHMODE too whenever it exits on compile errors, and the next run then aborts without writing a log - leaving the PREVIOUS run's log sitting there to be grepped as if it were this run's. That is how a false green happens: delete the log before launching and refuse any log whose timestamp predates the launch. Treating its presence as "the editor is open" stalls the loop; treating its absence as "safe to run" misses an editor that has not written it yet. Check the process, then delete a stale lockfile before launching.
 - **Unity batchmode is the ONLY compiler allowed here** (John, 2026-08-20). No Roslyn/csc, no
   dotnet, no hand-assembled reference list, ever, unless he asks for it by name. Its result is
@@ -59,5 +64,53 @@ the Unity CLI `unity status` / `unity command` sees the same Pipeline server. Ru
 - Two console errors are EXPECTED from a full in-editor run: Unity's "Unknown error occurred while
   loading .../cash.asset" from the test that plants a junk file (not ours to quiet). Since
   2026-09-02 our own validator prints nothing on a refusal - a third red line there is a defect.
-- `verify.ps1` lives in the session scratchpad (paths above); it is recreated per session from
-  this memory, and John has not asked for it in the repo.
+- `verify.ps1` lives in the session scratchpad; John has not asked for it in the repo. It is
+  COPIED from the block below, never retyped from recall - retyping is how the wrong process
+  predicate got in on 2026-09-09. Edit the block here if the loop changes, then copy.
+
+```powershell
+$ErrorActionPreference = 'Continue'
+$project = '<repo>\Garage Band Idle'
+$unity = 'C:\Program Files\Unity\Hub\Editor\6000.5.10f1\Editor\Unity.exe'   # version from ProjectVersion.txt
+$log = '<scratchpad>\tests.log'
+$results = Join-Path $env:USERPROFILE 'AppData\LocalLow\DefaultCompany\Garage Band Idle\TestResults.xml'
+
+if (-not (Test-Path $unity)) { Write-Output "NO UNITY AT $unity"; exit 2 }
+# By PATH, never by name: the CLI MCP process is also named unity.
+$editor = Get-Process | Where-Object { $_.Path -like '*Hub\Editor*' }
+if ($editor) { Write-Output "EDITOR RUNNING: $($editor.Path)"; exit 3 }
+
+$lock = Join-Path $project 'Temp\UnityLockfile'
+if (Test-Path $lock) { Remove-Item $lock -Force }
+if (Test-Path $log) { Remove-Item $log -Force }
+if (Test-Path $results) { Remove-Item $results -Force }
+$launched = Get-Date
+
+# Tests: no -quit. For an import instead, swap -runTests... for
+# -quit -executeMethod RidiculousGaming.GarageBandIdle.Editor.ChapterJsonImporter.ImportAll
+& $unity -batchmode -nographics -projectPath $project -runTests -testPlatform EditMode -testResults $results -logFile $log | Out-Null
+
+# Same predicate as the pre-check. -Name 'Unity' matches the MCP server and spins forever.
+while (Get-Process | Where-Object { $_.Path -like '*Hub\Editor*' }) { Start-Sleep -Seconds 2 }
+Start-Sleep -Seconds 5
+
+Write-Output "--- compile errors ---"
+Select-String -Path $log -Pattern 'error CS' | ForEach-Object { $_.Line }
+Write-Output "--- saving line ---"
+Select-String -Path $log -Pattern 'Saving results to' | ForEach-Object { $_.Line }
+Write-Output "--- results ---"
+if (Test-Path $results) {
+    $item = Get-Item $results
+    if ($item.LastWriteTime -lt $launched) { Write-Output "STALE RESULTS FILE from $($item.LastWriteTime)" }
+    (Select-String -Path $results -Pattern '<test-run ' | Select-Object -First 1).Line
+    Select-String -Path $results -Pattern '<test-case .*result="Failed"' | ForEach-Object {
+        if ($_.Line -match 'fullname="([^"]+)"') { $Matches[1] }
+    }
+} else {
+    Write-Output "NO RESULTS FILE"
+}
+```
+
+  Run it in the FOREGROUND with a 600000 ms timeout. A background run reports nothing until the
+  script exits, and if the script is wrong it never does; the foreground call returns the answer or
+  the timeout, and the log is readable at any point in between.

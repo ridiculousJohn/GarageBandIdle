@@ -211,9 +211,23 @@ namespace RidiculousGaming.GarageBandIdle
                                                Dictionary<ScopeState, List<ModifierDefinition>> grantable)
         {
             foreach (var source in node.Definition.Sources())
+            {
+                // Entries of one source naming one currency and stat are one
+                // coordinate, so they share one plan: an earlier entry on the
+                // same coordinate already compiled it, and this entry is filed
+                // under that same object rather than walking the chain again.
+                var done = new List<ProducesEntry>();
                 foreach (var entry in source.Entries)
-                    if (entry != null)
-                        node.StoreLink(entry, Plan(node, source.Source, entry.currency, entry.stat, grantable));
+                {
+                    if (entry == null)
+                        continue;
+                    var same = done.Find(e => e.currency == entry.currency && e.stat == entry.stat);
+                    node.StoreLink(entry, same != null
+                        ? node.Link<CoordinatePlan>(same)
+                        : Plan(node, source.Source, entry.currency, entry.stat, grantable));
+                    done.Add(entry);
+                }
+            }
 
             foreach (var currency in node.Definition.declaredCurrencies)
                 if (currency != null)

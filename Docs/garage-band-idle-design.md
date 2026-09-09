@@ -1047,8 +1047,11 @@ that question before any list runs - a rung, an event's entry and its ending lis
 upgrade payload, a bar completion alike - and a list runs whole or not at all, so each site's guard
 closes before any action runs and no list half-executes; the gate feedback renders the refusal as a
 leg naming the event by its `displayName`. A reset forced past a refusal throws (requirement 7).
-`DismissEvent` removes the record before running `onEnd`, so a restart from an ending list is never
-refused by its own event.
+Three kinds answer the runner, each for what it would do: `ResetScope` and `RestartScope` with the
+refusal of the subtree they would clear, `ExecuteRung` with the refusal of the list it would run - so
+a refusal nested in a named rung closes the outer list rather than reading as a closed gate one level
+down. `DismissEvent` removes the record before running `onEnd`, so a restart from an ending list is
+never refused by its own event.
 
 **`AddModifier`** counts a stack under the modifier's id in the target scope's
 `modifierStacks`. A modifier is declared content like everything else — `ScopeDefinition.modifiers` —
@@ -1086,7 +1089,9 @@ is **fail-closed against the rung's own gate**: `TryRung` (the UI entry point) c
 condition before executing, and **`ExecuteRung` runs another rung's action list through the same
 check — gate met, it executes; gate unmet, it no-ops.** There is no bypass: a payout is only
 reachable through its own gate, so an unfinished run is discarded by whatever reset follows, never
-banked. References are validated acyclic at load. A rung is declared on `InteriorDefinition`
+banked. Reach is self or enclosed (12.12), so rung references only ever point down and the one cycle
+possible is a rung's list naming its own rung, through `ExecuteRung` or `RestartScope`; that is
+refused at load and thrown at Build, since the recursion it would start is unbounded. A rung is declared on `InteriorDefinition`
 (§12.3), so the root has no field to hold one - unauthorable rather than refused.
 
 **PayoutFormula** — a polymorphic family computing an amount from readable state
@@ -1539,7 +1544,9 @@ per-feature: any kind an author gates with explains itself for free.
 - Scope references are checked for reach: `ResetScope` may target the acting scope, a scope it
   encloses — never a peer, the root, an ancestor, or an unrelated subtree. Peers are cleared by the
   scope that CONTAINS them, since resetting it is downward-closed. `ExecuteRung` may
-  only reference a rung declared within the acting scope. `AddModifier` and `RemoveModifier` may
+  only reference a rung declared within the acting scope, and never the rung its own list belongs
+  to - the one cycle the downward reach leaves possible, and an unbounded recursion; `RestartScope`
+  from its own rung's list is the same fault. `AddModifier` and `RemoveModifier` may
   target the acting scope or an ancestor (grants live outward), never an unrelated subtree; a
   `RemoveModifier` naming a modifier nothing reachable grants warns.
 - Ordinary reads and writes (`AddCurrency`, `SetFlag`, `AddSong`, Condition reads, `produces`

@@ -61,8 +61,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             declaringCtx.Spend(upgrade.costCurrency.Id, upgrade.cost);
 
             // Latch before payload: the effects are live for anything the actions
-            // read, and a payload resetting the latch's own scope is refused at
-            // load (set-then-wiped) rather than silently re-armed here.
+            // read. A payload that clears the latch's own scope re-arms the
+            // upgrade for another purchase; no load-time check refuses that
+            // shape, so the content's walkthrough is what would show it.
             declaring.purchasedUpgrades.Add(upgrade.Id);
             ActionList.Run(upgrade.actions, declaringCtx);
         }

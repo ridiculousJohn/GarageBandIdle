@@ -1862,6 +1862,48 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.Throws<InvalidOperationException>(() => ScopeState.Build(f.Content));
         }
 
+        // Reach is self or enclosed, so rung references only ever point down
+        // and the one cycle possible is a rung's list naming its own rung. That
+        // recursion is unbounded and a stack overflow is uncatchable, so it is
+        // a load-time fault (12.12) through both kinds that run a rung.
+        [Test]
+        public void LinkTime_ARungExecutingItsOwnRung_IsAContentFaultFromBuild()
+        {
+            var f = new ValidatorFixture();
+            f.Album.actions.Add(new ExecuteRung { tier = f.Tier1 });
+
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
+                "names the rung it belongs to");
+            var thrown = Assert.Throws<InvalidOperationException>(() => ScopeState.Build(f.Content));
+            StringAssert.Contains("never runs itself", thrown.Message);
+        }
+
+        [Test]
+        public void LinkTime_ARungRestartingItsOwnScope_IsAContentFaultFromBuild()
+        {
+            var f = new ValidatorFixture();
+            f.Album.actions.Add(new RestartScope { scope = f.Tier1 });
+
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ScopeReach,
+                "names the rung it belongs to");
+            var thrown = Assert.Throws<InvalidOperationException>(() => ScopeState.Build(f.Content));
+            StringAssert.Contains("never runs itself", thrown.Message);
+        }
+
+        // The same reference from any OTHER list at the scope is legitimate
+        // reach: an event ending that restarts its host is chapter 1's banked
+        // run, and a trigger firing its own scope's rung is the same shape.
+        [Test]
+        public void LinkTime_ATriggerRestartingItsOwnScope_Links()
+        {
+            var f = new ValidatorFixture();
+            f.Trigger.actions.Add(new RestartScope { scope = f.Tier1 });
+            f.Trigger.actions.Add(new ExecuteRung { tier = f.Tier1 });
+
+            AssertNoFinding(f.Run(), ValidationCheck.ScopeReach);
+            Assert.DoesNotThrow(() => ScopeState.Build(f.Content));
+        }
+
         [Test]
         public void LinkTime_ASectionScopeOutsideTheChapter_IsAContentFaultFromBuild()
         {

@@ -253,7 +253,8 @@ namespace RidiculousGaming.GarageBandIdle
     // Runs another rung's action list through the same gate check every
     // invocation gets: gate met, it executes; gate unmet, it no-ops. The context
     // REBASES to the referenced rung's declaring scope (design doc 12.4/12.5).
-    // Reach: a rung declared within the acting scope (12.12).
+    // Reach: a rung declared within the acting scope (12.12), never the rung
+    // this action's own list belongs to.
     [Serializable]
     public class ExecuteRung : GameAction
     {
@@ -264,9 +265,29 @@ namespace RidiculousGaming.GarageBandIdle
             var target = ctx.ResolveEnclosed(tier, "ExecuteRung");
             if (tier.rung == null)
                 throw new InvalidOperationException($"ExecuteRung: scope '{tier.Id}' declares no rung.");
+            // The one cycle the reach rule leaves possible: references only
+            // ever point at self or below, so the only way back onto a running
+            // rung is to name your own. That recursion is unbounded and a stack
+            // overflow is uncatchable, so it is a content fault here (12.12)
+            // rather than a first-run discovery.
+            if (tier.rung.actions.Contains(this))
+                throw new InvalidOperationException(
+                    $"ExecuteRung at '{tier.Id}' names the rung it belongs to - a rung never runs itself (12.12).");
             ctx.Store(this, target);
         }
 
+        // What this action would do is run the named rung's list, so its
+        // answer is that list's answer, asked at the node the link names
+        // (design doc 12.5) - the same shape as the two resets answering for
+        // the subtree they would clear. Without it a nested refusal reads as a
+        // closed gate one level down, and the outer list runs "whole" around a
+        // rung that did nothing and showed no leg.
+        public override Refusal Refuses(GameContext ctx, ScopeState ignoring) =>
+            ActionList.Refuses(tier.rung.actions, ctx.Rebase(ctx.Scope.Link(this)), ignoring);
+
+        // By the time a list reaches this, Refuses has answered null, so a
+        // false from TryExecute can only mean the offer condition is unmet -
+        // the designed no-op, never a swallowed refusal.
         public override void Execute(GameContext ctx) =>
             tier.rung.TryExecute(ctx.Rebase(ctx.Scope.Link(this)));
 
@@ -286,7 +307,10 @@ namespace RidiculousGaming.GarageBandIdle
             if (tier.rung == null)
             {
                 ctx.AddError(ValidationCheck.UnresolvedReference, $"ExecuteRung targets scope '{target.Id}', which declares no rung.");
+                return;
             }
+            if (tier.rung.actions.Contains(this))
+                ctx.AddError(ValidationCheck.ScopeReach, $"ExecuteRung at '{target.Id}' names the rung it belongs to - a rung never runs itself (12.12).");
         }
     }
 
@@ -304,6 +328,12 @@ namespace RidiculousGaming.GarageBandIdle
             var target = ctx.ResolveEnclosed(scope, "RestartScope");
             if (target.Parent == null)
                 throw new InvalidOperationException("RestartScope: the root scope is never resettable.");
+            // The bank half runs the named scope's rung, so this is the same
+            // self-cycle ExecuteRung refuses: a rung's own list restarting its
+            // own scope recurses without bound (12.12).
+            if (scope is InteriorDefinition interior && interior.rung != null && interior.rung.actions.Contains(this))
+                throw new InvalidOperationException(
+                    $"RestartScope at '{scope.Id}' names the rung it belongs to - a rung never runs itself (12.12).");
             ctx.Store(this, target);
         }
 
@@ -346,7 +376,10 @@ namespace RidiculousGaming.GarageBandIdle
             if (!ctx.InActingSubtree(target))
             {
                 ctx.AddError(ValidationCheck.ScopeReach, $"RestartScope may target the acting scope or a scope it encloses (12.12); '{target.Id}' is neither from '{ctx.ActingScope.Id}'.");
+                return;
             }
+            if (scope is InteriorDefinition interior && interior.rung != null && interior.rung.actions.Contains(this))
+                ctx.AddError(ValidationCheck.ScopeReach, $"RestartScope at '{target.Id}' names the rung it belongs to - a rung never runs itself (12.12).");
         }
     }
 }
