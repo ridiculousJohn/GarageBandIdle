@@ -7,9 +7,9 @@ using RidiculousGaming.GarageBandIdle.Meta;
 namespace RidiculousGaming.GarageBandIdle
 {
     // The session's phases (design doc 12.9). Launch and backgrounding are
-    // NoChapter; AwaitingIdleClaim admits only the claim and switch commands
-    // and never ticks - the chapter is live only after the claim settles;
-    // Live admits everything.
+    // NoChapter; AwaitingIdleClaim never ticks and is the one phase the claim
+    // settles from - the chapter is live only after the claim settles; Live is
+    // the one phase that ticks and sweeps.
     public enum SessionPhase
     {
         NoChapter,
@@ -42,9 +42,8 @@ namespace RidiculousGaming.GarageBandIdle
     // The transient execution context (design doc 12.9): plain C#, never
     // serialized, holding only orchestration - the foreground chapter, the
     // phase, the outstanding offer, and the reentrancy guard. Durable facts
-    // live in the tree. The session draws the command boundary and owns the
-    // transaction pipeline; the wrapped systems stay public and unchanged, and
-    // tests keep calling them directly.
+    // live in the tree. The session owns the transaction pipeline; the wrapped
+    // systems stay public and unchanged, and tests keep calling them directly.
     public class GameSession
     {
         public readonly RootScopeState Root;
@@ -405,8 +404,8 @@ namespace RidiculousGaming.GarageBandIdle
 
         // ---- the command surface ----
         // One wrapper per entry point, taking the same GameContext the wrapped
-        // system takes plus nothing new. Root-owned commands take the
-        // exception path 12.9 names and arrive with their step.
+        // system takes plus nothing new. A callback command arrives with its
+        // step and builds the context for the scope it writes.
 
         public bool TryRung(GameContext ctx) =>
             RunCommand(ctx, c => c.Scope.Definition is InteriorDefinition interior
@@ -418,8 +417,8 @@ namespace RidiculousGaming.GarageBandIdle
         public bool TryBuy(GameContext ctx, UpgradeDefinition upgrade) =>
             RunCommand(ctx, c => Purchasing.TryBuy(c, upgrade));
 
-        // Firing has no gate of its own - past the session's guards it always
-        // happens, so the pipeline always runs.
+        // Firing has no gate of its own - it always happens, so the pipeline
+        // always runs.
         public bool FireProducer(GameContext ctx, ProducerDefinition producer) =>
             RunCommand(ctx, c => { Producer.FireProducer(c, producer); return true; });
 
@@ -434,12 +433,10 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Extends the timer of the modifier whose record lives at `scope` - root
         // and encore for the ad callback, as AddModifier takes a target and a
-        // modifier. Legal in EVERY phase (12.9: an authenticated callback is
-        // always phase-eligible). The dialog's refusal of ordinary commands
-        // exists so a sweep cannot reset away an unpaid window, and a root
-        // record write sweeps nothing there, since the sweep is conditional on
-        // the resulting phase; refusing would discard a watched ad whenever the
-        // app resumed into the dialog before the callback landed.
+        // modifier. The record write is the whole mutation, and the sweep stays
+        // conditional on the resulting phase, so a grant that lands while a
+        // claim awaits presentation repaints without sweeping the unpaid window
+        // away (12.9).
         public void ExtendBuff(ScopeState scope, ModifierDefinition modifier, double seconds, DateTime nowUtc)
         {
             // A grant only ever moves an expiry LATER, so a nonpositive or
@@ -447,7 +444,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds <= 0)
                 throw new InvalidOperationException(
                     $"ExtendBuff for '{modifier.Id}': {seconds} is not a finite positive number of seconds.");
-            RunRootCommand(nowUtc, () =>
+            RunCommand(new GameContext(scope, nowUtc), c =>
             {
                 var record = FindBuff(scope, modifier.Id);
                 if (record == null)
@@ -467,6 +464,7 @@ namespace RidiculousGaming.GarageBandIdle
                 var ceiling = nowUtc.AddSeconds(config.encoreCapSeconds);
                 if (record.expiresAtUtc > ceiling)
                     record.expiresAtUtc = ceiling;
+                return true;
             });
         }
 
@@ -481,26 +479,35 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // The store callback's write for a restored or otherwise granted
-        // entitlement: legal in every phase, and under the dialog it sweeps
-        // nothing and repaints only the button set - the offer stays what was
-        // computed and is what OK pays (12.9).
-        public void GrantEntitlement(string entitlementId, DateTime nowUtc) =>
-            RunRootCommand(nowUtc, () => WriteEntitlement(entitlementId));
+        // entitlement: under the claim dialog it sweeps nothing and repaints
+        // only the button set - the offer stays what was computed and is what
+        // OK pays (12.9).
+        public void GrantEntitlement(string entitlementId, DateTime nowUtc)
+        {
+            RunCommand(new GameContext(Root, nowUtc), c =>
+            {
+                WriteEntitlement(entitlementId);
+                return true;
+            });
+        }
 
         // The store callback for a Pass purchase (12.9): the entitlement write,
         // and when an offer stands - bought FROM the dialog - the offer doubled
         // and settled in the same transaction, ending Live so the dialog closes
         // with the phase. Bought anywhere else, the write is the whole command.
-        public void PurchasePassFromDialog(DateTime nowUtc) =>
-            RunRootCommand(nowUtc, () =>
+        public void PurchasePassFromDialog(DateTime nowUtc)
+        {
+            RunCommand(new GameContext(Root, nowUtc), c =>
             {
                 WriteEntitlement(BackstagePass.EntitlementId);
                 if (Phase != SessionPhase.AwaitingIdleClaim)
-                    return;
+                    return true;
                 DoubleOffer();
                 SettleOffer(ForegroundChapter);
                 Phase = SessionPhase.Live;
+                return true;
             });
+        }
 
         // Writes at root, and only an id root declares: the save filter would
         // drop an undeclared one on the next load, so a write of one is a
@@ -521,23 +528,27 @@ namespace RidiculousGaming.GarageBandIdle
         {
             if (count <= 0)
                 throw new InvalidOperationException($"GrantRoadies: {count} is not a positive count.");
-            RunRootCommand(nowUtc, () => new GameContext(Root, nowUtc).Deposit(Roadies.CurrencyId, count));
+            RunCommand(new GameContext(Root, nowUtc), c =>
+            {
+                c.Deposit(Roadies.CurrencyId, count);
+                return true;
+            });
         }
 
         // ---- the pipeline ----
 
-        // Guards - mutation - conditional sweep - commit - one refresh
-        // (12.9/12.11). A refused command runs no pipeline: every refusal
-        // precedes any mutation, so there is nothing to sweep or repaint, and
-        // commit is a seam rather than machinery - the point after the sweep
-        // where the transaction's state is what refresh reads.
+        // The one pipeline every command runs: guard - flush - mutation -
+        // conditional sweep - commit - one refresh (12.9/12.11). The flush
+        // precedes the command, so the mutation runs against settled state; a
+        // command that returns false commits no transaction and triggers no
+        // refresh, and commit is a seam rather than machinery - the point after
+        // the sweep where the transaction's state is what refresh reads.
         private bool RunCommand(GameContext ctx, Func<GameContext, bool> command)
         {
             GuardReentrancy();
-            if (Phase != SessionPhase.Live || !InForeground(ctx))
-                return false;
-            // Past the refusals, so a refused command runs no pipeline and
-            // flushes nothing; the mutation below sees settled state.
+            // A command owns its mutation and the flush before it. Outside Live
+            // the flush is a no-op of its own accord, since the session banks
+            // time only while it ticks.
             FlushPending(ctx.NowUtc);
             commandInProgress = true;
             try
@@ -546,29 +557,6 @@ namespace RidiculousGaming.GarageBandIdle
                     return false;
                 CloseTransaction(ctx.NowUtc);
                 return true;
-            }
-            finally
-            {
-                commandInProgress = false;
-            }
-        }
-
-        // The root-owned pipeline: RunCommand without the phase test and the
-        // foreground test, which are the chapter-local boundary a root command
-        // is 12.9's exception to. The flush stays - a command owns its mutation
-        // and the flush before it - and outside Live it is a no-op of its own
-        // accord, since the session banks time only while it ticks. No phase
-        // logic is added anywhere: CloseTransaction still sweeps only when the
-        // resulting phase is Live.
-        private void RunRootCommand(DateTime nowUtc, Action command)
-        {
-            GuardReentrancy();
-            FlushPending(nowUtc);
-            commandInProgress = true;
-            try
-            {
-                command();
-                CloseTransaction(nowUtc);
             }
             finally
             {
@@ -588,16 +576,6 @@ namespace RidiculousGaming.GarageBandIdle
                 Sweep.Run(Root, ForegroundChapter, nowUtc);
             Refreshed?.Invoke();
         }
-
-        // The command boundary (12.9): a chapter-local mutation is rejected
-        // when its acting scope lies outside the foreground chapter's live
-        // subtree - ids are unique tree-wide, but reachable is not the same as
-        // mutable. The chain test IS the subtree test: a scope inside the
-        // subtree has the foreground chapter on its outward chain, and the
-        // identity comparison keeps a same-definition node from another tree
-        // out.
-        private bool InForeground(GameContext ctx) =>
-            ctx.Scope.FindOnChain(ForegroundChapter.Definition) == ForegroundChapter;
 
         private void GuardReentrancy()
         {

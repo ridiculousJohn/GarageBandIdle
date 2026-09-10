@@ -116,10 +116,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(f.Tree.Now.AddSeconds(20000), f.OnlyRecord().expiresAtUtc);
         }
 
-        // The dialog's refusal of ordinary commands exists so a sweep cannot
-        // reset an unpaid window away; a root record write sweeps nothing, since
-        // the sweep is conditional on the resulting phase. Refusing here would
-        // discard a watched ad whenever the app resumed into the dialog first.
+        // A record write under the dialog sweeps nothing, since the sweep is
+        // conditional on the resulting phase - so no reset can reach the unpaid
+        // window, and a watched ad that lands while the app sits in the dialog
+        // is paid rather than discarded.
         [Test]
         public void A_grant_under_the_idle_dialog_sweeps_nothing_and_leaves_the_offer_standing()
         {

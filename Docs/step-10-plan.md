@@ -19,7 +19,7 @@ replay with one Roadie stationed on ch1 through the allocation screen, ~1.87x as
 computes. Both walkthrough tests that today poke facts directly - 13.3's allocation map write and
 13.4's hand-doubled offer - convert to the commands that now own those writes.
 
-The command surface grows, for the first time since step 7, and only by root-owned commands and
+The command surface grows, for the first time since step 7, by two commands and the
 authenticated callbacks (12.11's list): `SetRoadieAllocation`, `AcknowledgeStory`, and the callback
 operations - extend Encore, double and settle the offer, write an entitlement, grant Roadies. No
 chapter-local mechanic changes. The condition family grows two kinds (a live buff record, a held
@@ -78,7 +78,7 @@ Settled in conversation and landed in the design doc the same day (commit `bb1f6
    its `availableWhen` renders as legs through `GateFeedback`, and the button opens the card as
    often as the player likes. A card never opens by itself unless the beat is MARKED to
    (`opensWhenAvailable`), and then the rule is state, never a transition: the card shows while
-   the beat is available and its seen flag is unset, once, because closing it sets the flag -
+   the beat is available and its seen flag is unset, once, because opening it sets the flag -
    section 10's own rule, crash-safe by construction. The seen-latch flag stays at root, so the
    capstone reset cannot replay an opener. No action opens a card: a `GameAction` writes state,
    and the moment a beat should light is its `availableWhen`, which reads every fact a trigger
@@ -138,8 +138,11 @@ facts only John can settle, and none blocks a slice.
   resolved outward from the acting scope, with `Validate` and `Progress`).
 - **`GameSession.EnterChapter`**: computes the offer once over `[stamp, nowUtc]` at current state
   under the idle context; `SettleOffer` pays the stored lines as they stand. `RunCommand` is
-  the pipeline every command runs: guards, flush, mutation, conditional sweep, one refresh.
-  Root-owned commands take "the exception path 12.9 names and arrive with their step" - this one.
+  the one pipeline every command runs: reentrancy guard, flush, the command's own check and
+  mutation, conditional sweep, one refresh. Decided 2026-09-10: the phase test and the foreground
+  test it carried are deleted, and with them the root-context variant that skipped them - no caller
+  could reach either, since the host builds widgets only for the foreground chapter while `Live`
+  and a dormant chapter is never executed.
 - **`RootFacts`**: `roadieAllocation` (read by `RoadieTotalBoost` / `RoadieActiveBoost`, both
   built), `entitlements`, `currentChapterId`. The save filter already drops allocation keys that
   are not root children and nonpositive counts.
@@ -217,23 +220,20 @@ one chapter, app closed, the buff expiring inside the window - is exact.
 
 **The extension**, `ExtendBuff(scope, modifier, seconds, nowUtc)`: a session command taking the
 record's home scope and the modifier whose timer it is, as `AddModifier` takes its target and its
-modifier - root and `encore` for Encore, so the ad callback's call is root-owned; the `encore`
+modifier - root and `encore` for Encore; the `encore`
 asset itself comes off root's own modifier list through the shared resolve `CodeReferences`
 validates (below), never from a string the command re-reads. Finds the record
 by the modifier's id on that scope; absent, creates it at `nowUtc + seconds`;
 present, sets
 `max(expiresAtUtc, nowUtc) + seconds`; then clamps remaining time to the config cap. **Legal in
-every phase**: it is an authenticated callback, and 12.9 already says those are always
-phase-eligible - the dialog's refusal of ordinary commands exists so a sweep cannot reset away an
-unpaid window, and a root record write under the dialog sweeps nothing, since the sweep is
-conditional on the resulting phase. A refusal here would discard a watched ad whenever the app
+every phase**: a root record write under the dialog sweeps nothing, since the sweep is
+conditional on the resulting phase, and a refusal here would discard a watched ad whenever the app
 resumed into the dialog before the callback landed. Under the Pass the window shows no ad button
 (Ctrl C: "Time remaining" reads infinity), so the command is never asked; if it were, the write is
-harmless, since the membership applies once either way. Runs the ordinary pipeline through a
-root-context variant of `RunCommand` that skips the foreground test and the phase test (root-owned
-commands are 12.9's exception) but keeps the flush - the memory rule: a command owns its mutation
-and the flush, and nothing the tick owns; under the dialog the flush is a no-op, since the session
-banks time only while Live. It is the ad callback's whole Encore job; the fake ad completes into it.
+harmless, since the membership applies once either way. Runs `RunCommand` with a context at root, like every
+command, the flush included - the memory rule: a command owns its mutation and the flush, and
+nothing the tick owns; under the dialog the flush is a no-op, since the session banks time only
+while Live. It is the ad callback's whole Encore job; the fake ad completes into it.
 
 **The window** (UI, slice D): "Time remaining HH:MM:SS" computed from the record against the
 clock per frame (display, not truth), "Boost for 4 hours" requesting the ad, "Boost forever"
@@ -292,7 +292,7 @@ applies. The three benefits, each on an existing mechanism:
 - **The raised cap**: the window computation reads `backstagePassIdleCapSeconds` instead of
   `idleCapSeconds` while it holds.
 
-**The write**, `GrantEntitlement(id, nowUtc)`: a root-owned session command the store callback
+**The write**, `GrantEntitlement(id, nowUtc)`: a session command the store callback
 completes into - sets the fact and runs the pipeline. From the idle dialog it is
 `PurchasePassFromDialog(nowUtc)`: the entitlement write, the offer doubled, and the claim in one
 transaction ending `Live` (decision 4). A kill between the store's confirmation and the claim
@@ -388,11 +388,11 @@ that flag's setter, which retires the two `FlagNoSetter` warnings the content te
 code-set flag remains: the Pass is an entitlement, not a flag, so the marker the flag spelling
 would have needed does not exist.
 
-**`AcknowledgeStory(ctx, beat)`**: a root-owned session command on the root-command pipeline -
-reentrancy guard, `Live` required (a card opens only over a live chapter), the flush, refused when
-the beat's `availableWhen` does not hold at that context (a card cannot be acknowledged before it
-could be shown), else the flag written at its home through the same outward walk `SetFlag` uses,
-then `CloseTransaction`: the sweep, and `Refreshed`.
+**`AcknowledgeStory(ctx, beat)`**: a session command like every other, on `RunCommand` - reentrancy
+guard, the flush, the beat's seen flag written at its home through the same outward walk `SetFlag`
+uses (root, where chapter 1 declares both), then `CloseTransaction`: the sweep, and `Refreshed`. It
+checks nothing of its own: the host opens a card only for a beat whose button is live or whose mark
+pops it, and setting a flag already set changes nothing.
 
 **The module**, `story_row`: a `ModuleDefinition` binding one beat as `content`, the event-row
 shape - a registry entry, a UXML with a button and a legs container, `StoryRowUI` in the factory
@@ -412,21 +412,22 @@ parameter - the host behind a one-method interface, open a story for a beat and 
 
 **The card.** One app-owned overlay in `Screen.uxml` (`story`), the host owning it as it owns the
 select and the collect dialog: title, text, one button, driven by a `StoryBeatUI` the host
-constructs over it. The host's open method stores the requested beat and scope and calls `Render`,
-which shows the overlay while a request is held and the phase is `Live`. The sections stay UP
-beneath it: the chapter is live and ticking, so the interpolation reason that keeps them down under
-the idle dialog does not apply. The card's button: the host clears the held request first; then, if
-the beat's flag is unset, `AcknowledgeStory` with a context at the beat's scope; if set, nothing
-else, and `Render` hides the overlay. `Refreshed` from the command calls `Render` - the request is
-already cleared, so the overlay hides, and the row's `Refresh` in the same pass reads the flag as
-set. One transaction, one redraw, the order every command follows.
+constructs over it. The host's open method stores the requested beat and scope; then, if the beat's flag is
+unset, `AcknowledgeStory` with a context at the beat's scope, whose `Refreshed` calls `Render`; if
+set, `Render` directly. `Render` shows the overlay while a request is held and the phase is `Live`,
+and the row's `Refresh` in that same pass reads the flag as set: a beat is read the moment it opens
+(John, 2026-09-10), so an app killed with the card up leaves it read and listed. One transaction,
+one redraw, the order every command follows. The sections stay UP beneath it: the chapter is live
+and ticking, so the interpolation reason that keeps them down under the idle dialog does not apply.
+The card's button clears the held request and calls `Render`, which hides the overlay; it writes
+nothing.
 
 **Auto-open, for marked beats only.** On each `Render` while `Live` with no request held, the host
 walks the foreground chapter's `storyBeats` - the declaration list of a scope it already holds -
 and opens the card for the first beat that is marked `opensWhenAvailable`, available at the
 chapter's context, and unseen. State, not a transition (section 10): the pair "available and
-unseen" holds from the transaction that made it available until the close sets the flag, so a
-crash with the card up shows it again next launch, and a beat whose gate is `UpgradePurchased(x)`
+unseen" holds from the transaction that made it available until the open sets the flag, so a
+crash before the card opens shows it next launch, and a beat whose gate is `UpgradePurchased(x)`
 pops once after the purchase and never again, though the gate stays true forever. Unmarked beats
 never pop; their button is the only way in. The walk is over the chapter's list, not its sections,
 so a marked beat pops whether or not any row for it is on screen at that moment.
@@ -437,7 +438,7 @@ transaction sets `ch1_complete` and resets the chapter in one go, so at the refr
 moment its beat became available. `garage_floor` is always visible and already exists, so no
 `story` section is authored; content doc section 12 gains the two rows there, the capstone row's
 `visibleWhen` being `FlagSet(ch1_complete)` so a fresh chapter shows only the opener's button.
-Neither ch1 beat is marked to pop; the content doc says so.
+Neither ch1 beat is marked to pop: popping is the exception, never the default (John, 2026-09-10).
 
 **The log** (if in step 10): a `StoryLogUI` overlay opened from the top bar, listing every beat
 whose flag is set, across root's roster - a downward walk from root through each chapter's
@@ -447,7 +448,7 @@ which is what the declaration-on-the-chapter rule buys.
 
 ## Roadie allocation
 
-**`SetRoadieAllocation(map, nowUtc)`**: a root-owned session command over the whole map, replace
+**`SetRoadieAllocation(map, nowUtc)`**: a session command over the whole map, replace
 semantics. Refused when any count is negative, any key is not a root child's id, or the sum
 exceeds the `roadies` balance (a `BigNumber` compare; the pool is a currency). Writes
 `Root.roadieAllocation` wholesale, dropping zero entries so the map holds only stationed chapters
@@ -515,7 +516,7 @@ list through a resolve the pass checked, so the command asks nothing of its own.
 - **`ExtendBuff`**: absent creates at now plus duration; present extends from the later of expiry
   and now; the cap clamps; legal in `AwaitingIdleClaim` and `NoChapter`, and under the dialog the
   transaction sweeps nothing and leaves the offer standing; the flush precedes the write (the
-  same-frame regression row from step 9, for a root command).
+  same-frame regression row from step 9, for a command with a root context).
 - **The claim's walk**: a record expiring inside the window cuts its boundary and reads dead in
   the segments after it while staying in the list - the 12:00 / 13:00 / 16:00 case pays one hour
   at 2x and three at 1x, which removing the record before the walk would pay entirely at 1x; a
@@ -536,16 +537,17 @@ list through a resolve the pass checked, so the command asks nothing of its own.
   fake ad's callback.
 - **Story**: the opener is available on a fresh chapter and unseen; `AcknowledgeStory` sets the
   root flag and the row reads seen; the capstone beat is unavailable before `ch1_complete` and its
-  legs name the gate; acknowledging an unavailable beat is refused; the reset leaves both flags
+  legs name the gate; the reset leaves both flags
   set and a seen row stays enabled with its gate false again; a marked beat opens the card by
-  itself at the transaction that makes it available and not again after the close, an unmarked one
+  itself at the transaction that makes it available and not again after the open, an unmarked one
   never; a fresh chapter renders the opener's row alone; validation flags a `seenFlag` with no home
   on the chain, and the content test's two `FlagNoSetter` rows go to zero.
 - **Allocation**: 13.3 through `SetRoadieAllocation({ch1: 1})` - the ~1.87x multiplier as
   authored; refused on a negative count, a non-chapter key, and a sum past the balance; zero
   entries are dropped; the allocation affects the next tick's rate (the flush row again).
 - **The host**: the overlay stack shows at most one overlay; a story row's click opens the card
-  over the still-rendered sections and the card's close hides it in the command's own refresh; the
+  over the still-rendered sections with the beat read in the same refresh, and the card's close
+  hides it; the
   dialog renders three buttons for a free player and OK alone for a Pass owner; the registry
   cross-check gains `story_row`; `Require` rejects a Pass cap below the base cap and a nonpositive
   bundle count.
@@ -579,8 +581,7 @@ build-plan step, `load-linking-plan.md` (2026-09-08), and lands before slice A.
 
 - **A. Encore in the runtime**: root.json's `encore` with the TIMED leg alone
   (`appliesWhen: BuffActive(encore)` - the Pass leg joins in B with `HasEntitlement`, so A stays
-  a one-kind changeset), `BuffActive`, the prune, `ExtendBuff` with the
-  root-command pipeline variant and the config knobs, the claim's segmented window over the shared
+  a one-kind changeset), `BuffActive`, the prune, `ExtendBuff` and the config knobs, the claim's segmented window over the shared
   boundary code, the save filter's buff row, the tests.
 - **B. Entitlements, the Pass, and the seams**: `HasEntitlement`, root.json's `entitlements`
   declaration list with its validation and save-filter rows,

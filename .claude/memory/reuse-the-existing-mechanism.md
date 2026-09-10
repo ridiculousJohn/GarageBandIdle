@@ -128,3 +128,21 @@ the amounts at the two moments it happens, and the exit question then has nothin
 THE CHECK, before keeping a field the doc names: name a reader that could not be served by the
 data already in hand. No such reader, no field - and the doc's list of parts gets corrected, not
 implemented.
+
+2026-09-10, `AcknowledgeStory`: asked why a root flag write is root-owned, I produced a fake caller
+(the log), then a new scope test, then a pipeline theory - three inventions in one conversation,
+when the answer was one fact the design already states: the flag is declared on root, root is live
+everywhere, the root pipeline exists for writes to root. Under pushback the answer is the NAME of
+the existing primitive and the fact that picks it. A guard, a caller, or a test I have to invent to
+explain a design rule means I have not found the rule yet.
+
+Same day: I called every player command "a tap". Tap is the Jam button (design section 6), one
+producer, nothing else. The design doc's vocabulary is the only vocabulary - a word I reach for that
+the doc does not use for that thing means I am describing my own model instead of the design, and
+that is where the confusion above came from.
+
+Same day, the other direction: I proposed "the story button is a rung, the pop is a trigger, show
+story is an action" as reuse of existing systems, John said go, and only THEN did I read Rung.cs and
+GameContext.cs - one rung per scope, addressed by scope, and a context an action cannot reach the
+session through. Naming an existing mechanism is a claim about the code. Read the class and its
+callers BEFORE the proposal leaves my mouth, not after the order arrives.

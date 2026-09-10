@@ -82,3 +82,7 @@ design doc spells out the other way; code and doc disagree." The rule above says
 leads; it means the FACT leads, in one plain sentence, with no scorekeeping about whose finding it
 was and no defense before it. If he asks what I did, name the action. If he asks why something
 exists, say whether it needs to, then stop.
+
+2026-09-10: opened a reply with "Right." after John corrected me, and he read it as me grading his
+answer. No verdict on his statement, ever - not "you're right", not "yes", not "correct". State the
+fact and what it changes. He knows he is right; the confirmation is for me, and it is noise to him.

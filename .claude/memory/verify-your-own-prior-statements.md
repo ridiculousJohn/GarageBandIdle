@@ -58,3 +58,13 @@ rule instead of from my own text. The review step that was missing: for every se
 that the diff implements, name the design rule it follows (12.14.8's two walks, 12.14.7's throw at
 the boundary, 12.12's checks) - and if the sentence cannot be traced to a rule, the sentence is the
 defect, not the code. The plan is my prior statement, and this file's rule applies to it.
+
+2026-09-10: after a morning of inventing guards, I overcorrected and answered "nothing else" about
+the story row without rereading the plan, dropping the auto-open (decision 7). "Nothing else" is a
+claim about the document and gets checked against it before it is said. Cutting my inventions
+removes what the design does NOT say; it never removes what it does.
+
+Same day: the design says a story card "shows while" its gate holds. I read that as the pop mark
+and told John twice that the documents say chapter 1's beats are marked to open. They say no such
+thing. A reading of a document is mine and gets labeled as mine; "the doc says X" is only ever the
+words on the page, quoted.

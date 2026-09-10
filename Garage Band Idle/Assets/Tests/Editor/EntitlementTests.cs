@@ -64,9 +64,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- the write ----
 
-        // An authenticated callback is phase-eligible in every phase (12.9), and
-        // the write is root's own fact, so nothing about the chapter-local
-        // boundary applies.
+        // An authenticated callback is phase-eligible in every phase (12.9),
+        // and the write is root's own fact - a store callback lands wherever
+        // the player happened to be.
         [Test]
         public void GrantEntitlement_writes_the_id_with_no_chapter_and_while_live()
         {

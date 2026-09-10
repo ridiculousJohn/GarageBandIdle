@@ -595,9 +595,11 @@ multiplier for first-clears).
 
 The story is delivered at chapter boundaries. A card at chapter open sets the scene and the goal
 ("Pull 200 people and the Friday slot is yours"); a beat at the capstone resolves it and introduces
-the next chapter — gated on state, never on observing a transition: the beat shows while
-`chapterN_complete && !storyN_seen`, and dismissing it sets the root `storyN_seen` latch, so a
-crash between the completion save and the beat cannot skip it. There are no story interruptions
+the next chapter — gated on state, never on observing a transition: the beat's button goes live on
+`chapterN_complete`, opening the card sets the root `storyN_seen` latch, and only a beat MARKED to
+pop opens itself, while `chapterN_complete && !storyN_seen` - so a crash between the completion
+save and the beat cannot skip it, and a beat read before an app kill stays read. Popping is the
+exception, never the default; chapter 1 marks neither beat. There are no story interruptions
 during the loop itself.
 
 Named Catalog songs (§7) serve as story artifacts — the songs that chart appear in the Discography
@@ -1405,13 +1407,11 @@ callback that leaves the phase alone (an entitlement written mid-dialog by any o
 sweeps nothing yet still repaints the dialog, because the refresh is unconditional: the offer it
 shows stays what was computed and is what OK pays - shown and paid never differ - and only the
 button set changes.
-Callbacks are not UI commands (§12.11). **The session also draws the
-command boundary**: **every chapter-local mutation** — `TryBuy`, `FireProducer`, `TryRung`,
-`SetActiveBars`, the event operations, the song operations, and any future mechanic command — is
-rejected when its owning scope lies outside the foreground chapter's live subtree; ids are unique
-tree-wide, but reachable is not the same as mutable. Root-owned commands
-(`SetRoadieAllocation`, `AcknowledgeStory`) and the session commands (`SwitchChapter`, `ClaimIdle`)
-are the exceptions. This guard is orchestration — it lives here, never in chapters or scopes.
+Callbacks are not UI commands (§12.11). **One pipeline runs every command**: reentrancy guard, the
+flush, the command's own check and mutation, the sweep when the resulting phase is `Live`, one
+refresh. The session tests neither the phase nor the acting scope: widgets exist only for the
+foreground chapter while it is `Live`, and a dormant chapter is never executed, so no caller can
+present a scope outside the foreground subtree.
 **Switching away settles first**: the switch transaction deposits the outgoing chapter's
 outstanding offer as it stands (switching is an exit path, §9: a free player's was never doubled, a
 Pass owner's was computed so), advancing the stamp to

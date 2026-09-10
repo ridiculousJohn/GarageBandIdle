@@ -234,9 +234,11 @@ math in Walkthrough 2.
 **Chapter 1 authors zero triggers.** Its only threshold moments are pure reveals (direct monotonic
 gates) or purchase moments (upgrade payloads); the Trigger family exists for later chapters.
 
-Story (root latches, §10): the opening card shows while `Not(FlagSet(story_ch1_open_seen))`; the
-capstone beat while `All[FlagSet(ch1_complete), Not(FlagSet(story_ch1_end_seen))]`; each
-`AcknowledgeStory` sets its latch.
+Story (root latches, §10): two beats, NEITHER marked to pop - no card opens by itself in chapter 1.
+Each is a button row in `garage_floor` (section 12, authored with slice C). The opener's button is
+live from a fresh chapter (`Always`); the capstone's goes live on `FlagSet(ch1_complete)`. Opening
+a card sets its latch through `AcknowledgeStory` - `story_ch1_open_seen`, `story_ch1_end_seen` -
+and a seen beat's button stays live for a reread.
 
 > *Open:* "It starts in the garage. Just you, a beat-up amp, and a handful of songs you half-know.
 > Time to make some noise."
