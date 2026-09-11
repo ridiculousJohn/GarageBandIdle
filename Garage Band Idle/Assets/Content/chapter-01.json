@@ -6,7 +6,7 @@
   "flags": ["album", "gj1_done", "gj2_done", "gj3_done"],
 
   "currencies": [
-    { "id": "ch1_records", "displayName": "Garage Records" }
+    { "id": "ch1_records", "displayName": "Demo Tapes" }
   ],
 
   "modifiers": [
@@ -32,7 +32,7 @@
 
   "rung": {
     "label": "Play the Backyard Party",
-    "offerCondition": { "type": "CurrencyAtLeast", "currency": "ch1_records", "threshold": 30 },
+    "offerCondition": { "type": "CurrencyAtLeast", "currency": "ch1_records", "threshold": 30, "uiText": "Hand out 30 Demo Tapes" },
     "actions": [
       { "type": "ExecuteRung", "tier": "tier1" },
       { "type": "AddCurrency", "currencies": ["roadies"], "amount": 1 },
@@ -292,22 +292,6 @@
           "actions": [
             { "type": "SetFlag", "flagId": "rehearsal_revealed" }
           ]
-        },
-        {
-          "id": "cut_demo",
-          "displayName": "Time to Record",
-          "gate": {
-            "type": "All",
-            "conditions": [
-              { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 50 },
-              { "type": "BarsCompleted", "group": "learn_covers", "count": 1 }
-            ]
-          },
-          "costCurrency": "cash",
-          "cost": 0,
-          "actions": [
-            { "type": "SetFlag", "flagId": "album" }
-          ]
         }
       ],
 
@@ -367,6 +351,22 @@
           "id": "cover_bonus_3",
           "effects": [
             { "target": "fans", "stat": "rate", "multiplier": 1.20 }
+          ]
+        }
+      ],
+
+      "triggers": [
+        {
+          "id": "reveal_release",
+          "condition": {
+            "type": "All",
+            "conditions": [
+              { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 50 },
+              { "type": "BarsCompleted", "group": "learn_covers", "count": 1 }
+            ]
+          },
+          "actions": [
+            { "type": "SetFlag", "flagId": "album" }
           ]
         }
       ],

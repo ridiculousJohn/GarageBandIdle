@@ -95,16 +95,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(new[] { "tap_producer", "band" }, Ids(tier1.producers));
             Assert.AreEqual(new[] { "practice_amp", "drummer", "bassist", "guitarist" }, Ids(tier1.generators));
             Assert.AreEqual(new[] { "stage_presence", "amp_strings", "kit_upgrade", "tight_set",
-                                    "play_for_crowd", "unlock_covers", "cut_demo" }, Ids(tier1.upgrades));
+                                    "play_for_crowd", "unlock_covers" }, Ids(tier1.upgrades));
             Assert.AreEqual(new[] { "cover_bonus_1", "cover_bonus_2", "cover_bonus_3" }, Ids(tier1.modifiers));
             Assert.AreEqual(new[] { "learn_covers" }, Ids(tier1.barGroups));
             Assert.AreEqual(new[] { "cover_1", "cover_2", "cover_3" }, Ids(tier1.barGroups[0].bars));
             Assert.AreEqual(new[] { "garage_jam_1", "garage_jam_2", "garage_jam_3" }, Ids(tier1.events));
 
-            // Chapter 1 authors zero triggers (content doc section 11) - the
-            // family exists for later chapters.
+            // Chapter 1's one trigger is the release reveal (content doc
+            // section 11), hosted at tier1 where both its legs read.
             Assert.AreEqual(0, ch1.triggers.Count);
-            Assert.AreEqual(0, tier1.triggers.Count);
+            Assert.AreEqual(new[] { "reveal_release" }, Ids(tier1.triggers));
         }
 
         // The income tag is what the Records and Roadie modifiers target, and
@@ -221,7 +221,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 ("stage_presence", 250), ("amp_strings", 500), ("kit_upgrade", 5000),
                 ("tight_set", 20000), ("play_for_crowd", 100), ("unlock_covers", 200),
-                ("cut_demo", 0),
             };
             foreach (var (id, cost) in costs)
             {
@@ -233,8 +232,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("fans_revealed", OnlyFlagSet(Find(tier1.upgrades, "play_for_crowd")));
             Assert.AreEqual("rehearsal_revealed", OnlyFlagSet(Find(tier1.upgrades, "unlock_covers")));
             // The album flag is the chapter's, so the release region persists
-            // across runs while the upgrade that sets it clears with the tier.
-            Assert.AreEqual("album", OnlyFlagSet(Find(tier1.upgrades, "cut_demo")));
+            // across runs; the trigger's latch clears with the tier and re-arms.
+            var reveal = Find(tier1.triggers, "reveal_release");
+            Assert.AreEqual("album", ((SetFlag)reveal.actions.Single()).flagId);
+            var revealLegs = ((All)reveal.condition).conditions;
+            Assert.AreEqual(new[] { "balance fans", "bars learn_covers 1" },
+                revealLegs.Select(Describe).ToArray());
+            Assert.AreEqual((BigNumber)50, Threshold(revealLegs[0]));
 
             // stage_presence carries no payload at all: it is a pure latch, and
             // the tap's conditioned entry is what reads it.
@@ -471,18 +475,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             Assert.AreEqual("The Garage", ch1.displayName);
             Assert.AreEqual("Records", Find(root.declaredCurrencies, "records").displayName);
-            Assert.AreEqual("Garage Records", Find(ch1.declaredCurrencies, "ch1_records").displayName);
+            Assert.AreEqual("Demo Tapes", Find(ch1.declaredCurrencies, "ch1_records").displayName);
             Assert.AreEqual("Cash", Find(tier1.declaredCurrencies, "cash").displayName);
             // The Jam button binds the producer, and the binding is what
             // requires the name - `band`, which nothing renders, stays unnamed.
             Assert.AreEqual("Jam", Find(tier1.producers, "tap_producer").displayName);
             Assert.AreEqual("Practice Amp", Find(tier1.generators, "practice_amp").displayName);
-            Assert.AreEqual("Time to Record", Find(tier1.upgrades, "cut_demo").displayName);
             Assert.AreEqual("Three-Chord Anthem", Find(tier1.barGroups[0].bars, "cover_1").displayName);
             Assert.AreEqual("Garage Jam I", Event("garage_jam_1").displayName);
 
             Assert.AreEqual("Cut a Demo", tier1.rung.label);
             Assert.AreEqual("Play the Backyard Party", ch1.rung.label);
+            // The capstone's one leg names what it asks, and the progress the
+            // button renders beside it is the same threshold (12.11).
+            Assert.AreEqual("Hand out 30 Demo Tapes", ch1.rung.offerCondition.uiText);
         }
 
         [Test]

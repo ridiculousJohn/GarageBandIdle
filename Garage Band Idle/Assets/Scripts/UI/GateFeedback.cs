@@ -36,7 +36,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         // How one leg renders (12.11): its Text, and for a threshold kind its
         // progress beside it - "50 fans (37/50)". A textless threshold leg is
-        // the progress alone, "0/30", which is the capstone's whole readout.
+        // the progress alone, "0/30".
         // Numbers go through the display rules, like every other number.
         public static string LegText(Condition leg, GameContext ctx)
         {

@@ -201,7 +201,7 @@ namespace RidiculousGaming.GarageBandIdle
         // mutable state, which is the only kind a bool answers here. A negative
         // amount would pass this and then ADD through the subtraction, minting
         // currency, so it throws rather than reporting false; zero stays legal,
-        // since cut_demo costs 0.
+        // since spending nothing neither mints nor takes anything.
         public bool CanSpend(string currencyId, BigNumber amount)
         {
             if (amount < BigNumber.Zero)

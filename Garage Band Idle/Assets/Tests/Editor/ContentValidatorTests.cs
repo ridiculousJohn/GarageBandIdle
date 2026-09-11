@@ -1104,7 +1104,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Upgrade_ZeroCost_NoFindings()
         {
             var f = new ValidatorFixture();
-            f.AmpStrings.cost = 0;                                   // cut_demo is authored at 0
+            f.AmpStrings.cost = 0;                                   // a zero cost is legal content
             AssertNoFinding(f.Run(), ValidationCheck.NumericRange);
         }
 

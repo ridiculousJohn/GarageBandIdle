@@ -48,7 +48,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly CurrencyDefinition Records, Roadies, Ch1Records, Cash, Fans, Rehearsal;
             public readonly ProducerDefinition TapProducer;
             public readonly GeneratorDefinition PracticeAmp, Drummer, Bassist;
-            public readonly UpgradeDefinition StagePresence, PlayForCrowd, UnlockCovers, CutDemo;
+            public readonly UpgradeDefinition StagePresence, PlayForCrowd, UnlockCovers;
             public readonly ModifierDefinition CoverBonus1, CoverBonus2, GjTap1;
             public readonly BarGroupDefinition LearnCovers;
             public readonly BarDefinition Cover1;
@@ -100,7 +100,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 StagePresence = Find(Tier1Def.upgrades, "stage_presence");
                 PlayForCrowd = Find(Tier1Def.upgrades, "play_for_crowd");
                 UnlockCovers = Find(Tier1Def.upgrades, "unlock_covers");
-                CutDemo = Find(Tier1Def.upgrades, "cut_demo");
                 CoverBonus1 = Find(Tier1Def.modifiers, "cover_bonus_1");
                 CoverBonus2 = Find(Tier1Def.modifiers, "cover_bonus_2");
                 LearnCovers = Find(Tier1Def.barGroups, "learn_covers");
@@ -299,9 +298,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fans = f.Balance(f.Tier1, f.Fans).ToDouble();
             Assert.Less(fans, 80, $"released at {fans:F1} fans, inside the bracket paying 3 - floor(sqrt(f/5)) is 3 for f in [45, 80)");
 
-            // The album flag is the chapter's, so the release region it reveals
-            // outlives the run that unlocked it.
-            f.Buy(f.CutDemo);
+            // The trigger fires in the sweep that closes the tick which reached
+            // 50 fans, so the album flag is already set by the time this reads.
             Assert.IsTrue(f.Ch1.flags.Contains("album"));
 
             Assert.IsTrue(f.Tier1Def.rung.IsOffered(f.Ctx(f.Tier1)));

@@ -12,6 +12,7 @@
 - [Narrowing a member type](narrowing-a-member-type.md) - generic base class; covariant overrides don't compile in Unity (CS8831) and `new` hiding is rejected
 - [Step 9 open UI items](step-9-open-ui-items.md) - the digit font (measured: only "1" is narrower), the omitted group title and how to add one, the accepted chrome literals, bulk buy later
 - [Orchestrated slice workflow](orchestrated-slice-workflow.md) - John: I orchestrate, Opus agents code, I review and approve; fixed API contract, runtime and tests agents in parallel, I run Unity, review traces each diff to a design rule not a plan sentence
+- [Step 10 playthrough notes](step-10-playthrough-notes.md) - John's ten notes from the 2026-09-11 hand playthrough, each with the fact behind it and its kind (code / architecture / content); 7 and 11 landed, 10 is content-only (flag + trigger per revealed row, section and row gates read it), the rest open
 - [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) - merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
 
 ## Gates

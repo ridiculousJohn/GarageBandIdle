@@ -240,8 +240,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual("50 fans", named.Text);
             // Nothing composes at a leaf, so an unauthored one renders as
-            // nothing at all - the capstone's threshold leg reads as its
-            // progress alone.
+            // nothing at all - a textless threshold leg reads as its progress.
             Assert.IsTrue(string.IsNullOrEmpty(unnamed.Text), "an unauthored leaf renders no text");
         }
 

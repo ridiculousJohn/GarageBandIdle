@@ -15,7 +15,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         [SerializeReference, SubclassPicker] public Condition gate;
 
         public CurrencyDefinition costCurrency;
-        public BigNumber cost;                  // zero is legal - cut_demo is authored at 0
+        public BigNumber cost;                  // zero is legal content
         public List<Effect> effects = new();
         [SerializeReference, SubclassPicker] public List<GameAction> actions = new();
 

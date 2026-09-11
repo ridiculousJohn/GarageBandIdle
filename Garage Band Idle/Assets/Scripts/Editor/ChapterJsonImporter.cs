@@ -489,7 +489,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 upgrade.costCurrency = Resolve<CurrencyDefinition>(build, scope, upgradeDto.costCurrency, "costCurrency");
                 upgrade.cost = upgradeDto.cost;
                 // The currency is ALWAYS required - Purchasing dereferences it -
-                // and only the amount may be zero: cut_demo authors {cash, 0}.
+                // and only the amount may be zero, which is legal content.
                 if (upgrade.costCurrency == null || upgrade.cost < BigNumber.Zero)
                     throw new ContentImportException(
                         $"upgrade '{upgrade.Id}': a cost block needs a currency and a nonnegative amount.");

@@ -18,13 +18,13 @@ MonoBehaviour:
   text: It starts in the garage. Just you, a beat-up amp, and a handful of songs
     you half-know. Time to make some noise.
   availableWhen:
-    rid: 2509765284140679251
+    rid: 7579425402431733838
   seenFlag: story_ch1_open_seen
   opensWhenAvailable: 0
   references:
     version: 2
     RefIds:
-    - rid: 2509765284140679251
+    - rid: 7579425402431733838
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

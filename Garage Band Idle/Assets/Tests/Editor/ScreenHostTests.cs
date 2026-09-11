@@ -675,12 +675,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var preview = module.Widget.Root.Q<Label>("preview");
             Assert.AreEqual(DisplayStyle.Flex, preview.style.display.value, "the rung opens with an AddCurrency");
-            Assert.AreEqual("Would bank: +0.00 Records, Garage Records", preview.text,
+            Assert.AreEqual("Would bank: +0.00 Records, Demo Tapes", preview.text,
                 "the payout at zero fans, over both tied currencies' authored names");
         }
 
         [Test]
-        public void TheBackyardPartyShowsTheChaptersRungAsProgressAloneAndPreviewsNothing()
+        public void TheBackyardPartyShowsTheChaptersRungLegAndPreviewsNothing()
         {
             var fx = new Fixture();
             fx.Enter();
@@ -691,11 +691,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var module = fx.Host.Sections[BackyardParty].Modules.Single();
             var press = module.Widget.Root.Q<Button>("press");
             Assert.AreEqual("Play the Backyard Party", press.text);
-            Assert.IsFalse(press.enabledSelf, "no garage records have been banked");
+            Assert.IsFalse(press.enabledSelf, "no demo tapes have been banked");
 
-            // The threshold leg carries no uiText, so it renders as its
-            // progress alone - the capstone's whole readout.
-            CollectionAssert.AreEqual(new[] { "0.00/30.00" }, Fixture.VisibleLegs(module));
+            // The threshold leg carries its own uiText, so it renders as that
+            // text with the progress beside it - the capstone's whole readout.
+            CollectionAssert.AreEqual(new[] { "Hand out 30 Demo Tapes (0.00/30.00)" }, Fixture.VisibleLegs(module));
             Assert.AreEqual(DisplayStyle.None,
                 module.Widget.Root.Q<Label>("preview").style.display.value,
                 "the capstone opens with ExecuteRung, which previews no number rather than a wrong one");

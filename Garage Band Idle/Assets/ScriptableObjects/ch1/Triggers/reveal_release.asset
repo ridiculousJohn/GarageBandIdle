@@ -9,37 +9,31 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: da0688336f1d57f48bbcb6016a7a2455, type: 3}
-  m_Name: cut_demo
-  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.UpgradeDefinition
-  id: cut_demo
+  m_Script: {fileID: 11500000, guid: 7de79bd8c41860d4e8804f07619e6f66, type: 3}
+  m_Name: reveal_release
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.TriggerDefinition
+  id: reveal_release
   tags: []
-  displayName: Time to Record
-  gate:
-    rid: 2509765284140679199
-  costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
-  cost:
-    _value:
-      mantissa: 0
-      exponent: 0
-  effects: []
+  displayName: 
+  condition:
+    rid: 7579425402431733839
   actions:
-  - rid: 2509765284140679200
+  - rid: 7579425402431733840
   references:
     version: 2
     RefIds:
-    - rid: 2509765284140679199
+    - rid: 7579425402431733839
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 2509765284140679201
-        - rid: 2509765284140679202
-    - rid: 2509765284140679200
+        - rid: 7579425402431733841
+        - rid: 7579425402431733842
+    - rid: 7579425402431733840
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: album
-    - rid: 2509765284140679201
+    - rid: 7579425402431733841
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -48,7 +42,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 1
-    - rid: 2509765284140679202
+    - rid: 7579425402431733842
       type: {class: BarsCompleted, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

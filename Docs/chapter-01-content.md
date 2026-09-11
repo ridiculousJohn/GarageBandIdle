@@ -65,7 +65,7 @@ root
 | `cash` ("Cash") | tier1 | `income` | - | The income tag is what the Records and Roadie modifiers target (§12.2). |
 | `fans` ("Fans") | tier1 | - | `FlagSet(fans_revealed)` | **Never income-tagged, never roadie-buffable** - the farm throttle (§8.2). |
 | `rehearsal` ("Rehearsal") | tier1 | - | `FlagSet(rehearsal_revealed)` | Fill pool for the cover bars. |
-| `ch1_records` ("Garage Records") | ch1 | - | - | Capstone gate counter; fed by the release payout, zeroed by the capstone's own reset (§5). |
+| `ch1_records` ("Demo Tapes") | ch1 | - | - | Capstone gate counter - what cutting a demo produces and what earns the party gig; fed by the release payout, zeroed by the capstone's own reset (§5). The capstone leg reads "Hand out 30 Demo Tapes" over its progress. |
 
 The two reveals are declared on the CURRENCY, not on the entries that pay it (§12.2). Fans is why:
 its sources are `band` plus every bandmate generator, so the per-entry form is a rule each new source
@@ -123,13 +123,13 @@ root's, per §2, because sources in every chapter carry them.
 | `kit_upgrade` ("Kit Upgrade") | 5,000 | `EarnedTotalAtLeast(cash, 5000)` | effect `{target: drummer, currencyId: cash, stat: rate, ×2}` — fans line untouched |
 | `tight_set` ("Tight Set") | 20,000 | `CurrencyAtLeast(fans, 30)` | effect `{target: cash, stat: rate, ×1.5}` — currency-total, declared at cash's home ✓ |
 
-**Content unlocks** (each sets a flag; revealed content gates on it):
+**Content unlocks** (each sets a flag; revealed content gates on it). The release reveal is not
+bought: `reveal_release` is a trigger (section 11).
 
 | Id | Cost | Gate | Action |
 |---|---|---|---|
 | `play_for_crowd` ("Play for a Crowd") | 100 | `OwnedCountAtLeast(drummer, 1)` | `SetFlag(fans_revealed)` |
 | `unlock_covers` ("Learn Covers") | 200 | `CurrencyAtLeast(fans, 25)` | `SetFlag(rehearsal_revealed)` |
-| `cut_demo` ("Time to Record") | 0 | `All[CurrencyAtLeast(fans, 50), BarsCompleted(learn_covers, 1)]` | `SetFlag(album)` — flag at **ch1**, so the release region persists across runs; the row's module hides on `Not(FlagSet(album))` |
 
 The gear *region* has no unlock and no flag: it gates directly on `EarnedTotalAtLeast(cash, 250)` (§2).
 
@@ -231,8 +231,11 @@ math in Walkthrough 2.
 
 ## 11. Triggers & story
 
-**Chapter 1 authors zero triggers.** Its only threshold moments are pure reveals (direct monotonic
-gates) or purchase moments (upgrade payloads); the Trigger family exists for later chapters.
+**Chapter 1 authors one trigger**, on tier1: `reveal_release` - condition
+`All[CurrencyAtLeast(fans, 50), BarsCompleted(learn_covers, 1)]`, action `SetFlag(album)`. The flag is
+ch1's, so the release region persists across runs; the trigger's latch clears with the tier and
+re-arms, and its re-fire on a set flag changes nothing. Every other threshold moment is a pure
+reveal (direct monotonic gate) or a purchase moment (upgrade payload).
 
 Story (root latches, §10): two beats on `ch1.storyBeats`, NEITHER marked to pop - no card opens by
 itself in chapter 1. Each is a button row in `garage_floor` (section 12). `story_ch1_open`
@@ -257,7 +260,7 @@ Opening a card sets its latch through `AcknowledgeStory` - `story_ch1_open_seen`
 | `rehearsal_space` | "The Rehearsal Space" | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
 | `the_release` | "The Release" | `FlagSet(album)` | ch1 | release rung button (+ "would bank: N" preview via the same formula) |
 | `garage_jam` | "Garage Jam" | `CurrencyAtLeast(records, 1)` | tier1 | three event rows, one per jam, all always-visible (below) |
-| `backyard_party` | "The Backyard Party" | `FlagSet(album)` | ch1 | capstone rung button + `ch1_records`/30 readout |
+| `backyard_party` | "The Backyard Party" | `FlagSet(album)` | ch1 | capstone rung button; its one leg reads "Hand out 30 Demo Tapes" over `ch1_records`/30 |
 
 Every gate above is a flag or a monotonic fact — nothing strobes with spending (§2).
 
@@ -309,7 +312,7 @@ authored for re-entry - content, no system change.
 | ~217s | buy `play_for_crowd` → fans accrue at 0.35 + 0.02/s | `SetFlag(fans_revealed)` — nothing pre-banked |
 | ~300s | 25 fans → buy `unlock_covers` → Rehearsal live (0.5/s + 1/press) | `SetFlag(rehearsal_revealed)` |
 | ~350s | `cover_1` fills (100 rehearsal at its own 2/s rate) → fan rate ×1.15 | `AddModifier(tier1, cover_bonus_1)` |
-| ~352s | 50 fans + 1 cover → **release**: `floor((50/5)^0.5)` = **3** → records 3, ch1_records 3; tier1 resets | one formula evaluation, two targets |
+| ~352s | 50 fans + 1 cover → `reveal_release` sets `album` in that sweep, the release region appears; **release**: `floor((50/5)^0.5)` = **3** → records 3, ch1_records 3; tier1 resets | one formula evaluation, two targets |
 
 At 3 taps/s the same trace lands at ~293s. Second run re-walks band → fans → covers ~30% faster
 (income ×1.06 from 3 records; reveals re-bought).
@@ -400,7 +403,7 @@ tutorial chapter; the gate is the knob if not.
   (`"setBy": "upgrade:learn_covers"` against `"group": "learn_covers"`), but ids are unique per chain
   across ALL kinds - an Effect target is a string, so one word cannot address two assets. The GROUP
   keeps the name, since it is what `BarsCompleted` reads and what the player-facing "Learn Covers"
-  matches; the unlock takes the verb-first form `play_for_crowd` and `cut_demo` already use.
+  matches; the unlock takes the verb-first form `play_for_crowd` uses.
 - `browse_gear` upgrade deleted — the region gates directly on the earned total (§2).
 - Garage Jam's internal tiers 1–3 → three `EventDefinition`s gated on completion flags (§6.1);
   `baselineReset` → `onEntry: [RestartScope]`; goals retuned 500/2500/10000 →
@@ -409,7 +412,7 @@ tutorial chapter; the gate is the knob if not.
 - Retunes for the ~300s first-demo target: amp rate 0.4 → 0.5, drummer 500 → 250 with unlock at
   3 amps (was 5), base fan rate 0.2 → 0.35, `cover_1` 120 → 100.
 - Upgrade gates moved from spendable-balance to `EarnedTotalAtLeast` (persistent rows never strobe, §2).
-- `cut_demo` is tier-declared with its `album` flag chapter-declared; `stage_presence`'s +1 became
+- The `album` flag is chapter-declared and set by tier1's `reveal_release` trigger; `stage_presence`'s +1 became
   a conditioned `produces` entry on `tap_producer` (§12.2) instead of an upgrade-owned contribution.
 - The separate `practice` producer folded into `tap_producer`'s gated rate entry (§12.2 authors it
   there); effect narrowing by `(currencyId, stat)` now protects what separate producer ids used to.

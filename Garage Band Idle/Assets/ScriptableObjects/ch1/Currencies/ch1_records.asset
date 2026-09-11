@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.CurrencyDefinition
   id: ch1_records
   tags: []
-  displayName: Garage Records
+  displayName: Demo Tapes
   activeWhen:
     rid: -2
   references:
