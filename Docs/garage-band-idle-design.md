@@ -461,8 +461,10 @@ SOURCES (`{target: production, currencyId: income, stat: rate}`), because which 
 produced in is a property of its source; a currency total has already summed across sources and can
 no longer name one chapter. **The fan rate must never carry a roadie-targeted tag**: the wall-clock
 throttle of §8.1 stands on Fans being unbuffable by Roadies, and the `currencyId: income` narrowing
-is what enforces it even on a bandmate that pays Cash and Fans from one definition. (Deliberately open: whether reallocating applies retroactively to a dormant
-chapter's idle claim computed at current rates.)
+is what enforces it even on a bandmate that pays Cash and Fans from one definition. **Reallocation is present state** (decided 2026-09-10): a dormant chapter's idle claim is computed at
+switch-in over the allocation standing then, the same stance Records and Encore take - what was
+stationed while the chapter was dormant is not reconstructed. An offer already computed keeps its
+lines. Ctrl C offers no precedent; its Completion Tokens only "increase generator output".
 
 **Where the numbers live.** Each factor is a formula-shaped effect inside a permanent modifier on
 the root scope (`permanentModifiers`, §12.5) whose formula carries its own `perRoadie`

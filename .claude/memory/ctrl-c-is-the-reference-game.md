@@ -71,6 +71,11 @@ Where it survives in writing (thin, which is why this memory exists):
   1.19e26 Money)" over "Currently: 2.01e19 Money" with a Confirm - the "would bank" preview. Tap
   producers are three big orange keys: "Ctrl", "C", "V".
 
+- 2026-09-10, on Roadie retroactivity (design 8.2): Ctrl C does not answer it. John: their
+  Completion Tokens "increase generator output, that's all it says", and their idle "doubles
+  yields"; whether a dormant chapter's idle payout reflects tokens moved in while it was dormant
+  is "a difficult thing to check". So the question is ours; the reference offers no precedent.
+
 **Why:** the doc names it once, as a parenthetical about one formula, so nothing tells a fresh
 session that the whole design descends from it. Without that, design questions get answered from
 first principles and land somewhere Ctrl C already answered differently.
