@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Monetization;
+using RidiculousGaming.GarageBandIdle.Story;
 using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
     // The screen's structure logic (design doc 12.11) - the authored sections
     // while Live, the select while NoChapter, the collect dialog while
-    // AwaitingIdleClaim - plain C# so an EditMode test builds it over imported
-    // content with no panel; UIRoot is the MonoBehaviour shell around it. This
-    // is the ONE Refreshed subscriber - widgets subscribe to nothing, so there
-    // is one dispatch order.
-    public sealed class ScreenHost : IDisposable
+    // AwaitingIdleClaim, and the story card over the live sections - plain C# so
+    // an EditMode test builds it over imported content with no panel; UIRoot is
+    // the MonoBehaviour shell around it. This is the ONE Refreshed subscriber -
+    // widgets subscribe to nothing, so there is one dispatch order.
+    public sealed class ScreenHost : IDisposable, IStoryOpener
     {
         // One module and the widget standing for it. The host owns these views,
         // so it writes them and anything holding the host reads them.
@@ -73,6 +74,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly GameClock clock;
         private readonly ChapterSelectUI select;
         private readonly CollectScreenUI collect;
+        private readonly StoryBeatUI story;
         private readonly List<SectionView> sections = new();
 
         // The chapter the section views describe. Identity, not id: a switch
@@ -80,10 +82,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // screen.
         private ChapterScopeState builtFor;
 
+        // The standing request: the beat whose card is open - asked for by a
+        // row's button or by the marked-beat walk alike - held until a close
+        // drops it or the phase leaves Live.
+        private StoryBeatDefinition requestedBeat;
+
         public IReadOnlyList<SectionView> Sections => sections;
 
-        // Over the screen's own root: the host owns all three screens, so it is
-        // the one place that knows which named elements Screen.uxml promises.
+        public StoryBeatDefinition ShownStory => requestedBeat;
+
+        // Over the screen's own root: the host owns every app-owned screen and
+        // overlay, so it is the one place that knows which named elements
+        // Screen.uxml promises.
         public ScreenHost(VisualElement screenRoot, ModuleRegistry registry, GameSession session, GameClock clock,
                           AdManager ads, IAPManager store)
         {
@@ -93,30 +103,40 @@ namespace RidiculousGaming.GarageBandIdle.UI
             this.clock = clock;
             select = new ChapterSelectUI(Require<VisualElement>(screenRoot, "select"), session, clock);
             collect = new CollectScreenUI(Require<VisualElement>(screenRoot, "collect"), session, clock, ads, store);
+            story = new StoryBeatUI(Require<VisualElement>(screenRoot, "story"), CloseStory);
             session.Refreshed += Render;
         }
 
-        // The unconditional first render and the Refreshed handler are the same
-        // method: a fresh game runs no transaction at all, so waiting for the
-        // first event would leave the screen permanently blank (12.11).
+        // The Refreshed handler, and the host's only render: every pass runs
+        // inside the queue entry that fired it, so a command a pass submits
+        // lands behind that entry and runs at the drain, never inside the pass.
+        // The first render of a bound screen is the session's own refresh entry
+        // (UIRoot.Bind), since a fresh game runs no transaction at all (12.11).
         public void Render()
         {
             var phase = session.Phase;
             select.Root.style.display = phase == SessionPhase.NoChapter ? DisplayStyle.Flex : DisplayStyle.None;
-            collect.Root.style.display = phase == SessionPhase.AwaitingIdleClaim ? DisplayStyle.Flex : DisplayStyle.None;
+            collect.Root.style.display =
+                phase == SessionPhase.AwaitingIdleClaim ? DisplayStyle.Flex : DisplayStyle.None;
             if (phase == SessionPhase.AwaitingIdleClaim)
                 collect.Refresh();
 
             var chapter = session.ForegroundChapter;
             if (phase != SessionPhase.Live || chapter == null)
             {
-                // The select and the dialog are whole screens of their own, and
-                // the sections stay down under the dialog: a phase that never
-                // ticks must not interpolate a display on a report measured
-                // before the switch.
+                // The select and the dialog are whole screens of their own,
+                // and the sections stay down under the dialog: a phase that
+                // never ticks must not interpolate a display on a report
+                // measured before the switch.
                 container.Clear();
                 sections.Clear();
                 builtFor = null;
+                // The card belongs to a live chapter, so a phase leaving
+                // Live takes the request down with the sections. The beat's
+                // mark was written when its card opened (section 10);
+                // nothing here writes.
+                requestedBeat = null;
+                story.Hide();
                 return;
             }
 
@@ -129,10 +149,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 section.Visible = section.Definition.visibleWhen.Evaluate(ctx);
                 section.Root.style.display = section.Visible ? DisplayStyle.Flex : DisplayStyle.None;
                 // A hidden section's modules are neither evaluated nor
-                // refreshed: nothing on screen depends on them (requirement 3).
+                // refreshed: nothing on screen depends on them
+                // (requirement 3).
                 if (section.Visible)
                     RenderModules(section);
             }
+
+            // After the rows, so the pass that reads a latch as set is the
+            // pass that put the card up. The sections stay UP beneath it:
+            // the chapter is live and ticking, so nothing here interpolates
+            // a stale report.
+            ShowStory(chapter);
         }
 
         // Presentation between refreshes, on every visible widget. Nothing here
@@ -151,6 +178,75 @@ namespace RidiculousGaming.GarageBandIdle.UI
         }
 
         public void Dispose() => session.Refreshed -= Render;
+
+        // The one way a card goes up, for a row's button and for the
+        // marked-beat walk alike: the request is held, and the beat is READ the
+        // moment its card opens (section 10). The mark is an ordinary command -
+        // issued outside any transaction it runs at the call and its own
+        // Refreshed renders the card; issued from inside one, from the walk
+        // below, it runs at the next drain (12.9) and the held request keeps the
+        // card up until then. With the latch already set nothing changes but
+        // the card, so the card alone is shown - no pass of the host's own, and
+        // no state read that a refresh would owe.
+        public void OpenStory(StoryBeatDefinition beat, ScopeState scope)
+        {
+            requestedBeat = beat;
+            var ctx = new GameContext(scope, clock.RealTimeUtc);
+            if (!ctx.IsFlagSet(beat.seenFlag))
+                session.AcknowledgeStory(ctx, beat);
+            else
+                story.Show(beat);
+        }
+
+        // What the card's button calls: dropping the request takes the card
+        // down. The beat was read when the card opened (section 10), so closing
+        // writes nothing and changes nothing else on screen - the card alone
+        // hides, and a marked beat still waiting shows at the next refresh.
+        public void CloseStory()
+        {
+            requestedBeat = null;
+            story.Hide();
+        }
+
+        // What the card shows this pass: the standing request, and when none
+        // stands whatever the marked-beat walk finds - opened through the same
+        // path a button takes, because a beat is read when its card opens.
+        // Nothing else opens a card.
+        private void ShowStory(ChapterScopeState chapter)
+        {
+            if (requestedBeat == null)
+            {
+                var popped = Popped(chapter);
+                if (popped != null)
+                    OpenStory(popped, chapter);
+            }
+            if (requestedBeat != null)
+                story.Show(requestedBeat);
+            else
+                story.Hide();
+        }
+
+        // The marked-beat walk (section 10): over the foreground chapter's own
+        // storyBeats list - a declaration list of a scope the host already
+        // holds - the first beat that is marked, available at the chapter's
+        // context, and unseen; the scope is the chapter. State, never a
+        // transition: such a beat pops on every pass until its card opens and
+        // the mark is written, so a crash before the card ever went up shows it
+        // on the next launch. Unmarked beats never pop; their button is the way
+        // in.
+        private StoryBeatDefinition Popped(ChapterScopeState chapter)
+        {
+            var ctx = new GameContext(chapter, clock.RealTimeUtc);
+            foreach (var candidate in ((ChapterDefinition)chapter.Definition).storyBeats)
+            {
+                if (candidate == null || !candidate.opensWhenAvailable)
+                    continue;
+                if (ctx.IsFlagSet(candidate.seenFlag) || !candidate.IsAvailable(ctx))
+                    continue;
+                return candidate;
+            }
+            return null;
+        }
 
         // The chapter's authored sections, in order, hidden until the pass
         // below judges them. Every evaluation scope was resolved when the tree
@@ -200,7 +296,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void CreateWidget(SectionView section, int index, ModuleView module)
         {
             var root = registry.Resolve(module.Definition.prefabId).Instantiate();
-            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root);
+            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, this);
             module.Widget.Bind(session, module.Scope, module.Definition.content, clock);
             section.ModulesContainer.Insert(PlacedBefore(section, index), root);
         }

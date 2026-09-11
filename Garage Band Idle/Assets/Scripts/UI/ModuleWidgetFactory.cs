@@ -16,12 +16,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
             || prefabId == "upgrade_list"
             || prefabId == "bar_group"
             || prefabId == "rung_button"
-            || prefabId == "event_row";
+            || prefabId == "event_row"
+            || prefabId == "story_row";
 
         // Unknown ids throw for the registry's reason (requirement 7): the id is
         // authored content, and the editor cross-check catches a miss before a
         // first render ever does.
-        public static ModuleWidget Create(string prefabId, VisualElement root)
+        //
+        // `stories` is the card's owner, which one widget kind needs and the
+        // rest ignore: the host is the one caller and hands itself in (12.11).
+        public static ModuleWidget Create(string prefabId, VisualElement root, IStoryOpener stories)
         {
             switch (prefabId)
             {
@@ -39,6 +43,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     return new RungButtonUI(root);
                 case "event_row":
                     return new EventUI(root);
+                case "story_row":
+                    return new StoryRowUI(root, stories);
                 default:
                     throw new InvalidOperationException(
                         $"No widget controller answers prefabId '{prefabId}' (design doc 12.11).");

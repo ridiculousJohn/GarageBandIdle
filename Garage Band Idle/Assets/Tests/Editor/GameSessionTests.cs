@@ -31,8 +31,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
-        // A trigger action that issues a session command - the exact shape the
-        // reentrancy guard exists to catch.
+        // A trigger action that issues a session command - the shape that
+        // submits a transaction from inside the one that is executing (12.9).
         private class IssueSessionCommand : GameAction
         {
             public GameSession session;
@@ -90,17 +90,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             Assert.AreEqual(SessionPhase.Live, f.Session.Phase);
 
-            Assert.IsTrue(f.Session.FireProducer(ctx, f.Tree.TapProducer));                            // +1 cash
-            Assert.IsTrue(f.Session.TryBuy(ctx, f.Tree.PracticeAmp));                                  // -60
-            Assert.IsTrue(f.Session.TryBuy(ctx, f.Tree.StagePresence));                                // -250
-            Assert.IsTrue(f.Session.SetActiveBars(ctx, f.Tree.LearnCovers, new[] { f.Tree.Cover1 }));
-            Assert.IsTrue(f.Session.TryStartEvent(ctx, f.Tree.TimedGig));
-            Assert.IsTrue(f.Session.TryDismissEvent(ctx, f.Tree.TimedGig));
-            Assert.IsTrue(f.Session.TryRung(ctx));
+            f.Session.FireProducer(ctx, f.Tree.TapProducer);                                           // +1 cash
+            f.Session.TryBuy(ctx, f.Tree.PracticeAmp);                                                 // -60
+            f.Session.TryBuy(ctx, f.Tree.StagePresence);                                               // -250
+            f.Session.SetActiveBars(ctx, f.Tree.LearnCovers, new[] { f.Tree.Cover1 });
+            f.Session.TryStartEvent(ctx, f.Tree.TimedGig);
+            Assert.IsNotNull(f.Tree.Tier1.activeEvent, "the gig is the host's standing attempt");
+            f.Session.TryDismissEvent(ctx, f.Tree.TimedGig);
+            f.Session.TryRung(ctx);
             f.Session.Tick(10, f.Tree.Now.AddSeconds(10));                                             // +5 from the amp
 
+            // What each command wrote, which is how a void command is read.
             Assert.AreEqual(1, f.Tree.Tier1.generatorCounts["practice_amp"]);
             Assert.IsTrue(f.Tree.Tier1.purchasedUpgrades.Contains("stage_presence"));
+            Assert.IsTrue(f.Tree.Tier1.activeBars[f.Tree.LearnCovers.Id].Contains(f.Tree.Cover1.Id));
             Assert.IsTrue(f.Tree.Tier1.flags.Contains("fans_revealed"));
             Assert.IsNull(f.Tree.Tier1.activeEvent);
             Assert.AreEqual((BigNumber)696, f.Tree.Tier1.balances["cash"]);
@@ -116,7 +119,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Tree.Tier1Trigger.actions.Add(new SetFlag { flagId = "fans_revealed" });
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);   // the entry sweep sees earned 0
 
-            Assert.IsTrue(f.Session.FireProducer(f.Tree.Ctx(f.Tree.Tier1), f.Tree.TapProducer));
+            f.Session.FireProducer(f.Tree.Ctx(f.Tree.Tier1), f.Tree.TapProducer);
 
             Assert.IsTrue(f.Tree.Tier1.flags.Contains("fans_revealed"));
             Assert.IsTrue(f.Tree.Tier1.firedTriggers.Contains("tier1_trigger"));
@@ -129,12 +132,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             Assert.AreEqual(1, f.Refreshes);
 
-            Assert.IsTrue(f.Session.FireProducer(f.Tree.Ctx(f.Tree.Tier1), f.Tree.TapProducer));
+            f.Session.FireProducer(f.Tree.Ctx(f.Tree.Tier1), f.Tree.TapProducer);
             Assert.AreEqual(2, f.Refreshes);
 
             // A refused buy, a nonpositive dt, and a same-chapter switch all
-            // run no pipeline.
-            Assert.IsFalse(f.Session.TryBuy(f.Tree.Ctx(f.Tree.Tier1), f.Tree.PracticeAmp));
+            // run no pipeline. The buy's answer is what its callback is told.
+            bool? bought = null;
+            f.Session.TryBuy(f.Tree.Ctx(f.Tree.Tier1), f.Tree.PracticeAmp, ran => bought = ran);
+            Assert.AreEqual(false, bought, "an unaffordable amp is refused");
             f.Session.Tick(0, f.Tree.Now);
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             Assert.AreEqual(2, f.Refreshes);
@@ -193,24 +198,46 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Tree.Tier1.firedTriggers.Contains("tier1_trigger"));
         }
 
-        // ---- reentrancy and construction ----
+        // ---- the queue and construction ----
 
+        // A command issued from inside a running transaction is submitted
+        // behind it (12.9): the entry that is executing holds the front, so the
+        // submission waits for the frame's drain and runs as its own
+        // transaction with its own refresh, never nested.
         [Test]
-        public void A_command_issued_from_inside_a_transaction_throws()
+        public void A_command_issued_from_inside_a_transaction_runs_at_the_next_drain()
         {
             // From a trigger action, mid-sweep.
             var f = new Fixture();
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             f.Tree.Tier1Trigger.condition = new EarnedTotalAtLeast { currency = f.Tree.Cash, threshold = 1 };
             f.Tree.Tier1Trigger.actions.Add(new IssueSessionCommand { session = f.Session, producer = f.Tree.TapProducer });
-            Assert.Throws<System.InvalidOperationException>(
-                () => f.Session.FireProducer(f.Tree.Ctx(f.Tree.Tier1), f.Tree.TapProducer));
+            var refreshes = f.Refreshes;
+
+            f.Session.FireProducer(f.Tree.Ctx(f.Tree.Tier1), f.Tree.TapProducer);
+
+            Assert.AreEqual((BigNumber)1, f.Tree.Tier1.balances["cash"],
+                "the tap the trigger issued waits behind the tap that armed it");
+            Assert.AreEqual(refreshes + 1, f.Refreshes, "one transaction, one refresh");
+
+            f.Session.Drain();
+
+            Assert.AreEqual((BigNumber)2, f.Tree.Tier1.balances["cash"], "the drain runs it");
+            Assert.AreEqual(refreshes + 2, f.Refreshes, "as a transaction of its own");
 
             // From a refresh handler, post-commit.
             var g = new Fixture();
             g.Session.Refreshed += () => g.Session.Tick(1, g.Tree.Now);
-            Assert.Throws<System.InvalidOperationException>(
-                () => g.Session.SwitchChapter(g.Tree.Ch1, g.Tree.Now));
+
+            g.Session.SwitchChapter(g.Tree.Ch1, g.Tree.Now);
+
+            Assert.AreEqual(1, g.Refreshes, "the switch's own refresh is all that has run");
+
+            g.Session.Drain();
+
+            // The drain runs the entries present when it started and no more,
+            // so the tick's own refresh submits a tick that waits again.
+            Assert.AreEqual(2, g.Refreshes, "the handler's tick, and nothing the tick's refresh submitted");
         }
 
         [Test]

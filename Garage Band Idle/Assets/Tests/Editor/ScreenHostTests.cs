@@ -6,6 +6,7 @@ using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Editor;
 using RidiculousGaming.GarageBandIdle.Events;
 using RidiculousGaming.GarageBandIdle.Monetization;
+using RidiculousGaming.GarageBandIdle.Story;
 using RidiculousGaming.GarageBandIdle.UI;
 using UnityEditor;
 using UnityEngine;
@@ -38,6 +39,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private const int RehearsalLine = 2;
         private const int RecordsLine = 3;
         private const int JamButton = 4;
+        private const int OpenStoryRow = 5;
+        private const int EndStoryRow = 6;
 
         private class Fixture
         {
@@ -50,6 +53,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly BarGroupDefinition LearnCovers;
             public readonly BarDefinition Cover1;
             public readonly EventDefinition GarageJam1;
+            public readonly StoryBeatDefinition Opener;
+            public readonly StoryBeatDefinition Capstone;
 
             public readonly RootScopeState Root;
             public readonly ChapterScopeState Ch1;
@@ -96,6 +101,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 LearnCovers = Find(Tier1Def.barGroups, "learn_covers");
                 Cover1 = Find(LearnCovers.bars, "cover_1");
                 GarageJam1 = Find(Tier1Def.events, "garage_jam_1");
+                Opener = Find(Ch1Def.storyBeats, "story_ch1_open");
+                Capstone = Find(Ch1Def.storyBeats, "story_ch1_end");
 
                 Root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { Ch1Def }));
                 Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
@@ -286,7 +293,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, fx.Session.Phase);
 
             // What OK calls; a headless test has no pointer to press with.
-            Assert.IsTrue(fx.Session.ClaimIdle(fx.Now), "the claim settled");
+            fx.Session.ClaimIdle(fx.Now);
 
             Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("collect")),
                 "the offer is paid, so the dialog is down");
@@ -326,12 +333,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Enter();
 
             var section = fx.Host.Sections[GarageFloor];
-            Assert.AreEqual(5, section.Modules.Count, "the authored module count");
+            Assert.AreEqual(7, section.Modules.Count, "the authored module count");
             Assert.IsTrue(section.Modules[CashLine].Visible, "cash is ungated");
             Assert.IsFalse(section.Modules[FansLine].Visible, "fans sits behind its reveal");
             Assert.IsFalse(section.Modules[RehearsalLine].Visible, "rehearsal sits behind its reveal");
             Assert.IsFalse(section.Modules[RecordsLine].Visible, "no records are held yet");
             Assert.IsTrue(section.Modules[JamButton].Visible, "the jam is ungated");
+            Assert.IsTrue(section.Modules[OpenStoryRow].Visible, "the opener's row is ungated");
+            Assert.IsFalse(section.Modules[EndStoryRow].Visible, "the capstone's row waits on the chapter flag");
 
             // Instantiation is lazy, so a hidden module costs no element tree.
             foreach (var module in section.Modules)
@@ -356,7 +365,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fx = new Fixture();
             fx.Enter();
 
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
             // No Render call here: the transaction's refresh is what repaints.
             Assert.AreEqual("1.00", Fixture.Text(fx.Host.Sections[GarageFloor].Modules[CashLine], "value"));
         }
@@ -371,7 +380,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // drummer and its cost is 100 cash, and its own action sets the flag.
             fx.Tier1.generatorCounts["drummer"] = 1;
             fx.Ctx(fx.Tier1).Deposit("cash", 100);
-            Assert.IsTrue(fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PlayForCrowd), "play_for_crowd was bought");
+            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PlayForCrowd);
+            Assert.IsTrue(fx.Tier1.purchasedUpgrades.Contains("play_for_crowd"), "play_for_crowd was bought");
 
             var fans = fx.Host.Sections[GarageFloor].Modules[FansLine];
             Assert.IsTrue(fans.Visible, "the purchase revealed the fans line");
@@ -390,7 +400,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(fx.Host.Sections[Band].Visible, "the band opens at 100 earned cash");
 
             fx.Ctx(fx.Tier1).Deposit("cash", 100);
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var section = fx.Host.Sections[Band];
             Assert.IsTrue(section.Visible, "the earned total crossed the section's gate");
@@ -421,7 +431,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Enter();
 
             fx.Tier1.flags.Add("rehearsal_revealed");
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var section = fx.Host.Sections[RehearsalSpace];
             Assert.IsTrue(section.Visible, "the reveal opened the rehearsal space");
@@ -458,9 +468,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Enter();
 
             fx.Tier1.flags.Add("rehearsal_revealed");
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
-            Assert.IsTrue(fx.Session.SetActiveBars(fx.Ctx(fx.Tier1), fx.LearnCovers, new[] { fx.Cover1 }),
-                "cover_1 was selected");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+            fx.Session.SetActiveBars(fx.Ctx(fx.Tier1), fx.LearnCovers, new[] { fx.Cover1 });
+            Assert.IsTrue(fx.Tier1.activeBars[fx.LearnCovers.Id].Contains(fx.Cover1.Id), "cover_1 was selected");
 
             // No Render call: the command's own refresh is what repaints.
             var buttons = Fixture.BarRows(fx.Host.Sections[RehearsalSpace].Modules.Single())
@@ -480,7 +490,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Enter();
 
             fx.Ch1.flags.Add("album");
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var module = fx.Host.Sections[Release].Modules.Single();
             Assert.IsTrue(module.Visible, "the flag opened the release");
@@ -507,7 +517,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Enter();
 
             fx.Ch1.flags.Add("album");
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var module = fx.Host.Sections[BackyardParty].Modules.Single();
             var press = module.Widget.Root.Q<Button>("press");
@@ -531,7 +541,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Records are root's, and the section's gate reads them by the
             // outward walk from tier1 - so the deposit lands at root.
             fx.Ctx(fx.Tier1).Deposit("records", 1);
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var section = fx.Host.Sections[GarageJam];
             Assert.IsTrue(section.Visible, "the first record opened the section");
@@ -558,8 +568,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Enter();
 
             fx.Ctx(fx.Tier1).Deposit("records", 1);
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer), "the tap fired");
-            Assert.IsTrue(fx.Session.TryStartEvent(fx.Ctx(fx.Tier1), fx.GarageJam1), "the jam started");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+            fx.Session.TryStartEvent(fx.Ctx(fx.Tier1), fx.GarageJam1);
+            Assert.IsNotNull(fx.Tier1.activeEvent, "the jam started");
 
             var section = fx.Host.Sections[GarageJam];
             var first = section.Modules[0];
@@ -586,6 +597,277 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsNotNull(fx.Host.Sections[GarageFloor].Modules[CashLine].Widget, "a widget is present to interpolate");
             Assert.DoesNotThrow(() => fx.Host.Interpolate());
+        }
+
+        // ---- the story rows and the card (section 10, 12.11) ----
+
+        // A story row's one button, named by the UXML.
+        private static Button StoryButton(ScreenHost.ModuleView module) =>
+            module.Widget.Root.Q<Button>("open");
+
+        // The card: the app-owned overlay Screen.uxml names.
+        private static VisualElement StoryCard(VisualElement screen) =>
+            screen.Q<VisualElement>("story");
+
+        [Test]
+        public void TheOpenersRowReadsItsBeatAndIsLiveOnAFreshChapter()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            var row = fx.Host.Sections[GarageFloor].Modules[OpenStoryRow];
+            var open = StoryButton(row);
+            Assert.AreEqual("Make Some Noise", open.text, "the beat's authored displayName is the button");
+            Assert.IsTrue(open.enabledSelf, "the opener's gate is Always, so it is live from the first press");
+            Assert.IsEmpty(Fixture.VisibleLegs(row), "an available beat has nothing left to explain");
+            Assert.IsFalse(open.ClassListContains("seen"), "and nothing has read it yet");
+            Assert.IsNull(fx.Host.ShownStory, "an unmarked beat never opens its own card");
+        }
+
+        // A beat is read the moment its card opens from the button: the command
+        // writes the latch and its own refresh is what raises the card and
+        // repaints the row, so an app killed with the card up leaves it read.
+        [Test]
+        public void OpeningTheOpenersCardMarksItReadInTheSameRefresh()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            // What the row's button calls; a headless test has no pointer.
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+
+            var card = StoryCard(fx.Screen);
+            Assert.IsTrue(Fixture.Shown(card), "the card is up over the chapter");
+            Assert.AreEqual("Make Some Noise", card.Q<Label>("title").text);
+            StringAssert.StartsWith("It starts in the garage.", card.Q<Label>("text").text);
+            Assert.AreSame(fx.Opener, fx.Host.ShownStory);
+            // The chapter is live and ticking, so the interpolation reason that
+            // keeps the sections down under the idle dialog does not apply.
+            Assert.AreEqual(7, fx.Host.Sections.Count, "the sections stay up beneath the card");
+
+            Assert.IsTrue(fx.Root.flags.Contains("story_ch1_open_seen"),
+                "the latch is written at root, where the chapter declares it");
+            var open = StoryButton(fx.Host.Sections[GarageFloor].Modules[OpenStoryRow]);
+            Assert.IsTrue(open.ClassListContains("seen"), "the row read the flag in the same pass");
+            Assert.IsTrue(open.enabledSelf, "a seen beat stays rereadable");
+        }
+
+        [Test]
+        public void TheCardsCloseTakesItDownAndHoldsNoBeat()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+
+            // What the close button calls; a headless test has no pointer.
+            fx.Host.CloseStory();
+
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.IsNull(fx.Host.ShownStory, "the request is cleared, so nothing is showing");
+            Assert.AreEqual(7, fx.Host.Sections.Count, "the chapter was never taken down");
+        }
+
+        // The capstone's row arrives with the flag its gate reads, so the one
+        // transaction that completes the chapter both reveals the button and
+        // makes it live.
+        [Test]
+        public void TheCapstonesRowArrivesLiveWithTheCompletionFlag()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            Assert.IsFalse(fx.Host.Sections[GarageFloor].Modules[EndStoryRow].Visible);
+
+            fx.Root.flags.Add("ch1_complete");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+
+            var row = fx.Host.Sections[GarageFloor].Modules[EndStoryRow];
+            Assert.IsTrue(row.Visible, "the flag opened the row's own gate");
+            var open = StoryButton(row);
+            Assert.AreEqual("Your First Roadie", open.text);
+            Assert.IsTrue(open.enabledSelf, "the same flag is the beat's gate");
+            Assert.IsEmpty(Fixture.VisibleLegs(row));
+            Assert.IsNull(fx.Host.ShownStory, "chapter 1 marks neither beat, so neither pops");
+        }
+
+        // Leaving Live takes the card down with the sections and clears the
+        // request, so a re-entry starts from no card rather than from the one
+        // the player was reading a phase ago.
+        [Test]
+        public void LeavingLiveTakesTheCardDownAndClearsTheRequest()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
+
+            fx.Session.SwitchChapter(null, fx.Now);
+
+            Assert.AreEqual(SessionPhase.NoChapter, fx.Session.Phase);
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.IsNull(fx.Host.ShownStory);
+
+            fx.Enter();
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)),
+                "the click's request did not survive the phase change");
+            Assert.IsNull(fx.Host.ShownStory);
+        }
+
+        // ---- the marked beat pops by itself (decision 7) ----
+
+        // A second host over the standing test tree: the pop rows need a MARKED
+        // beat, and no test mutates the imported assets. One section, two rows -
+        // a marked beat and an unmarked one behind the SAME gate, which is what
+        // makes "unmarked beats never pop" a fact about the mark rather than
+        // about the gate - plus the trigger whose transaction opens that gate.
+        private class StoryFixture
+        {
+            public readonly TestTree Tree = new();
+            public readonly StoryBeatDefinition Marked;
+            public readonly StoryBeatDefinition Unmarked;
+            public readonly TriggerDefinition Release;
+            public readonly GameSession Session;
+            public readonly VisualElement Screen;
+            public readonly ScreenHost Host;
+
+            public StoryFixture()
+            {
+                Marked = TestTree.MakeDefinition<StoryBeatDefinition>("story_marked");
+                Marked.displayName = "The First Cut";
+                Marked.text = "The tape is done.";
+                Marked.availableWhen = new FlagSet { flagId = "album", uiText = "Cut a demo" };
+                Marked.seenFlag = "story_marked_seen";
+                Marked.opensWhenAvailable = true;
+
+                Unmarked = TestTree.MakeDefinition<StoryBeatDefinition>("story_unmarked");
+                Unmarked.displayName = "The Second Cut";
+                Unmarked.text = "And so is this one.";
+                Unmarked.availableWhen = new FlagSet { flagId = "album", uiText = "Cut a demo" };
+                Unmarked.seenFlag = "story_unmarked_seen";
+
+                Tree.Ch1Def.storyBeats.AddRange(new[] { Marked, Unmarked });
+                Tree.RootDef.declaredFlags.AddRange(new[] { "story_marked_seen", "story_unmarked_seen" });
+                // A beat's home is the chapter, so both rows evaluate there.
+                Tree.Ch1Def.sections.Add(new SectionDefinition
+                {
+                    title = "The Release",
+                    visibleWhen = new Always(),
+                    scope = Tree.Ch1Def,
+                    modules =
+                    {
+                        new ModuleDefinition { prefabId = "story_row", content = Marked, scope = Tree.Ch1Def },
+                        new ModuleDefinition { prefabId = "story_row", content = Unmarked, scope = Tree.Ch1Def },
+                    }
+                });
+
+                // Closed at the entry sweep and armed by the test between
+                // transactions, so the sweep that fires it belongs to the one
+                // command the pop row is about.
+                Release = TestTree.MakeDefinition<TriggerDefinition>("release_trigger");
+                Release.condition = new Not { condition = new Always() };
+                Release.actions.Add(new SetFlag { flagId = "album" });
+                Tree.Ch1Def.triggers.Add(Release);
+
+                // The link pass runs in Build, so the section, its modules and
+                // the trigger are wired only once the tree is built again.
+                Tree.Rebuild();
+
+                var config = ScriptableObject.CreateInstance<GameConfig>();
+                config.maxGameSpeed = 4;
+                Session = new GameSession(Tree.Root, config);
+                var clock = new GameClock(Tree.Now);
+                var screen = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screen.uxml");
+                Assert.IsNotNull(screen, "Assets/UI/Screen.uxml is missing");
+                Screen = screen.Instantiate();
+                var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
+                Assert.IsNotNull(registry,
+                    "Assets/Settings/ModuleRegistry.asset is missing - it is hand-made settings.");
+                Host = new ScreenHost(Screen, registry, Session, clock,
+                    new AdManager(Session, new FakeAdService(), config, () => { }),
+                    new IAPManager(Session, new FakeStoreService(), config, () => { }));
+
+                // The stamp is now, so no idle window exists and the phase lands
+                // Live; the switch's own refresh is the first render.
+                Tree.Ch1.lastActiveUtc = Tree.Now;
+                Session.SwitchChapter(Tree.Ch1, Tree.Now);
+                Assert.AreEqual(SessionPhase.Live, Session.Phase);
+            }
+
+            public ScreenHost.ModuleView Row(int index) => Host.Sections.Single().Modules[index];
+
+            // Any command sweeps, so this one's sweep is what fires the armed
+            // trigger and its refresh is what repaints.
+            public void CutTheDemo()
+            {
+                Release.condition = new Always();
+                Session.FireProducer(Tree.Ctx(Tree.Tier1), Tree.TapProducer);
+                Assert.IsTrue(Tree.Ch1.flags.Contains("album"), "the sweep set the flag the gates read");
+            }
+        }
+
+        // Unseen and unavailable: the button is closed and the unmet legs are
+        // the goal readout, which is the row's whole state (12.11).
+        [Test]
+        public void AnUnavailableStoryRowIsClosedAndNamesItsGate()
+        {
+            var fx = new StoryFixture();
+
+            var open = StoryButton(fx.Row(0));
+            Assert.IsFalse(open.enabledSelf, "the gate does not hold and the beat is unread");
+            CollectionAssert.AreEqual(new[] { "Cut a demo" }, Fixture.VisibleLegs(fx.Row(0)));
+            Assert.IsNull(fx.Host.ShownStory, "a marked beat that is not available yet has nothing to pop");
+        }
+
+        // State, never a transition: the pair "available and unseen" holds from
+        // the transaction that made it available, so the card comes up in that
+        // transaction's own refresh with no render of the test's own. A beat is
+        // read when its card OPENS (section 10), and this open happened inside
+        // a refresh, so the mark is submitted and runs at the drain - the
+        // request holds the card up in between. An unmarked beat behind the
+        // same gate stays a button.
+        [Test]
+        public void AMarkedBeatOpensItsCardInTheTransactionThatMakesItAvailable()
+        {
+            var fx = new StoryFixture();
+
+            fx.CutTheDemo();
+
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.AreSame(fx.Marked, fx.Host.ShownStory, "the first marked, available, unseen beat");
+            Assert.AreEqual("The First Cut", StoryCard(fx.Screen).Q<Label>("title").text);
+            Assert.IsFalse(fx.Tree.Root.flags.Contains("story_marked_seen"),
+                "the open's mark waits behind the transaction it was issued from");
+            Assert.IsTrue(StoryButton(fx.Row(1)).enabledSelf, "the unmarked beat's own gate holds too");
+
+            fx.Session.Drain();
+
+            Assert.IsTrue(fx.Tree.Root.flags.Contains("story_marked_seen"), "the drain runs the mark");
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)),
+                "and the request is what holds the card up, so a read beat keeps reading");
+            Assert.IsTrue(StoryButton(fx.Row(0)).ClassListContains("seen"), "the row read the flag");
+        }
+
+        // The close writes nothing: the beat was read when the card opened, so
+        // closing clears the request and takes the card down, and the state
+        // that raised it - available and unseen - is already broken by the
+        // mark. The unmarked beat behind the same gate never takes its place.
+        [Test]
+        public void ClosingAPoppedCardTakesItDownAndNoUnmarkedBeatTakesItsPlace()
+        {
+            var fx = new StoryFixture();
+            fx.CutTheDemo();
+            // The mark was issued from inside the pop's own refresh.
+            fx.Session.Drain();
+
+            fx.Host.CloseStory();
+
+            Assert.IsTrue(fx.Tree.Root.flags.Contains("story_marked_seen"), "the open is the read");
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.IsNull(fx.Host.ShownStory);
+            Assert.IsTrue(StoryButton(fx.Row(0)).ClassListContains("seen"));
+
+            fx.Session.FireProducer(fx.Tree.Ctx(fx.Tree.Tier1), fx.Tree.TapProducer);
+            Assert.IsNull(fx.Host.ShownStory, "nothing pops a second time, and no unmarked beat ever pops");
+            Assert.IsFalse(fx.Tree.Root.flags.Contains("story_unmarked_seen"));
         }
 
         // ---- layout scopes are linked at the chapter (12.11) ----

@@ -94,9 +94,12 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
             {
                 // Always, after a backgrounding or a chapter change alike: the
                 // command is legal in every phase and there is no offer to
-                // lose, so a watched ad is never discarded.
-                session.ExtendBuff(session.Root, Encore.Modifier(session.Root), config.encoreAdSeconds, nowUtc);
-                save();
+                // lose, so a watched ad is never discarded. The save waits for
+                // the transaction that wrote the record: the grant is a
+                // submitted command (12.9) and may run at the frame's drain
+                // rather than at the call.
+                session.ExtendBuff(session.Root, Encore.Modifier(session.Root), config.encoreAdSeconds, nowUtc,
+                                   _ => save());
                 return;
             }
 
@@ -105,8 +108,14 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
             // watched for.
             if (session.ForegroundChapter != request.Chapter)
                 return;
-            if (session.DoubleAndClaimIdle(nowUtc))
-                save();
+            // The save waits for the transaction that settled: the claim is a
+            // submitted command (12.9), and the completed callback is what says
+            // an offer was actually paid and is on the tree to be written.
+            session.DoubleAndClaimIdle(nowUtc, settled =>
+            {
+                if (settled)
+                    save();
+            });
         }
     }
 }

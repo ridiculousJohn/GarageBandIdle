@@ -168,3 +168,38 @@
 .collect-ok {
     margin-top: 8px;
 }
+
+/* The story card: a scrim over the still-rendered sections, which stay up and
+   ticking beneath it - the chapter is live, so nothing here interpolates a
+   stale report. */
+.story {
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+.story-panel {
+    min-width: 480px;
+    max-width: 640px;
+    padding: 24px;
+    background-color: rgb(32, 32, 32);
+}
+
+.story-title {
+    -unity-font-style: bold;
+    font-size: 20px;
+    margin-bottom: 12px;
+}
+
+.story-text {
+    white-space: normal;
+    margin-bottom: 16px;
+}
+
+.story-close {
+    margin-top: 8px;
+}
+
+.story-row {
+    margin-bottom: 8px;
+}

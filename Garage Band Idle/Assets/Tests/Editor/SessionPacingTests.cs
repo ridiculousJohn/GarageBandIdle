@@ -151,7 +151,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The frame under the dialog is a non-Live sample: it advances the
             // sample and banks nothing, so the dialog time is never pooled.
             session.Accumulate(tree.Now.AddSeconds(0.4));
-            Assert.IsTrue(session.ClaimIdle(tree.Now.AddSeconds(0.4)));
+            session.ClaimIdle(tree.Now.AddSeconds(0.4));
+            Assert.AreEqual(SessionPhase.Live, session.Phase, "the claim settled");
             var settled = tree.Tier1.balances["cash"].ToDouble();
 
             // Had the dialog's 0.4 carried, this 0.6 would have crossed.
@@ -200,7 +201,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // at ONE amp, since the second is not paid for until the mutation
             // runs against the settled state.
             f.Frame(0.9);
-            Assert.IsTrue(f.Session.TryBuy(f.Ctx(0.9), f.Tree.PracticeAmp));
+            f.Session.TryBuy(f.Ctx(0.9), f.Tree.PracticeAmp);
 
             Assert.AreEqual(2, f.Tree.Tier1.generatorCounts["practice_amp"]);
             AssertClose(1000 + 0.45 - 69, f.Cash, "0.9s at 0.5/s, less the second amp's 60 x 1.15");
@@ -218,7 +219,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // settles the 0.5 at one amp before the second exists. A zero
             // elapsed is not a discontinuity.
             f.Frame(0.5);
-            Assert.IsTrue(f.Session.TryBuy(f.Ctx(0.5), f.Tree.PracticeAmp));
+            f.Session.TryBuy(f.Ctx(0.5), f.Tree.PracticeAmp);
             AssertClose(1000 + 0.25 - 69, f.Cash);
 
             // The bank was settled by the buy, so 0.5 more is still under the
@@ -261,9 +262,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new Fixture();
 
             f.Frame(0.5);
-            Assert.IsTrue(f.Session.FireProducer(f.Ctx(0.5), f.Tree.TapProducer));
+            f.Session.FireProducer(f.Ctx(0.5), f.Tree.TapProducer);
             f.Frame(1.0);
-            Assert.IsTrue(f.Session.FireProducer(f.Ctx(1.0), f.Tree.TapProducer));
+            f.Session.FireProducer(f.Ctx(1.0), f.Tree.TapProducer);
 
             // Two taps at 1 cash each plus the amp's full second of rate: a
             // clear per tap would starve the rate production the amp exists for.
@@ -281,7 +282,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             for (var i = 1; i <= 10; i++)
             {
                 f.Frame(i * 0.1);
-                Assert.IsTrue(f.Session.FireProducer(f.Ctx(i * 0.1), f.Tree.TapProducer));
+                f.Session.FireProducer(f.Ctx(i * 0.1), f.Tree.TapProducer);
             }
 
             AssertClose(10 + 0.5, f.Cash, "ten taps plus 1.0s at 0.5/s");

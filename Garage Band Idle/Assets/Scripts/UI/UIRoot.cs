@@ -20,7 +20,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
                          AdManager ads, IAPManager store)
         {
             host = new ScreenHost(document.rootVisualElement, registry, session, clock, ads, store);
-            host.Render();          // unconditional, because a fresh game runs no transaction
+            // The first render is the session's own refresh entry: a fresh game
+            // runs no transaction at all, and a render outside a queue entry
+            // could run what it submits at once, inside itself (12.9).
+            session.Refresh();
         }
 
         public void Interpolate() => host?.Interpolate();

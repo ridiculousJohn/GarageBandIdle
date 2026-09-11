@@ -4,6 +4,7 @@ using System.Linq;
 using RidiculousGaming.GarageBandIdle;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.Story;
 using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
@@ -59,6 +60,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly BarDefinition Cover1;
         public readonly BarDefinition Cover2;
         public readonly BarDefinition Cover3;
+        public readonly StoryBeatDefinition Opener;
+        public readonly StoryBeatDefinition Capstone;
 
         public TestTree()
         {
@@ -86,13 +89,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             RootDef = MakeRoot("root");
             Records = DeclareCurrency(RootDef, "records");
             Roadies = DeclareCurrency(RootDef, "roadies");
-            RootDef.declaredFlags.Add("ch1_complete");
+            // The two story latches sit at ROOT with the completion flag
+            // (section 10): the capstone resets the chapter, so a latch homed
+            // inside it would let a replay show an opener a second time.
+            RootDef.declaredFlags.AddRange(new[] { "ch1_complete", "story_open_seen", "story_end_seen" });
             RootDef.declaredTags.AddRange(new[] { "income", "production" });
             // The store product root declares (12.3). The save filter drops an
             // entitlement root does not declare, so a fixture that round-trips
             // one has to declare it here.
             RootDef.entitlements.Add("backstage_pass");
             Chapters.Add(Ch1Def);
+
+            // The chapter's two boundary beats, declared on the chapter that
+            // they tell the opening and the capstone of (section 10). Neither
+            // is marked: popping is the exception, so the row's button is the
+            // way into both cards.
+            Opener = MakeDefinition<StoryBeatDefinition>("story_open");
+            Opener.availableWhen = new Always();
+            Opener.seenFlag = "story_open_seen";
+            Opener.text = "It starts in the garage.";
+
+            Capstone = MakeDefinition<StoryBeatDefinition>("story_end");
+            Capstone.availableWhen = new FlagSet { flagId = "ch1_complete", uiText = "Finish the chapter" };
+            Capstone.seenFlag = "story_end_seen";
+            Capstone.text = "The backyard is packed.";
+
+            Ch1Def.storyBeats.AddRange(new[] { Opener, Capstone });
 
             // The Jam: two cash yield entries (the second reads the upgrade
             // latch) plus the reveal-gated rehearsal pair.

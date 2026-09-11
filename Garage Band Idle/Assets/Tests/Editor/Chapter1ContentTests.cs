@@ -40,20 +40,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- the keystone ----
 
         // The whole authored set, judged by the pass that gates the import
-        // itself. The two warnings are the story latches, whose setter
-        // (AcknowledgeStory) is step 10's - the whitelist retires with it.
+        // itself. Every declared flag has a setter, the two story latches
+        // included: opening a beat's card writes its own latch, so the beat is
+        // that flag's setter (12.12).
         [Test]
-        public void The_imported_pair_validates_with_only_the_story_latch_warnings()
+        public void The_imported_pair_validates_clean()
         {
             var report = ContentValidator.Validate(content);
 
-            var all = string.Join("\n", report.Findings);
-            Assert.IsFalse(report.HasErrors, all);
-            Assert.AreEqual(2, report.Findings.Count, all);
-            Assert.AreEqual(new[] { "story_ch1_end_seen", "story_ch1_open_seen" },
-                report.OfCheck(ValidationCheck.FlagNoSetter)
-                    .Select(f => f.Message.Split('\'')[1]).OrderBy(id => id).ToArray(),
-                all);
+            Assert.AreEqual(0, report.Findings.Count, string.Join("\n", report.Findings));
         }
 
         // ---- section 2: the scope tree ----
@@ -427,6 +422,35 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(root.permanentModifiers.Contains(encore));
         }
 
+        // ---- section 11: the story beats ----
+
+        // The chapter's two boundary cards, declared on the chapter they tell
+        // (section 10): the opener is live from a fresh chapter and the capstone
+        // waits on the completion flag. Both latches are ROOT's, so the
+        // capstone's reset cannot replay an opener, and neither beat is marked -
+        // popping is the exception, and the button is the only way in.
+        [Test]
+        public void The_chapter_declares_its_two_story_beats_behind_root_latches()
+        {
+            Assert.AreEqual(new[] { "story_ch1_open", "story_ch1_end" }, Ids(ch1.storyBeats));
+            Assert.AreEqual(new[] { "Make Some Noise", "Your First Roadie" },
+                ch1.storyBeats.Select(b => b.displayName).ToArray());
+            Assert.AreEqual(new[] { "story_ch1_open_seen", "story_ch1_end_seen" },
+                ch1.storyBeats.Select(b => b.seenFlag).ToArray());
+            Assert.AreEqual(new[] { "ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen" },
+                root.declaredFlags.ToArray(), "the latches are homed where no reset reaches them");
+
+            Assert.AreEqual(new[] { "Always", "flag ch1_complete" },
+                ch1.storyBeats.Select(b => Describe(b.availableWhen)).ToArray());
+            Assert.AreEqual("Play the Backyard Party", ch1.storyBeats[1].availableWhen.uiText,
+                "the capstone's one leg names the gate the disabled row reads");
+            Assert.IsFalse(ch1.storyBeats.Any(b => b.opensWhenAvailable),
+                "chapter 1 marks neither beat");
+
+            StringAssert.StartsWith("It starts in the garage.", ch1.storyBeats[0].text);
+            StringAssert.StartsWith("The backyard's packed.", ch1.storyBeats[1].text);
+        }
+
         // ---- section 12: the screen ----
 
         // One name per family plus both button texts: nothing derives "Three-
@@ -486,6 +510,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "currency_line rehearsal @tier1",
                 "currency_line records @ch1",
                 "jam_button tap_producer @tier1",
+                // A beat's home is the chapter, so its row normalizes there too.
+                "story_row story_ch1_open @ch1",
+                "story_row story_ch1_end @ch1",
             }, Modules(0));
 
             // A list module binds nothing - its content is the evaluation
@@ -523,6 +550,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("balance records", Describe(lines[3].visibleWhen));
             Assert.AreEqual((BigNumber)1, Threshold(lines[3].visibleWhen));
             Assert.IsNull(lines[4].visibleWhen, "the Jam button rides the section's own gate");
+            // The opener's row is there from the first press and the capstone's
+            // arrives with the completion flag, so a fresh chapter shows one
+            // story button rather than a locked pair.
+            Assert.IsNull(lines[5].visibleWhen, "the opener's row is on screen from the start");
+            Assert.AreEqual("flag ch1_complete", Describe(lines[6].visibleWhen));
 
             // All three jam rows are always visible, so once the section
             // reveals it is never an empty box - a locked jam sits disabled.

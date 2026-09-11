@@ -234,11 +234,12 @@ math in Walkthrough 2.
 **Chapter 1 authors zero triggers.** Its only threshold moments are pure reveals (direct monotonic
 gates) or purchase moments (upgrade payloads); the Trigger family exists for later chapters.
 
-Story (root latches, §10): two beats, NEITHER marked to pop - no card opens by itself in chapter 1.
-Each is a button row in `garage_floor` (section 12, authored with slice C). The opener's button is
-live from a fresh chapter (`Always`); the capstone's goes live on `FlagSet(ch1_complete)`. Opening
-a card sets its latch through `AcknowledgeStory` - `story_ch1_open_seen`, `story_ch1_end_seen` -
-and a seen beat's button stays live for a reread.
+Story (root latches, §10): two beats on `ch1.storyBeats`, NEITHER marked to pop - no card opens by
+itself in chapter 1. Each is a button row in `garage_floor` (section 12). `story_ch1_open`
+("Make Some Noise") is live from a fresh chapter (`Always`); `story_ch1_end` ("Your First
+Roadie") goes live on `FlagSet(ch1_complete)`, its one leg reading "Play the Backyard Party".
+Opening a card sets its latch through `AcknowledgeStory` - `story_ch1_open_seen`,
+`story_ch1_end_seen` - and a seen beat's button stays live for a reread.
 
 > *Open:* "It starts in the garage. Just you, a beat-up amp, and a handful of songs you half-know.
 > Time to make some noise."
@@ -250,7 +251,7 @@ and a seen beat's button stays live for a reread.
 
 | Section | title | visibleWhen | scopeId | Modules |
 |---|---|---|---|---|
-| `garage_floor` | "The Garage Floor" | always | tier1 | currency header lines (below), Jam button (`FireProducer(tap_producer)`) |
+| `garage_floor` | "The Garage Floor" | always | tier1 | currency header lines (below), Jam button (`FireProducer(tap_producer)`), two story rows (below) |
 | `the_band` | "The Band" | `EarnedTotalAtLeast(cash, 100)` | tier1 | generator list |
 | `the_gear` | "The Gear" | `EarnedTotalAtLeast(cash, 250)` | tier1 | upgrade list |
 | `rehearsal_space` | "The Rehearsal Space" | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
@@ -272,6 +273,16 @@ module's `visibleWhen`, the existing mechanism:
 | `records` (root's) | `CurrencyAtLeast(records, 1)` |
 
 No `ch1_records` line - the `backyard_party` readout is that currency's one presentation.
+
+**The story rows** (§10, §11): each is a `story_row` module binding one beat, evaluating at ch1
+where the beats are declared. Both live here rather than in `backyard_party`: the capstone
+transaction resets the chapter in the same go as it sets `ch1_complete`, and a row in a section
+gated on `album` would vanish at the moment its beat became available.
+
+| Binds | visibleWhen |
+|---|---|
+| `story_ch1_open` | always |
+| `story_ch1_end` | `FlagSet(ch1_complete)` |
 
 **An event module binds one event** - the header-line shape again. Whether a locked jam shows as
 a disabled row or not at all is that module's authored `visibleWhen`: Ch. 1 authors all three

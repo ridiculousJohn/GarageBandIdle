@@ -149,7 +149,10 @@ namespace RidiculousGaming.GarageBandIdle
         // (SwitchChapter(null) is the backgrounding rule); the return re-enters
         // the recorded chapter, which is where the away window recomputes. A
         // player who backgrounds on the select has no record, and the null
-        // re-entry is a no-op.
+        // re-entry is a no-op. The drain is what makes the switch run at the
+        // call (12.9): a submission behind a queued refresh's command would
+        // leave the save ahead of the stamp. The resume needs none - the queue
+        // is empty by the time a frame has drained it.
         private void OnApplicationPause(bool paused)
         {
             if (session == null)
@@ -158,6 +161,7 @@ namespace RidiculousGaming.GarageBandIdle
             var now = clock.RealTimeUtc;
             if (paused)
             {
+                session.Drain();
                 session.SwitchChapter(null, now);
                 Save(now);
             }
@@ -167,12 +171,16 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
+        // The drain before the switch, for the same reason backgrounding
+        // drains: the stamp the save writes has to be on the tree before the
+        // write (12.9).
         private void OnApplicationQuit()
         {
             if (session == null)
                 return;
             clock.Resample(DateTime.UtcNow);
             var now = clock.RealTimeUtc;
+            session.Drain();
             session.SwitchChapter(null, now);
             Save(now);
         }

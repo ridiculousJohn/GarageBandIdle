@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
 using RidiculousGaming.GarageBandIdle.Meta;
+using RidiculousGaming.GarageBandIdle.Story;
 
 namespace RidiculousGaming.GarageBandIdle
 {
@@ -41,7 +42,7 @@ namespace RidiculousGaming.GarageBandIdle
 
     // The transient execution context (design doc 12.9): plain C#, never
     // serialized, holding only orchestration - the foreground chapter, the
-    // phase, the outstanding offer, and the reentrancy guard. Durable facts
+    // phase, the outstanding offer, and the command queue. Durable facts
     // live in the tree. The session owns the transaction pipeline; the wrapped
     // systems stay public and unchanged, and tests keep calling them directly.
     public class GameSession
@@ -65,16 +66,23 @@ namespace RidiculousGaming.GarageBandIdle
         // command found. Null only before the first tick.
         public TickReport LastTick { get; private set; }
 
-        // The 12.11 hook, one per completed transaction and none on a refusal;
-        // step 9's widgets subscribe. Unconditional where the sweep is not,
-        // which is what repaints the claim dialog when an entitlement written
-        // under it changes only the button set (12.9).
+        // The 12.11 hook, one per completed transaction and none on a refusal,
+        // fired from inside the transaction that completes. A handler that
+        // issues a command submits it, and it runs at the next drain as its own
+        // transaction. Unconditional where the sweep is not, which is what
+        // repaints the claim dialog when an entitlement written under it
+        // changes only the button set (12.9).
         public event Action Refreshed;
 
-        // The reentrancy guard: a command issued from inside a transaction (a
-        // trigger action, a refresh handler) is a code bug and throws. The
-        // callback queue 12.9 describes is this flag's future consumer.
-        private bool commandInProgress;
+        // The command queue (12.9). Every transaction the session runs is
+        // submitted here and executed from the front; an entry stays at the
+        // front until it returns, so the queue is non-empty for the whole of
+        // its run and "empty" is the complete test for running a submission at
+        // once. A transaction submitted while one is executing - from a refresh
+        // handler, from a trigger action - lands behind it and runs at the
+        // frame's drain, as its own transaction with its own refresh, never
+        // nested. Nothing can reenter, so nothing guards.
+        private readonly Queue<Action> queue = new();
 
         // The pacing state (12.9): the frame's clock sample and the live time
         // banked since the last tick. The FRAME is the only reader of the clock;
@@ -95,7 +103,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Legal in every phase, one transaction (12.9). Switching to the
         // CURRENT chapter (or to null while already NoChapter) is a no-op
-        // success that runs no pipeline: the stamp is old during a live
+        // that runs no pipeline: the stamp is old during a live
         // session, and recomputing here would mint an offer covering time the
         // player spent playing. A live outgoing chapter stamps at now; one
         // with an offer up settles it on a chapter-to-chapter switch (an exit
@@ -108,18 +116,19 @@ namespace RidiculousGaming.GarageBandIdle
         // re-stamping the unpaid window away before it is presented.
         public void SwitchChapter(ChapterScopeState chapter, DateTime nowUtc)
         {
-            GuardReentrancy();
-            if (chapter == ForegroundChapter)
-                return;
-            // The outgoing chapter's banked foreground time settles into the
-            // outgoing subtree, never the incoming one - and the incoming
-            // window starts here, with nothing banked.
-            FlushPending(nowUtc);
-            lastSampleUtc = nowUtc;
-            pendingSeconds = 0;
-            commandInProgress = true;
-            try
+            Submit(() =>
             {
+                // Read when the transaction runs, which is the state the switch
+                // would act on.
+                if (chapter == ForegroundChapter)
+                    return;
+                // The outgoing chapter's banked foreground time settles into
+                // the outgoing subtree, never the incoming one - and the
+                // incoming window starts here, with nothing banked.
+                FlushPending(nowUtc);
+                lastSampleUtc = nowUtc;
+                pendingSeconds = 0;
+
                 var outgoing = ForegroundChapter;
                 if (outgoing != null)
                 {
@@ -147,11 +156,7 @@ namespace RidiculousGaming.GarageBandIdle
                     Phase = EnterChapter(chapter, nowUtc);
                 }
                 CloseTransaction(nowUtc);
-            }
-            finally
-            {
-                commandInProgress = false;
-            }
+            });
         }
 
         // AwaitingIdleClaim only. Pure settlement - the claim never computes
@@ -162,37 +167,38 @@ namespace RidiculousGaming.GarageBandIdle
         // now-live foreground - is the deferred one: a threshold crossed while
         // away, by the switch's own settle-out, or by this deposit fires here,
         // root triggers included.
-        public bool ClaimIdle(DateTime nowUtc) => Claim(nowUtc, doubled: false);
+        public void ClaimIdle(DateTime nowUtc, Action<bool> completed = null) =>
+            Claim(nowUtc, doubled: false, completed);
 
         // The rewarded ad's callback: doubles the offer's lines and settles them
         // in the SAME transaction (12.9), so a doubled offer is never left
         // standing. Refused like ClaimIdle when no offer stands - a kill mid-ad
         // takes the callback with the process, and the unmoved stamp re-offers
         // the window on the next launch.
-        public bool DoubleAndClaimIdle(DateTime nowUtc) => Claim(nowUtc, doubled: true);
+        public void DoubleAndClaimIdle(DateTime nowUtc, Action<bool> completed = null) =>
+            Claim(nowUtc, doubled: true, completed);
 
-        // The pipeline the OK button and the ad callback share: the doubling, if
-        // any, is inside the transaction with the settlement, so no phase and
-        // no exit can ever see a doubled offer standing.
-        private bool Claim(DateTime nowUtc, bool doubled)
+        // The pipeline the OK button and the ad callback share, as one queued
+        // transaction: the doubling, if any, is inside the transaction with the
+        // settlement, so no phase and no exit can ever see a doubled offer
+        // standing. The phase is read when the transaction runs, and the
+        // completed callback is told whether it settled.
+        private void Claim(DateTime nowUtc, bool doubled, Action<bool> completed)
         {
-            GuardReentrancy();
-            if (Phase != SessionPhase.AwaitingIdleClaim)
-                return false;
-            commandInProgress = true;
-            try
+            Submit(() =>
             {
+                if (Phase != SessionPhase.AwaitingIdleClaim)
+                {
+                    completed?.Invoke(false);
+                    return;
+                }
                 if (doubled)
                     DoubleOffer();
                 SettleOffer(ForegroundChapter);
                 Phase = SessionPhase.Live;
                 CloseTransaction(nowUtc);
-                return true;
-            }
-            finally
-            {
-                commandInProgress = false;
-            }
+                completed?.Invoke(true);
+            });
         }
 
         // The x2 written INTO the lines, because the lines are what settlement
@@ -340,7 +346,9 @@ namespace RidiculousGaming.GarageBandIdle
         // segments internally, so a hitch is one correct call.
         public void Accumulate(DateTime nowUtc)
         {
-            GuardReentrancy();
+            // The frame drains what the last frame's refreshes submitted, then
+            // banks time (12.9).
+            Drain();
             var elapsed = (nowUtc - lastSampleUtc).TotalSeconds;
             lastSampleUtc = nowUtc;
             // A backwards wall clock clears the bank with the discontinuity:
@@ -358,7 +366,11 @@ namespace RidiculousGaming.GarageBandIdle
                 return;
             var dt = pendingSeconds;
             pendingSeconds = 0;
-            Tick(dt, nowUtc);
+            // A submission like every other transaction (12.9): with the queue
+            // empty it runs here, and behind entries the drain above left
+            // standing it runs at the next drain - either way a command its
+            // refresh submits lands behind it and never inside it.
+            Submit(() => TickNow(dt, nowUtc));
         }
 
         // A player action settles the bank before it mutates: whatever the
@@ -367,15 +379,24 @@ namespace RidiculousGaming.GarageBandIdle
         // generator bought mid-window earns nothing for the time before it
         // existed. The action reads no clock; the frame already did. Flush,
         // never clear: FireProducer is a command, and clearing per Jam tap
-        // would starve the rate production the rates exist for.
+        // would starve the rate production the rates exist for. The tick BODY,
+        // never a submission: the flush is part of the transaction running
+        // around it, and a submitted flush would queue behind the command it
+        // has to precede.
         private void FlushPending(DateTime nowUtc)
         {
             if (Phase != SessionPhase.Live || pendingSeconds <= 0)
                 return;
             var dt = pendingSeconds;
             pendingSeconds = 0;
-            Tick(dt, nowUtc);
+            TickNow(dt, nowUtc);
         }
+
+        // A tick asked for by name: one submitted transaction like every other
+        // (12.9), so one issued from inside a running transaction lands behind
+        // it and runs at the drain. The frame's own tick is Accumulate's.
+        public void Tick(double realSeconds, DateTime nowUtc) =>
+            Submit(() => TickNow(realSeconds, nowUtc));
 
         // Live only; TickSystem.Tick inside the same pipeline. Nonpositive dt
         // no-ops like a refusal - nothing mutated, nothing to sweep or repaint.
@@ -383,61 +404,65 @@ namespace RidiculousGaming.GarageBandIdle
         // the world is simulated through nowUtc, so a command issued at that
         // moment flushes nothing, rather than re-simulating the window a caller
         // ticked by hand.
-        public void Tick(double realSeconds, DateTime nowUtc)
+        private void TickNow(double realSeconds, DateTime nowUtc)
         {
-            GuardReentrancy();
             if (Phase != SessionPhase.Live || realSeconds <= 0)
                 return;
-            commandInProgress = true;
-            try
-            {
-                lastSampleUtc = nowUtc;
-                pendingSeconds = 0;
-                LastTick = TickSystem.Tick(Root, ForegroundChapter, config, realSeconds, nowUtc);
-                CloseTransaction(nowUtc);
-            }
-            finally
-            {
-                commandInProgress = false;
-            }
+            lastSampleUtc = nowUtc;
+            pendingSeconds = 0;
+            LastTick = TickSystem.Tick(Root, ForegroundChapter, config, realSeconds, nowUtc);
+            CloseTransaction(nowUtc);
         }
 
         // ---- the command surface ----
         // One wrapper per entry point, taking the same GameContext the wrapped
         // system takes plus nothing new. A callback command arrives with its
-        // step and builds the context for the scope it writes.
+        // step and builds the context for the scope it writes. Every wrapper
+        // submits and returns; a caller that needs the outcome passes a
+        // completed callback and is told when the transaction has run.
 
-        public bool TryRung(GameContext ctx) =>
+        public void TryRung(GameContext ctx, Action<bool> completed = null) =>
             RunCommand(ctx, c => c.Scope.Definition is InteriorDefinition interior
-                && interior.rung != null && interior.rung.TryExecute(c));
+                && interior.rung != null && interior.rung.TryExecute(c), completed);
 
-        public bool TryBuy(GameContext ctx, GeneratorDefinition generator) =>
-            RunCommand(ctx, c => Purchasing.TryBuy(c, generator));
+        public void TryBuy(GameContext ctx, GeneratorDefinition generator, Action<bool> completed = null) =>
+            RunCommand(ctx, c => Purchasing.TryBuy(c, generator), completed);
 
-        public bool TryBuy(GameContext ctx, UpgradeDefinition upgrade) =>
-            RunCommand(ctx, c => Purchasing.TryBuy(c, upgrade));
+        public void TryBuy(GameContext ctx, UpgradeDefinition upgrade, Action<bool> completed = null) =>
+            RunCommand(ctx, c => Purchasing.TryBuy(c, upgrade), completed);
 
         // Firing has no gate of its own - it always happens, so the pipeline
         // always runs.
-        public bool FireProducer(GameContext ctx, ProducerDefinition producer) =>
-            RunCommand(ctx, c => { Producer.FireProducer(c, producer); return true; });
+        public void FireProducer(GameContext ctx, ProducerDefinition producer, Action<bool> completed = null) =>
+            RunCommand(ctx, c => { Producer.FireProducer(c, producer); return true; }, completed);
 
-        public bool SetActiveBars(GameContext ctx, BarGroupDefinition group, IReadOnlyList<BarDefinition> bars) =>
-            RunCommand(ctx, c => BarSystem.SetActiveBars(c, group, bars));
+        public void SetActiveBars(GameContext ctx, BarGroupDefinition group, IReadOnlyList<BarDefinition> bars,
+                                  Action<bool> completed = null) =>
+            RunCommand(ctx, c => BarSystem.SetActiveBars(c, group, bars), completed);
 
-        public bool TryStartEvent(GameContext ctx, EventDefinition evt) =>
-            RunCommand(ctx, c => EventSystem.TryStart(c, evt));
+        public void TryStartEvent(GameContext ctx, EventDefinition evt, Action<bool> completed = null) =>
+            RunCommand(ctx, c => EventSystem.TryStart(c, evt), completed);
 
-        public bool TryDismissEvent(GameContext ctx, EventDefinition evt) =>
-            RunCommand(ctx, c => EventSystem.TryDismiss(c, evt));
+        public void TryDismissEvent(GameContext ctx, EventDefinition evt, Action<bool> completed = null) =>
+            RunCommand(ctx, c => EventSystem.TryDismiss(c, evt), completed);
+
+        // Opening a beat's card marks it read (section 10): the seen flag is
+        // written at its home through the same outward walk SetFlag uses. A
+        // session command like every other, on RunCommand; it checks nothing of
+        // its own - the host opens a card only for a beat whose button is live
+        // or whose mark pops it, and setting a flag already set changes nothing.
+        public void AcknowledgeStory(GameContext ctx, StoryBeatDefinition beat, Action<bool> completed = null) =>
+            RunCommand(ctx, c => { c.SetFlag(beat.seenFlag); return true; }, completed);
 
         // Extends the timer of the modifier whose record lives at `scope` - root
         // and encore for the ad callback, as AddModifier takes a target and a
         // modifier. The record write is the whole mutation, and the sweep stays
         // conditional on the resulting phase, so a grant that lands while a
         // claim awaits presentation repaints without sweeping the unpaid window
-        // away (12.9).
-        public void ExtendBuff(ScopeState scope, ModifierDefinition modifier, double seconds, DateTime nowUtc)
+        // away (12.9). The completed callback is told when the write is on the
+        // tree.
+        public void ExtendBuff(ScopeState scope, ModifierDefinition modifier, double seconds, DateTime nowUtc,
+                               Action<bool> completed = null)
         {
             // A grant only ever moves an expiry LATER, so a nonpositive or
             // non-finite duration is a caller bug and not a shorter buff.
@@ -465,7 +490,7 @@ namespace RidiculousGaming.GarageBandIdle
                 if (record.expiresAtUtc > ceiling)
                     record.expiresAtUtc = ceiling;
                 return true;
-            });
+            }, completed);
         }
 
         // One record per modifier id per scope, so the first match IS the
@@ -481,21 +506,23 @@ namespace RidiculousGaming.GarageBandIdle
         // The store callback's write for a restored or otherwise granted
         // entitlement: under the claim dialog it sweeps nothing and repaints
         // only the button set - the offer stays what was computed and is what
-        // OK pays (12.9).
-        public void GrantEntitlement(string entitlementId, DateTime nowUtc)
+        // OK pays (12.9). The completed callback is told when the write is on
+        // the tree.
+        public void GrantEntitlement(string entitlementId, DateTime nowUtc, Action<bool> completed = null)
         {
             RunCommand(new GameContext(Root, nowUtc), c =>
             {
                 WriteEntitlement(entitlementId);
                 return true;
-            });
+            }, completed);
         }
 
         // The store callback for a Pass purchase (12.9): the entitlement write,
         // and when an offer stands - bought FROM the dialog - the offer doubled
         // and settled in the same transaction, ending Live so the dialog closes
         // with the phase. Bought anywhere else, the write is the whole command.
-        public void PurchasePassFromDialog(DateTime nowUtc)
+        // The completed callback is told when the write is on the tree.
+        public void PurchasePassFromDialog(DateTime nowUtc, Action<bool> completed = null)
         {
             RunCommand(new GameContext(Root, nowUtc), c =>
             {
@@ -506,7 +533,7 @@ namespace RidiculousGaming.GarageBandIdle
                 SettleOffer(ForegroundChapter);
                 Phase = SessionPhase.Live;
                 return true;
-            });
+            }, completed);
         }
 
         // Writes at root, and only an id root declares: the save filter would
@@ -524,7 +551,8 @@ namespace RidiculousGaming.GarageBandIdle
         // the AUTHORED write, so the currency's activeWhen is honored (12.2). A
         // nonpositive count is a caller bug, not a smaller bundle -
         // GameConfig.Require refuses one before any store can report success.
-        public void GrantRoadies(int count, DateTime nowUtc)
+        // The completed callback is told when the write is on the tree.
+        public void GrantRoadies(int count, DateTime nowUtc, Action<bool> completed = null)
         {
             if (count <= 0)
                 throw new InvalidOperationException($"GrantRoadies: {count} is not a positive count.");
@@ -532,36 +560,69 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 c.Deposit(Roadies.CurrencyId, count);
                 return true;
-            });
+            }, completed);
         }
 
         // ---- the pipeline ----
 
-        // The one pipeline every command runs: guard - flush - mutation -
-        // conditional sweep - commit - one refresh (12.9/12.11). The flush
+        // Submission: append, and when the entry is the only one, run it now.
+        // Running now is an optimization no call site relies on - a caller that
+        // needs the outcome passes a completed callback and is told when it
+        // happens.
+        private void Submit(Action transaction)
+        {
+            queue.Enqueue(transaction);
+            if (queue.Count == 1)
+                RunFront();
+        }
+
+        // The front entry runs and is then removed - in a finally, so a
+        // transaction that throws leaves the queue moving rather than parked
+        // behind it.
+        private void RunFront()
+        {
+            try { queue.Peek()(); }
+            finally { queue.Dequeue(); }
+        }
+
+        // The frame's drain (12.9): the entries present when it starts, in
+        // order, and no more - one enqueued by a refresh inside this drain
+        // waits for the next frame.
+        public void Drain()
+        {
+            var pending = queue.Count;
+            for (var i = 0; i < pending; i++)
+                RunFront();
+        }
+
+        // A refresh with nothing to commit, as its own queued entry: the first
+        // render of a bound screen, which no transaction precedes (12.11). It
+        // is an entry so that a command the render submits lands behind it and
+        // runs at the drain, exactly as one submitted from any other refresh.
+        public void Refresh() => Submit(() => Refreshed?.Invoke());
+
+        // The one pipeline every command runs (12.9/12.11), as one queued
+        // transaction: the flush, the command's own check and mutation, the
+        // sweep when the resulting phase is Live, one refresh. The flush
         // precedes the command, so the mutation runs against settled state; a
         // command that returns false commits no transaction and triggers no
         // refresh, and commit is a seam rather than machinery - the point after
-        // the sweep where the transaction's state is what refresh reads.
-        private bool RunCommand(GameContext ctx, Func<GameContext, bool> command)
+        // the sweep where the transaction's state is what refresh reads. The
+        // completed callback, when a caller passes one, is told the command's
+        // own answer after the transaction has run.
+        private void RunCommand(GameContext ctx, Func<GameContext, bool> command, Action<bool> completed = null)
         {
-            GuardReentrancy();
-            // A command owns its mutation and the flush before it. Outside Live
-            // the flush is a no-op of its own accord, since the session banks
-            // time only while it ticks.
-            FlushPending(ctx.NowUtc);
-            commandInProgress = true;
-            try
+            Submit(() =>
             {
-                if (!command(ctx))
-                    return false;
-                CloseTransaction(ctx.NowUtc);
-                return true;
-            }
-            finally
-            {
-                commandInProgress = false;
-            }
+                // A command owns its mutation and the flush before it. Outside
+                // Live the flush is a no-op of its own accord, since the
+                // session banks time only while it ticks.
+                FlushPending(ctx.NowUtc);
+                var ran = command(ctx);
+                if (ran)
+                    CloseTransaction(ctx.NowUtc);
+                completed?.Invoke(ran);
+            });
         }
 
         // The sweep is conditional on the transaction's RESULTING phase: only
@@ -575,13 +636,6 @@ namespace RidiculousGaming.GarageBandIdle
             if (Phase == SessionPhase.Live)
                 Sweep.Run(Root, ForegroundChapter, nowUtc);
             Refreshed?.Invoke();
-        }
-
-        private void GuardReentrancy()
-        {
-            if (commandInProgress)
-                throw new InvalidOperationException(
-                    "A session command was issued from inside a running transaction (design doc 12.9).");
         }
     }
 }

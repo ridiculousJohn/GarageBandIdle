@@ -113,6 +113,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Session.SwitchChapter(Ch1, Now);
                 Assert.AreEqual(SessionPhase.AwaitingIdleClaim, Session.Phase);
             }
+
+            // The tap's yield at its home, which is how a deferred row reads
+            // whether the queued command has run yet.
+            public BigNumber Cash =>
+                Tier1.balances.TryGetValue("cash", out var held) ? held : BigNumber.Zero;
+
+            // The queue made non-empty the way a frame makes it (12.9): a
+            // refresh handler submits a command, which lands behind the
+            // transaction that refreshed and waits for the drain. Anything a
+            // manager submits afterwards waits behind it too, which is the
+            // circumstance the rows at the bottom of the file are about.
+            public void QueueATap()
+            {
+                var armed = true;
+                Session.Refreshed += () =>
+                {
+                    if (!armed)
+                        return;
+                    armed = false;
+                    Session.FireProducer(Tree.Ctx(Tier1), Tree.TapProducer);
+                };
+                Session.Refresh();
+                Assert.AreEqual(BigNumber.Zero, Cash, "the handler's tap is on the queue, not run");
+            }
         }
 
         // ---- the ad seam ----
@@ -383,6 +407,132 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(BigNumber.Zero, f.Root.balances["roadies"], "a consumable is never restored");
             Assert.IsEmpty(f.Root.entitlements);
             Assert.IsEmpty(f.Saves, "nothing was written, so nothing was saved");
+        }
+
+        // ---- delivered while the queue is non-empty ----
+
+        // Every grant is a SUBMITTED command (12.9), so a delivery that lands
+        // with the queue non-empty writes nothing at the call: the command runs
+        // at the frame's drain, and the completed callback is what carries the
+        // save - and, for the store, the acknowledge after it. A save at the
+        // call would write a tree the grant is not on, and an acknowledge would
+        // tell the store a grant is banked that is not. The rows above deliver
+        // with an EMPTY queue, where the command runs at the call and the
+        // callback fires inside it - same order, one frame earlier.
+
+        [Test]
+        public void A_deferred_encore_grant_saves_when_the_command_runs()
+        {
+            var f = new Fixture();
+            f.Enter();
+            f.AdManager.RequestEncoreExtension();
+            f.QueueATap();
+
+            f.AdManager.Update(f.Now);
+
+            Assert.IsEmpty(f.Root.timedBuffs, "the grant is behind the queued tap");
+            Assert.IsEmpty(f.Saves, "so there is nothing on the tree for a save to write");
+
+            f.Session.Drain();
+
+            Assert.AreEqual((BigNumber)1, f.Cash, "the tap ran first, as it was queued first");
+            Assert.AreEqual(f.Now.AddSeconds(f.ConfigAsset.encoreAdSeconds),
+                f.Root.timedBuffs.Single().expiresAtUtc, "the grant stamps the moment it was delivered at");
+            Assert.AreEqual(1, f.Saves.Count, "and the save followed the write it is for");
+        }
+
+        [Test]
+        public void A_deferred_roadie_bundle_grants_saves_and_acknowledges_at_the_drain()
+        {
+            var f = new Fixture();
+            f.Enter();
+            f.IAPManager.RequestPurchase(ProductId.RoadieBundleMedium);
+            f.QueueATap();
+
+            f.IAPManager.Update(f.Now);
+
+            Assert.AreEqual(BigNumber.Zero, f.Root.balances["roadies"], "the grant is behind the queued tap");
+            Assert.IsEmpty(f.Saves, "a save here would write a tree the grant is not on");
+            Assert.IsEmpty(f.Store.Acknowledged, "and the store would be told a grant is banked that is not");
+
+            f.Session.Drain();
+
+            Assert.AreEqual((BigNumber)f.ConfigAsset.roadieBundleMedium, f.Root.balances["roadies"]);
+            Assert.AreEqual(new[] { 0 }, f.Saves.ToArray(),
+                "the save ran with nothing acknowledged yet, so the order held across the wait");
+            Assert.AreEqual(f.Store.Purchases.Single().transactionId, f.Store.Acknowledged.Single());
+        }
+
+        // Bought FROM the claim dialog, which is the command's other half: the
+        // entitlement, the doubled offer and the settlement are one transaction,
+        // so with the queue non-empty the dialog closes at the drain and not at
+        // the delivery.
+        [Test]
+        public void A_deferred_pass_purchase_settles_the_dialog_saves_and_acknowledges_at_the_drain()
+        {
+            var f = new Fixture();
+            f.EnterOwing();
+            f.IAPManager.RequestPurchase(ProductId.BackstagePass);
+            f.QueueATap();
+
+            f.IAPManager.Update(f.Now);
+
+            Assert.IsEmpty(f.Root.entitlements, "the grant is behind the queued tap");
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase, "so the offer still stands");
+            Assert.IsEmpty(f.Saves);
+            Assert.IsEmpty(f.Store.Acknowledged);
+
+            f.Session.Drain();
+
+            Assert.IsTrue(f.Root.entitlements.Contains(BackstagePass.EntitlementId));
+            Assert.AreEqual(SessionPhase.Live, f.Session.Phase, "the dialog closed with the phase");
+            AssertClose(501, f.Cash, "the queued tap's 1, then the doubled window's 500");
+            Assert.AreEqual(new[] { 0 }, f.Saves.ToArray(), "grant, then save, then acknowledge");
+            Assert.AreEqual(f.Store.Purchases.Single().transactionId, f.Store.Acknowledged.Single());
+        }
+
+        [Test]
+        public void A_deferred_restore_writes_the_entitlement_and_saves_at_the_drain()
+        {
+            var f = new Fixture();
+            f.Enter();
+            f.Store.Owned.Add(ProductId.BackstagePass);
+            f.IAPManager.RequestRestore();
+            f.QueueATap();
+
+            f.IAPManager.Update(f.Now);
+
+            Assert.IsEmpty(f.Root.entitlements, "the write is behind the queued tap");
+            Assert.IsEmpty(f.Saves, "and a restore saves only what is already on the tree");
+
+            f.Session.Drain();
+
+            Assert.IsTrue(f.Root.entitlements.Contains(BackstagePass.EntitlementId));
+            Assert.AreEqual(1, f.Saves.Count, "one save, for the one entitlement that was written");
+        }
+
+        // The Tip Jar is the exception that shows the rule: it issues no
+        // command, so there is nothing to wait for and nothing a wait could
+        // protect - the save and the acknowledge run at the delivery with the
+        // queue non-empty exactly as they do with it empty.
+        [Test]
+        public void A_tip_jar_saves_and_acknowledges_at_the_call_with_the_queue_non_empty()
+        {
+            var f = new Fixture();
+            f.Enter();
+            f.IAPManager.RequestPurchase(ProductId.TipJarSmall);
+            f.QueueATap();
+
+            f.IAPManager.Update(f.Now);
+
+            Assert.AreEqual(new[] { 0 }, f.Saves.ToArray(), "saved at the delivery, with nothing acknowledged yet");
+            Assert.AreEqual(f.Store.Purchases.Single().transactionId, f.Store.Acknowledged.Single());
+            Assert.AreEqual(BigNumber.Zero, f.Cash, "and the queued tap is still waiting");
+
+            f.Session.Drain();
+
+            Assert.AreEqual((BigNumber)1, f.Cash, "which the drain runs");
+            Assert.AreEqual(1, f.Saves.Count, "nothing was owed a second save");
         }
     }
 }

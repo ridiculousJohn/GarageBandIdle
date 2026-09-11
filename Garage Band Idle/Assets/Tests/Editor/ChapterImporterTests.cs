@@ -537,6 +537,97 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(Load<TierDefinition>("ch1/tier1.asset"), section.modules[0].scope);
         }
 
+        // ---- the chapter's story beats ----
+
+        // A beat is an ordinary declared family on the chapter (section 10),
+        // and a module binds one by id like any other content: the mark, the
+        // gate, the body and the latch all come off the document.
+        private const string StoryJson = @"{
+            ""type"": ""ChapterDefinition"",
+            ""id"": ""ch1"",
+            ""displayName"": ""The Garage"",
+            ""flags"": [""album"", ""story_open_seen""],
+            ""storyBeats"": [
+                {
+                    ""id"": ""story_open"",
+                    ""displayName"": ""Make Some Noise"",
+                    ""availableWhen"": { ""type"": ""FlagSet"", ""flagId"": ""album"", ""uiText"": ""Cut a demo"" },
+                    ""seenFlag"": ""story_open_seen"",
+                    ""text"": ""It starts in the garage."",
+                    ""opensWhenAvailable"": true
+                }
+            ],
+            ""sections"": [
+                {
+                    ""title"": ""The Garage Floor"",
+                    ""visibleWhen"": { ""type"": ""Always"" },
+                    ""scopeId"": ""tier1"",
+                    ""modules"": [{ ""prefabId"": ""story_row"", ""contentId"": ""story_open"" }]
+                }
+            ],
+            ""children"": [{ ""type"": ""TierDefinition"", ""id"": ""tier1"" }]
+        }";
+
+        [Test]
+        public void A_story_beats_block_imports_onto_the_chapter()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", StoryJson);
+
+            Import();
+
+            var beat = Load<Story.StoryBeatDefinition>("ch1/StoryBeats/story_open.asset");
+            Assert.IsNotNull(beat, "the beat landed in the chapter's own family folder");
+            Assert.AreEqual("Make Some Noise", beat.displayName);
+            Assert.AreEqual("It starts in the garage.", beat.text);
+            Assert.AreEqual("story_open_seen", beat.seenFlag);
+            Assert.AreEqual("album", ((FlagSet)beat.availableWhen).flagId);
+            Assert.AreEqual("Cut a demo", beat.availableWhen.uiText, "the leg text the row renders");
+            Assert.IsTrue(beat.opensWhenAvailable, "the mark is authored per beat");
+            Assert.AreEqual(new[] { beat }, Load<ChapterDefinition>("ch1/ch1.asset").storyBeats.ToArray(),
+                "the chapter's list holds the asset, not a copy");
+        }
+
+        // The beat's home is the chapter, so the row normalizes there rather
+        // than onto the tier its section evaluates at (12.11).
+        [Test]
+        public void A_module_binding_a_story_beat_normalizes_onto_the_chapter()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", StoryJson);
+
+            Import();
+
+            var chapter = Load<ChapterDefinition>("ch1/ch1.asset");
+            var module = chapter.sections.Single().modules.Single();
+            Assert.AreEqual("story_row", module.prefabId);
+            Assert.AreSame(Load<Story.StoryBeatDefinition>("ch1/StoryBeats/story_open.asset"), module.content);
+            Assert.AreSame(chapter, module.scope);
+        }
+
+        // The key is real on every scope block, so a scope that cannot hold one
+        // names itself in the refusal rather than reading as a misspelling.
+        [Test]
+        public void Story_beats_on_a_tier_or_on_the_root_abort()
+        {
+            const string beat = @"""storyBeats"": [{ ""id"": ""b"", ""displayName"": ""B"", ""availableWhen"": { ""type"": ""Always"" }, ""seenFlag"": ""b_seen"", ""text"": ""T"" }]";
+
+            Write("root.json", RootJson);
+            Write("ch1.json", ChapterJson.Replace(
+                @"{ ""type"": ""TierDefinition"", ""id"": ""tier1"" }",
+                @"{ ""type"": ""TierDefinition"", ""id"": ""tier1"", " + beat + " }"));
+
+            var onATier = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("scope 'tier1' authors story beats", onATier.Message);
+
+            Write("root.json", RootJson.Replace(
+                @"""declaredTags"": [""income""]", @"""declaredTags"": [""income""], " + beat));
+            Write("ch1.json", ChapterJson);
+
+            var onTheRoot = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("scope 'root' authors story beats", onTheRoot.Message);
+        }
+
         // ---- authored numbers span what the runtime can compute ----
 
         private const string GeneratorJson = @"{

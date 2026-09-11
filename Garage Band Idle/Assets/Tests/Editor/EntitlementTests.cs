@@ -188,7 +188,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             var windowEnd = f.Session.CurrentOffer.windowEndUtc;
 
-            Assert.IsTrue(f.Session.DoubleAndClaimIdle(f.Tree.Now.AddSeconds(300)));
+            f.Session.DoubleAndClaimIdle(f.Tree.Now.AddSeconds(300));
 
             AssertClose(500, f.Tree.Tier1.balances["cash"], "0.25/s x 1000, doubled");
             Assert.AreEqual(windowEnd, f.Tree.Ch1.lastActiveUtc, "the stamp advanced with the payment");
@@ -208,8 +208,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(SessionPhase.Live, f.Session.Phase);
             var refreshes = f.Refreshes;
 
-            Assert.IsFalse(f.Session.DoubleAndClaimIdle(f.Tree.Now));
+            bool? settled = null;
+            f.Session.DoubleAndClaimIdle(f.Tree.Now, ran => settled = ran);
 
+            Assert.AreEqual(false, settled, "no offer stands, so the claim is refused");
             Assert.AreEqual(BigNumber.Zero, f.Tree.Tier1.balances["cash"]);
             Assert.AreEqual(f.Tree.Now, f.Tree.Ch1.lastActiveUtc);
             Assert.AreEqual(refreshes, f.Refreshes, "a refusal runs no pipeline");

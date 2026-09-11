@@ -146,7 +146,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The tick is the report's only writer. A tap owns its deposit and
             // nothing the tick owns, so the slope the amp earned is still there
             // for the display to keep counting on.
-            Assert.IsTrue(f.Session.FireProducer(f.Ctx(1), f.Tree.TapProducer));
+            f.Session.FireProducer(f.Ctx(1), f.Tree.TapProducer);
             Assert.AreSame(report, f.Session.LastTick);
             AssertClose(0.5, f.Session.LastTick.CurrencySlope(f.Tree.Tier1, "cash"));
         }
@@ -160,7 +160,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // One second of cash at 0.5/s against a second amp's 69 and its
             // 100-earned gate: refused before any mutation, so there is nothing
             // for the refusal to invalidate.
-            Assert.IsFalse(f.Session.TryBuy(f.Ctx(1), f.Tree.PracticeAmp));
+            bool? bought = null;
+            f.Session.TryBuy(f.Ctx(1), f.Tree.PracticeAmp, ran => bought = ran);
+            Assert.AreEqual(false, bought, "the second amp is unaffordable, so the command refuses");
             Assert.AreSame(report, f.Session.LastTick);
         }
 

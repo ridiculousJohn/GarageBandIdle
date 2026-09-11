@@ -16,4 +16,11 @@
             <ui:Button name="ok" text="OK" class="collect-ok" />
         </ui:VisualElement>
     </ui:VisualElement>
+    <ui:VisualElement name="story" class="overlay story" style="display: none;">
+        <ui:VisualElement class="story-panel">
+            <ui:Label name="title" class="story-title" />
+            <ui:Label name="text" class="story-text" />
+            <ui:Button name="close" text="OK" class="story-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
 </ui:UXML>

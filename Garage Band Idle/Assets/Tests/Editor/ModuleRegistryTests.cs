@@ -26,7 +26,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static readonly string[] FactoryIds =
         {
             "currency_line", "jam_button", "generator_list", "upgrade_list",
-            "bar_group", "rung_button", "event_row"
+            "bar_group", "rung_button", "event_row", "story_row"
         };
 
         private static ModuleRegistry Load()

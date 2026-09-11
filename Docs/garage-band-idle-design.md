@@ -596,10 +596,11 @@ multiplier for first-clears).
 The story is delivered at chapter boundaries. A card at chapter open sets the scene and the goal
 ("Pull 200 people and the Friday slot is yours"); a beat at the capstone resolves it and introduces
 the next chapter — gated on state, never on observing a transition: the beat's button goes live on
-`chapterN_complete`, opening the card sets the root `storyN_seen` latch, and only a beat MARKED to
-pop opens itself, while `chapterN_complete && !storyN_seen` - so a crash between the completion
-save and the beat cannot skip it, and a beat read before an app kill stays read. Popping is the
-exception, never the default; chapter 1 marks neither beat. There are no story interruptions
+`chapterN_complete`, opening the card sets the root `storyN_seen` latch - from the button or by the
+beat's own mark alike - and only a beat MARKED to pop opens itself, while
+`chapterN_complete && !storyN_seen`, so a crash between the completion save and the beat cannot
+skip it, and a beat read before an app kill stays read. Popping is the exception, never the
+default; chapter 1 marks neither beat. There are no story interruptions
 during the loop itself.
 
 Named Catalog songs (§7) serve as story artifacts — the songs that chart appear in the Discography
@@ -643,7 +644,7 @@ clock; author timed goals with that end in mind.
    not a derivation.) Nothing derived can go stale, double-count, survive a reset it shouldn't, or
    disagree with a save.
 2. **All durable gameplay state lives in the ScopeState tree** (§12.3). Transient orchestration —
-   the foreground chapter selection, the session phase, command guards, derived caches — lives in a
+   the foreground chapter selection, the session phase, the command queue, derived caches — lives in a
    never-serialized `GameSession` (§12.9). Systems are stateless code that reads and writes those
    containers; no system instance per scope, no state hiding in managers.
 3. **Lifetime is placement.** A currency, flag, upgrade latch, or bar lives in the scope that
@@ -1380,7 +1381,7 @@ payloads; a trigger that spends the goal currency changes nothing already secure
 on goals is seen next sweep (§12.8).
 
 **GameSession** — the transient execution context, never serialized:
-`{foregroundChapter, phase: NoChapter | AwaitingIdleClaim | Live, currentOffer, commandInProgress}` — launch
+`{foregroundChapter, phase: NoChapter | AwaitingIdleClaim | Live, currentOffer, commandQueue}` — launch
 and backgrounding are `NoChapter`, so no-foreground states are explicit rather than a null reference.
 Durable facts live in the tree; the session holds only orchestration. The CURRENT chapter is one of
 those durable facts — a root-held id written by `SwitchChapter` when it enters a chapter
@@ -1390,12 +1391,13 @@ selection; only a save with no recorded chapter — a fresh game — shows a cha
 save owes no idle to conflict with. That is what makes an unpaid window unstrandable:
 every load lands on the chapter whose stamp holds it, and the offer recomputes. Never
 inferred from economy timestamps — `lastActiveUtc`
-records idle-settlement boundaries, not UI history. While `phase == AwaitingIdleClaim`, only claim
-and switch commands are legal — mutating commands are refused, so a rung or automation can never
-reset away an unpaid window; settling flips the session to `Live`. Authenticated ad/store
-callbacks are always **phase-eligible, never reentrant**: a callback is a serialized mutation
-transaction — queued behind `commandInProgress`, then the same pipeline as any command, its sweep
-conditional on the resulting phase like every transaction's. The idle double is ATOMIC with its
+records idle-settlement boundaries, not UI history. While `phase == AwaitingIdleClaim` the
+sections are down under the dialog, so no widget exists to issue a chapter command and nothing
+can reset away an unpaid window; settling flips the session to `Live`. Authenticated ad/store
+callbacks are ordinary submissions to the command queue: the same pipeline as any command, its
+sweep conditional on the resulting phase like every transaction's - and because a submission may
+run at the frame's drain rather than at the call, the save that follows a grant, and the store
+acknowledgement that follows the save, run in the grant's completed callback, never at the call. The idle double is ATOMIC with its
 settlement: the rewarded-ad callback doubles and claims in one transaction, so a doubled offer never sits
 exposed to a backgrounding's drop (a kill mid-ad takes the callback with the process; the stamp
 never moved, so the next launch offers the window again), and the transaction ends in `Live` and sweeps
@@ -1407,9 +1409,15 @@ callback that leaves the phase alone (an entitlement written mid-dialog by any o
 sweeps nothing yet still repaints the dialog, because the refresh is unconditional: the offer it
 shows stays what was computed and is what OK pays - shown and paid never differ - and only the
 button set changes.
-Callbacks are not UI commands (§12.11). **One pipeline runs every command**: reentrancy guard, the
-flush, the command's own check and mutation, the sweep when the resulting phase is `Live`, one
-refresh. The session tests neither the phase nor the acting scope: widgets exist only for the
+Callbacks are not UI commands (§12.11). **One pipeline runs every command, as one queued
+transaction**: the flush, the command's own check and mutation, the sweep when the resulting phase
+is `Live`, one refresh. **The command queue**: `RunCommand` appends the transaction and returns.
+When the entry is the only one it runs at once - an optimization no call site relies on; a caller
+that needs the command's answer passes a completed callback and is told when it ran. The frame
+drains the entries present when the drain starts, in order, each left at the front until it
+returns, so a transaction submitted from inside a running one - a refresh handler, a trigger
+action - lands behind it and runs at the next drain as its own transaction with its own refresh.
+Nothing nests, so nothing guards. The session tests neither the phase nor the acting scope: widgets exist only for the
 foreground chapter while it is `Live`, and a dormant chapter is never executed, so no caller can
 present a scope outside the foreground subtree.
 **Switching away settles first**: the switch transaction deposits the outgoing chapter's
@@ -1484,7 +1492,9 @@ upgrade)`, `FireProducer(producer)`, `SetActiveBars(group, set)`, the event oper
 offer, §9 — the dialog's double button only *requests* the rewarded ad and its Backstage Pass button
 only *requests* the purchase; doubling and settling the
 offer is AdManager's or IAPManager's authenticated callback, never a UI call), `SetRoadieAllocation(map)` (nonnegative integers, Σ ≤ owned Roadies, unlocked chapters only), the Ch. 6 song operations (write / name), and
-`AcknowledgeStory(storyId)` (sets the root `storyN_seen` latch, §10). All fail-closed — each checks
+`AcknowledgeStory(beat)` (writes the beat's seen latch at its home through the `SetFlag` walk, §10;
+it checks nothing of its own - the host opens a card only for a beat whose button is live or whose
+mark pops it). All fail-closed — each checks
 its own gate. Ad and store
 callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations -
 `ExtendBuff(scope, modifier, seconds)`, `DoubleAndClaimIdle()`, `GrantEntitlement(id)` and
@@ -1628,7 +1638,7 @@ per-feature: any kind an author gates with explains itself for free.
 Assets/Scripts/
   Core/
     GameManager.cs          // bootstrap, save/load, chapter switching
-    GameSession.cs          // transient orchestration: foreground chapter, phase, the idle offer, command guard — never serialized
+    GameSession.cs          // transient orchestration: foreground chapter, phase, the idle offer, the command queue — never serialized
     TickSystem.cs           // the segmented tick over one real-time window; returns the TickReport
     TickReport.cs           // what ONE tick moved, recorded at the mutation sites; interpolation's slopes
     GameClock.cs            // the one time source: driver-owned, advanced at every entry point
@@ -1666,6 +1676,8 @@ Assets/Scripts/
     ChapterManager.cs      // forward-only advance, reacting to root completion flags
   Events/
     EventDefinition.cs  EventSystem.cs
+  Story/
+    StoryBeatDefinition.cs // a chapter-boundary card: text, availableWhen, seenFlag, opensWhenAvailable (section 10)
   Meta/
     RoadieAllocation.cs    // SetRoadieAllocation; the boost arithmetic is Economy's
     Encore.cs              // the encore id the code names: the resolve off root's own modifier list and its CodeReferences check
@@ -1692,10 +1704,12 @@ Assets/Scripts/
     ModuleWidget.cs  ModuleWidgetFactory.cs   // the plain-C# controller base and the closed prefabId switch
     ScreenHost.cs  UIRoot.cs                  // the structure logic (the ONE Refreshed subscriber) and its MonoBehaviour shell
     GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
+    IStoryOpener.cs         // the one method a story row asks of the host: open the card for a beat at its scope
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorListUI  GeneratorRowUI
-              UpgradeListUI  UpgradeRowUI  BarGroupUI  BarRowUI  RungButtonUI  EventUI
+              UpgradeListUI  UpgradeRowUI  BarGroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI
     ChapterSelectUI.cs  CollectScreenUI.cs        // the app's own screens for NoChapter and AwaitingIdleClaim, over root's roster and the session's offer
-    NumberFormatter.cs  StoryBeatUI.cs  RoadieAllocationUI.cs
+    StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
+    NumberFormatter.cs  RoadieAllocationUI.cs
 Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
 Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)
@@ -1704,7 +1718,7 @@ ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (1
     Currencies/  Modifiers/
   ch1/
     ch1.asset  tier1.asset
-    Currencies/  Producers/  Generators/  Upgrades/  BarGroups/  Bars/  Events/  Triggers/
+    Currencies/  Producers/  Generators/  Upgrades/  BarGroups/  Bars/  Events/  Triggers/  StoryBeats/
 Content/                 // the authored JSON the importer reads
   root.json  chapter-01.json
 ```

@@ -41,6 +41,23 @@
     ]
   },
 
+  "storyBeats": [
+    {
+      "id": "story_ch1_open",
+      "displayName": "Make Some Noise",
+      "availableWhen": { "type": "Always" },
+      "seenFlag": "story_ch1_open_seen",
+      "text": "It starts in the garage. Just you, a beat-up amp, and a handful of songs you half-know. Time to make some noise."
+    },
+    {
+      "id": "story_ch1_end",
+      "displayName": "Your First Roadie",
+      "availableWhen": { "type": "FlagSet", "flagId": "ch1_complete", "uiText": "Play the Backyard Party" },
+      "seenFlag": "story_ch1_end_seen",
+      "text": "The backyard's packed. You plug in, count off, and for three minutes the whole neighborhood is yours. Someone's already asking when the next one is — and a guy named Dave offers to haul your gear. You've got your first roadie."
+    }
+  ],
+
   "sections": [
     {
       "title": "The Garage Floor",
@@ -63,7 +80,13 @@
           "contentId": "records",
           "visibleWhen": { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1 }
         },
-        { "prefabId": "jam_button", "contentId": "tap_producer" }
+        { "prefabId": "jam_button", "contentId": "tap_producer" },
+        { "prefabId": "story_row", "contentId": "story_ch1_open" },
+        {
+          "prefabId": "story_row",
+          "contentId": "story_ch1_end",
+          "visibleWhen": { "type": "FlagSet", "flagId": "ch1_complete" }
+        }
       ]
     },
     {

@@ -36,12 +36,12 @@ MonoBehaviour:
   barGroups: []
   upgrades: []
   rung:
-    rid: 7579425355617271855
+    rid: 2509765282537144367
   events: []
   sections:
   - title: The Garage Floor
     visibleWhen:
-      rid: 7579425355617271856
+      rid: 2509765282537144368
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: currency_line
@@ -52,26 +52,36 @@ MonoBehaviour:
     - prefabId: currency_line
       content: {fileID: 11400000, guid: 8fcd19c799d152b4b95054ec949a12ff, type: 2}
       visibleWhen:
-        rid: 7579425355617271857
+        rid: 2509765282537144369
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: currency_line
       content: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
       visibleWhen:
-        rid: 7579425355617271858
+        rid: 2509765282537144370
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: currency_line
       content: {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}
       visibleWhen:
-        rid: 7579425355617271859
+        rid: 2509765282537144371
       scope: {fileID: 11400000}
     - prefabId: jam_button
       content: {fileID: 11400000, guid: 326d00bf3a76fde459700afcb61e75e9, type: 2}
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
+    - prefabId: story_row
+      content: {fileID: 11400000, guid: 64624d08ef7a237419c4d43e2afa7b16, type: 2}
+      visibleWhen:
+        rid: -2
+      scope: {fileID: 11400000}
+    - prefabId: story_row
+      content: {fileID: 11400000, guid: 0592b4d73c498014999053bb85a90a52, type: 2}
+      visibleWhen:
+        rid: 2509765282537144372
+      scope: {fileID: 11400000}
   - title: The Band
     visibleWhen:
-      rid: 7579425355617271860
+      rid: 2509765282537144373
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: generator_list
@@ -81,7 +91,7 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
   - title: The Gear
     visibleWhen:
-      rid: 7579425355617271861
+      rid: 2509765282537144374
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: upgrade_list
@@ -91,7 +101,7 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
   - title: The Rehearsal Space
     visibleWhen:
-      rid: 7579425355617271862
+      rid: 2509765282537144375
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: bar_group
@@ -101,7 +111,7 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
   - title: The Release
     visibleWhen:
-      rid: 7579425355617271863
+      rid: 2509765282537144376
     scope: {fileID: 11400000}
     modules:
     - prefabId: rung_button
@@ -111,7 +121,7 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
   - title: Garage Jam
     visibleWhen:
-      rid: 7579425355617271864
+      rid: 2509765282537144377
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: event_row
@@ -131,7 +141,7 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
   - title: The Backyard Party
     visibleWhen:
-      rid: 7579425355617271865
+      rid: 2509765282537144378
     scope: {fileID: 11400000}
     modules:
     - prefabId: rung_button
@@ -139,37 +149,40 @@ MonoBehaviour:
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000}
+  storyBeats:
+  - {fileID: 11400000, guid: 64624d08ef7a237419c4d43e2afa7b16, type: 2}
+  - {fileID: 11400000, guid: 0592b4d73c498014999053bb85a90a52, type: 2}
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425355617271855
+    - rid: 2509765282537144367
       type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         label: Play the Backyard Party
         offerCondition:
-          rid: 7579425355617271866
+          rid: 2509765282537144379
         actions:
-        - rid: 7579425355617271867
-        - rid: 7579425355617271868
-        - rid: 7579425355617271869
-        - rid: 7579425355617271870
-    - rid: 7579425355617271856
+        - rid: 2509765282537144380
+        - rid: 2509765282537144381
+        - rid: 2509765282537144382
+        - rid: 2509765282537144383
+    - rid: 2509765282537144368
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-    - rid: 7579425355617271857
+    - rid: 2509765282537144369
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: fans_revealed
-    - rid: 7579425355617271858
+    - rid: 2509765282537144370
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: rehearsal_revealed
-    - rid: 7579425355617271859
+    - rid: 2509765282537144371
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -178,7 +191,12 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 7579425355617271860
+    - rid: 2509765282537144372
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: ch1_complete
+    - rid: 2509765282537144373
       type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -187,7 +205,7 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 2
-    - rid: 7579425355617271861
+    - rid: 2509765282537144374
       type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -196,17 +214,17 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 2
-    - rid: 7579425355617271862
+    - rid: 2509765282537144375
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: rehearsal_revealed
-    - rid: 7579425355617271863
+    - rid: 2509765282537144376
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: album
-    - rid: 7579425355617271864
+    - rid: 2509765282537144377
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -215,12 +233,12 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 7579425355617271865
+    - rid: 2509765282537144378
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: album
-    - rid: 7579425355617271866
+    - rid: 2509765282537144379
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -229,11 +247,11 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 1
-    - rid: 7579425355617271867
+    - rid: 2509765282537144380
       type: {class: ExecuteRung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         tier: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
-    - rid: 7579425355617271868
+    - rid: 2509765282537144381
       type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currencies:
@@ -244,11 +262,11 @@ MonoBehaviour:
             exponent: 0
         formula:
           rid: -2
-    - rid: 7579425355617271869
+    - rid: 2509765282537144382
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: ch1_complete
-    - rid: 7579425355617271870
+    - rid: 2509765282537144383
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000}

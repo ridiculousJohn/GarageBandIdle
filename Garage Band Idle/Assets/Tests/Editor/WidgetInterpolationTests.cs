@@ -15,6 +15,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // clock, which is what lets a frame land at an exact game time.
     public class WidgetInterpolationTests
     {
+        // The one thing a story row asks of the host (12.11), answered by
+        // nothing: no host is present here, and no row in this suite is a story
+        // row - the factory takes the opener because only StoryRowUI reads it.
+        private sealed class NoStories : IStoryOpener
+        {
+            public static readonly NoStories Instance = new();
+
+            public void OpenStory(Story.StoryBeatDefinition beat, ScopeState scope) { }
+        }
+
         // Computed amounts within tolerance, never bit-exact, for the reason
         // SessionPacingTests gives: BigDouble's base-10 mantissa is
         // binary-inexact. Label strings are compared exactly - a display string
@@ -56,7 +66,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 var asset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Widgets/" + uxml);
                 Assert.IsNotNull(asset, "Assets/UI/Widgets/" + uxml + " is missing");
-                var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate());
+                var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), NoStories.Instance);
                 widget.Bind(Session, Tree.Tier1, content, Clock);
                 return widget;
             }
@@ -64,9 +74,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The selection through the command, so the fact is written the way
             // the game writes it. It is a NON-tick transaction, so every row
             // does this before the tick it measures.
-            public void SelectCover1() =>
-                Assert.IsTrue(Session.SetActiveBars(Ctx(0), Tree.LearnCovers, new[] { Tree.Cover1 }),
+            public void SelectCover1()
+            {
+                Session.SetActiveBars(Ctx(0), Tree.LearnCovers, new[] { Tree.Cover1 });
+                Assert.IsTrue(Tree.Tier1.activeBars[Tree.LearnCovers.Id].Contains(Tree.Cover1.Id),
                     "cover_1 was selected");
+            }
         }
 
         // A pool drained faster than it fills: the negative slope is honest
@@ -158,7 +171,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var report = fx.Session.LastTick;
             Assert.IsNotNull(report, "the tick measured a slope");
 
-            Assert.IsTrue(fx.Session.FireProducer(fx.Ctx(10), fx.Tree.TapProducer), "the tap fired");
+            fx.Session.FireProducer(fx.Ctx(10), fx.Tree.TapProducer);
             Assert.AreSame(report, fx.Session.LastTick, "the tap touched nothing the tick owns");
 
             var widget = fx.Widget("currency_line", "CurrencyLine.uxml", fx.Tree.Cash);

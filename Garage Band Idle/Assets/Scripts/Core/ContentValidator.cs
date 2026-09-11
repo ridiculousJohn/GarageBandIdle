@@ -377,6 +377,8 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var upgrade in scope.upgrades) if (upgrade != null) yield return upgrade;
             if (scope is InteriorDefinition interior)
                 foreach (var evt in interior.events) if (evt != null) yield return evt;
+            if (scope is ChapterDefinition chapter)
+                foreach (var beat in chapter.storyBeats) if (beat != null) yield return beat;
             foreach (var group in scope.barGroups)
             {
                 if (group == null) continue;
@@ -544,6 +546,8 @@ namespace RidiculousGaming.GarageBandIdle
                 CollectDeclared(scope, scope.upgrades, "upgrades");
                 if (scope is InteriorDefinition interiorScope)
                     CollectDeclared(scope, interiorScope.events, "events");
+                if (scope is ChapterDefinition beatHost)
+                    CollectDeclared(scope, beatHost.storyBeats, "storyBeats");
                 // Root's store products are bare strings for the reason flags
                 // are (12.3), so their slot check is the string one. Nothing
                 // else about the list is checked: no mechanism reads a
@@ -682,6 +686,8 @@ namespace RidiculousGaming.GarageBandIdle
                 RecordHome(scope, scope.upgrades);
                 if (scope is InteriorDefinition interiorScope)
                     RecordHome(scope, interiorScope.events, "an event has one home");
+                if (scope is ChapterDefinition beatHost)
+                    RecordHome(scope, beatHost.storyBeats, "a story beat has one home");
             }
 
             var ctx = new ValidationContext(report, root, parentByScope,
@@ -703,9 +709,9 @@ namespace RidiculousGaming.GarageBandIdle
             foreach (var scope in treeScopes)
             {
                 // The CLOSED list (12.11): currencies, generators, upgrades,
-                // bars, events, and the chapter itself. Families off it go
-                // unjudged - a name no widget renders is junk that reads as
-                // design intent.
+                // bars, events, story beats, and the chapter itself. Families
+                // off it go unjudged - a name no widget renders is junk that
+                // reads as design intent.
                 foreach (var named in scope.declaredCurrencies)
                     RequireDisplayName(named, scope);
                 foreach (var named in scope.generators)
@@ -723,7 +729,13 @@ namespace RidiculousGaming.GarageBandIdle
                     foreach (var named in namedHost.events)
                         RequireDisplayName(named, scope);
                 if (scope is ChapterDefinition namedChapter)
+                {
                     RequireDisplayName(namedChapter, scope);
+                    // The row's button text and the card's title are both the
+                    // beat's displayName, rendered by construction (12.11).
+                    foreach (var named in namedChapter.storyBeats)
+                        RequireDisplayName(named, scope);
+                }
 
                 // A currency's activeWhen is judged at the currency's own home,
                 // which IS the scope declaring it - so the acting scope is this
@@ -787,6 +799,16 @@ namespace RidiculousGaming.GarageBandIdle
                         if (evt == null)
                             continue; // flagged during id collection
                         ValidateEvent(ctx, evt, scope);
+                    }
+                }
+
+                if (scope is ChapterDefinition storyHost)
+                {
+                    foreach (var beat in storyHost.storyBeats)
+                    {
+                        if (beat == null)
+                            continue; // flagged during id collection
+                        ValidateStoryBeat(ctx, beat, storyHost);
                     }
                 }
 
@@ -1078,6 +1100,52 @@ namespace RidiculousGaming.GarageBandIdle
                     return true;
             }
             return false;
+        }
+
+        // A beat's own shape (section 10, 12.11): the gate, the body text, and
+        // the seen latch, all judged at the CHAPTER that declares it - which is
+        // where the row rebases before it asks the gate, and where the
+        // acknowledging write walks outward from.
+        private static void ValidateStoryBeat(ValidationContext ctx, Story.StoryBeatDefinition beat,
+                                              ChapterDefinition chapter)
+        {
+            var site = $"story beat '{beat.Id}'";
+            ctx.EnterScope(chapter);
+            ctx.SetSite(site);
+            if (beat.availableWhen == null)
+                ctx.AddError(ValidationCheck.NullEntry,
+                    "availableWhen is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
+            else
+            {
+                ctx.SetSite($"{site} availableWhen");
+                beat.availableWhen.Validate(ctx);
+                // The row renders the gate's legs as its goal readout, so every
+                // leg's text is formatted here, once (12.11).
+                ValidateGateText(ctx, beat.availableWhen);
+            }
+
+            ctx.SetSite(site);
+            if (string.IsNullOrEmpty(beat.text))
+                ctx.AddError(ValidationCheck.NullEntry,
+                    "text is empty - the card's body is the beat's own content (12.11).");
+
+            // The latch is written by the outward walk SetFlag uses, so the home
+            // is whatever the chapter's own chain declares - a flag of the same
+            // name on another chain is a different flag (12.3). Found, the beat
+            // IS that flag's setter, which is what the no-setter question reads.
+            var home = ctx.FlagHome(beat.seenFlag);
+            if (home == null)
+            {
+                var elsewhere = ctx.AnyScopeDeclaringFlag(beat.seenFlag);
+                if (elsewhere == null)
+                    ctx.AddError(ValidationCheck.UnresolvedReference,
+                        $"seenFlag names flag '{beat.seenFlag}', which no scope declares (12.12).");
+                else
+                    ctx.AddError(ValidationCheck.ChainReach,
+                        $"seenFlag '{beat.seenFlag}' is homed at '{elsewhere.Id}', which is not on the chain from '{chapter.Id}' - the write can never reach it (12.12).");
+                return;
+            }
+            ctx.RecordFlagSetter(beat.seenFlag);
         }
 
         private static void ValidateGenerator(ValidationContext ctx, Economy.GeneratorDefinition generator)

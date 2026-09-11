@@ -11,6 +11,7 @@ using UnityEditor.AddressableAssets.Settings.GroupSchemas;
 using UnityEngine;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
+using RidiculousGaming.GarageBandIdle.Story;
 
 namespace RidiculousGaming.GarageBandIdle.Editor
 {
@@ -340,6 +341,11 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             if (scope is not ChapterDefinition && dto.sections.Count > 0)
                 throw new ContentImportException($"scope '{dto.id}' authors sections; only a chapter has a screen (12.11).");
 
+            // The same rule for the other chapter-only block: a beat tells a
+            // chapter boundary, so only a chapter declares one (section 10).
+            if (scope is not ChapterDefinition && dto.storyBeats.Count > 0)
+                throw new ContentImportException($"scope '{dto.id}' authors story beats; only a chapter declares them (section 10).");
+
             foreach (var currency in dto.currencies)
                 Declare<CurrencyDefinition>(build, scope, currency, document, options, materialize);
             foreach (var producer in dto.producers)
@@ -354,6 +360,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 Declare<TriggerDefinition>(build, scope, trigger, document, options, materialize);
             foreach (var evt in dto.events)
                 Declare<EventDefinition>(build, scope, evt, document, options, materialize);
+            foreach (var beat in dto.storyBeats)
+                Declare<StoryBeatDefinition>(build, scope, beat, document, options, materialize);
             foreach (var group in dto.barGroups)
             {
                 Declare<BarGroupDefinition>(build, scope, group, document, options, materialize);
@@ -547,11 +555,27 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     };
             }
 
-            // The screen, rebuilt wholesale like every other nested authored
-            // object: nothing outside references a section, so there is no
-            // identity to preserve across an import.
+            // The two blocks only a chapter carries: its boundary cards, and the
+            // screen that binds them.
             if (scope is ChapterDefinition chapter)
             {
+                // A beat's gate and its latch resolve outward from the CHAPTER,
+                // which declares the beat and is where the row rebases to judge
+                // it (section 10, 12.11).
+                chapter.storyBeats.Clear();
+                foreach (var beatDto in dto.storyBeats)
+                {
+                    var beat = (StoryBeatDefinition)build.Built[beatDto];
+                    beat.text = beatDto.text;
+                    beat.availableWhen = BuildCondition(build, scope, beatDto.availableWhen);
+                    beat.seenFlag = beatDto.seenFlag;
+                    beat.opensWhenAvailable = beatDto.opensWhenAvailable;
+                    chapter.storyBeats.Add(beat);
+                }
+
+                // The screen, rebuilt wholesale like every other nested authored
+                // object: nothing outside references a section, so there is no
+                // identity to preserve across an import.
                 chapter.sections.Clear();
                 foreach (var sectionDto in dto.sections)
                 {
@@ -877,6 +901,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             if (type == typeof(BarGroupDefinition)) return "BarGroups";
             if (type == typeof(BarDefinition)) return "Bars";
             if (type == typeof(EventDefinition)) return "Events";
+            if (type == typeof(StoryBeatDefinition)) return "StoryBeats";
             if (type == typeof(TriggerDefinition)) return "Triggers";
             throw new ContentImportException($"{type.Name} has no asset family.");
         }

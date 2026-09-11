@@ -139,7 +139,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 for (var i = 0; i < times; i++)
                 {
-                    Assert.IsTrue(Session.FireProducer(Ctx(Tier1), TapProducer), "the tap fired");
+                    Session.FireProducer(Ctx(Tier1), TapProducer);
                     Tick(0.5);
                 }
             }
@@ -172,13 +172,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void Buy(GeneratorDefinition generator)
             {
                 TapUntil(() => Purchasing.CanBuy(Ctx(Tier1), generator), $"{generator.Id} affordable");
-                Assert.IsTrue(Session.TryBuy(Ctx(Tier1), generator), generator.Id);
+                Tier1.generatorCounts.TryGetValue(generator.Id, out var owned);
+                Session.TryBuy(Ctx(Tier1), generator);
+                Assert.AreEqual(owned + 1, Tier1.generatorCounts[generator.Id], generator.Id);
             }
 
             public void Buy(UpgradeDefinition upgrade)
             {
                 TapUntil(() => Purchasing.CanBuy(Ctx(Tier1), upgrade), $"{upgrade.Id} affordable");
-                Assert.IsTrue(Session.TryBuy(Ctx(Tier1), upgrade), upgrade.Id);
+                Session.TryBuy(Ctx(Tier1), upgrade);
+                Assert.IsTrue(Tier1.purchasedUpgrades.Contains(upgrade.Id), upgrade.Id);
             }
 
             // The doc's mid-chapter run (13.2 and 13.3): a banked Records count
@@ -280,7 +283,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The cover drinks the pool the taps bank, at its OWN 2/s rather
             // than the pool's - a press pays one Rehearsal every half second,
             // which is exactly what the bar takes.
-            Assert.IsTrue(f.Session.SetActiveBars(f.Ctx(f.Tier1), f.LearnCovers, new[] { f.Cover1 }));
+            f.Session.SetActiveBars(f.Ctx(f.Tier1), f.LearnCovers, new[] { f.Cover1 });
+            Assert.IsTrue(f.Tier1.activeBars[f.LearnCovers.Id].Contains(f.Cover1.Id), "cover_1 is the running cover");
             f.TapUntil(() => f.Progress(f.Cover1) >= f.Cover1.fillAmount, "cover_1 filled");
             Assert.AreEqual(1, f.Tier1.modifierStacks[f.CoverBonus1.Id],
                 "a non-repeating completion leaves no derivable fact, so its reward is a grant");
@@ -301,7 +305,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Ch1.flags.Contains("album"));
 
             Assert.IsTrue(f.Tier1Def.rung.IsOffered(f.Ctx(f.Tier1)));
-            Assert.IsTrue(f.Session.TryRung(f.Ctx(f.Tier1)), "the release fires");
+            f.Session.TryRung(f.Ctx(f.Tier1));
 
             // One evaluation, two targets.
             AssertClose(3, f.Balance(f.Root, f.Records), "records");
@@ -332,7 +336,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1.5 * 1.34, f.Rate(f.Cash), "the gear pays before the jam");
 
             Assert.IsTrue(f.GarageJam1.IsAvailable(f.Ctx(f.Tier1)), "CurrencyAtLeast(records, 1) holds at 17");
-            Assert.IsTrue(f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1));
+            f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1);
 
             // onEntry's RestartScope banks through the release's OWN gate - 60
             // fans with a cover done meets it - and then clears the run, so
@@ -369,11 +373,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Spending back below the goal un-secures nothing - the latch is
             // the fact, not the balance.
-            Assert.IsTrue(f.Session.TryBuy(f.Ctx(f.Tier1), f.PracticeAmp));
+            f.Session.TryBuy(f.Ctx(f.Tier1), f.PracticeAmp);
             Assert.Less(f.Balance(f.Tier1, f.Cash).ToDouble(), 150);
             Assert.IsTrue(f.Tier1.activeEvent.goalReached);
 
-            Assert.IsTrue(f.Session.TryDismissEvent(f.Ctx(f.Tier1), f.GarageJam1));
+            f.Session.TryDismissEvent(f.Ctx(f.Tier1), f.GarageJam1);
             Assert.IsNull(f.Tier1.activeEvent, "the record is removed first, which is what reopens the guard");
             Assert.AreEqual(1, f.Ch1.modifierStacks[f.GjTap1.Id], "the bonus is granted at the chapter");
             Assert.IsTrue(f.Ch1.flags.Contains("gj1_done"));
@@ -391,16 +395,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Enter();
             f.SeedRun(records: 17, fans: 60);
 
-            Assert.IsTrue(f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1));
+            f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1);
             f.TickUntil(() => f.Tier1.activeEvent.remainingSeconds <= 0, "the timer expiring", 120);
 
             // The record persists past expiry: the handicap keeps applying and
             // the host stays occupied until somebody dismisses it.
             Assert.IsNotNull(f.Tier1.activeEvent);
             Assert.IsFalse(f.Tier1.activeEvent.goalReached, "the goal was never met");
-            Assert.IsFalse(f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1), "an occupied host refuses entry");
+            var record = f.Tier1.activeEvent;
+            bool? started = null;
+            f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1, ran => started = ran);
+            Assert.AreEqual(false, started, "an occupied host refuses entry");
+            Assert.AreSame(record, f.Tier1.activeEvent, "and the standing attempt is untouched");
 
-            Assert.IsTrue(f.Session.TryDismissEvent(f.Ctx(f.Tier1), f.GarageJam1));
+            f.Session.TryDismissEvent(f.Ctx(f.Tier1), f.GarageJam1);
             Assert.IsNull(f.Tier1.activeEvent);
             Assert.IsFalse(f.Ch1.modifierStacks.ContainsKey(f.GjTap1.Id), "no bonus without the goal");
             Assert.IsFalse(f.Ch1.flags.Contains("gj1_done"));
@@ -420,7 +428,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Ch1.flags.Add("album");
 
             Assert.IsTrue(f.Ch1Def.rung.IsOffered(f.Ctx(f.Ch1)), "32 banked records clears the gate of 30");
-            Assert.IsTrue(f.Session.TryRung(f.Ctx(f.Ch1)));
+            f.Session.TryRung(f.Ctx(f.Ch1));
 
             // ExecuteRung banks the live run through the release's own gate -
             // floor(sqrt(70/5)) = 3 - before the wipe reaches it.
@@ -469,7 +477,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The jam's entry restart banks the live run first, so the gate
             // stays met while the attempt runs.
-            Assert.IsTrue(f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1));
+            f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1);
             AssertClose(35, f.Balance(f.Root, f.Records), "32 + floor(sqrt(70/5))");
             f.Ctx(f.Tier1).Deposit("cash", 150);
             f.Tick(1);
@@ -488,14 +496,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // A refused list runs nothing at all - not even the ExecuteRung it
             // opens with.
-            Assert.IsFalse(f.Session.TryRung(f.Ctx(f.Ch1)));
+            bool? released = null;
+            f.Session.TryRung(f.Ctx(f.Ch1), ran => released = ran);
+            Assert.AreEqual(false, released, "the refused list runs nothing at all");
             AssertClose(35, f.Balance(f.Root, f.Records), "nothing banked");
             AssertClose(0, f.Balance(f.Root, f.Roadies));
             Assert.IsFalse(f.Root.flags.Contains("ch1_complete"));
             AssertClose(35, f.Balance(f.Ch1, f.Ch1Records), "and nothing cleared");
 
             // One tap of dismissal takes the reward and reopens the button.
-            Assert.IsTrue(f.Session.TryDismissEvent(f.Ctx(f.Tier1), f.GarageJam1));
+            f.Session.TryDismissEvent(f.Ctx(f.Tier1), f.GarageJam1);
             Assert.AreEqual(1, f.Ch1.modifierStacks[f.GjTap1.Id], "the reward was paid, not stranded");
             Assert.IsTrue(f.Ch1Def.rung.IsOffered(f.Ctx(f.Ch1)));
 
@@ -503,7 +513,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // the release's own gate, the roadie is the constant 1, and
             // ResetScope(ch1) is downward closed.
             f.SeedRun(records: 35, fans: 70);
-            Assert.IsTrue(f.Session.TryRung(f.Ctx(f.Ch1)));
+            f.Session.TryRung(f.Ctx(f.Ch1));
 
             AssertClose(38, f.Balance(f.Root, f.Records), "35 + floor(sqrt(70/5))");
             AssertClose(1, f.Balance(f.Root, f.Roadies), "chapter 1's reward formula is the constant 1");

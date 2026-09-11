@@ -87,9 +87,11 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
             if (result.Outcome != PurchaseOutcome.Succeeded)
                 return;
 
-            Grant(request.Product, nowUtc);
-            save();
-            store.Acknowledge(result.TransactionId);
+            Grant(request.Product, nowUtc, () =>
+            {
+                save();
+                store.Acknowledge(result.TransactionId);
+            });
         }
 
         // A Tip Jar buys nothing (design doc 9: no gated content), so it grants
@@ -97,25 +99,32 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
         // succeeded purchase takes. An unhandled product is a code fault: the
         // store would have already reported success against a grant that does
         // not exist.
-        private void Grant(ProductId product, DateTime nowUtc)
+        //
+        // The order the class promises - the grant on the tree, then the save,
+        // then the acknowledge - is tied to the command's completion, because a
+        // submitted command may run at the frame's drain rather than at the
+        // call (12.9). A case that issues a command hands the callback on; the
+        // Tip Jar cases, which issue none, call it themselves.
+        private void Grant(ProductId product, DateTime nowUtc, Action completed)
         {
             switch (product)
             {
                 case ProductId.BackstagePass:
-                    session.PurchasePassFromDialog(nowUtc);
+                    session.PurchasePassFromDialog(nowUtc, _ => completed());
                     break;
                 case ProductId.RoadieBundleSmall:
-                    session.GrantRoadies(config.roadieBundleSmall, nowUtc);
+                    session.GrantRoadies(config.roadieBundleSmall, nowUtc, _ => completed());
                     break;
                 case ProductId.RoadieBundleMedium:
-                    session.GrantRoadies(config.roadieBundleMedium, nowUtc);
+                    session.GrantRoadies(config.roadieBundleMedium, nowUtc, _ => completed());
                     break;
                 case ProductId.RoadieBundleLarge:
-                    session.GrantRoadies(config.roadieBundleLarge, nowUtc);
+                    session.GrantRoadies(config.roadieBundleLarge, nowUtc, _ => completed());
                     break;
                 case ProductId.TipJarSmall:
                 case ProductId.TipJarMedium:
                 case ProductId.TipJarLarge:
+                    completed();
                     break;
                 default:
                     throw new InvalidOperationException(
@@ -124,25 +133,23 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
         }
 
         // Restoration is the entitlement write for each id the store answers
-        // with, and one save if anything was written. A consumable is never
-        // restored, so a bundle in the list is ignored. The write is idempotent
-        // by construction - the id is in root's set or it is not - so no ledger
-        // of processed transactions is needed here.
+        // with, and one save per write, when it lands - the grant is a
+        // submitted command (12.9) and may run at the frame's drain rather than
+        // at the call. A consumable is never restored, so a bundle in the list
+        // is ignored. The write is idempotent by construction - the id is in
+        // root's set or it is not - so no ledger of processed transactions is
+        // needed here.
         private void DeliverRestore(Task<IReadOnlyList<ProductId>> completed, DateTime nowUtc)
         {
             if (completed.Status != TaskStatus.RanToCompletion || completed.Result == null)
                 return;
 
-            var wrote = false;
             foreach (var product in completed.Result)
             {
                 if (product != ProductId.BackstagePass)
                     continue;
-                session.GrantEntitlement(BackstagePass.EntitlementId, nowUtc);
-                wrote = true;
+                session.GrantEntitlement(BackstagePass.EntitlementId, nowUtc, _ => save());
             }
-            if (wrote)
-                save();
         }
     }
 }

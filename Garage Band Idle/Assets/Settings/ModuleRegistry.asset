@@ -27,3 +27,5 @@ MonoBehaviour:
     prefab: {fileID: 9197481963319205126, guid: 0f70d898be43e2a44861591de3339d76, type: 3}
   - prefabId: event_row
     prefab: {fileID: 9197481963319205126, guid: 3d2563f730476ff4786cd31a85111d68, type: 3}
+  - prefabId: story_row
+    prefab: {fileID: 9197481963319205126, guid: 9d34bc6381464b45900f23fb2d695ac4, type: 3}

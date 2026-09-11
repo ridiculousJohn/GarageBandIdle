@@ -159,7 +159,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase);
 
-            Assert.IsTrue(f.Session.ClaimIdle(f.Tree.Now));
+            f.Session.ClaimIdle(f.Tree.Now);
 
             // Fans settles first and shuts cash's gate; cash is paid anyway.
             AssertClose(175, f.Tree.Tier1.balances["fans"]);     // 0.175/s x 1000
@@ -347,7 +347,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(3600, f.Session.CurrentOffer.lines[0].amount);   // 0.25/s x the default 14400s cap
 
             // Settled, the advanced stamp offers nothing again.
-            Assert.IsTrue(f.Session.ClaimIdle(f.Tree.Now.AddSeconds(50000)));
+            f.Session.ClaimIdle(f.Tree.Now.AddSeconds(50000));
             AssertClose(3600, f.Tree.Tier1.balances["cash"]);
             f.Session.SwitchChapter(null, f.Tree.Now.AddSeconds(50010));
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now.AddSeconds(50020));
@@ -389,7 +389,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The claim's own sweep is where the root trigger fires - after
             // the deposits, which the surviving root-homed line proves.
             var facts = f.Tree.Ch1.facts;
-            Assert.IsTrue(f.Session.ClaimIdle(f.Tree.Now));
+            f.Session.ClaimIdle(f.Tree.Now);
             Assert.IsTrue(f.Tree.Root.firedTriggers.Contains("root_reset"));
             AssertClose(500, f.Tree.Root.balances["records"]);
             Assert.AreNotSame(facts, f.Tree.Ch1.facts);   // the reset took the chapter's facts; the deposits were already banked
@@ -429,7 +429,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Claimed well after the offer was computed: the deposit is the
             // stored amount, and the stamp advances to the window's end, not
             // the claim moment.
-            Assert.IsTrue(f.Session.ClaimIdle(f.Tree.Now.AddSeconds(300)));
+            f.Session.ClaimIdle(f.Tree.Now.AddSeconds(300));
 
             AssertClose(250, f.Tree.Tier1.balances["cash"]);   // 0.25/s x 1000
             Assert.AreEqual(f.Tree.Now, f.Tree.Ch1.lastActiveUtc);
@@ -437,7 +437,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(f.Session.CurrentOffer);
 
             // Replay is refused by phase, and nothing re-deposits.
-            Assert.IsFalse(f.Session.ClaimIdle(f.Tree.Now.AddSeconds(300)));
+            bool? settled = null;
+            f.Session.ClaimIdle(f.Tree.Now.AddSeconds(300), ran => settled = ran);
+            Assert.AreEqual(false, settled, "a settled offer is claimed once");
             AssertClose(250, f.Tree.Tier1.balances["cash"]);
         }
 
@@ -463,7 +465,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(500, session.CurrentOffer.lines.Find(l => l.currency == f.Tree.Cash).amount);      // 0.25/s x 2000
             AssertClose(1000, session.CurrentOffer.lines.Find(l => l.currency == f.Tree.Records).amount);  // 0.5/s x 2000
 
-            Assert.IsTrue(session.ClaimIdle(f.Tree.Now.AddSeconds(1000)));
+            session.ClaimIdle(f.Tree.Now.AddSeconds(1000));
             AssertClose(500, loadedTier1.balances["cash"]);
             AssertClose(1000, loaded.balances["records"]);
             Assert.AreEqual(f.Tree.Now.AddSeconds(1000), loadedCh1.lastActiveUtc);

@@ -39,6 +39,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly BarGroupDefinition Covers;
         public readonly BarDefinition Cover1;
 
+        // The chapter's one story beat, which is also the setter for the root
+        // latch it names (12.12) - so the no-setter accounting is exercised by
+        // the fixture that validates clean.
+        public readonly Story.StoryBeatDefinition Opener;
+
         // Root's children are the roster, never its serialized list (12.14.5).
         public readonly List<ChapterDefinition> Chapters = new();
 
@@ -76,6 +81,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Cover1.fillRate = 2;
             Covers.bars.Add(Cover1);
             Tier1.barGroups.Add(Covers);
+
+            // Chapter-boundary content, declared on the chapter and latched by a
+            // flag at root, which the outward walk from ch1 reaches (section 10).
+            Root.declaredFlags.Add("story_open_seen");
+            Opener = TestTree.MakeDefinition<Story.StoryBeatDefinition>("story_open");
+            Opener.availableWhen = new Always();
+            Opener.seenFlag = "story_open_seen";
+            Opener.text = "It starts in the garage.";
+            Ch1.storyBeats.Add(Opener);
 
             Album = new Rung
             {
@@ -860,6 +874,106 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.AddGuardedEvent();
             f.Trigger.condition = new EventRecordExists();
             AssertNoFinding(f.Run(), ValidationCheck.ScopeReach);
+        }
+
+        // ---- story beats ----
+
+        // The latch is written by the outward walk SetFlag uses, so a flag no
+        // scope declares at all is the unresolved case and one homed off the
+        // chain is the reach case - the same pair every write draws (12.12).
+        [Test]
+        public void StoryBeat_SeenFlagNoHome_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Opener.seenFlag = "ghost";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "seenFlag names flag 'ghost', which no scope declares");
+        }
+
+        [Test]
+        public void StoryBeat_SeenFlagOnASiblingChapter_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            sibling.Ch2.declaredFlags.Add("story_side_seen");
+            f.Opener.seenFlag = "story_side_seen";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "seenFlag 'story_side_seen' is homed at 'ch2'");
+        }
+
+        [Test]
+        public void StoryBeat_NullGate_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Opener.availableWhen = null;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "story beat 'story_open': availableWhen is unauthored");
+        }
+
+        [Test]
+        public void StoryBeat_EmptyText_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Opener.text = "";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "text is empty - the card's body is the beat's own content");
+        }
+
+        // The row's button and the card's title are both the beat's
+        // displayName, so a beat joins the closed list by construction (12.11).
+        [Test]
+        public void StoryBeat_MissingDisplayName_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Opener.displayName = "";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "StoryBeatDefinition 'story_open' at 'ch1' has no displayName");
+        }
+
+        // Opening the card is what writes the latch, so the beat IS its flag's
+        // setter and a flag only a beat sets is fully accounted for (12.12).
+        [Test]
+        public void StoryBeat_IsItsFlagsSetter_NoFlagNoSetterWarning()
+        {
+            AssertNoFinding(new ValidatorFixture().Run(), ValidationCheck.FlagNoSetter);
+        }
+
+        [Test]
+        public void StoryBeat_IdJoinsTheChainIdSpace_DuplicateId_Error()
+        {
+            var f = new ValidatorFixture();
+            var twin = TestTree.MakeDefinition<Story.StoryBeatDefinition>("cash");
+            twin.availableWhen = new Always();
+            twin.seenFlag = "story_open_seen";
+            twin.text = "A second card.";
+            f.Ch1.storyBeats.Add(twin);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateId,
+                "'cash' is declared twice on the chain");
+        }
+
+        // The row renders the gate's legs as its goal readout, so a leg
+        // string.Format refuses is the same finding it is at every other gate.
+        [Test]
+        public void StoryBeat_GateLegsGetTheTextCheck()
+        {
+            var f = new ValidatorFixture();
+            f.Opener.availableWhen = new All
+            {
+                conditions =
+                {
+                    new Any
+                    {
+                        uiText = "{2}",
+                        conditions =
+                        {
+                            new CurrencyAtLeast { currency = f.Ch1Records, threshold = 10, uiText = "10 records" },
+                            new FlagSet { flagId = "album", uiText = "a demo" },
+                        }
+                    }
+                }
+            };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "is not a format over its 2 part(s)");
         }
 
         // ---- effect selectors are never checked (12.12) ----

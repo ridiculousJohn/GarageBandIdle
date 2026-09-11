@@ -138,8 +138,9 @@ facts only John can settle, and none blocks a slice.
   resolved outward from the acting scope, with `Validate` and `Progress`).
 - **`GameSession.EnterChapter`**: computes the offer once over `[stamp, nowUtc]` at current state
   under the idle context; `SettleOffer` pays the stored lines as they stand. `RunCommand` is
-  the one pipeline every command runs: reentrancy guard, flush, the command's own check and
-  mutation, conditional sweep, one refresh. Decided 2026-09-10: the phase test and the foreground
+  the one pipeline every command runs, as one queued transaction: flush, the command's own check
+  and mutation, conditional sweep, one refresh - run at the call when the queue is empty, at the
+  frame's drain otherwise (the command queue, John 2026-09-10; 12.9). Decided 2026-09-10: the phase test and the foreground
   test it carried are deleted, and with them the root-context variant that skipped them - no caller
   could reach either, since the host builds widgets only for the foreground chapter while `Live`
   and a dormant chapter is never executed.
@@ -323,9 +324,11 @@ so the plug-in claim is honest rather than absolute:
   the Tip Jar tiers.
 
 **Consumable delivery order**: grant, save, acknowledge. A real store re-delivers any transaction
-the app never acknowledged, so `IAPManager` runs the grant command, calls the driver's one save
-site (`GameManager.Save` - "a periodic autosave is one call here whenever it is wanted"), and only
-then acknowledges. A kill before the save leaves the transaction unacknowledged and the store
+the app never acknowledged, so `IAPManager` runs the grant command and, in that command's
+completed callback - a submission may run at the frame's drain rather than at the call (12.9) -
+calls the driver's one save site (`GameManager.Save` - "a periodic autosave is one call here
+whenever it is wanted"), and only then acknowledges. The Encore ad's save and restore's save wait
+on their grants the same way; the Tip Jar issues no command and saves and acknowledges at the call. A kill before the save leaves the transaction unacknowledged and the store
 re-delivers it; a kill after the save and before the acknowledge re-delivers a transaction already
 granted. Two pieces of that replay are deferred to the real SDK's arrival, together, and the plan
 records the gap rather than claiming the seam complete: the ROUTE - a `Task` from `Purchase`
@@ -361,8 +364,7 @@ standing it is refused like `ClaimIdle`.
 
 The fakes complete on the main thread on the next frame, through the driver's `Update`, so the
 asynchrony is real enough to catch a callback landing under a changed phase but never interleaves
-with a running command - which is why no callback queue is built: 12.9's "queued behind
-`commandInProgress`" is satisfied by Unity's main thread until a real SDK proves otherwise. Each
+with a running command; the callbacks submit to the command queue like every command (12.9). Each
 fake has a scripted next outcome so a test or the editor forces failure or abort.
 
 ## Story beats
@@ -388,8 +390,8 @@ that flag's setter, which retires the two `FlagNoSetter` warnings the content te
 code-set flag remains: the Pass is an entitlement, not a flag, so the marker the flag spelling
 would have needed does not exist.
 
-**`AcknowledgeStory(ctx, beat)`**: a session command like every other, on `RunCommand` - reentrancy
-guard, the flush, the beat's seen flag written at its home through the same outward walk `SetFlag`
+**`AcknowledgeStory(ctx, beat)`**: a session command like every other, on `RunCommand` - one queued
+transaction: the flush, the beat's seen flag written at its home through the same outward walk `SetFlag`
 uses (root, where chapter 1 declares both), then `CloseTransaction`: the sweep, and `Refreshed`. It
 checks nothing of its own: the host opens a card only for a beat whose button is live or whose mark
 pops it, and setting a flag already set changes nothing.
@@ -412,25 +414,31 @@ parameter - the host behind a one-method interface, open a story for a beat and 
 
 **The card.** One app-owned overlay in `Screen.uxml` (`story`), the host owning it as it owns the
 select and the collect dialog: title, text, one button, driven by a `StoryBeatUI` the host
-constructs over it. The host's open method stores the requested beat and scope; then, if the beat's flag is
-unset, `AcknowledgeStory` with a context at the beat's scope, whose `Refreshed` calls `Render`; if
-set, `Render` directly. `Render` shows the overlay while a request is held and the phase is `Live`,
-and the row's `Refresh` in that same pass reads the flag as set: a beat is read the moment it opens
-(John, 2026-09-10), so an app killed with the card up leaves it read and listed. One transaction,
-one redraw, the order every command follows. The sections stay UP beneath it: the chapter is live
-and ticking, so the interpolation reason that keeps them down under the idle dialog does not apply.
-The card's button clears the held request and calls `Render`, which hides the overlay; it writes
-nothing.
+constructs over it. The host implements `IStoryOpener`, the one-method interface the row's click
+reaches it through. `OpenStory(beat, scope)` stores the requested beat and scope; then, if the
+beat's flag is unset, `AcknowledgeStory` with a context at the beat's scope, whose `Refreshed`
+calls `Render`; if set, `Render` directly. `Render` shows the overlay while a request is held and
+the phase is `Live`, and the row's `Refresh` in that same pass reads the flag as set: a beat opened
+from its button is read the moment it opens (John, 2026-09-10), so an app killed with the card up
+leaves it read and listed. One transaction, one redraw, the order every command follows. The
+sections stay UP beneath it: the chapter is live and ticking, so the interpolation reason that
+keeps them down under the idle dialog does not apply. `CloseStory()` - what the card's button
+calls - drops the request and `Render` hides the overlay; it writes nothing, the beat having been
+read when the card opened. A phase leaving `Live` drops the request with the sections.
 
 **Auto-open, for marked beats only.** On each `Render` while `Live` with no request held, the host
 walks the foreground chapter's `storyBeats` - the declaration list of a scope it already holds -
 and opens the card for the first beat that is marked `opensWhenAvailable`, available at the
 chapter's context, and unseen. State, not a transition (section 10): the pair "available and
-unseen" holds from the transaction that made it available until the open sets the flag, so a
-crash before the card opens shows it next launch, and a beat whose gate is `UpgradePurchased(x)`
-pops once after the purchase and never again, though the gate stays true forever. Unmarked beats
-never pop; their button is the only way in. The walk is over the chapter's list, not its sections,
-so a marked beat pops whether or not any row for it is on screen at that moment.
+unseen" holds from the transaction that made it available until the flag is set, so a crash
+before the card opens shows it next launch, and a beat whose gate is `UpgradePurchased(x)` pops
+once after the purchase and never again, though the gate stays true forever. The walk opens it
+through the same `OpenStory` the button uses: the request is held, so the card is up in this very
+pass, and the `AcknowledgeStory` it submits lands behind the running transaction and runs at the
+frame's drain (12.9's queue) - read on open here too, one frame later, and a kill inside that
+frame shows the card again next launch. Unmarked beats never pop; their button is the only way in. The walk is over the
+chapter's list, not its sections, so a marked beat pops whether or not any row for it is on screen
+at that moment.
 
 **One ch1 authoring consequence, settled: both rows live in `garage_floor`.** The capstone
 transaction sets `ch1_complete` and resets the chapter in one go, so at the refresh that follows,
@@ -523,7 +531,9 @@ list through a resolve the pass checked, so the command asks nothing of its own.
   record that began after the stamp reads as live over the whole window (present state, asserted
   so the rule is recorded).
 - **Store delivery order**: the fake's `Acknowledge` is called only after the save site ran; a fake
-  scripted to kill between grant and acknowledge leaves the transaction unacknowledged.
+  scripted to kill between grant and acknowledge leaves the transaction unacknowledged; a grant
+  delivered while the queue is non-empty saves and acknowledges only when the drain runs it, and
+  the Encore extension and a restored entitlement save the same way.
 - **The claim**: 13.4's numbers unchanged with no buff; with one hour of Encore left and four away,
   cash = 84 x (3600 x 2 + 10800 x 1) x 0.5; a buff expired before the stamp changes nothing; away
   time past the cap pays the cap; a Pass owner's offer is computed doubled and over the larger
@@ -539,8 +549,8 @@ list through a resolve the pass checked, so the command asks nothing of its own.
   root flag and the row reads seen; the capstone beat is unavailable before `ch1_complete` and its
   legs name the gate; the reset leaves both flags
   set and a seen row stays enabled with its gate false again; a marked beat opens the card by
-  itself at the transaction that makes it available and not again after the open, an unmarked one
-  never; a fresh chapter renders the opener's row alone; validation flags a `seenFlag` with no home
+  itself at the transaction that makes it available, its mark running at the next drain, and not
+  again after, an unmarked one behind the same gate never; a fresh chapter renders the opener's row alone; validation flags a `seenFlag` with no home
   on the chain, and the content test's two `FlagNoSetter` rows go to zero.
 - **Allocation**: 13.3 through `SetRoadieAllocation({ch1: 1})` - the ~1.87x multiplier as
   authored; refused on a negative count, a non-chapter key, and a sum past the balance; zero

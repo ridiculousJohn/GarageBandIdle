@@ -304,6 +304,16 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public List<ActionDto> onEnd = new();
     }
 
+    // A chapter-boundary card (section 10). The seen latch stays an id here and
+    // there both: a flag has no asset to reference (12.3).
+    internal class StoryBeatDto : DefinitionDto
+    {
+        public string text;
+        public ConditionDto availableWhen;
+        public string seenFlag;
+        public bool opensWhenAvailable;
+    }
+
     internal class RungDto
     {
         public string label;
@@ -334,9 +344,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     }
 
     // One block per scope, nesting as authored: a document IS its top scope
-    // block. `rung` and `events` are interior-only and `sections` is a
-    // chapter's alone; a scope authoring one it cannot hold is an import error
-    // rather than an unknown key, since the key is real on every other scope.
+    // block. `rung` and `events` are interior-only, and `sections` and
+    // `storyBeats` are a chapter's alone; a scope authoring one it cannot hold
+    // is an import error rather than an unknown key, since the key is real on
+    // every other scope.
     internal class ScopeDto
     {
         public string type;
@@ -357,6 +368,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public List<EventDto> events = new();
         public RungDto rung;
         public List<SectionDto> sections = new();
+        public List<StoryBeatDto> storyBeats = new();
         public List<ScopeDto> children = new();
     }
 
