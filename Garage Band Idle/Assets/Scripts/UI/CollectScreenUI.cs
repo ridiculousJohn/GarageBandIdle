@@ -22,6 +22,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly Button doubleButton;
         private readonly Button passButton;
 
+        // The offer the rows stand for, by identity: the session mints one offer
+        // object per entry (12.9), so this is what tells a repaint under the
+        // dialog apart from a dialog being raised over a different offer.
+        private IdleOffer builtFor;
+
         public CollectScreenUI(VisualElement root, GameSession session, GameClock clock,
                                AdManager ads, IAPManager store)
         {
@@ -36,13 +41,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
             ok.clicked += () => session.ClaimIdle(clock.RealTimeUtc);
         }
 
-        // Rebuilt on every pass, because the offer object is replaced on every
-        // entry and a repaint under the dialog (an entitlement written
-        // mid-dialog, 12.9) must show the offer as it stands. No interpolation:
-        // an offer is a fixed number over a window that already ended.
+        // The button set is a fact of the entitlement, so it is judged on every
+        // pass: that is what a repaint under the dialog is for, an entitlement
+        // written mid-dialog (12.9). The lines are a fact of the offer, built
+        // when the offer is first shown and left alone after, because an
+        // offer's amounts move only inside the transaction that settles it. No
+        // interpolation: an offer is a fixed number over a window that ended.
         public void Refresh()
         {
-            lines.Clear();
             // Both requests buy what the Pass already gives, so an owner's
             // dialog is OK alone (section 9). Judged before the offer, because
             // the button set is a fact of the entitlement and not of the offer.
@@ -52,10 +58,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             var offer = session.CurrentOffer;
             // The host shows this screen only in AwaitingIdleClaim, where the
-            // offer is non-null by the session's rule; the guard is for a
-            // headless caller.
-            if (offer == null)
+            // offer is non-null by the session's rule; the null arm is for a
+            // headless caller, and the identity arm is every pass after the one
+            // that built the rows.
+            if (offer == null || offer == builtFor)
                 return;
+            builtFor = offer;
+            lines.Clear();
 
             foreach (var line in offer.lines)
             {

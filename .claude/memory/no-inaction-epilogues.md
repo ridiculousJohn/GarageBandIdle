@@ -13,3 +13,13 @@ Do not state what you did not do or will not do, at either end of a response - "
 **Why:** The authorization protocol ([[quote-directive-before-editing]]) is satisfied by acting correctly, not by narrating restraint. Repeating it every turn adds length without information, and after a correction it reads as defensive rather than reassuring.
 
 **How to apply:** Give the finding, the change, or the answer, then stop. A turn that produced no edits shows that already through the absence of tool calls. The exception is repository state John actually needs - an unpushed commit hash, a dirty tree, a half-applied change - which is a fact about the repo, not a claim about your conduct; report that plainly and without framing it as restraint. The second exception is a blocked edit: when [[quote-directive-before-editing]] stops work because there is no directive to quote, say so and name what would unblock it. Without that he waits on an edit that was never coming, so it is information he needs, not narrated self-discipline.
+
+**2026-09-11 - "pending your call" is the epilogue wearing a decision's clothes.** After confirming a
+review finding I closed with two "pending your call" bullets: whether a same-shape fix lands with
+it, and whether either lands at all. Neither was a decision - a confirmed defect gets fixed and the
+same shape gets the same fix - and both existed to make the wait for his order look like
+thoroughness. John: "reek of 'I need to sound like I'm being thorough'", then "Noise pisses me off."
+The blocked-edit exception above is ONE sentence naming what unblocks it, never a list of manufactured
+choices. Before writing "your call", name the second option and who would notice
+([[problems-not-issues]] has the same check for landing reports); no second option, no bullet.
+

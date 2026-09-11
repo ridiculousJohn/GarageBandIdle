@@ -450,7 +450,7 @@ moment its beat became available. `garage_floor` is always visible and already e
 `visibleWhen` being `FlagSet(ch1_complete)` so a fresh chapter shows only the opener's button.
 Neither ch1 beat is marked to pop: popping is the exception, never the default (John, 2026-09-10).
 
-**The log** (if in step 10): a `StoryLogUI` overlay opened from the top bar, listing every beat
+**The log** (slice E): a `StoryLogUI` overlay opened from the top bar, listing every beat
 whose flag is set, across root's roster - a downward walk from root through each chapter's
 `storyBeats`, reading root flags: the legitimate walk (12.14.8). A tap is a second caller of the
 host's open method, handing it the beat and its chapter's state node. The log reads no section,
@@ -481,7 +481,7 @@ A top bar above the sections in `Screen.uxml`, visible while `Live`, as two pill
 John's screenshots). **The left pill is the Encore widget**: an icon and the remaining time
 inline, computed per frame from the root record against the clock (display, not truth), the
 infinity symbol under the Pass, and a tap opens the Encore window. **The right pill is three
-buttons**: the story log (or a placeholder until the log lands), the chapter selector (opens the
+buttons**: the story log, the chapter selector (opens the
 existing select as an overlay - `SwitchChapter` from a live chapter is already legal and settles
 the outgoing offer), and settings. `SettingsUI` is an overlay with one row this step, Roadies,
 opening the allocation screen.

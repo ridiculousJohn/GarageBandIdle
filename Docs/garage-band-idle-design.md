@@ -602,8 +602,10 @@ the next chapter — gated on state, never on observing a transition: the beat's
 beat's own mark alike - and only a beat MARKED to pop opens itself, while
 `chapterN_complete && !storyN_seen`, so a crash between the completion save and the beat cannot
 skip it, and a beat read before an app kill stays read. Popping is the exception, never the
-default; chapter 1 marks neither beat. There are no story interruptions
-during the loop itself.
+default; chapter 1 marks neither beat. Every read beat is listed in the story log, opened from the
+chapter's top bar: one entry per beat whose latch is set, over every chapter in root's roster; an entry
+reopens its card without writing anything, and closing that card returns to the log. There are no story
+interruptions during the loop itself.
 
 Named Catalog songs (§7) serve as story artifacts — the songs that chart appear in the Discography
 and persist.
@@ -1473,7 +1475,7 @@ controller a code-side factory constructs for the same id. A new widget type is 
 line, and a registry entry.
 
 **Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
-or Encore is open, the host does not run the automatic story walk. The modal and any unsubmitted
+Encore or the story log is open, the host does not run the automatic story walk. The modal and any unsubmitted
 allocation draft remain intact. A waiting marked beat stays unseen and opens on the first refresh
 after the last overlay closes, if it is still available. The walk reads state, not a transition.
 
@@ -1721,6 +1723,7 @@ Assets/Scripts/
               UpgradeListUI  UpgradeRowUI  BarGroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select at boot or over Live, and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
+    StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
     NumberFormatter.cs
     TopBarUI.cs             // the two pills, with the Encore countdown shared by the window
     SettingsUI.cs          // the Roadies entry and close button

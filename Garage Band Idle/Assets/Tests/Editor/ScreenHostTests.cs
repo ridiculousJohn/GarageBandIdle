@@ -217,7 +217,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var top = fx.Screen.Q<VisualElement>("top-bar");
             Assert.IsTrue(Fixture.Shown(top));
             Assert.AreEqual("\u23F1  00:00:00", top.Q<Button>("encore").text);
-            Assert.IsFalse(top.Q<Button>("story-log").enabledSelf, "the story log belongs to slice E");
+            Assert.IsTrue(top.Q<Button>("story-log").enabledSelf, "the story log opens from the right pill");
 
             fx.Host.OpenStory(fx.Opener, fx.Ch1);
             Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
@@ -421,6 +421,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var labels = fx.Screen.Q<VisualElement>("lines").Children().Single().Query<Label>().ToList();
             Assert.AreEqual("+400.00", labels[1].text, "the free player's 100 at 4x");
+        }
+
+        // The lines are a fact of the offer and the buttons a fact of the
+        // entitlement: a repaint under the dialog judges the buttons again and
+        // leaves the rows built when the offer was first shown (12.9).
+        [Test]
+        public void TheIdleDialogsLinesAreBuiltOncePerOffer()
+        {
+            var fx = new Fixture();
+            fx.Tier1.generatorCounts["practice_amp"] = 1;
+            fx.Ch1.lastActiveUtc = fx.Now.AddSeconds(-400);
+            fx.Session.SwitchChapter(fx.Ch1, fx.Now);
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, fx.Session.Phase);
+
+            var collect = fx.Screen.Q<VisualElement>("collect");
+            var first = collect.Q<VisualElement>("lines").Children().First();
+
+            // A root-owned write, legal in every phase: it grants the Pass and
+            // refreshes, and it settles nothing.
+            fx.Session.GrantEntitlement(Meta.BackstagePass.EntitlementId, fx.Now);
+
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, fx.Session.Phase, "the offer still stands");
+            Assert.AreSame(first, collect.Q<VisualElement>("lines").Children().First(),
+                "the offer's row is the element it was");
+            Assert.IsFalse(Fixture.Shown(collect.Q<Button>("double")), "the Pass already gives the ad's reward");
+            Assert.IsFalse(Fixture.Shown(collect.Q<Button>("pass")), "and there is nothing left to buy");
         }
 
         // OK settles (12.9): the claim pays the stored lines and advances the
@@ -855,6 +881,133 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(fx.Host.ShownStory);
         }
 
+        // ---- the story log (section 10, 12.11) ----
+
+        // The log: the app-owned overlay Screen.uxml names.
+        private static VisualElement StoryLogWindow(VisualElement screen) =>
+            screen.Q<VisualElement>("story-log-window");
+
+        // The listed beats, found by the class each entry gives its own button
+        // and filtered to the shown ones: a button stands for every candidate
+        // beat and the log shows the read ones, so the display IS the listing.
+        private static List<Button> LogEntries(VisualElement screen) =>
+            StoryLogWindow(screen).Query<Button>(className: "story-log-entry").ToList()
+                .Where(entry => entry.style.display.value == DisplayStyle.Flex).ToList();
+
+        // The log lists by the seen latch alone, read outward from each chapter
+        // as the row reads it (section 10), so an unread beat is absent whatever
+        // its gate says.
+        [Test]
+        public void TheStoryLogListsOnlyReadBeatsAcrossTheRoster()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenStoryLog();
+
+            Assert.IsTrue(Fixture.Shown(StoryLogWindow(fx.Screen)), "the log is up over the chapter");
+            Assert.IsEmpty(LogEntries(fx.Screen), "a fresh game has read nothing");
+            Assert.IsTrue(Fixture.Shown(StoryLogWindow(fx.Screen).Q<Label>("story-log-empty")),
+                "so the empty line is the whole log");
+            Assert.AreEqual(7, fx.Host.Sections.Count, "the sections stay up beneath every overlay");
+
+            fx.Host.CloseOverlay();
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+            fx.Host.CloseStory();
+            fx.Host.OpenStoryLog();
+
+            var entries = LogEntries(fx.Screen);
+            Assert.AreEqual(1, entries.Count, "one entry per read beat");
+            Assert.AreEqual("Make Some Noise", entries[0].text, "the beat's authored displayName");
+            Assert.IsFalse(Fixture.Shown(StoryLogWindow(fx.Screen).Q<Label>("story-log-empty")));
+            CollectionAssert.DoesNotContain(entries.Select(entry => entry.text).ToArray(), "Your First Roadie",
+                "the capstone is unread, so no entry stands for it");
+        }
+
+        // A reopen from the log is presentation alone (section 10): the latch
+        // was written when the card first opened, so the entry raises the card
+        // and writes nothing, and the card's close returns to the log.
+        [Test]
+        public void ARewatchFromTheLogShowsTheCardAndWritesNothing()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+            fx.Host.CloseStory();
+            fx.Host.OpenStoryLog();
+            var flags = fx.Root.flags.Count;
+
+            // What the entry's button calls; a headless test has no pointer.
+            fx.Host.StoryLog.Open(fx.Opener, fx.Ch1);
+
+            Assert.IsFalse(Fixture.Shown(StoryLogWindow(fx.Screen)), "the card takes the log's place");
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.AreEqual("Make Some Noise", StoryCard(fx.Screen).Q<Label>("title").text);
+            Assert.AreSame(fx.Opener, fx.Host.ShownStory);
+            Assert.AreEqual(flags, fx.Root.flags.Count, "a read beat's reopen writes nothing");
+
+            fx.Host.CloseStory();
+
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.IsTrue(Fixture.Shown(StoryLogWindow(fx.Screen)), "the close returns to the log");
+            Assert.IsNull(fx.Host.ShownStory, "the request is cleared, so no card is showing");
+            Assert.AreEqual(7, fx.Host.Sections.Count);
+
+            fx.Host.CloseOverlay();
+
+            Assert.IsFalse(Fixture.Shown(StoryLogWindow(fx.Screen)), "the log's own Back returns to the chapter");
+        }
+
+        // The log is a requested overlay (12.11): it replaces an open card and
+        // drops the request with it, exactly as settings does, and the next
+        // requested overlay replaces the log in turn.
+        [Test]
+        public void OpeningTheStoryLogReplacesAnOpenCard()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
+
+            fx.Host.OpenStoryLog();
+
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)), "a requested overlay replaces the card");
+            Assert.IsTrue(Fixture.Shown(StoryLogWindow(fx.Screen)));
+            Assert.IsNull(fx.Host.ShownStory, "and the request goes down with it");
+
+            fx.Host.OpenSettings();
+
+            Assert.IsFalse(Fixture.Shown(StoryLogWindow(fx.Screen)), "one requested overlay at a time");
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("settings")));
+        }
+
+        // A press that spans a refresh lands on the element it started on: the
+        // log holds a button per candidate beat for the whole process and a show
+        // toggles each by its latch, so the tick's pass moves a display and
+        // never the hierarchy (12.11).
+        [Test]
+        public void AStoryLogEntrySurvivesTheTicksRefresh()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+            fx.Host.CloseStory();
+            fx.Host.CloseOverlay();
+            fx.Host.OpenStoryLog();
+            var entry = LogEntries(fx.Screen).Single();
+
+            // The Live cadence is a tick every quarter second, and each one
+            // refreshes the log that is standing over the chapter.
+            fx.Session.Tick(0.25, fx.Now.AddSeconds(0.25));
+
+            Assert.IsTrue(Fixture.Shown(StoryLogWindow(fx.Screen)), "the log is still the requested overlay");
+            Assert.AreSame(entry, LogEntries(fx.Screen).Single(),
+                "the listed entry is the element it was, not a replacement for it");
+            Assert.IsNotNull(entry.parent, "and it is still in the tree, so a press on it is never cancelled");
+            Assert.AreEqual(fx.Ch1Def.storyBeats.Count,
+                StoryLogWindow(fx.Screen).Query<Button>(className: "story-log-entry").ToList().Count,
+                "one button per candidate beat, whatever its latch says");
+        }
+
         // ---- the marked beat pops by itself (decision 7) ----
 
         // A second host over the standing test tree: the pop rows need a MARKED
@@ -872,7 +1025,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly VisualElement Screen;
             public readonly ScreenHost Host;
 
-            public StoryFixture(bool markedUnlocksOnLiveTick = false)
+            // The dormant chapter and its one beat, off unless a row asks for
+            // them: every other row is about the foreground chapter's own list.
+            public readonly ChapterDefinition Ch2Def;
+            public readonly StoryBeatDefinition SecondStage;
+            public readonly ChapterScopeState Ch2;
+
+            public StoryFixture(bool markedUnlocksOnLiveTick = false, bool withSecondChapter = false)
             {
                 Marked = TestTree.MakeDefinition<StoryBeatDefinition>("story_marked");
                 Marked.displayName = "The First Cut";
@@ -923,11 +1082,29 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Release.actions.Add(new SetFlag { flagId = "album" });
                 Tree.Ch1Def.triggers.Add(Release);
 
+                if (withSecondChapter)
+                {
+                    // A second chapter in root's roster holding one beat and
+                    // nothing else: its latch is homed at root, which is where
+                    // the walk outward from ch2 lands (section 10).
+                    Ch2Def = TestTree.MakeChapter("ch2");
+                    SecondStage = TestTree.MakeDefinition<StoryBeatDefinition>("story_ch2");
+                    SecondStage.displayName = "Second Stage";
+                    SecondStage.text = "The second stage is yours.";
+                    SecondStage.availableWhen = new Always();
+                    SecondStage.seenFlag = "story_ch2_seen";
+                    Ch2Def.storyBeats.Add(SecondStage);
+                    Tree.RootDef.declaredFlags.Add("story_ch2_seen");
+                    Tree.Chapters.Add(Ch2Def);
+                }
+
                 // The link pass runs in Build, so the section, its modules and
                 // the trigger are wired only once the tree is built again.
                 Tree.Rebuild();
                 if (markedUnlocksOnLiveTick)
                     Tree.Tier1.generatorCounts[Tree.PracticeAmp.Id] = 1;
+                if (withSecondChapter)
+                    Ch2 = (ChapterScopeState)TestNavigation.Node(Tree.Root, Ch2Def);
 
                 var config = ScriptableObject.CreateInstance<GameConfig>();
                 config.maxGameSpeed = 4;
@@ -1008,6 +1185,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [TestCase("select")]
         [TestCase("roadie-allocation")]
         [TestCase("encore-window")]
+        [TestCase("story-log-window")]
         public void ARequestedOverlayDefersAnAutomaticStoryCardUntilItCloses(string overlayName)
         {
             var fx = new StoryFixture(markedUnlocksOnLiveTick: true);
@@ -1021,6 +1199,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     fx.Host.RoadieAllocation.Increase("ch1");
                     break;
                 case "encore-window": fx.Host.OpenEncore(); break;
+                case "story-log-window": fx.Host.OpenStoryLog(); break;
             }
             Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>(overlayName)));
             Assert.IsNull(fx.Host.ShownStory, "the passive income threshold has not been reached yet");
@@ -1074,6 +1253,37 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Session.FireProducer(fx.Tree.Ctx(fx.Tree.Tier1), fx.Tree.TapProducer);
             Assert.IsNull(fx.Host.ShownStory, "nothing pops a second time, and no unmarked beat ever pops");
             Assert.IsFalse(fx.Tree.Root.flags.Contains("story_unmarked_seen"));
+        }
+
+        // The log walks root's whole roster (section 10), so a beat read in a
+        // chapter that is not in the foreground is listed and rewatchable -
+        // reopening it shows the card alone and the foreground stays put.
+        [Test]
+        public void TheStoryLogListsADormantChaptersReadBeat()
+        {
+            var fx = new StoryFixture(withSecondChapter: true);
+            // A latch the save could hold: ch2's beat was read before, and ch1
+            // is the chapter the fixture switched into.
+            fx.Tree.Root.flags.Add("story_ch2_seen");
+            var flags = fx.Tree.Root.flags.Count;
+            fx.Host.OpenStoryLog();
+
+            var entries = LogEntries(fx.Screen);
+            Assert.AreEqual(1, entries.Count, "ch1's own two beats are unread");
+            Assert.AreEqual("Second Stage", entries[0].text, "the dormant chapter's beat");
+
+            // What the entry's button calls; a headless test has no pointer.
+            fx.Host.StoryLog.Open(fx.SecondStage, fx.Ch2);
+
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.AreEqual("Second Stage", StoryCard(fx.Screen).Q<Label>("title").text);
+            Assert.AreSame(fx.Tree.Ch1, fx.Session.ForegroundChapter, "a rewatch is not a switch");
+            Assert.AreEqual(flags, fx.Tree.Root.flags.Count, "the beat was already read");
+
+            fx.Host.CloseStory();
+
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.IsTrue(Fixture.Shown(StoryLogWindow(fx.Screen)), "the close returns to the log");
         }
 
         // ---- layout scopes are linked at the chapter (12.11) ----

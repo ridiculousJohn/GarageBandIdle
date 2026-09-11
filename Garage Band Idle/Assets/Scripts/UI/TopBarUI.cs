@@ -16,7 +16,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly Button encore;
 
         public TopBarUI(VisualElement rootElement, RootScopeState root, GameClock clock,
-                        Action openEncore, Action openChapterSelect, Action openSettings)
+                        Action openEncore, Action openStoryLog, Action openChapterSelect, Action openSettings)
         {
             Root = rootElement;
             this.root = root;
@@ -25,8 +25,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             encore.clicked += openEncore;
 
             var story = ScreenHost.Require<Button>(rootElement, "story-log");
-            story.SetEnabled(false); // Slice E supplies the story log.
             story.tooltip = "Story log";
+            story.clicked += openStoryLog;
             var chapters = ScreenHost.Require<Button>(rootElement, "chapter-select");
             chapters.tooltip = "Chapters";
             chapters.clicked += openChapterSelect;

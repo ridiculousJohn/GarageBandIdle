@@ -272,6 +272,21 @@
     -unity-text-align: middle-center;
 }
 
+.story-log-entries {
+    max-height: 400px;
+    margin-bottom: 8px;
+}
+
+.story-log-entry {
+    margin-bottom: 8px;
+    font-size: 18px;
+}
+
+.story-log-empty {
+    margin-bottom: 8px;
+    opacity: 0.8;
+}
+
 .overlay-close {
     margin-top: 8px;
 }

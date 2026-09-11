@@ -79,6 +79,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly SettingsUI settings;
         private readonly RoadieAllocationUI allocation;
         private readonly EncoreWindowUI encore;
+        private readonly StoryLogUI storyLog;
         private readonly List<SectionView> sections = new();
 
         private enum LiveOverlay
@@ -88,6 +89,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Settings,
             Roadies,
             Encore,
+            StoryLog,
         }
 
         private LiveOverlay requestedOverlay;
@@ -108,6 +110,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public RoadieAllocationUI RoadieAllocation => allocation;
 
+        public StoryLogUI StoryLog => storyLog;
+
         // Over the screen's own root: the host owns every app-owned screen and
         // overlay, so it is the one place that knows which named elements
         // Screen.uxml promises.
@@ -123,12 +127,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
             collect = new CollectScreenUI(Require<VisualElement>(screenRoot, "collect"), session, clock, ads, store);
             story = new StoryBeatUI(Require<VisualElement>(screenRoot, "story"), CloseStory);
             topBar = new TopBarUI(Require<VisualElement>(screenRoot, "top-bar"), session.Root, clock,
-                OpenEncore, OpenChapterSelect, OpenSettings);
+                OpenEncore, OpenStoryLog, OpenChapterSelect, OpenSettings);
             settings = new SettingsUI(Require<VisualElement>(screenRoot, "settings"), OpenRoadies, CloseOverlay);
             allocation = new RoadieAllocationUI(Require<VisualElement>(screenRoot, "roadie-allocation"),
                 session, clock, CloseOverlay);
             encore = new EncoreWindowUI(Require<VisualElement>(screenRoot, "encore-window"),
                 session.Root, clock, ads, store, CloseOverlay);
+            storyLog = new StoryLogUI(Require<VisualElement>(screenRoot, "story-log-window"),
+                session.Root, clock, this, CloseOverlay);
             session.Refreshed += Render;
         }
 
@@ -223,11 +229,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // below, it runs at the next drain (12.9) and the held request keeps the
         // card up until then. With the latch already set nothing changes but
         // the card, so the card alone is shown - no pass of the host's own, and
-        // no state read that a refresh would owe.
+        // no state read that a refresh would owe. A requested overlay keeps
+        // standing beneath the card: the log opens a card over itself, and
+        // the card's close hands the screen back to it.
         public void OpenStory(StoryBeatDefinition beat, ScopeState scope)
         {
             HideRequestedOverlay();
-            requestedOverlay = LiveOverlay.None;
             requestedBeat = beat;
             var ctx = new GameContext(scope, clock.RealTimeUtc);
             if (!ctx.IsFlagSet(beat.seenFlag))
@@ -237,16 +244,20 @@ namespace RidiculousGaming.GarageBandIdle.UI
         }
 
         // What the card's button calls: dropping the request takes the card
-        // down. The beat was read when the card opened (section 10), so closing
-        // writes nothing and changes nothing else on screen - the card alone
-        // hides, and a marked beat still waiting shows at the next refresh.
+        // down and the overlay that stood beneath it, if any, comes back - the
+        // log, for a card opened from it. The beat was read when the card
+        // opened (section 10), so closing writes nothing, and a marked beat
+        // still waiting shows at the next refresh.
         public void CloseStory()
         {
             requestedBeat = null;
             story.Hide();
+            ShowRequestedOverlay();
         }
 
         public void OpenEncore() => OpenOverlay(LiveOverlay.Encore);
+
+        public void OpenStoryLog() => OpenOverlay(LiveOverlay.StoryLog);
 
         public void OpenChapterSelect() => OpenOverlay(LiveOverlay.ChapterSelect);
 
@@ -298,6 +309,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             settings.Hide();
             allocation.Hide();
             encore.Hide();
+            storyLog.Hide();
         }
 
         private void ShowRequestedOverlay()
@@ -316,11 +328,22 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 case LiveOverlay.Encore:
                     encore.Show();
                     break;
+                case LiveOverlay.StoryLog:
+                    storyLog.Show();
+                    break;
             }
         }
 
         private void ShowLiveOverlay(ChapterScopeState chapter)
         {
+            if (requestedBeat != null)
+            {
+                // A held card is the top of the stack whatever stands beneath
+                // it; the overlay comes back when the card closes.
+                HideRequestedOverlay();
+                story.Show(requestedBeat);
+                return;
+            }
             if (requestedOverlay != LiveOverlay.None)
             {
                 // Modal dialogs block automatic stories. Leave the beat unseen

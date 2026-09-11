@@ -58,4 +58,12 @@
             <ui:Button name="encore-close" text="Back" class="overlay-close" />
         </ui:VisualElement>
     </ui:VisualElement>
+    <ui:VisualElement name="story-log-window" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel story-log-panel">
+            <ui:Label text="Story" class="modal-title" />
+            <ui:ScrollView name="story-log-entries" class="story-log-entries" />
+            <ui:Label name="story-log-empty" text="No story yet." class="story-log-empty" />
+            <ui:Button name="story-log-close" text="Back" class="overlay-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
 </ui:UXML>
