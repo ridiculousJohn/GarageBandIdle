@@ -125,3 +125,31 @@ always that the content belongs on a scope.
 
 Verification per step: the headless loop (compile grep + edit-mode suite; see the repo memory
 `unity-headless-verify-loop`). John reviews and commits per changeset.
+
+## After the plan
+
+The plan's scope ends at step 11: the 12.13 spine and Chapter 1 playable. What follows is not
+ordered here; each item gets its own plan when it is picked up. Recorded 2026-09-11 so the list
+lives somewhere other than a conversation.
+
+- **Real ad and store SDKs** behind `IAdService` / `IStoreService`. Step 10 delivers the seams and
+  the fakes; the SDK adapters, receipt handling and the platform's restore flow are their own work.
+- **Chapters 2-8**, thematic sketches today, and the authoring decisions deferred with them: the
+  Ch. 6 song operations and selection rule, the late-game Cash to Roadie sink, the reserved
+  `bought <= earned` cap. Step 11's orphan sweep lands as content grows.
+- **Overdrive** ("Sold-Out Show"), the higher game_speed tier the design defers.
+- **Bulk buy**, a runtime feature before it is a button: a read answering M, the largest count of a
+  generator the balance affords at the acting scope, and a buy of N as one transaction that
+  recomputes the series cost inside it and refuses whole if the balance moved (the fail-closed
+  stance `TryBuy` takes today over one unit). One cost-of-N function serves the label, M's search
+  and the charge; the single-unit buy is the N = 1 case, so this replaces it rather than sitting
+  beside it. Ctrl C shows "+1" and "+M"; that is presentation, and any count N <= M is buyable.
+- **A UI polish pass.** Every screen sits on the default runtime theme; theme, fonts, pill and
+  button styling, spacing, color, icons, overlay transitions and the code-owned chrome wording
+  are all placeholders. Step 9's open items belong here: a font with equal-width digits (the
+  default theme's "1" is narrower, so a right-anchored value jitters), and Ctrl C's wording for the
+  select and collect screens. After the step 10 playthrough, which produces the list.
+- **Tuning.** Every `GameConfig` number is a placeholder and the content doc's pacing targets have
+  only been checked in tests.
+- **Platform work** the plan never covered: a device build, the save's location and migration on
+  device, and store submission.

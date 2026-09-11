@@ -116,8 +116,8 @@ facts only John can settle, and none blocks a slice.
   of all generators is 2.0x. Time remaining HH:MM:SS") with the two boost buttons. The right pill
   is three icon buttons: story beat selector, chapter selector, settings, in that order.
 - **Settings' contents.** Assumed: the Roadies entry alone this step.
-- **The story log's timing.** The "conversation" screen is small once beats are definitions (a
-  downward walk over root's roster reading root flags). In step 10 or later.
+- **Decided (2026-09-11): the story log is in step 10, slice E.** The "conversation" screen is
+  small once beats are definitions (a downward walk over root's roster reading root flags).
 - **The numbers**, all `GameConfig` placeholders until tuning cares: the Encore ad duration
   (14400 s), the Encore cap, the Pass's idle cap, the Roadie bundle sizes.
 - **Decided (2026-09-09): Encore's shared resolve is an `Encore` static**, not a member of any
@@ -576,7 +576,7 @@ content again; boot checks the scene's registry before creating the session.
 
 A real ad or store SDK - the seams and fakes are the deliverable. Overdrive (decision 5). The
 `bought <= earned` cap held in reserve. The late-game Cash to Roadie sink. The Ch. 6 song
-operations. The story log, if John places it later.
+operations.
 
 Chapter unlock enforcement is part of slice D, not an exclusion from step 10.
 
@@ -619,4 +619,4 @@ build-plan step, `load-linking-plan.md` (2026-09-08), and lands before slice A.
   screen, the Encore window, 13.3 converted; the screens reuse the existing shared Meta checks in
   `CodeReferences`; the factory/registry cross-check runs directly from import and development
   boot, separately from ContentValidator and CodeReferences.
-- **E. The story log**, if in step, and the hand playthrough of every shape above.
+- **E. The story log** (decided in step, 2026-09-11) and the hand playthrough of every shape above.
