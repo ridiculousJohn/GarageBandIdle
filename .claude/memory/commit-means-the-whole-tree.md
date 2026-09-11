@@ -36,3 +36,11 @@ decision ([[asides-do-not-close-the-main-question]]).
 
 **How to apply:** before acting on any "John prefers X" belief, find the quote; no quote means it is
 my invention.
+
+**2026-09-11 - "commit" means MY changes.** John: "commit means commit YOUR CHANGES." On
+"commit what we have first" I swept seven playthrough screenshots he had dropped in the repo root
+into the commit, reasoning from the whole-tree rule above. That rule was always about the files the
+work dirtied - code, tests, docs, assets, memory - and never about anything else on disk. A file I
+did not change is not mine to commit, whatever the tree shows; it stays as it is and gets one
+sentence naming it. Amended the commit to drop them.
+
