@@ -10,12 +10,17 @@ namespace RidiculousGaming.GarageBandIdle
     public static class CodeReferences
     {
         private static readonly Action<ValidationContext>[] Checks =
-            { Meta.Encore.Validate, Meta.BackstagePass.Validate, Meta.Roadies.Validate };
+        {
+            Meta.Encore.Validate,
+            Meta.BackstagePass.Validate,
+            Meta.Roadies.Validate,
+        };
 
         // Run by ContentValidator.Validate after the tree walk, so this
         // enumerates CODE inside the one pass that audits the whole tree - not
-        // a content lookup (12.14.8). Every check asks from root, which is on
-        // every chain.
+        // a content lookup (12.14.8). Content-id checks ask from root, which is
+        // on every chain. Import and boot call the factory/registry check
+        // separately because it also reads the registry settings asset.
         internal static void Validate(ValidationContext ctx)
         {
             foreach (var check in Checks)

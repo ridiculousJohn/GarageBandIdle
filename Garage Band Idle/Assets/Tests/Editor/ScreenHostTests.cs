@@ -86,7 +86,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 return config;
             }
 
-            public Fixture()
+            public Fixture(Action<GameConfig> configure = null)
             {
                 var rootDef = AssetDatabase.LoadAssetAtPath<RootDefinition>(
                     ChapterJsonImporter.AssetRootPath + "/root/root.asset");
@@ -108,6 +108,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
                 Tier1 = (TierScopeState)TestNavigation.Node(Root, Tier1Def);
                 var config = Config();
+                configure?.Invoke(config);
                 Session = new GameSession(Root, config);
                 AdManager = new AdManager(Session, Ads, config, () => Saves++);
                 IAPManager = new IAPManager(Session, Store, config, () => Saves++);
@@ -192,9 +193,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var fx = new Fixture();
             fx.Host.Render();
-            // The switch is what the select's button calls; a headless test has
-            // no pointer to press with.
-            fx.Enter();
+            fx.Ch1.lastActiveUtc = fx.Now;
+            // The generated button and this headless call share Select, so the
+            // presentation-before-command order is under test too.
+            fx.Host.SelectChapter(fx.Ch1);
 
             Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("select")),
                 "a chapter is entered, so the select is down");
@@ -202,6 +204,147 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the entry stamps at now, so no window is owed");
             Assert.AreEqual(7, fx.Host.Sections.Count, "the authored section count");
             Assert.IsTrue(fx.Host.Sections[GarageFloor].Visible, "the garage floor is gated Always");
+        }
+
+        // ---- chapter chrome and its requested overlays (section 10) ----
+
+        [Test]
+        public void LiveChapterShowsTheTwoPillsAndOnlyOneRequestedOverlay()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            var top = fx.Screen.Q<VisualElement>("top-bar");
+            Assert.IsTrue(Fixture.Shown(top));
+            Assert.AreEqual("\u23F1  00:00:00", top.Q<Button>("encore").text);
+            Assert.IsFalse(top.Q<Button>("story-log").enabledSelf, "the story log belongs to slice E");
+
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
+            fx.Host.OpenSettings();
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)), "a requested overlay replaces the card");
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("settings")));
+            fx.Host.OpenEncore();
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("settings")));
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")));
+            Assert.AreEqual(7, fx.Host.Sections.Count, "live sections remain under every overlay");
+        }
+
+        [Test]
+        public void EncorePillAndWindowCountDownFromTheSharedClock()
+        {
+            var fx = new Fixture(config => config.encoreAdSeconds = 7200);
+            fx.Root.timedBuffs.Add(new TimedBuff
+            {
+                buffId = "encore",
+                expiresAtUtc = fx.Now.AddSeconds(3661),
+            });
+            fx.Enter();
+            fx.Host.OpenEncore();
+
+            var window = fx.Screen.Q<VisualElement>("encore-window");
+            Assert.AreEqual("Time remaining 01:01:01", window.Q<Label>("encore-remaining").text);
+            Assert.AreEqual("While active, game speed is 2.00x.", window.Q<Label>("encore-description").text);
+            Assert.AreEqual("Boost for 2 hours", window.Q<Button>("encore-ad").text,
+                "the promise comes from the manager's configured grant");
+
+            fx.Clock.Frame(fx.Now.AddSeconds(2), 2);
+            fx.Host.Interpolate();
+            Assert.AreEqual("Time remaining 01:00:59", window.Q<Label>("encore-remaining").text);
+            Assert.AreEqual("\u23F1  01:00:59", fx.Screen.Q<Button>("encore").text);
+        }
+
+        [Test]
+        public void APassOwnerSeesPermanentEncoreAndNoPurchaseChoices()
+        {
+            var fx = new Fixture();
+            fx.Root.entitlements.Add("backstage_pass");
+            fx.Enter();
+            fx.Host.OpenEncore();
+
+            var window = fx.Screen.Q<VisualElement>("encore-window");
+            Assert.AreEqual("Time remaining \u221E", window.Q<Label>("encore-remaining").text);
+            Assert.IsFalse(Fixture.Shown(window.Q<Button>("encore-ad")));
+            Assert.IsFalse(Fixture.Shown(window.Q<Button>("encore-pass")));
+            Assert.AreEqual("\u23F1  \u221E", fx.Screen.Q<Button>("encore").text);
+        }
+
+        [Test]
+        public void PendingEncoreRewardRepaintsWithoutReplacingTheOpenOverlay()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.AdManager.RequestEncoreExtension();
+            fx.Host.OpenSettings();
+
+            fx.AdManager.Update(fx.Now);
+
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("settings")),
+                "the callback's refresh preserves the requested overlay");
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")));
+            Assert.AreEqual("\u23F1  04:00:00", fx.Screen.Q<Button>("encore").text);
+            Assert.AreEqual(1, fx.Saves, "the delivered reward was saved");
+        }
+
+        [Test]
+        public void LiveChapterSelectClosesBeforeSameChapterNoOp()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenChapterSelect();
+            var select = fx.Screen.Q<VisualElement>("select");
+            Assert.IsTrue(Fixture.Shown(select));
+            Assert.IsTrue(Fixture.Shown(select.Q<Button>("select-close")));
+
+            fx.Host.SelectChapter(fx.Ch1);
+
+            Assert.IsFalse(Fixture.Shown(select), "same-chapter SwitchChapter emits no refresh");
+            Assert.AreEqual(SessionPhase.Live, fx.Session.Phase);
+            Assert.AreEqual(7, fx.Host.Sections.Count);
+        }
+
+        [Test]
+        public void RoadieDraftSurvivesRefreshAndDoneCommitsItsOneMap()
+        {
+            var fx = new Fixture();
+            fx.Ctx(fx.Root).Deposit("roadies", 2);
+            fx.Enter();
+            fx.Host.OpenRoadies();
+            var overlay = fx.Screen.Q<VisualElement>("roadie-allocation");
+
+            fx.Host.RoadieAllocation.Increase("ch1");
+            Assert.AreEqual("1", overlay.Q<Label>("roadie-count-ch1").text);
+            Assert.AreEqual("Unallocated  1.00", overlay.Q<Label>("roadie-unallocated").text);
+            Assert.IsTrue(overlay.Q<Button>("roadie-minus-ch1").enabledSelf);
+
+            fx.Session.GrantRoadies(1, fx.Now);
+            Assert.AreEqual("1", overlay.Q<Label>("roadie-count-ch1").text,
+                "a state refresh keeps the local draft");
+            Assert.AreEqual("Unallocated  2.00", overlay.Q<Label>("roadie-unallocated").text);
+
+            fx.Host.RoadieAllocation.Done();
+
+            Assert.AreEqual(1, fx.Root.roadieAllocation["ch1"]);
+            Assert.IsFalse(Fixture.Shown(overlay), "the accepted command's completion closes it");
+        }
+
+        [Test]
+        public void LeavingLiveDropsAnUnsubmittedRoadieDraft()
+        {
+            var fx = new Fixture();
+            fx.Ctx(fx.Root).Deposit("roadies", 1);
+            fx.Enter();
+            fx.Host.OpenRoadies();
+            fx.Host.RoadieAllocation.Increase("ch1");
+
+            fx.Session.SwitchChapter(null, fx.Now);
+
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("roadie-allocation")));
+            Assert.IsEmpty(fx.Root.roadieAllocation, "leaving without Done submits no command");
+            fx.Host.SelectChapter(fx.Ch1);
+            fx.Host.OpenRoadies();
+            Assert.AreEqual("0", fx.Screen.Q<Label>("roadie-count-ch1").text,
+                "the next overlay starts from simulation state, not the dead draft");
         }
 
         // A return with an unpaid window (12.9): the dialog is the whole screen
@@ -729,14 +872,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly VisualElement Screen;
             public readonly ScreenHost Host;
 
-            public StoryFixture()
+            public StoryFixture(bool markedUnlocksOnLiveTick = false)
             {
                 Marked = TestTree.MakeDefinition<StoryBeatDefinition>("story_marked");
                 Marked.displayName = "The First Cut";
                 Marked.text = "The tape is done.";
-                Marked.availableWhen = new FlagSet { flagId = "album", uiText = "Cut a demo" };
+                Marked.availableWhen = markedUnlocksOnLiveTick
+                    ? new EarnedTotalAtLeast { currency = Tree.Cash, threshold = 1, uiText = "Earn 1 cash" }
+                    : new FlagSet { flagId = "album", uiText = "Cut a demo" };
                 Marked.seenFlag = "story_marked_seen";
                 Marked.opensWhenAvailable = true;
+                if (markedUnlocksOnLiveTick)
+                {
+                    // The story evaluates at the chapter. Re-home Cash there
+                    // so its tier producer deposits outward and the chapter's
+                    // earned-total gate reads the same reachable fact.
+                    Tree.Tier1Def.declaredCurrencies.Remove(Tree.Cash);
+                    Tree.Ch1Def.declaredCurrencies.Add(Tree.Cash);
+                }
 
                 Unmarked = TestTree.MakeDefinition<StoryBeatDefinition>("story_unmarked");
                 Unmarked.displayName = "The Second Cut";
@@ -746,6 +899,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
                 Tree.Ch1Def.storyBeats.AddRange(new[] { Marked, Unmarked });
                 Tree.RootDef.declaredFlags.AddRange(new[] { "story_marked_seen", "story_unmarked_seen" });
+                var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+                encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+                Tree.RootDef.modifiers.Add(encore);
                 // A beat's home is the chapter, so both rows evaluate there.
                 Tree.Ch1Def.sections.Add(new SectionDefinition
                 {
@@ -770,6 +926,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 // The link pass runs in Build, so the section, its modules and
                 // the trigger are wired only once the tree is built again.
                 Tree.Rebuild();
+                if (markedUnlocksOnLiveTick)
+                    Tree.Tier1.generatorCounts[Tree.PracticeAmp.Id] = 1;
 
                 var config = ScriptableObject.CreateInstance<GameConfig>();
                 config.maxGameSpeed = 4;
@@ -844,6 +1002,54 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)),
                 "and the request is what holds the card up, so a read beat keeps reading");
             Assert.IsTrue(StoryButton(fx.Row(0)).ClassListContains("seen"), "the row read the flag");
+        }
+
+        [TestCase("settings")]
+        [TestCase("select")]
+        [TestCase("roadie-allocation")]
+        [TestCase("encore-window")]
+        public void ARequestedOverlayDefersAnAutomaticStoryCardUntilItCloses(string overlayName)
+        {
+            var fx = new StoryFixture(markedUnlocksOnLiveTick: true);
+            fx.Tree.Root.balances["roadies"] = 1;
+            switch (overlayName)
+            {
+                case "settings": fx.Host.OpenSettings(); break;
+                case "select": fx.Host.OpenChapterSelect(); break;
+                case "roadie-allocation":
+                    fx.Host.OpenRoadies();
+                    fx.Host.RoadieAllocation.Increase("ch1");
+                    break;
+                case "encore-window": fx.Host.OpenEncore(); break;
+            }
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>(overlayName)));
+            Assert.IsNull(fx.Host.ShownStory, "the passive income threshold has not been reached yet");
+
+            // Live production reaches the threshold beneath the modal.
+            fx.Session.Tick(2, fx.Tree.Now.AddSeconds(2));
+
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>(overlayName)),
+                "the automatic story must not replace the player's modal");
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.IsNull(fx.Host.ShownStory);
+            Assert.IsFalse(fx.Tree.Root.flags.Contains("story_marked_seen"));
+            if (overlayName == "roadie-allocation")
+                Assert.AreEqual("1", fx.Screen.Q<Label>("roadie-count-ch1").text,
+                    "the unsubmitted allocation draft survives while the story waits");
+
+            fx.Host.CloseOverlay();
+            fx.Session.Refresh();
+
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.AreSame(fx.Marked, fx.Host.ShownStory);
+            Assert.IsFalse(fx.Tree.Root.flags.Contains("story_marked_seen"),
+                "the open's mark is queued behind the first refresh after close");
+
+            fx.Session.Drain();
+
+            Assert.IsTrue(fx.Tree.Root.flags.Contains("story_marked_seen"), "the drain runs the mark");
+            Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)),
+                "the story request keeps the now-seen beat open for the player");
         }
 
         // The close writes nothing: the beat was read when the card opened, so

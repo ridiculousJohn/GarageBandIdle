@@ -75,7 +75,22 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly ChapterSelectUI select;
         private readonly CollectScreenUI collect;
         private readonly StoryBeatUI story;
+        private readonly TopBarUI topBar;
+        private readonly SettingsUI settings;
+        private readonly RoadieAllocationUI allocation;
+        private readonly EncoreWindowUI encore;
         private readonly List<SectionView> sections = new();
+
+        private enum LiveOverlay
+        {
+            None,
+            ChapterSelect,
+            Settings,
+            Roadies,
+            Encore,
+        }
+
+        private LiveOverlay requestedOverlay;
 
         // The chapter the section views describe. Identity, not id: a switch
         // rebuilds, and a same-definition node from another tree is a different
@@ -91,6 +106,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public StoryBeatDefinition ShownStory => requestedBeat;
 
+        public RoadieAllocationUI RoadieAllocation => allocation;
+
         // Over the screen's own root: the host owns every app-owned screen and
         // overlay, so it is the one place that knows which named elements
         // Screen.uxml promises.
@@ -101,9 +118,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
             this.registry = registry;
             this.session = session;
             this.clock = clock;
-            select = new ChapterSelectUI(Require<VisualElement>(screenRoot, "select"), session, clock);
+            select = new ChapterSelectUI(Require<VisualElement>(screenRoot, "select"), session, clock,
+                BeforeChapterSelection, CloseOverlay);
             collect = new CollectScreenUI(Require<VisualElement>(screenRoot, "collect"), session, clock, ads, store);
             story = new StoryBeatUI(Require<VisualElement>(screenRoot, "story"), CloseStory);
+            topBar = new TopBarUI(Require<VisualElement>(screenRoot, "top-bar"), session.Root, clock,
+                OpenEncore, OpenChapterSelect, OpenSettings);
+            settings = new SettingsUI(Require<VisualElement>(screenRoot, "settings"), OpenRoadies, CloseOverlay);
+            allocation = new RoadieAllocationUI(Require<VisualElement>(screenRoot, "roadie-allocation"),
+                session, clock, CloseOverlay);
+            encore = new EncoreWindowUI(Require<VisualElement>(screenRoot, "encore-window"),
+                session.Root, clock, ads, store, CloseOverlay);
             session.Refreshed += Render;
         }
 
@@ -115,7 +140,6 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Render()
         {
             var phase = session.Phase;
-            select.Root.style.display = phase == SessionPhase.NoChapter ? DisplayStyle.Flex : DisplayStyle.None;
             collect.Root.style.display =
                 phase == SessionPhase.AwaitingIdleClaim ? DisplayStyle.Flex : DisplayStyle.None;
             if (phase == SessionPhase.AwaitingIdleClaim)
@@ -124,6 +148,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
             var chapter = session.ForegroundChapter;
             if (phase != SessionPhase.Live || chapter == null)
             {
+                topBar.Root.style.display = DisplayStyle.None;
+                ClearLiveRequests();
+                if (phase == SessionPhase.NoChapter)
+                    select.Show(false);
+                else
+                    select.Hide();
                 // The select and the dialog are whole screens of their own,
                 // and the sections stay down under the dialog: a phase that
                 // never ticks must not interpolate a display on a report
@@ -135,10 +165,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 // Live takes the request down with the sections. The beat's
                 // mark was written when its card opened (section 10);
                 // nothing here writes.
-                requestedBeat = null;
-                story.Hide();
                 return;
             }
+
+            topBar.Root.style.display = DisplayStyle.Flex;
+            topBar.Refresh();
 
             if (chapter != builtFor)
                 Build(chapter);
@@ -159,7 +190,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // pass that put the card up. The sections stay UP beneath it:
             // the chapter is live and ticking, so nothing here interpolates
             // a stale report.
-            ShowStory(chapter);
+            ShowLiveOverlay(chapter);
         }
 
         // Presentation between refreshes, on every visible widget. Nothing here
@@ -175,6 +206,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     if (module.Visible && module.Widget != null)
                         module.Widget.Interpolate();
             }
+            if (session.Phase != SessionPhase.Live)
+                return;
+            topBar.Interpolate();
+            if (requestedOverlay == LiveOverlay.Encore)
+                encore.Interpolate();
         }
 
         public void Dispose() => session.Refreshed -= Render;
@@ -190,6 +226,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // no state read that a refresh would owe.
         public void OpenStory(StoryBeatDefinition beat, ScopeState scope)
         {
+            HideRequestedOverlay();
+            requestedOverlay = LiveOverlay.None;
             requestedBeat = beat;
             var ctx = new GameContext(scope, clock.RealTimeUtc);
             if (!ctx.IsFlagSet(beat.seenFlag))
@@ -206,6 +244,93 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             requestedBeat = null;
             story.Hide();
+        }
+
+        public void OpenEncore() => OpenOverlay(LiveOverlay.Encore);
+
+        public void OpenChapterSelect() => OpenOverlay(LiveOverlay.ChapterSelect);
+
+        public void OpenSettings() => OpenOverlay(LiveOverlay.Settings);
+
+        public void OpenRoadies() => OpenOverlay(LiveOverlay.Roadies);
+
+        public void SelectChapter(ChapterScopeState chapter) => select.Select(chapter);
+
+        public void CloseOverlay()
+        {
+            requestedOverlay = LiveOverlay.None;
+            HideRequestedOverlay();
+        }
+
+        private void OpenOverlay(LiveOverlay overlay)
+        {
+            if (session.Phase != SessionPhase.Live || session.ForegroundChapter == null)
+                return;
+            requestedBeat = null;
+            story.Hide();
+            HideRequestedOverlay();
+            requestedOverlay = overlay;
+            if (overlay == LiveOverlay.Roadies)
+                allocation.Open();
+            else
+                ShowRequestedOverlay();
+        }
+
+        private void BeforeChapterSelection()
+        {
+            if (session.Phase == SessionPhase.Live)
+                CloseOverlay();
+            else
+                select.Hide();
+        }
+
+        private void ClearLiveRequests()
+        {
+            requestedBeat = null;
+            story.Hide();
+            requestedOverlay = LiveOverlay.None;
+            HideRequestedOverlay();
+        }
+
+        private void HideRequestedOverlay()
+        {
+            select.Hide();
+            settings.Hide();
+            allocation.Hide();
+            encore.Hide();
+        }
+
+        private void ShowRequestedOverlay()
+        {
+            switch (requestedOverlay)
+            {
+                case LiveOverlay.ChapterSelect:
+                    select.Show(true);
+                    break;
+                case LiveOverlay.Settings:
+                    settings.Show();
+                    break;
+                case LiveOverlay.Roadies:
+                    allocation.Refresh();
+                    break;
+                case LiveOverlay.Encore:
+                    encore.Show();
+                    break;
+            }
+        }
+
+        private void ShowLiveOverlay(ChapterScopeState chapter)
+        {
+            if (requestedOverlay != LiveOverlay.None)
+            {
+                // Modal dialogs block automatic stories. Leave the beat unseen
+                // so the state-based walk finds it after the overlay closes.
+                story.Hide();
+                ShowRequestedOverlay();
+                return;
+            }
+            HideRequestedOverlay();
+            ShowStory(chapter);
         }
 
         // What the card shows this pass: the standing request, and when none

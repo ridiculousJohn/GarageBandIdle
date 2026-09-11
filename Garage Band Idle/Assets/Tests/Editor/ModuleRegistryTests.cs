@@ -20,15 +20,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     {
         private const string RegistryPath = "Assets/Settings/ModuleRegistry.asset";
 
-        // The ids the factory answers, which is the closed set the asset has to
-        // cover. Written out rather than derived: Answers is a predicate, and a
-        // predicate cannot be enumerated.
-        private static readonly string[] FactoryIds =
-        {
-            "currency_line", "jam_button", "generator_list", "upgrade_list",
-            "bar_group", "rung_button", "event_row", "story_row"
-        };
-
         private static ModuleRegistry Load()
         {
             var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>(RegistryPath);
@@ -72,18 +63,81 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void TheRegistryResolvesEveryIdTheFactoryAnswers()
         {
             var registry = Load();
-            foreach (var id in FactoryIds)
-            {
-                Assert.IsTrue(ModuleWidgetFactory.Answers(id), $"the factory no longer answers '{id}'");
+            foreach (var id in ModuleWidgetFactory.PrefabIds)
                 Assert.IsNotNull(registry.Resolve(id), $"the registry resolves '{id}' to nothing");
+        }
+
+        [Test]
+        public void CombinedValidationAcceptsTheShippedRegistry()
+        {
+            var root = TestTree.MakeRoot("root");
+            try
+            {
+                var report = ModuleWidgetFactory.Validate(ComposedContent.Compose(root), Load());
+
+                Assert.IsFalse(report.HasErrors,
+                    string.Join("\n", report.Findings.Select(finding => finding.ToString())));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
             }
         }
 
-        // The authored half of the closed set, over the IMPORTED chapter: a
-        // prefabId is content, so an id no widget answers is a content fault
-        // that this pass catches instead of a first render.
         [Test]
-        public void EveryPrefabIdChapterOneAuthorsResolvesAndIsAnswered()
+        public void CombinedValidationRejectsAControllerWhoseLayoutIsMissing()
+        {
+            var root = TestTree.MakeRoot("root");
+            var registry = UnityEngine.Object.Instantiate(Load());
+            try
+            {
+                registry.entries.RemoveAll(entry => entry != null && entry.prefabId == "story_row");
+
+                var report = ModuleWidgetFactory.Validate(ComposedContent.Compose(root), registry);
+
+                Assert.IsTrue(report.HasErrors);
+                Assert.IsTrue(report.OfCheck(ValidationCheck.UnresolvedReference)
+                    .Any(finding => finding.Message.Contains("'story_row' has no layout")));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(registry);
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void CombinedValidationRejectsAnAuthoredIdWithoutAControllerOrLayout()
+        {
+            var root = TestTree.MakeRoot("root");
+            var chapter = TestTree.MakeChapter("ch1");
+            chapter.sections.Add(new SectionDefinition
+            {
+                modules = { new ModuleDefinition { prefabId = "ghost_widget" } }
+            });
+            try
+            {
+                var report = ModuleWidgetFactory.Validate(
+                    ComposedContent.Compose(root, new[] { chapter }), Load());
+                var messages = report.OfCheck(ValidationCheck.UnresolvedReference)
+                    .Select(finding => finding.Message)
+                    .ToList();
+
+                Assert.IsTrue(messages.Any(message => message.Contains("'ghost_widget' has no widget controller")));
+                Assert.IsTrue(messages.Any(message => message.Contains("'ghost_widget' has no layout")));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(chapter);
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        // The authored-to-settings half, over the IMPORTED chapter. The
+        // combined factory validation above owns the controller cross-check;
+        // this asset test keeps the shipped chapter and registry paired too.
+        [Test]
+        public void EveryPrefabIdChapterOneAuthorsResolvesInTheRegistry()
         {
             var registry = Load();
             var ch1 = AssetDatabase.LoadAssetAtPath<ChapterDefinition>(
@@ -97,12 +151,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 .ToList();
             Assert.IsNotEmpty(authored, "the chapter authors no modules at all");
             foreach (var id in authored)
-            {
-                Assert.IsTrue(ModuleWidgetFactory.Answers(id),
-                    $"chapter 1 authors '{id}', which no widget controller answers");
                 Assert.IsNotNull(registry.Resolve(id),
                     $"chapter 1 authors '{id}', which the registry resolves to nothing");
-            }
         }
 
         [Test]

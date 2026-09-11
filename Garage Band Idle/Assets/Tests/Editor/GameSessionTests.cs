@@ -44,6 +44,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- the phase table ----
 
         [Test]
+        public void A_locked_chapter_cannot_be_entered_until_its_completion_requirement_is_met()
+        {
+            var tree = new TestTree();
+            var definition = TestTree.MakeChapter("ch2");
+            definition.unlock = new FlagSet { flagId = "ch1_complete" };
+            tree.Chapters.Add(definition);
+            tree.Rebuild();
+            var chapter = (ChapterScopeState)TestNavigation.Node(tree.Root, definition);
+            var session = new GameSession(tree.Root, Config());
+            session.SwitchChapter(tree.Ch1, tree.Now);
+            var stamp = tree.Ch1.lastActiveUtc;
+            var refreshes = 0;
+            session.Refreshed += () => refreshes++;
+
+            session.SwitchChapter(chapter, tree.Now.AddSeconds(1));
+            Assert.AreSame(tree.Ch1, session.ForegroundChapter);
+            Assert.AreEqual(tree.Ch1.ScopeId, tree.Root.currentChapterId);
+            Assert.AreEqual(stamp, tree.Ch1.lastActiveUtc);
+            Assert.AreEqual(0, refreshes);
+
+            tree.Root.flags.Add("ch1_complete");
+            session.SwitchChapter(chapter, tree.Now.AddSeconds(2));
+            Assert.AreSame(chapter, session.ForegroundChapter);
+            Assert.AreEqual("ch2", tree.Root.currentChapterId);
+        }
+
+        [Test]
         public void NoChapter_never_ticks()
         {
             var f = new Fixture();

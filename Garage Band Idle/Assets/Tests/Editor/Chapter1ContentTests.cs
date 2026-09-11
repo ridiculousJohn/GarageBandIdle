@@ -62,6 +62,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0, tier1.children.Count);
         }
 
+        [Test]
+        public void Chapter_1_defaults_to_an_open_unlock_gate()
+        {
+            Assert.IsInstanceOf<Always>(ch1.unlock,
+                "the existing chapter document predates authored unlock gates and must remain available");
+            var state = ScopeState.Build(content);
+            Assert.IsTrue(ch1.unlock.Evaluate(
+                new GameContext(TestNavigation.Node(state, ch1), System.DateTime.UtcNow)));
+        }
+
         // ---- sections 3-8: what each scope declares ----
 
         // Declaration counts per family: this is what catches a block that

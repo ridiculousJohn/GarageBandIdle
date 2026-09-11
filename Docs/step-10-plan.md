@@ -103,10 +103,12 @@ facts only John can settle, and none blocks a slice.
   deletes the code-set flag marker the flag spelling would have needed, since the story flags get
   their setter from the beat definition. The session's two code reads (the cap raise, the doubled
   lines) name the Pass id in one constant.
-- **"Unlocked chapters only"** (12.11's `SetRoadieAllocation` rule). No chapter unlock condition
-  exists: the select renders root's whole roster, and section 2 says a cleared chapter stays
-  available. Until a chapter authors an unlock gate, the constraint is "a chapter on root's
-  roster", which is also the save filter's rule for the map's keys.
+- **"Unlocked chapters only"** (12.11's `SetRoadieAllocation` rule) is enforced through
+  `ChapterDefinition.unlock`, an ordinary Condition evaluated from the chapter scope. It
+  defaults to Always for Chapter 1; later chapters can require root completion flags, which
+  survive replay resets. The importer accepts the gate and validation checks its references.
+  Chapter switching and allocation both check it; the selector and allocation controls refresh
+  their enabled state from the same check.
 - **Decided (2026-09-02, from John's screenshots): the Encore widget is the top bar's LEFT pill.**
   Ctrl C's top bar is two pills above every chapter's content. The left pill is the Overclock
   widget itself - a stopwatch icon and the remaining time inline ("5:15:03"), the infinity symbol
@@ -457,19 +459,21 @@ which is what the declaration-on-the-chapter rule buys.
 ## Roadie allocation
 
 **`SetRoadieAllocation(map, nowUtc)`**: a session command over the whole map, replace
-semantics. Refused when any count is negative, any key is not a root child's id, or the sum
+semantics. Refused when any count is negative, any key is not an unlocked root child's id, or the sum
 exceeds the `roadies` balance (a `BigNumber` compare; the pool is a currency). Writes
 `Root.roadieAllocation` wholesale, dropping zero entries so the map holds only stationed chapters
-(the save filter's rule, applied at the write). Runs the root pipeline: flush, write, sweep,
-refresh - so the next tick resolves the new boosts and the header re-renders. Legal in `Live` only
-this step, since the chrome that reaches it is chapter chrome; a dormant chapter's next claim is
+(the save filter's rule, applied at the write). Runs the existing queued `RunCommand` with a
+root context: flush, write, conditional sweep, refresh - so the next tick resolves the new boosts
+and the header re-renders. The UI reaches it from Live chapter chrome; the command adds no phase
+guard. A dormant chapter's next claim is
 computed at current state and so sees the new allocation, which answers 8.2's "deliberately
 open" retroactivity question by construction - recorded on landing.
 
 **`RoadieAllocationUI`**: an app-owned overlay - one row per root child (`displayName`, stationed
 count, minus and plus), a line for the unallocated remainder, Done. Plus and minus edit a local
 copy; Done calls the command once. The local copy is the only UI-held state in the app and dies
-with the overlay.
+with the overlay. Locked chapters have disabled controls and contribute no submitted entry.
+Refresh rechecks unlock conditions while preserving the player's eligible draft allocations.
 
 ## The chrome
 
@@ -495,14 +499,16 @@ grows: a timed record whose id is not a modifier declared on the chain from its 
 modifier-stack rule, applied to `timedBuffs`); an entitlement id root does not declare.
 
 Validation's second input lands with this step (12.12): `CodeReferences`, the explicit list of
-code-side existence checks. Every class that names content from code - the Encore pill and window,
-`AdManager`, `IAPManager`, the allocation screen, the session's Pass id, the widget factory - states
-what it needs as a static `Validate(ValidationContext)` asking root's declaration lists through
-`RequireOnChain`, the pass runs the list after the tree walk at import and at boot, and the runtime
-resolves the same reference off root's own list and holds the asset, throwing on a miss the pass
-already refused. The `ModuleRegistry` cross-check test becomes the factory's entry on the list. This
-is what makes `ExtendBuff`'s arguments validated wiring: the `encore` it is handed came off root's
-list through a resolve the pass checked, so the command asks nothing of its own.
+code-side existence checks. `Encore`, `BackstagePass`, and `Roadies` own the shared references
+and supply the three static `Validate(ValidationContext)` checks. The pill, window, allocation
+screen, managers and session reuse those shared references; they do not add separate entries.
+The pass runs the checks after the tree walk at import and development boot. Shared reference
+resolution throws on a missing declaration that validation should already have refused.
+`ExtendBuff` receives the Encore asset through that validated shared resolve.
+**Separate factory/registry check:** import and development boot
+call `ModuleWidgetFactory.Validate(content, registry)` directly. The registry is not passed through
+`ContentValidator` or `CodeReferences`. Import checks before writing assets and checks the written
+content again; boot checks the scene's registry before creating the session.
 
 ## Tests
 
@@ -549,7 +555,9 @@ list through a resolve the pass checked, so the command asks nothing of its own.
   root flag and the row reads seen; the capstone beat is unavailable before `ch1_complete` and its
   legs name the gate; the reset leaves both flags
   set and a seen row stays enabled with its gate false again; a marked beat opens the card by
-  itself at the transaction that makes it available, its mark running at the next drain, and not
+  itself at the transaction that makes it available when no modal is open; otherwise it waits
+  until the first refresh after the last overlay closes. The modal and any unsubmitted allocation
+  draft remain intact while it waits. Its mark runs at the next drain, and it does not pop
   again after, an unmarked one behind the same gate never; a fresh chapter renders the opener's row alone; validation flags a `seenFlag` with no home
   on the chain, and the content test's two `FlagNoSetter` rows go to zero.
 - **Allocation**: 13.3 through `SetRoadieAllocation({ch1: 1})` - the ~1.87x multiplier as
@@ -568,7 +576,9 @@ list through a resolve the pass checked, so the command asks nothing of its own.
 
 A real ad or store SDK - the seams and fakes are the deliverable. Overdrive (decision 5). The
 `bought <= earned` cap held in reserve. The late-game Cash to Roadie sink. The Ch. 6 song
-operations. The story log, if John places it later. Chapter unlock gating - no chapter authors one.
+operations. The story log, if John places it later.
+
+Chapter unlock enforcement is part of slice D, not an exclusion from step 10.
 
 ## Docs on landing
 
@@ -606,6 +616,7 @@ build-plan step, `load-linking-plan.md` (2026-09-08), and lands before slice A.
   walk in the host, ch1's two beats and their `garage_floor` rows (placement settled above, so C
   waits on nothing), the content doc.
 - **D. Allocation and the chrome**: `SetRoadieAllocation`, the top bar, settings, the allocation
-  screen, the Encore window, 13.3 converted; the `CodeReferences` entries for the pill, the window,
-  the allocation screen and the widget factory, the registry cross-check test folding into the last.
+  screen, the Encore window, 13.3 converted; the screens reuse the existing shared Meta checks in
+  `CodeReferences`; the factory/registry cross-check runs directly from import and development
+  boot, separately from ContentValidator and CodeReferences.
 - **E. The story log**, if in step, and the hand playthrough of every shape above.

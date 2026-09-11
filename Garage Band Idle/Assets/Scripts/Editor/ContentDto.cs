@@ -354,6 +354,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public string id;
         public string displayName;
         public List<string> tags = new();
+        public ConditionDto unlock;
         public List<CurrencyDto> currencies = new();
         public List<string> flags = new();
         public List<string> entitlements = new();

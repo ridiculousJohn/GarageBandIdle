@@ -1706,6 +1706,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
+        public void ChapterUnlock_ReadsARootCompletionFlagFromTheChapter_NoChainReach()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.unlock = new FlagSet { flagId = "ch1_complete" };
+
+            AssertNoFinding(f.Run(), ValidationCheck.ChainReach);
+        }
+
+        [Test]
+        public void ChapterUnlock_NullGate_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.unlock = null;
+
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "chapter 'ch1' unlock: unlock is unauthored");
+        }
+
+        [Test]
         public void Section_NullGate_Error()
         {
             var f = new ValidatorFixture();

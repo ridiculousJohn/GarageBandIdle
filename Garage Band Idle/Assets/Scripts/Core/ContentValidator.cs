@@ -804,6 +804,14 @@ namespace RidiculousGaming.GarageBandIdle
 
                 if (scope is ChapterDefinition storyHost)
                 {
+                    ctx.EnterScope(storyHost);
+                    ctx.SetSite($"chapter '{storyHost.Id}' unlock");
+                    if (storyHost.unlock == null)
+                        ctx.AddError(ValidationCheck.NullEntry,
+                            "unlock is unauthored - a gate may not be null, and Always is how an author says the gate is open (12.12).");
+                    else
+                        storyHost.unlock.Validate(ctx);
+
                     foreach (var beat in storyHost.storyBeats)
                     {
                         if (beat == null)

@@ -80,6 +80,11 @@ namespace RidiculousGaming.GarageBandIdle
             try
             {
                 database = ContentDatabase.LoadRoot(ContentDatabase.RootAddress, ContentDatabase.ChapterLabel);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                var widgetReport = ModuleWidgetFactory.Validate(database.Root, registry);
+                if (widgetReport.HasErrors)
+                    throw new ContentValidationException("widget registry validation failed.", widgetReport);
+#endif
             }
             catch (ContentValidationException e)
             {

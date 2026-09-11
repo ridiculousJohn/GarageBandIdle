@@ -1,3 +1,7 @@
+# Design Authority Rule
+
+`Docs/garage-band-idle-design.md` is the gold standard. Code and implementation plans must conform to it. When code or a plan does not match the design, flag the discrepancy and report it to John. Never weaken, reinterpret, remove, or defer a design requirement to match existing code or simplify implementation without John's explicit approval of that specific design change. Missing implementation is a defect, not evidence that a requirement is unnecessary. Passing tests do not establish design compliance.
+
 # Highest-Priority Repository Safety Rule
 
 Never restore, revert, reset, discard, overwrite, clean, or otherwise roll back any repository or workspace change without John's explicit direction to perform that exact destructive action.

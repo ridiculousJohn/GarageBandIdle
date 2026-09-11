@@ -139,7 +139,7 @@ balance held further out.
 **Permanent (root):**
 - **Records** — each Record increases global income; the Records earned within a chapter (mirrored
   into a chapter-declared counter, §5) gate its capstone. Accumulated, never spent.
-- **Roadies** — crew; a global multiplier allocated across cleared chapters (§8).
+- **Roadies** — crew; a global multiplier allocated across unlocked chapters (§8).
 - **Discography** — a list of the player's best named songs (§7). Display only.
 
 **Income.** Every produced number is computed on read as *the sum of its contributions times the
@@ -401,7 +401,7 @@ the studio-era multiplier (run-scoped, converts to Records); Discography is a pe
 
 Roadies are a permanent global multiplier. The player earns them from capstones and from replaying
 cleared chapters, and can also buy them (§9). All Roadies go into one pool and can be reassigned
-freely. The pool is the root `roadies` currency; the allocation is a root fact the venue boosts
+freely among unlocked chapters, including cleared chapters. The pool is the root `roadies` currency; the allocation is a root fact the venue boosts
 derive from.
 
 ### 8.1 Replaying cleared chapters
@@ -1470,6 +1470,11 @@ graph and instantiate synchronously mid-refresh; the behavior is a plain C# `Mod
 controller a code-side factory constructs for the same id. A new widget type is a UXML, a factory
 line, and a registry entry.
 
+**Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
+or Encore is open, the host does not run the automatic story walk. The modal and any unsubmitted
+allocation draft remain intact. A waiting marked beat stays unseen and opens on the first refresh
+after the last overlay closes, if it is still available. The walk reads state, not a transition.
+
 **Refresh** is coarse, on two triggers: after each tick of the foreground chapter, and after every
 **completed command transaction** (nested Actions never refresh individually — the outer
 transaction publishes one final state change, so a rung's payout, flag, and reset render as one).
@@ -1621,16 +1626,21 @@ per-feature: any kind an author gates with explains itself for free.
 - A polymorphic kind in data with no class behind it is an import error.
 - **Validation has a second input beside the content tree: the code side's own references.** A
   screen, a manager, or the session that names content from code - a modifier (`encore`), a currency
-  (`roadies`), an entitlement id (`backstage_pass`), a widget id the factory must answer - states
+  (`roadies`), an entitlement id (`backstage_pass`) - states
   what it needs as a static check on the class holding the reference, asking existence with the
   same primitives a definition uses (`RequireOnChain` from root, the declaration lists).
   `CodeReferences` lists every such check explicitly, the way the kind registry lists every kind and
   the widget factory every `prefabId`, and the pass runs the list after the tree walk, at import and
   at boot alike. Nothing is constructed to ask: a check reads only the composed content. At runtime
   the class resolves the same reference off root's own declaration list and holds the asset - a miss
-  there is a throw, not a guard, because the pass already answered. A class left off the list is what
-  the factory-registry cross-check catches. This is not a content lookup (12.14.8): it enumerates
+  there is a throw, not a guard, because the pass already answered. This is not a content lookup (12.14.8): it enumerates
   code, inside the one pass that audits the whole tree.
+- **Widget registry cross-check.** Import and development boot call
+  `ModuleWidgetFactory.Validate(content, registry)` directly beside content validation. The factory
+  verifies that authored widget ids have controllers and layouts, and cross-checks its controller
+  ids against the registry entries. Missing layouts, missing controllers, duplicate ids and invalid
+  entries are errors. The importer uses the project registry settings asset; boot uses the scene's
+  registry reference. Neither `ContentValidator` nor `CodeReferences` receives the registry.
 
 ### 12.13 File layout
 
@@ -1701,15 +1711,19 @@ Assets/Scripts/
     IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar; grant, save, acknowledge in that order
   UI/
     SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs
-    ModuleWidget.cs  ModuleWidgetFactory.cs   // the plain-C# controller base and the closed prefabId switch
+    ModuleWidget.cs  ModuleWidgetFactory.cs   // the plain-C# controller base and the closed prefabId constructor table; direct factory/registry validation at import and development boot
     ScreenHost.cs  UIRoot.cs                  // the structure logic (the ONE Refreshed subscriber) and its MonoBehaviour shell
     GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
     IStoryOpener.cs         // the one method a story row asks of the host: open the card for a beat at its scope
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorListUI  GeneratorRowUI
               UpgradeListUI  UpgradeRowUI  BarGroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI
-    ChapterSelectUI.cs  CollectScreenUI.cs        // the app's own screens for NoChapter and AwaitingIdleClaim, over root's roster and the session's offer
+    ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select at boot or over Live, and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
-    NumberFormatter.cs  RoadieAllocationUI.cs
+    NumberFormatter.cs
+    TopBarUI.cs             // the two pills, with the Encore countdown shared by the window
+    SettingsUI.cs          // the Roadies entry and close button
+    RoadieAllocationUI.cs  // local allocation draft; Done submits the whole map
+    EncoreWindowUI.cs      // remaining time and ad/Pass requests through the existing managers
 Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
 Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)

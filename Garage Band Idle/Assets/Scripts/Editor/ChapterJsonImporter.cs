@@ -12,6 +12,7 @@ using UnityEngine;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Events;
 using RidiculousGaming.GarageBandIdle.Story;
+using RidiculousGaming.GarageBandIdle.UI;
 
 namespace RidiculousGaming.GarageBandIdle.Editor
 {
@@ -54,6 +55,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             public string ContentDirectory = ContentPath;
             public string AssetRoot = AssetRootPath;
             public string GroupName = ChapterJsonImporter.GroupName;
+            public string RegistryPath = "Assets/Settings/ModuleRegistry.asset";
         }
 
         [MenuItem("Garage Band Idle/Import Content")]
@@ -118,6 +120,11 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     throw new ContentImportException(
                         "content validation failed on the assembled documents - nothing was written (12.12).",
                         preflight);
+                var widgets = ModuleWidgetFactory.Validate(transient.Content,
+                    AssetDatabase.LoadAssetAtPath<ModuleRegistry>(options.RegistryPath));
+                if (widgets.HasErrors)
+                    throw new ContentImportException(
+                        "widget registry validation failed - nothing was written.", widgets);
             }
             finally
             {
@@ -179,6 +186,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 throw new ContentImportException(
                     "the WRITTEN content fails validation - the writer disagreed with the preflight (12.14.5).",
                     report, true);
+            var widgets = ModuleWidgetFactory.Validate(loaded,
+                AssetDatabase.LoadAssetAtPath<ModuleRegistry>(options.RegistryPath));
+            if (widgets.HasErrors)
+                throw new ContentImportException("the WRITTEN content fails widget registry validation.", widgets, true);
             return report;
         }
 
@@ -345,6 +356,9 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             // chapter boundary, so only a chapter declares one (section 10).
             if (scope is not ChapterDefinition && dto.storyBeats.Count > 0)
                 throw new ContentImportException($"scope '{dto.id}' authors story beats; only a chapter declares them (section 10).");
+
+            if (scope is not ChapterDefinition && dto.unlock != null)
+                throw new ContentImportException($"scope '{dto.id}' authors an unlock condition; only a chapter has a chapter unlock gate.");
 
             foreach (var currency in dto.currencies)
                 Declare<CurrencyDefinition>(build, scope, currency, document, options, materialize);
@@ -555,10 +569,17 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     };
             }
 
-            // The two blocks only a chapter carries: its boundary cards, and the
-            // screen that binds them.
+            // The blocks only a chapter carries: its unlock gate, boundary
+            // cards, and the screen that binds them.
             if (scope is ChapterDefinition chapter)
             {
+                // An omitted unlock keeps the backward-compatible open gate.
+                // Authored conditions resolve from the chapter, whose outward
+                // chain continues through the composed root.
+                chapter.unlock = dto.unlock == null
+                    ? new Always()
+                    : BuildCondition(build, scope, dto.unlock);
+
                 // A beat's gate and its latch resolve outward from the CHAPTER,
                 // which declares the beat and is where the row rebases to judge
                 // it (section 10, 12.11).

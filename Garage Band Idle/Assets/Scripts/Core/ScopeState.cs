@@ -413,6 +413,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         public DateTime lastActiveUtc;
 
+        public bool IsUnlocked(DateTime nowUtc) =>
+            ((ChapterDefinition)Definition).unlock.Evaluate(new GameContext(this, nowUtc));
+
         // Every lastActiveUtc write is MONOTONIC (design doc 12.9/12.10): the
         // clamp on the read alone is not enough - stamping a rolled-back clock
         // into state would mint the difference the moment the clock recovers.

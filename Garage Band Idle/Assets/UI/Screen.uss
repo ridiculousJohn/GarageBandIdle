@@ -5,6 +5,34 @@
     flex-grow: 1;
 }
 
+.top-bar {
+    flex-direction: row;
+    justify-content: space-between;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 8px;
+}
+
+.top-pill {
+    flex-direction: row;
+    background-color: rgb(45, 45, 45);
+    border-radius: 12px;
+}
+
+.encore-pill {
+    min-width: 148px;
+}
+
+.top-actions {
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.top-action {
+    margin-left: 2px;
+    margin-right: 2px;
+}
+
 .sections {
     padding-left: 12px;
     padding-right: 12px;
@@ -120,6 +148,7 @@
     justify-content: center;
     align-items: center;
     padding: 24px;
+    background-color: rgb(24, 24, 24);
 }
 
 .select-title {
@@ -202,4 +231,47 @@
 
 .story-row {
     margin-bottom: 8px;
+}
+
+.modal {
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+.modal-panel {
+    min-width: 420px;
+    max-width: 640px;
+    padding: 24px;
+    background-color: rgb(32, 32, 32);
+}
+
+.modal-title {
+    -unity-font-style: bold;
+    font-size: 20px;
+    margin-bottom: 12px;
+}
+
+.settings-row, .encore-description, .encore-remaining,
+.roadie-unallocated, #roadie-done, #encore-ad, #encore-pass {
+    margin-bottom: 8px;
+}
+
+.roadie-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.roadie-name {
+    flex-grow: 1;
+}
+
+.roadie-count {
+    min-width: 52px;
+    -unity-text-align: middle-center;
+}
+
+.overlay-close {
+    margin-top: 8px;
 }

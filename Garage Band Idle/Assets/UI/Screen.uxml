@@ -1,11 +1,20 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <Style src="Screen.uss" />
+    <ui:VisualElement name="top-bar" class="top-bar" style="display: none;">
+        <ui:Button name="encore" class="top-pill encore-pill" />
+        <ui:VisualElement class="top-pill top-actions">
+            <ui:Button name="story-log" text="&#x2709;" class="top-action" />
+            <ui:Button name="chapter-select" text="&#x2630;" class="top-action" />
+            <ui:Button name="settings-button" text="&#x2699;" class="top-action" />
+        </ui:VisualElement>
+    </ui:VisualElement>
     <ui:ScrollView name="screen" class="screen">
         <ui:VisualElement name="sections" class="sections" />
     </ui:ScrollView>
     <ui:VisualElement name="select" class="overlay select" style="display: none;">
         <ui:Label text="Choose a chapter" class="select-title" />
         <ui:VisualElement name="chapters" class="select-chapters" />
+        <ui:Button name="select-close" text="Back" class="overlay-close" />
     </ui:VisualElement>
     <ui:VisualElement name="collect" class="overlay collect" style="display: none;">
         <ui:VisualElement class="collect-panel">
@@ -21,6 +30,32 @@
             <ui:Label name="title" class="story-title" />
             <ui:Label name="text" class="story-text" />
             <ui:Button name="close" text="OK" class="story-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="settings" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel settings-panel">
+            <ui:Label text="Settings" class="modal-title" />
+            <ui:Button name="roadies-button" text="Roadies" class="settings-row" />
+            <ui:Button name="settings-close" text="Back" class="overlay-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="roadie-allocation" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel roadie-panel">
+            <ui:Label text="Roadies" class="modal-title" />
+            <ui:VisualElement name="roadie-rows" />
+            <ui:Label name="roadie-unallocated" class="roadie-unallocated" />
+            <ui:Button name="roadie-done" text="Done" />
+            <ui:Button name="roadie-close" text="Back" class="overlay-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="encore-window" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel encore-panel">
+            <ui:Label text="Encore" class="modal-title" />
+            <ui:Label name="encore-description" class="encore-description" />
+            <ui:Label name="encore-remaining" class="encore-remaining" />
+            <ui:Button name="encore-ad" />
+            <ui:Button name="encore-pass" text="Boost forever" />
+            <ui:Button name="encore-close" text="Back" class="overlay-close" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

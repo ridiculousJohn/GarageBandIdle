@@ -174,6 +174,45 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(new[] { tier1 }, chapter.children.ToArray());
             Assert.AreSame(cash, tap.produces[0].currency, "the reference is the asset, not a copy");
             Assert.AreEqual(new[] { "income" }, cash.Tags.ToArray());
+            Assert.IsInstanceOf<Always>(chapter.unlock,
+                "chapters authored before unlock existed remain available");
+        }
+
+        [Test]
+        public void A_chapter_unlock_imports_in_the_chapter_context()
+        {
+            Write("root.json", RootJson.Replace(@"""entitlements"": [""backstage_pass""]",
+                @"""entitlements"": [""backstage_pass""], ""flags"": [""ch1_complete""]"));
+            Write("ch1.json", ChapterJson.Replace(@"""displayName"": ""The Garage""",
+                @"""displayName"": ""The Garage"", ""unlock"": { ""type"": ""FlagSet"", ""flagId"": ""ch1_complete"" }"));
+
+            Import();
+
+            var unlock = Load<ChapterDefinition>("ch1/ch1.asset").unlock;
+            Assert.AreEqual("ch1_complete", ((FlagSet)unlock).flagId);
+        }
+
+        [Test]
+        public void An_unknown_chapter_unlock_condition_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ChapterJson.Replace(@"""displayName"": ""The Garage""",
+                @"""displayName"": ""The Garage"", ""unlock"": { ""type"": ""Nonsense"" }"));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("Nonsense", thrown.Message);
+        }
+
+        [Test]
+        public void A_non_chapter_cannot_author_a_chapter_unlock()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ChapterJson.Replace(
+                @"{ ""type"": ""TierDefinition"", ""id"": ""tier1"" }",
+                @"{ ""type"": ""TierDefinition"", ""id"": ""tier1"", ""unlock"": { ""type"": ""Always"" } }"));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("only a chapter", thrown.Message);
         }
 
         [Test]
@@ -515,6 +554,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             StringAssert.Contains("content validation failed", thrown.Message);
             Assert.IsTrue(thrown.Report.OfCheck(ValidationCheck.NullEntry).Any(), "the refusal carries its findings");
+            Assert.IsNull(Load<ChapterDefinition>("ch1/ch1.asset"), "nothing was written");
+        }
+
+        [Test]
+        public void A_missing_module_registry_aborts_before_any_write()
+        {
+            WriteSectionsPair();
+            var options = Options();
+            options.RegistryPath = sandbox + "/MissingModuleRegistry.asset";
+
+            var thrown = Assert.Throws<ContentImportException>(() => ChapterJsonImporter.Import(options));
+
+            StringAssert.Contains("widget registry validation failed", thrown.Message);
+            Assert.IsTrue(thrown.Report.OfCheck(ValidationCheck.NullEntry)
+                .Any(finding => finding.Message.Contains("ModuleRegistry is missing")));
+            Assert.IsFalse(thrown.AssetsMutated, "the registry is part of preflight");
             Assert.IsNull(Load<ChapterDefinition>("ch1/ch1.asset"), "nothing was written");
         }
 

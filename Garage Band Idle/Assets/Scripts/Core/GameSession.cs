@@ -101,6 +101,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         // ---- the session commands ----
 
+        public bool IsChapterUnlocked(ChapterScopeState chapter, DateTime nowUtc) =>
+            chapter != null && chapter.Parent == Root && chapter.IsUnlocked(nowUtc);
+
         // Legal in every phase, one transaction (12.9). Switching to the
         // CURRENT chapter (or to null while already NoChapter) is a no-op
         // that runs no pipeline: the stamp is old during a live
@@ -121,6 +124,8 @@ namespace RidiculousGaming.GarageBandIdle
                 // Read when the transaction runs, which is the state the switch
                 // would act on.
                 if (chapter == ForegroundChapter)
+                    return;
+                if (chapter != null && !IsChapterUnlocked(chapter, nowUtc))
                     return;
                 // The outgoing chapter's banked foreground time settles into
                 // the outgoing subtree, never the incoming one - and the
@@ -561,6 +566,22 @@ namespace RidiculousGaming.GarageBandIdle
                 c.Deposit(Roadies.CurrencyId, count);
                 return true;
             }, completed);
+        }
+
+        // Replaces the whole allocation through the root command pipeline. The
+        // caller's draft is copied before submission because a command issued
+        // during a refresh waits for the next drain; later UI edits must not
+        // change the transaction that is already queued.
+        public void SetRoadieAllocation(IReadOnlyDictionary<string, int> allocation, DateTime nowUtc,
+                                        Action<bool> completed = null)
+        {
+            if (allocation == null)
+                throw new ArgumentNullException(nameof(allocation));
+            var requested = new Dictionary<string, int>(allocation.Count);
+            foreach (var pair in allocation)
+                requested.Add(pair.Key, pair.Value);
+            RunCommand(new GameContext(Root, nowUtc),
+                c => Meta.RoadieAllocation.TrySet(c, requested), completed);
         }
 
         // ---- the pipeline ----

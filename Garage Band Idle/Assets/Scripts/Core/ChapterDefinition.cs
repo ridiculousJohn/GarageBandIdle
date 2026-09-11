@@ -8,6 +8,11 @@ namespace RidiculousGaming.GarageBandIdle
     [CreateAssetMenu(menuName = "Garage Band Idle/Scope/Chapter")]
     public class ChapterDefinition : InteriorDefinition
     {
+        // Evaluated from the chapter scope, so a later chapter can read the
+        // root-owned completion flag of an earlier one by the ordinary outward
+        // condition walk. Existing chapters are open unless they author a gate.
+        [SerializeReference, SubclassPicker] public Condition unlock = new Always();
+
         // The authored screen, in order (design doc 12.11). Only a chapter has
         // one, and nothing outside references a section, so the sections are
         // inline data here rather than assets of their own.

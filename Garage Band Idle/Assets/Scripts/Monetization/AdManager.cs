@@ -31,6 +31,11 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
 
         private readonly List<Request> pending = new();
 
+        // The Encore window promises the same tuned duration this manager
+        // grants. Exposing the setting here keeps the UI from duplicating a
+        // number owned by GameConfig.
+        public double EncoreAdSeconds => config.encoreAdSeconds;
+
         public AdManager(GameSession session, IAdService ads, GameConfig config, Action save)
         {
             this.session = session;

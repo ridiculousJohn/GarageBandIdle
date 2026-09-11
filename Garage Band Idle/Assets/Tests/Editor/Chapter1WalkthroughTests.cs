@@ -445,7 +445,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The replay, with the new roadie stationed here: records x
             // roadie_total x roadie_active = 1.7 x 1.05 x 1.05, about 1.87.
-            f.Root.roadieAllocation[f.Ch1.ScopeId] = 1;
+            bool? allocated = null;
+            f.Session.SetRoadieAllocation(
+                new Dictionary<string, int> { { f.Ch1.ScopeId, 1 } }, f.Now,
+                ran => allocated = ran);
+            Assert.AreEqual(true, allocated, "the allocation command stations the earned Roadie");
             f.Tier1.generatorCounts[f.PracticeAmp.Id] = 1;
             AssertClose(0.5 * 1.7 * 1.05 * 1.05, f.Rate(f.Cash), "the income multiplier comes back at ~1.87x");
 
