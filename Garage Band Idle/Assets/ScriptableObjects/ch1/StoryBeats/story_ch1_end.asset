@@ -15,17 +15,18 @@ MonoBehaviour:
   id: story_ch1_end
   tags: []
   displayName: Your First Roadie
+  description: 
   text: "The backyard's packed. You plug in, count off, and for three minutes the
     whole neighborhood is yours. Someone's already asking when the next one is \u2014
     and a guy named Dave offers to haul your gear. You've got your first roadie."
   availableWhen:
-    rid: 7579425402431733847
+    rid: 7579425403673772148
   seenFlag: story_ch1_end_seen
   opensWhenAvailable: 0
   references:
     version: 2
     RefIds:
-    - rid: 7579425402431733847
+    - rid: 7579425403673772148
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Play the Backyard Party

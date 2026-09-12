@@ -15,25 +15,26 @@ MonoBehaviour:
   id: reveal_release
   tags: []
   displayName: 
+  description: 
   condition:
-    rid: 7579425402431733839
+    rid: 7579425403673772080
   actions:
-  - rid: 7579425402431733840
+  - rid: 7579425403673772081
   references:
     version: 2
     RefIds:
-    - rid: 7579425402431733839
+    - rid: 7579425403673772080
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 7579425402431733841
-        - rid: 7579425402431733842
-    - rid: 7579425402431733840
+        - rid: 7579425403673772082
+        - rid: 7579425403673772083
+    - rid: 7579425403673772081
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: album
-    - rid: 7579425402431733841
+    - rid: 7579425403673772082
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -42,7 +43,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 1
-    - rid: 7579425402431733842
+    - rid: 7579425403673772083
       type: {class: BarsCompleted, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

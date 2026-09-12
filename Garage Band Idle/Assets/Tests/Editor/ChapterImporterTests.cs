@@ -419,7 +419,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     ""modules"": [
                         { ""prefabId"": ""currency_line"", ""contentId"": ""cash"" },
                         { ""prefabId"": ""currency_line"", ""contentId"": ""records"" },
-                        { ""prefabId"": ""generator_list"" },
+                        { ""prefabId"": ""bar_group"" },
                         {
                             ""prefabId"": ""rung_button"",
                             ""scopeId"": ""tier1"",
@@ -458,11 +458,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsInstanceOf<Always>(section.visibleWhen, "Always is how an author says the gate is open");
             Assert.AreSame(Load<TierDefinition>("ch1/tier1a.asset"), section.scope,
                 "the section's scope is the asset, not a copy");
-            Assert.AreEqual(new[] { "currency_line", "currency_line", "generator_list", "rung_button" },
+            Assert.AreEqual(new[] { "currency_line", "currency_line", "bar_group", "rung_button" },
                 section.modules.Select(m => m.prefabId).ToArray());
             Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/cash.asset"), section.modules[0].content,
                 "the binding is the asset the tier declares");
-            Assert.IsNull(section.modules[2].content, "a list module's content is its scope's own lists");
+            Assert.IsNull(section.modules[2].content, "a contentless module reads its own scope's declarations");
             Assert.AreEqual("album", ((FlagSet)section.modules[3].visibleWhen).flagId,
                 "the module gate is built from the module's own scope, which reaches ch1's flag");
         }
@@ -545,7 +545,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void An_empty_prefab_id_aborts_through_the_preflight()
         {
             Write("root.json", RootJson);
-            Write("ch1.json", SectionsJson.Replace(@"""prefabId"": ""generator_list""", @"""prefabId"": """""));
+            Write("ch1.json", SectionsJson.Replace(@"""prefabId"": ""bar_group""", @"""prefabId"": """""));
 
             // No LogAssert here: an expected refusal prints nothing, and an
             // unexpected error log would fail the row on its own. The findings

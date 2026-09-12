@@ -16,6 +16,7 @@ MonoBehaviour:
   tags:
   - income
   displayName: Cash
+  description: 
   activeWhen:
     rid: -2
   references:

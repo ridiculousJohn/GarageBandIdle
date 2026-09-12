@@ -14,6 +14,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // it - the content doc's row labels are for humans, not ids.
         public string title;
 
+        // Optional player-facing text saying what the band is for, rendered
+        // beneath the title by the section view (12.11). Never read by the
+        // economy.
+        public string description;
+
         // The gate, judged at this section's evaluation scope. Never null:
         // Always is how an author says the gate is open (12.12).
         [SerializeReference, SubclassPicker] public Condition visibleWhen;

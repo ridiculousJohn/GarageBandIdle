@@ -232,19 +232,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new Chapter1();
             f.Enter();
 
-            // Nothing is revealed at t=0: the band region gates on a lifetime
+            // Nothing is buyable at t=0: the amp's purchase gate is a lifetime
             // earned total, and only the tap pays anything at all.
-            Assert.IsFalse(f.PracticeAmp.IsAvailable(f.Ctx(f.Tier1)), "the band region is closed on a fresh run");
+            Assert.IsFalse(f.PracticeAmp.IsAvailable(f.Ctx(f.Tier1)), "the amp's gate is closed on a fresh run");
             AssertClose(0, f.Rate(f.Cash), "nothing pays a rate yet");
             Assert.IsFalse(f.Tier1Def.rung.IsOffered(f.Ctx(f.Tier1)), "the release wants fans and a cover");
 
             f.TapUntil(() => f.Earned(f.Tier1, f.Cash) >= 100, "100 cash earned");
-            Assert.IsTrue(f.PracticeAmp.IsAvailable(f.Ctx(f.Tier1)), "EarnedTotalAtLeast(cash, 100) opened the band region");
+            Assert.IsTrue(f.PracticeAmp.IsAvailable(f.Ctx(f.Tier1)),
+                "EarnedTotalAtLeast(cash, 100) opened the amp's gate; the section's reveal is a chapter flag");
             Assert.IsFalse(f.StagePresence.IsOffered(f.Ctx(f.Tier1)), "the gear region is still closed");
 
             f.TapUntil(() => f.Earned(f.Tier1, f.Cash) >= 250, "250 cash earned");
             Assert.IsTrue(f.StagePresence.IsOffered(f.Ctx(f.Tier1)),
-                "the gear region gates on the earned total, with no flag of its own");
+                "the upgrade's own gate is the earned total; the section's reveal is a chapter flag");
 
             // The upgrade is a pure latch; the flat bonus is tap_producer's
             // conditioned entry reading it, which is why the press doubles.
@@ -437,7 +438,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // ResetScope(ch1) is downward closed: the chapter's own facts go
             // with the tier's, and the chapter sits immediately replayable.
             AssertClose(0, f.Balance(f.Ch1, f.Ch1Records), "the gate counter zeroes");
-            Assert.IsEmpty(f.Ch1.flags, "album and the gj latches go with it");
+            Assert.IsEmpty(f.Ch1.flags, "every ch1 flag goes with it - album, the gj latches, the ten reveals");
             Assert.IsEmpty(f.Ch1.modifierStacks);
             f.AssertTierIsFresh();
 

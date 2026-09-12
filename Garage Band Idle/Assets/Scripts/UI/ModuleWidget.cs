@@ -17,8 +17,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // outward from and where its commands act.
         protected ScopeState Scope { get; private set; }
 
-        // What the module binds; null for a list module, whose content is the
-        // evaluation scope's own declaration lists.
+        // What the module binds; null for a module that binds nothing, the rung
+        // button and the bar group, which render their scope's own rung and bar
+        // groups.
         protected Definition Content { get; private set; }
 
         protected GameClock Clock { get; private set; }

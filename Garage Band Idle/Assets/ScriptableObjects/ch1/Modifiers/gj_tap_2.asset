@@ -15,6 +15,7 @@ MonoBehaviour:
   id: gj_tap_2
   tags: []
   displayName: 
+  description: 
   stacking: 0
   effects:
   - target: tap_producer

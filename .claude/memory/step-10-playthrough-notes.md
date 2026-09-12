@@ -1,6 +1,6 @@
 ---
 name: step-10-playthrough-notes
-description: "John's notes from the step 10 hand playthrough (2026-09-11) - the defect list, sorted by kind; 7 and 11 landed 2026-09-11, 10 is content-only and open, the rest are open"
+description: "John's notes from the step 10 hand playthrough (2026-09-11) - the defect list; everything landed 2026-09-11 except the colors, which are the polish pass"
 metadata: 
   node_type: memory
   type: project
@@ -13,13 +13,13 @@ John's notes from the first hand playthrough after slice E, 2026-09-11, fresh sa
 moment". Each item carries the fact I checked behind it and its kind. Nothing here is an order.
 
 **Code**
-1. Colors: dark grey background with black text is unreadable. (UI polish pass territory, but
+1. PARTLY LANDED 2026-09-11: labels read light on the dark panels (one USS rule); the rest is the polish pass. Colors: dark grey background with black text is unreadable. (UI polish pass territory, but
    noted here because he hit it first.)
-1b. The Encore window stays open after "Boost for 4 hours" or "Boost forever" succeeds. Slice D
+1b. LANDED 2026-09-11 (the grant's completed callback closes the window if it is still shown). The Encore window stays open after "Boost for 4 hours" or "Boost forever" succeeds. Slice D
    built it that way: the grant lands as a callback command and nothing closes the overlay. He
    wants it to close on the service's successful return.
 
-**Architecture first (a description field no content family has)**
+**Architecture first (a description field no content family has)** - LANDED 2026-09-11: `description` on Definition and SectionDefinition, rendered beneath the name by the row widgets and beneath the title by the section; chapter 1 authors all twenty (content doc section 12).
 2. Upgrades (Stage Presence, New Strings...) say nothing about what they do. Ctrl C shows cost and
    flavor icons on the button, and a long-tap gives an explanation.
 3. The Rehearsal Space and its currency do not say what they are for.
@@ -43,7 +43,7 @@ moment". Each item carries the fact I checked behind it and its kind. Nothing he
 8. Kit Upgrade (x2 drummer cash rate) produced no noticeable change with few drummers.
 9. The Backyard Party button is grey until 30 `ch1_records`; the section itself appears on the
    `album` flag. Item 7's uiText is the fix.
-10. OPEN, content only (John settled the shape 2026-09-11). After the Garage Jam's reward, the
+10. LANDED 2026-09-11 as row modules (generator_row / upgrade_row binding one thing, visible on the module's visibleWhen; the list widgets deleted; ten reveal triggers) - see the build plan line. The "content only" claim below was wrong: the list widgets conflated visibility with the purchase gate, John found it ("you conflated visible with available"), and the fix was the module shape the currency lines already had. Original note: After the Garage Jam's reward, the
    tier reset hides The Band (gate `EarnedTotalAtLeast(cash, 100)` at tier1; the reset clears the
    earned total). Content doc section 2 states reveals re-walk every run - intended today. John: an
    exposed section should stay exposed and its rows go disabled. The list widgets show a row while

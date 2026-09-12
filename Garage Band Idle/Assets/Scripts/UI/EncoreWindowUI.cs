@@ -13,6 +13,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private readonly RootScopeState root;
         private readonly GameClock clock;
+        private readonly AdManager ads;
+        private readonly IAPManager store;
+        private readonly Action close;
         private readonly Label remaining;
         private readonly Label description;
         private readonly Button ad;
@@ -25,16 +28,26 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Root = rootElement;
             this.root = root;
             this.clock = clock;
+            this.ads = ads;
+            this.store = store;
+            this.close = close;
             remaining = ScreenHost.Require<Label>(rootElement, "encore-remaining");
             description = ScreenHost.Require<Label>(rootElement, "encore-description");
             ad = ScreenHost.Require<Button>(rootElement, "encore-ad");
             pass = ScreenHost.Require<Button>(rootElement, "encore-pass");
             modifier = Encore.Modifier(root);
             ad.text = "Boost for " + GrantDuration(ads.EncoreAdSeconds);
-            ad.clicked += ads.RequestEncoreExtension;
-            pass.clicked += () => store.RequestPurchase(ProductId.BackstagePass);
+            ad.clicked += RequestAd;
+            pass.clicked += RequestPass;
             ScreenHost.Require<Button>(rootElement, "encore-close").clicked += close;
         }
+
+        // What each request button calls. Kept as public UI actions for the
+        // reason ChapterSelectUI.Select is public: a headless test exercises
+        // what the button exercises without manufacturing pointer events.
+        public void RequestAd() => ads.RequestEncoreExtension(CloseIfShown);
+
+        public void RequestPass() => store.RequestPurchase(ProductId.BackstagePass, CloseIfShown);
 
         public void Show()
         {
@@ -54,6 +67,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Interpolate() => remaining.text = "Time remaining " + EncoreTime.Text(root, clock.RealTimeUtc);
 
         public void Hide() => Root.style.display = DisplayStyle.None;
+
+        // The grant may land after the player closed the window and opened
+        // something else, and closing then would take down whatever stands - so
+        // the window closes only itself.
+        private void CloseIfShown()
+        {
+            if (Root.style.display.value == DisplayStyle.Flex)
+                close();
+        }
 
         private void RefreshDescription()
         {

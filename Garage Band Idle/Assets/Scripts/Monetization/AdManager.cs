@@ -19,6 +19,11 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
             public AdPlacement Placement;
             public Task<AdResult> Result;
             public ChapterScopeState Chapter;
+
+            // What the requester wants told once the reward is on the tree and
+            // saved - the Encore window closes on it. Nothing is told on a
+            // failed or aborted result, since the player watched no ad.
+            public Action Granted;
         }
 
         private readonly GameSession session;
@@ -44,11 +49,12 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
             this.save = save;
         }
 
-        public void RequestEncoreExtension() =>
+        public void RequestEncoreExtension(Action granted = null) =>
             pending.Add(new Request
             {
                 Placement = AdPlacement.EncoreExtension,
                 Result = ads.ShowRewarded(AdPlacement.EncoreExtension),
+                Granted = granted,
             });
 
         // Records the chapter the offer belongs to: a switch under the dialog
@@ -104,7 +110,11 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
                 // submitted command (12.9) and may run at the frame's drain
                 // rather than at the call.
                 session.ExtendBuff(session.Root, Encore.Modifier(session.Root), config.encoreAdSeconds, nowUtc,
-                                   _ => save());
+                                   _ =>
+                                   {
+                                       save();
+                                       request.Granted?.Invoke();
+                                   });
                 return;
             }
 

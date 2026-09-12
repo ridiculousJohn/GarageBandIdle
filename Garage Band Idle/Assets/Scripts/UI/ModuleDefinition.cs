@@ -15,8 +15,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public string prefabId;
 
         // What the widget shows - a producer, a currency, an event. Base-typed
-        // because modules bind different families, and null for a list module,
-        // whose content is the evaluation scope's own declaration lists.
+        // because modules bind different families, and null for a module that
+        // binds nothing, the rung button and the bar group, which render their
+        // scope's own rung and bar groups.
         public Definition content;
 
         // Optional gate, judged at this module's scope. Absent means always

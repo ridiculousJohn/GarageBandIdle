@@ -20,6 +20,11 @@ namespace RidiculousGaming.GarageBandIdle
         // are private, because they are identity.
         public string displayName;
 
+        // Optional player-facing text saying what the thing does or is for,
+        // rendered beneath the name by the widgets that show a row for it
+        // (12.11). Never read by the economy.
+        public string description;
+
         public string Id => id;
         public IReadOnlyList<string> Tags => tags;
 

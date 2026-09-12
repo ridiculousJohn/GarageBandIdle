@@ -85,7 +85,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(new[] { "backstage_pass" }, root.entitlements.ToArray());
 
             Assert.AreEqual(new[] { "ch1_records" }, Ids(ch1.declaredCurrencies));
-            Assert.AreEqual(new[] { "album", "gj1_done", "gj2_done", "gj3_done" }, ch1.declaredFlags.ToArray());
+            Assert.AreEqual(new[] { "album", "gj1_done", "gj2_done", "gj3_done", "band_revealed",
+                                    "drummer_revealed", "bassist_revealed", "guitarist_revealed",
+                                    "gear_revealed", "amp_strings_revealed", "kit_upgrade_revealed",
+                                    "tight_set_revealed", "play_for_crowd_revealed", "unlock_covers_revealed" },
+                ch1.declaredFlags.ToArray());
             Assert.AreEqual(new[] { "gj_tap_1", "gj_tap_2", "gj_tap_3" }, Ids(ch1.modifiers));
             Assert.AreEqual(0, ch1.events.Count, "the Garage Jam chain hosts at tier1");
 
@@ -101,10 +105,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(new[] { "cover_1", "cover_2", "cover_3" }, Ids(tier1.barGroups[0].bars));
             Assert.AreEqual(new[] { "garage_jam_1", "garage_jam_2", "garage_jam_3" }, Ids(tier1.events));
 
-            // Chapter 1's one trigger is the release reveal (content doc
-            // section 11), hosted at tier1 where both its legs read.
+            // Eleven triggers: ten reveals and the release (content doc section
+            // 11), hosted at tier1 where the gates they copy read.
             Assert.AreEqual(0, ch1.triggers.Count);
-            Assert.AreEqual(new[] { "reveal_release" }, Ids(tier1.triggers));
+            Assert.AreEqual(new[] { "reveal_band", "reveal_drummer", "reveal_bassist", "reveal_guitarist",
+                                    "reveal_gear", "reveal_amp_strings", "reveal_kit_upgrade",
+                                    "reveal_tight_set", "reveal_play_for_crowd", "reveal_unlock_covers",
+                                    "reveal_release" }, Ids(tier1.triggers));
         }
 
         // The income tag is what the Records and Roadie modifiers target, and
@@ -491,6 +498,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("Hand out 30 Demo Tapes", ch1.rung.offerCondition.uiText);
         }
 
+        // What a thing does is authored beside its name, and the row shows it
+        // (12.11); chapter 1 authors one for everything it renders as a row or a
+        // band.
+        [Test]
+        public void Every_row_and_section_chapter_one_shows_carries_a_description()
+        {
+            foreach (var generator in tier1.generators)
+                Assert.IsFalse(string.IsNullOrEmpty(generator.description),
+                    $"generator '{generator.Id}' has no description for its row to show");
+            foreach (var upgrade in tier1.upgrades)
+                Assert.IsFalse(string.IsNullOrEmpty(upgrade.description),
+                    $"upgrade '{upgrade.Id}' has no description for its row to show");
+            foreach (var bar in tier1.barGroups[0].bars)
+                Assert.IsFalse(string.IsNullOrEmpty(bar.description),
+                    $"cover '{bar.Id}' has no description for its row to show");
+            foreach (var section in ch1.sections)
+                Assert.IsFalse(string.IsNullOrEmpty(section.description),
+                    $"section '{section.title}' has no description beneath its title");
+        }
+
         [Test]
         public void The_screen_is_the_seven_sections_of_the_content_doc()
         {
@@ -501,11 +528,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Every gate is a flag or a monotonic fact - nothing here strobes
             // with spending.
-            Assert.AreEqual(new[] { "Always", "earned cash", "earned cash", "flag rehearsal_revealed",
+            Assert.AreEqual(new[] { "Always", "flag band_revealed", "flag gear_revealed", "flag rehearsal_revealed",
                                     "flag album", "balance records", "flag album" },
                 ch1.sections.Select(s => Describe(s.visibleWhen)).ToArray());
-            Assert.AreEqual((BigNumber)100, Threshold(ch1.sections[1].visibleWhen));
-            Assert.AreEqual((BigNumber)250, Threshold(ch1.sections[2].visibleWhen));
             Assert.AreEqual((BigNumber)1, Threshold(ch1.sections[5].visibleWhen));
 
             // The two release regions evaluate at ch1, where the album flag
@@ -531,10 +556,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "story_row story_ch1_end @ch1",
             }, Modules(0));
 
-            // A list module binds nothing - its content is the evaluation
-            // scope's own declaration lists - so it lands on its section.
-            Assert.AreEqual(new[] { "generator_list - @tier1" }, Modules(1));
-            Assert.AreEqual(new[] { "upgrade_list - @tier1" }, Modules(2));
+            // A row binds one generator or upgrade and normalizes onto its home,
+            // the tier that declares it (content doc section 12).
+            Assert.AreEqual(new[]
+            {
+                "generator_row practice_amp @tier1",
+                "generator_row drummer @tier1",
+                "generator_row bassist @tier1",
+                "generator_row guitarist @tier1",
+            }, Modules(1));
+            Assert.AreEqual(new[]
+            {
+                "upgrade_row stage_presence @tier1",
+                "upgrade_row amp_strings @tier1",
+                "upgrade_row kit_upgrade @tier1",
+                "upgrade_row tight_set @tier1",
+                "upgrade_row play_for_crowd @tier1",
+                "upgrade_row unlock_covers @tier1",
+            }, Modules(2));
+
+            // The group module binds nothing - its content is the evaluation
+            // scope's own declaration list - so it lands on its section.
             Assert.AreEqual(new[] { "bar_group - @tier1" }, Modules(3));
 
             // The release rung is TIER1's, so this module authors its scope
@@ -575,6 +617,38 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // All three jam rows are always visible, so once the section
             // reveals it is never an empty box - a locked jam sits disabled.
             Assert.IsTrue(ch1.sections[5].modules.All(m => m.visibleWhen == null));
+        }
+
+        // A reveal is the first moment the row's purchase gate holds, latched at
+        // the chapter so it survives the run's reset while the gate itself does
+        // not (content doc section 2).
+        [Test]
+        public void Each_reveal_trigger_fires_on_the_gate_of_the_row_it_reveals()
+        {
+            var reveals = new (string trigger, Condition gate, string flag)[]
+            {
+                ("reveal_band", Find(tier1.generators, "practice_amp").availableWhen, "band_revealed"),
+                ("reveal_drummer", Find(tier1.generators, "drummer").availableWhen, "drummer_revealed"),
+                ("reveal_bassist", Find(tier1.generators, "bassist").availableWhen, "bassist_revealed"),
+                ("reveal_guitarist", Find(tier1.generators, "guitarist").availableWhen, "guitarist_revealed"),
+                ("reveal_gear", Find(tier1.upgrades, "stage_presence").gate, "gear_revealed"),
+                ("reveal_amp_strings", Find(tier1.upgrades, "amp_strings").gate, "amp_strings_revealed"),
+                ("reveal_kit_upgrade", Find(tier1.upgrades, "kit_upgrade").gate, "kit_upgrade_revealed"),
+                ("reveal_tight_set", Find(tier1.upgrades, "tight_set").gate, "tight_set_revealed"),
+                ("reveal_play_for_crowd", Find(tier1.upgrades, "play_for_crowd").gate, "play_for_crowd_revealed"),
+                ("reveal_unlock_covers", Find(tier1.upgrades, "unlock_covers").gate, "unlock_covers_revealed"),
+            };
+
+            foreach (var (id, gate, flag) in reveals)
+            {
+                var trigger = Find(tier1.triggers, id);
+                Assert.AreEqual(Describe(gate), Describe(trigger.condition), id);
+                // Describe leaves a BigNumber out of the string, so the two
+                // kinds that carry one get the number asserted on its own.
+                if (gate is CurrencyAtLeast or EarnedTotalAtLeast)
+                    Assert.AreEqual(Threshold(gate), Threshold(trigger.condition), id);
+                Assert.AreEqual(flag, ((SetFlag)trigger.actions.Single()).flagId, id);
+            }
         }
 
         // ---- helpers ----

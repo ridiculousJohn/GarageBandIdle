@@ -3,7 +3,10 @@
   "id": "ch1",
   "displayName": "The Garage",
 
-  "flags": ["album", "gj1_done", "gj2_done", "gj3_done"],
+  "flags": ["album", "gj1_done", "gj2_done", "gj3_done",
+            "band_revealed", "drummer_revealed", "bassist_revealed", "guitarist_revealed",
+            "gear_revealed", "amp_strings_revealed", "kit_upgrade_revealed", "tight_set_revealed",
+            "play_for_crowd_revealed", "unlock_covers_revealed"],
 
   "currencies": [
     { "id": "ch1_records", "displayName": "Demo Tapes" }
@@ -61,6 +64,7 @@
   "sections": [
     {
       "title": "The Garage Floor",
+      "description": "Where you play. Tap Jam for cash, and read your running totals on the lines above it.",
       "visibleWhen": { "type": "Always" },
       "scopeId": "tier1",
       "modules": [
@@ -91,22 +95,65 @@
     },
     {
       "title": "The Band",
-      "visibleWhen": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 100 },
+      "description": "Amps and the people to play them. They earn while you do nothing, and every bandmate brings fans of their own.",
+      "visibleWhen": { "type": "FlagSet", "flagId": "band_revealed" },
       "scopeId": "tier1",
       "modules": [
-        { "prefabId": "generator_list" }
+        { "prefabId": "generator_row", "contentId": "practice_amp" },
+        {
+          "prefabId": "generator_row",
+          "contentId": "drummer",
+          "visibleWhen": { "type": "FlagSet", "flagId": "drummer_revealed" }
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "bassist",
+          "visibleWhen": { "type": "FlagSet", "flagId": "bassist_revealed" }
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "guitarist",
+          "visibleWhen": { "type": "FlagSet", "flagId": "guitarist_revealed" }
+        }
       ]
     },
     {
       "title": "The Gear",
-      "visibleWhen": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 250 },
+      "description": "One-time buys that make everything else pay more. Cutting a demo clears them, and you buy them back faster each run.",
+      "visibleWhen": { "type": "FlagSet", "flagId": "gear_revealed" },
       "scopeId": "tier1",
       "modules": [
-        { "prefabId": "upgrade_list" }
+        { "prefabId": "upgrade_row", "contentId": "stage_presence" },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "amp_strings",
+          "visibleWhen": { "type": "FlagSet", "flagId": "amp_strings_revealed" }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "kit_upgrade",
+          "visibleWhen": { "type": "FlagSet", "flagId": "kit_upgrade_revealed" }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "tight_set",
+          "visibleWhen": { "type": "FlagSet", "flagId": "tight_set_revealed" }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "play_for_crowd",
+          "visibleWhen": { "type": "FlagSet", "flagId": "play_for_crowd_revealed" }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "unlock_covers",
+          "visibleWhen": { "type": "FlagSet", "flagId": "unlock_covers_revealed" }
+        }
       ]
     },
     {
       "title": "The Rehearsal Space",
+      "description": "Rehearsal builds up while you play. Spend it learning covers, one at a time, and each one you learn draws a bigger crowd.",
       "visibleWhen": { "type": "FlagSet", "flagId": "rehearsal_revealed" },
       "scopeId": "tier1",
       "modules": [
@@ -115,6 +162,7 @@
     },
     {
       "title": "The Release",
+      "description": "Cut a demo when you have 50 fans and a cover. It banks Records and Demo Tapes and resets the run.",
       "visibleWhen": { "type": "FlagSet", "flagId": "album" },
       "scopeId": "ch1",
       "modules": [
@@ -123,6 +171,7 @@
     },
     {
       "title": "Garage Jam",
+      "description": "Three timed sprints, one at a time. The band goes quiet and you tap alone for the goal, and clearing one pays more cash per tap for the rest of the chapter.",
       "visibleWhen": { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1 },
       "scopeId": "tier1",
       "modules": [
@@ -133,6 +182,7 @@
     },
     {
       "title": "The Backyard Party",
+      "description": "The gig that ends the chapter. Hand out 30 Demo Tapes to get the show, and you walk away with your first Roadie.",
       "visibleWhen": { "type": "FlagSet", "flagId": "album" },
       "scopeId": "ch1",
       "modules": [
@@ -185,6 +235,7 @@
         {
           "id": "practice_amp",
           "displayName": "Practice Amp",
+          "description": "Pays 0.50 cash a second per amp. The first thing worth buying.",
           "tags": ["gear", "production"],
           "availableWhen": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 100 },
           "costCurrency": "cash",
@@ -197,6 +248,7 @@
         {
           "id": "drummer",
           "displayName": "Drummer",
+          "description": "Pays 3 cash a second and pulls in 0.02 fans. Three amps in the garage and someone shows up to play them.",
           "tags": ["gear", "bandmate", "production"],
           "availableWhen": { "type": "OwnedCountAtLeast", "generator": "practice_amp", "count": 3 },
           "costCurrency": "cash",
@@ -210,6 +262,7 @@
         {
           "id": "bassist",
           "displayName": "Bassist",
+          "description": "Pays 20 cash a second and 0.02 fans, once five drummers have made the racket worth joining.",
           "tags": ["gear", "bandmate", "production"],
           "availableWhen": { "type": "OwnedCountAtLeast", "generator": "drummer", "count": 5 },
           "costCurrency": "cash",
@@ -223,6 +276,7 @@
         {
           "id": "guitarist",
           "displayName": "Guitarist",
+          "description": "Pays 130 cash a second and 0.02 fans. Five bassists deep, the lead players start turning up.",
           "tags": ["gear", "bandmate", "production"],
           "availableWhen": { "type": "OwnedCountAtLeast", "generator": "bassist", "count": 5 },
           "costCurrency": "cash",
@@ -239,6 +293,7 @@
         {
           "id": "stage_presence",
           "displayName": "Stage Presence",
+          "description": "Doubles the cash every press of the Jam button pays.",
           "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 250 },
           "costCurrency": "cash",
           "cost": 250
@@ -246,6 +301,7 @@
         {
           "id": "amp_strings",
           "displayName": "New Strings",
+          "description": "Doubles the cash every practice amp brings in.",
           "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 500 },
           "costCurrency": "cash",
           "cost": 500,
@@ -256,6 +312,7 @@
         {
           "id": "kit_upgrade",
           "displayName": "Kit Upgrade",
+          "description": "Doubles the cash every drummer brings in.",
           "gate": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 5000 },
           "costCurrency": "cash",
           "cost": 5000,
@@ -266,6 +323,7 @@
         {
           "id": "tight_set",
           "displayName": "Tight Set",
+          "description": "Play the set clean and the whole band earns 1.5 times the cash a second. Opens at 30 fans.",
           "gate": { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 30 },
           "costCurrency": "cash",
           "cost": 20000,
@@ -276,6 +334,7 @@
         {
           "id": "play_for_crowd",
           "displayName": "Play for a Crowd",
+          "description": "Turn the amps around and play to the room. Fans start showing up and counting.",
           "gate": { "type": "OwnedCountAtLeast", "generator": "drummer", "count": 1 },
           "costCurrency": "cash",
           "cost": 100,
@@ -286,6 +345,7 @@
         {
           "id": "unlock_covers",
           "displayName": "Learn Covers",
+          "description": "Start working up other people's songs. Opens the Rehearsal Space and the Rehearsal that fills it.",
           "gate": { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 25 },
           "costCurrency": "cash",
           "cost": 200,
@@ -303,6 +363,7 @@
             {
               "id": "cover_1",
               "displayName": "Three-Chord Anthem",
+              "description": "Your first cover, 100 Rehearsal to learn. Learning it pulls fans 15% faster.",
               "fillCurrency": "rehearsal",
               "fillAmount": 100,
               "fillRate": 2,
@@ -313,6 +374,7 @@
             {
               "id": "cover_2",
               "displayName": "Parking-Lot Standard",
+              "description": "The one everybody knows, 300 Rehearsal to learn. Another 15% on your fan rate.",
               "fillCurrency": "rehearsal",
               "fillAmount": 300,
               "fillRate": 2,
@@ -323,6 +385,7 @@
             {
               "id": "cover_3",
               "displayName": "The Crowd-Pleaser",
+              "description": "The big one, 600 Rehearsal to learn, and the best of the three: fans arrive 20% faster.",
               "fillCurrency": "rehearsal",
               "fillAmount": 600,
               "fillRate": 2,
@@ -356,6 +419,76 @@
       ],
 
       "triggers": [
+        {
+          "id": "reveal_band",
+          "condition": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 100 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "band_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_drummer",
+          "condition": { "type": "OwnedCountAtLeast", "generator": "practice_amp", "count": 3 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "drummer_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_bassist",
+          "condition": { "type": "OwnedCountAtLeast", "generator": "drummer", "count": 5 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "bassist_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_guitarist",
+          "condition": { "type": "OwnedCountAtLeast", "generator": "bassist", "count": 5 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "guitarist_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_gear",
+          "condition": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 250 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "gear_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_amp_strings",
+          "condition": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 500 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "amp_strings_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_kit_upgrade",
+          "condition": { "type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 5000 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "kit_upgrade_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_tight_set",
+          "condition": { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 30 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "tight_set_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_play_for_crowd",
+          "condition": { "type": "OwnedCountAtLeast", "generator": "drummer", "count": 1 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "play_for_crowd_revealed" }
+          ]
+        },
+        {
+          "id": "reveal_unlock_covers",
+          "condition": { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 25 },
+          "actions": [
+            { "type": "SetFlag", "flagId": "unlock_covers_revealed" }
+          ]
+        },
         {
           "id": "reveal_release",
           "condition": {

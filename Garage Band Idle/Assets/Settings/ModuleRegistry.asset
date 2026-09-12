@@ -17,10 +17,10 @@ MonoBehaviour:
     prefab: {fileID: 9197481963319205126, guid: df9e9f89c55131e43a378ecf2381566e, type: 3}
   - prefabId: jam_button
     prefab: {fileID: 9197481963319205126, guid: 2ec63e7755e21eb419d0650a55722319, type: 3}
-  - prefabId: generator_list
-    prefab: {fileID: 9197481963319205126, guid: 40541fe4003f12a4b9bb5edc73523dad, type: 3}
-  - prefabId: upgrade_list
-    prefab: {fileID: 9197481963319205126, guid: 37468190635ea564ab03e34e04523d31, type: 3}
+  - prefabId: generator_row
+    prefab: {fileID: 9197481963319205126, guid: a1c4f70b2e3d48f6ba59d0c81e7f3462, type: 3}
+  - prefabId: upgrade_row
+    prefab: {fileID: 9197481963319205126, guid: b7d2e6913f8a4c05ad61b39e2c740f85, type: 3}
   - prefabId: bar_group
     prefab: {fileID: 9197481963319205126, guid: 98c68a1b8bc5f5b44bdfc75ff2291031, type: 3}
   - prefabId: rung_button

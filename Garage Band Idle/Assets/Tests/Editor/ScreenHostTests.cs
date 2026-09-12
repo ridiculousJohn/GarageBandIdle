@@ -25,9 +25,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     public class ScreenHostTests
     {
         // The authored section order, read by index so a row says which band it
-        // means. The Gear has no row of its own, so it gets no constant.
+        // means.
         private const int GarageFloor = 0;
         private const int Band = 1;
+        private const int Gear = 2;
         private const int RehearsalSpace = 3;
         private const int Release = 4;
         private const int GarageJam = 5;
@@ -49,6 +50,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly ChapterDefinition Ch1Def;
             public readonly TierDefinition Tier1Def;
             public readonly ProducerDefinition TapProducer;
+            public readonly GeneratorDefinition PracticeAmp;
+            public readonly UpgradeDefinition StagePresence;
             public readonly UpgradeDefinition PlayForCrowd;
             public readonly BarGroupDefinition LearnCovers;
             public readonly BarDefinition Cover1;
@@ -97,6 +100,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Tier1Def = (TierDefinition)Ch1Def.children.Single();
 
                 TapProducer = Find(Tier1Def.producers, "tap_producer");
+                PracticeAmp = Find(Tier1Def.generators, "practice_amp");
+                StagePresence = Find(Tier1Def.upgrades, "stage_presence");
                 PlayForCrowd = Find(Tier1Def.upgrades, "play_for_crowd");
                 LearnCovers = Find(Tier1Def.barGroups, "learn_covers");
                 Cover1 = Find(LearnCovers.bars, "cover_1");
@@ -284,6 +289,95 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")));
             Assert.AreEqual("\u23F1  04:00:00", fx.Screen.Q<Button>("encore").text);
             Assert.AreEqual(1, fx.Saves, "the delivered reward was saved");
+        }
+
+        // The window's two buttons only REQUEST, and the close rides the grant's
+        // completed callback - which runs after the save (12.9), so the boost is
+        // on disk before the player is handed the screen back. A request still in
+        // flight leaves the window standing (12.11).
+        [Test]
+        public void TheEncoreWindowClosesWhenTheAdsGrantLands()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenEncore();
+            var window = fx.Screen.Q<VisualElement>("encore-window");
+            Assert.IsTrue(Fixture.Shown(window));
+
+            // What the ad button calls; a headless test has no pointer to press.
+            fx.Host.EncoreWindow.RequestAd();
+            Assert.IsTrue(Fixture.Shown(window), "a request is not a grant");
+
+            fx.AdManager.Update(fx.Now);
+
+            Assert.IsFalse(Fixture.Shown(window), "the close rides the grant's completion, after the save");
+            Assert.AreEqual("encore", fx.Root.timedBuffs.Single().buffId, "the boost is what landed");
+            Assert.AreEqual(1, fx.Saves, "and the save ran before the close");
+
+            fx.Host.OpenEncore();
+            Assert.IsTrue(Fixture.Shown(window), "the overlay reopens, so the close broke nothing");
+        }
+
+        // A failed result invokes no callback, so there is nothing for a close to
+        // ride: the window stands with its buttons, which is the only state a
+        // retry can come from (12.11).
+        [Test]
+        public void TheEncoreWindowStaysOpenWhenTheAdFails()
+        {
+            var fx = new Fixture();
+            fx.Ads.NextResult = AdResult.Failed;
+            fx.Enter();
+            fx.Host.OpenEncore();
+
+            fx.Host.EncoreWindow.RequestAd();
+            fx.AdManager.Update(fx.Now);
+
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")),
+                "a failed ad grants nothing, so nothing closed the window");
+            Assert.IsEmpty(fx.Root.timedBuffs);
+            Assert.AreEqual(0, fx.Saves, "and there is no write for a save to follow");
+        }
+
+        // The Pass is the window's other request and it lands the same way: the
+        // close follows the grant, the save, and the acknowledge the store is
+        // waiting on (12.9).
+        [Test]
+        public void TheEncoreWindowClosesWhenThePassPurchaseLands()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenEncore();
+
+            // What the pass button calls; a headless test has no pointer.
+            fx.Host.EncoreWindow.RequestPass();
+            fx.IAPManager.Update(fx.Now);
+
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")),
+                "the close rides the grant's completion");
+            Assert.IsTrue(fx.Root.entitlements.Contains(Meta.BackstagePass.EntitlementId));
+            Assert.AreEqual(1, fx.Saves, "the grant was saved");
+            Assert.AreEqual(1, fx.Store.Acknowledged.Count, "and the store was told after it");
+        }
+
+        // The grant may land after the player closed the window and opened
+        // something else, and closing then would take down whatever stands - so
+        // the window closes only itself and the boost lands either way (12.11).
+        [Test]
+        public void AGrantLandingAfterTheWindowClosedLeavesTheOpenOverlayAlone()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Host.OpenEncore();
+            fx.Host.EncoreWindow.RequestAd();
+            fx.Host.CloseOverlay();
+            fx.Host.OpenSettings();
+
+            fx.AdManager.Update(fx.Now);
+
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("settings")),
+                "the window closes only itself");
+            Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")));
+            Assert.AreEqual("encore", fx.Root.timedBuffs.Single().buffId, "the reward was never in doubt");
         }
 
         [Test]
@@ -562,35 +656,103 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void ASectionCrossingIntoViewBuildsItsListAndShowsOnlyAvailableRows()
+        public void ASectionCrossingIntoViewShowsTheRowsItsFlagsReveal()
         {
             var fx = new Fixture();
             fx.Enter();
-            Assert.IsFalse(fx.Host.Sections[Band].Visible, "the band opens at 100 earned cash");
+            Assert.IsFalse(fx.Host.Sections[Band].Visible, "the band's flag is unset on a fresh chapter");
 
+            // The deposit raises the earned total; the command's sweep is what
+            // fires reveal_band, whose condition is the amp's own purchase gate.
             fx.Ctx(fx.Tier1).Deposit("cash", 100);
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var section = fx.Host.Sections[Band];
-            Assert.IsTrue(section.Visible, "the earned total crossed the section's gate");
-            var list = section.Modules.Single();
-            Assert.IsTrue(list.Visible, "the list module carries no gate of its own");
-            Assert.IsNotNull(list.Widget, "the list built its widget in the pass that showed the section");
-
-            var rows = list.Widget.Root.Q<VisualElement>("rows");
-            Assert.AreEqual(4, rows.childCount, "one row per authored generator");
-            var shown = rows.Children()
-                .Where(row => row.style.display.value == DisplayStyle.Flex)
-                .Select(row => row.Q<Label>(className: "row-name").text)
-                .ToArray();
-            CollectionAssert.AreEqual(new[] { "Practice Amp" }, shown,
-                "only practice_amp is available at 100 earned cash - the drummer wants three amps");
+            Assert.IsTrue(section.Visible, "the trigger set the flag the section reads");
+            Assert.IsTrue(fx.Ch1.flags.Contains("band_revealed"), "the latch is homed at the chapter");
+            Assert.AreEqual(4, section.Modules.Count, "one module per authored generator");
+            Assert.IsTrue(section.Modules[0].Visible, "the amp's row carries no gate of its own");
+            Assert.IsNotNull(section.Modules[0].Widget, "the row built its widget in the pass that showed the section");
+            for (var i = 1; i < section.Modules.Count; i++)
+                Assert.IsFalse(section.Modules[i].Visible, "their flags are unset");
 
             // The button is the reference game's line: the first amp's authored
             // 60 cash, then what one amp pays per second.
-            var buy = rows.Children().First(row => row.style.display.value == DisplayStyle.Flex)
-                .Q<Button>(className: "row-buy");
+            var buy = section.Modules[0].Widget.Root.Q<Button>("buy");
             Assert.AreEqual("60.00 Cash => 0.50 Cash", buy.text);
+            Assert.IsTrue(buy.enabledSelf, "101 cash covers the 60");
+        }
+
+        // Exposed stays exposed, and the purchase gate is the button's business
+        // (12.11, content doc section 2).
+        [Test]
+        public void ARevealedRowStaysVisibleAndGreyedAfterTheRunResets()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            // The flags a save could hold after a reset: the run's earned total
+            // went with the wipe and the chapter's latches did not.
+            fx.Ch1.flags.Add("band_revealed");
+            fx.Ch1.flags.Add("drummer_revealed");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+
+            var section = fx.Host.Sections[Band];
+            Assert.IsTrue(section.Visible, "the chapter's flag outlived the run");
+            Assert.IsTrue(section.Modules[0].Visible, "the amp's row carries no gate of its own");
+            Assert.IsTrue(section.Modules[1].Visible, "the drummer's flag is set");
+            Assert.IsFalse(section.Modules[2].Visible, "the bassist's is not");
+            Assert.IsFalse(section.Modules[3].Visible, "and neither is the guitarist's");
+
+            var drummer = section.Modules[1].Widget.Root.Q<Button>("buy");
+            Assert.IsFalse(drummer.enabledSelf,
+                "no amps are owned, so the purchase gate is closed and the button says so");
+            Assert.AreEqual("250.00 Cash => 3.00 Cash", drummer.text,
+                "fans sits behind its own reveal, and an inactive currency takes nothing from any source");
+            Assert.IsFalse(section.Modules[0].Widget.Root.Q<Button>("buy").enabledSelf,
+                "1 cash after one press does not cover the amp's 60");
+        }
+
+        // The description is content read off the definition, never a widget's
+        // words (12.11): a band shows the section's own and a row shows the one
+        // authored on the content it binds.
+        [Test]
+        public void RowsAndSectionsShowTheirAuthoredDescriptions()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Ch1.flags.Add("band_revealed");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+
+            var floor = fx.Host.Sections[GarageFloor].Root.Q<Label>(className: "section-description");
+            Assert.IsNotNull(floor, "the garage floor's band carries its authored line");
+            Assert.AreEqual(fx.Ch1Def.sections[GarageFloor].description, floor.text);
+
+            var amp = fx.Host.Sections[Band].Modules[0].Widget.Root.Q<Label>("description");
+            Assert.IsTrue(Fixture.Shown(amp), "the amp's row has a description, so it shows one");
+            Assert.AreEqual(fx.PracticeAmp.description, amp.text, "the bound generator's own text");
+        }
+
+        // A bought upgrade is a fact the row renders rather than a reason to
+        // drop it: the latch reads Bought and the row keeps its place (12.11).
+        [Test]
+        public void ABoughtUpgradeRowReadsBoughtAndStaysListed()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Ch1.flags.Add("gear_revealed");
+            fx.Ctx(fx.Tier1).Deposit("cash", 250);
+            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.StagePresence);
+            Assert.IsTrue(fx.Tier1.purchasedUpgrades.Contains("stage_presence"), "stage_presence was bought");
+
+            var section = fx.Host.Sections[Gear];
+            Assert.IsTrue(section.Visible, "the chapter's flag opened the gear");
+            Assert.AreEqual(6, section.Modules.Count, "one module per authored upgrade");
+            Assert.IsTrue(section.Modules[0].Visible, "the latch's row carries no gate of its own");
+            var buy = section.Modules[0].Widget.Root.Q<Button>("buy");
+            Assert.AreEqual("Bought", buy.text);
+            Assert.IsFalse(buy.enabledSelf, "a one-shot purchase is not pressable twice");
+            for (var i = 1; i < section.Modules.Count; i++)
+                Assert.IsFalse(section.Modules[i].Visible, "the rest wait on their own flags");
         }
 
         [Test]

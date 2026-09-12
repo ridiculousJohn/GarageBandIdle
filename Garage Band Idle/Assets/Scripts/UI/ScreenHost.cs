@@ -60,6 +60,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 var title = new Label(definition.title);
                 title.AddToClassList("section-title");
                 Root.Add(title);
+                // Authored text fixed for the process, so it is built once and
+                // no refresh owes it anything (12.11).
+                if (!string.IsNullOrEmpty(definition.description))
+                {
+                    var description = new Label(definition.description);
+                    description.AddToClassList("section-description");
+                    Root.Add(description);
+                }
                 ModulesContainer = new VisualElement();
                 ModulesContainer.AddToClassList("section-modules");
                 Root.Add(ModulesContainer);
@@ -109,6 +117,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public StoryBeatDefinition ShownStory => requestedBeat;
 
         public RoadieAllocationUI RoadieAllocation => allocation;
+
+        public EncoreWindowUI EncoreWindow => encore;
 
         public StoryLogUI StoryLog => storyLog;
 

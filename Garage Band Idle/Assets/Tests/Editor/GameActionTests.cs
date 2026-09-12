@@ -142,7 +142,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             reset.Execute(ctx);
 
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["cash"]);       // key kept, value zeroed
-            Assert.AreEqual(BigNumber.Zero, tree.Tier1.earnedTotals["cash"]);   // gear region re-hides
+            Assert.AreEqual(BigNumber.Zero, tree.Tier1.earnedTotals["cash"]);   // the earned total clears too
             Assert.IsEmpty(tree.Tier1.flags);
             Assert.IsEmpty(tree.Tier1.firedTriggers);                           // triggers re-arm
             Assert.IsEmpty(tree.Tier1.generatorCounts);

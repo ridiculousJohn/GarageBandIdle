@@ -16,6 +16,7 @@ MonoBehaviour:
   tags:
   - production
   displayName: Local Buzz
+  description: 
   produces:
   - currency: {fileID: 11400000, guid: 8fcd19c799d152b4b95054ec949a12ff, type: 2}
     stat: rate

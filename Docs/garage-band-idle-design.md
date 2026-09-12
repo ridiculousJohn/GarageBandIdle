@@ -96,11 +96,15 @@ every purchase. (Ch. 1's gear region gates on `EarnedTotalAtLeast(cash, 250)` fo
 reason — earned total, not balance.)
 
 A flag's lifetime is the scope that declares it (§12.3). Chapter 1 declares `fans` and `covers`
-(and the upgrades that set them) in its tier, so an album release clears them — and the tier's Cash
-earned total resets with the run too, re-hiding the threshold-gated gear region — so the second run
-re-walks the progression — band → fans → covers → gear — instead of opening with every system on
-screen. The `album` flag is declared at the chapter level, so the release *region* stays on screen
-across runs; only the button's pressability tracks the live offer condition (§5).
+(and the upgrades that set them) in its tier, so an album release clears them, and the tier's Cash
+earned total resets with the run too - so the second run re-walks the PURCHASE ladder: band, fans,
+covers, gear are bought again, faster as banked multipliers accumulate. What a run has once shown
+stays shown: a section's or a row's reveal is a chapter flag, set once by a tier trigger at the
+moment the row's purchase gate first holds, so the band and the gear stay on screen across runs
+with their buttons greyed until they can be bought again (a purchase gate is the button's
+business, never a row's visibility). The `album` flag is declared at the chapter level for the
+same reason, so the release *region* stays on screen across runs; only the button's pressability
+tracks the live offer condition (§5).
 
 Boot validation: a setter that lives OUTSIDE the flag's home is an error, not a warning — the write
 walks outward and can never reach the flag, and the same scope could not read it either, so the
@@ -1472,7 +1476,9 @@ mapping each `prefabId` to a `VisualTreeAsset` held by direct reference - the UX
 Toolkit shape's "prefab" - so the widgets load with the scene as the registry's own dependency
 graph and instantiate synchronously mid-refresh; the behavior is a plain C# `ModuleWidget`
 controller a code-side factory constructs for the same id. A new widget type is a UXML, a factory
-line, and a registry entry.
+line, and a registry entry. Every `Definition` and every section may carry an optional
+`description`, player-facing text saying what the thing does; the widgets that render a row or a
+band show it beneath the name or title when present, and nothing else reads it.
 
 **Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
 Encore or the story log is open, the host does not run the automatic story walk. The modal and any unsubmitted
@@ -1719,8 +1725,8 @@ Assets/Scripts/
     ScreenHost.cs  UIRoot.cs                  // the structure logic (the ONE Refreshed subscriber) and its MonoBehaviour shell
     GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
     IStoryOpener.cs         // the one method a story row asks of the host: open the card for a beat at its scope
-    Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorListUI  GeneratorRowUI
-              UpgradeListUI  UpgradeRowUI  BarGroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI
+    Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
+              BarGroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select at boot or over Live, and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host

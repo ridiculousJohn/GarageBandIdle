@@ -209,6 +209,9 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         // The on-screen name every Definition carries; required on the closed
         // list of families the widgets render (12.11), judged by the pass.
         public string displayName;
+        // The optional player-facing text every Definition carries; absent is
+        // fine on every family, so no pass judges it (12.11).
+        public string description;
         public List<string> tags = new();
     }
 
@@ -327,6 +330,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     internal class SectionDto
     {
         public string title;
+        public string description;
         public ConditionDto visibleWhen;
         public string scopeId;
         public List<ModuleDto> modules = new();
@@ -334,7 +338,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
 
     // One widget on a section. Both ids are optional: an absent scopeId is the
     // authoring convenience the importer normalizes away, and an absent
-    // contentId is a list module, which binds its scope's own lists (12.11).
+    // contentId is a module that binds nothing, the rung button and the bar
+    // group, which render their scope's own rung and bar groups (12.11).
     internal class ModuleDto
     {
         public string prefabId;

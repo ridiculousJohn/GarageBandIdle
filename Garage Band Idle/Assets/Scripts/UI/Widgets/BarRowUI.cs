@@ -22,6 +22,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly BarGroupDefinition group;
         private readonly BarDefinition bar;
         private readonly Label nameLabel;
+        private readonly Label descriptionLabel;
         private readonly ProgressBar fill;
         private readonly Label progressLabel;
         private readonly Button selectButton;
@@ -41,8 +42,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             Root = new VisualElement();
             Root.AddToClassList("bar-row");
+            // The name and its description are one column, so the row stays a
+            // row and the description sits under the name (12.11).
+            var text = new VisualElement();
+            text.AddToClassList("bar-text");
             nameLabel = new Label();
             nameLabel.AddToClassList("bar-name");
+            descriptionLabel = new Label();
+            descriptionLabel.AddToClassList("bar-description");
+            text.Add(nameLabel);
+            text.Add(descriptionLabel);
             fill = new ProgressBar { lowValue = 0, highValue = 100 };
             fill.AddToClassList("bar-fill");
             progressLabel = new Label();
@@ -54,7 +63,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // nothing. A chapter authoring maxActive above one wants a toggle
             // here instead of a replacement; none does.
             selectButton.clicked += () => this.session.SetActiveBars(Context(), this.group, new[] { this.bar });
-            Root.Add(nameLabel);
+            Root.Add(text);
             Root.Add(fill);
             Root.Add(progressLabel);
             Root.Add(selectButton);
@@ -81,6 +90,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
             stamp = clock.GameTimeSeconds;
 
             nameLabel.text = bar.displayName;
+            // An absent description leaves the row one line tall.
+            descriptionLabel.text = bar.description;
+            descriptionLabel.style.display = string.IsNullOrEmpty(bar.description)
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
             var complete = !bar.repeating && truth >= bar.fillAmount;
             var active = scope.activeBars.TryGetValue(group.Id, out var selected) && selected.Contains(bar.Id);
             selectButton.text = complete ? "Done" : active ? "Selected" : "Select";

@@ -307,7 +307,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     $"document '{Path.GetFileName(document.Path)}' declares a {dto.type} at the top; a document is the root or a chapter (12.14.5).");
 
             var scope = (ScopeDefinition)materialize(scopeType, ScopeAssetPath(options, document.Id, dto.id));
-            Init(build, scope, dto.id, dto.displayName, dto.tags, ScopeAssetPath(options, document.Id, dto.id));
+            // A scope block authors no description: nothing renders a row for a
+            // scope, so the ScopeDto carries no key to copy (12.11).
+            Init(build, scope, dto.id, dto.displayName, null, dto.tags,
+                 ScopeAssetPath(options, document.Id, dto.id));
             if (build.ScopesById.ContainsKey(dto.id))
                 throw new ContentImportException($"two scopes share the id '{dto.id}'; scope ids are tree-wide unique (12.3).");
             build.ScopesById[dto.id] = scope;
@@ -394,7 +397,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             RequireId(dto.id, typeof(T).Name);
             var path = AssetPath(options, document.Id, FamilyOf(typeof(T)), dto.id);
             var definition = (T)materialize(typeof(T), path);
-            Init(build, definition, dto.id, dto.displayName, dto.tags, path);
+            Init(build, definition, dto.id, dto.displayName, dto.description, dto.tags, path);
             var declared = build.Declared[scope];
             if (declared.ContainsKey(dto.id))
                 throw new ContentImportException($"scope '{scope.Id}' declares '{dto.id}' twice.");
@@ -403,12 +406,15 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         }
 
         private static void Init(Build build, Definition definition, string id, string displayName,
-                                 List<string> tags, string path)
+                                 string description, List<string> tags, string path)
         {
             definition.EditorInit(id, tags == null ? Array.Empty<string>() : tags.ToArray());
             // Not identity, so it is a plain field assign rather than part of
             // EditorInit: the pass decides which families require one (12.11).
             definition.displayName = displayName;
+            // Optional on every family, so nothing judges it and an absent one
+            // is the empty text the row hides (12.11).
+            definition.description = description;
             build.Created.Add(definition);
             build.Paths[definition] = path;
         }
@@ -607,6 +613,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     var section = new UI.SectionDefinition
                     {
                         title = sectionDto.title,
+                        description = sectionDto.description,
                         // The gate's references resolve outward from the
                         // section's own evaluation scope, which is what lets a
                         // chapter's section read a tier-declared flag (12.11).

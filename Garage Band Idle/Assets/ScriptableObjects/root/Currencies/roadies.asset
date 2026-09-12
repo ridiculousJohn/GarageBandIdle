@@ -15,6 +15,7 @@ MonoBehaviour:
   id: roadies
   tags: []
   displayName: Roadies
+  description: 
   activeWhen:
     rid: -2
   references:

@@ -74,7 +74,10 @@ drummer, so a bandmate necessarily exists before the flag is set - with the gate
 drummer trickles fans behind the reveal.
 
 Flags: tier1 declares `fans_revealed`, `rehearsal_revealed`; ch1 declares `album`, `gj1_done`,
-`gj2_done`, `gj3_done`. (The design doc's §2 speaks loosely of "`fans` and `covers`" flags — authored
+`gj2_done`, `gj3_done`, and the ten reveal latches `band_revealed`, `drummer_revealed`,
+`bassist_revealed`, `guitarist_revealed`, `gear_revealed`, `amp_strings_revealed`,
+`kit_upgrade_revealed`, `tight_set_revealed`, `play_for_crowd_revealed`, `unlock_covers_revealed`
+(section 11) - what a run has once shown stays shown across the tier's resets (design §2). (The design doc's §2 speaks loosely of "`fans` and `covers`" flags — authored
 as `fans_revealed` / `rehearsal_revealed` because a flag id may not collide with the `fans` currency
 (§12.12), and §12.2's `tap_producer` snippet already names `rehearsal_revealed`.)
 
@@ -112,7 +115,7 @@ Declaration homes (§12.2): tier1 declares `gear` and `bandmate` - its generator
 carrier resolves its declaration outward, so tier1 is high enough. `income` and `production` are
 root's, per §2, because sources in every chapter carry them.
 
-## 6. Upgrades (all tier1 — the reveal chain is re-walked every run, §2)
+## 6. Upgrades (all tier1 — the purchase ladder is re-walked every run, the rows stay revealed, §2)
 
 **Buffs** (latch clears at each release; re-bought faster as multipliers bank):
 
@@ -231,11 +234,26 @@ math in Walkthrough 2.
 
 ## 11. Triggers & story
 
-**Chapter 1 authors one trigger**, on tier1: `reveal_release` - condition
-`All[CurrencyAtLeast(fans, 50), BarsCompleted(learn_covers, 1)]`, action `SetFlag(album)`. The flag is
-ch1's, so the release region persists across runs; the trigger's latch clears with the tier and
-re-arms, and its re-fire on a set flag changes nothing. Every other threshold moment is a pure
-reveal (direct monotonic gate) or a purchase moment (upgrade payload).
+**Chapter 1 authors eleven triggers, all on tier1, all reveals**: each sets a chapter flag once, at
+the moment a row's PURCHASE gate first holds, and the section or row module gates on the flag - so
+the reveal outlives the run while the gate resets with it (design §2). The trigger's latch clears
+with the tier and re-arms; its re-fire on a set flag changes nothing.
+
+| Trigger | Condition (the revealed row's own gate) | Sets |
+|---|---|---|
+| `reveal_band` | `EarnedTotalAtLeast(cash, 100)` (practice_amp) | `band_revealed` - The Band and the amp row |
+| `reveal_drummer` | `OwnedCountAtLeast(practice_amp, 3)` | `drummer_revealed` |
+| `reveal_bassist` | `OwnedCountAtLeast(drummer, 5)` | `bassist_revealed` |
+| `reveal_guitarist` | `OwnedCountAtLeast(bassist, 5)` | `guitarist_revealed` |
+| `reveal_gear` | `EarnedTotalAtLeast(cash, 250)` (stage_presence) | `gear_revealed` - The Gear and the Stage Presence row |
+| `reveal_amp_strings` | `EarnedTotalAtLeast(cash, 500)` | `amp_strings_revealed` |
+| `reveal_kit_upgrade` | `EarnedTotalAtLeast(cash, 5000)` | `kit_upgrade_revealed` |
+| `reveal_tight_set` | `CurrencyAtLeast(fans, 30)` | `tight_set_revealed` |
+| `reveal_play_for_crowd` | `OwnedCountAtLeast(drummer, 1)` | `play_for_crowd_revealed` |
+| `reveal_unlock_covers` | `CurrencyAtLeast(fans, 25)` | `unlock_covers_revealed` |
+| `reveal_release` | `All[CurrencyAtLeast(fans, 50), BarsCompleted(learn_covers, 1)]` | `album` - The Release and The Backyard Party |
+
+Every other threshold moment is a purchase (upgrade payload).
 
 Story (root latches, §10): two beats on `ch1.storyBeats`, NEITHER marked to pop - no card opens by
 itself in chapter 1. Each is a button row in `garage_floor` (section 12). `story_ch1_open`
@@ -255,8 +273,8 @@ Opening a card sets its latch through `AcknowledgeStory` - `story_ch1_open_seen`
 | Section | title | visibleWhen | scopeId | Modules |
 |---|---|---|---|---|
 | `garage_floor` | "The Garage Floor" | always | tier1 | currency header lines (below), Jam button (`FireProducer(tap_producer)`), two story rows (below) |
-| `the_band` | "The Band" | `EarnedTotalAtLeast(cash, 100)` | tier1 | generator list |
-| `the_gear` | "The Gear" | `EarnedTotalAtLeast(cash, 250)` | tier1 | upgrade list |
+| `the_band` | "The Band" | `FlagSet(band_revealed)` | tier1 | four `generator_row` modules, one per generator; the amp's shows with the section, each bandmate's gates on its own reveal flag (section 11) |
+| `the_gear` | "The Gear" | `FlagSet(gear_revealed)` | tier1 | six `upgrade_row` modules, one per upgrade; Stage Presence's shows with the section, the rest gate on their reveal flags; a bought upgrade's row reads Bought |
 | `rehearsal_space` | "The Rehearsal Space" | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
 | `the_release` | "The Release" | `FlagSet(album)` | ch1 | release rung button (+ "would bank: N" preview via the same formula) |
 | `garage_jam` | "Garage Jam" | `CurrencyAtLeast(records, 1)` | tier1 | three event rows, one per jam, all always-visible (below) |
@@ -298,6 +316,33 @@ authored for re-entry - content, no system change.
 
 ---
 
+**Descriptions** (design 12.11: optional text on any definition or section, rendered beneath the
+name or title by the row and section widgets; the economy never reads it). Chapter 1 authors one
+for everything it renders as a row or a band:
+
+| Id | Description |
+|---|---|
+| `practice_amp` | Pays 0.50 cash a second per amp. The first thing worth buying. |
+| `drummer` | Pays 3 cash a second and pulls in 0.02 fans. Three amps in the garage and someone shows up to play them. |
+| `bassist` | Pays 20 cash a second and 0.02 fans, once five drummers have made the racket worth joining. |
+| `guitarist` | Pays 130 cash a second and 0.02 fans. Five bassists deep, the lead players start turning up. |
+| `stage_presence` | Doubles the cash every press of the Jam button pays. |
+| `amp_strings` | Doubles the cash every practice amp brings in. |
+| `kit_upgrade` | Doubles the cash every drummer brings in. |
+| `tight_set` | Play the set clean and the whole band earns 1.5 times the cash a second. Opens at 30 fans. |
+| `play_for_crowd` | Turn the amps around and play to the room. Fans start showing up and counting. |
+| `unlock_covers` | Start working up other people's songs. Opens the Rehearsal Space and the Rehearsal that fills it. |
+| `cover_1` | Your first cover, 100 Rehearsal to learn. Learning it pulls fans 15% faster. |
+| `cover_2` | The one everybody knows, 300 Rehearsal to learn. Another 15% on your fan rate. |
+| `cover_3` | The big one, 600 Rehearsal to learn, and the best of the three: fans arrive 20% faster. |
+| `garage_floor` | Where you play. Tap Jam for cash, and read your running totals on the lines above it. |
+| `the_band` | Amps and the people to play them. They earn while you do nothing, and every bandmate brings fans of their own. |
+| `the_gear` | One-time buys that make everything else pay more. Cutting a demo clears them, and you buy them back faster each run. |
+| `rehearsal_space` | Rehearsal builds up while you play. Spend it learning covers, one at a time, and each one you learn draws a bigger crowd. |
+| `the_release` | Cut a demo when you have 50 fans and a cover. It banks Records and Demo Tapes and resets the run. |
+| `garage_jam` | Three timed sprints, one at a time. The band goes quiet and you tap alone for the goal, and clearing one pays more cash per tap for the rest of the chapter. |
+| `backyard_party` | The gig that ends the chapter. Hand out 30 Demo Tapes to get the show, and you walk away with your first Roadie. |
+
 ## 13. Walkthroughs
 
 ### 13.1 Normal release (fresh install, 2 taps/s)
@@ -305,8 +350,8 @@ authored for re-entry - content, no system change.
 | t | What happens | Why |
 |---|---|---|
 | 0s | Tap for cash at 1/press | only `garage_floor` visible |
-| ~50s | 100 cash earned → `the_band` appears, amps buyable | `EarnedTotalAtLeast(cash, 100)` |
-| ~125s | 250 earned → `the_gear` appears | direct threshold gate, no flag |
+| ~50s | 100 cash earned → `reveal_band` sets `band_revealed`, `the_band` appears with the amp row, amps buyable | the trigger fires in the sweep; the amp's gate is the same fact |
+| ~125s | 250 earned → `reveal_gear`, `the_gear` appears with Stage Presence | same shape |
 | ~160s | buy `stage_presence` → taps now 2/press | conditioned entry on tap_producer |
 | ~205s | 3 amps owned → drummer available → bought at 250 | `OwnedCountAtLeast(practice_amp, 3)` |
 | ~217s | buy `play_for_crowd` → fans accrue at 0.35 + 0.02/s | `SetFlag(fans_revealed)` — nothing pre-banked |
@@ -314,8 +359,9 @@ authored for re-entry - content, no system change.
 | ~350s | `cover_1` fills (100 rehearsal at its own 2/s rate) → fan rate ×1.15 | `AddModifier(tier1, cover_bonus_1)` |
 | ~352s | 50 fans + 1 cover → `reveal_release` sets `album` in that sweep, the release region appears; **release**: `floor((50/5)^0.5)` = **3** → records 3, ch1_records 3; tier1 resets | one formula evaluation, two targets |
 
-At 3 taps/s the same trace lands at ~293s. Second run re-walks band → fans → covers ~30% faster
-(income ×1.06 from 3 records; reveals re-bought).
+At 3 taps/s the same trace lands at ~293s. Second run re-buys band → fans → covers ~30% faster
+(income ×1.06 from 3 records); the band and gear rows revealed in the first run are on screen from
+the start, greyed until affordable (design §2).
 
 **To the capstone:** releasing at roughly 50 / 65 / 85 / 110 / 145 / 190 / 250 fans pays
 3+3+4+4+5+6+7 = **32 ≥ 30 after 7 cycles** (pushing less each run means 8–10). Fan wall-clock —
@@ -396,15 +442,16 @@ tutorial chapter; the gate is the knob if not.
 
 ## 14. Deltas from `chapter-01-garage.json` (and why)
 
-- Flags `fans`/`covers`/`gear` → `fans_revealed` / `rehearsal_revealed` / *deleted*: id-collision
-  rule (§12.12), §12.2's authored snippet, and the pass-7 no-flag ruling for the gear region.
+- Flags `fans`/`covers`/`gear` → `fans_revealed` / `rehearsal_revealed` / `gear_revealed`: id-collision
+  rule (§12.12), §12.2's authored snippet; the gear region's flag is a reveal latch set by a trigger
+  (section 11), never bought.
 - The `learn_covers` content unlock renamed `unlock_covers`: the same id-collision rule. The JSON
   gave that one name to BOTH the unlock and the bar group and told them apart by kind
   (`"setBy": "upgrade:learn_covers"` against `"group": "learn_covers"`), but ids are unique per chain
   across ALL kinds - an Effect target is a string, so one word cannot address two assets. The GROUP
   keeps the name, since it is what `BarsCompleted` reads and what the player-facing "Learn Covers"
   matches; the unlock takes the verb-first form `play_for_crowd` uses.
-- `browse_gear` upgrade deleted — the region gates directly on the earned total (§2).
+- `browse_gear` upgrade deleted — the region's reveal is the `reveal_gear` trigger on the earned total (§2).
 - Garage Jam's internal tiers 1–3 → three `EventDefinition`s gated on completion flags (§6.1);
   `baselineReset` → `onEntry: [RestartScope]`; goals retuned 500/2500/10000 →
   150/300/600 (the old goals needed 8+ taps/s; new ones sit at 1.8–2.8 taps/s against the intended

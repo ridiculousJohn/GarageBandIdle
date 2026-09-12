@@ -16,6 +16,11 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
         {
             public ProductId Product;
             public Task<PurchaseResult> Result;
+
+            // What the requester wants told once the whole grant-save-
+            // acknowledge order is done - the Encore window closes on it.
+            // Nothing is told on a failed or cancelled purchase.
+            public Action Granted;
         }
 
         private readonly GameSession session;
@@ -40,8 +45,8 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
             this.save = save;
         }
 
-        public void RequestPurchase(ProductId product) =>
-            pending.Add(new Request { Product = product, Result = store.Purchase(product) });
+        public void RequestPurchase(ProductId product, Action granted = null) =>
+            pending.Add(new Request { Product = product, Result = store.Purchase(product), Granted = granted });
 
         public void RequestRestore()
         {
@@ -91,6 +96,7 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
             {
                 save();
                 store.Acknowledge(result.TransactionId);
+                request.Granted?.Invoke();
             });
         }
 

@@ -3,51 +3,52 @@ using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // One upgrade row (design doc 12.11): the generator row's shape without a
-    // count, since the fact behind an upgrade is a latch rather than a number.
-    public sealed class UpgradeRowUI
+    // One bound upgrade's row (design doc 12.11): the generator row's shape
+    // without a count, since the fact behind an upgrade is a latch rather than
+    // a number. A bought upgrade reads Bought, the way a bar row reads Done -
+    // the latch is a fact this renders; visibility is the module's visibleWhen.
+    public sealed class UpgradeRowUI : ModuleWidget
     {
-        public VisualElement Root { get; }
+        private readonly Label name;
+        private readonly Label description;
+        private readonly Button buy;
 
-        private readonly GameSession session;
-        private readonly ScopeState scope;
-        private readonly GameClock clock;
-        private readonly UpgradeDefinition upgrade;
-        private readonly Label nameLabel;
-        private readonly Button buyButton;
+        private UpgradeDefinition upgrade;
 
-        public UpgradeRowUI(GameSession session, ScopeState scope, GameClock clock, UpgradeDefinition upgrade)
+        public UpgradeRowUI(VisualElement root) : base(root)
         {
-            this.session = session;
-            this.scope = scope;
-            this.clock = clock;
-            this.upgrade = upgrade;
-
-            Root = new VisualElement();
-            Root.AddToClassList("row");
-            nameLabel = new Label();
-            nameLabel.AddToClassList("row-name");
-            buyButton = new Button();
-            buyButton.AddToClassList("row-buy");
-            buyButton.clicked += () => this.session.TryBuy(Context(), this.upgrade);
-            Root.Add(nameLabel);
-            Root.Add(buyButton);
+            name = Require<Label>(root, "name", "UpgradeRow.uxml");
+            description = Require<Label>(root, "description", "UpgradeRow.uxml");
+            buy = Require<Button>(root, "buy", "UpgradeRow.uxml");
         }
 
-        // Offered AND unbought: chapter 1's gates are progression conditions
-        // that never exclude their own purchase, so without the purchased leg a
-        // bought row would sit disabled forever (12.11).
-        public bool Offered(GameContext ctx) =>
-            upgrade.IsOffered(ctx) && !ctx.IsUpgradePurchased(upgrade.Id);
+        protected override void OnBound()
+        {
+            upgrade = (UpgradeDefinition)Content;
+            buy.clicked += () => Session.TryBuy(Context(), upgrade);
+        }
 
-        public void Refresh()
+        public override void Refresh()
         {
             var ctx = Context();
-            nameLabel.text = upgrade.displayName;
-            buyButton.text = NumberFormatter.Format(upgrade.cost) + " " + upgrade.costCurrency.displayName;
-            buyButton.SetEnabled(Purchasing.CanBuy(ctx, upgrade));
+            name.text = upgrade.displayName;
+            // An absent description leaves the row one line tall.
+            description.text = upgrade.description;
+            description.style.display = string.IsNullOrEmpty(upgrade.description)
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
+            // The purchased latch is the one-shot Purchasing itself reads, so a
+            // tier reset that clears it leaves the row reading as buyable.
+            if (ctx.IsUpgradePurchased(upgrade.Id))
+            {
+                buy.text = "Bought";
+                buy.SetEnabled(false);
+            }
+            else
+            {
+                buy.text = NumberFormatter.Format(upgrade.cost) + " " + upgrade.costCurrency.displayName;
+                buy.SetEnabled(Purchasing.CanBuy(ctx, upgrade));
+            }
         }
-
-        private GameContext Context() => new GameContext(scope, clock.RealTimeUtc);
     }
 }

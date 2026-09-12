@@ -15,8 +15,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             {
                 ["currency_line"] = (root, _) => new CurrencyHeaderUI(root),
                 ["jam_button"] = (root, _) => new JamButtonUI(root),
-                ["generator_list"] = (root, _) => new GeneratorListUI(root),
-                ["upgrade_list"] = (root, _) => new UpgradeListUI(root),
+                ["generator_row"] = (root, _) => new GeneratorRowUI(root),
+                ["upgrade_row"] = (root, _) => new UpgradeRowUI(root),
                 ["bar_group"] = (root, _) => new BarGroupUI(root),
                 ["rung_button"] = (root, _) => new RungButtonUI(root),
                 ["event_row"] = (root, _) => new EventUI(root),

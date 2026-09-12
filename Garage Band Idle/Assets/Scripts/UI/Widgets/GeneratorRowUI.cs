@@ -4,54 +4,50 @@ using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // One buyable row (design doc 12.11): name, owned count, and a button
-    // carrying the next cost. Pressability is Purchasing's own answer, never a
-    // rule restated here - the domain owns the gate.
-    public sealed class GeneratorRowUI
+    // One bound generator's row (design doc 12.11): name, owned count, and a
+    // button carrying the next cost. Visibility is the MODULE's visibleWhen,
+    // never a decision here; pressability is Purchasing's own answer.
+    public sealed class GeneratorRowUI : ModuleWidget
     {
-        public VisualElement Root { get; }
+        private readonly Label name;
+        private readonly Label description;
+        private readonly Label count;
+        private readonly Button buy;
 
-        private readonly GameSession session;
-        private readonly ScopeState scope;
-        private readonly GameClock clock;
-        private readonly GeneratorDefinition generator;
-        private readonly Label nameLabel;
-        private readonly Label countLabel;
-        private readonly Button buyButton;
+        private GeneratorDefinition generator;
 
-        public GeneratorRowUI(GameSession session, ScopeState scope, GameClock clock, GeneratorDefinition generator)
+        // The declaring scope, resolved once: the generator's count and its
+        // cost are its declaring scope's facts (12.3/12.4).
+        private ScopeState home;
+
+        public GeneratorRowUI(VisualElement root) : base(root)
         {
-            this.session = session;
-            this.scope = scope;
-            this.clock = clock;
-            this.generator = generator;
-
-            Root = new VisualElement();
-            Root.AddToClassList("row");
-            nameLabel = new Label();
-            nameLabel.AddToClassList("row-name");
-            countLabel = new Label();
-            countLabel.AddToClassList("row-count");
-            buyButton = new Button();
-            buyButton.AddToClassList("row-buy");
-            buyButton.clicked += () => this.session.TryBuy(Context(), this.generator);
-            Root.Add(nameLabel);
-            Root.Add(countLabel);
-            Root.Add(buyButton);
+            name = Require<Label>(root, "name", "GeneratorRow.uxml");
+            description = Require<Label>(root, "description", "GeneratorRow.uxml");
+            count = Require<Label>(root, "count", "GeneratorRow.uxml");
+            buy = Require<Button>(root, "buy", "GeneratorRow.uxml");
         }
 
-        // The list's filter, asked with the list's own context: a list module's
-        // evaluation scope IS the declaring scope, so nothing rebases.
-        public bool Available(GameContext ctx) => generator.IsAvailable(ctx);
-
-        public void Refresh()
+        protected override void OnBound()
         {
-            var ctx = Context();
-            nameLabel.text = generator.displayName;
-            countLabel.text = "x" + ctx.GetOwnedCount(generator.Id);
-            buyButton.text = NumberFormatter.Format(Purchasing.CostOf(generator, ctx))
+            generator = (GeneratorDefinition)Content;
+            home = Producer.DeclaringScope<ScopeState>(Scope, generator);
+            buy.clicked += () => Session.TryBuy(Context().Rebase(home), generator);
+        }
+
+        public override void Refresh()
+        {
+            var ctx = Context().Rebase(home);
+            name.text = generator.displayName;
+            // An absent description leaves the row one line tall.
+            description.text = generator.description;
+            description.style.display = string.IsNullOrEmpty(generator.description)
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
+            count.text = "x" + ctx.GetOwnedCount(generator.Id);
+            buy.text = NumberFormatter.Format(Purchasing.CostOf(generator, ctx))
                 + " " + generator.costCurrency.displayName + UnitRateText(ctx);
-            buyButton.SetEnabled(Purchasing.CanBuy(ctx, generator));
+            buy.SetEnabled(Purchasing.CanBuy(ctx, generator));
         }
 
         // "cost => yield", the reference game's row: what one more unit pays,
@@ -69,7 +65,5 @@ namespace RidiculousGaming.GarageBandIdle.UI
             }
             return text.ToString();
         }
-
-        private GameContext Context() => new GameContext(scope, clock.RealTimeUtc);
     }
 }

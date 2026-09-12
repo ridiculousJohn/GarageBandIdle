@@ -1,6 +1,11 @@
 /* The screen's minimum legibility: a heading reads as a heading and a row
    reads as a row. Nothing decorative - presentation tuning is content. */
 
+/* Every label reads light on the dark panels; buttons keep the theme's own text. */
+Label {
+    color: rgb(232, 232, 232);
+}
+
 .screen {
     flex-grow: 1;
 }
@@ -66,7 +71,7 @@
     margin-bottom: 4px;
 }
 
-.row-name {
+.row-text {
     flex-grow: 1;
 }
 
@@ -90,7 +95,7 @@
     margin-bottom: 4px;
 }
 
-.bar-name {
+.bar-text {
     min-width: 160px;
 }
 
@@ -106,6 +111,18 @@
 
 .bar-select {
     min-width: 96px;
+}
+
+/* What a thing does, beneath its name: one voice for a row, a bar, and a
+   section band alike. */
+.row-description, .bar-description, .section-description {
+    font-size: 12px;
+    opacity: 0.8;
+    white-space: normal;
+}
+
+.section-description {
+    margin-bottom: 6px;
 }
 
 .legs {
