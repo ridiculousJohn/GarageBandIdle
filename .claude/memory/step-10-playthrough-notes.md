@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 725fbcaf-f7c7-487b-a644-802df186dfc3
-  modified: 2026-09-11T21:34:29.257Z
+  modified: 2026-09-14T20:03:43.131Z
 ---
 
 John's notes from the first hand playthrough after slice E, 2026-09-11, fresh save. He said
@@ -40,7 +40,7 @@ moment". Each item carries the fact I checked behind it and its kind. Nothing he
    completion: root `records` (career, never resets, header shows it) and `ch1_records` (capstone
    counter, zeroed by the chapter reset). Content doc section 3 row and section 13 mentions change
    with the rename.
-8. Kit Upgrade (x2 drummer cash rate) produced no noticeable change with few drummers.
+8. CLOSED 2026-09-14 by the rate display slice: the row's yield line ("502.84 Cash => 11.25 Cash, 0.02 Fans") doubles on purchase in its own line, John confirmed in the editor; whether the number is off at the ladder point it is offered is tuning. Original: Kit Upgrade (x2 drummer cash rate) produced no noticeable change with few drummers.
 9. The Backyard Party button is grey until 30 `ch1_records`; the section itself appears on the
    `album` flag. Item 7's uiText is the fix.
 10. LANDED 2026-09-11 as row modules (generator_row / upgrade_row binding one thing, visible on the module's visibleWhen; the list widgets deleted; ten reveal triggers) - see the build plan line. The "content only" claim below was wrong: the list widgets conflated visibility with the purchase gate, John found it ("you conflated visible with available"), and the fix was the module shape the currency lines already had. Original note: After the Garage Jam's reward, the
