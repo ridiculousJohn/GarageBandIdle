@@ -1,18 +1,28 @@
+using System;
 using System.Text;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // One bound generator's row (design doc 12.11): name, owned count, and a
-    // button carrying the next cost. Visibility is the MODULE's visibleWhen,
-    // never a decision here; pressability is Purchasing's own answer.
+    // One bound generator's row (design doc 12.11): name, owned count, the cost
+    // and yield line beneath the name, and a "+1" button. A long press on the
+    // text opens the info screen, which is where the description is read.
+    // Visibility is the MODULE's visibleWhen, never a decision here;
+    // pressability is Purchasing's own answer.
     public sealed class GeneratorRowUI : ModuleWidget
     {
         private readonly Label name;
-        private readonly Label description;
+        private readonly Label yieldLine;
         private readonly Label count;
         private readonly Button buy;
+
+        // The hold's target: the text, never the button beside it.
+        private readonly VisualElement text;
+
+        // The host, behind the one method a row needs of it: the info screen is
+        // the host's, and the row hands over the generator and its scope.
+        private readonly IGeneratorInfoOpener infos;
 
         private GeneratorDefinition generator;
 
@@ -20,12 +30,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // cost are its declaring scope's facts (12.3/12.4).
         private ScopeState home;
 
-        public GeneratorRowUI(VisualElement root) : base(root)
+        public GeneratorRowUI(VisualElement root, IGeneratorInfoOpener infos) : base(root)
         {
             name = Require<Label>(root, "name", "GeneratorRow.uxml");
-            description = Require<Label>(root, "description", "GeneratorRow.uxml");
+            yieldLine = Require<Label>(root, "yield", "GeneratorRow.uxml");
             count = Require<Label>(root, "count", "GeneratorRow.uxml");
             buy = Require<Button>(root, "buy", "GeneratorRow.uxml");
+            text = Require<VisualElement>(root, "text", "GeneratorRow.uxml");
+            // A row with nowhere to send the hold would render a dead gesture,
+            // and the host is the only caller (requirement 7).
+            this.infos = infos ?? throw new ArgumentNullException(nameof(infos));
         }
 
         protected override void OnBound()
@@ -33,37 +47,45 @@ namespace RidiculousGaming.GarageBandIdle.UI
             generator = (GeneratorDefinition)Content;
             home = Producer.DeclaringScope<ScopeState>(Scope, generator);
             buy.clicked += () => Session.TryBuy(Context().Rebase(home), generator);
+            text.AddManipulator(new LongPressManipulator(OpenInfo, Session.Config.longPressSeconds));
         }
 
         public override void Refresh()
         {
             var ctx = Context().Rebase(home);
             name.text = generator.displayName;
-            // An absent description leaves the row one line tall.
-            description.text = generator.description;
-            description.style.display = string.IsNullOrEmpty(generator.description)
-                ? DisplayStyle.None
-                : DisplayStyle.Flex;
             count.text = "x" + ctx.GetOwnedCount(generator.Id);
-            buy.text = NumberFormatter.Format(Purchasing.CostOf(generator, ctx))
-                + " " + generator.costCurrency.displayName + UnitRateText(ctx);
+            yieldLine.text = CostAndYieldText(ctx, generator);
+            buy.text = "+1";
             buy.SetEnabled(Purchasing.CanBuy(ctx, generator));
         }
 
-        // "cost => yield", the reference game's row: what one more unit pays,
-        // through the same resolution the tick sums (12.5). A currency the unit
-        // pays nothing is not a line, and a unit paying nothing has no arrow.
-        private string UnitRateText(GameContext ctx)
+        // What the hold calls. Kept as a public UI action for the reason
+        // EncoreWindowUI.RequestAd is public: a headless test exercises what the
+        // hold exercises without manufacturing pointer events. The scope is the
+        // declaring one the row resolved at bind, so the screen reads what the
+        // row reads.
+        public void OpenInfo() => infos.OpenGeneratorInfo(generator, home);
+
+        // "cost => yield", the reference game's row: the next unit's cost and
+        // what that one unit pays, through the same resolution the tick sums
+        // (12.5). A currency the unit pays nothing is not a line, and a unit
+        // paying nothing has no arrow. Static, so the info screen prints the
+        // identical line.
+        public static string CostAndYieldText(GameContext ctx, GeneratorDefinition generator)
         {
-            var text = new StringBuilder();
+            var line = new StringBuilder();
+            line.Append(NumberFormatter.Format(Purchasing.CostOf(generator, ctx)))
+                .Append(" ").Append(generator.costCurrency.displayName);
+            var yields = 0;
             foreach (var (currency, amount) in Producer.UnitRate(ctx, generator))
             {
                 if (amount == BigNumber.Zero)
                     continue;
-                text.Append(text.Length == 0 ? " => " : ", ");
-                text.Append(NumberFormatter.Format(amount)).Append(" ").Append(currency.displayName);
+                line.Append(yields++ == 0 ? " => " : ", ");
+                line.Append(NumberFormatter.Format(amount)).Append(" ").Append(currency.displayName);
             }
-            return text.ToString();
+            return line.ToString();
         }
     }
 }

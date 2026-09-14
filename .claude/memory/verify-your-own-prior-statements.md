@@ -68,3 +68,14 @@ Same day: the design says a story card "shows while" its gate holds. I read that
 and told John twice that the documents say chapter 1's beats are marked to open. They say no such
 thing. A reading of a document is mine and gets labeled as mine; "the doc says X" is only ever the
 words on the page, quoted.
+
+**2026-09-14 - a Ctrl C claim needs a recorded source.** Proposing a rate line for the header, I
+wrote "under Encore it shows the doubled rate, which is what Ctrl C's header does." Nothing John
+ever said, no screenshot, and no memory file records what Ctrl C's rate line does under Overclock;
+the Ctrl C memory records the line's format and nothing about the buff. I completed the pattern
+from "the design descends from Ctrl C" and offered it as justification. John: "why the fuck did you
+offer it as justification for anything if you have no evidence for it." The rule for the reference
+game is the aside rule: every "Ctrl C does X" is quoted from [[ctrl-c-is-the-reference-game]], a
+screenshot in the conversation, or John's words in it, or it is not said. The design descending
+from Ctrl C is never evidence of any specific Ctrl C behavior. When a claim I made turns out to
+have no source, the first sentence says it was invented; not "I have no evidence for it".

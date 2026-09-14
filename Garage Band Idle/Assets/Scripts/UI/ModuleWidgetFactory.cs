@@ -10,17 +10,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // line here, and a registry entry (design doc 12.11).
     public static class ModuleWidgetFactory
     {
-        private static readonly Dictionary<string, Func<VisualElement, IStoryOpener, ModuleWidget>> Creators =
+        private static readonly Dictionary<string, Func<VisualElement, IStoryOpener, IGeneratorInfoOpener,
+                                                        ModuleWidget>> Creators =
             new()
             {
-                ["currency_line"] = (root, _) => new CurrencyHeaderUI(root),
-                ["jam_button"] = (root, _) => new JamButtonUI(root),
-                ["generator_row"] = (root, _) => new GeneratorRowUI(root),
-                ["upgrade_row"] = (root, _) => new UpgradeRowUI(root),
-                ["bar_group"] = (root, _) => new BarGroupUI(root),
-                ["rung_button"] = (root, _) => new RungButtonUI(root),
-                ["event_row"] = (root, _) => new EventUI(root),
-                ["story_row"] = (root, stories) => new StoryRowUI(root, stories),
+                ["currency_line"] = (root, stories, infos) => new CurrencyHeaderUI(root),
+                ["jam_button"] = (root, stories, infos) => new JamButtonUI(root),
+                ["generator_row"] = (root, stories, infos) => new GeneratorRowUI(root, infos),
+                ["upgrade_row"] = (root, stories, infos) => new UpgradeRowUI(root),
+                ["bar_group"] = (root, stories, infos) => new BarGroupUI(root),
+                ["rung_button"] = (root, stories, infos) => new RungButtonUI(root),
+                ["event_row"] = (root, stories, infos) => new EventUI(root),
+                ["story_row"] = (root, stories, infos) => new StoryRowUI(root, stories),
             };
 
         // The registry cross-check enumerates the same closed set Create uses,
@@ -106,12 +107,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // authored content, and the import/boot cross-check catches a miss before a
         // first render ever does.
         //
-        // `stories` is the card's owner, which one widget kind needs and the
-        // rest ignore: the host is the one caller and hands itself in (12.11).
-        public static ModuleWidget Create(string prefabId, VisualElement root, IStoryOpener stories)
+        // `stories` is the card's owner and `infos` the info screen's, each
+        // needed by one widget kind and ignored by the rest: the host is the one
+        // caller and hands itself in for both (12.11).
+        public static ModuleWidget Create(string prefabId, VisualElement root, IStoryOpener stories,
+                                          IGeneratorInfoOpener infos)
         {
             if (prefabId != null && Creators.TryGetValue(prefabId, out var create))
-                return create(root, stories);
+                return create(root, stories, infos);
             throw new InvalidOperationException(
                 $"No widget controller answers prefabId '{prefabId}' (design doc 12.11).");
         }

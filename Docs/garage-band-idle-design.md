@@ -1478,10 +1478,24 @@ graph and instantiate synchronously mid-refresh; the behavior is a plain C# `Mod
 controller a code-side factory constructs for the same id. A new widget type is a UXML, a factory
 line, and a registry entry. Every `Definition` and every section may carry an optional
 `description`, player-facing text saying what the thing does; the widgets that render a row or a
-band show it beneath the name or title when present, and nothing else reads it.
+band show it beneath the name or title when present, a generator's is read on its info screen
+instead, and nothing else reads it.
+
+**Rates on screen.** A currency's header line is the name, the balance, and the tick report's
+realized rate beside it as "(X/s)" - the slope the readout already interpolates by, so it is the
+rate the balance is climbing at, zero before the first tick and for a currency nothing pays. A
+generator row is the name, the owned count, a line beneath the name reading the next unit's cost
+and what that one unit pays per second ("250.00 Cash => 3.00 Cash", through `Producer.UnitRate` at
+the declaring scope), and a "+1" button. A long press on the row's text - a hold of
+`GameConfig.longPressSeconds`, judged by the element's own scheduler since it is presentation and
+never a game read - opens the generator's info screen, a host-owned overlay: the description, the
+same cost and yield line, the owned count, and what the owned units produce per second, which is
+the count times the per-unit rate because nothing in the effect vocabulary reads the count. The
+row reaches the host through `IGeneratorInfoOpener`, the shape `IStoryOpener` has, and the screen
+holds the generator and its declaring scope for as long as the request stands.
 
 **Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
-Encore or the story log is open, the host does not run the automatic story walk. The modal and any unsubmitted
+Encore, the story log or a generator's info screen is open, the host does not run the automatic story walk. The modal and any unsubmitted
 allocation draft remain intact. A waiting marked beat stays unseen and opens on the first refresh
 after the last overlay closes, if it is still available. The walk reads state, not a transition.
 
@@ -1662,7 +1676,7 @@ Assets/Scripts/
     TickSystem.cs           // the segmented tick over one real-time window; returns the TickReport
     TickReport.cs           // what ONE tick moved, recorded at the mutation sites; interpolation's slopes
     GameClock.cs            // the one time source: driver-owned, advanced at every entry point
-    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds, tickIntervalSeconds, the Encore ad grant and cap
+    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds, tickIntervalSeconds, longPressSeconds, the Encore ad grant and cap
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root + labeled chapter roots, composes the pair, runs the §12.12 pass
@@ -1725,6 +1739,8 @@ Assets/Scripts/
     ScreenHost.cs  UIRoot.cs                  // the structure logic (the ONE Refreshed subscriber) and its MonoBehaviour shell
     GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
     IStoryOpener.cs         // the one method a story row asks of the host: open the card for a beat at its scope
+    IGeneratorInfoOpener.cs // the one method a generator row asks of the host: open the info screen for a generator at its declaring scope
+    LongPressManipulator.cs // the hold gesture over an element's own scheduler; no capture, no propagation change
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               BarGroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select at boot or over Live, and the AwaitingIdleClaim screen
@@ -1735,6 +1751,7 @@ Assets/Scripts/
     SettingsUI.cs          // the Roadies entry and close button
     RoadieAllocationUI.cs  // local allocation draft; Done submits the whole map
     EncoreWindowUI.cs      // remaining time and ad/Pass requests through the existing managers
+    GeneratorInfoUI.cs     // a generator's info screen: description, the row's cost and yield line, owned count, production
 Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
 Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)

@@ -46,6 +46,10 @@ namespace RidiculousGaming.GarageBandIdle
         // to remove.
         public double tickIntervalSeconds = 0.25;
 
+        // The hold that opens a row's info screen (12.11): presentation cadence
+        // like tickIntervalSeconds, and a placeholder until tuning cares.
+        public double longPressSeconds = 0.5;
+
         // Fail-loud at the consumers (requirement 7): the tick for direct use,
         // the session at construction. A bad ceiling would silently clamp the
         // clamp, so it throws instead; sub-1 is refused because the clamp's
@@ -85,6 +89,10 @@ namespace RidiculousGaming.GarageBandIdle
                 || config.tickIntervalSeconds <= 0)
                 throw new InvalidOperationException(
                     $"GameConfig: tickIntervalSeconds {config.tickIntervalSeconds} is not a finite positive value.");
+            if (double.IsNaN(config.longPressSeconds) || double.IsInfinity(config.longPressSeconds)
+                || config.longPressSeconds <= 0)
+                throw new InvalidOperationException(
+                    $"GameConfig: longPressSeconds {config.longPressSeconds} is not a finite positive value.");
         }
 
         // The three bundles take one rule, so they ask it in one place: a

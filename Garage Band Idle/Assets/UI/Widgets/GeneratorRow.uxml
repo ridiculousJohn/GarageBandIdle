@@ -1,8 +1,8 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <ui:VisualElement name="generator_row" class="row">
-        <ui:VisualElement class="row-text">
+        <ui:VisualElement name="text" class="row-text">
             <ui:Label name="name" class="row-name" />
-            <ui:Label name="description" class="row-description" />
+            <ui:Label name="yield" class="row-yield" />
         </ui:VisualElement>
         <ui:Label name="count" class="row-count" />
         <ui:Button name="buy" class="row-buy" />

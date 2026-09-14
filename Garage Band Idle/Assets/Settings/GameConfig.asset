@@ -16,3 +16,4 @@ MonoBehaviour:
   minimumAwaySeconds: 180
   idleCapSeconds: 14400
   tickIntervalSeconds: 0.25
+  longPressSeconds: 0.5

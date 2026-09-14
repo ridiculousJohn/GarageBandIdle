@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Monetization;
 using RidiculousGaming.GarageBandIdle.Story;
 using UnityEngine.UIElements;
@@ -12,7 +13,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // an EditMode test builds it over imported content with no panel; UIRoot is
     // the MonoBehaviour shell around it. This is the ONE Refreshed subscriber -
     // widgets subscribe to nothing, so there is one dispatch order.
-    public sealed class ScreenHost : IDisposable, IStoryOpener
+    public sealed class ScreenHost : IDisposable, IStoryOpener, IGeneratorInfoOpener
     {
         // One module and the widget standing for it. The host owns these views,
         // so it writes them and anything holding the host reads them.
@@ -88,6 +89,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly RoadieAllocationUI allocation;
         private readonly EncoreWindowUI encore;
         private readonly StoryLogUI storyLog;
+        private readonly GeneratorInfoUI generatorInfo;
         private readonly List<SectionView> sections = new();
 
         private enum LiveOverlay
@@ -98,6 +100,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Roadies,
             Encore,
             StoryLog,
+            GeneratorInfo,
         }
 
         private LiveOverlay requestedOverlay;
@@ -122,6 +125,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public StoryLogUI StoryLog => storyLog;
 
+        public GeneratorInfoUI GeneratorInfo => generatorInfo;
+
         // Over the screen's own root: the host owns every app-owned screen and
         // overlay, so it is the one place that knows which named elements
         // Screen.uxml promises.
@@ -145,6 +150,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 session.Root, clock, ads, store, CloseOverlay);
             storyLog = new StoryLogUI(Require<VisualElement>(screenRoot, "story-log-window"),
                 session.Root, clock, this, CloseOverlay);
+            generatorInfo = new GeneratorInfoUI(Require<VisualElement>(screenRoot, "generator-info"),
+                clock, CloseOverlay);
             session.Refreshed += Render;
         }
 
@@ -265,6 +272,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
             ShowRequestedOverlay();
         }
 
+        // The row's hold, the one way the info screen opens: the generator and
+        // its declaring scope live on the overlay class the way the allocation
+        // draft lives on RoadieAllocationUI, since a LiveOverlay value cannot
+        // carry them.
+        public void OpenGeneratorInfo(GeneratorDefinition generator, ScopeState scope)
+        {
+            generatorInfo.Hold(generator, scope);
+            OpenOverlay(LiveOverlay.GeneratorInfo);
+        }
+
         public void OpenEncore() => OpenOverlay(LiveOverlay.Encore);
 
         public void OpenStoryLog() => OpenOverlay(LiveOverlay.StoryLog);
@@ -280,6 +297,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void CloseOverlay()
         {
             requestedOverlay = LiveOverlay.None;
+            generatorInfo.Drop();
             HideRequestedOverlay();
         }
 
@@ -289,6 +307,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
             requestedBeat = null;
             story.Hide();
+            // Another overlay opening releases the held generator: the request
+            // it belongs to is the one being replaced.
+            if (overlay != LiveOverlay.GeneratorInfo)
+                generatorInfo.Drop();
             HideRequestedOverlay();
             requestedOverlay = overlay;
             if (overlay == LiveOverlay.Roadies)
@@ -310,6 +332,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             requestedBeat = null;
             story.Hide();
             requestedOverlay = LiveOverlay.None;
+            generatorInfo.Drop();
             HideRequestedOverlay();
         }
 
@@ -320,6 +343,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             allocation.Hide();
             encore.Hide();
             storyLog.Hide();
+            generatorInfo.Hide();
         }
 
         private void ShowRequestedOverlay()
@@ -340,6 +364,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     break;
                 case LiveOverlay.StoryLog:
                     storyLog.Show();
+                    break;
+                // Every refresh while it stands re-reads the count and the
+                // production: a purchase beneath it, a tick, a Roadie change.
+                case LiveOverlay.GeneratorInfo:
+                    generatorInfo.Show();
                     break;
             }
         }
@@ -454,7 +483,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void CreateWidget(SectionView section, int index, ModuleView module)
         {
             var root = registry.Resolve(module.Definition.prefabId).Instantiate();
-            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, this);
+            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, this, this);
             module.Widget.Bind(session, module.Scope, module.Definition.content, clock);
             section.ModulesContainer.Insert(PlacedBefore(section, index), root);
         }

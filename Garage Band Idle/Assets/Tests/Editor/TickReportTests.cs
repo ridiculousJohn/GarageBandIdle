@@ -135,6 +135,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(report, f.Session.LastTick, "the session holds the tick's own report");
         }
 
+        // The frames bank whatever they measured, so a tick's dt is almost never
+        // a whole number of milliseconds. The window the tick simulates and the
+        // Seconds the slope divides by are the same number, so the slope IS the
+        // rate rather than the rate times a ratio that wanders tick to tick.
+        [Test]
+        public void A_tick_of_a_fraction_of_a_millisecond_reports_the_rate_exactly()
+        {
+            var f = new Fixture();
+
+            var report = f.Tick(0.2504);
+
+            AssertClose(0.5 * 0.2504, report.CurrencyNet(f.Tree.Tier1, "cash"));
+            AssertClose(0.5, report.CurrencySlope(f.Tree.Tier1, "cash"));
+        }
+
         // ---- what replaces it ----
 
         [Test]

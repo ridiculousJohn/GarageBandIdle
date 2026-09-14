@@ -622,6 +622,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("0.00", Fixture.Text(cash, "value"));
         }
 
+        // The reference game's rate line (12.11): the tick report's realized
+        // slope for the currency at its home, beside the balance - which is
+        // exactly the rate the interpolated balance climbs by between ticks.
+        [Test]
+        public void HeaderShowsTheRealizedRateBesideTheBalance()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            var cash = fx.Host.Sections[GarageFloor].Modules[CashLine];
+            var zero = "(" + NumberFormatter.Format(BigNumber.Zero) + "/s)";
+            Assert.AreEqual(zero, Fixture.Text(cash, "rate"),
+                "no tick has run, so there is no measured slope to show");
+
+            // The amp's authored gate is 100 earned cash and its first unit
+            // costs 60, so one deposit both opens the gate and pays for it.
+            fx.Ctx(fx.Tier1).Deposit("cash", 100);
+            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PracticeAmp);
+            Assert.AreEqual(1, fx.Tier1.generatorCounts["practice_amp"], "one amp is producing");
+
+            // One tick of the Live cadence; its own refresh is what repaints.
+            fx.Session.Tick(0.25, fx.Now.AddSeconds(0.25));
+
+            // Cash is declared at tier1, so tier1 is the home the report keys
+            // the net by (12.3).
+            var slope = fx.Session.LastTick.CurrencySlope(fx.Tier1, "cash");
+            Assert.AreEqual("(" + NumberFormatter.Format(slope) + "/s)", Fixture.Text(cash, "rate"));
+            Assert.AreNotEqual(zero, Fixture.Text(cash, "rate"), "the amp paid, so the slope is not zero");
+        }
+
         [Test]
         public void ATapRepaintsTheCashLineThroughTheSessionsOwnRefresh()
         {
@@ -676,10 +706,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             for (var i = 1; i < section.Modules.Count; i++)
                 Assert.IsFalse(section.Modules[i].Visible, "their flags are unset");
 
-            // The button is the reference game's line: the first amp's authored
-            // 60 cash, then what one amp pays per second.
-            var buy = section.Modules[0].Widget.Root.Q<Button>("buy");
-            Assert.AreEqual("60.00 Cash => 0.50 Cash", buy.text);
+            // The yield line is the reference game's row: the first amp's
+            // authored 60 cash, then what one amp pays per second. The button
+            // beside it is the single-unit buy and carries nothing else.
+            var amp = section.Modules[0].Widget.Root;
+            Assert.AreEqual("60.00 Cash => 0.50 Cash", amp.Q<Label>("yield").text);
+            var buy = amp.Q<Button>("buy");
+            Assert.AreEqual("+1", buy.text);
             Assert.IsTrue(buy.enabledSelf, "101 cash covers the 60");
         }
 
@@ -703,33 +736,40 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(section.Modules[2].Visible, "the bassist's is not");
             Assert.IsFalse(section.Modules[3].Visible, "and neither is the guitarist's");
 
-            var drummer = section.Modules[1].Widget.Root.Q<Button>("buy");
-            Assert.IsFalse(drummer.enabledSelf,
+            var drummer = section.Modules[1].Widget.Root;
+            var drummerBuy = drummer.Q<Button>("buy");
+            Assert.IsFalse(drummerBuy.enabledSelf,
                 "no amps are owned, so the purchase gate is closed and the button says so");
-            Assert.AreEqual("250.00 Cash => 3.00 Cash", drummer.text,
+            Assert.AreEqual("+1", drummerBuy.text, "the button is the single-unit buy");
+            Assert.AreEqual("250.00 Cash => 3.00 Cash", drummer.Q<Label>("yield").text,
                 "fans sits behind its own reveal, and an inactive currency takes nothing from any source");
             Assert.IsFalse(section.Modules[0].Widget.Root.Q<Button>("buy").enabledSelf,
                 "1 cash after one press does not cover the amp's 60");
         }
 
         // The description is content read off the definition, never a widget's
-        // words (12.11): a band shows the section's own and a row shows the one
-        // authored on the content it binds.
+        // words (12.11): a band shows the section's own and an upgrade row the
+        // one authored on the content it binds.
         [Test]
         public void RowsAndSectionsShowTheirAuthoredDescriptions()
         {
             var fx = new Fixture();
             fx.Enter();
             fx.Ch1.flags.Add("band_revealed");
+            fx.Ch1.flags.Add("gear_revealed");
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var floor = fx.Host.Sections[GarageFloor].Root.Q<Label>(className: "section-description");
             Assert.IsNotNull(floor, "the garage floor's band carries its authored line");
             Assert.AreEqual(fx.Ch1Def.sections[GarageFloor].description, floor.text);
 
-            var amp = fx.Host.Sections[Band].Modules[0].Widget.Root.Q<Label>("description");
-            Assert.IsTrue(Fixture.Shown(amp), "the amp's row has a description, so it shows one");
-            Assert.AreEqual(fx.PracticeAmp.description, amp.text, "the bound generator's own text");
+            var upgrade = fx.Host.Sections[Gear].Modules[0].Widget.Root.Q<Label>("description");
+            Assert.IsTrue(Fixture.Shown(upgrade), "the latch's row has a description, so it shows one");
+            Assert.AreEqual(fx.StagePresence.description, upgrade.text, "the bound upgrade's own text");
+
+            // A generator row holds no description label: its authored text is
+            // read on the info screen instead (12.11).
+            Assert.IsNull(fx.Host.Sections[Band].Modules[0].Widget.Root.Q<Label>("description"));
         }
 
         // A bought upgrade is a fact the row renders rather than a reason to
@@ -928,6 +968,135 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsNotNull(fx.Host.Sections[GarageFloor].Modules[CashLine].Widget, "a widget is present to interpolate");
             Assert.DoesNotThrow(() => fx.Host.Interpolate());
+        }
+
+        // ---- the generator info screen (12.11) ----
+
+        // The band's latch and the amp's row widget. The long press that opens
+        // the screen is a pointer gesture on panel time, so the row exposes
+        // OpenInfo for the same reason the Encore window exposes RequestAd.
+        private static GeneratorRowUI AmpRow(Fixture fx)
+        {
+            fx.Ch1.flags.Add("band_revealed");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+            return (GeneratorRowUI)fx.Host.Sections[Band].Modules[0].Widget;
+        }
+
+        private static string InfoText(Fixture fx, string element) =>
+            fx.Host.GeneratorInfo.Root.Q<Label>(element).text;
+
+        // The one figure nothing else on the screen shows: the owned count and
+        // what those units produce, beside the flavor text the row gave up and
+        // the same cost-and-yield line the row prints. Production is the count
+        // times the per-unit rate, so it follows a purchase made beneath the
+        // screen in that purchase's own refresh.
+        [Test]
+        public void TheInfoScreenReadsTheHeldGeneratorAndFollowsAPurchase()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            var row = AmpRow(fx);
+
+            row.OpenInfo();
+
+            Assert.IsTrue(Fixture.Shown(fx.Host.GeneratorInfo.Root), "the screen is up over the chapter");
+            Assert.AreSame(fx.PracticeAmp, fx.Host.GeneratorInfo.Held, "the row's own generator");
+            Assert.AreEqual(fx.PracticeAmp.displayName, InfoText(fx, "info-name"));
+            var description = fx.Host.GeneratorInfo.Root.Q<Label>("info-description");
+            Assert.IsTrue(Fixture.Shown(description), "the amp has a description, so the screen shows one");
+            Assert.AreEqual(fx.PracticeAmp.description, description.text);
+            Assert.AreEqual(row.Root.Q<Label>("yield").text, InfoText(fx, "info-cost"),
+                "the row and the screen print one line, not two that agree until they do not");
+            Assert.AreEqual("Owned: 0", InfoText(fx, "info-owned"));
+            Assert.AreEqual("Producing: nothing", InfoText(fx, "info-production"),
+                "no units are owned, so there is no product to name");
+
+            // Bought beneath the standing screen: the gate is 100 earned cash
+            // and the first unit costs 60.
+            fx.Ctx(fx.Tier1).Deposit("cash", 100);
+            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PracticeAmp);
+            Assert.AreEqual(1, fx.Tier1.generatorCounts["practice_amp"], "the amp was bought");
+
+            Assert.IsTrue(Fixture.Shown(fx.Host.GeneratorInfo.Root), "a purchase is not a close");
+            Assert.AreEqual("Owned: 1", InfoText(fx, "info-owned"));
+            // One unit's rate at the declaring scope, which is what N units
+            // produce: nothing in the effect vocabulary reads the owned count.
+            var (currency, amount) = Producer.UnitRate(fx.Ctx(fx.Tier1), fx.PracticeAmp).Single();
+            Assert.AreEqual("Producing: " + NumberFormatter.Format(amount) + " " + currency.displayName + "/s",
+                InfoText(fx, "info-production"));
+        }
+
+        // A press that spans a refresh lands on the element it started on: the
+        // screen's labels are the document's, so a tick's pass moves their text
+        // and never the hierarchy (12.11).
+        [Test]
+        public void TheInfoScreenStandsAcrossATicksRefresh()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            AmpRow(fx).OpenInfo();
+
+            fx.Session.Tick(0.25, fx.Now.AddSeconds(0.25));
+
+            Assert.IsTrue(Fixture.Shown(fx.Host.GeneratorInfo.Root), "the screen is still the requested overlay");
+            Assert.AreSame(fx.PracticeAmp, fx.Host.GeneratorInfo.Held, "and it holds the generator it held");
+        }
+
+        // A requested overlay like any other (12.11): the next one replaces it
+        // and takes the held pair with it, and Back drops the pair too, so a
+        // reopen starts from the row that asked rather than a dead reference.
+        [Test]
+        public void TheInfoScreenIsReplacedByAnotherOverlayAndDroppedOnClose()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            var row = AmpRow(fx);
+            row.OpenInfo();
+
+            fx.Host.OpenEncore();
+
+            Assert.IsFalse(Fixture.Shown(fx.Host.GeneratorInfo.Root), "one requested overlay at a time");
+            Assert.IsNull(fx.Host.GeneratorInfo.Held, "and the request goes down with it");
+            Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")));
+
+            row.OpenInfo();
+            Assert.IsTrue(Fixture.Shown(fx.Host.GeneratorInfo.Root));
+
+            fx.Host.CloseOverlay();
+
+            Assert.IsFalse(Fixture.Shown(fx.Host.GeneratorInfo.Root));
+            Assert.IsNull(fx.Host.GeneratorInfo.Held);
+        }
+
+        [Test]
+        public void TheInfoScreenReplacesAnOpenStoryCard()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            var row = AmpRow(fx);
+            fx.Host.OpenStory(fx.Opener, fx.Ch1);
+            Assert.IsNotNull(fx.Host.ShownStory, "the card is the top of the overlay stack");
+
+            row.OpenInfo();
+
+            Assert.IsNull(fx.Host.ShownStory, "a requested overlay replaces the card");
+            Assert.IsFalse(Fixture.Shown(StoryCard(fx.Screen)));
+            Assert.IsTrue(Fixture.Shown(fx.Host.GeneratorInfo.Root));
+        }
+
+        // The overlay belongs to a live chapter, so a phase with no chapter has
+        // nothing to open one over (12.11).
+        [Test]
+        public void TheInfoScreenIsRefusedOutsideLive()
+        {
+            var fx = new Fixture();
+            fx.Host.Render();
+            Assert.AreEqual(SessionPhase.NoChapter, fx.Session.Phase);
+
+            fx.Host.OpenGeneratorInfo(fx.PracticeAmp, fx.Tier1);
+
+            Assert.IsFalse(Fixture.Shown(fx.Host.GeneratorInfo.Root),
+                "there is no chapter to open an overlay over");
         }
 
         // ---- the story rows and the card (section 10, 12.11) ----
@@ -1348,6 +1517,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [TestCase("roadie-allocation")]
         [TestCase("encore-window")]
         [TestCase("story-log-window")]
+        [TestCase("generator-info")]
         public void ARequestedOverlayDefersAnAutomaticStoryCardUntilItCloses(string overlayName)
         {
             var fx = new StoryFixture(markedUnlocksOnLiveTick: true);
@@ -1362,6 +1532,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     break;
                 case "encore-window": fx.Host.OpenEncore(); break;
                 case "story-log-window": fx.Host.OpenStoryLog(); break;
+                // What the row's long press calls, at the scope the row
+                // resolved; a headless test has no pointer to hold.
+                case "generator-info":
+                    fx.Host.OpenGeneratorInfo(fx.Tree.PracticeAmp, fx.Tree.Tier1);
+                    break;
             }
             Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>(overlayName)));
             Assert.IsNull(fx.Host.ShownStory, "the passive income threshold has not been reached yet");

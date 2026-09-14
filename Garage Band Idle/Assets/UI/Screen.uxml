@@ -66,4 +66,14 @@
             <ui:Button name="story-log-close" text="Back" class="overlay-close" />
         </ui:VisualElement>
     </ui:VisualElement>
+    <ui:VisualElement name="generator-info" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel info-panel">
+            <ui:Label name="info-name" class="modal-title" />
+            <ui:Label name="info-description" class="info-description" />
+            <ui:Label name="info-cost" class="info-line" />
+            <ui:Label name="info-owned" class="info-line" />
+            <ui:Label name="info-production" class="info-line" />
+            <ui:Button name="info-close" text="Back" class="overlay-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
 </ui:UXML>

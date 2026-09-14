@@ -66,6 +66,9 @@ namespace RidiculousGaming.GarageBandIdle
         // command found. Null only before the first tick.
         public TickReport LastTick { get; private set; }
 
+        // The knobs a widget reads off the session it already holds (12.11).
+        public GameConfig Config => config;
+
         // The 12.11 hook, one per completed transaction and none on a refusal,
         // fired from inside the transaction that completes. A handler that
         // issues a command submits it, and it runs at the next drain as its own

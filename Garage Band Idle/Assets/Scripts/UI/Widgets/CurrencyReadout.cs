@@ -29,6 +29,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             home = Producer.DeclaringScope<ScopeState>(scope, currency);
         }
 
+        // The slope the last Snap took, for a caller that prints the rate the
+        // balance is climbing by (12.11).
+        public BigNumber Slope => slope;
+
         // The refresh: truth, the report's realized slope, and the game-time
         // stamp the interpolation measures from. A null report means no tick has
         // run yet, so there is no slope and the display sits at truth.

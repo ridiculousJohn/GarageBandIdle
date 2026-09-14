@@ -17,19 +17,19 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425403673772076
+    rid: 7579425465538183218
   actions:
-  - rid: 7579425403673772077
+  - rid: 7579425465538183219
   references:
     version: 2
     RefIds:
-    - rid: 7579425403673772076
+    - rid: 7579425465538183218
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         generator: {fileID: 11400000, guid: 5b005e8c874631040b8ac5ad50552de8, type: 2}
         count: 5
-    - rid: 7579425403673772077
+    - rid: 7579425465538183219
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: bassist_revealed

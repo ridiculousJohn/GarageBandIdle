@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e6b3ee4e-601a-46e9-8b69-94d55b6fad6a
-  modified: 2026-09-02T20:12:30.405Z
+  modified: 2026-09-14T17:07:21.183Z
 ---
 
 Ctrl C is John's strong reference for Garage Band Idle. The design doc was built against it across
@@ -57,7 +57,9 @@ Where it survives in writing (thin, which is why this memory exists):
   pill: three icon buttons - story beat selector (phone icon), chapter selector (building icon),
   settings (gear). The header shows the rate under the total ("Lines: 7.79e17" / "(4.42e13/s)");
   the Money chapter shows no rate line. Generator rows: "Mouse (0+5)" / "100.00 lines => 8.65e9
-  lines" / "+1" "+76" - the count is "(bought + granted)": the second number is the count given by
+  lines" / "+1" "+76" - the row line is cost => the NEXT unit's yield per second with multipliers
+  applied ("100.00 lines -> 10.00 lines" on a fresh game), never the generator's total and never
+  the bulk count (John, 2026-09-14); the count is "(bought + granted)": the second number is the count given by
   OTHER generators or buffs, since Ctrl C lets a generator generate count for another generator
   and shows the two separately. John will likely want it, and it is authored, not built: a
   currency the feeding generator pays (never spent, its balance IS the granted count) plus a

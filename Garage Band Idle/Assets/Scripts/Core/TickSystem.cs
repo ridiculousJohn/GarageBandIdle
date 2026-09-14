@@ -26,7 +26,11 @@ namespace RidiculousGaming.GarageBandIdle
             // Every segment records into the ONE report, so a segmented tick
             // reports its whole dt's movement over Seconds = realSeconds.
             var report = new TickReport(realSeconds);
-            var tickStartUtc = tickEndUtc.AddSeconds(-realSeconds);
+            // At the clock's own 100ns precision: AddSeconds rounds its argument
+            // to a whole millisecond, and a window rounded one way while the
+            // report's Seconds stays exact makes every slope wander by up to
+            // half a millisecond's worth of production per tick.
+            var tickStartUtc = tickEndUtc.AddTicks(-(long)Math.Round(realSeconds * TimeSpan.TicksPerSecond));
             foreach (var (start, end) in Segments(root, foregroundChapter, tickStartUtc, tickEndUtc))
                 RunSegment(root, foregroundChapter, config, start, end, report);
             PruneExpiredBuffs(root, foregroundChapter, tickEndUtc);

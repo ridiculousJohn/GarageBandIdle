@@ -440,6 +440,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             RefusesInterval(-1);
             RefusesInterval(double.NaN);
             RefusesInterval(double.PositiveInfinity);
+
+            // And the hold that opens a row's info screen: a zero, negative or
+            // non-finite threshold is no gesture at all.
+            void RefusesHold(double seconds)
+            {
+                var config = Config();
+                config.longPressSeconds = seconds;
+                Assert.Throws<System.InvalidOperationException>(
+                    () => TickSystem.Tick(tree.Root, tree.Ch1, config, 10, end));
+            }
+
+            RefusesHold(0);
+            RefusesHold(-1);
+            RefusesHold(double.NaN);
+            RefusesHold(double.PositiveInfinity);
+
+            var halfSecondHold = Config();
+            halfSecondHold.longPressSeconds = 0.5;
+            Assert.DoesNotThrow(() => TickSystem.Tick(tree.Root, tree.Ch1, halfSecondHold, 10, end),
+                "the authored default is a legal hold");
         }
 
         // The Encore knobs take the same Require. The cap bounds remaining time

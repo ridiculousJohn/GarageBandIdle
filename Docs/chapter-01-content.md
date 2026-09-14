@@ -317,8 +317,9 @@ authored for re-entry - content, no system change.
 ---
 
 **Descriptions** (design 12.11: optional text on any definition or section, rendered beneath the
-name or title by the row and section widgets; the economy never reads it). Chapter 1 authors one
-for everything it renders as a row or a band:
+name or title by the upgrade row, the bar row and the section band, and on the info screen a long
+press on a generator's row opens; the economy never reads it). Chapter 1 authors one for
+everything it renders as a row or a band:
 
 | Id | Description |
 |---|---|

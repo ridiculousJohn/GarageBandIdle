@@ -4,14 +4,17 @@ using UnityEngine.UIElements;
 namespace RidiculousGaming.GarageBandIdle.UI
 {
     // One header line for the currency the module binds (design doc 12.11):
-    // the authored name and the balance through step 1's display rules. The
-    // reveals are the module's own visibleWhen, never a decision made here.
-    // The balance rides the tick's realized slope between refreshes, which is
-    // the shared readout's job rather than this widget's.
+    // the authored name, the balance through step 1's display rules, and the
+    // tick report's realized rate per second beside it - zero before the first
+    // tick and for a currency nothing pays. The reveals are the module's own
+    // visibleWhen, never a decision made here. The balance rides the tick's
+    // realized slope between refreshes, which is the shared readout's job
+    // rather than this widget's.
     public sealed class CurrencyHeaderUI : ModuleWidget
     {
         private readonly Label nameLabel;
         private readonly Label valueLabel;
+        private readonly Label rateLabel;
 
         private CurrencyReadout readout;
 
@@ -19,6 +22,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             nameLabel = Require<Label>(root, "name", "CurrencyLine.uxml");
             valueLabel = Require<Label>(root, "value", "CurrencyLine.uxml");
+            rateLabel = Require<Label>(root, "rate", "CurrencyLine.uxml");
         }
 
         protected override void OnBound() =>
@@ -28,6 +32,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             nameLabel.text = Content.displayName;
             readout.Snap(Context(), Session.LastTick, Clock.GameTimeSeconds);
+            rateLabel.text = "(" + NumberFormatter.Format(readout.Slope) + "/s)";
         }
 
         public override void Interpolate() => readout.Interpolate(Clock.GameTimeSeconds);

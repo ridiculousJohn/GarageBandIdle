@@ -25,6 +25,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void OpenStory(Story.StoryBeatDefinition beat, ScopeState scope) { }
         }
 
+        // The one thing a generator row asks of the host (12.11), answered by
+        // nothing for the same reason: the long press is panel time, and no row
+        // in this suite is pressed at all.
+        private sealed class NoInfos : IGeneratorInfoOpener
+        {
+            public static readonly NoInfos Instance = new();
+
+            public void OpenGeneratorInfo(Economy.GeneratorDefinition generator, ScopeState scope) { }
+        }
+
         // Computed amounts within tolerance, never bit-exact, for the reason
         // SessionPacingTests gives: BigDouble's base-10 mantissa is
         // binary-inexact. Label strings are compared exactly - a display string
@@ -66,7 +76,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 var asset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Widgets/" + uxml);
                 Assert.IsNotNull(asset, "Assets/UI/Widgets/" + uxml + " is missing");
-                var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), NoStories.Instance);
+                var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(),
+                    NoStories.Instance, NoInfos.Instance);
                 widget.Bind(Session, Tree.Tier1, content, Clock);
                 return widget;
             }

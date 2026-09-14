@@ -61,6 +61,12 @@ Label {
     margin-bottom: 2px;
 }
 
+.currency-rate {
+    font-size: 12px;
+    opacity: 0.8;
+    margin-left: 6px;
+}
+
 .jam-button {
     margin-top: 6px;
 }
@@ -115,7 +121,7 @@ Label {
 
 /* What a thing does, beneath its name: one voice for a row, a bar, and a
    section band alike. */
-.row-description, .bar-description, .section-description {
+.row-description, .row-yield, .bar-description, .section-description {
     font-size: 12px;
     opacity: 0.8;
     white-space: normal;
@@ -271,6 +277,17 @@ Label {
 
 .settings-row, .encore-description, .encore-remaining,
 .roadie-unallocated, #roadie-done, #encore-ad, #encore-pass {
+    margin-bottom: 8px;
+}
+
+.info-description {
+    font-size: 12px;
+    opacity: 0.8;
+    white-space: normal;
+    margin-bottom: 8px;
+}
+
+.info-line {
     margin-bottom: 8px;
 }
 

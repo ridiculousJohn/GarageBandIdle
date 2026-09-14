@@ -2,5 +2,6 @@
     <ui:VisualElement name="line" class="currency-line">
         <ui:Label name="name" />
         <ui:Label name="value" />
+        <ui:Label name="rate" class="currency-rate" />
     </ui:VisualElement>
 </ui:UXML>
