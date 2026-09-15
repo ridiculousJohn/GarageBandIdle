@@ -68,3 +68,8 @@ moment". Each item carries the fact I checked behind it and its kind. Nothing he
 
 **How to apply:** when he says update the doc and content, this is the list; confirm each item's
 kind against the code before editing, and land 7 (decided) first.
+
+**Second hand playthrough, 2026-09-15**, on a fresh save after bulk buy, the timers refactor and the
+fresh-game entry landed: timers work, bulk buy works, every rehearsal played, every upgrade and buff
+bought, a demo cut and the records granted correctly. One note came out of it and landed the same
+day: a fresh game enters the first chapter instead of showing the select. Nothing else.
