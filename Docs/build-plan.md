@@ -141,12 +141,10 @@ lives somewhere other than a conversation.
 - **A higher speed tier** stays undecided (design 9). Timers landed 2026-09-14 (`timers-plan.md`),
   so if it is ever decided it is content alone: one more root modifier reading `encore_timer` with
   `activeAfterSeconds: 86400`, and removing it is deleting that modifier.
-- **Bulk buy**, a runtime feature before it is a button: a read answering M, the largest count of a
-  generator the balance affords at the acting scope, and a buy of N as one transaction that
-  recomputes the series cost inside it and refuses whole if the balance moved (the fail-closed
-  stance `TryBuy` takes today over one unit). One cost-of-N function serves the label, M's search
-  and the charge; the single-unit buy is the N = 1 case, so this replaces it rather than sitting
-  beside it. Ctrl C shows "+1" and "+M"; that is presentation, and any count N <= M is buyable.
+- **Bulk buy** - planned 2026-09-15, `bulk-buy-plan.md`, design 12.2 and 12.11 updated with the
+  decisions: one cost-of-N function (the series, exact at N = 1), `MaxAffordable` by search over
+  it, `TryBuy(generator, count)` as one spend and one count write that refuses whole, and a second
+  row button "+M" that buys the count printed on it. Lands as a row above when done.
 - **A UI polish pass.** Every screen sits on the default runtime theme; theme, fonts, pill and
   button styling, spacing, color, icons, overlay transitions and the code-owned chrome wording
   are all placeholders. Step 9's open items belong here: a font with equal-width digits (the

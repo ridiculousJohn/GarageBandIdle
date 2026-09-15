@@ -763,8 +763,26 @@ tap_producer.produces: [ { cash,      yield, 1 },
 **Generator** — the purchasable. Definition: `{id, tags, availableWhen, costCurrency, baseCost,
 growth, produces: [...]}` — the same entry shape as a producer, scaled by `ownedCount`; state:
 `ownedCount` in its declaring scope. A bandmate is a generator with two rate entries (cash, fans)
-and a `bandmate` tag. Cost currency is independent of what it produces. `TryBuy` is fail-closed
-against `availableWhen` and affordability — the domain owns the gate, never the UI's visibility.
+and a `bandmate` tag. Cost currency is independent of what it produces. A purchase is a count:
+buying `n` units at owned count `o` costs the geometric series
+`baseCost * growth^o * (growth^n - 1) / (growth - 1)`, or `n * baseCost * growth^o` when growth is
+exactly 1 (validation refuses only a nonpositive growth), and `Purchasing.CostOf(generator, ctx, n)`
+is the only thing that computes a generator cost - the row's line, the affordability search, the
+info screen and the charge all call it, so what the screen says is what the bank pays. The series
+factor is computed as its own quotient and then multiplied onto `baseCost * growth^o`, so at n = 1
+the factor is exactly 1 and the single buy costs exactly the unit cost. `MaxAffordable(generator)`
+answers M, the largest count the gate and the balance allow at the declaring scope, or zero: it
+doubles a count until the cost exceeds the balance and bisects, evaluating affordability through
+that one function at every probe and returning only a count it found affordable - a last-digit
+wobble in the power can hide a larger affordable count and never offer an unaffordable one.
+`CanBuy` / `Buy` / `TryBuy(generator, count)` take a count of at least one (below one throws as a
+caller bug), and a buy is one spend of the series sum and one write of `ownedCount + count`, never
+a loop of unit buys: nothing in the effect vocabulary observes a unit landing and counts scale on
+read, so the only differences from `count` unit buys are that the trigger sweep runs once at the
+transaction's close (12.9) and a residual in the last digits, one rounding against `count`
+roundings, that no read compares. `TryBuy` is fail-closed against `availableWhen` and the
+affordability of the whole count - the domain owns the gate, never the UI's visibility - and
+refuses whole when the balance does not cover it.
 (Producers need no equivalent field: their `produces` entries carry their own conditions.)
 
 **Effect** — the modifier atom:
@@ -1511,7 +1529,13 @@ realized rate beside it as "(X/s)" - the slope the readout already interpolates 
 rate the balance is climbing at, zero before the first tick and for a currency nothing pays. A
 generator row is the name, the owned count, a line beneath the name reading the next unit's cost
 and what that one unit pays per second ("250.00 Cash => 3.00 Cash", through `Producer.UnitRate` at
-the declaring scope), and a "+1" button. A long press on the row's text - a hold of
+the declaring scope), and two buy buttons: "+1", and "+M" printing `Purchasing.MaxAffordable` at
+the declaring scope, both disabled and both reading "+1" when M is zero, and both reading "+1"
+when one unit is affordable. A button buys the count printed on it: the tap submits `TryBuy` with that count, the
+command recomputes the series cost against the balance after its flush, and buys that count or
+refuses whole - never a count the player did not see. The flushed frames may have moved the
+balance either way (production up, a bar's draw down), and the refresh at the transaction's close
+repaints both labels. A long press on the row's text - a hold of
 `GameConfig.longPressSeconds`, judged by the element's own scheduler since it is presentation and
 never a game read - opens the generator's info screen, a host-owned overlay: the description, the
 same cost and yield line, the owned count, and what the owned units produce per second, which is
@@ -1539,7 +1563,7 @@ is a `Can*` query plus a `Do*` command, with `Try*` as the convenience wrapper o
 query is what renders pressability and the feedback text, the command performs the mutation and
 refuses to run when the query says no. A reference that cannot resolve is never an answer either
 one returns - static content cannot legitimately be in that state, so those throw. The set:
-`IsOffered(rung)` / `ExecuteRung` / `TryRung(rung)`, `CanBuy` / `Buy` / `TryBuy(generator |
+`IsOffered(rung)` / `ExecuteRung` / `TryRung(rung)`, `CanBuy` / `Buy` / `TryBuy(generator, count |
 upgrade)`, `FireProducer(producer)`, `SetActiveBars(group, set)`, the event operations
 `StartEvent / DismissEvent (event)`, `SwitchChapter(chapterId)` (stamps
 `lastActiveUtc`, computes the idle offer, §12.9), `ClaimIdle(chapterId)` (settle the
@@ -1735,7 +1759,7 @@ Assets/Scripts/
     CurrencyDefinition.cs  ProducerDefinition.cs
     Producer.cs             // stateless resolution: a source's entries summed, times the product of its coordinate plan's links; GetRate and RatePairs read the contributor plan of the node they are asked at
     GeneratorDefinition.cs  UpgradeDefinition.cs
-    Purchasing.cs           // TryBuy(generator | upgrade): fail-closed gate, spend, count or latch, payload
+    Purchasing.cs           // CostOf(generator, n) the series, MaxAffordable, TryBuy(generator, count | upgrade): fail-closed gate, one spend, count or latch, payload
     MultiplierFormula.cs    // the formula family an Effect's factor can compute from
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply) + optional appliesWhen
     BarDefinition.cs  BarGroupDefinition.cs  BarSystem.cs
