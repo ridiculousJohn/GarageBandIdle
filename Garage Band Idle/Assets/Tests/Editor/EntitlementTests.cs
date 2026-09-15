@@ -36,24 +36,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly GameSession Session;
             public int Refreshes;
 
-            // root.json's Encore shape: a wildcard game_speed x2 declared and
-            // applied at root, whose membership counts two ways in - the Pass,
-            // or a live record. Declaration precedes Rebuild because the gather
-            // is compiled when the tree is built.
+            // root.json's Encore shape: root declares the timer, and a wildcard
+            // game_speed x2 applied at root reads it, so membership counts two
+            // ways in - the Pass, or time left on the timer. Declaration
+            // precedes Rebuild because the gather is compiled when the tree is
+            // built.
             public Fixture(GameConfig config = null, Action<TestTree> author = null)
             {
-                Encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
-                Encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
-                Encore.appliesWhen = new Any
-                {
-                    conditions =
-                    {
-                        new HasEntitlement { entitlementId = BackstagePass.EntitlementId },
-                        new BuffActive { modifier = Encore },
-                    }
-                };
-                Tree.RootDef.modifiers.Add(Encore);
-                Tree.RootDef.permanentModifiers.Add(Encore);
+                Encore = TestTree.DeclareEncore(Tree.RootDef);
                 author?.Invoke(Tree);
                 Tree.Rebuild();
                 Tree.Tier1.generatorCounts["practice_amp"] = 1;
@@ -300,7 +290,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             f.Tree.Root.entitlements.Add(BackstagePass.EntitlementId);
             f.Tree.Root.timedBuffs.Add(new TimedBuff
-                { buffId = "encore", expiresAtUtc = f.Tree.Now.AddSeconds(3600) });
+                { buffId = "encore_timer", expiresAtUtc = f.Tree.Now.AddSeconds(3600) });
 
             f.Session.Tick(1000, f.Tree.Now.AddSeconds(1000));
 

@@ -130,6 +130,13 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public string flagId;
     }
 
+    internal class ExtendTimerDto : ActionDto
+    {
+        public string timer;
+        public double seconds;
+        public double capSeconds;
+    }
+
     internal class AddModifierDto : ActionDto
     {
         public string scope;
@@ -265,6 +272,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public Economy.StackingKind stacking = Economy.StackingKind.Replace;
         public List<EffectDto> effects = new();
         public ConditionDto appliesWhen;
+        public string timer;
+        public double activeAfterSeconds;
     }
 
     internal class PerFillDto
@@ -362,7 +371,9 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public ConditionDto unlock;
         public List<CurrencyDto> currencies = new();
         public List<string> flags = new();
+        public List<string> timers = new();
         public List<string> entitlements = new();
+        public List<ActionDto> encoreAdReward = new();
         public List<string> declaredTags = new();
         public List<ProducerDto> producers = new();
         public List<GeneratorDto> generators = new();
@@ -406,6 +417,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         {
             { nameof(AddCurrency), typeof(AddCurrencyDto) },
             { nameof(SetFlag), typeof(SetFlagDto) },
+            { nameof(ExtendTimer), typeof(ExtendTimerDto) },
             { nameof(AddModifier), typeof(AddModifierDto) },
             { nameof(RemoveModifier), typeof(RemoveModifierDto) },
             { nameof(ResetScope), typeof(ResetScopeDto) },

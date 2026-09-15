@@ -249,6 +249,35 @@ namespace RidiculousGaming.GarageBandIdle
             return null;
         }
 
+        // The runtime timer walk (section 9): outward from the acting scope, stopping
+        // at the first scope that declares the name. Two chains may each declare one
+        // of their own, so the answer depends on where you ask - which is why this
+        // takes the asking scope instead of consulting a map.
+        public ScopeDefinition TimerHomeFrom(ScopeDefinition from, string timerId)
+        {
+            if (string.IsNullOrEmpty(timerId))
+                return null;
+            for (var node = from; node != null; node = Parent(node))
+                if (node.declaredTimers.Contains(timerId))
+                    return node;
+            return null;
+        }
+
+        public ScopeDefinition TimerHome(string timerId) => TimerHomeFrom(ActingScope, timerId);
+
+        // Diagnostics only: when the walk above comes back empty, this says whether
+        // the name was a typo or a misplacement. It never decides a verdict - an
+        // off-chain declaration is unreachable either way.
+        public ScopeDefinition AnyScopeDeclaringTimer(string timerId)
+        {
+            if (string.IsNullOrEmpty(timerId))
+                return null;
+            foreach (var scope in treeScopes)
+                if (scope.declaredTimers.Contains(timerId))
+                    return scope;
+            return null;
+        }
+
         public ScopeDefinition Parent(ScopeDefinition scope) =>
             scope != null && parentByScope.TryGetValue(scope, out var parent) ? parent : null;
 
@@ -624,6 +653,15 @@ namespace RidiculousGaming.GarageBandIdle
                     else
                         Claim(flag, $"flag at '{scope.Id}'", false, ValidationCheck.DuplicateHome);
                 }
+                for (var i = 0; i < scope.declaredTimers.Count; i++)
+                {
+                    var timer = scope.declaredTimers[i];
+                    if (string.IsNullOrEmpty(timer))
+                        report.Add(ValidationSeverity.Error, ValidationCheck.NullEntry,
+                            $"scope '{scope.Id}' declaredTimers[{i}] is empty.");
+                    else
+                        Claim(timer, $"timer at '{scope.Id}'", false, ValidationCheck.DuplicateHome);
+                }
                 for (var i = 0; i < scope.declaredTags.Count; i++)
                 {
                     var tag = scope.declaredTags[i];
@@ -867,6 +905,17 @@ namespace RidiculousGaming.GarageBandIdle
                 {
                     ctx.EnterScope(scope);
                     ValidateActionList(ctx, list.Actions, list.Site);
+                }
+
+                // The ad placement pays what this list says, so an empty list is an ad
+                // that pays nothing - a product fault refused at load (section 9,
+                // 12.12). The actions themselves are walked with every other list,
+                // from root's own enumeration.
+                if (scope is RootDefinition rewardHost && rewardHost.encoreAdReward.Count == 0)
+                {
+                    ctx.EnterScope(scope);
+                    ctx.SetSite("encoreAdReward");
+                    ctx.AddError(ValidationCheck.NullEntry, "root authors no encoreAdReward - the EncoreExtension placement pays what this list says, and an empty list is an ad that pays nothing (12.12).");
                 }
 
                 // Usage, not declaration: each entry must reference a modifier
@@ -1431,6 +1480,7 @@ namespace RidiculousGaming.GarageBandIdle
                         continue;
                     for (var i = 0; i < modifier.effects.Count; i++)
                         ValidateEffectNumbers(ctx, modifier.effects[i], $"modifier '{modifier.Id}' effects[{i}]");
+                    ValidateModifierTimer(ctx, modifier, scope);
 
                     var sites = new List<(ScopeDefinition home, string at)>();
                     foreach (var target in ctx.ModifierGrants
@@ -1443,6 +1493,28 @@ namespace RidiculousGaming.GarageBandIdle
                         ValidateModifierAtSite(ctx, modifier, home, at);
                 }
             ctx.ClearSite();
+        }
+
+        // The modifier's own timer, judged at the scope DECLARING the modifier: the
+        // read walks outward from wherever the modifier is applied, and every
+        // application site sits inside the declaring scope's subtree, so a timer that
+        // resolves from here resolves from every site, and one that does not is
+        // unreachable from some of them.
+        private static void ValidateModifierTimer(ValidationContext ctx, Economy.ModifierDefinition modifier,
+                                                  ScopeDefinition scope)
+        {
+            ctx.EnterScope(scope);
+            ctx.SetSite($"modifier '{modifier.Id}'");
+            if (!string.IsNullOrEmpty(modifier.timer) && ctx.TimerHome(modifier.timer) == null)
+            {
+                var elsewhere = ctx.AnyScopeDeclaringTimer(modifier.timer);
+                if (elsewhere == null)
+                    ctx.AddError(ValidationCheck.UnresolvedReference, $"modifier '{modifier.Id}' reads timer '{modifier.timer}', which no scope declares (12.12).");
+                else
+                    ctx.AddError(ValidationCheck.ChainReach, $"modifier '{modifier.Id}' reads timer '{modifier.timer}' homed at '{elsewhere.Id}', which is not on the chain from '{scope.Id}' (12.12).");
+            }
+            if (ctx.RequireFiniteDouble(modifier.activeAfterSeconds, $"modifier '{modifier.Id}' activeAfterSeconds") && modifier.activeAfterSeconds < 0)
+                ctx.AddError(ValidationCheck.NumericRange, $"modifier '{modifier.Id}' activeAfterSeconds is {modifier.activeAfterSeconds} - the band is time that must remain, never negative.");
         }
 
         // One modifier judged from one usage site: each effect's address and

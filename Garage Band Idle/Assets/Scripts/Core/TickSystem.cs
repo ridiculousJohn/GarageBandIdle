@@ -89,13 +89,14 @@ namespace RidiculousGaming.GarageBandIdle
                 node.timedBuffs.RemoveAll(buff => buff == null || buff.expiresAtUtc <= tickEndUtc);
         }
 
-        // Every expiry timestamp strictly inside the tick, sorted and
-        // deduplicated (12.9): each running timed record in the foreground
-        // subtree expires at tick start plus its remaining seconds, and every
-        // timed buff in the swept set - root plus the subtree - at its own
-        // stamp. Buffs contribute boundaries, the BuffActive condition reads
-        // them, and the tick's end prunes the expired. An expiry AT an edge of
-        // the tick is not a boundary - it would cut an empty segment.
+        // Every moment strictly inside the tick at which a judged truth flips, sorted
+        // and deduplicated (12.9), and there are two kinds. An event's timer expires
+        // at tick start plus its remaining seconds. A timer's record expires at its
+        // own stamp - and a buff reading that timer with a band flips one band's worth
+        // of seconds EARLIER, so that moment is an edge too, admitted for every
+        // modifier the swept set declares. BuffActive reads those edges, and the
+        // tick's end prunes the expired. A moment AT an edge of the tick is not a
+        // boundary - it would cut an empty segment.
         //
         // Why an event expiry is a boundary when handicaps ride on the record
         // existing: the latch. "A goal first met after expiry never latches"
@@ -126,6 +127,24 @@ namespace RidiculousGaming.GarageBandIdle
                 foreach (var buff in node.timedBuffs)
                     if (buff != null)
                         Admit(buff.expiresAtUtc);
+                // A buff with a band flips at its timer's expiry minus the band, so that
+                // moment is a segment edge like the expiry itself (section 9). The timer
+                // resolves outward from the scope declaring the buff, the walk its
+                // BuffActive makes from every scope the buff applies to.
+                foreach (var modifier in node.Definition.modifiers)
+                {
+                    if (modifier == null || string.IsNullOrEmpty(modifier.timer) || modifier.activeAfterSeconds <= 0)
+                        continue;
+                    for (var home = node; home != null; home = home.Parent)
+                    {
+                        if (!home.Definition.DeclaresTimer(modifier.timer))
+                            continue;
+                        foreach (var buff in home.timedBuffs)
+                            if (buff != null && buff.buffId == modifier.timer)
+                                Admit(buff.expiresAtUtc.AddSeconds(-modifier.activeAfterSeconds));
+                        break;
+                    }
+                }
             }
 
             void Admit(DateTime edge)

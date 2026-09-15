@@ -419,10 +419,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
-        // Encore is one ordinary root modifier with a timer (section 9): a
-        // wildcard game_speed x2, applied permanently, whose membership counts
-        // two ways in - the Pass, or a live record carrying its own id. One
-        // membership, so a Pass owner holding a record is still x2.
+        // Encore is one ordinary root modifier reading one root timer (section
+        // 9): a wildcard game_speed x2, applied permanently, whose membership
+        // counts two ways in - the Pass, or time left on the timer. One
+        // membership, so a Pass owner with a live timer is still x2. The band is
+        // zero, which is "while the timer runs"; a second modifier over the same
+        // timer with a band is all a speed ladder would take.
         [Test]
         public void Root_declares_encore_as_a_permanent_game_speed_membership()
         {
@@ -434,13 +436,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(string.IsNullOrEmpty(effect.target), "game_speed addresses no owner");
             Assert.IsTrue(string.IsNullOrEmpty(effect.currencyId), "and no currency");
 
+            Assert.AreEqual(new[] { "encore_timer" }, root.declaredTimers.ToArray());
+            Assert.AreEqual("encore_timer", encore.timer);
+            Assert.AreEqual(0d, encore.activeAfterSeconds);
+
             var legs = ((Any)encore.appliesWhen).conditions;
             Assert.AreEqual(2, legs.Count);
             Assert.AreEqual("backstage_pass", ((HasEntitlement)legs[0]).entitlementId,
                 "the Pass supersedes the timer, so its leg comes first");
             Assert.AreSame(encore, ((BuffActive)legs[1]).modifier,
-                "and the modifier's own record is the other way in");
+                "and the timer the modifier names is the other way in");
             Assert.IsTrue(root.permanentModifiers.Contains(encore));
+        }
+
+        // The EncoreExtension placement is a product slot the code knows by id,
+        // and what it grants is whatever this list says - four hours onto the
+        // timer, with a day of banked time as the ceiling (section 9).
+        [Test]
+        public void Root_pays_the_encore_ad_with_one_ExtendTimer()
+        {
+            var reward = (ExtendTimer)root.encoreAdReward.Single();
+
+            Assert.AreEqual("encore_timer", reward.timer);
+            Assert.AreEqual(14400d, reward.seconds);
+            Assert.AreEqual(86400d, reward.capSeconds);
         }
 
         // ---- section 11: the story beats ----

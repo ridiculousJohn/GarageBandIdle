@@ -147,7 +147,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             allocation = new RoadieAllocationUI(Require<VisualElement>(screenRoot, "roadie-allocation"),
                 session, clock, CloseOverlay);
             encore = new EncoreWindowUI(Require<VisualElement>(screenRoot, "encore-window"),
-                session.Root, clock, ads, store, CloseOverlay);
+                session.Root, topBar.TimerId, clock, ads, store, CloseOverlay);
             storyLog = new StoryLogUI(Require<VisualElement>(screenRoot, "story-log-window"),
                 session.Root, clock, this, CloseOverlay);
             generatorInfo = new GeneratorInfoUI(Require<VisualElement>(screenRoot, "generator-info"),

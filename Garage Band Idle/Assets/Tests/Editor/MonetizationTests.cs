@@ -47,22 +47,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // re-delivers a transaction the app never acknowledged.
             public bool SaveThrows;
 
-            public Fixture()
+            // Every refresh the session emitted, so a row can say that one
+            // delivery repainted once.
+            public int Refreshes;
+
+            public Fixture(Action<TestTree> author = null)
             {
-                // root.json's Encore shape, because the ad callback resolves the
-                // modifier off root's own list and a miss throws.
-                Encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
-                Encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
-                Encore.appliesWhen = new Any
-                {
-                    conditions =
-                    {
-                        new HasEntitlement { entitlementId = BackstagePass.EntitlementId },
-                        new BuffActive { modifier = Encore },
-                    }
-                };
-                Tree.RootDef.modifiers.Add(Encore);
-                Tree.RootDef.permanentModifiers.Add(Encore);
+                // root.json's Encore shape and the list its ad placement pays:
+                // the callback runs what root authors, so the reward has to be
+                // standing before the build that links it.
+                Encore = TestTree.DeclareEncore(Tree.RootDef);
+                Tree.RootDef.encoreAdReward.Add(
+                    new ExtendTimer { timer = "encore_timer", seconds = 14400, capSeconds = 86400 });
+                author?.Invoke(Tree);
 
                 // A second chapter, so a callback can land under a foreground
                 // that is no longer the one its request was made for.
@@ -80,12 +77,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Ch2 = (ChapterScopeState)TestNavigation.Node(Root, Ch2Def);
                 Tier1.generatorCounts["practice_amp"] = 1;
 
-                // Section 9's own numbers are the asset's defaults, and the rows
-                // read the knobs back rather than repeating them.
+                // Section 9's own numbers are the asset's defaults, and the store
+                // rows read those knobs back rather than repeating them. What the
+                // ad pays is not a knob: it is the authored list above.
                 ConfigAsset = ScriptableObject.CreateInstance<GameConfig>();
                 Session = new GameSession(Root, ConfigAsset);
-                AdManager = new AdManager(Session, Ads, ConfigAsset, Save);
+                AdManager = new AdManager(Session, Ads, Save);
                 IAPManager = new IAPManager(Session, Store, ConfigAsset, Save);
+                Session.Refreshed += () => Refreshes++;
             }
 
             public DateTime Now => Tree.Now;
@@ -145,7 +144,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // legal in every phase, so a watched ad is never discarded - after a
         // backgrounding and after a chapter change alike.
         [Test]
-        public void An_encore_extension_always_reaches_ExtendBuff_and_saves()
+        public void An_encore_extension_always_pays_roots_reward_and_saves()
         {
             var live = new Fixture();
             live.Enter();
@@ -156,8 +155,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             live.AdManager.Update(live.Now);
 
             Assert.AreEqual(new[] { AdPlacement.EncoreExtension }, live.Ads.Shown.ToArray());
-            Assert.AreEqual(live.Now.AddSeconds(live.ConfigAsset.encoreAdSeconds),
-                live.Root.timedBuffs.Single().expiresAtUtc);
+            Assert.AreEqual(live.Now.AddSeconds(14400), live.Root.timedBuffs.Single().expiresAtUtc);
             Assert.AreEqual(1, live.Saves.Count);
 
             // Backgrounded between the request and the result.
@@ -169,7 +167,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             backgrounded.AdManager.Update(backgrounded.Now);
 
-            Assert.AreEqual(backgrounded.Now.AddSeconds(backgrounded.ConfigAsset.encoreAdSeconds),
+            Assert.AreEqual(backgrounded.Now.AddSeconds(14400),
                 backgrounded.Root.timedBuffs.Single().expiresAtUtc);
             Assert.AreEqual(1, backgrounded.Saves.Count);
 
@@ -182,9 +180,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             switched.AdManager.Update(switched.Now);
 
-            Assert.AreEqual(switched.Now.AddSeconds(switched.ConfigAsset.encoreAdSeconds),
+            Assert.AreEqual(switched.Now.AddSeconds(14400),
                 switched.Root.timedBuffs.Single().expiresAtUtc);
             Assert.AreEqual(1, switched.Saves.Count);
+        }
+
+        // The placement pays whatever the list says, and the list is ONE
+        // transaction: a reward of two actions lands both writes, repaints once
+        // and saves once, which is what makes a richer Encore reward content
+        // rather than a second delivery path (section 9, 12.5).
+        [Test]
+        public void A_reward_list_of_two_actions_lands_both_in_one_transaction()
+        {
+            var f = new Fixture(tree =>
+                tree.RootDef.encoreAdReward.Add(new SetFlag { flagId = "ch1_complete" }));
+            f.Enter();
+            f.AdManager.RequestEncoreExtension();
+            var refreshes = f.Refreshes;
+
+            f.AdManager.Update(f.Now);
+
+            Assert.AreEqual(f.Now.AddSeconds(14400), f.Root.timedBuffs.Single().expiresAtUtc);
+            Assert.IsTrue(f.Root.flags.Contains("ch1_complete"), "the second action ran in the same command");
+            Assert.AreEqual(refreshes + 1, f.Refreshes);
+            Assert.AreEqual(1, f.Saves.Count);
         }
 
         // The double is ATOMIC with its settlement (12.9): one transaction ends
@@ -436,7 +455,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.Drain();
 
             Assert.AreEqual((BigNumber)1, f.Cash, "the tap ran first, as it was queued first");
-            Assert.AreEqual(f.Now.AddSeconds(f.ConfigAsset.encoreAdSeconds),
+            Assert.AreEqual(f.Now.AddSeconds(14400),
                 f.Root.timedBuffs.Single().expiresAtUtc, "the grant stamps the moment it was delivered at");
             Assert.AreEqual(1, f.Saves.Count, "and the save followed the write it is for");
         }

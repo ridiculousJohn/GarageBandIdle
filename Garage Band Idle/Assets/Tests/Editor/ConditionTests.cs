@@ -132,7 +132,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(pending.Evaluate(tree.Ctx(tree.Tier1)), "and the tier never saw it");
         }
 
-        // A record is a MODIFIER's timer and truth is the timestamp against the
+        // A record is a TIMER's value and truth is the timestamp against the
         // asking context's own time, so the same record answers differently to
         // two contexts and the comparison is strict at the expiry itself.
         [Test]
@@ -140,10 +140,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.timer = "encore_timer";
             encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            tree.RootDef.declaredTimers.Add("encore_timer");
             tree.RootDef.modifiers.Add(encore);
             tree.Rebuild();
-            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(3600) });
+            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore_timer", expiresAtUtc = tree.Now.AddSeconds(3600) });
             var live = new BuffActive { modifier = encore };
 
             Assert.IsTrue(live.Evaluate(tree.Ctx(tree.Tier1)));
@@ -154,20 +156,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // Placement is lifetime: the record resolves outward like a flag, so a
         // sibling chapter never sees it and the chapter's own reset takes it
-        // with the rest of the payload.
+        // with the rest of the payload. The timer is declared where the buff
+        // reading it is, which is what puts the record on the chapter.
         [Test]
         public void BuffActive_reads_outward_and_dies_with_the_scope_holding_the_record()
         {
             var tree = new TestTree();
             var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.timer = "encore_timer";
             encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            tree.Ch1Def.declaredTimers.Add("encore_timer");
             tree.Ch1Def.modifiers.Add(encore);
             var ch2Def = TestTree.MakeChapter("ch2");
             TestTree.DeclareCurrency(ch2Def, "merch");
             tree.Chapters.Add(ch2Def);
             tree.Rebuild();
             var ch2 = TestNavigation.Node(tree.Root, ch2Def);
-            tree.Ch1.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(3600) });
+            tree.Ch1.timedBuffs.Add(new TimedBuff { buffId = "encore_timer", expiresAtUtc = tree.Now.AddSeconds(3600) });
             var live = new BuffActive { modifier = encore };
 
             Assert.IsTrue(live.Evaluate(tree.Ctx(tree.Tier1)), "the tier reads its chapter's record");
@@ -183,13 +188,40 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
             var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.timer = "encore_timer";
             encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            tree.RootDef.declaredTimers.Add("encore_timer");
             tree.RootDef.modifiers.Add(encore);
             tree.Rebuild();
-            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(-1) });
+            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore_timer", expiresAtUtc = tree.Now.AddSeconds(-1) });
 
             Assert.IsFalse(new BuffActive { modifier = encore }.Evaluate(tree.Ctx(tree.Tier1)));
             Assert.AreEqual(1, tree.Root.timedBuffs.Count, "presence is not truth - nothing removed it");
+        }
+
+        // The band is the time that must still REMAIN, so two buffs over one
+        // timer answer differently on the same record - which is the whole of a
+        // speed ladder (section 9). The comparison is strict at the band's own
+        // edge, exactly as it is at the expiry.
+        [Test]
+        public void BuffActive_answers_the_bands_edge_strictly_and_per_modifier()
+        {
+            var tree = new TestTree();
+            tree.RootDef.declaredTimers.Add("encore_timer");
+            tree.Rebuild();
+            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore_timer", expiresAtUtc = tree.Now.AddSeconds(3600) });
+
+            BuffActive Band(double activeAfterSeconds)
+            {
+                var modifier = TestTree.MakeDefinition<ModifierDefinition>($"band_{activeAfterSeconds}");
+                modifier.timer = "encore_timer";
+                modifier.activeAfterSeconds = activeAfterSeconds;
+                return new BuffActive { modifier = modifier };
+            }
+
+            Assert.IsTrue(Band(3000).Evaluate(tree.Ctx(tree.Tier1)), "600 seconds of headroom");
+            Assert.IsFalse(Band(3600).Evaluate(tree.Ctx(tree.Tier1)), "the band's edge itself is already dead");
+            Assert.IsFalse(Band(4000).Evaluate(tree.Ctx(tree.Tier1)));
         }
 
         // An entitlement has no data beyond its own existence (12.3), so the

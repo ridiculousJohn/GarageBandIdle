@@ -111,7 +111,7 @@ namespace RidiculousGaming.GarageBandIdle
             clock = new GameClock(now);
             // The one save site, handed to the managers so a grant is on disk
             // before the store is told it landed.
-            ads = new AdManager(booted, new FakeAdService(), config, () => Save(clock.RealTimeUtc));
+            ads = new AdManager(booted, new FakeAdService(), () => Save(clock.RealTimeUtc));
             store = new IAPManager(booted, new FakeStoreService(), config, () => Save(clock.RealTimeUtc));
             session = booted;               // the guard, published last
 

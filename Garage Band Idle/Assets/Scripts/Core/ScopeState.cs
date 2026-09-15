@@ -33,7 +33,9 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
-    // A timed buff (Encore) - absolute expiry, burns real time app-closed (design doc 9).
+    // A timer's value - an absolute expiry under the id the declaring scope names,
+    // burning real time app-closed (design doc 9). buffId holds a TIMER id; the
+    // field names are the save schema's (12.10).
     public class TimedBuff
     {
         public string buffId;

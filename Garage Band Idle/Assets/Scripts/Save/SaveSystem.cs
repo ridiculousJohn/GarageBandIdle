@@ -459,15 +459,15 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     facts.modifierStacks.Remove(key);
             }
 
-            // A timed record is a MODIFIER's timer, so its id takes the same
-            // rule the stacks do. An EXPIRED record is KEPT: a dormant chapter's
-            // unpaid window still cuts its boundary at that expiry, and removal
-            // belongs to the tick's end.
+            // A timed record is a TIMER's value, so its id takes the flag's rule: the
+            // same outward walk, against what the chain declares. An EXPIRED record is
+            // KEPT: a dormant chapter's unpaid window still cuts its boundary at that
+            // expiry, and removal belongs to the tick's end.
             facts.timedBuffs.RemoveAll(buff =>
             {
-                if (buff != null && DeclaresModifierOnChain(state, buff.buffId))
+                if (buff != null && DeclaresTimerOnChain(state, buff.buffId))
                     return false;
-                Debug.LogWarning($"SaveSystem: timed buff '{buff?.buffId}' is not a modifier declared on the chain from '{state.ScopeId}' - dropped.");
+                Debug.LogWarning($"SaveSystem: timed buff '{buff?.buffId}' is not a timer declared on the chain from '{state.ScopeId}' - dropped.");
                 return true;
             });
 
@@ -527,6 +527,14 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     return group;
             }
             return null;
+        }
+
+        private static bool DeclaresTimerOnChain(ScopeState state, string timerId)
+        {
+            for (var node = state; node != null; node = node.Parent)
+                if (node.Definition.DeclaresTimer(timerId))
+                    return true;
+            return false;
         }
 
         private static bool DeclaresModifierOnChain(ScopeState state, string modifierId)

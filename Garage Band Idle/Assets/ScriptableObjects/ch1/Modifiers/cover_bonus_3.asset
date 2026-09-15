@@ -29,6 +29,8 @@ MonoBehaviour:
       rid: -2
   appliesWhen:
     rid: -2
+  timer: 
+  activeAfterSeconds: 0
   references:
     version: 2
     RefIds:

@@ -155,21 +155,30 @@ namespace RidiculousGaming.GarageBandIdle
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(upgrade, "UpgradePurchased");
     }
 
-    // A timed record is a MODIFIER's timer, and the condition names the
-    // modifier as UpgradePurchased names an upgrade (design doc 9). The record
-    // is a fact read outward from the acting scope exactly as a flag is, and
-    // truth is the timestamp against the context's OWN time, never the record's
-    // presence - so no answer depends on when a prune ran.
+    // A timed record is a TIMER's value, and the condition names the MODIFIER as
+    // UpgradePurchased names an upgrade (design doc 9): the modifier in turn names
+    // the timer it reads and the band it needs left on it. The record is a fact read
+    // outward from the acting scope exactly as a flag is, and truth is the timestamp
+    // against the context's OWN time, never the record's presence - so no answer
+    // depends on when a prune ran. No Progress override: a timer is not a threshold
+    // the player approaches, so the default stands.
     [Serializable]
     public class BuffActive : Condition
     {
         public Economy.ModifierDefinition modifier;
 
-        public override bool Evaluate(GameContext ctx) => ctx.IsBuffActive(modifier.Id);
+        public override bool Evaluate(GameContext ctx) => ctx.IsBuffActive(modifier.timer, modifier.activeAfterSeconds);
 
-        // No Progress override: a timer is not a threshold the player
-        // approaches, so the default stands.
-        public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(modifier, "BuffActive");
+        // The modifier resolves on the acting chain like every reference, and it has
+        // to name a timer: a buff with no timer to read would never be active.
+        public override void Validate(ValidationContext ctx)
+        {
+            if (ctx.RequireOnChain(modifier, "BuffActive") == null)
+                return;
+            if (string.IsNullOrEmpty(modifier.timer))
+                ctx.AddError(ValidationCheck.UnresolvedReference,
+                    $"BuffActive names modifier '{modifier.Id}', which declares no timer - a buff reads the timer its modifier names (section 9).");
+        }
     }
 
     // A held store product (design doc 12.3): the set is root's alone, so the

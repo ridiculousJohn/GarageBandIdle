@@ -24,6 +24,8 @@ MonoBehaviour:
   - ch1_complete
   - story_ch1_open_seen
   - story_ch1_end_seen
+  declaredTimers:
+  - encore_timer
   declaredTags:
   - income
   - production
@@ -46,3 +48,14 @@ MonoBehaviour:
   upgrades: []
   entitlements:
   - backstage_pass
+  encoreAdReward:
+  - rid: 7579425475204481039
+  references:
+    version: 2
+    RefIds:
+    - rid: 7579425475204481039
+      type: {class: ExtendTimer, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        timer: encore_timer
+        seconds: 14400
+        capSeconds: 86400

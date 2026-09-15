@@ -49,11 +49,15 @@ root
     narrowing is what keeps a bandmate's Fans line out of it.
 - Idle bases: fraction 0.5 authored as a root modifier `{stat: rate, ×0.5}` applying only during
   idle accumulation (`appliesWhen`, §12.5); cap 14400s (4h) and minimum-away threshold 180s are
-  `GameConfig` values. `game_speed` base 1; Encore is a root permanent modifier `{stat: game_speed,
-  ×2}` with `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` - the timed record or
-  the Pass, the idle fraction's shape; read by the tick and the idle claim, the claim over the
-  real-time cap (§9). A higher speed tier is undecided (§9); when timers land (`timers-plan.md`),
-  Encore's record is root's declared timer `encore` and any tier is one more modifier reading it.
+  `GameConfig` values. `game_speed` base 1; root declares the timer `encore_timer`, and Encore is a root
+  permanent modifier `{stat: game_speed, x2}` with `timer: encore_timer` and
+  `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` - the timer or the Pass,
+  the idle fraction's shape; read by the tick and the idle claim, the claim over the real-time cap
+  (§9). The Encore ad's reward is root's `encoreAdReward`: one `ExtendTimer(encore_timer, 14400, 86400)`,
+  4 hours per ad and 24 hours of remaining time at most. The chrome's pill names the timer once, in
+  `Screen.uxml` (`timer="encore_timer"`). A higher speed tier is undecided (§9); if ever authored it is
+  one more modifier reading `encore_timer` with a 24-hour `activeAfterSeconds`, and no code.
+- Timers: `encore_timer` - distinct from the modifier `encore` that reads it, since a timer shares the chain's name space with ids (§12.12).
 - Flags: `ch1_complete`, `story_ch1_open_seen`, `story_ch1_end_seen`.
 - Tags: `income`, `production` - the declared vocabulary the modifiers above filter on (§12.2).
   Declared at root because they are game-wide words: every chapter's income currency and every

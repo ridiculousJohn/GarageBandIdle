@@ -6,7 +6,13 @@
 
   "flags": ["ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen"],
 
+  "timers": ["encore_timer"],
+
   "entitlements": ["backstage_pass"],
+
+  "encoreAdReward": [
+    { "type": "ExtendTimer", "timer": "encore_timer", "seconds": 14400, "capSeconds": 86400 }
+  ],
 
   "currencies": [
     { "id": "records", "displayName": "Records" },
@@ -59,6 +65,7 @@
     },
     {
       "id": "encore",
+      "timer": "encore_timer",
       "appliesWhen": {
         "type": "Any",
         "conditions": [

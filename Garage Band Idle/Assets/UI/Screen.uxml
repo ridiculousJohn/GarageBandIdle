@@ -1,7 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <Style src="Screen.uss" />
     <ui:VisualElement name="top-bar" class="top-bar" style="display: none;">
-        <ui:Button name="encore" class="top-pill encore-pill" />
+        <RidiculousGaming.GarageBandIdle.UI.TimerPill name="encore" timer="encore_timer" class="top-pill encore-pill" />
         <ui:VisualElement class="top-pill top-actions">
             <ui:Button name="story-log" text="&#x2709;" class="top-action" />
             <ui:Button name="chapter-select" text="&#x2630;" class="top-action" />

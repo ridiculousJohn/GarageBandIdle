@@ -93,15 +93,16 @@ namespace RidiculousGaming.GarageBandIdle
             return false;
         }
 
-        // A live record for the modifier anywhere on the chain, judged against
-        // THIS context's time (design doc 9): a record is a modifier's timer,
-        // read outward like a flag, and truth is expiresAtUtc > NowUtc - never
-        // presence.
-        public bool IsBuffActive(string modifierId)
+        // A live record for the timer anywhere on the chain, judged against THIS
+        // context's time (section 9): a record is a timer's value, read outward like a
+        // flag, and truth is expiresAtUtc against now plus the asking buff's band -
+        // never presence. A band of zero is "while the timer runs".
+        public bool IsBuffActive(string timerId, double activeAfterSeconds)
         {
+            var threshold = NowUtc.AddSeconds(activeAfterSeconds);
             for (var node = Scope; node != null; node = node.Parent)
                 foreach (var buff in node.timedBuffs)
-                    if (buff != null && buff.buffId == modifierId && buff.expiresAtUtc > NowUtc)
+                    if (buff != null && buff.buffId == timerId && buff.expiresAtUtc > threshold)
                         return true;
             return false;
         }
@@ -248,6 +249,58 @@ namespace RidiculousGaming.GarageBandIdle
             }
             throw new InvalidOperationException(
                 $"No scope on the chain from '{Scope.ScopeId}' declares flag '{flagId}'.");
+        }
+
+        // The timer's declared home on this chain (section 9), the flag walk's shape. A
+        // timer no scope on the chain declares is refused at load; reaching it here is
+        // a code or content fault, so it throws rather than answering null.
+        public ScopeState TimerHome(string timerId)
+        {
+            for (var node = Scope; node != null; node = node.Parent)
+                if (node.Definition.DeclaresTimer(timerId))
+                    return node;
+            throw new InvalidOperationException(
+                $"No scope on the chain from '{Scope.ScopeId}' declares timer '{timerId}'.");
+        }
+
+        // The timer extend (section 9): an absent record is created at now plus the
+        // grant; a present one extends from the later of its expiry and now, so a dead
+        // record is no credit toward the next grant. The cap bounds the REMAINING time
+        // this grant may reach, measured from now, and clamps the grant rather than
+        // refusing it - and never lowers time an earlier grant banked. A grant only
+        // ever moves an expiry later, so a nonpositive or non-finite duration is a
+        // caller bug and not a shorter buff; a cap under the grant is the same bug.
+        public void ExtendTimer(string timerId, double seconds, double capSeconds)
+        {
+            if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds <= 0)
+                throw new InvalidOperationException(
+                    $"ExtendTimer for '{timerId}': {seconds} is not a finite positive number of seconds.");
+            if (double.IsNaN(capSeconds) || double.IsInfinity(capSeconds) || capSeconds < seconds)
+                throw new InvalidOperationException(
+                    $"ExtendTimer for '{timerId}': cap {capSeconds} is not a finite value of at least the grant {seconds}.");
+            var home = TimerHome(timerId);
+            // One record per timer id per scope, so the first match IS the record.
+            TimedBuff record = null;
+            foreach (var buff in home.timedBuffs)
+                if (buff != null && buff.buffId == timerId)
+                {
+                    record = buff;
+                    break;
+                }
+            if (record == null)
+            {
+                record = new TimedBuff { buffId = timerId, expiresAtUtc = NowUtc };
+                home.timedBuffs.Add(record);
+            }
+            // From the later of the expiry and now: a dead record is no credit
+            // toward the next grant.
+            var from = record.expiresAtUtc > NowUtc ? record.expiresAtUtc : NowUtc;
+            var extended = from.AddSeconds(seconds);
+            // The cap bounds what THIS grant may bring the remaining time to, never
+            // what another grant already banked: caps are the reward action's own,
+            // so a record past this one's ceiling stands and the grant adds nothing.
+            var ceiling = NowUtc.AddSeconds(capSeconds);
+            record.expiresAtUtc = from >= ceiling ? from : (extended < ceiling ? extended : ceiling);
         }
     }
 }

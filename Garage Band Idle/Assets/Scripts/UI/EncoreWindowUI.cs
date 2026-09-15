@@ -20,13 +20,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly Label description;
         private readonly Button ad;
         private readonly Button pass;
-        private readonly ModifierDefinition modifier;
 
-        public EncoreWindowUI(VisualElement rootElement, RootScopeState root, GameClock clock,
+        // The timer the chrome counts down, authored on the pill and handed here by
+        // the host, so this window names no timer of its own.
+        private readonly string timerId;
+
+        public EncoreWindowUI(VisualElement rootElement, RootScopeState root, string timerId, GameClock clock,
                               AdManager ads, IAPManager store, Action close)
         {
             Root = rootElement;
             this.root = root;
+            this.timerId = timerId;
             this.clock = clock;
             this.ads = ads;
             this.store = store;
@@ -35,8 +39,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             description = ScreenHost.Require<Label>(rootElement, "encore-description");
             ad = ScreenHost.Require<Button>(rootElement, "encore-ad");
             pass = ScreenHost.Require<Button>(rootElement, "encore-pass");
-            modifier = Encore.Modifier(root);
-            ad.text = "Boost for " + GrantDuration(ads.EncoreAdSeconds);
+            var grant = GrantSeconds(root.DefinitionAs<RootDefinition>());
+            ad.text = grant > 0 ? "Boost for " + GrantDuration(grant) : "Boost";
             ad.clicked += RequestAd;
             pass.clicked += RequestPass;
             ScreenHost.Require<Button>(rootElement, "encore-close").clicked += close;
@@ -64,7 +68,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Interpolate();
         }
 
-        public void Interpolate() => remaining.text = "Time remaining " + EncoreTime.Text(root, clock.RealTimeUtc);
+        public void Interpolate() => remaining.text = "Time remaining " + EncoreTime.Text(root, timerId, clock.RealTimeUtc);
 
         public void Hide() => Root.style.display = DisplayStyle.None;
 
@@ -79,20 +83,47 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void RefreshDescription()
         {
-            // Current content authors Encore as wildcard game_speed. The UI
-            // reads that shape when present, but Encore remains valid if later
-            // content expresses the same boost through another authored stat.
-            foreach (var effect in modifier.effects)
+            // What the timer buys right now: every root modifier reading the pill's
+            // timer contributes its wildcard game_speed factor, and they multiply -
+            // a rung whose own appliesWhen holds, which is the membership the gather
+            // reads (null is always), and a rung with no band regardless, since that
+            // is the promise the ad pays for. So one rung prints 2.00x, a ladder
+            // prints 4.00x once its gate holds and 2.00x before, and the tick agrees
+            // whatever legs the tier's gate is authored with. A timer whose buffs
+            // express the boost through some other authored stat has no factor to
+            // print, and the window says so in words instead.
+            var factor = BigNumber.One;
+            var found = false;
+            var ctx = new GameContext(root, clock.RealTimeUtc);
+            foreach (var modifier in root.Definition.modifiers)
             {
-                if (effect.stat != Stat.GameSpeed || !string.IsNullOrEmpty(effect.target)
-                    || !string.IsNullOrEmpty(effect.currencyId))
+                if (modifier == null || modifier.timer != timerId)
                     continue;
-                var factor = Producer.FactorOf(effect, new GameContext(root, clock.RealTimeUtc));
-                description.text = "While active, game speed is "
-                    + NumberFormatter.Format(factor) + "x.";
-                return;
+                var applies = modifier.appliesWhen == null || modifier.appliesWhen.Evaluate(ctx);
+                if (!applies && modifier.activeAfterSeconds > 0)
+                    continue;
+                foreach (var effect in modifier.effects)
+                {
+                    if (effect.stat != Stat.GameSpeed || !string.IsNullOrEmpty(effect.target)
+                        || !string.IsNullOrEmpty(effect.currencyId))
+                        continue;
+                    factor *= Producer.FactorOf(effect, ctx);
+                    found = true;
+                }
             }
-            description.text = "While active, Encore boosts your band.";
+            description.text = found
+                ? "While active, game speed is " + NumberFormatter.Format(factor) + "x."
+                : "While active, Encore boosts your band.";
+        }
+
+        // The promise is the grant: the seconds of the first ExtendTimer root's reward
+        // list authors, and zero when the list pays in something else.
+        internal static double GrantSeconds(RootDefinition root)
+        {
+            foreach (var action in root.encoreAdReward)
+                if (action is ExtendTimer extend)
+                    return extend.seconds;
+            return 0;
         }
 
         private static string GrantDuration(double seconds)

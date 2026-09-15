@@ -554,7 +554,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var windowEnd = f.Session.CurrentOffer.windowEndUtc;
             var ads = new FakeAdService();
             var saves = 0;
-            var manager = new AdManager(f.Session, ads, f.ConfigAsset, () => saves++);
+            var manager = new AdManager(f.Session, ads, () => saves++);
 
             manager.RequestIdleDouble();
             Assert.AreEqual((BigNumber)0, f.Balance(f.Tier1, f.Cash), "a request pays nothing");
@@ -586,7 +586,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var stamp = f.Now.AddSeconds(-14400);
             f.Ch1.lastActiveUtc = stamp;
-            f.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = stamp.AddSeconds(3600) });
+            f.Root.timedBuffs.Add(new TimedBuff { buffId = "encore_timer", expiresAtUtc = stamp.AddSeconds(3600) });
             f.Session.SwitchChapter(f.Ch1, f.Now);
 
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase);

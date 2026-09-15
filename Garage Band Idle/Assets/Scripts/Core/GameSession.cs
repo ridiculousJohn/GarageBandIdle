@@ -462,54 +462,21 @@ namespace RidiculousGaming.GarageBandIdle
         public void AcknowledgeStory(GameContext ctx, StoryBeatDefinition beat, Action<bool> completed = null) =>
             RunCommand(ctx, c => { c.SetFlag(beat.seenFlag); return true; }, completed);
 
-        // Extends the timer of the modifier whose record lives at `scope` - root
-        // and encore for the ad callback, as AddModifier takes a target and a
-        // modifier. The record write is the whole mutation, and the sweep stays
-        // conditional on the resulting phase, so a grant that lands while a
-        // claim awaits presentation repaints without sweeping the unpaid window
-        // away (12.9). The completed callback is told when the write is on the
-        // tree.
-        public void ExtendBuff(ScopeState scope, ModifierDefinition modifier, double seconds, DateTime nowUtc,
-                               Action<bool> completed = null)
-        {
-            // A grant only ever moves an expiry LATER, so a nonpositive or
-            // non-finite duration is a caller bug and not a shorter buff.
-            if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds <= 0)
-                throw new InvalidOperationException(
-                    $"ExtendBuff for '{modifier.Id}': {seconds} is not a finite positive number of seconds.");
-            RunCommand(new GameContext(scope, nowUtc), c =>
-            {
-                var record = FindBuff(scope, modifier.Id);
-                if (record == null)
-                {
-                    record = new TimedBuff { buffId = modifier.Id, expiresAtUtc = nowUtc.AddSeconds(seconds) };
-                    scope.timedBuffs.Add(record);
-                }
-                else
-                {
-                    // From the later of the expiry and now: a record already
-                    // dead is no credit toward the next grant.
-                    record.expiresAtUtc =
-                        (record.expiresAtUtc > nowUtc ? record.expiresAtUtc : nowUtc).AddSeconds(seconds);
-                }
-                // The cap bounds REMAINING time, so it is measured from now and
-                // clamps the grant rather than refusing it.
-                var ceiling = nowUtc.AddSeconds(config.encoreCapSeconds);
-                if (record.expiresAtUtc > ceiling)
-                    record.expiresAtUtc = ceiling;
-                return true;
-            }, completed);
-        }
+        // The timer extend as a command (section 9): the record write is the whole
+        // mutation, and the sweep stays conditional on the resulting phase, so a grant
+        // that lands while a claim awaits presentation repaints without sweeping the
+        // unpaid window away (12.9). The completed callback is told when the write is
+        // on the tree.
+        public void ExtendBuff(ScopeState scope, string timerId, double seconds, double capSeconds, DateTime nowUtc,
+                               Action<bool> completed = null) =>
+            RunCommand(new GameContext(scope, nowUtc), c => { c.ExtendTimer(timerId, seconds, capSeconds); return true; }, completed);
 
-        // One record per modifier id per scope, so the first match IS the
-        // record; null means the scope holds none for that modifier yet.
-        private static TimedBuff FindBuff(ScopeState scope, string modifierId)
-        {
-            foreach (var buff in scope.timedBuffs)
-                if (buff != null && buff.buffId == modifierId)
-                    return buff;
-            return null;
-        }
+        // An authored reward list run at root's context as ONE transaction (section 9,
+        // 12.5): the ad callback hands it root's encoreAdReward. Run rather than TryRun:
+        // a reward list is authored on root, which no reset can refuse, and forcing
+        // past a refusal throws (requirement 7).
+        public void RunReward(IReadOnlyList<GameAction> actions, DateTime nowUtc, Action<bool> completed = null) =>
+            RunCommand(new GameContext(Root, nowUtc), c => { ActionList.Run(actions, c); return true; }, completed);
 
         // The store callback's write for a restored or otherwise granted
         // entitlement: under the claim dialog it sweeps nothing and repaints

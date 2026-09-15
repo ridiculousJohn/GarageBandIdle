@@ -7,18 +7,20 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
     // Encore as the session sees it: the ExtendBuff command that writes the
-    // record, and the claim's walk over a paid window the record cuts. The
-    // arithmetic everywhere is IdleTests': the amp pays cash at 0.5/s live, and
-    // the authored idle base halves it to 0.25/s idle.
+    // timer's record, and the claim's walk over a paid window the record cuts.
+    // The arithmetic everywhere is IdleTests': the amp pays cash at 0.5/s live,
+    // and the authored idle base halves it to 0.25/s idle.
     public class EncoreTests
     {
-        private static GameConfig Config(double idleCap = 14400, double encoreCap = 86400,
-                                         double tickInterval = 0.25)
+        private static GameConfig Config(double idleCap = 14400, double tickInterval = 0.25)
         {
             var config = ScriptableObject.CreateInstance<GameConfig>();
             config.minimumAwaySeconds = 180;
             config.idleCapSeconds = idleCap;
-            config.encoreCapSeconds = encoreCap;
+            // Require refuses a Pass cap below the base cap, so a row that raises
+            // the base cap past the asset's Pass cap raises the Pass cap with it.
+            if (config.backstagePassIdleCapSeconds < idleCap)
+                config.backstagePassIdleCapSeconds = idleCap;
             config.tickIntervalSeconds = tickInterval;
             return config;
         }
@@ -39,17 +41,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly GameSession Session;
             public int Refreshes;
 
-            // The Encore shape root.json authors: a wildcard game_speed x2
-            // declared and applied at root, whose membership is its own record.
-            // Declaration precedes Rebuild because the gather is compiled when
-            // the tree is built; the record is a fact written afterward.
+            // The Encore shape root.json authors: root declares the timer, and a
+            // wildcard game_speed x2 applied at root reads it. Declaration
+            // precedes Rebuild because the gather is compiled when the tree is
+            // built; the record is a fact written afterward.
             public Fixture(GameConfig config = null, Action<TestTree> author = null)
             {
-                Encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
-                Encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
-                Encore.appliesWhen = new BuffActive { modifier = Encore };
-                Tree.RootDef.modifiers.Add(Encore);
-                Tree.RootDef.permanentModifiers.Add(Encore);
+                Encore = TestTree.DeclareEncore(Tree.RootDef);
                 author?.Invoke(Tree);
                 Tree.Rebuild();
                 Tree.Tier1.generatorCounts["practice_amp"] = 1;
@@ -61,13 +59,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // row that is not about ExtendBuff needs standing before it starts.
             public void Record(double expiresInSeconds) =>
                 Tree.Root.timedBuffs.Add(new TimedBuff
-                    { buffId = "encore", expiresAtUtc = Tree.Now.AddSeconds(expiresInSeconds) });
+                    { buffId = "encore_timer", expiresAtUtc = Tree.Now.AddSeconds(expiresInSeconds) });
 
             public TimedBuff OnlyRecord()
             {
-                Assert.AreEqual(1, Tree.Root.timedBuffs.Count, "one record per modifier id on a scope");
+                Assert.AreEqual(1, Tree.Root.timedBuffs.Count, "one record per timer id on a scope");
                 return Tree.Root.timedBuffs[0];
             }
+        }
+
+        // The second rung of a speed ladder, authored and nothing else: another
+        // wildcard x2 over the SAME timer, counting only while more than 24
+        // hours remain (section 9). No code names it or knows a ladder exists.
+        private static void DeclareBandedTier(TestTree tree)
+        {
+            var tier = TestTree.MakeDefinition<ModifierDefinition>("encore_4x");
+            tier.timer = "encore_timer";
+            tier.activeAfterSeconds = 86400;
+            tier.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            tier.appliesWhen = new BuffActive { modifier = tier };
+            tree.RootDef.modifiers.Add(tier);
+            tree.RootDef.permanentModifiers.Add(tier);
         }
 
         // ---- ExtendBuff ----
@@ -77,10 +89,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new Fixture();
 
-            f.Session.ExtendBuff(f.Tree.Root, f.Encore, 14400, f.Tree.Now);
+            f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 14400, 86400, f.Tree.Now);
 
             var record = f.OnlyRecord();
-            Assert.AreEqual("encore", record.buffId, "the record is keyed by the MODIFIER's id");
+            Assert.AreEqual("encore_timer", record.buffId, "the record is keyed by the TIMER's id");
             Assert.AreEqual(f.Tree.Now.AddSeconds(14400), record.expiresAtUtc);
         }
 
@@ -90,29 +102,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Still live: the grant stacks onto the time left.
             var live = new Fixture();
             live.Record(1000);
-            live.Session.ExtendBuff(live.Tree.Root, live.Encore, 14400, live.Tree.Now);
+            live.Session.ExtendBuff(live.Tree.Root, "encore_timer", 14400, 86400, live.Tree.Now);
             Assert.AreEqual(live.Tree.Now.AddSeconds(15400), live.OnlyRecord().expiresAtUtc);
 
             // Lapsed: dead time is no credit toward the next ad.
             var lapsed = new Fixture();
             lapsed.Record(-1000);
-            lapsed.Session.ExtendBuff(lapsed.Tree.Root, lapsed.Encore, 14400, lapsed.Tree.Now);
+            lapsed.Session.ExtendBuff(lapsed.Tree.Root, "encore_timer", 14400, 86400, lapsed.Tree.Now);
             Assert.AreEqual(lapsed.Tree.Now.AddSeconds(14400), lapsed.OnlyRecord().expiresAtUtc);
         }
 
         [Test]
         public void The_cap_clamps_remaining_time_and_a_regrant_never_makes_a_second_record()
         {
-            var f = new Fixture(Config(encoreCap: 20000));
+            var f = new Fixture();
 
             // Two 14400 grants at the same moment want 28800 of remaining time;
-            // the cap bounds what is LEFT, measured from now.
-            f.Session.ExtendBuff(f.Tree.Root, f.Encore, 14400, f.Tree.Now);
-            f.Session.ExtendBuff(f.Tree.Root, f.Encore, 14400, f.Tree.Now);
+            // the cap bounds what is LEFT, measured from now, and it is the
+            // caller's number rather than a knob.
+            f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 14400, 20000, f.Tree.Now);
+            f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 14400, 20000, f.Tree.Now);
             Assert.AreEqual(f.Tree.Now.AddSeconds(20000), f.OnlyRecord().expiresAtUtc);
 
             // A third changes nothing and still finds the one record.
-            f.Session.ExtendBuff(f.Tree.Root, f.Encore, 14400, f.Tree.Now);
+            f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 14400, 20000, f.Tree.Now);
             Assert.AreEqual(f.Tree.Now.AddSeconds(20000), f.OnlyRecord().expiresAtUtc);
         }
 
@@ -136,7 +149,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var offer = f.Session.CurrentOffer;
             var refreshes = f.Refreshes;
 
-            f.Session.ExtendBuff(f.Tree.Root, f.Encore, 14400, f.Tree.Now);
+            f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 14400, 86400, f.Tree.Now);
 
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase);
             Assert.AreSame(offer, f.Session.CurrentOffer, "the unpaid window is still the one on screen");
@@ -152,7 +165,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new Fixture();
             Assert.AreEqual(SessionPhase.NoChapter, f.Session.Phase);
 
-            f.Session.ExtendBuff(f.Tree.Root, f.Encore, 14400, f.Tree.Now);
+            f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 14400, 86400, f.Tree.Now);
 
             Assert.AreEqual(SessionPhase.NoChapter, f.Session.Phase);
             Assert.AreEqual(f.Tree.Now.AddSeconds(14400), f.OnlyRecord().expiresAtUtc);
@@ -160,18 +173,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // A grant only ever moves an expiry later, so a duration that could not
-        // is a caller bug rather than a shorter buff.
+        // is a caller bug rather than a shorter buff - and a cap under the grant
+        // is the same bug, since it would clamp every grant short.
         [Test]
         public void A_nonpositive_or_non_finite_grant_throws()
         {
             var f = new Fixture();
 
             Assert.Throws<InvalidOperationException>(
-                () => f.Session.ExtendBuff(f.Tree.Root, f.Encore, 0, f.Tree.Now));
+                () => f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 0, 86400, f.Tree.Now));
             Assert.Throws<InvalidOperationException>(
-                () => f.Session.ExtendBuff(f.Tree.Root, f.Encore, -1, f.Tree.Now));
+                () => f.Session.ExtendBuff(f.Tree.Root, "encore_timer", -1, 86400, f.Tree.Now));
             Assert.Throws<InvalidOperationException>(
-                () => f.Session.ExtendBuff(f.Tree.Root, f.Encore, double.NaN, f.Tree.Now));
+                () => f.Session.ExtendBuff(f.Tree.Root, "encore_timer", double.NaN, 86400, f.Tree.Now));
+            Assert.Throws<InvalidOperationException>(
+                () => f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 14400, 3600, f.Tree.Now));
             Assert.IsEmpty(f.Tree.Root.timedBuffs);
         }
 
@@ -187,7 +203,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.Accumulate(f.Tree.Now);
 
             f.Session.Accumulate(f.Tree.Now.AddSeconds(0.5));
-            f.Session.ExtendBuff(f.Tree.Root, f.Encore, 14400, f.Tree.Now.AddSeconds(0.5));
+            f.Session.ExtendBuff(f.Tree.Root, "encore_timer", 14400, 86400, f.Tree.Now.AddSeconds(0.5));
             AssertClose(0.25, f.Tree.Tier1.balances["cash"], "0.5s at 0.5/s, unscaled");
 
             // The bank was settled by the grant, so 0.5 more is still under the
@@ -287,6 +303,64 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             claimed.Session.SwitchChapter(claimed.Tree.Ch1, claimed.Tree.Now.AddSeconds(1000));
             var line = Line(claimed.Session, claimed.Tree.Cash);
             AssertClose(350, line.amount);
+
+            AssertClose((line.amount * 2).ToDouble(), ticked.Tree.Tier1.balances["cash"],
+                "the idle base halves the claim and nothing else differs");
+        }
+
+        // ---- a ladder the claim's walk cuts, authored and not known to code ----
+
+        // Twenty-five hours on the timer and six hours away: the banded buff
+        // counts only while more than 24 remain, so the first hour of the window
+        // runs at x4 and the other five at x2, and the edge the walk cuts is the
+        // expiry minus the band. 0.25/s idle: 3600x4x0.25 + 18000x2x0.25.
+        [Test]
+        public void The_claims_walk_cuts_at_the_bands_edge_and_pays_each_side_its_own_speed()
+        {
+            var f = new Fixture(Config(idleCap: 86400), DeclareBandedTier);
+            var stamp = f.Tree.Now;
+            f.Tree.Ch1.lastActiveUtc = stamp;
+            f.Record(90000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, stamp.AddSeconds(21600));
+
+            AssertClose(12600, Line(f.Session, f.Tree.Cash).amount, "3600 at x4, then 18000 at x2");
+        }
+
+        // The same window with the second modifier simply absent, which is
+        // sentence 2 as a test: the ladder is content, so a fixture that does
+        // not author it pays the base speed end to end.
+        [Test]
+        public void The_same_window_without_the_banded_buff_pays_the_base_speed_throughout()
+        {
+            var f = new Fixture(Config(idleCap: 86400));
+            var stamp = f.Tree.Now;
+            f.Tree.Ch1.lastActiveUtc = stamp;
+            f.Record(90000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, stamp.AddSeconds(21600));
+
+            AssertClose(10800, Line(f.Session, f.Tree.Cash).amount, "0.25/s over 21600 seconds at x2");
+        }
+
+        // The claim and the tick divide the banded window with the same method
+        // too, so the pair differs only by the idle base's x0.5.
+        [Test]
+        public void The_banded_windows_claim_and_tick_are_the_same_segment_walk()
+        {
+            var ticked = new Fixture(Config(idleCap: 86400), DeclareBandedTier);
+            ticked.Tree.Ch1.lastActiveUtc = ticked.Tree.Now;
+            ticked.Session.SwitchChapter(ticked.Tree.Ch1, ticked.Tree.Now);
+            ticked.Record(90000);
+            ticked.Session.Tick(21600, ticked.Tree.Now.AddSeconds(21600));
+            AssertClose(25200, ticked.Tree.Tier1.balances["cash"], "0.5/s over 3600x4 + 18000x2");
+
+            var claimed = new Fixture(Config(idleCap: 86400), DeclareBandedTier);
+            claimed.Tree.Ch1.lastActiveUtc = claimed.Tree.Now;
+            claimed.Record(90000);
+            claimed.Session.SwitchChapter(claimed.Tree.Ch1, claimed.Tree.Now.AddSeconds(21600));
+            var line = Line(claimed.Session, claimed.Tree.Cash);
+            AssertClose(12600, line.amount);
 
             AssertClose((line.amount * 2).ToDouble(), ticked.Tree.Tier1.balances["cash"],
                 "the idle base halves the claim and nothing else differs");

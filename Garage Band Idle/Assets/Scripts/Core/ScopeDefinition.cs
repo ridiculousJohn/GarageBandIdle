@@ -104,6 +104,11 @@ namespace RidiculousGaming.GarageBandIdle
         // and the flag its lifetime; reads walk the whole chain.
         public List<string> declaredFlags = new();
 
+        // Timers homed here: an absolute UTC expiry under a declared id, the value a
+        // buff's BuffActive reads and an ExtendTimer writes (section 9). Bare strings for
+        // the reason flags are, and declaration is the write target and the lifetime.
+        public List<string> declaredTimers = new();
+
         // The tag vocabulary this scope's subtree may carry - bare strings for
         // the same reason flags are, since a tag has no data beyond its own
         // existence. A definition CARRYING one resolves it by walking outward to
@@ -160,6 +165,8 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         public bool DeclaresFlag(string flagId) => declaredFlags.Contains(flagId);
+
+        public bool DeclaresTimer(string timerId) => declaredTimers.Contains(timerId);
 
         // Every action list this scope declares, ONCE, in one place
         // (InteriorDefinition adds its own). The link pass iterates this and so

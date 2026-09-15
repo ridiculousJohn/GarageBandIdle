@@ -320,20 +320,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return currency;
         }
 
-        // The three ids the CODE names, which CodeReferences asks root for at
-        // the end of every validation pass (12.12): the Encore modifier the ad
-        // callback extends, the Backstage Pass entitlement the session reads,
-        // and the roadies currency the store's bundle grant deposits into. A
-        // fixture root that is expected to validate declares all three, and the
-        // Encore asset comes back so a test can address it.
-        public static ModifierDefinition DeclareCodeReferences(RootDefinition root)
+        // What the CODE side asks of a root (12.12): the roadies currency the
+        // store's bundle grant deposits into, the Backstage Pass entitlement the
+        // session reads, the timer the Encore chrome counts down, and the reward
+        // list the EncoreExtension placement pays. A fixture root that is
+        // expected to validate declares all four. No modifier: a buff over the
+        // timer is content a fixture authors when it wants one.
+        public static void DeclareCodeReferences(RootDefinition root)
         {
             DeclareCurrency(root, "roadies");
             root.entitlements.Add("backstage_pass");
+            root.declaredTimers.Add("encore_timer");
+            root.encoreAdReward.Add(new ExtendTimer { timer = "encore_timer", seconds = 14400, capSeconds = 86400 });
+        }
+
+        // root.json's Encore shape as content (section 9): root declares the
+        // timer, and one wildcard game_speed x2 reads it with no band, so the
+        // buff runs while the timer does. One membership, two ways in - the Pass
+        // leg first, the timer second. A ladder is a second modifier over the
+        // same timer with a band, which is why nothing here is named in code.
+        public static ModifierDefinition DeclareEncore(RootDefinition root)
+        {
+            if (!root.DeclaresTimer("encore_timer"))
+                root.declaredTimers.Add("encore_timer");
             var encore = MakeDefinition<ModifierDefinition>("encore");
+            encore.timer = "encore_timer";
             encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
-            // One membership, two ways in (section 9): the Pass leg first, the
-            // timed record second.
             encore.appliesWhen = new Any
             {
                 conditions =

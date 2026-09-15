@@ -18,6 +18,20 @@ namespace RidiculousGaming.GarageBandIdle
 
         public bool DeclaresEntitlement(string entitlementId) => entitlements.Contains(entitlementId);
 
+        // What the EncoreExtension ad placement pays, run at root's context by the ad
+        // callback as one command (section 9, 12.11). The placement is a product slot
+        // the code knows by id; what it grants is whatever this list says.
+        [SerializeReference, SubclassPicker] public List<GameAction> encoreAdReward = new();
+
+        // The reward list joins the scope's own enumeration, so the link pass and the
+        // validator's action-list walk both reach it with no second site of their own.
+        public override IEnumerable<ActionListSite> ActionLists()
+        {
+            foreach (var entry in base.ActionLists())
+                yield return entry;
+            yield return new ActionListSite(encoreAdReward, "encoreAdReward");
+        }
+
         // Typed, because the tree build must hand back a RootScopeState and the
         // polymorphic entry point can only promise a ScopeState.
         internal RootScopeState CreateRoot() => new RootScopeState(this);

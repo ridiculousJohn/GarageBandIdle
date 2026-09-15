@@ -349,6 +349,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 throw new ContentImportException(
                     $"scope '{dto.id}' authors entitlements; only the root declares store products (12.3).");
 
+            if (!isRoot && dto.encoreAdReward.Count > 0)
+                throw new ContentImportException(
+                    $"scope '{dto.id}' authors encoreAdReward; only the root pays the Encore ad (section 9).");
+
             // The key is real on every scope block, so a root or a tier
             // authoring one names itself in the error rather than reading as a
             // misspelling - the rung-on-root rule's shape (12.11).
@@ -437,6 +441,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             scope.children.Clear();
             scope.declaredCurrencies.Clear();
             scope.declaredFlags.Clear();
+            scope.declaredTimers.Clear();
             scope.declaredTags.Clear();
             scope.producers.Clear();
             scope.generators.Clear();
@@ -447,6 +452,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             scope.triggers.Clear();
 
             scope.declaredFlags.AddRange(dto.flags);
+            scope.declaredTimers.AddRange(dto.timers);
             scope.declaredTags.AddRange(dto.declaredTags);
             // Root's alone, so the wiring is typed rather than cleared with the
             // lists every scope carries (12.3).
@@ -454,6 +460,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             {
                 rootDefinition.entitlements.Clear();
                 rootDefinition.entitlements.AddRange(dto.entitlements);
+                rootDefinition.encoreAdReward = dto.encoreAdReward.Select(a => BuildAction(build, scope, a)).ToList();
             }
 
             foreach (var currencyDto in dto.currencies)
@@ -510,6 +517,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 modifier.stacking = modifierDto.stacking;
                 modifier.effects = modifierDto.effects.Select(e => BuildEffect(build, scope, e)).ToList();
                 modifier.appliesWhen = BuildCondition(build, scope, modifierDto.appliesWhen);
+                modifier.timer = modifierDto.timer;
+                modifier.activeAfterSeconds = modifierDto.activeAfterSeconds;
                 scope.modifiers.Add(modifier);
             }
 
@@ -745,6 +754,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 formula = BuildPayoutFormula(build, scope, d.formula),
             },
             SetFlagDto d => new SetFlag { flagId = d.flagId },
+            ExtendTimerDto d => new ExtendTimer { timer = d.timer, seconds = d.seconds, capSeconds = d.capSeconds },
             AddModifierDto d => new AddModifier
             {
                 scope = ResolveScope(build, d.scope, "AddModifier"),

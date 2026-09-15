@@ -209,4 +209,34 @@ What exists and is kept, checked 2026-09-14:
 
 ## Status
 
-Not started.
+**DONE 2026-09-14** - 788/788 green (+26: 27 added, 1 deleted). Built by two Opus agents against a
+fixed contract (runtime and tests in parallel), reviewed diff by diff against the design rules, the
+headless import and the EditMode suite run once each after one fixture fix. Two review findings
+(John's reviewer, both P2) corrected the same day: an `ExtendTimer` clamped the WHOLE record to
+its own cap, so a small-capped grant could take back time a larger one banked - the cap now bounds
+only what its own grant may reach, and a record already past it stands (row: twenty banked hours
+survive a one-hour grant capped at four); and the window multiplied every rung's factor regardless
+of band, printing a ladder's top with four hours banked - a banded rung now counts while its own
+`appliesWhen` holds, the membership the gather reads, so a tier gated `Any[HasEntitlement,
+BuffActive]` prints for a Pass owner as the tick runs it; a rung with no band prints regardless,
+as the ad's promise (row: 2.00x with nothing or four hours banked, 4.00x with twenty-five, 4.00x
+for a Pass owner with no timer). A third finding, the band-only check that first replaced the
+top-of-ladder read, was the same class and is folded into that fix. Deviations from the text
+above, each with its reason:
+
+1. **The timer is `encore_timer`, not `encore`.** Decision 1 puts timers in the chain's name
+   space, and root's modifier is already `encore`, so a timer `encore` on root is a `DuplicateHome`
+   the pass refuses - the plan's own example collided with the plan's own rule. Sentence 5 names
+   the timer "encore-timer", distinct from the buff, so the id follows the sentence and the rule
+   stands. Consequence: a record saved under the modifier's id `encore` is dropped at load as an
+   undeclared timer (John's dev saves only; nothing shipped).
+2. **`TimerPill` is a `[UxmlElement]` partial class with a `[UxmlAttribute("timer")]` property**,
+   not a `UxmlFactory` with `UxmlTraits`: the factory form is obsolete in Unity 6000.5, and the
+   attribute form is the same mechanism (UI Toolkit's own way to author a value on an element).
+3. **The save rows declare the timer on the LOAD-side tree.** The filter runs against the tree
+   being loaded into, so the test declares `encore_timer` on the fresh tree it deserializes into
+   rather than on the one it serialized from; the plan's sentence had the declaration on the wrong
+   side.
+4. **The Encore config knobs left `GameConfig.asset` untouched** as decision 4 said, and the two
+   fixture caps were the one suite fix: a band row raising the idle cap to 24 hours has to raise
+   the Pass cap with it, since `Require` refuses a Pass cap below the base cap.

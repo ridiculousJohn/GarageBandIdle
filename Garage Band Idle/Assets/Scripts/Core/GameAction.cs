@@ -96,6 +96,39 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
+    // Adds seconds to a declared timer at its home, capped at capSeconds of
+    // remaining time so a repeatable grant runs into the cap rather than past it;
+    // the cap is this action's own and never lowers time another grant banked
+    // (section 9). The write walks OUTWARD like SetFlag's; the Encore ad's reward is
+    // one of these authored on root.
+    [Serializable]
+    public class ExtendTimer : GameAction
+    {
+        public string timer;
+        public double seconds;
+        public double capSeconds;
+
+        public override void Execute(GameContext ctx) => ctx.ExtendTimer(timer, seconds, capSeconds);
+
+        public override void Validate(ValidationContext ctx)
+        {
+            var home = ctx.TimerHome(timer);
+            if (home == null)
+            {
+                var elsewhere = ctx.AnyScopeDeclaringTimer(timer);
+                if (elsewhere == null)
+                    ctx.AddError(ValidationCheck.UnresolvedReference, $"ExtendTimer names timer '{timer}', which no scope declares (12.12).");
+                else
+                    ctx.AddError(ValidationCheck.ChainReach, $"ExtendTimer writes timer '{timer}' homed at '{elsewhere.Id}', which is not on the chain from '{ctx.ActingScope.Id}' (12.12).");
+                return;
+            }
+            if (ctx.RequireFiniteDouble(seconds, "ExtendTimer seconds") && seconds <= 0)
+                ctx.AddError(ValidationCheck.NumericRange, $"ExtendTimer seconds is {seconds} - a grant only ever moves an expiry later.");
+            if (ctx.RequireFiniteDouble(capSeconds, "ExtendTimer capSeconds") && capSeconds < seconds)
+                ctx.AddError(ValidationCheck.NumericRange, $"ExtendTimer capSeconds {capSeconds} is below seconds {seconds} - a cap under one grant would clamp every grant short.");
+        }
+    }
+
     // Appends/increments a pointer-fact {modifierId, count} on the target scope.
     // The numbers stay on the ModifierDefinition; its stacking enum decides what
     // a re-grant does (design doc 12.5). Target: the acting scope or an ancestor

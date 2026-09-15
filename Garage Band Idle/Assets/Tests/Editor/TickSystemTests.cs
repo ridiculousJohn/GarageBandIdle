@@ -48,22 +48,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 tree.Ch1.modifierStacks[id] = 1;
         }
 
-        // Encore's own shape: a wildcard game_speed carrier declared and applied
-        // at ROOT whose membership is a record with its own id. The tick reads
-        // speed from the foreground chapter outward, so a root record reaches
-        // whichever chapter is in front.
-        private static void DeclareEncore(TestTree tree)
+        // Encore's own shape: root declares the timer and a wildcard game_speed
+        // carrier applied at ROOT reads it. The tick reads speed from the
+        // foreground chapter outward, so a root record reaches whichever chapter
+        // is in front.
+        private static void DeclareEncore(TestTree tree) => TestTree.DeclareEncore(tree.RootDef);
+
+        // The ladder's second rung, authored on root over the SAME timer with a
+        // 24-hour band (section 9): it counts only while more than that remains,
+        // and the moment it stops counting is an edge the walk cuts like an
+        // expiry. Nothing in code names it.
+        private static void DeclareBandedTier(TestTree tree)
         {
-            var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
-            encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
-            encore.appliesWhen = new BuffActive { modifier = encore };
-            tree.RootDef.modifiers.Add(encore);
-            tree.RootDef.permanentModifiers.Add(encore);
+            var tier = TestTree.MakeDefinition<ModifierDefinition>("encore_4x");
+            tier.timer = "encore_timer";
+            tier.activeAfterSeconds = 86400;
+            tier.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            tier.appliesWhen = new BuffActive { modifier = tier };
+            tree.RootDef.modifiers.Add(tier);
+            tree.RootDef.permanentModifiers.Add(tier);
         }
 
         private static void Record(TestTree tree, double expiresInSeconds) =>
             tree.Root.timedBuffs.Add(new TimedBuff
-                { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(expiresInSeconds) });
+                { buffId = "encore_timer", expiresAtUtc = tree.Now.AddSeconds(expiresInSeconds) });
 
         // ---- rate production ----
 
@@ -263,7 +271,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // has to stand before the build that compiles the plans.
             tree.Rebuild();
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic", remainingSeconds = 0 };
-            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore", expiresAtUtc = tree.Now.AddSeconds(50) });
+            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore_timer", expiresAtUtc = tree.Now.AddSeconds(50) });
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 100, tree.Now.AddSeconds(100));
 
@@ -462,43 +470,78 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the authored default is a legal hold");
         }
 
-        // The Encore knobs take the same Require. The cap bounds remaining time
-        // and the ad grants it, so a cap below one grant would clamp every ad
-        // short - a tuning fault that has to fail at boot rather than quietly.
+        // ---- two buffs over one timer ----
+
+        // A ladder is two modifiers reading one timer with different bands, and
+        // the code knows neither of them: with 25 hours left the banded rung
+        // counts too, so the speeds multiply to x4 and the clamp is what holds
+        // it there; an hour later only the base rung is left.
         [Test]
-        public void The_encore_knobs_must_be_finite_positive_and_a_cap_at_least_the_grant()
+        public void A_banded_buff_over_the_same_timer_reads_its_own_side_of_the_edge()
         {
             var tree = new TestTree();
-            var end = tree.Now.AddSeconds(10);
+            DeclareEncore(tree);
+            DeclareBandedTier(tree);
+            tree.Rebuild();
+            Record(tree, 90000);
 
-            Assert.DoesNotThrow(() => TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, end),
-                "the authored defaults are a legal pair");
+            Assert.AreEqual(4d, TickSystem.GameSpeed(tree.Ctx(tree.Ch1), tree.Ch1, Config()),
+                "both rungs count, and the ceiling is where the product lands");
+            Assert.AreEqual(2d, TickSystem.GameSpeed(
+                new GameContext(tree.Ch1, tree.Now.AddSeconds(3601)), tree.Ch1, Config()),
+                "past the band's edge only the base rung is left");
+        }
 
-            void RefusesAd(double seconds)
-            {
-                var config = Config();
-                config.encoreAdSeconds = seconds;
-                Assert.Throws<System.InvalidOperationException>(
-                    () => TickSystem.Tick(tree.Root, tree.Ch1, config, 10, end));
-            }
+        // The band's edge is a segment edge exactly as an expiry is: the tick
+        // spans it and pays each side its own speed, at 0.5/s.
+        [Test]
+        public void A_tick_crossing_the_bands_edge_pays_each_segment_at_its_own_speed()
+        {
+            var laddered = new TestTree();
+            AddRateSource(laddered.Tier1Def, "riff_press", laddered.Fans, 0.5);
+            DeclareEncore(laddered);
+            DeclareBandedTier(laddered);
+            laddered.Rebuild();
+            // The edge is the expiry minus 86400, which this record puts 5
+            // seconds into a 10-second tick.
+            Record(laddered, 86405);
 
-            void RefusesCap(double seconds)
-            {
-                var config = Config();
-                config.encoreCapSeconds = seconds;
-                Assert.Throws<System.InvalidOperationException>(
-                    () => TickSystem.Tick(tree.Root, tree.Ch1, config, 10, end));
-            }
+            TickSystem.Tick(laddered.Root, laddered.Ch1, Config(), 10, laddered.Now.AddSeconds(10));
 
-            RefusesAd(0);
-            RefusesAd(-1);
-            RefusesAd(double.NaN);
-            RefusesAd(double.PositiveInfinity);
-            RefusesCap(0);
-            RefusesCap(-1);
-            RefusesCap(double.NaN);
-            RefusesCap(double.PositiveInfinity);
-            RefusesCap(3600);   // finite and positive, but under the 14400 one ad grants
+            Assert.AreEqual((BigNumber)15, laddered.Tier1.balances["fans"], "5s at x4, then 5s at x2");
+
+            // The same tick with the banded rung simply absent: the ladder is
+            // content, so its edge does not exist and the speed never moves.
+            var plain = new TestTree();
+            AddRateSource(plain.Tier1Def, "riff_press", plain.Fans, 0.5);
+            DeclareEncore(plain);
+            plain.Rebuild();
+            Record(plain, 86405);
+
+            TickSystem.Tick(plain.Root, plain.Ch1, Config(), 10, plain.Now.AddSeconds(10));
+
+            Assert.AreEqual((BigNumber)10, plain.Tier1.balances["fans"], "10s at x2");
+        }
+
+        // Read off Segments directly: the edge a banded buff flips at is the
+        // timer's expiry minus the band, admitted from the scope declaring the
+        // buff, and the record's own expiry lies outside this window.
+        [Test]
+        public void Segments_cuts_at_the_timers_expiry_minus_the_band()
+        {
+            var tree = new TestTree();
+            DeclareEncore(tree);
+            DeclareBandedTier(tree);
+            tree.Rebuild();
+            Record(tree, 86405);
+            var start = tree.Now;
+            var end = start.AddSeconds(10);
+
+            var segments = TickSystem.Segments(tree.Root, tree.Ch1, start, end).ToList();
+
+            Assert.AreEqual(2, segments.Count);
+            Assert.AreEqual((start, start.AddSeconds(5)), segments[0]);
+            Assert.AreEqual((start.AddSeconds(5), end), segments[1]);
         }
     }
 }

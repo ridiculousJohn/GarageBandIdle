@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using RidiculousGaming.GarageBandIdle.Meta;
 
 namespace RidiculousGaming.GarageBandIdle.Monetization
 {
@@ -28,7 +27,6 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
 
         private readonly GameSession session;
         private readonly IAdService ads;
-        private readonly GameConfig config;
 
         // The driver's one save site. A watched ad is never replayed by an ad
         // network, so a crash after the grant would take the reward off disk.
@@ -36,16 +34,10 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
 
         private readonly List<Request> pending = new();
 
-        // The Encore window promises the same tuned duration this manager
-        // grants. Exposing the setting here keeps the UI from duplicating a
-        // number owned by GameConfig.
-        public double EncoreAdSeconds => config.encoreAdSeconds;
-
-        public AdManager(GameSession session, IAdService ads, GameConfig config, Action save)
+        public AdManager(GameSession session, IAdService ads, Action save)
         {
             this.session = session;
             this.ads = ads;
-            this.config = config;
             this.save = save;
         }
 
@@ -105,16 +97,15 @@ namespace RidiculousGaming.GarageBandIdle.Monetization
             {
                 // Always, after a backgrounding or a chapter change alike: the
                 // command is legal in every phase and there is no offer to
-                // lose, so a watched ad is never discarded. The save waits for
-                // the transaction that wrote the record: the grant is a
-                // submitted command (12.9) and may run at the frame's drain
-                // rather than at the call.
-                session.ExtendBuff(session.Root, Encore.Modifier(session.Root), config.encoreAdSeconds, nowUtc,
-                                   _ =>
-                                   {
-                                       save();
-                                       request.Granted?.Invoke();
-                                   });
+                // lose, so a watched ad is never discarded. What the placement
+                // pays is root's authored reward list, run as one command; the
+                // save waits for that transaction, since the grant is submitted
+                // (12.9) and may run at the frame's drain rather than at the call.
+                session.RunReward(session.Root.DefinitionAs<RootDefinition>().encoreAdReward, nowUtc, _ =>
+                {
+                    save();
+                    request.Granted?.Invoke();
+                });
                 return;
             }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle;
 using RidiculousGaming.GarageBandIdle.Economy;
@@ -67,6 +68,69 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             new AddCurrency { currencies = { tree.Roadies }, amount = 1 }.Execute(tree.Ctx(tree.Ch1));
 
             Assert.AreEqual(BigNumber.One, tree.Root.balances["roadies"]);
+        }
+
+        // ---- ExtendTimer ----
+
+        // The write walks OUTWARD to the timer's declared home the way SetFlag's
+        // does, so an action running in the tier lands the record on root. The
+        // absent-record, extend-from-the-later and clamp arithmetic is the
+        // command's, reached here through the authored kind.
+        [Test]
+        public void ExtendTimer_writes_at_the_timers_home_and_the_cap_clamps_what_remains()
+        {
+            var tree = new TestTree();
+            tree.RootDef.declaredTimers.Add("encore_timer");
+            var ctx = tree.Ctx(tree.Tier1);
+            var grant = new ExtendTimer { timer = "encore_timer", seconds = 14400, capSeconds = 20000 };
+
+            grant.Execute(ctx);
+
+            Assert.IsEmpty(tree.Tier1.timedBuffs, "the acting scope holds no record; the home does");
+            Assert.AreEqual(1, tree.Root.timedBuffs.Count);
+            Assert.AreEqual("encore_timer", tree.Root.timedBuffs[0].buffId);
+            Assert.AreEqual(tree.Now.AddSeconds(14400), tree.Root.timedBuffs[0].expiresAtUtc);
+
+            grant.Execute(ctx);
+
+            Assert.AreEqual(1, tree.Root.timedBuffs.Count, "one record per timer id on a scope");
+            Assert.AreEqual(tree.Now.AddSeconds(20000), tree.Root.timedBuffs[0].expiresAtUtc,
+                "the second grant runs into the cap rather than past it");
+        }
+
+        // Caps are each reward action's own, so a grant with a small cap meeting
+        // a record another grant banked past it adds nothing and takes nothing:
+        // the cap bounds what THIS grant may reach, never what already stands.
+        [Test]
+        public void ExtendTimer_with_a_smaller_cap_never_takes_banked_time_away()
+        {
+            var tree = new TestTree();
+            tree.RootDef.declaredTimers.Add("encore_timer");
+            var ctx = tree.Ctx(tree.Tier1);
+            var banked = tree.Now.AddSeconds(72000);
+            tree.Root.timedBuffs.Add(new TimedBuff { buffId = "encore_timer", expiresAtUtc = banked });
+
+            new ExtendTimer { timer = "encore_timer", seconds = 3600, capSeconds = 14400 }.Execute(ctx);
+
+            Assert.AreEqual(banked, tree.Root.timedBuffs.Single().expiresAtUtc, "twenty banked hours stand");
+
+            // Under the ceiling the same grant extends and the cap still bounds it.
+            tree.Root.timedBuffs[0].expiresAtUtc = tree.Now.AddSeconds(12000);
+            new ExtendTimer { timer = "encore_timer", seconds = 3600, capSeconds = 14400 }.Execute(ctx);
+            Assert.AreEqual(tree.Now.AddSeconds(14400), tree.Root.timedBuffs.Single().expiresAtUtc);
+        }
+
+        // A timer no scope on the chain declares is refused at load, so meeting
+        // one at the write is a code or content fault rather than a quiet no-op.
+        [Test]
+        public void ExtendTimer_for_a_timer_no_scope_on_the_chain_declares_throws()
+        {
+            var tree = new TestTree();
+
+            Assert.Throws<InvalidOperationException>(
+                () => new ExtendTimer { timer = "ghost", seconds = 1, capSeconds = 1 }
+                    .Execute(tree.Ctx(tree.Tier1)));
+            Assert.IsEmpty(tree.Root.timedBuffs);
         }
 
         [Test]

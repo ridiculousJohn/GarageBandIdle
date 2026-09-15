@@ -38,14 +38,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // Every block on the closed list carries a displayName (12.11), so the
         // preflight these fixtures all run through has nothing to say about the
         // fixture itself - a producer stays unnamed, since only a binding would
-        // require one. Root also declares the three ids the CODE names (12.12):
-        // the Encore modifier, the Backstage Pass entitlement, and roadies -
-        // CodeReferences asks for them at the end of the pass the preflight is.
+        // require one. Root also carries what the CODE asks of it (12.12): the
+        // Backstage Pass entitlement, roadies, the timer the Encore chrome
+        // counts down, and the list its ad placement pays.
         private const string RootJson = @"{
             ""type"": ""RootDefinition"",
             ""id"": ""root"",
             ""declaredTags"": [""income""],
             ""entitlements"": [""backstage_pass""],
+            ""timers"": [""encore_timer""],
+            ""encoreAdReward"": [
+                { ""type"": ""ExtendTimer"", ""timer"": ""encore_timer"", ""seconds"": 14400, ""capSeconds"": 86400 }
+            ],
             ""currencies"": [
                 { ""id"": ""records"", ""displayName"": ""Records"" },
                 { ""id"": ""roadies"", ""displayName"": ""Roadies"" }
@@ -53,6 +57,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ""modifiers"": [
                 {
                     ""id"": ""encore"",
+                    ""timer"": ""encore_timer"",
                     ""appliesWhen"": {
                         ""type"": ""Any"",
                         ""conditions"": [
@@ -151,6 +156,54 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 ((FlagSet)Load<CurrencyDefinition>("ch1/Currencies/cash.asset").activeWhen).flagId);
             Assert.IsNull(Load<CurrencyDefinition>("ch1/Currencies/plain.asset").activeWhen,
                 "an unauthored gate stays null, which is always active");
+        }
+
+        // A timer is a declared value on a scope, imported from a `timers` array
+        // the way flags are, and a buff names the timer it reads and the time
+        // that must still remain for it to count (section 9).
+        [Test]
+        public void Timers_and_a_modifiers_timer_and_band_import()
+        {
+            Write("root.json", RootJson.Replace(@"""id"": ""encore"",",
+                @"""id"": ""encore"", ""activeAfterSeconds"": 86400,"));
+            Write("ch1.json", ChapterJson);
+
+            Import();
+
+            Assert.AreEqual(new[] { "encore_timer" },
+                Load<RootDefinition>("root/root.asset").declaredTimers.ToArray());
+            var encore = Load<ModifierDefinition>("root/Modifiers/encore.asset");
+            Assert.AreEqual("encore_timer", encore.timer);
+            Assert.AreEqual(86400d, encore.activeAfterSeconds);
+        }
+
+        // What the EncoreExtension placement pays is a list root authors, so it
+        // imports as the ordinary action list it is.
+        [Test]
+        public void The_encore_ad_reward_imports_as_one_ExtendTimer()
+        {
+            WritePair();
+
+            Import();
+
+            var reward = (ExtendTimer)Load<RootDefinition>("root/root.asset").encoreAdReward.Single();
+            Assert.AreEqual("encore_timer", reward.timer);
+            Assert.AreEqual(14400d, reward.seconds);
+            Assert.AreEqual(86400d, reward.capSeconds);
+        }
+
+        // The reward is root's alone (section 9): the key is real on every scope
+        // block, so a chapter authoring one names itself in the refusal rather
+        // than reading as a misspelling, the way entitlements does.
+        [Test]
+        public void A_chapter_authoring_the_encore_ad_reward_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ChapterJson.Replace(@"""id"": ""ch1"",",
+                @"""id"": ""ch1"", ""encoreAdReward"": [{ ""type"": ""ExtendTimer"", ""timer"": ""encore_timer"", ""seconds"": 60, ""capSeconds"": 60 }],"));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("only the root pays the Encore ad", thrown.Message);
         }
 
         [Test]

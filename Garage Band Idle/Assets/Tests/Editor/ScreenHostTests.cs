@@ -89,7 +89,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 return config;
             }
 
-            public Fixture(Action<GameConfig> configure = null)
+            public Fixture()
             {
                 var rootDef = AssetDatabase.LoadAssetAtPath<RootDefinition>(
                     ChapterJsonImporter.AssetRootPath + "/root/root.asset");
@@ -113,9 +113,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
                 Tier1 = (TierScopeState)TestNavigation.Node(Root, Tier1Def);
                 var config = Config();
-                configure?.Invoke(config);
                 Session = new GameSession(Root, config);
-                AdManager = new AdManager(Session, Ads, config, () => Saves++);
+                AdManager = new AdManager(Session, Ads, () => Saves++);
                 IAPManager = new IAPManager(Session, Store, config, () => Saves++);
 
                 var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
@@ -238,10 +237,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void EncorePillAndWindowCountDownFromTheSharedClock()
         {
-            var fx = new Fixture(config => config.encoreAdSeconds = 7200);
+            var fx = new Fixture();
             fx.Root.timedBuffs.Add(new TimedBuff
             {
-                buffId = "encore",
+                buffId = "encore_timer",
                 expiresAtUtc = fx.Now.AddSeconds(3661),
             });
             fx.Enter();
@@ -250,13 +249,94 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var window = fx.Screen.Q<VisualElement>("encore-window");
             Assert.AreEqual("Time remaining 01:01:01", window.Q<Label>("encore-remaining").text);
             Assert.AreEqual("While active, game speed is 2.00x.", window.Q<Label>("encore-description").text);
-            Assert.AreEqual("Boost for 2 hours", window.Q<Button>("encore-ad").text,
-                "the promise comes from the manager's configured grant");
+            Assert.AreEqual("Boost for 4 hours", window.Q<Button>("encore-ad").text,
+                "the promise is the authored grant");
 
             fx.Clock.Frame(fx.Now.AddSeconds(2), 2);
             fx.Host.Interpolate();
             Assert.AreEqual("Time remaining 01:00:59", window.Q<Label>("encore-remaining").text);
             Assert.AreEqual("\u23F1  01:00:59", fx.Screen.Q<Button>("encore").text);
+        }
+
+        // The chrome names its timer ONCE, in its own UXML: the pill is an
+        // element declaring a `timer` attribute, and the pill's value is what
+        // the top bar and the window both count down (12.11).
+        // The window says what the timer buys right now: a rung with no band is
+        // the ad's promise and always prints, and a banded rung prints while its
+        // own appliesWhen holds - the membership the tick reads, whatever legs it
+        // is authored with - so a ladder over the same timer reads 2.00x under the
+        // threshold, 4.00x over it, and 4.00x for a Pass owner the tier's gate
+        // admits with no timer at all.
+        [Test]
+        public void TheWindowPrintsTheLaddersCurrentRungNotItsTop()
+        {
+            var fx = new StoryFixture(author: tree =>
+            {
+                var tier = TestTree.MakeDefinition<ModifierDefinition>("encore_4x");
+                tier.timer = "encore_timer";
+                tier.activeAfterSeconds = 86400;
+                tier.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+                tier.appliesWhen = new Any
+                {
+                    conditions =
+                    {
+                        new HasEntitlement { entitlementId = "backstage_pass" },
+                        new BuffActive { modifier = tier },
+                    }
+                };
+                tree.RootDef.modifiers.Add(tier);
+                tree.RootDef.permanentModifiers.Add(tier);
+            });
+            var description = fx.Screen.Q<Label>("encore-description");
+
+            fx.Host.OpenEncore();
+            Assert.AreEqual("While active, game speed is 2.00x.", description.text, "nothing banked: the promise");
+
+            var record = new TimedBuff { buffId = "encore_timer", expiresAtUtc = fx.Tree.Now.AddSeconds(14400) };
+            fx.Tree.Root.timedBuffs.Add(record);
+            fx.Host.OpenEncore();
+            Assert.AreEqual("While active, game speed is 2.00x.", description.text, "four hours: under the band");
+
+            record.expiresAtUtc = fx.Tree.Now.AddSeconds(90000);
+            fx.Host.OpenEncore();
+            Assert.AreEqual("While active, game speed is 4.00x.", description.text, "twenty-five hours: both rungs");
+
+            fx.Tree.Root.timedBuffs.Clear();
+            fx.Tree.Root.entitlements.Add("backstage_pass");
+            fx.Host.OpenEncore();
+            Assert.AreEqual("While active, game speed is 4.00x.", description.text,
+                "the Pass leg admits the tier with no timer, as the tick reads it");
+        }
+
+        [Test]
+        public void TheEncorePillCarriesTheTimerItsUxmlNames()
+        {
+            var fx = new Fixture();
+
+            Assert.AreEqual("encore_timer", fx.Screen.Q<TimerPill>("encore").Timer);
+        }
+
+        // The host requires that timer to be one ROOT declares, at construction,
+        // the way it requires the named elements themselves (requirement 7) - so
+        // a content set the pill's attribute does not match is refused where the
+        // screen is bound rather than at the first countdown.
+        [Test]
+        public void AScreenWhosePillNamesATimerRootDoesNotDeclareIsRefused()
+        {
+            var tree = new TestTree();
+            var config = ScriptableObject.CreateInstance<GameConfig>();
+            config.maxGameSpeed = 4;
+            var session = new GameSession(tree.Root, config);
+            var screen = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screen.uxml");
+            Assert.IsNotNull(screen, "Assets/UI/Screen.uxml is missing");
+            var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
+            Assert.IsNotNull(registry,
+                "Assets/Settings/ModuleRegistry.asset is missing - it is hand-made settings.");
+
+            Assert.Throws<InvalidOperationException>(() => new ScreenHost(
+                screen.Instantiate(), registry, session, new GameClock(tree.Now),
+                new AdManager(session, new FakeAdService(), () => { }),
+                new IAPManager(session, new FakeStoreService(), config, () => { })));
         }
 
         [Test]
@@ -311,7 +391,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.AdManager.Update(fx.Now);
 
             Assert.IsFalse(Fixture.Shown(window), "the close rides the grant's completion, after the save");
-            Assert.AreEqual("encore", fx.Root.timedBuffs.Single().buffId, "the boost is what landed");
+            Assert.AreEqual("encore_timer", fx.Root.timedBuffs.Single().buffId, "the boost is what landed");
             Assert.AreEqual(1, fx.Saves, "and the save ran before the close");
 
             fx.Host.OpenEncore();
@@ -377,7 +457,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("settings")),
                 "the window closes only itself");
             Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")));
-            Assert.AreEqual("encore", fx.Root.timedBuffs.Single().buffId, "the reward was never in doubt");
+            Assert.AreEqual("encore_timer", fx.Root.timedBuffs.Single().buffId, "the reward was never in doubt");
         }
 
         [Test]
@@ -1362,7 +1442,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly StoryBeatDefinition SecondStage;
             public readonly ChapterScopeState Ch2;
 
-            public StoryFixture(bool markedUnlocksOnLiveTick = false, bool withSecondChapter = false)
+            // `author` runs over the definitions before the build, for a row that
+            // wants content the standing fixture does not carry.
+            public StoryFixture(bool markedUnlocksOnLiveTick = false, bool withSecondChapter = false,
+                                Action<TestTree> author = null)
             {
                 Marked = TestTree.MakeDefinition<StoryBeatDefinition>("story_marked");
                 Marked.displayName = "The First Cut";
@@ -1389,9 +1472,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
                 Tree.Ch1Def.storyBeats.AddRange(new[] { Marked, Unmarked });
                 Tree.RootDef.declaredFlags.AddRange(new[] { "story_marked_seen", "story_unmarked_seen" });
-                var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
-                encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
-                Tree.RootDef.modifiers.Add(encore);
+                // The chrome the host binds: Screen.uxml's pill names timer
+                // 'encore_timer', and the host requires root to declare it.
+                TestTree.DeclareEncore(Tree.RootDef);
                 // A beat's home is the chapter, so both rows evaluate there.
                 Tree.Ch1Def.sections.Add(new SectionDefinition
                 {
@@ -1429,6 +1512,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     Tree.Chapters.Add(Ch2Def);
                 }
 
+                author?.Invoke(Tree);
                 // The link pass runs in Build, so the section, its modules and
                 // the trigger are wired only once the tree is built again.
                 Tree.Rebuild();
@@ -1448,7 +1532,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsNotNull(registry,
                     "Assets/Settings/ModuleRegistry.asset is missing - it is hand-made settings.");
                 Host = new ScreenHost(Screen, registry, Session, clock,
-                    new AdManager(Session, new FakeAdService(), config, () => { }),
+                    new AdManager(Session, new FakeAdService(), () => { }),
                     new IAPManager(Session, new FakeStoreService(), config, () => { }));
 
                 // The stamp is now, so no idle window exists and the phase lands

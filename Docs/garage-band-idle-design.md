@@ -546,14 +546,23 @@ second vocabulary exists:
 Idle income is themed as streaming/radio royalties and is largest at the Radio chapter.
 
 **Encore (the accelerator).** A **game-speed multiplier**, not an income multiplier: an ordinary
-root permanent modifier with a timer. There is no buff kind - a timed record (`{buffId, expiresAt}`
-at root, the id a MODIFIER's) is the one place a time attaches to a modifier id, and `encore` is
-`{stat: game_speed, ×2}` with `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` -
-the same shape as the idle fraction, a membership that counts only while a fact holds. The record
-is that fact, a source of nothing, read by the `BuffActive` condition, which names the modifier as
-`UpgradePurchased` names an upgrade and resolves outward from the acting scope to the first scope
-holding a record with that modifier's id - so the record's placement is its lifetime, no scope is
-named, and the id validates and filters as every modifier id does. `game_speed` is a stat with exactly two consumers, the two
+root permanent modifier reading a TIMER. A timer is a declared value on a scope
+(`declaredTimers`, bare strings like flags): its value is the timed record (`{buffId, expiresAt}`,
+the id the timer's) on the declaring scope, and absent or expired both read as not running. A buff
+declares which timer it reads (`ModifierDefinition.timer`) and how much time must remain on it for
+the buff to count as active (`activeAfterSeconds`, the band, default 0); `BuffActive(modifier)` is
+true while the record's expiry is later than now plus the band, the record resolved outward from
+the acting scope to the first scope holding it, so the record's placement is its lifetime and no
+scope is named. Root declares timer `encore_timer`, and `encore` is `{stat: game_speed, x2}` with
+`timer: encore_timer` and `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` - the
+same shape as the idle fraction, a membership that counts only while a fact holds. Extending a
+timer is one command, `ExtendBuff(scope, timer, seconds, cap)`, and one authored action,
+`ExtendTimer(timer, seconds, capSeconds)` (12.5), writing at the timer's home through the flag's
+outward walk; the Encore ad's reward is root's authored `encoreAdReward` list,
+`[ExtendTimer(encore_timer, 14400, 86400)]`, run at root's context by the ad callback as one transaction.
+The code names no timer: the chrome's pill authors `timer="encore_timer"` in `Screen.uxml` and the window
+reads the pill's. Two buffs reading one timer with different bands is a speed ladder authored with
+no code. `game_speed` is a stat with exactly two consumers, the two
 places real time becomes production: the tick - `effective dt = real dt x
 GetMultiplier(game_speed)` - so every rate, accrual, and bar fill in the live chapter speeds up
 automatically, and the idle claim, which scales each segment of the paid window the same way. For
@@ -563,21 +572,22 @@ seconds after the stamp and Encore multiplies what those seconds pay, never how 
 are (4 h away at 2x pays 8 h of base rate). Yields never scale (per-firing, no time component), and
 **wall-clock decrements never scale**: event `remainingSeconds` and buff expirations burn real
 seconds. The timer is an absolute expiry, so it counts down whether the app is open or closed, and
-a buff that expires inside the paid window scales only the segment it was live for. Rewarded ads
-add ~+4 h to the timer, repeatable, to a cap in `GameConfig`. The tick prunes an expired record at
-its end as housekeeping; `BuffActive` judges a record by the context's own time
-(`expiresAtUtc > NowUtc`), so a segment, a closing sweep, or a module gate reads the truth at the
-moment it asks, and no answer depends on when a prune ran.
+a buff that expires inside the paid window scales only the segment it was live for, and a buff
+with a band flips at its timer's expiry minus the band, which the walk cuts at as it cuts at an
+expiry (12.9). Rewarded ads add 4 h to the timer, repeatable, to 24 h of remaining time - both
+numbers on the reward action root authors, and a cap bounds only what its own grant may bring the
+remaining time to, never time another grant banked. The tick prunes an expired record at its end as
+housekeeping; `BuffActive` judges a record by the context's own time
+(`expiresAtUtc > NowUtc + activeAfterSeconds`), so a segment, a closing sweep, or a module gate
+reads the truth at the moment it asks, and no answer depends on when a prune ran.
 
 **A higher speed tier is undecided** (2026-09-14). Cells to Singularity banks 2x ad time to 24 hours and
 runs the excess at 4x to a higher cap; Ctrl C's Overclock has no tier above its 2x. Nothing is
 decided, because a 4x earned by ads has not been reconciled with the Pass. What IS settled is that
-the engine must be able to do either with no further code, by content alone: timers are a declared
-value on a scope, a buff declares which timer it reads and how much time must remain for it to
-count as active, and the extend is one command (`timers-plan.md`). A 4x, if ever authored, is one
-more root modifier reading the `encore` timer with a 24-hour band; removing it is deleting that
-modifier. The walk cuts a segment where such a buff flips, expiry minus band, as it cuts at an
-expiry today.
+the engine can do either with no further code, by content alone, and the timers above are that
+ability. A 4x, if ever authored, is one more root modifier reading the `encore_timer` timer with
+`activeAfterSeconds: 86400`; removing it is deleting that modifier. The walk cuts a segment where
+such a buff flips, expiry minus band, as it cuts at an expiry.
 
 **Backstage Pass** - lifetime IAP (~$5-10). Every reward the two ads give, without the ads, plus a
 raised idle cap: permanent Encore - the entitlement is the first leg of `encore`'s own
@@ -893,7 +903,7 @@ class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these
     Dictionary<string, int>       fillCounts;       // repeating bars
     Dictionary<string, HashSet<string>> activeBars; // per group
     Dictionary<string, int>       modifierStacks;   // AddModifier grants, keyed like every other count
-    List<TimedBuff>               timedBuffs;       // {buffId, expiresAt}, the id a modifier's: a modifier's timer; Encore lives at root
+    List<TimedBuff>               timedBuffs;       // {buffId, expiresAt}, the id a declared TIMER's: the timer's value; root's encore_timer lives here
     List<SongEntry>               songs;            // tier = the run's Catalog; root = Discography (§7)
 }
 
@@ -948,7 +958,10 @@ name is the one authored reference a typo can break, which is why `SetFlag` and 
 validated against the acting chain and `SetFlag` throws at runtime on a name no scope on the chain
 declares. **Tags are declared the same way**, and for the same reason: a tag has no data beyond its
 own existence either, so a scope's `declaredTags` is a list of bare strings, and a definition may
-carry only a tag some scope on its own chain declares. Stat names and the `Effect` selectors
+carry only a tag some scope on its own chain declares. **Timers are declared the same way**
+(`declaredTimers`): a timer is an expiry under a name, its value the timed record at the declaring
+scope, and a modifier's `timer` and an `ExtendTimer` are validated against the chain as `FlagSet`
+and `SetFlag` are (section 9). Stat names and the `Effect` selectors
 (`target`, `currencyId`) stay strings too: a selector matches by id OR tag (§12.2), so it cannot be
 a reference to one thing - all of these are vocabulary, not things.
 
@@ -1001,9 +1014,11 @@ Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, 
 a scaling goal or reward curve reading a per-clear counter, §8.1). Records need no special kind:
 they are a currency.
 
-`BuffActive` names a modifier as `UpgradePurchased` names an upgrade and reads that modifier's timed
-record outward from the acting scope, true while the record's `expiresAtUtc` is later than the
-context's own time - never by the record's presence (section 9). `HasEntitlement` names a store
+`BuffActive` names a modifier as `UpgradePurchased` names an upgrade and reads the TIMER that
+modifier declares (`ModifierDefinition.timer`) outward from the acting scope, true while the
+record's `expiresAtUtc` is later than the context's own time plus the modifier's
+`activeAfterSeconds` - never by the record's presence (section 9). A `BuffActive` on a modifier
+that names no timer is refused at load. `HasEntitlement` names a store
 product root declares on its `entitlements` list (12.3) and is true while root's set holds it: the
 read is the chain's root, the id is validated against root's own list, and the store callback is
 its only writer. The two event kinds read a record the way `FlagSet` reads a flag: outward from the acting scope to
@@ -1052,7 +1067,9 @@ public abstract class Action
 
 Kinds: `AddCurrency` (one or more target currencies paid from a single evaluation; amount constant
 or from a `PayoutFormula`), `AddModifier(scope, modifier)`, `RemoveModifier(scope, modifier)`,
-`SetFlag(flagId)`, `AddSong`, `ResetScope(scope)`, `ExecuteRung(tier)` and `RestartScope(scope)`
+`SetFlag(flagId)`, `ExtendTimer(timer, seconds, capSeconds)` (adds to a declared timer at its home
+through the flag's outward walk, remaining time clamped to the cap - the Encore ad's reward, §9),
+`AddSong`, `ResetScope(scope)`, `ExecuteRung(tier)` and `RestartScope(scope)`
 (fire that scope's rung through its own gate, then clear it - the restart idiom as one action; a
 bare `ResetScope` remains for a pure wipe). The event lifecycle operations are commands rather than
 Action kinds (§6.1, §12.11). Authored inline via
@@ -1180,7 +1197,7 @@ named list off it. Across the tree the sources are:
 |---|---|---|
 | Purchased upgrades | `purchasedUpgrades` set | the upgrade definition's `List<Effect>` |
 | Owned generators | `generatorCounts` | `produces` entries scaled by count (contributions, not effects) |
-| Timed records (Encore) | `{buffId, expiresAt}` list, the id a MODIFIER's | none directly - a record is a modifier's timer, a FACT the `BuffActive` condition reads by naming that modifier, and the modifier is a permanent membership with that condition in its `appliesWhen` (§9), the idle fraction's shape |
+| Timed records (Encore) | `{buffId, expiresAt}` list, the id a declared TIMER's | none directly - a record is a timer's value, a FACT the `BuffActive` condition reads through the modifier that names the timer and its band, and the modifier is a permanent membership with that condition in its `appliesWhen` (§9), the idle fraction's shape |
 | Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `barGroups` |
@@ -1534,7 +1551,8 @@ it checks nothing of its own - the host opens a card only for a beat whose butto
 mark pops it). All fail-closed — each checks
 its own gate. Ad and store
 callbacks (AdManager / IAPManager) mutate through their own equally fail-closed operations -
-`ExtendBuff(scope, modifier, seconds)`, `DoubleAndClaimIdle()`, `GrantEntitlement(id)` and
+`ExtendBuff(scope, timer, seconds, cap)`, `RunReward(actions)` (root's authored reward list as one
+transaction), `DoubleAndClaimIdle()`, `GrantEntitlement(id)` and
 `PurchasePassFromDialog()`, `GrantRoadies(count)` - they are not UI paths.
 
 **A disarmed rung explains itself**: the rung-button widget evaluates its gate's top-level legs
@@ -1594,6 +1612,13 @@ per-feature: any kind an author gates with explains itself for free.
 - A `SetFlag` naming an undeclared flag is an error, as is one whose home is off the acting chain -
   including a home the acting scope encloses, which the outward write can never reach (§2). A
   declared flag with no setter warns.
+- A timer takes the flag's rule (§9): a modifier's `timer` that no scope declares, or one homed off
+  the chain from the modifier's declaring scope, is an error, and so is an `ExtendTimer` whose timer
+  is undeclared or off the acting chain; a `BuffActive` on a modifier with no timer is an error. A
+  modifier's `activeAfterSeconds` is finite and nonnegative; an `ExtendTimer`'s `seconds` is finite
+  and positive and its `capSeconds` finite and at least `seconds`. A timer shares the chain's name
+  space with ids, flags and tags. A root whose `encoreAdReward` is empty is an error: the ad
+  placement pays what that list says, and an empty list is an ad that pays nothing.
 - A currency's `activeWhen` is judged at the currency's own home, so its operands take the reach
   check there rather than at any site that reads the currency. An `IdleAccumulation` anywhere inside
   one is an ERROR, not the inert-operand warning it draws elsewhere: the circumstance does reach the
@@ -1657,8 +1682,8 @@ per-feature: any kind an author gates with explains itself for free.
   A textless leg at the top level is the author's choice - a threshold leg renders as progress alone.
 - A polymorphic kind in data with no class behind it is an import error.
 - **Validation has a second input beside the content tree: the code side's own references.** A
-  screen, a manager, or the session that names content from code - a modifier (`encore`), a currency
-  (`roadies`), an entitlement id (`backstage_pass`) - states
+  screen, a manager, or the session that names content from code - a currency (`roadies`), an
+  entitlement id (`backstage_pass`) - states
   what it needs as a static check on the class holding the reference, asking existence with the
   same primitives a definition uses (`RequireOnChain` from root, the declaration lists).
   `CodeReferences` lists every such check explicitly, the way the kind registry lists every kind and
@@ -1684,7 +1709,7 @@ Assets/Scripts/
     TickSystem.cs           // the segmented tick over one real-time window; returns the TickReport
     TickReport.cs           // what ONE tick moved, recorded at the mutation sites; interpolation's slopes
     GameClock.cs            // the one time source: driver-owned, advanced at every entry point
-    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds, tickIntervalSeconds, longPressSeconds, the Encore ad grant and cap
+    GameConfig.cs           // the global tuning knobs: maxGameSpeed, the idle thresholds, tickIntervalSeconds, longPressSeconds
     BigNumber.cs            // wraps break_infinity.cs
     Definition.cs           // base: id + tags, declared once for every content family
     ContentDatabase.cs      // loads the root + labeled chapter roots, composes the pair, runs the §12.12 pass
@@ -1722,7 +1747,6 @@ Assets/Scripts/
     StoryBeatDefinition.cs // a chapter-boundary card: text, availableWhen, seenFlag, opensWhenAvailable (section 10)
   Meta/
     RoadieAllocation.cs    // SetRoadieAllocation; the boost arithmetic is Economy's
-    Encore.cs              // the encore id the code names: the resolve off root's own modifier list and its CodeReferences check
     BackstagePass.cs       // the backstage_pass entitlement id, the one Owned(root) read, and its CodeReferences check
     Roadies.cs             // the roadies currency id and its CodeReferences check
   Content/
@@ -1739,7 +1763,7 @@ Assets/Scripts/
     IAdService.cs          // AdPlacement, AdResult, the request-now-result-later seam a rewarded-ad SDK presents
     IStoreService.cs       // ProductId, PurchaseOutcome, PurchaseResult; Purchase / Acknowledge / RestoreEntitlements
     FakeAdService.cs  FakeStoreService.cs   // the seams until a real SDK: scripted outcomes, recorded calls
-    AdManager.cs           // rewarded only (Encore top-up + Double it); polls its requests from the driver's Update
+    AdManager.cs           // rewarded only (the Encore placement's authored reward + Double it); polls its requests from the driver's Update
     IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar; grant, save, acknowledge in that order
   UI/
     SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs
@@ -1755,7 +1779,8 @@ Assets/Scripts/
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
     NumberFormatter.cs
-    TopBarUI.cs             // the two pills, with the Encore countdown shared by the window
+    TopBarUI.cs             // the two pills; the countdown pill's timer, authored in Screen.uxml, is read by the window too
+    TimerPill.cs            // the countdown pill element: a Button with a `timer` UXML attribute, so the chrome names its timer once
     SettingsUI.cs          // the Roadies entry and close button
     RoadieAllocationUI.cs  // local allocation draft; Done submits the whole map
     EncoreWindowUI.cs      // remaining time and ad/Pass requests through the existing managers
@@ -1892,10 +1917,10 @@ Content/                 // the authored JSON the importer reads
   as the idle dialog — the stamp IS the pending claim, the ad callback doubles and settles
   atomically, a plain dismissal deposits the base, settlement advances the stamp; app close is not
   special; yields and bar progress never accrue.
-- **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2x, a timed root
-  buff ads extend (`game_speed` stat, consumed by the tick and the idle claim over a real-time cap;
-  wall clocks never scale; a higher speed tier is undecided and would be content alone over the
-  same timer); Backstage Pass (lifetime: permanent Encore, the idle claim computed already
+- **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2x, a root buff
+  reading root's declared `encore_timer` timer, which the ad's authored reward extends (`game_speed` stat,
+  consumed by the tick and the idle claim over a real-time cap; wall clocks never scale; a higher
+  speed tier is undecided and would be content alone over the same timer); Backstage Pass (lifetime: permanent Encore, the idle claim computed already
   doubled, and a raised idle cap); Buy Roadies (repeatable); Tip Jar; no subscriptions.
 - **Engine:** Unity; break_infinity numbers; DateTime ticks; checksummed JSON save of the state tree;
   boot composes the root address plus the `chapter` label into the tree, each chapter's direct

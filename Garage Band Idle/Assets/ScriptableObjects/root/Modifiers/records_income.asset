@@ -26,7 +26,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 7579425465538183207
+      rid: 7579425475204481064
   - target: income
     currencyId: 
     stat: yield
@@ -35,15 +35,17 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 7579425465538183208
+      rid: 7579425475204481065
   appliesWhen:
     rid: -2
+  timer: 
+  activeAfterSeconds: 0
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425465538183207
+    - rid: 7579425475204481064
       type: {class: LinearOnBalance, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         currency: {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}
@@ -51,7 +53,7 @@ MonoBehaviour:
           _value:
             mantissa: 2
             exponent: -2
-    - rid: 7579425465538183208
+    - rid: 7579425475204481065
       type: {class: LinearOnBalance, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         currency: {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}

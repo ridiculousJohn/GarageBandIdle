@@ -28,8 +28,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly UpgradeDefinition AmpStrings;
         public readonly ModifierDefinition RecordsIncome;
 
-        // The Encore modifier root declares for the code side (12.12), kept so
-        // a row can break it and read the CodeReferences finding back.
+        // The buff over root's `encore_timer`, kept so a row can address the
+        // shape root.json authors without rebuilding it (section 9).
         public readonly ModifierDefinition Encore;
         public readonly CurrencyDefinition Cash;
         public readonly CurrencyDefinition Fans;
@@ -58,10 +58,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Ch1.children.Add(Tier1b);
 
             Records = TestTree.DeclareCurrency(Root, "records");
-            // What the code names from root: without these three the pass ends
-            // in three UnresolvedReference errors and no row here would be
-            // reading its own break (12.12).
-            Encore = TestTree.DeclareCodeReferences(Root);
+            // What the code asks of root: without these the pass ends in
+            // findings no row here authored, and none would be reading its own
+            // break (12.12). The Encore buff over the timer is content on top.
+            TestTree.DeclareCodeReferences(Root);
+            Encore = TestTree.DeclareEncore(Root);
             Root.declaredFlags.Add("ch1_complete");
             // income is a game-wide word, so root declares it; gear is only ever
             // carried by tier1's generators, so tier1 is high enough (12.2).
@@ -650,15 +651,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.KindPlacement, "IdleAccumulation");
         }
 
-        // The record resolves outward from the acting scope like every other
-        // fact, so a modifier a sibling chapter declares can never be read.
+        // The modifier resolves outward from the acting scope like every other
+        // reference, so one a sibling chapter declares can never be read - and
+        // its timer is declared beside it, so the reach miss is the condition's
+        // alone.
         [Test]
         public void BuffActive_ModifierOnASiblingChapter_Error()
         {
             var f = new ValidatorFixture();
             var sibling = f.AddSiblingChapter();
             var encore = TestTree.MakeDefinition<ModifierDefinition>("encore");
+            encore.timer = "encore_timer";
             encore.effects.Add(new Effect { stat = Stat.GameSpeed, multiplier = 2 });
+            sibling.Tier2.declaredTimers.Add("encore_timer");
             sibling.Tier2.modifiers.Add(encore);
 
             f.Trigger.condition = new BuffActive { modifier = encore };
@@ -670,8 +675,124 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void BuffActive_RootModifierFromATier_Clean()
         {
             var f = new ValidatorFixture();
-            f.Trigger.condition = new BuffActive { modifier = f.RecordsIncome };
+            f.Trigger.condition = new BuffActive { modifier = f.Encore };
             AssertNoFinding(f.Run(), ValidationCheck.ChainReach);
+        }
+
+        // A buff reads the timer its modifier names, so a modifier naming none
+        // could never be active and the condition is unauthored rather than
+        // merely inert (section 9).
+        [Test]
+        public void BuffActive_ModifierWithNoTimer_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Trigger.condition = new BuffActive { modifier = f.Boost };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "which declares no timer");
+        }
+
+        // ---- timers (section 9) ----
+
+        // A timer joins the per-chain name space ids, flags and tags share, so a
+        // timer taking a flag's word on the same chain is the collision rule
+        // already in force.
+        [Test]
+        public void TimerCollidingWithAFlagOnTheChain_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.declaredTimers.Add("album");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateHome,
+                "'album' is declared twice on the chain");
+        }
+
+        // The modifier's own timer is judged at its DECLARING scope: every scope
+        // the buff applies to sits inside that subtree, so a timer that resolves
+        // there resolves from all of them.
+        [Test]
+        public void Modifier_TimerNoScopeDeclares_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.timer = "ghost";
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "reads timer 'ghost', which no scope declares");
+        }
+
+        [Test]
+        public void Modifier_TimerDeclaredBelowTheDeclaringScope_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Ch1.declaredTimers.Add("deep");
+            f.RecordsIncome.timer = "deep";   // declared at root, which cannot read into ch1
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "homed at 'ch1'");
+        }
+
+        // The band is time that must still REMAIN, so it is a finite,
+        // nonnegative number of seconds or it is not a band at all.
+        [Test]
+        public void Modifier_BandOutOfRange_Error()
+        {
+            var nonFinite = new ValidatorFixture();
+            nonFinite.Encore.activeAfterSeconds = double.NaN;
+            AssertFinding(nonFinite.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange,
+                "activeAfterSeconds is NaN");
+
+            var negative = new ValidatorFixture();
+            negative.Encore.activeAfterSeconds = -1;
+            AssertFinding(negative.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange,
+                "the band is time that must remain, never negative");
+        }
+
+        // The write takes SetFlag's shapes exactly: unresolved when nothing
+        // declares the name, and a reach miss when something off the chain does.
+        [Test]
+        public void ExtendTimer_UndeclaredTimer_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Trigger.actions.Add(new ExtendTimer { timer = "ghost", seconds = 60, capSeconds = 60 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "ExtendTimer names timer 'ghost'");
+        }
+
+        [Test]
+        public void ExtendTimer_TimerOnASiblingChapter_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            sibling.Tier2.declaredTimers.Add("side");
+            f.Trigger.actions.Add(new ExtendTimer { timer = "side", seconds = 60, capSeconds = 60 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "ExtendTimer writes timer 'side' homed at 'tier2'");
+        }
+
+        // A grant only ever moves an expiry later, and a cap under one grant
+        // would clamp every grant short - both are tuning faults refused at load.
+        [Test]
+        public void ExtendTimer_SecondsOrCapOutOfRange_Error()
+        {
+            var nonpositive = new ValidatorFixture();
+            nonpositive.Trigger.actions.Add(new ExtendTimer { timer = "encore_timer", seconds = 0, capSeconds = 60 });
+            AssertFinding(nonpositive.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange,
+                "ExtendTimer seconds is 0");
+
+            var shortCap = new ValidatorFixture();
+            shortCap.Trigger.actions.Add(new ExtendTimer { timer = "encore_timer", seconds = 14400, capSeconds = 3600 });
+            AssertFinding(shortCap.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange,
+                "is below seconds");
+        }
+
+        // Root's reward list is walked with every other action list, from root's
+        // own enumeration (12.12): the authored grant over a timer root declares
+        // is clean, and one naming nothing is reported from that same site.
+        [Test]
+        public void EncoreAdReward_IsWalkedLikeEveryOtherActionList()
+        {
+            var f = new ValidatorFixture();
+            AssertNoFinding(f.Run(), ValidationCheck.UnresolvedReference);
+
+            f.Root.encoreAdReward.Add(new ExtendTimer { timer = "ghost", seconds = 60, capSeconds = 60 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "ExtendTimer names timer 'ghost'");
         }
 
         // The set is root's alone (12.3), so the id is judged against root's own
@@ -696,16 +817,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- the code side's content references (12.12) ----
 
         // The pass runs the code's own existence checks after the tree walk, so
-        // a content set that drops one of the three ids the code names is
-        // refused at import and at boot rather than throwing at the callback.
+        // a content set that drops an id the code names is refused at import and
+        // at boot rather than throwing at the callback.
+
+        // The EncoreExtension placement is a product slot the code knows by id,
+        // and what it pays is whatever root's list says - so an empty list is an
+        // ad that pays nothing, which is a product fault (section 9, 12.12).
         [Test]
-        public void CodeReference_RootDeclaresNoEncoreModifier_Error()
+        public void Root_with_an_empty_encoreAdReward_Error()
         {
             var f = new ValidatorFixture();
-            f.Root.permanentModifiers.Remove(f.Encore);
-            f.Root.modifiers.Remove(f.Encore);
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
-                "root declares no modifier 'encore'");
+            f.Root.encoreAdReward.Clear();
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "root authors no encoreAdReward");
         }
 
         [Test]

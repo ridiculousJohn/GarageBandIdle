@@ -11,7 +11,6 @@ namespace RidiculousGaming.GarageBandIdle
     {
         private static readonly Action<ValidationContext>[] Checks =
         {
-            Meta.Encore.Validate,
             Meta.BackstagePass.Validate,
             Meta.Roadies.Validate,
         };

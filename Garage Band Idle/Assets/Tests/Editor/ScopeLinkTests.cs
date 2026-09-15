@@ -70,7 +70,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // Root has no rung field and no events list at all (12.3): the kinds it
         // cannot have are unauthorable rather than filtered, so there is
-        // nothing for the enumeration to skip.
+        // nothing for the enumeration to skip. The one list root alone holds,
+        // the Encore ad's reward (section 9), comes last.
         [Test]
         public void A_root_scope_enumerates_only_the_lists_it_can_hold()
         {
@@ -86,7 +87,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             root.upgrades.Add(upgrade);
 
             CollectionAssert.AreEqual(
-                new object[] { trigger.actions, upgrade.actions },
+                new object[] { trigger.actions, upgrade.actions, root.encoreAdReward },
                 root.ActionLists().Select(site => (object)site.Actions).ToArray());
         }
 

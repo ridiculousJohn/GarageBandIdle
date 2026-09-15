@@ -36,7 +36,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 var config = Config();
                 Session = new GameSession(Tree.Root, config);
-                AdManager = new AdManager(Session, Ads, config, () => Saves++);
+                AdManager = new AdManager(Session, Ads, () => Saves++);
                 Session.Refreshed += () => Refreshes++;
             }
 
