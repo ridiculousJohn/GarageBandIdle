@@ -102,10 +102,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("ch2", GameBoot.EntryChapter(root).ScopeId);
         }
 
-        // A fresh game has no record, and boot does not pick for the player: the
-        // select is the screen, and only a fresh game ever sees it (12.9).
+        // A fresh game has no record and enters the first chapter, root's
+        // roster head; the switch writes the record every later boot goes by
+        // (12.9).
         [Test]
-        public void An_unrecorded_chapter_answers_null_and_the_session_stays_NoChapter()
+        public void An_unrecorded_chapter_enters_the_first_chapter()
         {
             var tree = new TestTree();
             var session = new GameSession(tree.Root, Config());
@@ -113,9 +114,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var entered = GameBoot.EntryChapter(tree.Root);
             session.SwitchChapter(entered, BootUtc);
 
-            Assert.IsNull(entered);
-            Assert.AreEqual(SessionPhase.NoChapter, session.Phase);
-            Assert.IsNull(session.Root.currentChapterId, "nothing was recorded on the player's behalf");
+            Assert.AreSame(tree.Ch1, entered);
+            Assert.AreEqual(SessionPhase.Live, session.Phase);
+            Assert.AreEqual("ch1", session.Root.currentChapterId, "the entry is recorded for the next boot");
         }
 
         // A chapter authored SINCE the save was written arrives freshly built -
@@ -144,8 +145,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var session = GameBoot.Load(
                 ComposedContent.Compose(TestTree.MakeRoot("root"), new[] { newChapter }),
                 SavePath, Config());
-            Assert.IsNull(GameBoot.EntryChapter(session.Root), "the stale record cleared, so the select is the screen");
-            var entered = (ChapterScopeState)session.Root.Children[0];   // the player's pick from the select
+            var entered = GameBoot.EntryChapter(session.Root);
+            Assert.AreEqual("ch_new", entered.ScopeId, "the stale record cleared, so boot enters the first chapter");
             session.SwitchChapter(entered, BootUtc);
 
             Assert.AreEqual("ch_new", entered.ScopeId, "the roster holds only the new chapter");

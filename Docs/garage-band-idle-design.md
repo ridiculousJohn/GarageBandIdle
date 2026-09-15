@@ -1438,8 +1438,10 @@ Durable facts live in the tree; the session holds only orchestration. The CURREN
 those durable facts — a root-held id written by `SwitchChapter` when it enters a chapter
 (backgrounding leaves it: it names where play left off, which is where boot returns), so it travels
 with the save, cloud restore included. Boot auto-enters the recorded chapter and offers no
-selection; only a save with no recorded chapter — a fresh game — shows a chapter select, and such a
-save owes no idle to conflict with. That is what makes an unpaid window unstrandable:
+selection; a save with no recorded chapter - a fresh game - enters the first chapter, root's
+roster head, and such a save owes no idle to conflict with. The chapter select is the switcher
+over Live chrome, and the screen only while the session is `NoChapter` - which boot reaches only
+if the switch refused the entry as locked. That is what makes an unpaid window unstrandable:
 every load lands on the chapter whose stamp holds it, and the offer recomputes. Never
 inferred from economy timestamps — `lastActiveUtc`
 records idle-settlement boundaries, not UI history. While `phase == AwaitingIdleClaim` the
@@ -1799,7 +1801,7 @@ Assets/Scripts/
     LongPressManipulator.cs // the hold gesture over an element's own scheduler; no capture, no propagation change
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               BarGroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
-    ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select at boot or over Live, and the AwaitingIdleClaim screen
+    ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
     NumberFormatter.cs

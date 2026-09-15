@@ -29,13 +29,13 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Where play resumes: the recorded chapter resolved over root's direct
         // children - the load-boundary name resolution, one scan (12.3). A fresh
-        // game has no record and answers null: boot stays NoChapter and the select
-        // is the first screen, which is the one state the select exists for (12.9).
+        // game has no record and enters the first chapter, the roster's head
+        // (12.9); every later boot has the record SwitchChapter wrote.
         public static ChapterScopeState EntryChapter(RootScopeState root)
         {
             var recorded = root.currentChapterId;
             if (string.IsNullOrEmpty(recorded))
-                return null;
+                return (ChapterScopeState)root.Children[0];
             foreach (var child in root.Children)
                 if (child.ScopeId == recorded)
                     return (ChapterScopeState)child;
@@ -104,8 +104,9 @@ namespace RidiculousGaming.GarageBandIdle
             // reward.
             var booted = GameBoot.Load(database.Root, SavePath, config);
             // Entering re-offers any unpaid window as the idle dialog phase; a fresh
-            // game has no record, so the switch is a no-op and the select is the first
-            // screen (12.9).
+            // game has no record and enters the first chapter with nothing owed
+            // (12.9). A locked entry is refused by the switch itself, and the
+            // select is then the screen.
             booted.SwitchChapter(GameBoot.EntryChapter(booted.Root), now);
 
             clock = new GameClock(now);
@@ -153,8 +154,9 @@ namespace RidiculousGaming.GarageBandIdle
         // Backgrounding stamps the live chapter and preserves an unpaid window
         // (SwitchChapter(null) is the backgrounding rule); the return re-enters
         // the recorded chapter, which is where the away window recomputes. A
-        // player who backgrounds on the select has no record, and the null
-        // re-entry is a no-op. The drain is what makes the switch run at the
+        // player on the select has no record only because the first chapter's
+        // entry was refused as locked, and the re-entry is refused the same
+        // way. The drain is what makes the switch run at the
         // call (12.9): a submission behind a queued refresh's command would
         // leave the save ahead of the stamp. The resume needs none - the queue
         // is empty by the time a frame has drained it.

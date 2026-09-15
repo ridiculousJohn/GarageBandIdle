@@ -4,11 +4,11 @@ using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // The fresh-game select (design doc 12.9): one button per chapter in root's
+    // The chapter select (design doc 12.9): one button per chapter in root's
     // roster, in composition order (12.14.5 sorts it), named from content. It
-    // is the whole screen for a fresh game and an overlay from Live chapter
-    // chrome; only the latter offers Back. Built once because the roster is
-    // fixed for the process.
+    // is the whole screen while the session is NoChapter and an overlay from
+    // Live chapter chrome; only the latter offers Back. Built once because the
+    // roster is fixed for the process.
     public sealed class ChapterSelectUI
     {
         public VisualElement Root { get; }

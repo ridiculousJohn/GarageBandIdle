@@ -169,8 +169,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The roster is root's children in composition order, named from
-        // content, and only a fresh game ever reaches this screen: boot enters a
-        // recorded chapter, and a save with no record owes no idle (12.9).
+        // content. NoChapter is the select's screen: boot enters the recorded
+        // chapter, or the first, and lands here only if that switch refused
+        // (12.9).
         [Test]
         public void NoChapterRendersTheSelectOverRootsRoster()
         {
