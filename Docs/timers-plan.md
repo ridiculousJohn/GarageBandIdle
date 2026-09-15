@@ -87,13 +87,19 @@ What exists and is kept, checked 2026-09-14:
    The field is named for the placement it pays, `AdPlacement.EncoreExtension`, which is a product
    slot in code; what it grants is whatever the list says. `GameConfig` loses `encoreAdSeconds` and
    `encoreCapSeconds` and their `Require` lines.
-5. **The Encore chrome binds a timer root names** (sentence 5, and the pill exists). `RootDefinition.
-   encoreTimer`, a string id, the timer the pill counts down and the window shows. The window's
-   "Boost for N" reads N off the reward list's `ExtendTimer` action, so the promise is the grant.
-   The window's factor line keeps reading the game-speed effect of the modifiers whose timer is
-   `encoreTimer`, as it reads `encore`'s today. Both fields validated on root: the timer declared,
-   the reward list non-empty and valid. This is the one place a code-side surface has a name for
-   Encore, and it is the name of a pill.
+5. **The Encore chrome names its timer in its own UXML** (John, 2026-09-14: "why can't the
+   pill/window encode the timer name in its json/xml?"). The pill is a custom element, `TimerPill`,
+   a `Button` subclass declaring one UXML attribute, `timer`, through a `UxmlFactory` and a
+   `UxmlStringAttributeDescription`, which is UI Toolkit's way to author a value on an element
+   (a plain element drops attributes its traits do not declare). `Screen.uxml` authors
+   `<TimerPill name="encore" timer="encore" .../>`; the window's remaining label reads the pill's
+   `timer`, so the chrome names it once. The code reads the attribute and knows no timer id. The
+   window's "Boost for N" reads N off the reward list's `ExtendTimer` action, so the promise is the
+   grant. The window's factor line reads the game-speed effect of the root modifiers whose `timer`
+   is the pill's, as it reads `encore`'s today. Validation: the host requires the pill's `timer` to
+   be a timer root declares, at construction, the way it requires the named elements themselves
+   (requirement 7). With this, the only name for Encore left in code is the ad placement's enum
+   member, which is a product slot.
 6. **The walk learns one edge** (sentence 1: no code later). A buff with a band flips at its timer's
    expiry minus the band. `Boundaries` already walks root and the foreground subtree; on each node
    it also visits the scope's own modifier list, and for a modifier with a timer and a nonzero band
@@ -101,7 +107,8 @@ What exists and is kept, checked 2026-09-14:
    record's own expiry is still admitted as today. This is what makes a 4x pure content: its edge is
    cut without anything named.
 7. **The `Encore` static and its code reference go.** `CodeReferences` keeps the Pass and Roadies
-   checks. `EncoreTime` reads root's `encoreTimer` record instead of the `Encore.ModifierId` record.
+   checks. `EncoreTime` reads the record the pill's `timer` attribute names instead of the
+   `Encore.ModifierId` record.
 8. **Events are unchanged** (sentence 7). Their remaining-seconds counter stays; an absolute event
    is a future option on the event definition.
 
@@ -114,13 +121,16 @@ What exists and is kept, checked 2026-09-14:
 - `ModifierDefinition.timer` (string) and `activeAfterSeconds` (double), imported from the modifier
   object; `Validate` checks the timer on the chain (`RequireTimerOnChain`, the flag's shape) and the
   band's range.
-- `RootDefinition.encoreTimer` (string) and `encoreAdReward` (List<GameAction>, `SerializeReference`
-  like every action list); imported; validated at root.
+- `RootDefinition.encoreAdReward` (List<GameAction>, `SerializeReference` like every action list);
+  imported; validated at root as non-empty and each action valid at root's context.
 - `ExtendTimer : GameAction { timer, seconds, capSeconds }` with its DTO and `KindRegistry` entry.
 - `root.json`: `"timers": ["encore"]`; the `encore` modifier gains `"timer": "encore"`;
-  `"encoreTimer": "encore"`; `"encoreAdReward": [{ "type": "ExtendTimer", "timer": "encore",
-  "seconds": 14400, "capSeconds": 86400 }]`. No other content changes. Reimport; `root.asset` and
-  `encore.asset` regenerate, rid churn elsewhere.
+  `"encoreAdReward": [{ "type": "ExtendTimer", "timer": "encore", "seconds": 14400,
+  "capSeconds": 86400 }]`. No other content changes. Reimport; `root.asset` and `encore.asset`
+  regenerate, rid churn elsewhere.
+- `Screen.uxml`: the pill element becomes `<TimerPill name="encore" timer="encore" .../>` with its
+  existing classes; `UI/TimerPill.cs` is the custom element (a `Button` with the `timer` attribute,
+  its `UxmlFactory` and `UxmlTraits`). 12.13 lists it.
 
 ### Runtime: `GameContext`, `Condition`, `GameSession`, `TickSystem`, `SaveSystem`
 
@@ -147,10 +157,11 @@ What exists and is kept, checked 2026-09-14:
   `EncoreAdSeconds` goes, and the window reads the grant off the reward list's first `ExtendTimer`
   (a small static on the window, `GrantSeconds(RootDefinition)`, zero when the list has none, and
   the button then reads "Boost").
-- `EncoreTime.Text` reads the record named by root's `encoreTimer`.
+- `EncoreTime.Text(root, timerId, nowUtc)` reads the record named by the pill's `timer` attribute;
+  `TopBarUI` reads the attribute off the `TimerPill` it requires, and hands the id to the window.
 - `EncoreWindowUI.RefreshDescription` reads the game-speed factor of the root modifiers whose
-  `timer` is `encoreTimer` (all of them, multiplied, so a future 4x prints its ladder's top without
-  a code change); the sentence stays "While active, game speed is N.NNx.".
+  `timer` is the pill's (all of them, multiplied, so a future 4x prints its ladder's top without a
+  code change); the sentence stays "While active, game speed is N.NNx.".
 
 ### Docs
 
@@ -159,8 +170,8 @@ What exists and is kept, checked 2026-09-14:
   timer. 12.11's entry points list `ExtendBuff(scope, timer, seconds, cap)` and `RunReward`. 12.12
   gains the timer checks. 12.13 drops `Encore.cs`, adds nothing. 12.14.5 or wherever declaration
   families are listed gains timers.
-- Content doc section 2: root declares timer `encore`, the modifier's `timer`, `encoreTimer`, the
-  reward list; the tier sentence becomes undecided.
+- Content doc section 2: root declares timer `encore`, the modifier's `timer`, the reward list;
+  the pill's `timer` attribute is noted as the chrome's one binding.
 - Build plan: the after-the-plan bullet becomes "undecided; content-only when decided"; the landing
   line goes on this plan's status and a build-plan row.
 - `encore-tier-plan.md` deleted.
@@ -180,11 +191,11 @@ What exists and is kept, checked 2026-09-14:
 - The ad reward: `RunReward` over root's authored list extends the timer, saves in the callback,
   closes the window; a reward list of two actions runs as one transaction.
 - Save: a record whose timer is not declared on the chain is dropped; declared ones survive.
-- Content keystone: root declares `encore` as a timer, the modifier names it, `encoreTimer` is it,
-  the reward is one `ExtendTimer` of 14400 capped at 86400. Validator: root missing `encoreTimer`
-  or with an empty reward list is refused.
-- UI: the pill and window rows read the record by root's `encoreTimer`; "Boost for 4 hours" from
-  the reward.
+- Content keystone: root declares `encore` as a timer, the modifier names it, the reward is one
+  `ExtendTimer` of 14400 capped at 86400. Validator: root with an empty reward list is refused.
+- UI: the pill and window rows read the record by the pill's `timer` attribute over the shipping
+  `Screen.uxml`; a host built over a screen whose pill names a timer root does not declare throws
+  at construction; "Boost for 4 hours" from the reward.
 - `MonetizationTests`, `EncoreTests`, `ScreenHostTests`, `TestContent.DeclareCodeReferences` (the
   Encore modifier declared with a timer, root declaring it; the code-reference helper no longer
   declares Encore for validation's sake, only the fixtures that use it do).
