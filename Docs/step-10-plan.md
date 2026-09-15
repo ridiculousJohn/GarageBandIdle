@@ -63,10 +63,13 @@ Settled in conversation and landed in the design doc the same day (commit `bb1f6
    entitlement write, one transaction ending `Live`, so the dialog closes with the phase. An
    entitlement written by any other path repaints only the button set: shown and paid never
    differ, because the dialog renders the stored lines the claim pays.
-5. **Overdrive is deferred.** If a sustained ad streak ever earns a higher speed, it is the ONE
-   Encore buff reporting 2x or 4x from its own remaining time through a formula-shaped effect -
-   never two buffs relying on the tick's clamp. Nothing in this step builds toward it, and
-   nothing forecloses it.
+5. **No higher speed tier is designed.** A 4x earned by a sustained ad streak is Cells to
+   Singularity's shape, mentioned once, and has never been reconciled with the Pass's permanent 2x;
+   the name "Overdrive" this plan carried was a conflation and no decision (corrected
+   2026-09-14). Decided later the same day as the Encore tier, design section 9: TWO root buffs,
+   the second's record written by the same grant at Encore's expiry minus the threshold, so the
+   tier edge is an expiry the segment walk already cuts at; the Pass holds both. Nothing in this
+   step builds toward it, and nothing forecloses it.
 6. **Store and ad back ends are stubs with real asynchrony.** The API shape is what a store SDK
    presents - request now, result later - and the fake completes with success by default, with
    scripted paths for a failed purchase and an aborted ad so the tests and the editor can force
@@ -574,7 +577,7 @@ content again; boot checks the scene's registry before creating the session.
 
 ## Not in step 10
 
-A real ad or store SDK - the seams and fakes are the deliverable. Overdrive (decision 5). The
+A real ad or store SDK - the seams and fakes are the deliverable. Any higher speed tier (decision 5). The
 `bought <= earned` cap held in reserve. The late-game Cash to Roadie sink. The Ch. 6 song
 operations.
 

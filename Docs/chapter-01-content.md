@@ -52,7 +52,9 @@ root
   `GameConfig` values. `game_speed` base 1; Encore is a root permanent modifier `{stat: game_speed,
   ×2}` with `appliesWhen: Any[HasEntitlement(backstage_pass), BuffActive(encore)]` - the timed record or
   the Pass, the idle fraction's shape; read by the tick and the idle claim, the claim over the
-  real-time cap (§9). Overdrive `×4` is deferred.
+  real-time cap (§9). The Encore tier (section 9, decided 2026-09-14, not yet authored): a second
+  root `game_speed x2` modifier on the same `appliesWhen` shape over its own record, for banked time
+  past the threshold; the Pass holds both.
 - Flags: `ch1_complete`, `story_ch1_open_seen`, `story_ch1_end_seen`.
 - Tags: `income`, `production` - the declared vocabulary the modifiers above filter on (§12.2).
   Declared at root because they are game-wide words: every chapter's income currency and every

@@ -137,7 +137,13 @@ lives somewhere other than a conversation.
 - **Chapters 2-8**, thematic sketches today, and the authoring decisions deferred with them: the
   Ch. 6 song operations and selection rule, the late-game Cash to Roadie sink, the reserved
   `bought <= earned` cap. Step 11's orphan sweep lands as content grows.
-- **Overdrive** ("Sold-Out Show"), the higher game_speed tier the design defers.
+- **The Encore tier** (design section 9, decided 2026-09-14): banked Encore time past a threshold
+  runs at 4x to a higher cap, as a second root `game_speed x2` buff whose record the same grant
+  writes at Encore's expiry minus the threshold, so the tier edge is an expiry the segment walk
+  already cuts at; the Pass holds both buffs and is permanent 4x. Content: the second modifier and
+  its `permanentModifiers` entry. Config: the threshold beside the cap, the cap raised. Code: the
+  second record write inside the Encore grant, and the window and pill reading the tick's one
+  clamped speed. Tuning's bound moves to the 4x owner.
 - **Bulk buy**, a runtime feature before it is a button: a read answering M, the largest count of a
   generator the balance affords at the acting scope, and a buy of N as one transaction that
   recomputes the series cost inside it and refuses whole if the balance moved (the fail-closed

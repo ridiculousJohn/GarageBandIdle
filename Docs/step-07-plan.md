@@ -65,7 +65,7 @@ threshold are thresholds in seconds, not multipliers, so both live in `GameConfi
 numbers (0.5, 14400s, 180s) are placeholders until tuning cares. The same mechanism gives
 live-only buffs (a modifier that excuses itself from idle) and chapter-local idle tuning (an
 idle-only modifier declared at one chapter) as ordinary authoring. game_speed's base is code's 1;
-Encore and Overdrive carry it as wildcard effects (step 10).
+Encore carries it as a wildcard effect (step 10).
 
 ## Careers fold into modifiers
 
@@ -139,7 +139,7 @@ Per segment [a, b]:
 1. `game_speed` read at a, CLAMPED at the consumer: `effDt = (b - a) * clamp(GetMultiplier(stat:
    game_speed), 1, GameConfig.maxGameSpeed)` at the foreground chapter's context. Section 9
    describes the caps but nothing else enforces one - unclamped authoring could stall time (a x0
-   wildcard) or stack carriers past Overdrive - so the sole consumer clamps, ceiling in the config
+   wildcard) or stack carriers past the ceiling - so the sole consumer clamps, ceiling in the config
    (4 today). The floor of 1 also forbids an authored slow-time mechanic; nothing designs one, and
    it is one constant if that ever changes. A buff live at segment start governs the whole segment
    (12.9). `effDt` stays a double - `ConsumeAndSettle` and the decrement take doubles, and the

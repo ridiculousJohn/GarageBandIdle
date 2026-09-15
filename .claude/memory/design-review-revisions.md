@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 7f293076-5bbd-4dc3-bc37-166bf599a1eb
-  modified: 2026-08-28T22:00:00.000Z
+  modified: 2026-09-15T00:49:51.415Z
 ---
 
 `Docs/garage-band-idle-design.md` went through twelve external design review passes (2026-08-17/18),
@@ -34,8 +34,19 @@ prohibits in its own words, or that its schemas make unwritable, is deliberately
 - **Event level/tier machinery.** A harder rerun is just another EventDefinition whose `availableWhen`
   gates on the prior level's completion flag. Level rewards stack as authored increments or swap via
   `RemoveModifier` + `AddModifier`.
-- **Encore as income.** It is a game-speed multiplier: `{target: game_speed, x2}`, 4x Overdrive, Pass
-  = permanent Overdrive. `game_speed` is consumed ONLY by the tick and scales production dt;
+- **Encore as income.** It is a game-speed multiplier: `{target: game_speed, x2}`; the Pass makes
+  THAT 2x permanent. CORRECTED 2026-09-14 (John): there is no designed 4x tier. "Overdrive" in the
+  design doc and the build plan's after-the-plan list is a conflation I wrote: the 4x idea is Cells to
+  Singularity's (2x per ad to a 24h bank, the excess 4x to ~36h), mentioned once; Ctrl C's Overclock
+  is a flat ad-extended 2x made permanent by its IAP and has no 4x; we discussed how a 4x would work
+  mechanically and decided NOTHING about implementing it, since it cuts against the Backstage Pass.
+  DECIDED later 2026-09-14 (John): the Encore tier - 2x to a 24h threshold, 4x beyond it to a 36h
+  cap (config placeholders), the Pass = permanent 4x so the two never compete. TWO buffs, not one
+  formula: John's argument, which I first weighed wrong - the segment walk cuts only at record
+  expiries, so a second record written by the same grant at Encore's expiry minus the threshold
+  makes the tier edge free, while a tiered formula would teach the walk to derive an edge from
+  content. Design section 9 holds the write-up; not yet built.
+  `game_speed` is consumed ONLY by the tick and scales production dt;
   wall-clock decrements (event timers, buff expiries) never scale, and yields never scale.
 - **Banking or auto-claiming a reward on reset (2026-08-18).** Resets only clear. Refuse the
   destroyer, never rescue the value - mirroring the idle-claim guard. A rung whose reset closure
