@@ -170,9 +170,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             public void Buy(GeneratorDefinition generator)
             {
-                TapUntil(() => Purchasing.CanBuy(Ctx(Tier1), generator), $"{generator.Id} affordable");
+                TapUntil(() => Purchasing.CanBuy(Ctx(Tier1), generator, 1), $"{generator.Id} affordable");
                 Tier1.generatorCounts.TryGetValue(generator.Id, out var owned);
-                Session.TryBuy(Ctx(Tier1), generator);
+                Session.TryBuy(Ctx(Tier1), generator, 1);
                 Assert.AreEqual(owned + 1, Tier1.generatorCounts[generator.Id], generator.Id);
             }
 
@@ -372,7 +372,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Spending back below the goal un-secures nothing - the latch is
             // the fact, not the balance.
-            f.Session.TryBuy(f.Ctx(f.Tier1), f.PracticeAmp);
+            f.Session.TryBuy(f.Ctx(f.Tier1), f.PracticeAmp, 1);
             Assert.Less(f.Balance(f.Tier1, f.Cash).ToDouble(), 150);
             Assert.IsTrue(f.Tier1.activeEvent.goalReached);
 

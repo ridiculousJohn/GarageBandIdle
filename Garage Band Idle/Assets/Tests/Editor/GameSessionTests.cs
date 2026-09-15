@@ -118,7 +118,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(SessionPhase.Live, f.Session.Phase);
 
             f.Session.FireProducer(ctx, f.Tree.TapProducer);                                           // +1 cash
-            f.Session.TryBuy(ctx, f.Tree.PracticeAmp);                                                 // -60
+            f.Session.TryBuy(ctx, f.Tree.PracticeAmp, 1);                                              // -60
             f.Session.TryBuy(ctx, f.Tree.StagePresence);                                               // -250
             f.Session.SetActiveBars(ctx, f.Tree.LearnCovers, new[] { f.Tree.Cover1 });
             f.Session.TryStartEvent(ctx, f.Tree.TimedGig);
@@ -165,11 +165,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // A refused buy, a nonpositive dt, and a same-chapter switch all
             // run no pipeline. The buy's answer is what its callback is told.
             bool? bought = null;
-            f.Session.TryBuy(f.Tree.Ctx(f.Tree.Tier1), f.Tree.PracticeAmp, ran => bought = ran);
+            f.Session.TryBuy(f.Tree.Ctx(f.Tree.Tier1), f.Tree.PracticeAmp, 1, ran => bought = ran);
             Assert.AreEqual(false, bought, "an unaffordable amp is refused");
             f.Session.Tick(0, f.Tree.Now);
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
             Assert.AreEqual(2, f.Refreshes);
+        }
+
+        // A count is one command (12.2/12.9): one spend, one count write, one
+        // sweep at the close and one refresh, whether the player tapped "+1"
+        // five times or "+5" once. The latch the crossing arms is set once.
+        [Test]
+        public void A_bulk_buy_is_one_transaction()
+        {
+            var f = new Fixture();
+            var ctx = f.Tree.Ctx(f.Tree.Tier1);
+            f.Tree.Tier1.balances["cash"] = 1000;
+            f.Tree.Tier1.earnedTotals["cash"] = 1000;                  // the amp's gate wants 100 earned
+            f.Tree.Tier1Trigger.condition = new OwnedCountAtLeast { generator = f.Tree.PracticeAmp, count = 3 };
+            f.Tree.Tier1Trigger.actions.Add(new SetFlag { flagId = "fans_revealed" });
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);            // the entry sweep sees no amps
+            var before = f.Refreshes;
+
+            bool? bought = null;
+            f.Session.TryBuy(ctx, f.Tree.PracticeAmp, 5, ran => bought = ran);
+
+            Assert.AreEqual(true, bought);
+            Assert.AreEqual(before + 1, f.Refreshes, "one transaction, one refresh");
+            Assert.AreEqual(5, f.Tree.Tier1.generatorCounts["practice_amp"]);
+            Assert.IsTrue(f.Tree.Tier1.firedTriggers.Contains("tier1_trigger"),
+                "the count crossed three inside the buy and the close's sweep latched it");
         }
 
         [Test]

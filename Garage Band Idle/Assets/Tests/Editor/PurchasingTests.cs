@@ -37,7 +37,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = Ready();
             tree.Tier1.generatorCounts["practice_amp"] = 2;
 
-            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp));
+            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp, 1));
 
             // The third amp costs 60 x 1.15^2.
             AssertClose(1000 - 60 * 1.15 * 1.15, tree.Tier1.balances["cash"], "balance");
@@ -48,7 +48,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Spending_never_touches_the_earned_total()
         {
             var tree = Ready();
-            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp));
+            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp, 1));
 
             // Section 2's strobe-proofing: a threshold met once stays met.
             AssertClose(1000, tree.Tier1.earnedTotals["cash"], "earned total");
@@ -61,12 +61,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = Ready();
 
             // The drummer needs three amps.
-            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.Drummer));
+            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.Drummer, 1));
             Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("drummer"));
             AssertClose(1000, tree.Tier1.balances["cash"], "balance");
 
             tree.Tier1.generatorCounts["practice_amp"] = 3;
-            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.Drummer));
+            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.Drummer, 1));
             Assert.AreEqual(1, tree.Tier1.generatorCounts["drummer"]);
         }
 
@@ -84,7 +84,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 t.Tier1Def.generators.Add(gateless);
             });
 
-            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), gateless));
+            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), gateless, 1));
             AssertClose(1000, tree.Tier1.balances["cash"], "balance");
         }
 
@@ -94,7 +94,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = Ready();
             tree.Tier1.balances["cash"] = 59.99;
 
-            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp));
+            Assert.IsFalse(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp, 1));
             AssertClose(59.99, tree.Tier1.balances["cash"], "balance");
             Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("practice_amp"));
         }
@@ -117,7 +117,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // A repeatable free purchase is an unbounded rate printer, and a
             // malformed cost curve is content, not an answer about state.
             Assert.Throws<System.InvalidOperationException>(
-                () => Purchasing.TryBuy(tree.Ctx(tree.Tier1), free));
+                () => Purchasing.TryBuy(tree.Ctx(tree.Tier1), free, 1));
             Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("free_gear"));
         }
 
@@ -146,7 +146,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_bought_generator_starts_contributing_immediately()
         {
             var tree = Ready();
-            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp));
+            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp, 1));
 
             AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "rate");
         }
@@ -243,7 +243,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = Ready();
 
-            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp), "generator");
+            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp, 1), "generator");
             Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.AmpStrings), "upgrade");
 
         }
@@ -253,7 +253,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = Ready();
 
-            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp));
+            Assert.IsTrue(Purchasing.TryBuy(tree.Ctx(tree.Tier1), tree.PracticeAmp, 1));
 
             Assert.AreEqual(1, tree.Tier1.generatorCounts["practice_amp"]);
             Assert.IsFalse(tree.Root.generatorCounts.ContainsKey("practice_amp"));
@@ -266,7 +266,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = Ready();
             Assert.Throws<System.InvalidOperationException>(
-                () => Purchasing.TryBuy(tree.Ctx(tree.Root), tree.PracticeAmp));
+                () => Purchasing.TryBuy(tree.Ctx(tree.Root), tree.PracticeAmp, 1));
         }
 
         // CanBuy answers the state question the UI needs without mutating; Buy
@@ -277,12 +277,187 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = Ready();
             var ctx = tree.Ctx(tree.Tier1);
 
-            Assert.IsTrue(Purchasing.CanBuy(ctx, tree.PracticeAmp));
+            Assert.IsTrue(Purchasing.CanBuy(ctx, tree.PracticeAmp, 1));
             Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("practice_amp"), "CanBuy mutates nothing");
 
             tree.Tier1.balances["cash"] = 0;
-            Assert.IsFalse(Purchasing.CanBuy(ctx, tree.PracticeAmp));
-            Assert.Throws<System.InvalidOperationException>(() => Purchasing.Buy(ctx, tree.PracticeAmp));
+            Assert.IsFalse(Purchasing.CanBuy(ctx, tree.PracticeAmp, 1));
+            Assert.Throws<System.InvalidOperationException>(() => Purchasing.Buy(ctx, tree.PracticeAmp, 1));
+        }
+
+        // ---- the count (12.2) ----
+
+        // The series factor is computed as its own quotient, so at n = 1 it is
+        // x / x for a finite nonzero x - exactly 1, and the single buy costs
+        // exactly the unit cost. Equality with ==, not a tolerance.
+        [Test]
+        public void The_cost_of_one_is_the_unit_cost_exactly()
+        {
+            var tree = Ready();
+            var ctx = tree.Ctx(tree.Tier1);
+
+            foreach (var owned in new[] { 0, 1, 25 })
+            {
+                tree.Tier1.generatorCounts["practice_amp"] = owned;
+                Assert.AreEqual(tree.PracticeAmp.CostAt(owned),
+                    Purchasing.CostOf(tree.PracticeAmp, ctx, 1), $"owned {owned}");
+            }
+        }
+
+        // The closed form is the sum of the unit costs it replaces. The relative
+        // tolerance is the growth^n - 1 subtraction's digit loss, under one digit
+        // of sixteen at the authored 1.15.
+        [Test]
+        public void The_cost_of_n_is_the_sum_of_the_n_unit_costs()
+        {
+            var tree = Ready();
+            var ctx = tree.Ctx(tree.Tier1);
+
+            foreach (var owned in new[] { 0, 25 })
+            {
+                tree.Tier1.generatorCounts["practice_amp"] = owned;
+                foreach (var count in new[] { 2, 10, 76 })
+                {
+                    var expected = BigNumber.Zero;
+                    for (var i = 0; i < count; i++)
+                        expected += tree.PracticeAmp.CostAt(owned + i);
+
+                    Assert.AreEqual(expected.ToDouble(),
+                        Purchasing.CostOf(tree.PracticeAmp, ctx, count).ToDouble(),
+                        expected.ToDouble() * 1e-12, $"owned {owned}, count {count}");
+                }
+            }
+        }
+
+        // Validation refuses only a nonpositive growth, so a growth of exactly 1
+        // is authorable and the flat branch is required rather than defensive.
+        [Test]
+        public void A_growth_of_one_costs_the_base_cost_per_unit()
+        {
+            GeneratorDefinition flat = null;
+            var tree = Ready(t =>
+            {
+                flat = TestTree.MakeDefinition<GeneratorDefinition>("flat_gear");
+                flat.availableWhen = new CurrencyAtLeast { currency = t.Cash, threshold = 0 };
+                flat.costCurrency = t.Cash;
+                flat.baseCost = 7;
+                flat.growth = 1;
+                flat.produces.Add(TestTree.Entry(t.Cash, Stat.Rate, 1));
+                t.Tier1Def.generators.Add(flat);
+            });
+            var ctx = tree.Ctx(tree.Tier1);
+
+            foreach (var count in new[] { 1, 7, 1000 })
+                Assert.AreEqual((BigNumber)(7 * count), Purchasing.CostOf(flat, ctx, count), $"count {count}");
+        }
+
+        // A count below one is a caller bug at every leg, which is the ruling
+        // Buy already gives a false Can - not an answer the player's own state
+        // could have produced.
+        [Test]
+        public void A_count_below_one_throws_at_every_leg()
+        {
+            var tree = Ready();
+            var ctx = tree.Ctx(tree.Tier1);
+
+            foreach (var count in new[] { 0, -1 })
+            {
+                Assert.Throws<System.InvalidOperationException>(
+                    () => Purchasing.CostOf(tree.PracticeAmp, ctx, count), $"CostOf {count}");
+                Assert.Throws<System.InvalidOperationException>(
+                    () => Purchasing.CanBuy(ctx, tree.PracticeAmp, count), $"CanBuy {count}");
+                Assert.Throws<System.InvalidOperationException>(
+                    () => Purchasing.Buy(ctx, tree.PracticeAmp, count), $"Buy {count}");
+                Assert.Throws<System.InvalidOperationException>(
+                    () => Purchasing.TryBuy(ctx, tree.PracticeAmp, count), $"TryBuy {count}");
+            }
+
+            Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("practice_amp"), "nothing was written");
+            AssertClose(1000, tree.Tier1.balances["cash"], "balance");
+        }
+
+        // M is zero when the gate is closed or one unit is unaffordable, and
+        // otherwise a count the search evaluated through CostOf itself - so the
+        // number the row prints is one the command accepts.
+        [Test]
+        public void MaxAffordable_answers_a_count_it_evaluated_or_zero()
+        {
+            var tree = Ready();
+            var ctx = tree.Ctx(tree.Tier1);
+
+            // The domain owns the gate: a closed one answers zero however much
+            // the balance holds.
+            tree.Tier1.earnedTotals["cash"] = 0;
+            Assert.AreEqual(0, Purchasing.MaxAffordable(ctx, tree.PracticeAmp), "the gate is closed");
+
+            tree.Tier1.earnedTotals["cash"] = 1000;
+            tree.Tier1.balances["cash"] = 59;
+            Assert.AreEqual(0, Purchasing.MaxAffordable(ctx, tree.PracticeAmp), "one unit short of the first unit");
+
+            var eight = Purchasing.CostOf(tree.PracticeAmp, ctx, 8);
+            tree.Tier1.balances["cash"] = eight;
+            Assert.AreEqual(8, Purchasing.MaxAffordable(ctx, tree.PracticeAmp), "exactly the price of eight");
+            Assert.IsTrue(Purchasing.CanBuy(ctx, tree.PracticeAmp, 8), "the answer is buyable");
+            Assert.IsFalse(Purchasing.CanBuy(ctx, tree.PracticeAmp, 9), "and one more is not");
+
+            tree.Tier1.balances["cash"] = eight - 0.01;
+            Assert.AreEqual(7, Purchasing.MaxAffordable(ctx, tree.PracticeAmp), "a cent short of eight");
+            Assert.IsTrue(Purchasing.CanBuy(ctx, tree.PracticeAmp, 7), "the answer is buyable");
+            Assert.IsFalse(Purchasing.CanBuy(ctx, tree.PracticeAmp, 8), "and one more is not");
+        }
+
+        // The search is a doubling bracket and a bisect over the one cost
+        // function, so a count no loop of unit buys could reach is still exact.
+        [Test]
+        public void MaxAffordable_reaches_a_count_a_loop_never_would()
+        {
+            GeneratorDefinition penny = null;
+            var tree = Ready(t =>
+            {
+                penny = TestTree.MakeDefinition<GeneratorDefinition>("penny_gear");
+                penny.availableWhen = new CurrencyAtLeast { currency = t.Cash, threshold = 0 };
+                penny.costCurrency = t.Cash;
+                penny.baseCost = 1;
+                penny.growth = 1;
+                penny.produces.Add(TestTree.Entry(t.Cash, Stat.Rate, 1));
+                t.Tier1Def.generators.Add(penny);
+            });
+            tree.Tier1.balances["cash"] = 1e9;
+            tree.Tier1.earnedTotals["cash"] = 1e9;
+
+            Assert.AreEqual(1000000000, Purchasing.MaxAffordable(tree.Ctx(tree.Tier1), penny));
+        }
+
+        // A buy of n is one Spend of the series sum and one write of owned + n,
+        // never a loop of unit buys.
+        [Test]
+        public void A_bulk_buy_is_one_spend_and_one_count_write()
+        {
+            var tree = Ready();
+            var ctx = tree.Ctx(tree.Tier1);
+            tree.Tier1.generatorCounts["practice_amp"] = 2;
+            var cost = Purchasing.CostOf(tree.PracticeAmp, ctx, 5);
+
+            Purchasing.Buy(ctx, tree.PracticeAmp, 5);
+
+            Assert.AreEqual(7, tree.Tier1.generatorCounts["practice_amp"]);
+            Assert.AreEqual((BigNumber)1000 - cost, tree.Tier1.balances["cash"], "the series sum, spent once");
+            Assert.AreEqual(1, tree.Tier1.generatorCounts.Count, "one generator, one entry");
+        }
+
+        // Fail-closed against the affordability of the WHOLE count: a buy the
+        // balance cannot cover is refused entire rather than trimmed.
+        [Test]
+        public void A_bulk_buy_the_balance_cannot_cover_refuses_whole()
+        {
+            var tree = Ready();
+            var ctx = tree.Ctx(tree.Tier1);
+            var oneShort = Purchasing.CostOf(tree.PracticeAmp, ctx, 3) - 0.01;
+            tree.Tier1.balances["cash"] = oneShort;
+
+            Assert.IsFalse(Purchasing.TryBuy(ctx, tree.PracticeAmp, 3));
+            Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("practice_amp"), "no count was written");
+            Assert.AreEqual(oneShort, tree.Tier1.balances["cash"], "and nothing was spent");
         }
     }
 }

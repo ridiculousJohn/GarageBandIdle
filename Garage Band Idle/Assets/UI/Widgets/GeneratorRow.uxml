@@ -6,5 +6,6 @@
         </ui:VisualElement>
         <ui:Label name="count" class="row-count" />
         <ui:Button name="buy" class="row-buy" />
+        <ui:Button name="buy_max" class="row-buy" />
     </ui:VisualElement>
 </ui:UXML>

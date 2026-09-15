@@ -17,19 +17,19 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425475204481028
+    rid: 7579425489276108826
   actions:
-  - rid: 7579425475204481029
+  - rid: 7579425489276108827
   references:
     version: 2
     RefIds:
-    - rid: 7579425475204481028
+    - rid: 7579425489276108826
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         generator: {fileID: 11400000, guid: 33b3573035229174eb47d9cb6e0b0f02, type: 2}
         count: 3
-    - rid: 7579425475204481029
+    - rid: 7579425489276108827
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: drummer_revealed

@@ -153,4 +153,13 @@ Stated here so they are tested facts and not caveats.
 
 ## Status
 
-Planned 2026-09-15. Not started.
+DONE 2026-09-15 - 799/799 green (+11: 8 purchasing, 1 session and 2 host tests added, 0 deleted).
+Landed as planned. Two review corrections before the run: the search's `n == lo` early return was
+deleted, since when the cap is 1 the loop already returns through `n == cap` after one redundant
+probe and the branch guarded nothing; the `cap < 1` operand stays, because without it a saturated
+count hands `CostOf` a zero and throws from inside the search. Two fixture facts from the tests
+agent: the host fixture's tap leaves 1001 cash over the 1000 poured, so the max test's eight is
+against 1001 (823.61 for eight, 1007.15 for nine, 177.39 left under the ninth unit's 183.54); and
+the exactly-one-unit test deposits 100 before the reveal's tap, since the reveal helper alone
+leaves 1 cash. No test drives a UI click, as none does today: the max test submits the same
+command the button's click submits, with the count it asserted was printed.

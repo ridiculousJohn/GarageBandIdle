@@ -13,13 +13,19 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // either path: static content cannot legitimately be in that state, and
     // reporting one as "no" hides a bug behind an answer the player's own state
     // could have produced.
+    //
+    // A generator purchase is a count (12.2): CostOf is the one function that
+    // computes a generator cost, MaxAffordable searches over it, and a buy is
+    // one spend of the series sum and one write of the new count. The count is
+    // required at every leg, so what the row prints and what the bank pays are
+    // the same number by construction.
     public static class Purchasing
     {
-        public static bool CanBuy(GameContext ctx, GeneratorDefinition generator)
+        public static bool CanBuy(GameContext ctx, GeneratorDefinition generator, int count)
         {
             var declaringCtx = ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, generator));
             return generator.IsAvailable(declaringCtx)
-                && declaringCtx.CanSpend(generator.costCurrency.Id, CostOf(generator, declaringCtx));
+                && declaringCtx.CanSpend(generator.costCurrency.Id, CostOf(generator, declaringCtx, count));
         }
 
         // The payload takes the action-list runner's question like every other
@@ -36,17 +42,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // Performs the purchase. Calling either when Can answers false is a
         // caller bug, so the guard throws rather than no-oping.
-        public static void Buy(GameContext ctx, GeneratorDefinition generator)
+        // One spend of the series sum and one write of the new count, never a
+        // loop of unit buys: nothing in the effect vocabulary observes a unit
+        // landing and counts scale on read, so the count lands at once and the
+        // trigger sweep runs once at the transaction's close (12.9).
+        public static void Buy(GameContext ctx, GeneratorDefinition generator, int count)
         {
             var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, generator);
             var declaringCtx = ctx.Rebase(declaring);
-            var cost = CostOf(generator, declaringCtx);
+            var cost = CostOf(generator, declaringCtx, count);
             if (!generator.IsAvailable(declaringCtx) || !declaringCtx.CanSpend(generator.costCurrency.Id, cost))
                 throw new InvalidOperationException($"Buy: generator '{generator.Id}' is not currently buyable - ask CanBuy first.");
 
             declaring.generatorCounts.TryGetValue(generator.Id, out var owned);
             declaringCtx.Spend(generator.costCurrency.Id, cost);
-            declaring.generatorCounts[generator.Id] = owned + 1;
+            declaring.generatorCounts[generator.Id] = owned + count;
         }
 
         public static void Buy(GameContext ctx, UpgradeDefinition upgrade)
@@ -68,11 +78,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             ActionList.Run(upgrade.actions, declaringCtx);
         }
 
-        public static bool TryBuy(GameContext ctx, GeneratorDefinition generator)
+        public static bool TryBuy(GameContext ctx, GeneratorDefinition generator, int count)
         {
-            if (!CanBuy(ctx, generator))
+            if (!CanBuy(ctx, generator, count))
                 return false;
-            Buy(ctx, generator);
+            Buy(ctx, generator, count);
             return true;
         }
 
@@ -84,17 +94,87 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return true;
         }
 
-        // Runtime backstop on the cost curve. Validation refuses a nonpositive
-        // baseCost and a nonpositive growth, but that pass is dev-only, and
-        // generator purchases REPEAT - a free one is an unbounded rate printer.
-        public static BigNumber CostOf(GeneratorDefinition generator, GameContext declaringCtx)
+        // The cost of count units from the current owned count: the geometric
+        // series, as the unit cost times a factor (12.2). Runtime backstop on
+        // the cost curve: validation refuses a nonpositive baseCost and a
+        // nonpositive growth, but that pass is dev-only, and generator
+        // purchases REPEAT - a free one is an unbounded rate printer.
+        public static BigNumber CostOf(GeneratorDefinition generator, GameContext declaringCtx, int count)
         {
-            declaringCtx.Scope.generatorCounts.TryGetValue(generator.Id, out var owned);
-            var cost = generator.CostAt(owned);
-            if (cost <= BigNumber.Zero)
+            if (count < 1)
                 throw new InvalidOperationException(
-                    $"Generator '{generator.Id}' computed cost {cost} at owned={owned}.");
-            return cost;
+                    $"CostOf: generator '{generator.Id}' asked for count {count}; a purchase is at least one unit.");
+
+            declaringCtx.Scope.generatorCounts.TryGetValue(generator.Id, out var owned);
+            var unit = generator.CostAt(owned);
+            if (unit <= BigNumber.Zero)
+                throw new InvalidOperationException(
+                    $"Generator '{generator.Id}' computed cost {unit} at owned={owned}.");
+
+            // The factor is its own quotient, multiplied onto the unit cost
+            // afterwards: at count 1 it is x / x, exactly 1 in IEEE, so a single
+            // buy costs the unit cost bit for bit. Growth 1 is authorable -
+            // validation refuses only a nonpositive growth - and there the
+            // closed form is 0 / 0, so the count IS the factor.
+            var factor = generator.growth == BigNumber.One
+                ? (BigNumber)count
+                : (BigNumber.Pow(generator.growth, count) - BigNumber.One) / (generator.growth - BigNumber.One);
+            return unit * factor;
+        }
+
+        // M, the largest count the gate and the balance allow at the declaring
+        // scope, or zero (12.2). Doubling then bisection over CostOf, with no
+        // logarithm: every probe IS the affordability check, so there is no
+        // closed-form estimate left needing a fix-up against the last digit.
+        public static int MaxAffordable(GameContext ctx, GeneratorDefinition generator)
+        {
+            var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, generator);
+            var declaringCtx = ctx.Rebase(declaring);
+            if (!generator.IsAvailable(declaringCtx))
+                return 0;
+
+            declaring.generatorCounts.TryGetValue(generator.Id, out var owned);
+
+            // owned + count has to fit the count field, so the bracket stops at
+            // the headroom left in that int rather than at int.MaxValue.
+            var cap = int.MaxValue - owned;
+
+            bool Affordable(int n) =>
+                declaringCtx.CanSpend(generator.costCurrency.Id, CostOf(generator, declaringCtx, n));
+
+            if (cap < 1 || !Affordable(1))
+                return 0;
+
+            // The invariant through both loops: lo is a count Affordable was
+            // evaluated true for, and the answer is always lo. So a non-monotone
+            // last bit in the power can hide a larger affordable count, never
+            // offer a count the command would refuse on its own arithmetic.
+            var lo = 1;
+            var hi = 0;
+            for (var probe = 2L; ; probe *= 2)
+            {
+                var n = (int)Math.Min(probe, cap);
+                if (!Affordable(n))
+                {
+                    hi = n;
+                    break;
+                }
+                lo = n;
+                if (n == cap)
+                    return cap;
+            }
+
+            // hi is the first unaffordable count above lo; the bracket closes
+            // on lo, which is the largest count that was found affordable.
+            while (hi - lo > 1)
+            {
+                var mid = lo + (hi - lo) / 2;
+                if (Affordable(mid))
+                    lo = mid;
+                else
+                    hi = mid;
+            }
+            return lo;
         }
     }
 }

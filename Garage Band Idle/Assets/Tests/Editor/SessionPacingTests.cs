@@ -201,7 +201,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // at ONE amp, since the second is not paid for until the mutation
             // runs against the settled state.
             f.Frame(0.9);
-            f.Session.TryBuy(f.Ctx(0.9), f.Tree.PracticeAmp);
+            f.Session.TryBuy(f.Ctx(0.9), f.Tree.PracticeAmp, 1);
 
             Assert.AreEqual(2, f.Tree.Tier1.generatorCounts["practice_amp"]);
             AssertClose(1000 + 0.45 - 69, f.Cash, "0.9s at 0.5/s, less the second amp's 60 x 1.15");
@@ -219,7 +219,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // settles the 0.5 at one amp before the second exists. A zero
             // elapsed is not a discontinuity.
             f.Frame(0.5);
-            f.Session.TryBuy(f.Ctx(0.5), f.Tree.PracticeAmp);
+            f.Session.TryBuy(f.Ctx(0.5), f.Tree.PracticeAmp, 1);
             AssertClose(1000 + 0.25 - 69, f.Cash);
 
             // The bank was settled by the buy, so 0.5 more is still under the

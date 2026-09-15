@@ -199,7 +199,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)1, f.Cash);
 
             bool? bought = null;
-            f.Session.TryBuy(f.Ctx, f.Tree.PracticeAmp, ran => bought = ran);
+            f.Session.TryBuy(f.Ctx, f.Tree.PracticeAmp, 1, ran => bought = ran);
             Assert.AreEqual(false, bought, "an unaffordable amp is the command's own refusal");
             Assert.IsFalse(f.Tree.Tier1.generatorCounts.ContainsKey("practice_amp"), "and nothing was written");
         }

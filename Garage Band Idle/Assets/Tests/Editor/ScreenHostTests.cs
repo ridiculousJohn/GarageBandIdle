@@ -719,7 +719,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The amp's authored gate is 100 earned cash and its first unit
             // costs 60, so one deposit both opens the gate and pays for it.
             fx.Ctx(fx.Tier1).Deposit("cash", 100);
-            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PracticeAmp);
+            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PracticeAmp, 1);
             Assert.AreEqual(1, fx.Tier1.generatorCounts["practice_amp"], "one amp is producing");
 
             // One tick of the Live cadence; its own refresh is what repaints.
@@ -794,6 +794,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var buy = amp.Q<Button>("buy");
             Assert.AreEqual("+1", buy.text);
             Assert.IsTrue(buy.enabledSelf, "101 cash covers the 60");
+            var buyMax = amp.Q<Button>("buy_max");
+            Assert.AreEqual("+1", buyMax.text, "101 cash covers one amp and not the second's 69");
+            Assert.IsTrue(buyMax.enabledSelf);
         }
 
         // Exposed stays exposed, and the purchase gate is the button's business
@@ -821,10 +824,75 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(drummerBuy.enabledSelf,
                 "no amps are owned, so the purchase gate is closed and the button says so");
             Assert.AreEqual("+1", drummerBuy.text, "the button is the single-unit buy");
+            var drummerBuyMax = drummer.Q<Button>("buy_max");
+            Assert.IsFalse(drummerBuyMax.enabledSelf, "a closed gate affords zero of them");
+            Assert.AreEqual("+1", drummerBuyMax.text, "and at zero the max button reads the single unit");
             Assert.AreEqual("250.00 Cash => 3.00 Cash", drummer.Q<Label>("yield").text,
                 "fans sits behind its own reveal, and an inactive currency takes nothing from any source");
             Assert.IsFalse(section.Modules[0].Widget.Root.Q<Button>("buy").enabledSelf,
                 "1 cash after one press does not cover the amp's 60");
+        }
+
+        // The row's second button prints the largest count the balance affords
+        // and buys that count (12.2, 12.11): the number on the screen and the
+        // number the bank pays are the same number.
+        [Test]
+        public void TheMaxButtonPrintsTheLargestAffordableCountAndBuysIt()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            var row = AmpRow(fx);
+
+            fx.Tier1.balances["cash"] = 1000;
+            fx.Tier1.earnedTotals["cash"] = 1000;
+            // The tap is a transaction, so its own refresh is what repaints the
+            // row over the balance set beneath it.
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+
+            var ctx = fx.Ctx(fx.Tier1);
+            var max = Purchasing.MaxAffordable(ctx, fx.PracticeAmp);
+            // 60 x (1.15^n - 1) / 0.15 against the 1001 cash the tap left:
+            // eight units cost 823.61 and nine cost 1007.15.
+            Assert.AreEqual(8, max);
+            var buy = row.Root.Q<Button>("buy");
+            var buyMax = row.Root.Q<Button>("buy_max");
+            Assert.AreEqual("+1", buy.text);
+            Assert.AreEqual("+8", buyMax.text);
+            Assert.IsTrue(buy.enabledSelf);
+            Assert.IsTrue(buyMax.enabledSelf);
+
+            // What the button's click submits: the count it printed.
+            fx.Session.TryBuy(ctx, fx.PracticeAmp, max);
+
+            Assert.AreEqual("x8", row.Root.Q<Label>("count").text);
+            // 177.39 left against the ninth unit's 183.54, so nothing is
+            // affordable: both buttons read "+1" and neither presses.
+            Assert.AreEqual("+1", buy.text);
+            Assert.AreEqual("+1", buyMax.text);
+            Assert.IsFalse(buy.enabledSelf);
+            Assert.IsFalse(buyMax.enabledSelf);
+        }
+
+        // Exactly one unit affordable is the state both buttons read "+1" for,
+        // and both do the same thing - no hiding rule for a state that lasts
+        // seconds (12.11).
+        [Test]
+        public void BothButtonsReadPlusOneWhenExactlyOneUnitIsAffordable()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            fx.Ctx(fx.Tier1).Deposit("cash", 100);
+            var row = AmpRow(fx);
+
+            // The tap the reveal fires leaves 101 cash: the first amp's 60 is
+            // covered and the second's 69 is not.
+            Assert.AreEqual(1, Purchasing.MaxAffordable(fx.Ctx(fx.Tier1), fx.PracticeAmp));
+            var buy = row.Root.Q<Button>("buy");
+            var buyMax = row.Root.Q<Button>("buy_max");
+            Assert.AreEqual("+1", buy.text);
+            Assert.AreEqual("+1", buyMax.text);
+            Assert.IsTrue(buy.enabledSelf);
+            Assert.IsTrue(buyMax.enabledSelf);
         }
 
         // The description is content read off the definition, never a widget's
@@ -1094,7 +1162,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Bought beneath the standing screen: the gate is 100 earned cash
             // and the first unit costs 60.
             fx.Ctx(fx.Tier1).Deposit("cash", 100);
-            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PracticeAmp);
+            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PracticeAmp, 1);
             Assert.AreEqual(1, fx.Tier1.generatorCounts["practice_amp"], "the amp was bought");
 
             Assert.IsTrue(Fixture.Shown(fx.Host.GeneratorInfo.Root), "a purchase is not a close");

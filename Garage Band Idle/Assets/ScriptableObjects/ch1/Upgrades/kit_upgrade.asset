@@ -17,7 +17,7 @@ MonoBehaviour:
   displayName: Kit Upgrade
   description: Doubles the cash every drummer brings in.
   gate:
-    rid: 7579425475204481027
+    rid: 7579425489276108803
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   cost:
     _value:
@@ -39,7 +39,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425475204481027
+    - rid: 7579425489276108803
       type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

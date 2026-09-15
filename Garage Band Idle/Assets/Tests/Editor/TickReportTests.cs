@@ -176,7 +176,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // 100-earned gate: refused before any mutation, so there is nothing
             // for the refusal to invalidate.
             bool? bought = null;
-            f.Session.TryBuy(f.Ctx(1), f.Tree.PracticeAmp, ran => bought = ran);
+            f.Session.TryBuy(f.Ctx(1), f.Tree.PracticeAmp, 1, ran => bought = ran);
             Assert.AreEqual(false, bought, "the second amp is unaffordable, so the command refuses");
             Assert.AreSame(report, f.Session.LastTick);
         }

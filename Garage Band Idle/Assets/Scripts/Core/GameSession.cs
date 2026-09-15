@@ -433,8 +433,8 @@ namespace RidiculousGaming.GarageBandIdle
             RunCommand(ctx, c => c.Scope.Definition is InteriorDefinition interior
                 && interior.rung != null && interior.rung.TryExecute(c), completed);
 
-        public void TryBuy(GameContext ctx, GeneratorDefinition generator, Action<bool> completed = null) =>
-            RunCommand(ctx, c => Purchasing.TryBuy(c, generator), completed);
+        public void TryBuy(GameContext ctx, GeneratorDefinition generator, int count, Action<bool> completed = null) =>
+            RunCommand(ctx, c => Purchasing.TryBuy(c, generator, count), completed);
 
         public void TryBuy(GameContext ctx, UpgradeDefinition upgrade, Action<bool> completed = null) =>
             RunCommand(ctx, c => Purchasing.TryBuy(c, upgrade), completed);
