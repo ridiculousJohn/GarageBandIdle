@@ -66,10 +66,9 @@ Settled in conversation and landed in the design doc the same day (commit `bb1f6
 5. **No higher speed tier is designed.** A 4x earned by a sustained ad streak is Cells to
    Singularity's shape, mentioned once, and has never been reconciled with the Pass's permanent 2x;
    the name "Overdrive" this plan carried was a conflation and no decision (corrected
-   2026-09-14). Decided later the same day as the Encore tier, design section 9: TWO root buffs,
-   the second's record written by the same grant at Encore's expiry minus the threshold, so the
-   tier edge is an expiry the segment walk already cuts at; the Pass holds both. Nothing in this
-   step builds toward it, and nothing forecloses it.
+   2026-09-14). It stays undecided; the timer refactor (`timers-plan.md`) makes any such tier one
+   more modifier reading the `encore` timer, authored or not, with no code either way. Nothing in
+   this step builds toward it, and nothing forecloses it.
 6. **Store and ad back ends are stubs with real asynchrony.** The API shape is what a store SDK
    presents - request now, result later - and the fake completes with success by default, with
    scripted paths for a failed purchase and an aborted ad so the tests and the editor can force

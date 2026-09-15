@@ -569,38 +569,26 @@ its end as housekeeping; `BuffActive` judges a record by the context's own time
 (`expiresAtUtc > NowUtc`), so a segment, a closing sweep, or a module gate reads the truth at the
 moment it asks, and no answer depends on when a prune ran.
 
-**The Encore tier** (decided 2026-09-14, not yet built; Cells to Singularity's shape, since Ctrl
-C's Overclock has no tier above its 2x). Banked Encore time up to a threshold runs at 2x; banked
-time beyond the threshold runs at 4x, up to the cap. Threshold and cap are `GameConfig` numbers
-(24 and 36 hours as placeholders); the two factors are authored. So a player with 26 hours banked
-runs the first 2 hours at 4x and the next 24 at 2x, and every further ad extends the 4x stretch
-until the cap refuses it. **It is two buffs, not one formula.** Two root modifiers, each a constant
-`game_speed x2`: `encore`, applying while the Pass is held or its record is live, exactly as today;
-and a second, applying while the Pass is held or ITS record is live. Both live is the authored
-product 4x, and `maxGameSpeed` 4 is that product's ceiling, not its source. **One grant writes both
-records**: the command that extends Encore to the cap also sets the tier record's expiry to
-Encore's expiry minus the threshold when that lies in the future, and leaves it expired otherwise,
-so the tier record IS "Encore remaining exceeds the threshold" held as a stamp. That is the whole
-reason for two records over one tiered formula: the tick and the idle claim cut their windows at
-record expiries and nowhere else, so the moment speed falls from 4x to 2x is an ordinary expiry
-the walk already admits, the segment before it reads both records live and the one after reads
-Encore alone, and the walk learns nothing about content. A single formula over remaining time
-would have needed the walk to derive a second edge, expiry minus threshold, from a number living
-on a modifier's effect. `BuffActive` over the tier record is the existing condition kind; the
-Encore window and the pill read the tick's one clamped speed, so they say 4.00x or 2.00x from what
-the tick uses. Nothing here changes the segment walk, the condition family, or the effect shape.
+**A higher speed tier is undecided** (2026-09-14). Cells to Singularity banks 2x ad time to 24 hours and
+runs the excess at 4x to a higher cap; Ctrl C's Overclock has no tier above its 2x. Nothing is
+decided, because a 4x earned by ads has not been reconciled with the Pass. What IS settled is that
+the engine must be able to do either with no further code, by content alone: timers are a declared
+value on a scope, a buff declares which timer it reads and how much time must remain for it to
+count as active, and the extend is one command (`timers-plan.md`). A 4x, if ever authored, is one
+more root modifier reading the `encore` timer with a 24-hour band; removing it is deleting that
+modifier. The walk cuts a segment where such a buff flips, expiry minus band, as it cuts at an
+expiry today.
 
 **Backstage Pass** - lifetime IAP (~$5-10). Every reward the two ads give, without the ads, plus a
-raised idle cap: permanent Encore at the TOP tier - the entitlement is the first leg of BOTH
-game-speed modifiers' `appliesWhen`, so a Pass owner applies the same two memberships a free
-player's two records apply and runs at 4x always; the Pass and the ad streak never compete,
-because the Pass simply holds the best acceleration the streak can reach. The Encore window shows
+raised idle cap: permanent Encore - the entitlement is the first leg of `encore`'s own
+`appliesWhen`, so a Pass owner applies the same one membership a free player's timer applies, and
+the Encore window shows
 "Time remaining" as infinity with no ad button, the Pass superseding the timer - the idle claim always doubled
 (the offer's lines computed at twice the amount, exactly what the ad callback does to them before
 it settles, so the claim path is unchanged and no second idle modifier exists), and the cap raise on the
 config read. A free player who watches both ads reaches the same 4x on an offer; the Pass makes it
-automatic. Since ads are opt-in, the Pass's value is convenience and the tier's top from the first
-minute.
+automatic. Since ads are opt-in, the Pass's value is convenience; how the Pass would relate to any
+higher speed tier is the open question above.
 
 **Buy Roadies** — consumable, repeatable IAP. Bought Roadies are identical to earned ones. No
 purchase cap; throttled by escalating bundle price. (Allocation concavity punishes stacking one
@@ -647,7 +635,7 @@ Two structural properties keep pacing stable against players with strong income 
 - Fan rate is tuned loosely relative to Cash, so income alone does not shortcut the album payout.
 
 Tuning must hold at both ends: an unbuffed player's pace is doable and never feels impossible, and
-a Pass owner (4x game speed, the Encore tier's top held permanently, plus Roadie and
+a permanent-Encore player (2x game speed, with `maxGameSpeed` 4 as headroom above it, plus Roadie and
 Catalog multipliers) still takes
 meaningful play time per chapter and breaks nothing. Timed events feel Encore fully — speed
 scales production but never timers (§9), so a 4× player meets a timed goal in a quarter of the
@@ -1906,9 +1894,8 @@ Content/                 // the authored JSON the importer reads
   special; yields and bar progress never accrue.
 - **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2x, a timed root
   buff ads extend (`game_speed` stat, consumed by the tick and the idle claim over a real-time cap;
-  wall clocks never scale; the Encore tier: banked time past a threshold runs at 4x as a second
-  root buff whose record the same grant writes, so the tier edge is an ordinary expiry);
-  Backstage Pass (lifetime: permanent Encore at the tier's top, the idle claim computed already
+  wall clocks never scale; a higher speed tier is undecided and would be content alone over the
+  same timer); Backstage Pass (lifetime: permanent Encore, the idle claim computed already
   doubled, and a raised idle cap); Buy Roadies (repeatable); Tip Jar; no subscriptions.
 - **Engine:** Unity; break_infinity numbers; DateTime ticks; checksummed JSON save of the state tree;
   boot composes the root address plus the `chapter` label into the tree, each chapter's direct
