@@ -43,10 +43,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             tree.Tier1.generatorCounts["practice_amp"] = 3;
 
-            Assert.AreEqual(1, sources[0].CountAt(tree.Tier1), "a producer is one");
-            Assert.AreEqual(1, sources[1].CountAt(tree.Tier1), "always one - there is no count fact to hold");
-            Assert.AreEqual(3, sources[2].CountAt(tree.Tier1), "a generator is its owned count");
-            Assert.AreEqual(0, sources[3].CountAt(tree.Tier1), "and an unowned one is none");
+            AssertClose(1, sources[0].CountAt(tree.Tier1), "a producer is one");
+            AssertClose(1, sources[1].CountAt(tree.Tier1), "always one - there is no count fact to hold");
+            AssertClose(3, sources[2].CountAt(tree.Tier1), "a generator is its owned count");
+            AssertClose(0, sources[3].CountAt(tree.Tier1), "and an unowned one is none");
         }
 
         // The order of EffectCarriers IS the multiplication order at a node:
@@ -466,10 +466,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The gate is a purchase latch declared at the CHAPTER, so each
             // tier's own facts answer it: a latch written at the inner tier is
-            // invisible to the outer one, which is the whole difference.
+            // invisible to the outer one, which is the whole difference. Priced
+            // in a chapter currency: a cost names a currency on its own chain
+            // like every other reference, and Build compiles the cost plan.
+            var fee = TestTree.DeclareCurrency(chapterDef, "fee");
             var latch = TestTree.MakeDefinition<UpgradeDefinition>("rehearsed");
-            latch.gate = new CurrencyAtLeast { currency = coin, threshold = 0 };
-            latch.costCurrency = coin;
+            latch.gate = new CurrencyAtLeast { currency = fee, threshold = 0 };
+            latch.costCurrency = fee;
             latch.cost = 1;
             chapterDef.upgrades.Add(latch);
 
@@ -553,20 +556,40 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 foreach (var source in node.Definition.Sources())
                     foreach (var entry in source.Entries)
                         Assert.IsNotNull(node.Link<CoordinatePlan>(entry),
-                            $"{source.Source.Id} pays {entry.currency.Id} at {entry.stat}");
+                            $"{source.Source.Id} pays {entry.Target.Id} at {entry.stat}");
 
                 foreach (var currency in node.Definition.declaredCurrencies)
                 {
-                    var plans = node.Link<CurrencyPlans>(currency);
+                    var plans = node.Link<StatPlans>(currency);
                     Assert.IsNotNull(plans.Rate, $"{currency.Id} rate stage");
                     Assert.IsNotNull(plans.Yield, $"{currency.Id} yield stage");
                     Assert.AreSame(plans.Rate, plans.For(Stat.Rate));
                     Assert.AreSame(plans.Yield, plans.For(Stat.Yield));
                 }
 
+                // A generator holds the two plans it is ever asked for: the
+                // stage-2 coordinate of a payment into its count, and its price.
+                foreach (var generator in node.Definition.generators)
+                {
+                    var plans = node.Link<StatPlans>(generator);
+                    Assert.IsNotNull(plans.Count, $"{generator.Id} count stage");
+                    Assert.IsNotNull(plans.Cost, $"{generator.Id} cost");
+                    Assert.AreSame(plans.Count, plans.For(Stat.Count));
+                    Assert.AreSame(plans.Cost, plans.For(Stat.Cost));
+                }
+
+                foreach (var upgrade in node.Definition.upgrades)
+                    Assert.IsNotNull(node.Link<StatPlans>(upgrade).For(Stat.Cost), $"{upgrade.Id} cost");
+
                 foreach (var group in node.Definition.barGroups)
+                {
                     foreach (var bar in group.bars)
-                        Assert.IsNotNull(node.Link<CoordinatePlan>(bar), $"bar {bar.Id}");
+                    {
+                        var plans = node.Link<StatPlans>(bar);
+                        Assert.IsNotNull(plans.Rate, $"bar {bar.Id} fill rate");
+                        Assert.IsNotNull(plans.Yield, $"bar {bar.Id} yield");
+                    }
+                }
 
                 foreach (var child in node.Children)
                     Visit(child);
@@ -587,7 +610,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // plan for it.
             Assert.Throws<InvalidOperationException>(
                 () => tree.Tier1.Link<CoordinatePlan>(TestTree.Entry(tree.Cash, Stat.Rate, 1)));
-            Assert.Throws<InvalidOperationException>(() => tree.Ch1.Link<CurrencyPlans>(tree.Cash));
+            Assert.Throws<InvalidOperationException>(() => tree.Ch1.Link<StatPlans>(tree.Cash));
 
             // game_speed is the tick's read and the tick runs a chapter, so no
             // other kind of node holds one.
@@ -605,14 +628,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var tree = new TestTree();
 
-            // Filed as CurrencyPlans, asked for as a coordinate plan.
+            // Filed as StatPlans, asked for as a coordinate plan.
             Assert.Throws<InvalidOperationException>(() => tree.Tier1.Link<CoordinatePlan>(tree.Cash));
 
             // Filed as a ContributorPlan under the chapter's own definition.
             Assert.Throws<InvalidOperationException>(
                 () => tree.Ch1.Link<CoordinatePlan>(tree.Ch1Def));
 
-            Assert.IsNotNull(tree.Tier1.Link<CurrencyPlans>(tree.Cash), "and the right kind still reads");
+            Assert.IsNotNull(tree.Tier1.Link<StatPlans>(tree.Cash), "and the right kind still reads");
         }
 
         // Nothing is written into an asset: the plans live on the runtime nodes,
@@ -666,7 +689,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // fans. First-seen order over that walk is the currency order.
             CollectionAssert.AreEqual(
                 new[] { tree.Rehearsal, tree.Fans, tree.Cash },
-                plan.Currencies.Select(entry => entry.Currency).ToArray(),
+                plan.Targets.Select(entry => entry.Target).ToArray(),
                 "first seen, over tree order then declaration order");
 
             var cash = plan.For(tree.Cash);
@@ -684,6 +707,38 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(tree.LearnCovers, plan.Bars[0].Group);
             Assert.AreSame(tree.Tier1, plan.Bars[0].Node);
             Assert.AreSame(tree.Tier1, plan.Bars[0].PoolHome, "rehearsal is homed at tier1");
+        }
+
+        // A target is a target however it is spelled (12.2): the contributor
+        // list files a generator and a bar at their own homes with the sources
+        // paying them, exactly as it files a currency. The rate phase's pairs
+        // are the subset it DEPOSITS to, which leaves the bar out - a bar
+        // collects what pays it at its own draw (12.7).
+        [Test]
+        public void A_contributor_plan_files_a_generator_and_a_bar_target_with_their_payers()
+        {
+            var tree = new TestTree();
+            var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
+            crew.produces.Add(TestTree.Entry(tree.PracticeAmp, Stat.Rate, 1));
+            crew.produces.Add(TestTree.Entry(tree.Cover1, Stat.Rate, 2));
+            tree.Tier1Def.producers.Add(crew);
+            tree.Rebuild();
+
+            var plan = ContributorPlan.At(tree.Ch1);
+
+            var amp = plan.For(tree.PracticeAmp);
+            Assert.AreSame(tree.Tier1, amp.Home, "the generator's declaring scope");
+            CollectionAssert.AreEqual(new Definition[] { crew },
+                amp.Contributors.Select(contributor => contributor.Source.Source).ToArray());
+
+            var cover = plan.For(tree.Cover1);
+            Assert.AreSame(tree.Tier1, cover.Home, "the group that owns the bar is declared at tier1");
+            CollectionAssert.AreEqual(new Definition[] { crew },
+                cover.Contributors.Select(contributor => contributor.Source.Source).ToArray());
+
+            var paid = Producer.RatePairs(tree.Ch1).Select(pair => pair.target).ToArray();
+            CollectionAssert.Contains(paid, tree.PracticeAmp, "the rate phase deposits into the count");
+            CollectionAssert.DoesNotContain(paid, tree.Cover1, "and never into a bar, which would pay it twice");
         }
 
         // A currency named off the acting chain has no home to find, and the

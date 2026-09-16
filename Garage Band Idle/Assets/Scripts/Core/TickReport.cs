@@ -21,9 +21,11 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Keyed by the SCOPE OBJECT plus the id. ScopeState does not override
         // equality, so the tuple compares the scope by reference identity,
-        // which is what the key needs: a currency has one home and a bar one
-        // declaring scope, and two chapters may both declare "cash".
-        private readonly Dictionary<(ScopeState, string), BigNumber> currencyNet = new();
+        // which is what the key needs: a currency has one home, a generator and
+        // a bar one declaring scope, and two chapters may both declare "cash".
+        // One deposit ledger holds currencies and granted counts alike (12.2):
+        // ids are unique per chain, so a generator's never meets a currency's.
+        private readonly Dictionary<(ScopeState, string), BigNumber> depositNet = new();
         private readonly Dictionary<(ScopeState, string), BigNumber> barFill = new();
 
         public TickReport(double seconds) => Seconds = seconds;
@@ -31,27 +33,27 @@ namespace RidiculousGaming.GarageBandIdle
         // The three recording sites. The amounts are what actually landed, not
         // what was wanted: a stalled bar records the short draw and the short
         // fill, which is the pair a display needs.
-        public void RecordDeposit(ScopeState home, string currencyId, BigNumber amount) =>
-            Add(currencyNet, home, currencyId, amount);
+        public void RecordDeposit(ScopeState home, string id, BigNumber amount) =>
+            Add(depositNet, home, id, amount);
 
         public void RecordDraw(ScopeState home, string currencyId, BigNumber amount) =>
-            Add(currencyNet, home, currencyId, -amount);
+            Add(depositNet, home, currencyId, -amount);
 
         public void RecordFill(ScopeState scope, string barId, BigNumber amount) =>
             Add(barFill, scope, barId, amount);
 
         // Unrecorded is zero, never a miss - a tick that moved nothing at a
         // key is indistinguishable from one that moved zero there.
-        public BigNumber CurrencyNet(ScopeState home, string currencyId) =>
-            currencyNet.TryGetValue((home, currencyId), out var value) ? value : BigNumber.Zero;
+        public BigNumber DepositNet(ScopeState home, string id) =>
+            depositNet.TryGetValue((home, id), out var value) ? value : BigNumber.Zero;
 
         public BigNumber BarFill(ScopeState scope, string barId) =>
             barFill.TryGetValue((scope, barId), out var value) ? value : BigNumber.Zero;
 
         // Per real second. An empty report has no slope, so a nonpositive
         // Seconds answers zero rather than dividing by it.
-        public BigNumber CurrencySlope(ScopeState home, string currencyId) =>
-            Slope(CurrencyNet(home, currencyId));
+        public BigNumber DepositSlope(ScopeState home, string id) =>
+            Slope(DepositNet(home, id));
 
         public BigNumber BarSlope(ScopeState scope, string barId) =>
             Slope(BarFill(scope, barId));

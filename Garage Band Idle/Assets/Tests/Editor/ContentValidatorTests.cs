@@ -1164,6 +1164,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never subtracts");
         }
 
+        // A line pays exactly one thing (12.2): two targets is an amount with no
+        // single home to land at, and none is a contribution with nowhere to go.
+        [Test]
+        public void ProducesEntry_TwoTargets_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(new ProducesEntry
+                { currency = f.Cash, generator = f.Amp, stat = Stat.Yield, value = 1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "names 2 targets");
+        }
+
+        [Test]
+        public void ProducesEntry_NoTarget_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(new ProducesEntry { stat = Stat.Yield, value = 1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "names 0 targets");
+        }
+
         [Test]
         public void ProducesEntry_ConditionValidatedInTheDeclaringScope_Error()
         {
@@ -1337,6 +1356,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "must live at a chapter or the root");
         }
 
+        // cost and count are effect addresses (12.2), read through GetMultiplier
+        // alone, so naming either is ordinary content rather than a stat no
+        // consumer reads - and each has one coordinate per number, so the
+        // wildcard applies there like it applies to a currency's total.
+        [Test]
+        public void Effect_CostAndCountStats_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "gear", stat = Stat.Cost, multiplier = 0.5 });
+            f.Boost.effects.Add(new Effect { target = "practice_amp", stat = Stat.Count, multiplier = 2 });
+            f.Boost.effects.Add(new Effect { stat = Stat.Cost, multiplier = 0.5 });
+            f.Boost.effects.Add(new Effect { stat = Stat.Count, multiplier = 0.5 });
+            AssertClean(f.Run());
+        }
+
+        // The one stat where zero is not legal: a price repeats, so a free
+        // generator is an unbounded rate printer.
+        [Test]
+        public void Effect_ZeroCostFactor_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "gear", stat = Stat.Cost, multiplier = 0 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "a cost factor is positive");
+        }
+
         [Test]
         public void DeclaringTheSameSourceTwice_Error()
         {
@@ -1358,6 +1402,52 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // tier1's rung cannot read a count stored in tier1b.
             ((All)f.Album.offerCondition).conditions.Add(new OwnedCountAtLeast { generator = sibling, count = 1 });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "OwnedCountAtLeast addresses 'merch_stand' declared at 'tier1b'");
+        }
+
+        // A yield entry pays on a FIRING, and a generator's is fired by
+        // FireGeneratorYield alone (12.5) - so entries nothing names are content
+        // with no takers.
+        [Test]
+        public void Generator_YieldEntriesNothingFires_Warning()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.produces.Add(TestTree.Entry(f.Cash, Stat.Yield, 1));
+            AssertFinding(f.Run(), ValidationSeverity.Warning, ValidationCheck.InertOperand,
+                "no FireGeneratorYield names it");
+        }
+
+        [Test]
+        public void Generator_YieldEntriesWithAFirer_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.produces.Add(TestTree.Entry(f.Cash, Stat.Yield, 1));
+            f.Trigger.actions.Add(new FireGeneratorYield { generator = f.Amp });
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void FireGeneratorYield_OffActingChain_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = TestTree.MakeDefinition<GeneratorDefinition>("merch_stand");
+            sibling.availableWhen = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 };
+            sibling.costCurrency = f.Ch1Records;
+            sibling.baseCost = 5;
+            f.Tier1b.generators.Add(sibling);
+
+            // tier1's trigger cannot fire a generator homed in tier1b.
+            f.Trigger.actions.Add(new FireGeneratorYield { generator = sibling });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "FireGeneratorYield addresses 'merch_stand' declared at 'tier1b'");
+        }
+
+        [Test]
+        public void FireGeneratorYield_Missing_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Trigger.actions.Add(new FireGeneratorYield { generator = null });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "FireGeneratorYield names nothing");
         }
 
         [Test]

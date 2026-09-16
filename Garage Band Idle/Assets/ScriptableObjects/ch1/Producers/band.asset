@@ -19,6 +19,8 @@ MonoBehaviour:
   description: 
   produces:
   - currency: {fileID: 11400000, guid: 8fcd19c799d152b4b95054ec949a12ff, type: 2}
+    generator: {fileID: 0}
+    bar: {fileID: 0}
     stat: rate
     value:
       _value:

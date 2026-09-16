@@ -32,7 +32,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(expected, actual.ToDouble(), 1e-9, what ?? string.Empty);
 
         private static IdleOfferLine Line(GameSession session, CurrencyDefinition currency) =>
-            session.CurrentOffer.lines.Find(l => l.currency == currency);
+            session.CurrentOffer.lines.Find(l => l.target == currency);
 
         private class Fixture
         {

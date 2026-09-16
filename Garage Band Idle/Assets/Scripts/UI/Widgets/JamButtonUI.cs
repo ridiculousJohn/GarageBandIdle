@@ -32,15 +32,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public override void Refresh()
         {
             var text = new StringBuilder();
-            foreach (var (currency, amount) in Producer.ResolveYield(Context(), producer))
+            foreach (var (target, amount) in Producer.ResolveYield(Context(), producer))
             {
                 // Zeros are kept by the resolution and dropped by the reading:
-                // a currency this firing pays nothing is not a line.
+                // a target this firing pays nothing is not a line.
                 if (amount == BigNumber.Zero)
                     continue;
                 if (text.Length > 0)
                     text.Append(", ");
-                text.Append("+").Append(NumberFormatter.Format(amount)).Append(" ").Append(currency.displayName);
+                text.Append("+").Append(NumberFormatter.Format(amount)).Append(" ").Append(target.displayName);
             }
             yieldLabel.text = text.ToString();
         }

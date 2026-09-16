@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425489276108908
+    rid: 7579425511256359020
   actions:
-  - rid: 7579425489276108909
+  - rid: 7579425511256359021
   references:
     version: 2
     RefIds:
-    - rid: 7579425489276108908
+    - rid: 7579425511256359020
       type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 3
-    - rid: 7579425489276108909
+    - rid: 7579425511256359021
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: kit_upgrade_revealed

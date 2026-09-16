@@ -359,6 +359,35 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     facts.generatorCounts.Remove(key);
             }
 
+            // A granted count is the same fact in the other half (12.2), so it
+            // takes the same rule: zero already reads as absent, and a negative
+            // one is tampering.
+            List<string> staleGranted = null;
+            foreach (var pair in facts.grantedCounts)
+            {
+                var declared = false;
+                foreach (var generator in definition.generators)
+                {
+                    if (generator != null && generator.Id == pair.Key)
+                    {
+                        declared = true;
+                        break;
+                    }
+                }
+                if (!declared)
+                    Debug.LogWarning($"SaveSystem: granted count '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
+                else if (pair.Value <= BigNumber.Zero)
+                    Debug.LogWarning($"SaveSystem: granted count '{pair.Key}' is {pair.Value} - dropped.");
+                else
+                    continue;
+                (staleGranted ??= new List<string>()).Add(pair.Key);
+            }
+            if (staleGranted != null)
+            {
+                foreach (var key in staleGranted)
+                    facts.grantedCounts.Remove(key);
+            }
+
             // Progress is uncapped by design - overfill is allowed and
             // readable (12.7) - so the only illegal value is a negative one.
             List<string> staleProgress = null;

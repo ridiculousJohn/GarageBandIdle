@@ -684,14 +684,26 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             };
         }
 
-        private static ProducesEntry Entry(Build build, ScopeDefinition scope, ProducesDto dto) => new()
+        // Each authored name resolves like any other reference, outward from the
+        // scope the entry sits on. Naming more than one target is the validation
+        // pass's finding (12.2); naming NONE has no field to write at all, so it
+        // is refused here.
+        private static ProducesEntry Entry(Build build, ScopeDefinition scope, ProducesDto dto)
         {
-            currency = Resolve<CurrencyDefinition>(build, scope, dto.currency, "produces entry")
-                       ?? throw new ContentImportException($"a produces entry at '{scope.Id}' names no currency."),
-            stat = dto.stat,
-            value = dto.value,
-            condition = BuildCondition(build, scope, dto.condition),
-        };
+            var entry = new ProducesEntry
+            {
+                currency = Resolve<CurrencyDefinition>(build, scope, dto.currency, "produces entry"),
+                generator = Resolve<GeneratorDefinition>(build, scope, dto.generator, "produces entry"),
+                bar = Resolve<BarDefinition>(build, scope, dto.bar, "produces entry"),
+                stat = dto.stat,
+                value = dto.value,
+                condition = BuildCondition(build, scope, dto.condition),
+            };
+            if (entry.Target == null)
+                throw new ContentImportException(
+                    $"a produces entry at '{scope.Id}' names no target (currency, generator or bar).");
+            return entry;
+        }
 
         private static Effect BuildEffect(Build build, ScopeDefinition scope, EffectDto dto)
         {
@@ -753,6 +765,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 amount = d.amount,
                 formula = BuildPayoutFormula(build, scope, d.formula),
             },
+            FireGeneratorYieldDto d => new FireGeneratorYield
+                { generator = Resolve<GeneratorDefinition>(build, scope, d.generator, "FireGeneratorYield") },
             SetFlagDto d => new SetFlag { flagId = d.flagId },
             ExtendTimerDto d => new ExtendTimer { timer = d.timer, seconds = d.seconds, capSeconds = d.capSeconds },
             AddModifierDto d => new AddModifier

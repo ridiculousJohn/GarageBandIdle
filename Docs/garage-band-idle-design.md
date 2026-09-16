@@ -532,7 +532,9 @@ earns nothing — the system self-regulates without a rule.
 are two different kinds of number. The cap and the threshold are **seconds** — thresholds, not
 multipliers — and live in `GameConfig`. The fraction IS a multiplier, and it is an ordinary rate
 effect: a root modifier `{stat: rate, ×0.5}` that **applies only during idle accumulation**
-(`appliesWhen`, §12.5). The claim runs the same rate and `game_speed` gathers the tick runs, under
+(`appliesWhen`, §12.5), with `{stat: count, x0.5}` beside it so a grant into a generator's count
+while away is halved too - away pays half of ALL of it, and the wildcard reaching every stat's one
+coordinate (§12.2) is what makes that two lines at root rather than a rule each chapter repeats. The claim runs the same rate and `game_speed` gathers the tick runs, under
 an idle-accumulation context, so idle-only factors join, live-only buffs excuse themselves, and no
 second vocabulary exists:
 
@@ -734,6 +736,14 @@ class ProducerDefinition : Definition        // id + tags, like every Definition
 }
 ```
 
+**An entry pays exactly one target**: a currency (its balance), a generator (its granted count), or
+a bar (its progress, 12.7) - `{ currency | generator | bar, stat, value, condition? }`, and two or
+none is a load error. A generator paying another generator's count is how a generator-generator is
+authored: Scoring's yield entry names Querying, and a bar firing Scoring's yield
+(`FireGeneratorYield`, 12.5) pays Querying so many per cycle, count and multipliers included. The
+compiler files the sources paying any target at that target's home, exactly as it does for a
+currency, so "how fast is my count growing" is the read a currency's rate is.
+
 Stats are **named, not enumerated**: `rate` (units/second — accrues idle time) and `yield`
 (units/firing — paid when something calls `FireProducer(producer)`, never accrues). A stat means
 something because a system consumes it — the tick consumes `rate`, `FireProducer` consumes `yield` —
@@ -761,8 +771,12 @@ tap_producer.produces: [ { cash,      yield, 1 },
 ```
 
 **Generator** — the purchasable. Definition: `{id, tags, availableWhen, costCurrency, baseCost,
-growth, produces: [...]}` — the same entry shape as a producer, scaled by `ownedCount`; state:
-`ownedCount` in its declaring scope. A bandmate is a generator with two rate entries (cash, fans)
+growth, produces: [...]}` — the same entry shape as a producer, scaled by its owned count - purchased plus granted;
+state: `generatorCounts` (purchased, an int the player's buys bound) and `grantedCounts` (a BigNumber
+other sources' entries pay into, keeping its fraction) in its declaring scope. The price reads the
+purchased count alone, so granted copies never raise it; production and `OwnedCountAtLeast` read the
+sum, and the condition's threshold is a BigNumber like every number the runtime can outgrow. A
+bandmate is a generator with two rate entries (cash, fans)
 and a `bandmate` tag. Cost currency is independent of what it produces. A purchase is a count:
 buying `n` units at owned count `o` costs the geometric series
 `baseCost * growth^o * (growth^n - 1) / (growth - 1)`, or `n * baseCost * growth^o` when growth is
@@ -784,6 +798,14 @@ roundings, that no read compares. `TryBuy` is fail-closed against `availableWhen
 affordability of the whole count - the domain owns the gate, never the UI's visibility - and
 refuses whole when the balance does not cover it.
 (Producers need no equivalent field: their `produces` entries carry their own conditions.)
+
+**A price is a multiplier target like a rate.** `cost` is a stat in the same open vocabulary, and an
+effect naming the generator or upgrade (by id or tag) with `stat: cost` multiplies the unit cost
+before the series - stage 1 only, gathered from the declaring scope outward, since a price has no
+total for a currency stage to modify ("everything priced in cash" is a tag the generators carry).
+The factor is constant across one purchase, so `MaxAffordable` only ever evaluates `CostOf`. A
+constant x0 on a cost effect is refused at load: a free generator is an unbounded rate printer, and
+"nearly free" is a small factor. An upgrade's `cost` takes the factor the same way.
 
 **Effect** — the modifier atom:
 
@@ -842,11 +864,14 @@ or tag. **The stat is required**: a query resolves one number and a number alway
 stat-less effect would claim to answer questions of different kinds with one factor — "rate and
 yield alike" is two entries, an empty stat is a load-time error, and at runtime it matches nothing
 (fail-closed). **An empty `target` is
-the wildcard: "every currency."** It applies at the currency stage — one stage per effect, since
-root sits on both gather walks and a stage-less wildcard there would be collected twice — so
-`{stat: rate, ×2}` speeds every currency's rate (bar fills excluded, as with any currency-stage
-effect), and `{stat: game_speed, ×2}` — Encore — is a wildcard read owner-less by the tick and the
-idle claim, which match wildcards only. `currencyId` matches an id or a tag, exactly as
+the wildcard: every number of that stat**, at the one coordinate the stat has per number. For
+`rate` and `yield` that is the target's total, the currency's - a source's own term would otherwise
+meet it twice, since root sits on both gather walks, and a bar's fill stays out - so
+`{stat: rate, x2}` speeds every currency's rate. `count` has one coordinate per generator and `cost`
+one per price, so `{stat: count, x0.5}` halves every grant and `{stat: cost, x0.5}` halves every
+price - which is what lets root's idle fraction say "away pays half of all of it" in two lines.
+`{stat: game_speed, x2}` - Encore - is a wildcard read owner-less by the tick and the idle claim,
+which match wildcards only. `currencyId` matches an id or a tag, exactly as
 `target` does, so "every rate entry paying an income currency" is one effect rather than one per
 currency — and a currency stays out of it by not carrying the tag (§8.2's fans rule). **Where matches are gathered from is two
 explicit stages**, which is what keeps sibling scopes isolated (§12.3):
@@ -862,6 +887,14 @@ descendant scope wanting a local boost targets its producer, generator, or a sou
 That is a placement rule rather than a load-time check: an effect nobody walks up to meet simply has
 no takers, which is also what a root buff looks like before any chapter carrying its tag is loaded.
 
+**The second stage belongs to the target, whatever kind it is**, asked under the target's own stat:
+a currency's total under `rate` or `yield`; a bar's under `rate` - the same plan as its fill rate, so
+"10x this bar" speeds its own fill and what is paid into it alike - and `yield`; a generator's
+granted count under `count`, one stat however the grant arrives, so an effect naming a generator
+with `rate` keeps meaning that generator's own output. `cost` and `count` are effect addresses like
+`game_speed`: an effect may name them, a produces entry may not, and a wildcard reaches every
+generator's count or every price, as the paragraph above says.
+
 **Both stages are compiled, once, when the tree is built.** Everything above but liveness is authored
 and validated, so the load pass (12.14.8) asks the question for every coordinate the content authors
 and files the answer, at the node it will be asked from, as a **coordinate plan**: walk outward from
@@ -872,7 +905,10 @@ and the selector never runs again. There is no separate stage-1, currency-stage,
 plan: those are the same plan asked with a different owner. The queries compiled are exactly the ones
 the content authors - each source entry at its declaring scope (stage 1), each currency at its home
 for `rate` and `yield` (stage 2, the currency its own owner, so its own tags match), each bar at its
-declaring scope for its fill rate (stage 1 only, 12.7), and `game_speed` at each chapter. A
+declaring scope for `rate` (its fill, and what is paid into it; stage 1 for the fill itself, 12.7)
+and `yield`, each generator for `count` and `cost`, each upgrade for `cost`, and `game_speed` at
+each chapter. A definition's plans sit under the definition itself at its home, one per stat it is
+ever asked for. A
 coordinate no content authors has no plan, and a consumer asking for one throws rather than
 answering 1x.
 
@@ -913,7 +949,8 @@ class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these
 {
     Dictionary<string, BigDouble> balances;
     Dictionary<string, BigDouble> earnedTotals;     // per currency, same home as its balance
-    Dictionary<string, int>       generatorCounts;
+    Dictionary<string, int>       generatorCounts;  // purchased; the price reads this alone (12.2)
+    Dictionary<string, BigDouble> grantedCounts;    // paid in by other sources' entries, fraction kept
     HashSet<string>               flags;
     HashSet<string>               purchasedUpgrades;
     HashSet<string>               firedTriggers;    // one-shot trigger latches — a reset re-arms (§12.5)
@@ -1087,6 +1124,9 @@ Kinds: `AddCurrency` (one or more target currencies paid from a single evaluatio
 or from a `PayoutFormula`), `AddModifier(scope, modifier)`, `RemoveModifier(scope, modifier)`,
 `SetFlag(flagId)`, `ExtendTimer(timer, seconds, capSeconds)` (adds to a declared timer at its home
 through the flag's outward walk, remaining time clamped to the cap - the Encore ad's reward, §9),
+`FireGeneratorYield(generator)` (fires a generator's yield entries the way `FireProducer` fires a
+producer's, at the generator's declaring scope and scaled by its owned count - on a bar's
+`onComplete` a team paying per cycle, on an upgrade or a rung a one-shot grant that scales),
 `AddSong`, `ResetScope(scope)`, `ExecuteRung(tier)` and `RestartScope(scope)`
 (fire that scope's rung through its own gate, then clear it - the restart idiom as one action; a
 bare `ResetScope` remains for a pure wipe). The event lifecycle operations are commands rather than
@@ -1315,6 +1355,20 @@ every crossing. (The arithmetic shortcut `fires = floor((progress + Δ)/fillAmou
 optimization only when `onComplete` cannot affect the bar's environment, which in practice means an
 EMPTY list; a bar with actions iterates.)
 
+**A bar is a payment target** (12.2), and it collects what pays it the way a currency does. A rate
+entry naming a bar is collected by the bar at its draw beside its own `fillRate`, so it fills only
+while the bar is drawing - selected, available, not full - and the rate phase deposits nothing into
+a bar. A yield entry naming a bar (a tap's, a fired generator's) moves progress the moment it is
+paid, and the bar settles its own crossing right there through the same settlement the tick runs,
+because the tick settles only the bars its draw admitted and would read a bar filled between ticks
+as one that fired earlier. Each mover settles only the crossing its own fill made - a settlement
+compares the progress before its fill with that fill, never with live progress - so a payment
+landing inside a tick's settlement fires once and not again when the pass reaches that bar.
+Clamped at `fillAmount` for a non-repeating bar; a repeating bar keeps the excess and pays every
+threshold it crossed. Selection and availability do not gate a paid
+completion - they govern drinking from a pool, and a payment is not a drink. A refused completion
+list leaves the payment undelivered, as the draw excludes the bar for its segment.
+
 **The snapshot admits; live state may only disqualify.** Every rate and gate the draw needs is
 resolved BEFORE the segment's production deposits (12.9), and only the bars that snapshot
 recorded as drawing enter settlement at all. The per-iteration re-reads may take a bar OUT of the
@@ -1398,7 +1452,7 @@ foreground chapter only and only while Live, on save (a save under the dialog mu
 unpaid window); every write is monotonic (max), so a rolled-back clock can delay
 a stamp but never regress one. **The stamp IS the pending claim** — nothing about an offer is ever
 saved. Switch-in computes
-`idleRate x game_speed x paid time` per currency at current rates over the paid window - the first
+`idleRate x game_speed x paid time` per rate target - a currency, or a generator's granted count; a bar collects only at a draw (12.7) - at current rates over the paid window - the first
 `min(elapsed, cap)` REAL seconds after the stamp, segmented at the buff expiries inside it by the
 tick's own segment walk (`TickSystem.Segments`, the one place a window is divided) and reading
 `game_speed` through the tick's own clamped read, each segment paying its own length at the rate
@@ -1408,7 +1462,7 @@ ordinary gathers under the idle-accumulation context - skipped below the minimum
 threshold and skipped entirely while that chapter holds a record for an event that blocks idle
 (§6.1: `blocksIdle` is derived from the event carrying a timer, and the idle path asks the event
 rather than inspecting one) - into a **transient offer** for the idle dialog: the lines
-(currency, home, amount — all references) and the window's end B, computed once
+(target, home, amount - all references) and the window's end B, computed once
 over the explicit window [stamp, B], held by the session, never serialized. The lines hold what is
 paid: a Pass owner's are computed doubled, and the ad callback doubles them before it settles. The claim never
 computes anything: deposit pays the stored lines as they stand and advances the stamp to B, the window actually paid, in one transaction. That is the
@@ -1529,7 +1583,9 @@ instead, and nothing else reads it.
 **Rates on screen.** A currency's header line is the name, the balance, and the tick report's
 realized rate beside it as "(X/s)" - the slope the readout already interpolates by, so it is the
 rate the balance is climbing at, zero before the first tick and for a currency nothing pays. A
-generator row is the name, the owned count, a line beneath the name reading the next unit's cost
+generator row is the name, the owned count - the purchased count in parentheses with the granted
+count added inside them when there is one, `(3)` and `(3+8.89e11)`, the reference game's shape - a
+line beneath the name reading the next unit's cost
 and what that one unit pays per second ("250.00 Cash => 3.00 Cash", through `Producer.UnitRate` at
 the declaring scope), and two buy buttons: "+1", and "+M" printing `Purchasing.MaxAffordable` at
 the declaring scope, both disabled and both reading "+1" when M is zero, and both reading "+1"
@@ -1540,8 +1596,8 @@ balance either way (production up, a bar's draw down), and the refresh at the tr
 repaints both labels. A long press on the row's text - a hold of
 `GameConfig.longPressSeconds`, judged by the element's own scheduler since it is presentation and
 never a game read - opens the generator's info screen, a host-owned overlay: the description, the
-same cost and yield line, the owned count, and what the owned units produce per second, which is
-the count times the per-unit rate because nothing in the effect vocabulary reads the count. The
+same cost and yield line, the owned count in the row's form, and what the owned units produce per second, which is the
+owned sum times the per-unit rate because nothing in the effect vocabulary reads the count. The
 row reaches the host through `IGeneratorInfoOpener`, the shape `IStoryOpener` has, and the screen
 holds the generator and its declaring scope for as long as the request stands.
 
@@ -1669,6 +1725,10 @@ per-feature: any kind an author gates with explains itself for free.
   from its own rung's list is the same fault. `AddModifier` and `RemoveModifier` may
   target the acting scope or an ancestor (grants live outward), never an unrelated subtree; a
   `RemoveModifier` naming a modifier nothing reachable grants warns.
+- A produces entry names exactly one target - a currency, a generator, or a bar; two or none is an
+  error - and the target sits on the acting chain like every other ordinary read. A cost effect with
+  a constant x0 is an error: a free generator is an unbounded rate printer. A generator with yield
+  entries that no `FireGeneratorYield` names warns: nothing fires them.
 - Ordinary reads and writes (`AddCurrency`, `SetFlag`, `AddSong`, Condition reads, `produces`
   targets) may address only the acting scope's chain — itself or an ancestor. The runtime state
   walk cannot reach siblings, so a cross-tree reference is a load-time error rather than a silent

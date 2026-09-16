@@ -133,7 +133,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             session.SwitchChapter(tree.Ch1, tree.Now);
 
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, session.Phase);
-            var cash = session.CurrentOffer.lines.Find(line => line.currency == tree.Cash);
+            var cash = session.CurrentOffer.lines.Find(line => line.target == tree.Cash);
             Assert.IsNotNull(cash);
             Assert.That(cash.amount.ToDouble(), Is.EqualTo(55.125).Within(1e-9),
                 "200 seconds at 0.5/s, idle x0.5, roadie_total x1.05 and roadie_active x1.05");

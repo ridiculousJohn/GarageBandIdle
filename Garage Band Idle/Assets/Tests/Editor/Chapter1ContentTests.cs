@@ -699,14 +699,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static T Find<T>(IEnumerable<T> definitions, string id) where T : Definition =>
             definitions.Single(d => d.Id == id);
 
-        // The gate SHAPE plus whatever operand is an int - a BigNumber
-        // threshold stays out of the string and gets its own typed assertion,
-        // since what a BigNumber prints is not part of any contract here.
+        // The gate SHAPE plus whatever operand is a count - an authored count is
+        // whole, so a BigNumber one prints through ToDouble as the integer it was
+        // authored as. A BigNumber threshold stays out of the string and gets its
+        // own typed assertion, since what a BigNumber prints is not part of any
+        // contract here.
         private static string Describe(Condition condition) => condition switch
         {
             CurrencyAtLeast c => $"balance {c.currency.Id}",
             EarnedTotalAtLeast c => $"earned {c.currency.Id}",
-            OwnedCountAtLeast c => $"owned {c.generator.Id} {c.count}",
+            OwnedCountAtLeast c => $"owned {c.generator.Id} {c.count.ToDouble()}",
             FlagSet c => $"flag {c.flagId}",
             BarsCompleted c => $"bars {c.group.Id} {c.count}",
             Not { condition: EventRewardPending } => "not reward pending",

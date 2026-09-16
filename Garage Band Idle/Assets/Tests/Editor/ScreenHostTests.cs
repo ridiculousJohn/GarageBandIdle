@@ -728,7 +728,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Cash is declared at tier1, so tier1 is the home the report keys
             // the net by (12.3).
-            var slope = fx.Session.LastTick.CurrencySlope(fx.Tier1, "cash");
+            var slope = fx.Session.LastTick.DepositSlope(fx.Tier1, "cash");
             Assert.AreEqual("(" + NumberFormatter.Format(slope) + "/s)", Fixture.Text(cash, "rate"));
             Assert.AreNotEqual(zero, Fixture.Text(cash, "rate"), "the amp paid, so the slope is not zero");
         }
@@ -865,13 +865,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // What the button's click submits: the count it printed.
             fx.Session.TryBuy(ctx, fx.PracticeAmp, max);
 
-            Assert.AreEqual("x8", row.Root.Q<Label>("count").text);
+            Assert.AreEqual("(8)", row.Root.Q<Label>("count").text);
             // 177.39 left against the ninth unit's 183.54, so nothing is
             // affordable: both buttons read "+1" and neither presses.
             Assert.AreEqual("+1", buy.text);
             Assert.AreEqual("+1", buyMax.text);
             Assert.IsFalse(buy.enabledSelf);
             Assert.IsFalse(buyMax.enabledSelf);
+        }
+
+        // The count label is the purchased count in parentheses, with the
+        // granted count added inside them only when a payment has landed
+        // (12.11): "(3)" and "(3+2.50)". The two halves are one fact read two
+        // ways, and the price reads the purchased one.
+        [Test]
+        public void TheCountLabelAddsTheGrantedCountOnlyWhenThereIsOne()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            var row = AmpRow(fx);
+            fx.Tier1.generatorCounts["practice_amp"] = 3;
+
+            // The tap is a transaction, so its own refresh repaints the row over
+            // the facts set beneath it.
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+            Assert.AreEqual("(3)", row.Root.Q<Label>("count").text);
+
+            fx.Tier1.grantedCounts["practice_amp"] = 2.5;
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+
+            Assert.AreEqual("(3+2.50)", row.Root.Q<Label>("count").text);
         }
 
         // Exactly one unit affordable is the state both buttons read "+1" for,
@@ -1156,7 +1179,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(fx.PracticeAmp.description, description.text);
             Assert.AreEqual(row.Root.Q<Label>("yield").text, InfoText(fx, "info-cost"),
                 "the row and the screen print one line, not two that agree until they do not");
-            Assert.AreEqual("Owned: 0", InfoText(fx, "info-owned"));
+            Assert.AreEqual("Owned: (0)", InfoText(fx, "info-owned"));
             Assert.AreEqual("Producing: nothing", InfoText(fx, "info-production"),
                 "no units are owned, so there is no product to name");
 
@@ -1167,11 +1190,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, fx.Tier1.generatorCounts["practice_amp"], "the amp was bought");
 
             Assert.IsTrue(Fixture.Shown(fx.Host.GeneratorInfo.Root), "a purchase is not a close");
-            Assert.AreEqual("Owned: 1", InfoText(fx, "info-owned"));
+            Assert.AreEqual("Owned: (1)", InfoText(fx, "info-owned"));
             // One unit's rate at the declaring scope, which is what N units
             // produce: nothing in the effect vocabulary reads the owned count.
-            var (currency, amount) = Producer.UnitRate(fx.Ctx(fx.Tier1), fx.PracticeAmp).Single();
-            Assert.AreEqual("Producing: " + NumberFormatter.Format(amount) + " " + currency.displayName + "/s",
+            var (target, amount) = Producer.UnitRate(fx.Ctx(fx.Tier1), fx.PracticeAmp).Single();
+            Assert.AreEqual("Producing: " + NumberFormatter.Format(amount) + " " + target.displayName + "/s",
                 InfoText(fx, "info-production"));
         }
 

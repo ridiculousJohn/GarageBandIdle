@@ -108,6 +108,68 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)30, tree.Tier1.earnedTotals["fans"]);
         }
 
+        // ---- targets other than a currency (12.2) ----
+
+        // A generator is a rate target like any other: the phase deposits into
+        // its granted count and records the deposit, so the row's count follows
+        // the same slope a currency readout does (12.11).
+        [Test]
+        public void The_tick_pays_a_generator_target_and_records_the_deposit()
+        {
+            var tree = new TestTree();
+            var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
+            crew.produces.Add(TestTree.Entry(tree.PracticeAmp, Stat.Rate, 0.25));
+            tree.Tier1Def.producers.Add(crew);
+            tree.Rebuild();
+
+            var report = TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
+
+            Assert.AreEqual((BigNumber)2.5, tree.Tier1.grantedCounts["practice_amp"]);
+            Assert.AreEqual((BigNumber)2.5, report.DepositNet(tree.Tier1, "practice_amp"), "the deposit is recorded at the home");
+        }
+
+        // A rate paid into a bar is collected by the BAR at its own draw (12.7),
+        // beside its fillRate - so a bar fed 3/s on top of its own 1/s fills at
+        // four, and the rate phase never deposits into it.
+        [Test]
+        public void A_rate_into_a_bar_is_collected_at_its_draw_beside_its_own_fill_rate()
+        {
+            var tree = new TestTree();
+            var drill = TestTree.MakeDefinition<BarDefinition>("drill");
+            drill.fillAmount = 1000;
+            drill.fillRate = 1;
+            tree.LearnCovers.bars.Add(drill);
+            var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
+            crew.produces.Add(TestTree.Entry(drill, Stat.Rate, 3));
+            tree.Tier1Def.producers.Add(crew);
+            tree.Rebuild();
+            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "drill" };
+
+            TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
+
+            Assert.AreEqual((BigNumber)40, tree.Tier1.barProgress["drill"], "its own 1/s plus the 3/s paid in");
+        }
+
+        [Test]
+        public void An_unselected_bar_collects_nothing_paid_into_it()
+        {
+            var tree = new TestTree();
+            var drill = TestTree.MakeDefinition<BarDefinition>("drill");
+            drill.fillAmount = 1000;
+            drill.fillRate = 1;
+            tree.LearnCovers.bars.Add(drill);
+            var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
+            crew.produces.Add(TestTree.Entry(drill, Stat.Rate, 3));
+            tree.Tier1Def.producers.Add(crew);
+            tree.Rebuild();
+
+            TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
+
+            // The draw is what a rate into a bar arrives through, and the draw
+            // admits the selected bars alone.
+            Assert.IsFalse(tree.Tier1.barProgress.ContainsKey("drill"));
+        }
+
         // ---- phase order ----
 
         [Test]

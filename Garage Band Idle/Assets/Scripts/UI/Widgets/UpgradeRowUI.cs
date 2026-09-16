@@ -46,7 +46,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
             }
             else
             {
-                buy.text = NumberFormatter.Format(upgrade.cost) + " " + upgrade.costCurrency.displayName;
+                // The price the command would spend, factor included, read at the
+                // upgrade's declaring scope like the command reads it (12.2).
+                buy.text = NumberFormatter.Format(Purchasing.CostOf(upgrade,
+                               ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade))))
+                           + " " + upgrade.costCurrency.displayName;
                 buy.SetEnabled(Purchasing.CanBuy(ctx, upgrade));
             }
         }

@@ -111,9 +111,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.generatorCounts["drummer"] = 3;
             tree.Ch1.purchasedUpgrades.Add("some_chapter_upgrade");
 
-            Assert.AreEqual(3, tree.Ctx(tree.Tier1).GetOwnedCount("drummer"));
-            Assert.AreEqual(0, tree.Ctx(tree.Ch1).GetOwnedCount("drummer"));   // counts never leak upward
+            Assert.AreEqual((BigNumber)3, tree.Ctx(tree.Tier1).GetOwnedCount("drummer"));
+            Assert.AreEqual(BigNumber.Zero, tree.Ctx(tree.Ch1).GetOwnedCount("drummer"));   // counts never leak upward
             Assert.IsTrue(tree.Ctx(tree.Tier1).IsUpgradePurchased("some_chapter_upgrade"));
+        }
+
+        // The owned count is two facts summed (12.2): prices read the purchased
+        // int, production and the count conditions read the sum, and the granted
+        // half keeps its fraction.
+        [Test]
+        public void The_owned_count_splits_into_a_purchased_and_a_granted_half()
+        {
+            var tree = new TestTree();
+            tree.Tier1.generatorCounts["drummer"] = 3;
+            tree.Tier1.grantedCounts["drummer"] = 1.5;
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.AreEqual(3, ctx.GetPurchasedCount("drummer"));
+            Assert.AreEqual((BigNumber)1.5, ctx.GetGrantedCount("drummer"));
+            Assert.AreEqual((BigNumber)4.5, ctx.GetOwnedCount("drummer"));
+            Assert.AreEqual(BigNumber.Zero, tree.Ctx(tree.Ch1).GetOwnedCount("drummer"), "neither leaks upward");
         }
 
     }

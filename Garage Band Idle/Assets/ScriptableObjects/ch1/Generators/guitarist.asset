@@ -21,7 +21,7 @@ MonoBehaviour:
   description: Pays 130 cash a second and 0.02 fans. Five bassists deep, the lead
     players start turning up.
   availableWhen:
-    rid: 7579425489276108902
+    rid: 7579425511256359018
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   baseCost:
     _value:
@@ -33,6 +33,8 @@ MonoBehaviour:
       exponent: 0
   produces:
   - currency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
+    generator: {fileID: 0}
+    bar: {fileID: 0}
     stat: rate
     value:
       _value:
@@ -41,6 +43,8 @@ MonoBehaviour:
     condition:
       rid: -2
   - currency: {fileID: 11400000, guid: 8fcd19c799d152b4b95054ec949a12ff, type: 2}
+    generator: {fileID: 0}
+    bar: {fileID: 0}
     stat: rate
     value:
       _value:
@@ -53,9 +57,12 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425489276108902
+    - rid: 7579425511256359018
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         generator: {fileID: 11400000, guid: 37392b79405d15547ad98f94b778d49f, type: 2}
-        count: 5
+        count:
+          _value:
+            mantissa: 5
+            exponent: 0

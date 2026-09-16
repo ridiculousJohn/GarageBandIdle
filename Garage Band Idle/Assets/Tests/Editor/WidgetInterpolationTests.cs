@@ -51,8 +51,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly GameSession Session;
             public readonly GameClock Clock;
 
-            public Fixture()
+            // `author` runs against the DEFINITIONS before the rebuild, because
+            // the gather is compiled when the tree is built: a produces entry
+            // authored afterward sits on no plan, and the session holds the tree
+            // that pass ran on.
+            public Fixture(Action<TestTree> author = null)
             {
+                if (author != null)
+                {
+                    author(Tree);
+                    Tree.Rebuild();
+                }
                 Tree.Ch1.lastActiveUtc = Tree.Now;
                 Session = new GameSession(Tree.Root, Config());
                 Session.SwitchChapter(Tree.Ch1, Tree.Now);
@@ -168,6 +177,52 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             widget.Interpolate();
             Assert.AreEqual("5.00", value.text);
+        }
+
+        // The row's count follows the granted slope the last tick realized,
+        // the rule a currency readout follows (12.11): truth at the snap, the
+        // slope between, and the purchased half standing still.
+        [Test]
+        public void TheCountLabelFollowsTheGrantedSlopeBetweenTicks()
+        {
+            var fx = new Fixture(tree =>
+            {
+                var crew = TestTree.MakeDefinition<Economy.ProducerDefinition>("road_crew");
+                crew.produces.Add(TestTree.Entry(tree.PracticeAmp, Economy.Stat.Rate, 0.25));
+                tree.Tier1Def.producers.Add(crew);
+            });
+            fx.Tree.Tier1.generatorCounts["practice_amp"] = 3;
+
+            // Ten seconds at 0.25/s: truth 2.5 granted, slope 0.25/s.
+            fx.Session.Tick(10, fx.At(10));
+            fx.Clock.Frame(fx.At(10), 10);
+
+            var widget = fx.Widget("generator_row", "GeneratorRow.uxml", fx.Tree.PracticeAmp);
+            var count = widget.Root.Q<Label>("count");
+            widget.Refresh();
+            Assert.AreEqual("(3+2.50)", count.text);
+
+            fx.Clock.Frame(fx.At(12), 2);
+            widget.Interpolate();
+            Assert.AreEqual("(3+3.00)", count.text, "two seconds of the slope, the purchased three unmoved");
+        }
+
+        // The preview names the TARGET of each yield line whatever kind it is
+        // (12.11): a line paying a generator's count reads that generator's
+        // name, through the same resolution the firing deposits.
+        [Test]
+        public void TheJamPreviewNamesTheTargetOfEveryYieldLine()
+        {
+            var fx = new Fixture(tree =>
+                tree.TapProducer.produces.Add(TestTree.Entry(tree.PracticeAmp, Economy.Stat.Yield, 2)));
+
+            var widget = fx.Widget("jam_button", "JamButton.uxml", fx.Tree.TapProducer);
+            widget.Refresh();
+
+            // The rehearsal lines sit behind their reveal and pay nothing, and a
+            // line paying nothing is not a line.
+            Assert.AreEqual("+1.00 cash, +2.00 practice_amp",
+                widget.Root.Q<Label>("yield").text);
         }
 
         // A command leaves the tick's report standing: the tap's yield snaps in

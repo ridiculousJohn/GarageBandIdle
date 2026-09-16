@@ -36,7 +36,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var declaringCtx = ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade));
             return upgrade.IsOffered(declaringCtx)
                 && !declaringCtx.Scope.purchasedUpgrades.Contains(upgrade.Id)   // the latch IS the one-shot; a reset re-arms it
-                && declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost)
+                && declaringCtx.CanSpend(upgrade.costCurrency.Id, CostOf(upgrade, declaringCtx))
                 && ActionList.Refuses(upgrade.actions, declaringCtx) == null;
         }
 
@@ -63,12 +63,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade);
             var declaringCtx = ctx.Rebase(declaring);
+            var cost = CostOf(upgrade, declaringCtx);
             if (!upgrade.IsOffered(declaringCtx) || declaring.purchasedUpgrades.Contains(upgrade.Id)
-                || !declaringCtx.CanSpend(upgrade.costCurrency.Id, upgrade.cost)
+                || !declaringCtx.CanSpend(upgrade.costCurrency.Id, cost)
                 || ActionList.Refuses(upgrade.actions, declaringCtx) != null)
                 throw new InvalidOperationException($"Buy: upgrade '{upgrade.Id}' is not currently buyable - ask CanBuy first.");
 
-            declaringCtx.Spend(upgrade.costCurrency.Id, upgrade.cost);
+            declaringCtx.Spend(upgrade.costCurrency.Id, cost);
 
             // Latch before payload: the effects are live for anything the actions
             // read. A payload that clears the latch's own scope re-arms the
@@ -94,22 +95,28 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return true;
         }
 
-        // The cost of count units from the current owned count: the geometric
-        // series, as the unit cost times a factor (12.2). Runtime backstop on
-        // the cost curve: validation refuses a nonpositive baseCost and a
-        // nonpositive growth, but that pass is dev-only, and generator
-        // purchases REPEAT - a free one is an unbounded rate printer.
+        // The cost of count units from the current purchased count: the geometric
+        // series, as the unit cost times a factor (12.2). The unit cost takes the
+        // stage-1 gather at the (generator, cost currency, cost) coordinate, so a
+        // "half price" effect is authored the way every other multiplier is; a
+        // granted copy never raises the price, which is why the curve reads the
+        // PURCHASED count alone. Runtime backstop on the cost curve: validation
+        // refuses a nonpositive baseCost, a nonpositive growth and a constant x0
+        // cost factor, but that pass is dev-only, and generator purchases REPEAT
+        // - a free one is an unbounded rate printer.
         public static BigNumber CostOf(GeneratorDefinition generator, GameContext declaringCtx, int count)
         {
             if (count < 1)
                 throw new InvalidOperationException(
                     $"CostOf: generator '{generator.Id}' asked for count {count}; a purchase is at least one unit.");
 
-            declaringCtx.Scope.generatorCounts.TryGetValue(generator.Id, out var owned);
-            var unit = generator.CostAt(owned);
+            declaringCtx.Scope.generatorCounts.TryGetValue(generator.Id, out var purchased);
+            var unit = generator.CostAt(purchased)
+                * Producer.GetMultiplier(declaringCtx,
+                    declaringCtx.Scope.Link<StatPlans>(generator).For(Stat.Cost));
             if (unit <= BigNumber.Zero)
                 throw new InvalidOperationException(
-                    $"Generator '{generator.Id}' computed cost {unit} at owned={owned}.");
+                    $"Generator '{generator.Id}' computed cost {unit} at owned={purchased}.");
 
             // The factor is its own quotient, multiplied onto the unit cost
             // afterwards: at count 1 it is x / x, exactly 1 in IEEE, so a single
@@ -121,6 +128,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 : (BigNumber.Pow(generator.growth, count) - BigNumber.One) / (generator.growth - BigNumber.One);
             return unit * factor;
         }
+
+        // An upgrade's price takes the same stage-1 factor at its own (upgrade,
+        // cost currency, cost) coordinate (12.2). No positive backstop: a free
+        // upgrade is legal content, because the latch makes it one-shot.
+        public static BigNumber CostOf(UpgradeDefinition upgrade, GameContext declaringCtx) =>
+            upgrade.cost * Producer.GetMultiplier(declaringCtx,
+                declaringCtx.Scope.Link<StatPlans>(upgrade).For(Stat.Cost));
 
         // M, the largest count the gate and the balance allow at the declaring
         // scope, or zero (12.2). Doubling then bisection over CostOf, with no

@@ -17,9 +17,9 @@ MonoBehaviour:
   displayName: Garage Jam I
   description: 
   availableWhen:
-    rid: 7579425489276108893
+    rid: 7579425511256359005
   goal:
-    rid: 7579425489276108894
+    rid: 7579425511256359006
   timeLimitSeconds: 60
   handicaps:
   - target: gear
@@ -32,25 +32,25 @@ MonoBehaviour:
     formula:
       rid: -2
   onEntry:
-  - rid: 7579425489276108895
+  - rid: 7579425511256359007
   rewards:
-  - rid: 7579425489276108896
-  - rid: 7579425489276108897
+  - rid: 7579425511256359008
+  - rid: 7579425511256359009
   onEnd:
-  - rid: 7579425489276108898
+  - rid: 7579425511256359010
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425489276108893
+    - rid: 7579425511256359005
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 7579425489276108899
-        - rid: 7579425489276108900
-    - rid: 7579425489276108894
+        - rid: 7579425511256359011
+        - rid: 7579425511256359012
+    - rid: 7579425511256359006
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -59,24 +59,24 @@ MonoBehaviour:
           _value:
             mantissa: 1.5
             exponent: 2
-    - rid: 7579425489276108895
+    - rid: 7579425511256359007
       type: {class: RestartScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
-    - rid: 7579425489276108896
+    - rid: 7579425511256359008
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 53d76036188af0f46bb1c8a21ad9afd2, type: 2}
         modifier: {fileID: 11400000, guid: 40cbc90550c89f447a9caf1c4c433d64, type: 2}
-    - rid: 7579425489276108897
+    - rid: 7579425511256359009
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: gj1_done
-    - rid: 7579425489276108898
+    - rid: 7579425511256359010
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
-    - rid: 7579425489276108899
+    - rid: 7579425511256359011
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 1 Records
@@ -85,13 +85,13 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 7579425489276108900
+    - rid: 7579425511256359012
       type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Already cleared
         condition:
-          rid: 7579425489276108901
-    - rid: 7579425489276108901
+          rid: 7579425511256359013
+    - rid: 7579425511256359013
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

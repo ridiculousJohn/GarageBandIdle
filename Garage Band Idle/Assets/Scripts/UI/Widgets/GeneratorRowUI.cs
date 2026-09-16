@@ -37,6 +37,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // cost are its declaring scope's facts (12.3/12.4).
         private ScopeState home;
 
+        // The count's snap: truth at the refresh, and the granted slope the last
+        // tick realized at the home, for the frames between (12.11). The
+        // purchased half moves only by a buy, which is itself a refresh.
+        private int purchased;
+        private BigNumber granted = BigNumber.Zero;
+        private BigNumber grantedSlope = BigNumber.Zero;
+        private double stamp;
+
         public GeneratorRowUI(VisualElement root, IGeneratorInfoOpener infos) : base(root)
         {
             name = Require<Label>(root, "name", "GeneratorRow.uxml");
@@ -66,7 +74,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             var ctx = Context().Rebase(home);
             name.text = generator.displayName;
-            count.text = "x" + ctx.GetOwnedCount(generator.Id);
+            purchased = ctx.GetPurchasedCount(generator.Id);
+            granted = ctx.GetGrantedCount(generator.Id);
+            grantedSlope = Session.LastTick == null
+                ? BigNumber.Zero
+                : Session.LastTick.DepositSlope(home, generator.Id);
+            stamp = Clock.GameTimeSeconds;
+            count.text = CountText(purchased, granted);
             yieldLine.text = CostAndYieldText(ctx, generator);
 
             // One read answers both the labels and the pressability: M is zero
@@ -87,9 +101,34 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // row reads.
         public void OpenInfo() => infos.OpenGeneratorInfo(generator, home);
 
+        // The owned count as the row prints it (12.11): the purchased count in
+        // parentheses, with the granted count added inside them when a payment
+        // has landed - "(3)" and "(3+8.89e11)". The two halves are one fact read
+        // two ways, so the label says which is which rather than a single sum
+        // the player cannot square with the price. Static, so the info screen
+        // prints the identical text.
+        public static string CountText(GameContext ctx, GeneratorDefinition generator) =>
+            CountText(ctx.GetPurchasedCount(generator.Id), ctx.GetGrantedCount(generator.Id));
+
+        public static string CountText(int purchased, BigNumber granted) =>
+            granted > BigNumber.Zero
+                ? "(" + purchased + "+" + NumberFormatter.Format(granted) + ")"
+                : "(" + purchased + ")";
+
+        // Presentation only (12.11): the granted count follows the slope the
+        // last tick realized, clamped at zero like a balance, and the frame
+        // that refreshed shows truth exactly since its elapsed term is zero.
+        public override void Interpolate()
+        {
+            if (grantedSlope == BigNumber.Zero)
+                return;
+            var display = BigNumber.Max(BigNumber.Zero, granted + grantedSlope * (Clock.GameTimeSeconds - stamp));
+            count.text = CountText(purchased, display);
+        }
+
         // "cost => yield", the reference game's row: the next unit's cost and
         // what that one unit pays, through the same resolution the tick sums
-        // (12.5). A currency the unit pays nothing is not a line, and a unit
+        // (12.5). A target the unit pays nothing is not a line, and a unit
         // paying nothing has no arrow. Static, so the info screen prints the
         // identical line.
         public static string CostAndYieldText(GameContext ctx, GeneratorDefinition generator)
@@ -98,12 +137,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
             line.Append(NumberFormatter.Format(Purchasing.CostOf(generator, ctx, 1)))
                 .Append(" ").Append(generator.costCurrency.displayName);
             var yields = 0;
-            foreach (var (currency, amount) in Producer.UnitRate(ctx, generator))
+            foreach (var (target, amount) in Producer.UnitRate(ctx, generator))
             {
                 if (amount == BigNumber.Zero)
                     continue;
                 line.Append(yields++ == 0 ? " => " : ", ");
-                line.Append(NumberFormatter.Format(amount)).Append(" ").Append(currency.displayName);
+                line.Append(NumberFormatter.Format(amount)).Append(" ").Append(target.displayName);
             }
             return line.ToString();
         }

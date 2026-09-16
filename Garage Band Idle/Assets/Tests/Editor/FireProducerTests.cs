@@ -133,6 +133,59 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(2, tree.Tier1.balances["cash"], "cash");
         }
 
+        // ---- a payment into a generator's count (12.2) ----
+
+        [Test]
+        public void A_yield_into_a_generator_lands_in_the_granted_count_with_its_fraction()
+        {
+            var tree = new TestTree();
+            var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
+            crew.produces.Add(TestTree.Entry(tree.PracticeAmp, Stat.Yield, 0.25));
+            tree.Tier1Def.producers.Add(crew);
+            tree.Rebuild();
+
+            Producer.FireProducer(tree.Ctx(tree.Tier1), crew);
+            Producer.FireProducer(tree.Ctx(tree.Tier1), crew);
+
+            // A granted count is a BigNumber and is never floored, so two
+            // quarter-amps are half an amp rather than nothing.
+            AssertClose(0.5, tree.Tier1.grantedCounts["practice_amp"], "granted");
+            Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("practice_amp"), "and nothing was purchased");
+        }
+
+        // ---- FireGeneratorYield (12.5) ----
+
+        [Test]
+        public void Firing_a_generators_yield_scales_it_by_the_owned_count()
+        {
+            var tree = new TestTree();
+            tree.PracticeAmp.produces.Add(TestTree.Entry(tree.Cash, Stat.Yield, 10));
+            tree.Rebuild();
+            tree.Root.balances["records"] = 20;              // records_income: x1.4 on the income tag
+
+            Producer.FireGeneratorYield(tree.Ctx(tree.Tier1), tree.PracticeAmp);
+            AssertClose(0, tree.Tier1.balances["cash"], "no units owned, so every target resolves to zero");
+
+            tree.Tier1.generatorCounts["practice_amp"] = 3;
+            Producer.FireGeneratorYield(tree.Ctx(tree.Tier1), tree.PracticeAmp);
+
+            AssertClose(10 * 3 * 1.4, tree.Tier1.balances["cash"], "three units under the gathered multiplier");
+        }
+
+        [Test]
+        public void A_generators_yield_scales_by_the_purchased_count_plus_the_granted_one()
+        {
+            var tree = new TestTree();
+            tree.PracticeAmp.produces.Add(TestTree.Entry(tree.Cash, Stat.Yield, 10));
+            tree.Rebuild();
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+            tree.Tier1.grantedCounts["practice_amp"] = 2.5;
+
+            Producer.FireGeneratorYield(tree.Ctx(tree.Tier1), tree.PracticeAmp);
+
+            AssertClose(35, tree.Tier1.balances["cash"], "three and a half units at 10");
+        }
+
         [Test]
         public void An_undeclared_producer_throws()
         {

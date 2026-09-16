@@ -73,6 +73,24 @@ Where it survives in writing (thin, which is why this memory exists):
   1.19e26 Money)" over "Currently: 2.01e19 Money" with a Confirm - the "would bank" preview. Tap
   producers are three big orange keys: "Ctrl", "C", "V".
 
+- 2026-09-16, chapter 2 "Money" screenshot from John, deep in a run: every generator row prints its
+  count as "(bought+granted)" with the bought count a plain integer and the granted count in the
+  fixed-slot format - "Personal Co (180+8.89e11)", "Server Farm (169+4.81e12)" - so granted counts run
+  far past the bought ones; the row line below is "1.16e21 Money => 3.09e9 Assets" (cost then one
+  unit's yield); both buy buttons read "+1" when nothing more is affordable; the header is
+  "Money: 8.85e20" with no rate line; "Liquidate (Gain 3.02e26 Money)" over "Currently: 8.85e20
+  Money" with a Confirm. Decided the same day for our row (John: match Ctrl C, drop the x): the bought count in
+  parentheses, and "+" plus the formatted granted count inside them only when something has been
+  granted - "(3)", "(3+8.89e11)"; if there is no granted, print nothing for that field.
+
+- 2026-09-16, idle window screenshot from John (chapter 8, the Money/Assets chapter): "Idle Income" /
+  "Income Doubled" / "You earned:" then one line per thing paid - "Assets: 2.38e25", then the
+  GRANTED GENERATOR COUNTS as lines of their own ("Server: 5.70e10", "PC: 1.05e10", "Cache: 8.28e9",
+  "Network: 1.98e8"), then "Productivity: 9.15e6" - and a "Great!" button (Pro Unlock owner, already
+  doubled). So Ctrl C's idle pays payments into a generator's count exactly as it pays a currency.
+  Decided the same day for us: the idle claim pays every rate target the tick would, one offer line
+  per target, the line holding the target Definition.
+
 - 2026-09-10, on Roadie retroactivity (design 8.2): Ctrl C does not answer it. John: their
   Completion Tokens "increase generator output, that's all it says", and their idle "doubles
   yields"; whether a dormant chapter's idle payout reflects tokens moved in while it was dormant

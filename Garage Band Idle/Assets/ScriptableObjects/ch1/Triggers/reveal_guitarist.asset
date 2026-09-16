@@ -17,19 +17,22 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425489276108910
+    rid: 7579425511256359022
   actions:
-  - rid: 7579425489276108911
+  - rid: 7579425511256359023
   references:
     version: 2
     RefIds:
-    - rid: 7579425489276108910
+    - rid: 7579425511256359022
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         generator: {fileID: 11400000, guid: 37392b79405d15547ad98f94b778d49f, type: 2}
-        count: 5
-    - rid: 7579425489276108911
+        count:
+          _value:
+            mantissa: 5
+            exponent: 0
+    - rid: 7579425511256359023
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: guitarist_revealed

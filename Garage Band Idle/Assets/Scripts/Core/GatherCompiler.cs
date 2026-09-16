@@ -14,10 +14,13 @@ namespace RidiculousGaming.GarageBandIdle
     // "game_speed plan": those are this plan asked with a different owner.
     public sealed class CoordinatePlan
     {
-        // The coordinate's currency, and the node declaring it as found outward
-        // from the origin - null when the query has no currency coordinate (a
-        // bar filling from time, the tick's game_speed read). Every consumer
-        // that needs a home takes it from here rather than walking for one.
+        // The coordinate's currency, used for matching and for the activeWhen
+        // gate - null when the query has no currency coordinate (a generator or
+        // bar target, a bar filling from time, the tick's game_speed read).
+        // Home is the TARGET's: the currency's home for a currency target, the
+        // generator's or the bar's for those, found outward from the origin.
+        // Every consumer that needs a home takes it from here rather than
+        // walking for one.
         public CurrencyDefinition Currency { get; }
         public ScopeState Home { get; }
 
@@ -34,37 +37,61 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
-    // A currency's two stage-2 plans, filed at its home under ONE key - the
-    // CurrencyDefinition itself - because a currency has one home and its
-    // total is modified per stat (design doc 12.2).
-    public sealed class CurrencyPlans
+    // One definition's compiled plans at its home, one per stat it is ever asked
+    // for (12.2): a currency's rate and yield totals, a bar's fill rate (also
+    // what a rate paid into it collects) and the yield paid into it, a
+    // generator's granted count and its cost, an upgrade's cost. Null where a
+    // kind is never asked; For throws on a null, since asking is a code bug
+    // (requirement 7). Filed under ONE key - the definition itself - because a
+    // definition has one home and its totals are modified per stat.
+    public sealed class StatPlans
     {
         public CoordinatePlan Rate { get; }
         public CoordinatePlan Yield { get; }
+        public CoordinatePlan Count { get; }
+        public CoordinatePlan Cost { get; }
 
-        internal CurrencyPlans(CoordinatePlan rate, CoordinatePlan yield)
+        internal StatPlans(CoordinatePlan rate, CoordinatePlan yield, CoordinatePlan count, CoordinatePlan cost)
         {
             Rate = rate;
             Yield = yield;
+            Count = count;
+            Cost = cost;
         }
 
-        // The plan for one produced stat. A stat outside the produced
-        // vocabulary has no currency total to modify, so asking is a code bug
-        // rather than an empty answer (requirement 7).
+        // The plan for one stat. A stat this holder was never compiled for has
+        // no total to modify, so asking is a code bug rather than an empty
+        // answer (requirement 7).
         public CoordinatePlan For(string stat)
         {
-            if (stat == Stat.Rate)
-                return Rate;
-            if (stat == Stat.Yield)
-                return Yield;
-            throw new InvalidOperationException(
-                $"No currency-stage plan for stat '{stat}' - the currency stage answers {Stat.ProducedNames} (12.2).");
+            var plan = stat switch
+            {
+                Stat.Rate => Rate,
+                Stat.Yield => Yield,
+                Stat.Count => Count,
+                Stat.Cost => Cost,
+                _ => null
+            };
+            return plan ?? throw new InvalidOperationException(
+                $"No compiled plan for stat '{stat}' - this holder answers {Answered()} (12.2).");
+        }
+
+        // Which stats the compiler filed for this holder, which is the whole of
+        // what its kind is asked for - the message's way of saying so.
+        private string Answered()
+        {
+            var answered = new List<string>();
+            if (Rate != null) answered.Add(Stat.Rate);
+            if (Yield != null) answered.Add(Stat.Yield);
+            if (Count != null) answered.Add(Stat.Count);
+            if (Cost != null) answered.Add(Stat.Cost);
+            return answered.Count == 0 ? "no stat" : string.Join(", ", answered);
         }
     }
 
-    // One source paying one currency at Stat.Rate, compiled: the node it is
+    // One source paying one target at Stat.Rate, compiled: the node it is
     // declared at, the source with the count fact that scales it, the entries
-    // that pay this currency, and the stage-1 plan they share - one coordinate,
+    // that pay this target, and the stage-1 plan they share - one coordinate,
     // one plan, however many entries name it.
     public sealed class RateContributor
     {
@@ -83,22 +110,22 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
-    // Everything a scope's subtree pays into one currency at Stat.Rate, in
+    // Everything a scope's subtree pays into one target at Stat.Rate, in
     // tree order (parent before child) then Sources() order, with the home the
     // total is deposited at - resolved outward from a PAYING node, never from
-    // the subtree root, since the currency may be homed below where the walk
+    // the subtree root, since the target may be homed below where the walk
     // started (design doc 12.2).
-    public sealed class CurrencyContributors
+    public sealed class TargetContributors
     {
-        public CurrencyDefinition Currency { get; }
+        public Definition Target { get; }
         public ScopeState Home { get; internal set; }
         public IReadOnlyList<RateContributor> Contributors => contributors;
 
         internal readonly List<RateContributor> contributors = new();
 
-        internal CurrencyContributors(CurrencyDefinition currency)
+        internal TargetContributors(Definition target)
         {
-            Currency = currency;
+            Target = target;
         }
     }
 
@@ -111,53 +138,57 @@ namespace RidiculousGaming.GarageBandIdle
         public BarGroupDefinition Group { get; }
         public BarDefinition Bar { get; }
 
-        // Null when the bar fills from time alone.
+        // The pool currency's own home, carried beside the fill-rate plan
+        // because that plan is homed at the BAR (12.2). Null when the bar fills
+        // from time alone.
         public ScopeState PoolHome { get; }
 
         public CoordinatePlan Rate { get; }
 
-        internal BarPlan(ScopeState node, BarGroupDefinition group, BarDefinition bar, CoordinatePlan rate)
+        internal BarPlan(ScopeState node, BarGroupDefinition group, BarDefinition bar, CoordinatePlan rate,
+                         ScopeState poolHome)
         {
             Node = node;
             Group = group;
             Bar = bar;
-            PoolHome = rate.Home;
+            PoolHome = poolHome;
             Rate = rate;
         }
     }
 
     // A scope's compiled aggregation (design doc 12.2): which sources in its
-    // OWN subtree pay which currency at Stat.Rate and where each is homed, and
+    // OWN subtree pay which target at Stat.Rate and where each is homed, and
     // its bars in settlement order. This is what the rate gather and bar demand
     // rediscovered by walking the subtree on every segment.
     public sealed class ContributorPlan
     {
         // First-seen order over the same walk: tree order, then Sources() order,
-        // then entry order - declaration-shaped, so a currency whose only payer
-        // is currently unowned is still listed and simply pays zero.
-        public IReadOnlyList<CurrencyContributors> Currencies => currencies;
+        // then entry order - declaration-shaped, so a target whose only payer
+        // is currently unowned is still listed and simply pays zero. Bars are
+        // listed like any target; Producer.RatePairs is what excludes them.
+        public IReadOnlyList<TargetContributors> Targets => targets;
 
         // Scopes parent before child, then barGroups in declaration order, then
         // bars in declaration order (12.7).
         public IReadOnlyList<BarPlan> Bars => bars;
 
-        private readonly CurrencyContributors[] currencies;
+        private readonly TargetContributors[] targets;
         private readonly BarPlan[] bars;
 
-        internal ContributorPlan(List<CurrencyContributors> currencies, List<BarPlan> bars)
+        internal ContributorPlan(List<TargetContributors> targets, List<BarPlan> bars)
         {
-            this.currencies = currencies.ToArray();
+            this.targets = targets.ToArray();
             this.bars = bars.ToArray();
         }
 
-        // What pays this currency here, or null when nothing in the subtree
-        // does - which is not a miss but the answer: a currency no source pays
+        // What pays this target here, or null when nothing in the subtree
+        // does - which is not a miss but the answer: a target no source pays
         // has a rate of zero, and the plan is what says so.
-        public CurrencyContributors For(CurrencyDefinition currency)
+        public TargetContributors For(Definition target)
         {
-            for (var i = 0; i < currencies.Length; i++)
-                if (currencies[i].Currency == currency)
-                    return currencies[i];
+            for (var i = 0; i < targets.Length; i++)
+                if (targets[i].Target == target)
+                    return targets[i];
             return null;
         }
 
@@ -204,39 +235,69 @@ namespace RidiculousGaming.GarageBandIdle
 
         // Which queries exist is decided by the content, and exactly those are
         // built: every source entry at its declaring node (stage 1), every
-        // currency at its home for rate and yield (stage 2), every bar at its
-        // declaring node (its fill rate, stage 1 only - 12.7), and game_speed at
-        // every chapter node.
+        // currency at its home for rate and yield (stage 2), every generator for
+        // its granted count and its cost, every upgrade for its cost, every bar
+        // at its declaring node (its fill rate and the yield paid into it -
+        // 12.7), and game_speed at every chapter node.
         private static void CompileCoordinates(ScopeState node,
                                                Dictionary<ScopeState, List<ModifierDefinition>> grantable)
         {
             foreach (var source in node.Definition.Sources())
             {
-                // Entries of one source naming one currency and stat are one
+                // Entries of one source naming one target and stat are one
                 // coordinate, so they share one plan: an earlier entry on the
                 // same coordinate already compiled it, and this entry is filed
                 // under that same object rather than walking the chain again.
                 var done = new List<ProducesEntry>();
                 foreach (var entry in source.Entries)
                 {
-                    if (entry == null)
+                    // An entry naming no target names no coordinate, so there is
+                    // nothing to compile; validation reports it (12.2).
+                    if (entry == null || entry.Target == null)
                         continue;
-                    var same = done.Find(e => e.currency == entry.currency && e.stat == entry.stat);
+                    var same = done.Find(e => e.Target == entry.Target && e.stat == entry.stat);
                     node.StoreLink(entry, same != null
                         ? node.Link<CoordinatePlan>(same)
-                        : Plan(node, source.Source, entry.currency, entry.stat, grantable));
+                        : Plan(node, source.Source, entry.currency, entry.stat, HomeOf(node, entry.Target), grantable));
                     done.Add(entry);
                 }
             }
 
             foreach (var currency in node.Definition.declaredCurrencies)
-                if (currency != null)
-                    // The currency's own definition is the owner, so its tags
-                    // match - which is how the income tag carries the Records
-                    // and Roadie factors (design doc 8.2).
-                    node.StoreLink(currency, new CurrencyPlans(
-                        Plan(node, currency, currency, Stat.Rate, grantable),
-                        Plan(node, currency, currency, Stat.Yield, grantable)));
+            {
+                if (currency == null)
+                    continue;
+                // The currency's own definition is the owner, so its tags
+                // match - which is how the income tag carries the Records
+                // and Roadie factors (design doc 8.2).
+                var home = HomeOf(node, currency);
+                node.StoreLink(currency, new StatPlans(
+                    Plan(node, currency, currency, Stat.Rate, home, grantable),
+                    Plan(node, currency, currency, Stat.Yield, home, grantable),
+                    null, null));
+            }
+
+            // A generator's count plan carries no currency coordinate - one
+            // number however the grant arrives - and its cost plan names the
+            // cost currency, whose home the read never uses (12.2).
+            foreach (var generator in node.Definition.generators)
+            {
+                if (generator == null)
+                    continue;
+                node.StoreLink(generator, new StatPlans(null, null,
+                    Plan(node, generator, null, Stat.Count, node, grantable),
+                    Plan(node, generator, generator.costCurrency, Stat.Cost,
+                         HomeOf(node, generator.costCurrency), grantable)));
+            }
+
+            foreach (var upgrade in node.Definition.upgrades)
+            {
+                if (upgrade == null)
+                    continue;
+                node.StoreLink(upgrade, new StatPlans(null, null, null,
+                    Plan(node, upgrade, upgrade.costCurrency, Stat.Cost,
+                         HomeOf(node, upgrade.costCurrency), grantable)));
+            }
 
             foreach (var group in node.Definition.barGroups)
             {
@@ -244,11 +305,18 @@ namespace RidiculousGaming.GarageBandIdle
                     continue;
                 foreach (var bar in group.bars)
                     if (bar != null)
-                        node.StoreLink(bar, Plan(node, bar, bar.fillCurrency, Stat.Rate, grantable));
+                        // The rate plan IS the fill-rate plan, and it is also
+                        // what a rate paid into the bar collects: "10x this bar"
+                        // speeds its own fill and what is paid into it alike
+                        // (12.7). Both are homed at the bar itself.
+                        node.StoreLink(bar, new StatPlans(
+                            Plan(node, bar, bar.fillCurrency, Stat.Rate, node, grantable),
+                            Plan(node, bar, null, Stat.Yield, node, grantable),
+                            null, null));
             }
 
             if (node is ChapterScopeState)
-                node.StoreLink(GameSpeed, Plan(node, null, null, Stat.GameSpeed, grantable));
+                node.StoreLink(GameSpeed, Plan(node, null, null, Stat.GameSpeed, null, grantable));
 
             foreach (var child in node.Children)
                 CompileCoordinates(child, grantable);
@@ -257,9 +325,11 @@ namespace RidiculousGaming.GarageBandIdle
         // One query: walk outward from the origin; at each node take
         // EffectCarriers in order; keep every effect the selector rule of 12.2
         // accepts. The kept links, chain order then carrier order, ARE the plan
-        // - and Matches never runs again.
+        // - and Matches never runs again. The home is the target's, resolved by
+        // the caller, since which definition a query is ABOUT is the caller's.
         private static CoordinatePlan Plan(ScopeState origin, Definition owner, CurrencyDefinition currency,
-                                           string stat, Dictionary<ScopeState, List<ModifierDefinition>> grantable)
+                                           string stat, ScopeState home,
+                                           Dictionary<ScopeState, List<ModifierDefinition>> grantable)
         {
             var links = new List<EffectLink>();
             for (var node = origin; node != null; node = node.Parent)
@@ -267,7 +337,7 @@ namespace RidiculousGaming.GarageBandIdle
                     if (Producer.Matches(carrier.Effect.target, carrier.Effect.currencyId, carrier.Effect.stat,
                                          owner, currency, stat))
                         links.Add(new EffectLink(carrier, node));
-            return new CoordinatePlan(currency, HomeOf(origin, currency), links);
+            return new CoordinatePlan(currency, home, links);
         }
 
         // The modifiers a grant at this node could ever have stacked: the ones
@@ -288,24 +358,36 @@ namespace RidiculousGaming.GarageBandIdle
             return chain;
         }
 
-        // The currency's home: the first scope OUTWARD from here declaring this
-        // exact asset (design doc 12.3). An entry, a currency stage or a bar
-        // naming a currency off its chain is a content fault, so it throws HERE,
-        // at build, like every other unresolved static reference in this pass
-        // (12.14.7): the validation pass reports it as a finding for a person,
-        // and this is what stands when that pass has been skipped. No currency
-        // at all is not a fault - a bar filling from time and the game_speed
-        // read have no currency coordinate, so they have no home either.
-        private static ScopeState HomeOf(ScopeState from, CurrencyDefinition currency)
+        // The target's home: the first scope OUTWARD from here declaring this
+        // exact asset (design doc 12.3). An entry, a currency stage, a bar or a
+        // cost naming an asset off its chain is a content fault, so it throws
+        // HERE, at build, like every other unresolved static reference in this
+        // pass (12.14.7): the validation pass reports it as a finding for a
+        // person, and this is what stands when that pass has been skipped. No
+        // target at all is not a fault - a bar filling from time and the
+        // game_speed read have no currency coordinate, so they have no home
+        // either.
+        private static ScopeState HomeOf(ScopeState from, Definition target)
         {
-            if (currency == null)
+            if (target == null)
                 return null;
-            var home = Producer.FindDeclaringScope<ScopeState>(from, currency);
+            var home = Producer.FindDeclaringScope<ScopeState>(from, target);
             if (home == null)
                 throw new InvalidOperationException(
-                    $"No scope on the chain from '{from.ScopeId}' declares currency '{currency.Id}' (12.12).");
+                    $"No scope on the chain from '{from.ScopeId}' declares {Kind(target)} '{target.Id}' (12.12).");
             return home;
         }
+
+        // The word the message calls a target by, so a fault reads the way the
+        // design doc names the thing (12.12).
+        private static string Kind(Definition target) => target switch
+        {
+            CurrencyDefinition => "currency",
+            GeneratorDefinition => "generator",
+            BarDefinition => "bar",
+            UpgradeDefinition => "upgrade",
+            _ => target.GetType().Name
+        };
 
         // No kind of scope is special to the economy (12.14.8): every node holds
         // the aggregation of its OWN subtree, keyed by its own definition, and
@@ -318,13 +400,13 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // One scope's aggregation, over its own subtree: what pays each
-        // currency at Stat.Rate, and the bars in settlement order.
+        // target at Stat.Rate, and the bars in settlement order.
         private static ContributorPlan ContributorsOf(ScopeState subtreeRoot)
         {
-            var currencies = new List<CurrencyContributors>();
+            var targets = new List<TargetContributors>();
             var bars = new List<BarPlan>();
             Walk(subtreeRoot);
-            return new ContributorPlan(currencies, bars);
+            return new ContributorPlan(targets, bars);
 
             void Walk(ScopeState node)
             {
@@ -337,28 +419,29 @@ namespace RidiculousGaming.GarageBandIdle
                         continue;
                     foreach (var bar in group.bars)
                         if (bar != null)
-                            bars.Add(new BarPlan(node, group, bar, node.Link<CoordinatePlan>(bar)));
+                            bars.Add(new BarPlan(node, group, bar, node.Link<StatPlans>(bar).Rate,
+                                                 HomeOf(node, bar.fillCurrency)));
                 }
 
                 foreach (var child in node.Children)
                     Walk(child);
             }
 
-            // One source's rate entries, grouped by the currency they pay in
-            // authored order: entries naming one currency share one coordinate,
+            // One source's rate entries, grouped by the target they pay in
+            // authored order: entries naming one target share one coordinate,
             // so they share one plan and sum into one term.
             void Contribute(ScopeState node, ScopeSource source)
             {
-                var paid = new List<CurrencyDefinition>();
+                var paid = new List<Definition>();
                 var grouped = new List<List<ProducesEntry>>();
                 foreach (var entry in source.Entries)
                 {
-                    if (entry == null || entry.currency == null || entry.stat != Stat.Rate)
+                    if (entry == null || entry.Target == null || entry.stat != Stat.Rate)
                         continue;
-                    var index = paid.IndexOf(entry.currency);
+                    var index = paid.IndexOf(entry.Target);
                     if (index < 0)
                     {
-                        paid.Add(entry.currency);
+                        paid.Add(entry.Target);
                         grouped.Add(new List<ProducesEntry>());
                         index = paid.Count - 1;
                     }
@@ -374,13 +457,13 @@ namespace RidiculousGaming.GarageBandIdle
                 }
             }
 
-            CurrencyContributors Bucket(CurrencyDefinition currency)
+            TargetContributors Bucket(Definition target)
             {
-                for (var i = 0; i < currencies.Count; i++)
-                    if (currencies[i].Currency == currency)
-                        return currencies[i];
-                var fresh = new CurrencyContributors(currency);
-                currencies.Add(fresh);
+                for (var i = 0; i < targets.Count; i++)
+                    if (targets[i].Target == target)
+                        return targets[i];
+                var fresh = new TargetContributors(target);
+                targets.Add(fresh);
                 return fresh;
             }
         }

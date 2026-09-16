@@ -19,6 +19,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public BigNumber rate = BigNumber.Zero;             // effective fill speed, units/sec
         public BigNumber progressBefore = BigNumber.Zero;   // what the crossing test compares against
         public BigNumber filled = BigNumber.Zero;
+
+        // A payment into the bar rather than a draw from its pool (12.7):
+        // selection and availability govern DRINKING, and a payment is not a
+        // drink, so the settlement's entry gate does not ask them of one.
+        public bool payment;
     }
 
     // A subtree's drawing bars for one segment, in settlement order: scopes
@@ -77,7 +82,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     bar = entry.Bar,
                     pool = entry.Bar.fillCurrency,
                     poolHome = entry.PoolHome,
-                    rate = Rate(ctx, entry.Rate, entry.Bar),
+                    // Its own fill, plus the rate entries paying it - those
+                    // already carry their own stage 1 and this bar's stage 2,
+                    // and the bar is the one asking, so they arrive at the draw
+                    // rather than through a deposit (12.7).
+                    rate = Rate(ctx, entry.Rate, entry.Bar)
+                           + Producer.GetRate(new GameContext(subtreeRoot, segmentStartUtc), entry.Bar),
                     progressBefore = progress,
                 });
             }
@@ -210,17 +220,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
-        // A non-repeating bar fires on the CROSSING, detected within the pass:
-        // the snapshot holds the pre-fill progress, so a bar already full when the
-        // segment began was below nothing, and a save loaded at full progress
-        // never fires because no fill crossed it. That is what "no completed-set
-        // is stored" costs, and it is why filling and settling are one call.
+        // A non-repeating bar fires on the CROSSING its own fill made, detected
+        // within the pass: the snapshot holds the pre-fill progress and the entry
+        // holds what its fill added, so a bar already full when the segment
+        // began was below nothing, a save loaded at full progress never fires
+        // because no fill crossed it, and a payment that landed inside this
+        // settlement and settled its own crossing (Deposit) is not fired again
+        // when the pass reaches the bar - live progress is never the test. That
+        // is what "no completed-set is stored" costs, and it is why filling and
+        // settling are one call.
         private static void SettleOnce(BarFill entry, DateTime settlementUtc)
         {
             var bar = entry.bar;
             if (entry.progressBefore >= bar.fillAmount)
                 return;
-            if (Progress(entry, bar) < bar.fillAmount)
+            if (entry.progressBefore + entry.filled < bar.fillAmount)
                 return;
             Execute(entry, bar, settlementUtc);
         }
@@ -275,10 +289,78 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // gate and pay the whole backlog, the very coupling ResolveDemand closes.
         private static bool Eligible(BarFill entry, BarDefinition bar, DateTime nowUtc)
         {
+            // A payment is not a drink (12.7): what the snapshot admits to the
+            // POOL is what selection and availability decide, and a bar paid
+            // directly settles its crossing whether or not it was selected.
+            if (entry.payment)
+                return true;
             if (!entry.scope.activeBars.TryGetValue(entry.group.Id, out var selected) || !selected.Contains(bar.Id))
                 return false;
             return bar.availableWhen == null
                 || bar.availableWhen.Evaluate(new GameContext(entry.scope, nowUtc));
+        }
+
+        // A yield paid into this bar (12.7): progress moves and the bar settles
+        // its own crossing at the moment it is paid, through the settlement the
+        // tick runs, since the tick only ever settles the bars its draw admitted
+        // and would read a bar filled between ticks as one that fired earlier.
+        // Clamped at fillAmount for a non-repeating bar (a tap cannot overshoot
+        // full); a repeating bar keeps the excess and settles every threshold it
+        // crossed. Selection and availability do not gate the completion: they
+        // govern drinking from a pool, and a payment is not a drink. A refused
+        // completion list (12.5) leaves the payment undelivered, exactly as the
+        // draw excludes that bar for the segment.
+        public static void Deposit(GameContext ctx, BarDefinition bar, BigNumber amount)
+        {
+            if (amount < BigNumber.Zero)
+                throw new InvalidOperationException(
+                    $"Deposit of {amount} into bar '{bar.Id}': a payment is never negative.");
+
+            var home = Producer.DeclaringScope<ScopeState>(ctx.Scope, bar);
+            var homeCtx = new GameContext(home, ctx.NowUtc);
+            if (ActionList.Refuses(bar.onComplete, homeCtx) != null)
+                return;
+
+            // The home's OWN plan lists every bar its subtree holds, and a bar is
+            // declared once, so exactly one entry names it; none is a link-pass
+            // bug rather than content (12.14.8).
+            BarPlan planned = null;
+            var listed = ContributorPlan.At(home).Bars;
+            for (var i = 0; i < listed.Count; i++)
+            {
+                if (listed[i].Bar != bar)
+                    continue;
+                planned = listed[i];
+                break;
+            }
+            if (planned == null)
+                throw new InvalidOperationException(
+                    $"Scope '{home.ScopeId}' declares bar '{bar.Id}', but its contributor plan lists no entry for it.");
+
+            // Progress is monotonic until reset (12.7): a non-repeating bar at or
+            // past full takes nothing, and one below full stops at the threshold.
+            var progress = home.barProgress.TryGetValue(bar.Id, out var stored) ? stored : BigNumber.Zero;
+            var moved = progress + amount;
+            if (!bar.repeating && moved > bar.fillAmount)
+                moved = BigNumber.Max(progress, bar.fillAmount);
+            home.barProgress[bar.Id] = moved;
+
+            // One entry through the one settlement, so a payment's crossing and a
+            // draw's are the same code (12.7).
+            var demand = new BarDemand();
+            demand.bars.Add(new BarFill
+            {
+                scope = home,
+                facts = home.facts,
+                group = planned.Group,
+                bar = bar,
+                pool = bar.fillCurrency,
+                poolHome = planned.PoolHome,
+                progressBefore = progress,
+                filled = moved - progress,
+                payment = true,
+            });
+            Settle(demand, ctx.NowUtc);
         }
 
         // Fail-closed and all-or-nothing (12.7/12.11): a refusal changes nothing,

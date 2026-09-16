@@ -83,8 +83,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // 0.5 deposited and 0.5 drawn in the same second: the pool is what
             // limits the draw, so the net is zero and the bar fills at the
             // supply rate rather than at its own 2/s demand.
-            AssertClose(0, report.CurrencyNet(f.Tree.Tier1, "rehearsal"), "0.5 in, 0.5 out");
-            AssertClose(0, report.CurrencySlope(f.Tree.Tier1, "rehearsal"));
+            AssertClose(0, report.DepositNet(f.Tree.Tier1, "rehearsal"), "0.5 in, 0.5 out");
+            AssertClose(0, report.DepositSlope(f.Tree.Tier1, "rehearsal"));
             AssertClose(0.5, report.BarFill(f.Tree.Tier1, f.Tree.Cover1.Id));
             AssertClose(0.5, report.BarSlope(f.Tree.Tier1, f.Tree.Cover1.Id), "realized, not demanded");
 
@@ -107,8 +107,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // 0.5 in against the bar's full 2/s draw, the stock covering the
             // shortfall: 10 + 0.5 - 2.
-            AssertClose(-1.5, report.CurrencyNet(f.Tree.Tier1, "rehearsal"));
-            AssertClose(-1.5, report.CurrencySlope(f.Tree.Tier1, "rehearsal"));
+            AssertClose(-1.5, report.DepositNet(f.Tree.Tier1, "rehearsal"));
+            AssertClose(-1.5, report.DepositSlope(f.Tree.Tier1, "rehearsal"));
             AssertClose(2, report.BarFill(f.Tree.Tier1, f.Tree.Cover1.Id), "the bar drew its whole rate");
             AssertClose(8.5, f.Balance("rehearsal"));
         }
@@ -124,8 +124,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // One amp at 0.5/s for ten seconds, and the slope is that net per
             // real second - the same 0.5 whatever window measured it.
-            AssertClose(5, report.CurrencyNet(f.Tree.Tier1, "cash"));
-            AssertClose(0.5, report.CurrencySlope(f.Tree.Tier1, "cash"));
+            AssertClose(5, report.DepositNet(f.Tree.Tier1, "cash"));
+            AssertClose(0.5, report.DepositSlope(f.Tree.Tier1, "cash"));
             Assert.AreEqual(10, report.Seconds, 1e-12);
             AssertClose(5, f.Balance("cash"));
 
@@ -146,8 +146,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var report = f.Tick(0.2504);
 
-            AssertClose(0.5 * 0.2504, report.CurrencyNet(f.Tree.Tier1, "cash"));
-            AssertClose(0.5, report.CurrencySlope(f.Tree.Tier1, "cash"));
+            AssertClose(0.5 * 0.2504, report.DepositNet(f.Tree.Tier1, "cash"));
+            AssertClose(0.5, report.DepositSlope(f.Tree.Tier1, "cash"));
         }
 
         // ---- what replaces it ----
@@ -163,7 +163,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // for the display to keep counting on.
             f.Session.FireProducer(f.Ctx(1), f.Tree.TapProducer);
             Assert.AreSame(report, f.Session.LastTick);
-            AssertClose(0.5, f.Session.LastTick.CurrencySlope(f.Tree.Tier1, "cash"));
+            AssertClose(0.5, f.Session.LastTick.DepositSlope(f.Tree.Tier1, "cash"));
         }
 
         [Test]
@@ -200,8 +200,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // one-shot out of the slope: a state delta would extrapolate the
             // payout as if it repeated every second.
             AssertClose(1000, f.Balance("cash"), "truth moved");
-            AssertClose(0, report.CurrencyNet(f.Tree.Tier1, "cash"), "and the report did not");
-            AssertClose(0, report.CurrencySlope(f.Tree.Tier1, "cash"));
+            AssertClose(0, report.DepositNet(f.Tree.Tier1, "cash"), "and the report did not");
+            AssertClose(0, report.DepositSlope(f.Tree.Tier1, "cash"));
             AssertClose(2, report.BarFill(f.Tree.Tier1, f.Tree.Cover1.Id), "the draw itself is recorded");
         }
 
@@ -223,8 +223,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 Assert.IsNotNull(report);
                 Assert.AreEqual(0, report.Seconds, 1e-12);
-                AssertClose(0, report.CurrencyNet(f.Tree.Tier1, "cash"));
-                AssertClose(0, report.CurrencySlope(f.Tree.Tier1, "cash"), "no seconds, no slope");
+                AssertClose(0, report.DepositNet(f.Tree.Tier1, "cash"));
+                AssertClose(0, report.DepositSlope(f.Tree.Tier1, "cash"), "no seconds, no slope");
                 AssertClose(0, report.BarFill(f.Tree.Tier1, f.Tree.Cover1.Id));
                 AssertClose(0, report.BarSlope(f.Tree.Tier1, f.Tree.Cover1.Id));
             }

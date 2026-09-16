@@ -62,6 +62,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, BigNumber> balances = new();
         public Dictionary<string, BigNumber> earnedTotals = new();     // per currency, same home as its balance
         public Dictionary<string, int> generatorCounts = new();
+        public Dictionary<string, BigNumber> grantedCounts = new();    // per generator, beside generatorCounts; BigNumber and never floored (12.2)
         public HashSet<string> flags = new();
         public HashSet<string> purchasedUpgrades = new();
         public HashSet<string> firedTriggers = new();                  // one-shot trigger latches - a reset re-arms
@@ -137,6 +138,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, BigNumber> balances => facts.balances;
         public Dictionary<string, BigNumber> earnedTotals => facts.earnedTotals;
         public Dictionary<string, int> generatorCounts => facts.generatorCounts;
+        public Dictionary<string, BigNumber> grantedCounts => facts.grantedCounts;
         public HashSet<string> flags => facts.flags;
         public HashSet<string> purchasedUpgrades => facts.purchasedUpgrades;
         public HashSet<string> firedTriggers => facts.firedTriggers;

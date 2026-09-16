@@ -18,12 +18,13 @@ namespace RidiculousGaming.GarageBandIdle
         Live
     }
 
-    // One line of the idle offer: the currency, its home, and the amount - all
-    // references, born from the same (currency, home) enumeration GetRate sums,
-    // because nothing about an offer ever crosses a save boundary.
+    // One line of the idle offer: the target, its home, and the amount - all
+    // references, born from the same (target, home) enumeration GetRate sums,
+    // because nothing about an offer ever crosses a save boundary. Idle pays
+    // every rate target the tick would, one line per target (12.9).
     public class IdleOfferLine
     {
-        public CurrencyDefinition currency;
+        public Definition target;
         public ScopeState home;
         public BigNumber amount;
     }
@@ -275,7 +276,7 @@ namespace RidiculousGaming.GarageBandIdle
                 var segCtx = new GameContext(chapter, start, idleAccumulation: true);
                 var effSeconds = (end - start).TotalSeconds * TickSystem.GameSpeed(segCtx, chapter, config);
                 for (var i = 0; i < pairs.Count; i++)
-                    amounts[i] += Producer.GetRate(segCtx, pairs[i].currency) * effSeconds;
+                    amounts[i] += Producer.GetRate(segCtx, pairs[i].target) * effSeconds;
             }
 
             // The offer's window ends at NOW even though the payment covers the
@@ -289,7 +290,7 @@ namespace RidiculousGaming.GarageBandIdle
                     continue;
                 offer.lines.Add(new IdleOfferLine
                 {
-                    currency = pairs[i].currency,
+                    target = pairs[i].target,
                     home = pairs[i].home,
                     amount = owner ? amounts[i] * 2 : amounts[i]
                 });
@@ -315,11 +316,11 @@ namespace RidiculousGaming.GarageBandIdle
             var offer = CurrentOffer;
             foreach (var line in offer.lines)
             {
-                // Resolved: the line's currency was judged active by the gather
+                // Resolved: the line's target was judged active by the gather
                 // that built the offer, under the claim's own circumstance. A
                 // re-ask here would run under a live context instead and could
                 // refuse a line the offer already promised, mid-settlement.
-                new GameContext(line.home, offer.windowEndUtc).DepositResolved(line.currency.Id, line.amount);
+                Producer.PayResolved(new GameContext(line.home, offer.windowEndUtc), line.target, line.amount);
             }
             chapter.StampActive(offer.windowEndUtc);
             CurrentOffer = null;

@@ -127,6 +127,32 @@ Recorded so no one builds them again.
     same coordinate means do not while the record exists, which is the design doc's own "automation
     disabled" handicap example.
 
+## Decisions (John, 2026-09-16)
+
+13. A constant x0 on a cost effect is refused at load; the runtime backstop on a nonpositive unit
+    cost stays where it is, covering the product.
+14. A bar collects what pays it, as a currency does: a rate at its draw beside its own `fillRate`,
+    a yield at the write, settling its own crossing there, selected or not (selection governs
+    drinking from a pool; a payment is not a drink).
+15. Stage 2 belongs to the target under the target's own stat: `rate`/`yield` for a currency,
+    `rate`/`yield` for a bar (its fill-rate plan doubles as its rate stage), `count` for a
+    generator's granted count - so "querying, rate" keeps meaning Querying's output.
+16. The generator row prints the purchased count in parentheses with the granted count added inside
+    when there is one: `(3)`, `(3+8.89e11)`; the "x" is gone (Ctrl C's shape; an absent granted
+    prints nothing).
+17. Idle pays every rate target the tick would, one offer line per target (Ctrl C's idle window
+    lists granted counts as lines).
+18. Cost is stage 1 only: an effect names the generator or upgrade by id or tag; "everything priced
+    in cash" is a tag. Names whose type widens from currency to any target follow the type
+    (`TargetContributors`, `StatPlans`, the offer line's `target`); `OwnedCountAtLeast`'s threshold
+    is BigNumber.
+
+19. Away pays half of ALL idle income, a grant into a generator's count included (John,
+    2026-09-16: "it's about all of it"). The wildcard is every number of a stat at the one coordinate
+    that stat has per number, so `count` and `cost` take a wildcard as a currency's total does;
+    root's `idle_base` carries `{stat: count, x0.5}` beside its rate line. The tick records a granted
+    deposit like a currency's, so the row's count interpolates between ticks.
+
 ## The changes
 
 Ordered by what a Ctrl C-shaped chapter 2 hits first. A, B and C are its first day of authoring.
@@ -143,16 +169,17 @@ Ordered by what a Ctrl C-shaped chapter 2 hits first. A, B and C are its first d
   `CostOf`. The upgrade cost takes the factor at (upgrade id or tag, cost currency, cost).
 - The gather compiler compiles a cost plan per generator and per upgrade at its declaring scope,
   the same shape as a source's rate plan.
-- Clamped: a cost factor below zero is a content fault at load (`NumericRange`), and a zero factor
-  is legal (Ctrl C's "99.99% cheaper" rounds to it in practice, and a free generator is bit-for-bit
-  the growth-1, cost-0 case bulk buy already handles).
+- Range: a cost factor below zero is a content fault at load (`NumericRange`), and so is a constant
+  x0 (decision 13): a free generator is an unbounded rate printer, `CostOf` already throws on a
+  nonpositive unit cost, and Ctrl C's "99.99% cheaper" is a small factor, never zero. A wildcard
+  cost effect halves every price (decision 19).
 - Outside: a change to the growth ratio itself (Literally Unusable) is a different feature, and a
   per-count discount (Ergonomics) is this plus D.
 
 ### B. Fire a generator's yield (decision 2; 12.5, 12.7)
 
 - `FireGeneratorYield : GameAction { GeneratorDefinition generator }`. Resolves the generator
-  outward from the acting scope (`ChainReach`), runs `Producer.ResolveUnit` over the generator's
+  outward from the acting scope (`ChainReach`), runs `Producer.Resolve` over the generator's
   produces entries with `Stat.Yield`, count-scaled and gathered exactly as a rate is, and deposits
   through `FireProducer`'s path. Any action list may hold it; on a bar's `onComplete` it is a team
   paying per cycle, on an upgrade or a rung it is a one-shot grant that scales.
@@ -168,10 +195,17 @@ Ordered by what a Ctrl C-shaped chapter 2 hits first. A, B and C are its first d
   pays on a firing.
 - A payment into a generator is a deposit into its `granted` count (decisions 8, 9) at the
   generator's declaring scope, found by the outward walk from the paying source. A payment into a
-  bar is a deposit into its progress at the bar's declaring scope, clamped at the fill amount.
+  bar goes to the bar (decision 14): a rate is collected by the bar at its draw beside its own
+  `fillRate`, and a yield moves progress at the write and settles the bar's crossing right there
+  through the tick's own settlement, clamped at `fillAmount` for a non-repeating bar, selected or
+  not.
 - The compiler builds a plan at the target's home listing the sources on the chain that pay it,
   as it does for a currency, so a "how fast is my count growing" readout is the same read a
   currency's rate is.
+- Each target collects its own stage-2 modifiers (decision 15): a currency's under `rate`/`yield`,
+  a bar's under `rate` (its fill-rate plan, so "10x this bar" speeds its own fill and what is paid
+  in alike) and `yield`, a generator's granted count under the stat `count`, so an effect naming a
+  generator with `rate` keeps meaning its output.
 - Ctrl C's recursive generator is then content: Scoring is a generator whose yield entry pays
   Querying's count, and a repeating time-only bar of 37.4 s fires Scoring's yield on completion
   (B). Three Scoring owned pays three Querying per cycle; "10x generator-generator speed" is a
@@ -182,9 +216,8 @@ Ordered by what a Ctrl C-shaped chapter 2 hits first. A, B and C are its first d
 - `OwnedCountAtLeast`, `UnitRate`, the row's count label and the info screen read the sum;
   `CostAt` reads purchased. Save: `ownedCounts` gains the granted map; missing reads as zero, so no
   migration.
-- Validation: the target resolves on the paying source's chain (`ChainReach`); a payment into a
-  bar with a fill currency is an `InertOperand` warning unless the entry's stat is yield (a rate
-  into a currency-fed bar's progress fights its own drain and is never what an author means).
+- Validation: the target resolves on the paying source's chain (`ChainReach`). No warning on a rate
+  into a currency-fed bar: the bar collects it as fill, which is ordinary authoring (decision 14).
 
 ### D. Owned-count multiplier formula (decision 4; 12.2)
 
@@ -266,7 +299,7 @@ Each change's tests exercise the runtime code, never a second implementation (me
   identity holds under a factor; `MaxAffordable` under a factor equals the count `CostOf` affords;
   a handicap of 100 lifts when the record goes; a factor below zero is refused at load.
 - B: firing a generator's yield at owned 3 deposits three units' worth times the gathered
-  multiplier; on a bar's completion the deposit matches `ResolveUnit`; an unfired yield entry
+  multiplier; on a bar's completion the deposit matches `ResolveGeneratorYield`; an unfired yield entry
   warns.
 - C: a yield paid into a count lands in granted; `CostAt` ignores granted; `OwnedCountAtLeast`
   and production read the sum; a rate paid into a time-fed bar's progress advances it and clamps
@@ -296,4 +329,15 @@ Each change's tests exercise the runtime code, never a second implementation (me
 
 ## Status
 
-**PLANNED 2026-09-15.** Nothing open.
+**A, B, C DONE 2026-09-16** - 844/844 green (+45: 47 added, 2 deleted), with decisions 13-18 landed the
+same day. Two review corrections on the runtime agent's diff: a payment into a non-repeating bar
+already past full takes nothing rather than being clamped down to `fillAmount` (progress is
+monotonic, 12.7), and `ResolveGeneratorYield` reads the owned sum through `GameContext.GetOwnedCount`
+instead of adding the two facts itself. One fixture fix: a `GatherCompilerTests` upgrade priced in a
+currency off its chain, which Build refuses once it compiles a cost plan for it. Same day, on the
+landing report's findings: decision 19 (the wildcard reaches count and cost, idle halves grants),
+the tick records granted deposits so the row's count interpolates, and the save's dropped-granted
+warning names a granted count. External review, same day: a payment landing inside a tick's
+settlement fired a non-repeating bar's crossing twice, since `SettleOnce` compared the snapshot with
+live progress; it compares the snapshot with its own fill, so each mover settles only its own
+crossing (one test). D, E, F, G, H open.

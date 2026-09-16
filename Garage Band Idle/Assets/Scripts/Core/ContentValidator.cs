@@ -168,6 +168,11 @@ namespace RidiculousGaming.GarageBandIdle
         internal List<ModifierGrantRecord> ModifierGrants { get; } = new();
         internal List<ModifierRemoveRecord> ModifierRemoves { get; } = new();
 
+        // The generators some action list fires the yield of. Each record
+        // already passed the reach check from its acting scope, so a recorded
+        // firer is a reachable one by construction (12.5).
+        internal List<Economy.GeneratorDefinition> YieldFirers { get; } = new();
+
         internal ValidationContext(
             ValidationReport report,
             ScopeDefinition rootScope,
@@ -376,6 +381,8 @@ namespace RidiculousGaming.GarageBandIdle
 
         public void RecordFlagSetter(string flagId) =>
             FlagSetters.Add(new FlagSetterRecord(flagId, ActingScope));
+
+        public void RecordYieldFirer(Economy.GeneratorDefinition generator) => YieldFirers.Add(generator);
 
         public void RecordModifierGrant(Economy.ModifierDefinition modifier, ScopeDefinition target) =>
             ModifierGrants.Add(new ModifierGrantRecord(modifier, target));
@@ -1052,6 +1059,7 @@ namespace RidiculousGaming.GarageBandIdle
             // ---- cross-container checks over the ledgers ----
             ctx.ClearSite();
             FinalizeFlagChecks(ctx);
+            FinalizeYieldChecks(ctx);
             FinalizeModifierChecks(ctx);
 
             // Validation's second input (12.12): the code side's own content
@@ -1076,7 +1084,18 @@ namespace RidiculousGaming.GarageBandIdle
                     ctx.AddError(ValidationCheck.NullEntry, "null produces entry.");
                     continue;
                 }
-                ctx.RequireOnChain(entry.currency, "a produces entry");
+                // A line pays exactly one thing (12.2): two targets is an amount
+                // with no single home to land at, and none is a contribution
+                // with nowhere to go.
+                var named = 0;
+                if (entry.currency != null) named++;
+                if (entry.generator != null) named++;
+                if (entry.bar != null) named++;
+                if (named != 1)
+                    ctx.AddError(ValidationCheck.NullEntry,
+                        $"names {named} targets - a produces entry pays exactly one of a currency, a generator, or a bar (12.2).");
+                else
+                    ctx.RequireOnChain(entry.Target, "a produces entry");
                 ctx.RequireProducedStat(entry.stat, "a produces entry");
                 if (entry.value < BigNumber.Zero)
                     ctx.AddError(ValidationCheck.NumericRange,
@@ -1457,6 +1476,34 @@ namespace RidiculousGaming.GarageBandIdle
                 }
         }
 
+        // A yield entry pays on a FIRING, and a generator's is fired by
+        // FireGeneratorYield (12.5) - so entries no action list names are
+        // content with no takers. Every recorded firer already passed the reach
+        // check from its own acting scope, so "reachable" is by construction and
+        // nothing here walks a chain.
+        private static void FinalizeYieldChecks(ValidationContext ctx)
+        {
+            foreach (var scope in ctx.TreeScopes)
+                foreach (var generator in scope.generators)
+                {
+                    if (generator == null || ctx.YieldFirers.Contains(generator))
+                        continue;
+                    var yields = false;
+                    foreach (var entry in generator.produces)
+                        if (entry != null && entry.stat == Economy.Stat.Yield)
+                        {
+                            yields = true;
+                            break;
+                        }
+                    if (!yields)
+                        continue;
+                    ctx.SetSite($"generator '{generator.Id}'");
+                    ctx.AddWarning(ValidationCheck.InertOperand,
+                        "authors yield entries and no FireGeneratorYield names it - nothing fires them (12.5).");
+                }
+            ctx.ClearSite();
+        }
+
         private static void FinalizeModifierChecks(ValidationContext ctx)
         {
             foreach (var remove in ctx.ModifierRemoves)
@@ -1562,6 +1609,12 @@ namespace RidiculousGaming.GarageBandIdle
             if (effect.multiplier < BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"{site}: multiplier is {effect.multiplier} - a multiplier never flips a number's sign (zero is legal: an event handicap is x0).");
+            // The one stat where zero is not legal: a price repeats, so a free
+            // generator is what CostOf's own backstop throws on (12.2). A
+            // formula is judged at read, so only the constant is answered here.
+            if (effect.stat == Economy.Stat.Cost && effect.formula == null && effect.multiplier == BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"{site}: a cost factor is positive - a free generator is an unbounded rate printer, and 'nearly free' is a small factor.");
         }
 
         // One effect address (12.12), judged from the scope the effect LIVES in.

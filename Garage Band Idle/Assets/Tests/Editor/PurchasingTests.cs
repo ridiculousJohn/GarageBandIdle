@@ -459,5 +459,164 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("practice_amp"), "no count was written");
             Assert.AreEqual(oneShort, tree.Tier1.balances["cash"], "and nothing was spent");
         }
+
+        // The price reads the PURCHASED count alone (12.2): a granted copy is a
+        // gift, and letting it raise the price would charge for the gift.
+        [Test]
+        public void A_granted_count_never_raises_the_price()
+        {
+            var tree = Ready();
+            var ctx = tree.Ctx(tree.Tier1);
+            tree.Tier1.generatorCounts["practice_amp"] = 2;
+            var unit = Purchasing.CostOf(tree.PracticeAmp, ctx, 1);
+            var max = Purchasing.MaxAffordable(ctx, tree.PracticeAmp);
+
+            tree.Tier1.grantedCounts["practice_amp"] = 40;
+
+            Assert.AreEqual(tree.PracticeAmp.CostAt(2), unit, "the curve at two owned");
+            Assert.AreEqual(unit, Purchasing.CostOf(tree.PracticeAmp, ctx, 1), "unmoved by forty granted");
+            Assert.AreEqual(max, Purchasing.MaxAffordable(ctx, tree.PracticeAmp), "and so is the search");
+        }
+
+        // ---- cost as a stat (12.2) ----
+
+        // A permanent cost factor on the gear tag, declared BEFORE the build the
+        // gather compiles over.
+        private static void Sale(TestTree tree, double multiplier)
+        {
+            var sale = TestTree.MakeDefinition<ModifierDefinition>("gear_sale");
+            sale.effects.Add(new Effect { target = "gear", stat = Stat.Cost, multiplier = multiplier });
+            tree.Tier1Def.modifiers.Add(sale);
+            tree.Tier1Def.permanentModifiers.Add(sale);
+        }
+
+        // A cost effect is stage 1 on the generator itself, so a tag selector
+        // reaches every generator carrying that tag and nothing else.
+        [Test]
+        public void A_cost_factor_on_a_tag_reaches_every_generator_carrying_it()
+        {
+            GeneratorDefinition untagged = null;
+            var tree = Ready(t =>
+            {
+                untagged = TestTree.MakeDefinition<GeneratorDefinition>("kazoo");
+                untagged.availableWhen = new CurrencyAtLeast { currency = t.Cash, threshold = 0 };
+                untagged.costCurrency = t.Cash;
+                untagged.baseCost = 40;
+                untagged.growth = 1.15;
+                untagged.produces.Add(TestTree.Entry(t.Cash, Stat.Rate, 1));
+                t.Tier1Def.generators.Add(untagged);
+                Sale(t, 0.5);
+            });
+            var ctx = tree.Ctx(tree.Tier1);
+
+            AssertClose(30, Purchasing.CostOf(tree.PracticeAmp, ctx, 1), "the amp carries gear");
+            AssertClose(125, Purchasing.CostOf(tree.Drummer, ctx, 1), "and so does the drummer");
+            AssertClose(40, Purchasing.CostOf(untagged, ctx, 1), "the kazoo carries no tag the sale names");
+        }
+
+        // The series factor is its own quotient, so one unit under a cost factor
+        // is the unit cost times that factor and nothing else - the same
+        // identity the factorless case has, bit for bit.
+        [Test]
+        public void The_cost_of_one_under_a_factor_is_the_unit_cost_times_the_factor()
+        {
+            var tree = Ready(t => Sale(t, 0.5));
+            var ctx = tree.Ctx(tree.Tier1);
+
+            foreach (var owned in new[] { 0, 1, 25 })
+            {
+                tree.Tier1.generatorCounts["practice_amp"] = owned;
+                Assert.AreEqual(tree.PracticeAmp.CostAt(owned) * (BigNumber)0.5,
+                    Purchasing.CostOf(tree.PracticeAmp, ctx, 1), $"owned {owned}");
+            }
+        }
+
+        // The search evaluates every probe through CostOf, so the factor rides
+        // in and the answer is still a count the command accepts.
+        [Test]
+        public void MaxAffordable_under_a_cost_factor_is_the_largest_count_CostOf_affords()
+        {
+            var tree = Ready(t => Sale(t, 0.5));
+            var ctx = tree.Ctx(tree.Tier1);
+            tree.Tier1.balances["cash"] = Purchasing.CostOf(tree.PracticeAmp, ctx, 12);
+
+            Assert.AreEqual(12, Purchasing.MaxAffordable(ctx, tree.PracticeAmp), "exactly the price of twelve");
+            Assert.IsTrue(Purchasing.CanBuy(ctx, tree.PracticeAmp, 12), "the answer is buyable");
+            Assert.IsFalse(Purchasing.CanBuy(ctx, tree.PracticeAmp, 13), "and one more is not");
+        }
+
+        // An upgrade's price takes a factor the same way, and the buy spends the
+        // number CostOf answers - the row prints that same call (12.11).
+        [Test]
+        public void An_upgrade_cost_takes_its_factor_and_the_buy_spends_it()
+        {
+            var tree = Ready(t =>
+            {
+                var deal = TestTree.MakeDefinition<ModifierDefinition>("strings_deal");
+                deal.effects.Add(new Effect { target = "amp_strings", stat = Stat.Cost, multiplier = 0.2 });
+                t.Tier1Def.modifiers.Add(deal);
+                t.Tier1Def.permanentModifiers.Add(deal);
+            });
+            var ctx = tree.Ctx(tree.Tier1);
+
+            AssertClose(100, Purchasing.CostOf(tree.AmpStrings, ctx), "500 at a fifth");
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tree.AmpStrings));
+            AssertClose(900, tree.Tier1.balances["cash"], "the spend is that same number");
+        }
+
+        // A handicap is an ordinary carrier on the cost coordinate (12.6): it
+        // rides the record EXISTING, so the price lifts when the record goes.
+        [Test]
+        public void An_event_handicap_on_cost_lifts_when_the_record_goes()
+        {
+            var tree = Ready(t =>
+                t.TimedGig.handicaps.Add(new Effect { target = "practice_amp", stat = Stat.Cost, multiplier = 100 }));
+            var ctx = tree.Ctx(tree.Tier1);
+
+            AssertClose(60, Purchasing.CostOf(tree.PracticeAmp, ctx, 1), "no record");
+
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 100 };
+            AssertClose(6000, Purchasing.CostOf(tree.PracticeAmp, ctx, 1), "the gig's own handicap");
+
+            tree.Tier1.activeEvent = null;
+            AssertClose(60, Purchasing.CostOf(tree.PracticeAmp, ctx, 1), "and the record is gone");
+        }
+
+        // Cost has one coordinate per price, so the wildcard reaches every
+        // price, a generator's and an upgrade's alike (12.2): "everything half
+        // off" is one line with no target.
+        [Test]
+        public void A_wildcard_cost_effect_reaches_every_price()
+        {
+            var tree = Ready(t =>
+            {
+                var sale = TestTree.MakeDefinition<ModifierDefinition>("everything_half_off");
+                sale.effects.Add(new Effect { stat = Stat.Cost, multiplier = 0.5 });
+                t.RootDef.modifiers.Add(sale);
+                t.RootDef.permanentModifiers.Add(sale);
+            });
+            var ctx = tree.Ctx(tree.Tier1);
+
+            AssertClose(30, Purchasing.CostOf(tree.PracticeAmp, ctx, 1), "the amp");
+            AssertClose(125, Purchasing.CostOf(tree.Drummer, ctx, 1), "the drummer");
+            AssertClose(250, Purchasing.CostOf(tree.AmpStrings, ctx), "and the upgrade");
+        }
+
+        // Cost is stage 1 only: the coordinate's currency is the price's
+        // currency, and no currency is ever asked for a cost - so an effect
+        // naming cash reaches no generator's price (12.2).
+        [Test]
+        public void A_cost_effect_naming_the_cost_currency_reaches_nothing()
+        {
+            var tree = Ready(t =>
+            {
+                var cashOff = TestTree.MakeDefinition<ModifierDefinition>("cash_off");
+                cashOff.effects.Add(new Effect { target = "cash", stat = Stat.Cost, multiplier = 0.5 });
+                t.Tier1Def.modifiers.Add(cashOff);
+                t.Tier1Def.permanentModifiers.Add(cashOff);
+            });
+
+            AssertClose(60, Purchasing.CostOf(tree.PracticeAmp, tree.Ctx(tree.Tier1), 1));
+        }
     }
 }

@@ -478,6 +478,46 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 () => tree.Author(tree.RootDef, new RestartScope { scope = tree.RootDef }));
         }
 
+        // ---- FireGeneratorYield ----
+
+        // A bar's completion firing a team's yield per cycle (12.5): what lands
+        // is the resolution itself - count scaling and both stages included -
+        // rather than a number the action computes a second way.
+        [Test]
+        public void FireGeneratorYield_on_a_bar_completion_deposits_the_resolved_amounts()
+        {
+            var tree = new TestTree();
+            tree.PracticeAmp.produces.Add(TestTree.Entry(tree.Cash, Stat.Yield, 4));
+            tree.Cover1.onComplete.Add(new FireGeneratorYield { generator = tree.PracticeAmp });
+            tree.Rebuild();
+            tree.Tier1.generatorCounts["practice_amp"] = 2;
+            tree.Tier1.balances["rehearsal"] = 1000;
+            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+
+            var expected = Producer.ResolveGeneratorYield(tree.Ctx(tree.Tier1), tree.PracticeAmp).Single();
+            Assert.AreSame(tree.Cash, expected.target, "the amp pays cash");
+
+            // cover_1 drinks 2/s against its 100, so fifty seconds crosses it.
+            BarSystem.ConsumeAndSettle(BarSystem.ResolveDemand(tree.Root, tree.Now), 50,
+                tree.Now.AddSeconds(50), new TickReport(50));
+
+            Assert.AreEqual(expected.amount, tree.Tier1.balances["cash"]);
+        }
+
+        // The reach rule every reference obeys (12.12): the generator is
+        // resolved outward from the acting scope, so one no scope on that chain
+        // declares is a fault rather than a quiet no-op.
+        [Test]
+        public void FireGeneratorYield_throws_on_a_generator_off_the_acting_chain()
+        {
+            var tree = new TestTree();
+            var orphan = TestTree.MakeDefinition<GeneratorDefinition>("orphan_amp");
+            orphan.produces.Add(TestTree.Entry(tree.Cash, Stat.Yield, 1));
+
+            Assert.Throws<InvalidOperationException>(
+                () => new FireGeneratorYield { generator = orphan }.Execute(tree.Ctx(tree.Tier1)));
+        }
+
         // ---- the link, and the reset's own refusal ----
 
         // Each of the three acts on the node its LINK names, resolved once when

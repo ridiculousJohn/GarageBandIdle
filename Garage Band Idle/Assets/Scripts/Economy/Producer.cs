@@ -10,15 +10,17 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // explicit stages:
     //
     //   sourceContribution = base entries x source-targeted effects  gathered SOURCE scope to root
-    //   currencyTotal      = sum of sourceContributions
-    //                        x currency-targeted effects             gathered CURRENCY home to root
+    //   targetTotal        = sum of sourceContributions
+    //                        x target-targeted effects               gathered TARGET home to root
     //
-    // The two stages are what keep sibling scopes isolated (12.3), and the
-    // stage-2 walk is why a currency-total effect must sit at the currency's
-    // home or above it (validated, 12.12). Both walks happen ONCE, when the tree
-    // is built: GatherCompiler turns each stage into a CoordinatePlan and every
-    // read here is a plan read (12.6/12.14.8). Nothing stores a derived value:
-    // GetMultiplier is a pure read, and FireProducer's deposit is the only write.
+    // A target is a currency, a generator's granted count, or a bar's progress,
+    // and each collects its own stage-2 modifiers at its own home (12.2). The
+    // two stages are what keep sibling scopes isolated (12.3), and the stage-2
+    // walk is why a total effect must sit at the target's home or above it
+    // (validated, 12.12). Both walks happen ONCE, when the tree is built:
+    // GatherCompiler turns each stage into a CoordinatePlan and every read here
+    // is a plan read (12.6/12.14.8). Nothing stores a derived value:
+    // GetMultiplier is a pure read, and PayResolved is the only write.
     public static class Producer
     {
         // ---- multiplier gathering ----
@@ -51,10 +53,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // is two entries, and an empty effect stat matches nothing, the
         // fail-closed backstop behind the load-time error.
         //
-        // An empty TARGET is the wildcard, "every currency": it applies at the
-        // currency stage only, because root sits on both gather walks and a
-        // stage-less wildcard would be collected twice. An owner-less query
-        // (the tick's game_speed read) matches wildcards only.
+        // An empty TARGET is the wildcard: every number of that stat, at the one
+        // coordinate the stat has per number. For rate and yield that is the
+        // target's total, the currency's - a source's own term would otherwise
+        // meet it twice, since root sits on both gather walks, and a bar's fill
+        // stays out - while count, cost and game_speed have a single coordinate
+        // each, so any owner answers. An owner-less query (the tick's game_speed
+        // read) matches wildcards only.
         //
         // The currency coordinate matches by id OR tag, exactly as target does:
         // "every rate entry paying an income currency" is one effect rather than
@@ -68,7 +73,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return false;
             if (string.IsNullOrEmpty(target))
             {
-                if (owner != null && !(owner is CurrencyDefinition))
+                if (Stat.IsProduced(stat) && !(owner is CurrencyDefinition))
                     return false;
             }
             else if (owner == null || (target != owner.Id && !owner.HasTag(target)))
@@ -130,7 +135,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // re-asks which coordinate they name. Conditions are judged in the
         // declaring scope.
         internal static BigNumber SourceTerm(GameContext declaringCtx, IReadOnlyList<ProducesEntry> entries,
-                                             int countScale, CoordinatePlan plan)
+                                             BigNumber countScale, CoordinatePlan plan)
         {
             var baseSum = BigNumber.Zero;
             for (var i = 0; i < entries.Count; i++)
@@ -149,30 +154,41 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // quiet, since a zero amount is never handed to Deposit at all.
             //
             // The gate is asked at the currency's HOME, which is on the plan.
-            if (!plan.Currency.IsActive(declaringCtx.Rebase(plan.Home)))
+            // Only a currency has one: a generator or a bar target carries no
+            // currency coordinate, so there is nothing to ask.
+            if (plan.Currency != null && !plan.Currency.IsActive(declaringCtx.Rebase(plan.Home)))
                 return BigNumber.Zero;
             return baseSum * countScale * GetMultiplier(declaringCtx, plan);
         }
 
-        // The stage-2 product for one currency, from the pair of plans compiled
-        // at its home. The currency's own definition is the owner, so its tags
-        // match - which is how the income tag carries the Records and Roadie
-        // factors (design doc 8.2).
-        private static BigNumber CurrencyStage(GameContext atHome, CurrencyDefinition currency, string stat) =>
-            GetMultiplier(atHome, atHome.Scope.Link<CurrencyPlans>(currency).For(stat));
+        // The stage-2 product for one target, from the plans compiled at its own
+        // home (design doc 12.2). A currency's and a bar's answer per stat; a
+        // generator's count is ONE number however the grant arrives, so its
+        // stage reads the count plan whatever the entry's stat says. The
+        // target's own definition is the owner, so its tags match - which is how
+        // the income tag carries the Records and Roadie factors (8.2).
+        private static BigNumber TargetStage(GameContext atHome, Definition target, string stat)
+        {
+            if (target is CurrencyDefinition || target is BarDefinition)
+                return GetMultiplier(atHome, atHome.Scope.Link<StatPlans>(target).For(stat));
+            if (target is GeneratorDefinition)
+                return GetMultiplier(atHome, atHome.Scope.Link<StatPlans>(target).For(Stat.Count));
+            throw new InvalidOperationException(
+                $"'{target.Id}' is a {target.GetType().Name}, which no payment addresses - a produces entry pays a currency, a generator, or a bar (12.2).");
+        }
 
-        // The rate one subtree pays into one currency, per second of production
+        // The rate one subtree pays into one target, per second of production
         // time: the subtree root's compiled contributors, both stages, summed.
-        // The tick and the idle claim consume this; the context carries the
-        // subtree root explicitly - "the foreground chapter" is a session
-        // concept, not an economy one - along with the timestamp and the
-        // circumstance, so the idle claim's gather differs from the tick's only
-        // in the context it hands over.
-        public static BigNumber GetRate(GameContext ctx, CurrencyDefinition currency)
+        // The tick, the idle claim and a bar's own draw consume this; the
+        // context carries the subtree root explicitly - "the foreground chapter"
+        // is a session concept, not an economy one - along with the timestamp
+        // and the circumstance, so the idle claim's gather differs from the
+        // tick's only in the context it hands over.
+        public static BigNumber GetRate(GameContext ctx, Definition target)
         {
             // No entry is the plan's ANSWER, not a miss: nothing in this subtree
-            // pays this currency at rate, which is a rate of zero.
-            var paying = ContributorPlan.At(ctx.Scope).For(currency);
+            // pays this target at rate, which is a rate of zero.
+            var paying = ContributorPlan.At(ctx.Scope).For(target);
             if (paying == null)
                 return BigNumber.Zero;
 
@@ -184,88 +200,101 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 // An unowned generator scales its entries by zero, so it is
                 // skipped rather than summed as a zero term.
                 var count = contributor.Source.CountAt(contributor.Node);
-                if (count <= 0)
+                if (count <= BigNumber.Zero)
                     continue;
                 sum += SourceTerm(ctx.Rebase(contributor.Node), contributor.Entries, count, contributor.Plan);
             }
             if (sum == BigNumber.Zero)
                 return BigNumber.Zero;
-            return sum * CurrencyStage(ctx.Rebase(paying.Home), currency, Stat.Rate);
+            return sum * TargetStage(ctx.Rebase(paying.Home), target, Stat.Rate);
         }
 
-        // The unique (currency, home) pairs one subtree's sources pay at
-        // Stat.Rate, in tree order then declaration order - GetRate's sibling,
-        // enumerating what it sums, and now a projection of the contributor plan
-        // rather than a walk. The pair is the point: the tick deposits through
-        // the home reference and the idle claim's lines retain it, so neither
-        // consumer looks anything up twice.
-        public static List<(CurrencyDefinition currency, ScopeState home)> RatePairs(ScopeState subtreeRoot)
+        // The (target, home) pairs the rate phase DEPOSITS to, in tree order
+        // then declaration order - GetRate's sibling, enumerating what it sums,
+        // and a projection of the contributor plan rather than a walk. The pair
+        // is the point: the tick deposits through the home reference and the
+        // idle claim's lines retain it, so neither consumer looks anything up
+        // twice. Bars are excluded: a bar collects what pays it at its OWN draw
+        // (12.7), so listing it here would pay it twice.
+        public static List<(Definition target, ScopeState home)> RatePairs(ScopeState subtreeRoot)
         {
-            var currencies = ContributorPlan.At(subtreeRoot).Currencies;
-            var pairs = new List<(CurrencyDefinition currency, ScopeState home)>(currencies.Count);
-            for (var i = 0; i < currencies.Count; i++)
-                pairs.Add((currencies[i].Currency, currencies[i].Home));
+            var targets = ContributorPlan.At(subtreeRoot).Targets;
+            var pairs = new List<(Definition target, ScopeState home)>(targets.Count);
+            for (var i = 0; i < targets.Count; i++)
+                if (targets[i].Target is not BarDefinition)
+                    pairs.Add((targets[i].Target, targets[i].Home));
             return pairs;
         }
 
         // What one firing would pay against the given state: every yield
-        // currency in authored order with its resolved amount, multipliers
+        // target in authored order with its resolved amount, multipliers
         // included, zeros kept. The Jam button's preview reads this, so the
         // preview and the execution are one implementation of the number rather
         // than two that agree until they do not (design doc 12.5).
-        public static List<(CurrencyDefinition currency, BigNumber amount)> ResolveYield(
+        public static List<(Definition target, BigNumber amount)> ResolveYield(
             GameContext ctx, ProducerDefinition producer) =>
-            ResolveUnit(ctx, producer, producer.produces, Stat.Yield);
+            Resolve(ctx, producer, producer.produces, Stat.Yield, BigNumber.One);
 
         // What ONE unit of a generator pays per second against the given state:
         // the generator row's "cost => yield" line (12.11). The same resolution
         // as a firing's, over the rate entries with a count of one; nothing in
         // the effect vocabulary reads the owned count, so one unit's term is
         // also what the next unit adds.
-        public static List<(CurrencyDefinition currency, BigNumber amount)> UnitRate(
+        public static List<(Definition target, BigNumber amount)> UnitRate(
             GameContext ctx, GeneratorDefinition generator) =>
-            ResolveUnit(ctx, generator, generator.produces, Stat.Rate);
+            Resolve(ctx, generator, generator.produces, Stat.Rate, BigNumber.One);
 
-        // One source's per-unit payment for one stat: every matching currency in
-        // authored order with its resolved amount, both stages, zeros kept.
-        // Grouping the entries by currency is reading the AUTHORED shape, which
+        // What one firing of a GENERATOR's yield would pay: the same resolution,
+        // scaled by the owned count - purchased plus granted - read at the
+        // declaring scope (12.2). A count of zero resolves every target to zero,
+        // which is what a team nobody hired pays.
+        public static List<(Definition target, BigNumber amount)> ResolveGeneratorYield(
+            GameContext ctx, GeneratorDefinition generator)
+        {
+            var declaringCtx = ctx.Rebase(DeclaringScope<ScopeState>(ctx.Scope, generator));
+            return Resolve(ctx, generator, generator.produces, Stat.Yield, declaringCtx.GetOwnedCount(generator.Id));
+        }
+
+        // One source's payment for one stat at one count: every matching target
+        // in authored order with its resolved amount, both stages, zeros kept.
+        // Grouping the entries by target is reading the AUTHORED shape, which
         // is what the plans are keyed by; the gather itself asks nothing.
-        private static List<(CurrencyDefinition currency, BigNumber amount)> ResolveUnit(
-            GameContext ctx, Definition source, List<ProducesEntry> entries, string stat)
+        private static List<(Definition target, BigNumber amount)> Resolve(
+            GameContext ctx, Definition source, List<ProducesEntry> entries, string stat, BigNumber countScale)
         {
             var declaring = DeclaringScope<ScopeState>(ctx.Scope, source);
             var declaringCtx = ctx.Rebase(declaring);
 
-            var currencies = new List<CurrencyDefinition>();
+            var targets = new List<Definition>();
             var grouped = new List<List<ProducesEntry>>();
             foreach (var entry in entries)
             {
-                if (entry == null || entry.currency == null || entry.stat != stat)
+                if (entry == null || entry.Target == null || entry.stat != stat)
                     continue;
-                var index = currencies.IndexOf(entry.currency);
+                var index = targets.IndexOf(entry.Target);
                 if (index < 0)
                 {
-                    currencies.Add(entry.currency);
+                    targets.Add(entry.Target);
                     grouped.Add(new List<ProducesEntry>());
-                    index = currencies.Count - 1;
+                    index = targets.Count - 1;
                 }
                 grouped[index].Add(entry);
             }
 
-            var amounts = new List<(CurrencyDefinition currency, BigNumber amount)>(currencies.Count);
-            for (var i = 0; i < currencies.Count; i++)
+            var amounts = new List<(Definition target, BigNumber amount)>(targets.Count);
+            for (var i = 0; i < targets.Count; i++)
             {
                 // Entries naming one coordinate share one plan, so the first of
                 // the group names it for all of them.
                 var plan = declaring.Link<CoordinatePlan>(grouped[i][0]);
-                var term = SourceTerm(declaringCtx, grouped[i], 1, plan);
+                var term = SourceTerm(declaringCtx, grouped[i], countScale, plan);
                 if (term == BigNumber.Zero)
                 {
-                    amounts.Add((currencies[i], BigNumber.Zero));
+                    amounts.Add((targets[i], BigNumber.Zero));
                     continue;
                 }
-                amounts.Add((currencies[i],
-                    term * CurrencyStage(declaringCtx.Rebase(plan.Home), currencies[i], stat)));
+                amounts.Add((targets[i],
+                    term * TargetStage(declaringCtx.Rebase(plan.Home), targets[i], stat)));
             }
             return amounts;
         }
@@ -277,9 +306,44 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public static void FireProducer(GameContext ctx, ProducerDefinition producer)
         {
             var declaringCtx = ctx.Rebase(DeclaringScope<ScopeState>(ctx.Scope, producer));
-            foreach (var (currency, amount) in ResolveYield(ctx, producer))
+            foreach (var (target, amount) in ResolveYield(ctx, producer))
                 if (amount != BigNumber.Zero)
-                    declaringCtx.DepositResolved(currency.Id, amount);
+                    PayResolved(declaringCtx, target, amount);
+        }
+
+        // Fires a generator's yield the way FireProducer fires a producer's
+        // (12.5), scaled by the owned count: one pre-fire snapshot, then the
+        // commit, so no output can flip a sibling's condition mid-fire.
+        public static void FireGeneratorYield(GameContext ctx, GeneratorDefinition generator)
+        {
+            var declaringCtx = ctx.Rebase(DeclaringScope<ScopeState>(ctx.Scope, generator));
+            foreach (var (target, amount) in ResolveGeneratorYield(ctx, generator))
+                if (amount != BigNumber.Zero)
+                    PayResolved(declaringCtx, target, amount);
+        }
+
+        // The one write a resolved payment makes, at the target's home (12.2): a
+        // currency's balance and earned total through DepositResolved, a
+        // generator's granted count through DepositGranted, a bar's progress
+        // through BarSystem.Deposit. Every gathered payment ends here; nothing
+        // else writes these facts from a payment.
+        public static void PayResolved(GameContext ctx, Definition target, BigNumber amount)
+        {
+            switch (target)
+            {
+                case CurrencyDefinition currency:
+                    ctx.DepositResolved(currency.Id, amount);
+                    return;
+                case GeneratorDefinition generator:
+                    ctx.DepositGranted(generator, amount);
+                    return;
+                case BarDefinition bar:
+                    BarSystem.Deposit(ctx, bar, amount);
+                    return;
+                default:
+                    throw new InvalidOperationException(
+                        $"'{target.Id}' is a {target.GetType().Name}, which no payment addresses - a produces entry pays a currency, a generator, or a bar (12.2).");
+            }
         }
 
         // ---- the outward walk ----

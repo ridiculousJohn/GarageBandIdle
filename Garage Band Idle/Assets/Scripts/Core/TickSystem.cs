@@ -179,12 +179,12 @@ namespace RidiculousGaming.GarageBandIdle
             var pairs = Producer.RatePairs(foregroundChapter);
             var amounts = new List<BigNumber>(pairs.Count);
             foreach (var pair in pairs)
-                amounts.Add(Producer.GetRate(liveCtx, pair.currency) * effDt);
+                amounts.Add(Producer.GetRate(liveCtx, pair.target) * effDt);
             for (var i = 0; i < pairs.Count; i++)
                 if (amounts[i] != BigNumber.Zero)
                 {
-                    liveCtx.Rebase(pairs[i].home).DepositResolved(pairs[i].currency.Id, amounts[i]);
-                    report.RecordDeposit(pairs[i].home, pairs[i].currency.Id, amounts[i]);
+                    Producer.PayResolved(liveCtx.Rebase(pairs[i].home), pairs[i].target, amounts[i]);
+                    report.RecordDeposit(pairs[i].home, pairs[i].target.Id, amounts[i]);
                 }
 
             // Consumption on scaled time, settlement stamped at the segment's

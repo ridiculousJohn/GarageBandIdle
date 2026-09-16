@@ -109,7 +109,10 @@ namespace RidiculousGaming.GarageBandIdle
     public class OwnedCountAtLeast : Condition
     {
         public Economy.GeneratorDefinition generator;
-        public int count;
+
+        // BigNumber because the sum it compares against is one: a granted count
+        // keeps its fraction and runs past a double (design doc 12.2).
+        public BigNumber count;
 
         public override bool Evaluate(GameContext ctx) => ctx.GetOwnedCount(generator.Id) >= count;
 

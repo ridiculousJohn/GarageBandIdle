@@ -55,12 +55,40 @@ namespace RidiculousGaming.GarageBandIdle
 
         public BigNumber GetEarnedTotal(string currencyId) => HomeOf(currencyId).earnedTotals[currencyId];
 
-        public int GetOwnedCount(string generatorId)
+        // The count PRICES read: a granted copy never raises the next unit's
+        // cost (design doc 12.2).
+        public int GetPurchasedCount(string generatorId)
         {
             for (var node = Scope; node != null; node = node.Parent)
                 if (node.generatorCounts.TryGetValue(generatorId, out var count))
                     return count;
             return 0;
+        }
+
+        // The granted half, BigNumber and never floored: a payment into a
+        // generator keeps its fraction (design doc 12.2).
+        public BigNumber GetGrantedCount(string generatorId)
+        {
+            for (var node = Scope; node != null; node = node.Parent)
+                if (node.grantedCounts.TryGetValue(generatorId, out var count))
+                    return count;
+            return BigNumber.Zero;
+        }
+
+        // The sum, which is what production and the count conditions read. Both
+        // facts live at the generator's declaring scope, so the first node
+        // holding EITHER key is the home and answers for both.
+        public BigNumber GetOwnedCount(string generatorId)
+        {
+            for (var node = Scope; node != null; node = node.Parent)
+            {
+                var hasPurchased = node.generatorCounts.TryGetValue(generatorId, out var purchased);
+                var hasGranted = node.grantedCounts.TryGetValue(generatorId, out var granted);
+                if (!hasPurchased && !hasGranted)
+                    continue;
+                return (hasPurchased ? purchased : 0) + (hasGranted ? granted : BigNumber.Zero);
+            }
+            return BigNumber.Zero;
         }
 
         // Set anywhere on the chain = set (design doc 12.3).
@@ -185,6 +213,29 @@ namespace RidiculousGaming.GarageBandIdle
             var home = HomeOf(currencyId);
             home.balances[currencyId] += amount;
             home.earnedTotals[currencyId] += amount;
+        }
+
+        // A payment into a generator's granted count, written at the generator's
+        // declaring scope found by the outward walk (design doc 12.3) - SetFlag's
+        // shape, with the definition in hand because every payer holds it. A
+        // negative amount would drive a count DOWNWARD, which no payment means,
+        // and a chain declaring no such generator is refused at load, so both
+        // throw (requirement 7).
+        public void DepositGranted(Economy.GeneratorDefinition generator, BigNumber amount)
+        {
+            if (amount < BigNumber.Zero)
+                throw new InvalidOperationException(
+                    $"Granted deposit of {amount} for generator '{generator.Id}': a grant is never negative.");
+            for (var node = Scope; node != null; node = node.Parent)
+            {
+                if (!node.Definition.Declares(generator))
+                    continue;
+                var granted = node.grantedCounts.TryGetValue(generator.Id, out var stored) ? stored : BigNumber.Zero;
+                node.grantedCounts[generator.Id] = granted + amount;
+                return;
+            }
+            throw new InvalidOperationException(
+                $"No scope on the chain from '{Scope.ScopeId}' declares generator '{generator.Id}'.");
         }
 
         // The currency asset the home declares under this id. The home is

@@ -39,7 +39,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Snap(GameContext ctx, TickReport report, double gameTimeSeconds)
         {
             truth = ctx.GetBalance(currency.Id);
-            slope = report == null ? BigNumber.Zero : report.CurrencySlope(home, currency.Id);
+            slope = report == null ? BigNumber.Zero : report.DepositSlope(home, currency.Id);
             stamp = gameTimeSeconds;
             label.text = NumberFormatter.Format(truth);
         }

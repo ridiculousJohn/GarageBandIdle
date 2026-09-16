@@ -68,6 +68,27 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
+    // Fires a generator's yield entries the way FireProducer fires a producer's
+    // (design doc 12.5): resolved at the generator's declaring scope, scaled by
+    // its owned count (purchased plus granted), every target paid from one
+    // pre-fire snapshot. On a bar's onComplete it is a team paying per cycle; on
+    // an upgrade or a rung it is a one-shot grant that scales with the count.
+    [Serializable]
+    public class FireGeneratorYield : GameAction
+    {
+        public Economy.GeneratorDefinition generator;
+
+        public override void Execute(GameContext ctx) => Economy.Producer.FireGeneratorYield(ctx, generator);
+
+        // Recorded so the pass can say which generators' yield entries nothing
+        // fires; the reach check is what makes a recorded firer reachable.
+        public override void Validate(ValidationContext ctx)
+        {
+            if (ctx.RequireOnChain(generator, "FireGeneratorYield") != null)
+                ctx.RecordYieldFirer(generator);
+        }
+    }
+
     [Serializable]
     public class SetFlag : GameAction
     {

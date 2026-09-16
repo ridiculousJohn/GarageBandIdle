@@ -635,6 +635,138 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(0, f.Balance(f.Root, f.Shared), "nothing fired");
         }
 
+        // ---- a payment into a bar (12.7) ----
+
+        // A yield settles at the WRITE: the crossing fires the moment the
+        // payment lands, because the tick only settles the bars its draw
+        // admitted and would read a bar filled between ticks as one that fired
+        // earlier. A non-repeating bar keeps no excess - a tap cannot overshoot
+        // full.
+        [Test]
+        public void A_yield_into_a_non_repeating_bar_clamps_at_full_and_fires_the_crossing()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            f.Build();
+            CountFires(bar, f.Shared);
+            f.Select(f.Tier1, group, bar);
+
+            BarSystem.Deposit(new GameContext(f.Tier1, f.Now), bar, 250);
+
+            AssertClose(100, f.Progress(f.Tier1, bar), "clamped at the fill amount");
+            AssertClose(1, f.Balance(f.Root, f.Shared), "the crossing fired at the write");
+
+            // Already full: the next payment crosses nothing.
+            BarSystem.Deposit(new GameContext(f.Tier1, f.Now), bar, 100);
+
+            AssertClose(100, f.Progress(f.Tier1, bar), "progress");
+            AssertClose(1, f.Balance(f.Root, f.Shared), "no second fire");
+        }
+
+        // Selection governs drinking from a POOL, and a payment is not a drink
+        // (12.7), so an unselected bar takes what is paid into it and settles.
+        [Test]
+        public void A_yield_into_an_unselected_bar_still_fires_its_crossing()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            f.Build();
+            CountFires(bar, f.Shared);
+
+            BarSystem.Deposit(new GameContext(f.Tier1, f.Now), bar, 100);
+
+            AssertClose(100, f.Progress(f.Tier1, bar), "progress");
+            AssertClose(1, f.Balance(f.Root, f.Shared), "selection gates the draw, not the payment");
+        }
+
+        [Test]
+        public void A_yield_into_a_repeating_bar_settles_every_crossing_and_keeps_the_excess()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
+            var bar = f.Bar(group, "loop_a", 10, 0, repeating: true);
+            f.Build();
+            CountFires(bar, f.Shared);
+            f.Select(f.Tier1, group, bar);
+
+            BarSystem.Deposit(new GameContext(f.Tier1, f.Now), bar, 25);
+
+            AssertClose(2, f.Balance(f.Root, f.Shared), "two thresholds crossed");
+            Assert.AreEqual(2, f.Fills(f.Tier1, bar), "fill count");
+            AssertClose(5, f.Progress(f.Tier1, bar), "the residual is retained");
+        }
+
+        // Each mover settles only the crossing its own fill made (12.7). Here the
+        // first bar's completion fires a generator yield that fills the second
+        // bar past full inside the tick's own settlement: the payment settles
+        // that crossing once, and the pass, reaching the second bar with a draw
+        // that crossed nothing, fires nothing more.
+        [Test]
+        public void A_payment_landing_inside_a_settlement_fires_its_crossing_once()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "teams", null);
+            var lead = f.Bar(group, "lead", 10, 1);
+            var follow = f.Bar(group, "follow", 100, 1);
+            CountFires(follow, f.Shared);
+
+            var crew = TestTree.MakeDefinition<GeneratorDefinition>("crew");
+            crew.availableWhen = new Always();
+            crew.produces.Add(TestTree.Entry(follow, Stat.Yield, 100));
+            f.Tier1Def.generators.Add(crew);
+            lead.onComplete.Add(new FireGeneratorYield { generator = crew });
+            f.Build();
+            f.Tier1.generatorCounts["crew"] = 1;
+            f.Select(f.Tier1, group, lead, follow);
+
+            // Ten seconds: lead crosses its 10, follow's own draw reaches 10 of
+            // 100, and lead's completion pays follow the other 90 and more.
+            f.Segment(10);
+
+            AssertClose(100, f.Progress(f.Tier1, follow), "paid to full and clamped");
+            AssertClose(1, f.Balance(f.Root, f.Shared), "one crossing, one reward");
+        }
+
+        [Test]
+        public void A_negative_payment_into_a_bar_throws()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            f.Build();
+
+            Assert.Throws<InvalidOperationException>(
+                () => BarSystem.Deposit(new GameContext(f.Tier1, f.Now), bar, -1));
+            Assert.IsFalse(f.Tier1.barProgress.ContainsKey(bar.Id));
+        }
+
+        // A refused completion list leaves the payment undelivered (12.5),
+        // exactly as the draw excludes that bar for the whole segment. The
+        // standing tree is what has an event to arm: only an armed reward
+        // refuses a clear.
+        [Test]
+        public void A_refused_completion_leaves_a_payment_into_the_bar_undelivered()
+        {
+            var tree = new TestTree();
+            tree.Cover1.onComplete.Add(new ResetScope { scope = tree.Tier1Def });
+            tree.Rebuild();
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic", goalReached = true };
+
+            BarSystem.Deposit(tree.Ctx(tree.Tier1), tree.Cover1, 100);
+
+            Assert.IsFalse(tree.Tier1.barProgress.ContainsKey("cover_1"), "no progress was written");
+            Assert.IsFalse(tree.Tier1.modifierStacks.ContainsKey("cover_bonus_1"), "and nothing fired");
+
+            // The reward claimed, the same payment lands and the completion runs.
+            var facts = tree.Tier1.facts;
+            tree.Tier1.activeEvent = null;
+            BarSystem.Deposit(tree.Ctx(tree.Tier1), tree.Cover1, 100);
+
+            Assert.AreNotSame(facts, tree.Tier1.facts, "the completion ran, and its reset took the payload");
+        }
+
         // ---- SetActiveBars ----
 
         [Test]

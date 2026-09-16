@@ -194,13 +194,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             RootDef.modifiers.Add(RoadieActive);
             RootDef.permanentModifiers.Add(RoadieActive);
 
-            // The idle fraction (9, 12.5): a wildcard rate x0.5 on root that
-            // applies only under the idle-accumulation circumstance - "rate
-            // but idle" is a circumstance of one gather, never a second
-            // vocabulary. Every idle-context gather in the suite carries it.
+            // The idle fraction (9, 12.5): a wildcard x0.5 on root that applies
+            // only under the idle-accumulation circumstance - "rate but idle"
+            // is a circumstance of one gather, never a second vocabulary. Away
+            // pays half of ALL of it, so the same factor sits on count: a grant
+            // into a generator while away is halved as a currency is. Every
+            // idle-context gather in the suite carries both.
             IdleBase = MakeDefinition<ModifierDefinition>("idle_base");
             IdleBase.appliesWhen = new IdleAccumulation();
             IdleBase.effects.Add(new Effect { stat = Stat.Rate, multiplier = 0.5 });
+            IdleBase.effects.Add(new Effect { stat = Stat.Count, multiplier = 0.5 });
             RootDef.modifiers.Add(IdleBase);
             RootDef.permanentModifiers.Add(IdleBase);
 
@@ -290,6 +293,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         public static ProducesEntry Entry(CurrencyDefinition currency, string stat, double value, Condition condition = null) =>
             new ProducesEntry { currency = currency, stat = stat, value = value, condition = condition };
+
+        // The other two targets a produces entry may name (12.2): a generator,
+        // paid at its granted count, and a bar, paid at its progress. One
+        // overload per kind, so a fixture states the target by handing over the
+        // asset rather than by picking a field.
+        public static ProducesEntry Entry(GeneratorDefinition generator, string stat, double value, Condition condition = null) =>
+            new ProducesEntry { generator = generator, stat = stat, value = value, condition = condition };
+
+        public static ProducesEntry Entry(BarDefinition bar, string stat, double value, Condition condition = null) =>
+            new ProducesEntry { bar = bar, stat = stat, value = value, condition = condition };
 
         public ComposedContent Content => ComposedContent.Compose(RootDef, Chapters);
 

@@ -4,7 +4,8 @@ using UnityEngine;
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
     // The purchasable (design doc 12.2): the same produces-entry shape as a
-    // producer, scaled by the ownedCount stored in its declaring scope. Cost
+    // producer, scaled by its owned count - purchased plus granted - stored in
+    // its declaring scope. Cost
     // currency is independent of what it produces.
     [CreateAssetMenu(menuName = "Garage Band Idle/Generator")]
     public class GeneratorDefinition : Definition

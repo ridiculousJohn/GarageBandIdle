@@ -20,7 +20,8 @@ namespace RidiculousGaming.GarageBandIdle
     // One source of base contributions a scope declares, as everything that
     // gathers sees it: the producer or generator itself, its authored entries,
     // and the count fact that scales them at a node (design doc 12.2). A
-    // producer is one; a generator is its ownedCount, so the caller never asks
+    // producer is one; a generator is its owned count, purchased plus granted,
+    // so the caller never asks
     // which kind it is holding.
     public readonly struct ScopeSource
     {
@@ -40,12 +41,15 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // The stored count that scales this source at one node (design doc
-        // 12.2/12.6). A missing generator count is zero owned.
-        public int CountAt(ScopeState node)
+        // 12.2/12.6): a generator's purchased count plus its granted one, which
+        // is the sum production reads. A missing count on either side is zero.
+        public BigNumber CountAt(ScopeState node)
         {
             if (generator == null)
-                return 1;
-            return node.generatorCounts.TryGetValue(generator.Id, out var owned) ? owned : 0;
+                return BigNumber.One;
+            var purchased = node.generatorCounts.TryGetValue(generator.Id, out var bought) ? bought : 0;
+            var granted = node.grantedCounts.TryGetValue(generator.Id, out var given) ? given : BigNumber.Zero;
+            return purchased + granted;
         }
     }
 
@@ -286,6 +290,7 @@ namespace RidiculousGaming.GarageBandIdle
             || Holds(modifiers, definition)
             || Holds(generators, definition)
             || Holds(barGroups, definition)
+            || HoldsBar(definition)
             || Holds(upgrades, definition)
             || Holds(triggers, definition);
 
@@ -294,6 +299,20 @@ namespace RidiculousGaming.GarageBandIdle
             for (var i = 0; i < list.Count; i++)
                 if (list[i] == definition)
                     return true;
+            return false;
+        }
+
+        // A group owns its bars, so the scope declaring the group declares them
+        // too (design doc 12.7) - which is what lets the outward walk find a
+        // bar's home the way it finds a currency's.
+        private bool HoldsBar(Definition definition)
+        {
+            for (var i = 0; i < barGroups.Count; i++)
+            {
+                var group = barGroups[i];
+                if (group != null && Holds(group.bars, definition))
+                    return true;
+            }
             return false;
         }
     }

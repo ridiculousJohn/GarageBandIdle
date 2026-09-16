@@ -53,6 +53,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.earnedTotals["cash"] = 300;
             tree.Tier1.balances["fans"] = BigNumber.FromMantissaExponent(1.5, 320);   // beyond double range
             tree.Tier1.generatorCounts["drummer"] = 3;
+            tree.Tier1.grantedCounts["drummer"] = 2.5;
             tree.Tier1.flags.Add("fans_revealed");
             tree.Tier1.purchasedUpgrades.Add("stage_presence");
             tree.Tier1.firedTriggers.Add("tier1_trigger");   // declared by the fixture's tier1
@@ -98,6 +99,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)300, tier1.earnedTotals["cash"]);
             Assert.AreEqual(BigNumber.FromMantissaExponent(1.5, 320), tier1.balances["fans"]);
             Assert.AreEqual(3, tier1.generatorCounts["drummer"]);
+            Assert.AreEqual((BigNumber)2.5, tier1.grantedCounts["drummer"]);
             Assert.IsTrue(tier1.flags.Contains("fans_revealed"));
             Assert.IsTrue(tier1.purchasedUpgrades.Contains("stage_presence"));
             Assert.IsTrue(tier1.firedTriggers.Contains("tier1_trigger"));
@@ -412,6 +414,62 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestNavigation.Node(root, loaded.Ch1Def);
             Assert.AreEqual(1, ch1.modifierStacks.Count);
             Assert.IsTrue(ch1.modifierStacks.ContainsKey("gj_tap_1"));
+        }
+
+        // The granted half of an owned count takes the same filter the purchased
+        // half takes (12.2): one no scope declares can never be read.
+        [Test]
+        public void A_granted_count_no_scope_declares_is_dropped()
+        {
+            var saved = new TestTree();
+            saved.Tier1.grantedCounts["drummer"] = 2.5;              // declared - survives
+            saved.Tier1.grantedCounts["ghost_generator"] = 2;
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_generator"));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
+
+            var tier1 = TestNavigation.Node(root, loaded.Tier1Def);
+            Assert.AreEqual((BigNumber)2.5, tier1.grantedCounts["drummer"]);
+            Assert.IsFalse(tier1.grantedCounts.ContainsKey("ghost_generator"));
+        }
+
+        // Zero already reads as absent and a negative one is tampering, so
+        // neither is a fact worth keeping.
+        [Test]
+        public void A_nonpositive_granted_count_is_not_a_fact()
+        {
+            var saved = new TestTree();
+            saved.Tier1.grantedCounts["drummer"] = -0.5;
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("drummer"));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
+
+            Assert.IsEmpty(TestNavigation.Node(root, loaded.Tier1Def).grantedCounts);
+        }
+
+        // A save written before the fact existed carries no map at all: the
+        // seeded empty one stands, so a missing granted count reads as zero and
+        // the schema version never had to move (12.2).
+        [Test]
+        public void A_save_carrying_no_granted_counts_reads_them_as_zero()
+        {
+            var saved = new TestTree();
+            saved.Tier1.generatorCounts["drummer"] = 3;
+            var envelope = Newtonsoft.Json.Linq.JObject.Parse(SaveSystem.Serialize(saved.Root));
+            var payload = Newtonsoft.Json.Linq.JToken.Parse(envelope.Value<string>("payload"));
+            var maps = new List<Newtonsoft.Json.Linq.JToken>(payload.SelectTokens("$..grantedCounts"));
+            Assert.IsNotEmpty(maps, "the payload carries the map this test removes");
+            foreach (var map in maps)
+                map.Parent.Remove();
+            envelope["payload"] = payload.ToString(Newtonsoft.Json.Formatting.None);
+
+            Assert.IsTrue(Load(Rechecksum(envelope), out var root, out var loaded));
+
+            var tier1 = TestNavigation.Node(root, loaded.Tier1Def);
+            Assert.IsEmpty(tier1.grantedCounts);
+            Assert.AreEqual((BigNumber)3, new GameContext(tier1, loaded.Now).GetOwnedCount("drummer"));
         }
 
         // A record's id is a TIMER's, so it takes the rule the stacks take: one

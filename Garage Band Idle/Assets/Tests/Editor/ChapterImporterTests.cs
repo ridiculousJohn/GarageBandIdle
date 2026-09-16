@@ -756,6 +756,68 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ]
         }";
 
+        // A generator's yield, and the trigger action that fires it (12.5). The
+        // produces entry names the generator it pays into, which is the second
+        // of the three targets a line may name (12.2).
+        private const string FiredYieldJson = @"{
+            ""type"": ""ChapterDefinition"",
+            ""id"": ""ch1"",
+            ""displayName"": ""The Garage"",
+            ""currencies"": [{ ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] }],
+            ""generators"": [
+                {
+                    ""id"": ""amp"",
+                    ""displayName"": ""Practice Amp"",
+                    ""availableWhen"": { ""type"": ""Always"" },
+                    ""costCurrency"": ""cash"",
+                    ""baseCost"": 60,
+                    ""growth"": 1.15,
+                    ""produces"": [{ ""currency"": ""cash"", ""stat"": ""yield"", ""value"": 5 }]
+                }
+            ],
+            ""producers"": [
+                { ""id"": ""crew"", ""produces"": [{ ""generator"": ""amp"", ""stat"": ""rate"", ""value"": 0.25 }] }
+            ],
+            ""triggers"": [
+                {
+                    ""id"": ""encore_set"",
+                    ""condition"": { ""type"": ""Always"" },
+                    ""actions"": [{ ""type"": ""FireGeneratorYield"", ""generator"": ""amp"" }]
+                }
+            ]
+        }";
+
+        [Test]
+        public void A_FireGeneratorYield_action_and_a_generator_target_import()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", FiredYieldJson);
+
+            Import();
+
+            var amp = Load<GeneratorDefinition>("ch1/Generators/amp.asset");
+            var crew = Load<ProducerDefinition>("ch1/Producers/crew.asset");
+            var trigger = Load<TriggerDefinition>("ch1/Triggers/encore_set.asset");
+
+            Assert.AreSame(amp, crew.produces[0].generator, "the reference is the asset, not a copy");
+            Assert.AreSame(amp, crew.produces[0].Target, "and it is the entry's one target");
+            Assert.AreSame(amp, ((FireGeneratorYield)trigger.actions.Single()).generator);
+        }
+
+        // Exactly one target is the validator's rule; the importer refuses only
+        // the line that names NONE, which has no field to write at all.
+        [Test]
+        public void A_produces_entry_naming_no_target_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ChapterJson.Replace(
+                @"[{ ""currency"": ""cash"", ""stat"": ""yield"", ""value"": 1 }]",
+                @"[{ ""stat"": ""yield"", ""value"": 1 }]"));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("names no target", thrown.Message);
+        }
+
         [Test]
         public void An_ordinary_number_lands_exactly()
         {

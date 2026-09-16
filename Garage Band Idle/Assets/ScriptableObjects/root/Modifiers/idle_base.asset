@@ -27,8 +27,17 @@ MonoBehaviour:
         exponent: -1
     formula:
       rid: -2
+  - target: 
+    currencyId: 
+    stat: count
+    multiplier:
+      _value:
+        mantissa: 5
+        exponent: -1
+    formula:
+      rid: -2
   appliesWhen:
-    rid: 7579425489276108912
+    rid: 7579425511256359024
   timer: 
   activeAfterSeconds: 0
   references:
@@ -36,7 +45,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425489276108912
+    - rid: 7579425511256359024
       type: {class: IdleAccumulation, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

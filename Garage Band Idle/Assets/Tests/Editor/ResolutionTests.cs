@@ -32,7 +32,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             node.Link<CoordinatePlan>(entries.First(entry => entry.currency == currency && entry.stat == stat));
 
         private static CoordinatePlan Stage2(ScopeState home, CurrencyDefinition currency, string stat) =>
-            home.Link<CurrencyPlans>(currency).For(stat);
+            home.Link<StatPlans>(currency).For(stat);
 
         // ---- the currency gate (12.2) ----
 
@@ -66,14 +66,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var amp = Producer.UnitRate(ctx, tree.PracticeAmp);
             Assert.AreEqual(1, amp.Count);
-            Assert.AreSame(tree.Cash, amp[0].currency);
+            Assert.AreSame(tree.Cash, amp[0].target);
             AssertClose(0.5, amp[0].amount, "one amp's authored rate");
 
             var drummer = Producer.UnitRate(ctx, tree.Drummer);
             Assert.AreEqual(2, drummer.Count, "a bandmate pays two currencies");
-            Assert.AreSame(tree.Cash, drummer[0].currency);
+            Assert.AreSame(tree.Cash, drummer[0].target);
             AssertClose(3, drummer[0].amount);
-            Assert.AreSame(tree.Fans, drummer[1].currency);
+            Assert.AreSame(tree.Fans, drummer[1].target);
             AssertClose(0.02, drummer[1].amount);
 
             // amp_strings is a stage-1 factor on the amp alone; records_income
@@ -299,7 +299,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // A bar consumes: its rate resolves stage 1 only, with the bar as
             // the owner, which a currency-stage wildcard never matches.
             AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1),
-                tree.Tier1.Link<CoordinatePlan>(tree.Cover1)));
+                tree.Tier1.Link<StatPlans>(tree.Cover1).Rate));
         }
 
         [Test]
@@ -513,6 +513,76 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             tree.Tier1.generatorCounts["practice_amp"] = 7;
             AssertClose(3.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "seven amps");
+        }
+
+        // The count that scales a source is the SUM of the two facts (12.2), and
+        // a granted count is never floored - half an amp pays half an amp's rate.
+        [Test]
+        public void Owned_counts_scale_a_generator_by_the_purchased_count_plus_the_granted_one()
+        {
+            var tree = new TestTree();
+            tree.Tier1.generatorCounts["practice_amp"] = 2;
+            AssertClose(1, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "two purchased");
+
+            tree.Tier1.grantedCounts["practice_amp"] = 2.5;
+            AssertClose(2.25, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "and two and a half granted");
+        }
+
+        // A generator target collects its own stage-2 factors under the stat
+        // `count` - one number however the grant arrives - while what it PAYS
+        // collects them under `rate` (12.2). So "practice_amp, count" scales
+        // what is paid into the amp and "practice_amp, rate" scales its output,
+        // and neither reaches the other's number.
+        [Test]
+        public void A_count_effect_scales_a_grant_and_a_rate_effect_scales_the_output()
+        {
+            var tree = new TestTree();
+            var tripled = TestTree.MakeDefinition<ModifierDefinition>("tripled_grants");
+            tripled.effects.Add(new Effect { target = "practice_amp", stat = Stat.Count, multiplier = 3 });
+            tree.Tier1Def.modifiers.Add(tripled);
+            tree.Tier1Def.permanentModifiers.Add(tripled);
+
+            var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
+            crew.produces.Add(TestTree.Entry(tree.PracticeAmp, Stat.Yield, 2));
+            tree.Tier1Def.producers.Add(crew);
+            tree.Rebuild();
+
+            Producer.FireProducer(tree.Ctx(tree.Tier1), crew);
+            AssertClose(6, tree.Tier1.grantedCounts["practice_amp"], "2 under the count factor");
+
+            // amp_strings is "practice_amp, rate": it doubles what the six amps
+            // pay and leaves what is paid into them alone.
+            tree.Tier1.purchasedUpgrades.Add("amp_strings");
+            AssertClose(0.5 * 6 * 2, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "six amps at twice the rate");
+
+            Producer.FireProducer(tree.Ctx(tree.Tier1), crew);
+            AssertClose(12, tree.Tier1.grantedCounts["practice_amp"], "and the rate factor never touched the grant");
+        }
+
+        // The wildcard is every number of a stat at the one coordinate that stat
+        // has per number (12.2): count has exactly one, a generator's granted
+        // count, so an empty target reaches every grant - which is what lets
+        // root's idle fraction halve grants with one line. A wildcard on rate
+        // still never meets the source's own term, only the currency's total.
+        [Test]
+        public void A_wildcard_count_effect_reaches_every_grant_and_no_output()
+        {
+            var tree = new TestTree();
+            var halved = TestTree.MakeDefinition<ModifierDefinition>("grants_halved");
+            halved.effects.Add(new Effect { stat = Stat.Count, multiplier = 0.5 });
+            tree.RootDef.modifiers.Add(halved);
+            tree.RootDef.permanentModifiers.Add(halved);
+
+            var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
+            crew.produces.Add(TestTree.Entry(tree.PracticeAmp, Stat.Yield, 2));
+            tree.Tier1Def.producers.Add(crew);
+            tree.Rebuild();
+
+            Producer.FireProducer(tree.Ctx(tree.Tier1), crew);
+            AssertClose(1, tree.Tier1.grantedCounts["practice_amp"], "2 under the count wildcard");
+
+            tree.Tier1.generatorCounts["practice_amp"] = 2;
+            AssertClose(1.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "three amps at 0.5, untouched by a count effect");
         }
 
         [Test]

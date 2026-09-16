@@ -71,9 +71,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 ? DisplayStyle.None
                 : DisplayStyle.Flex;
             cost.text = GeneratorRowUI.CostAndYieldText(ctx, generator);
-            var owned = ctx.GetOwnedCount(generator.Id);
-            ownedLabel.text = "Owned: " + owned;
-            production.text = "Producing: " + ProductionText(ctx, owned);
+            // The row's own formatter, so the screen and the row never print one
+            // count two ways (12.11).
+            ownedLabel.text = "Owned: " + GeneratorRowUI.CountText(ctx, generator);
+            production.text = "Producing: " + ProductionText(ctx, ctx.GetOwnedCount(generator.Id));
         }
 
         public void Hide() => Root.style.display = DisplayStyle.None;
@@ -87,16 +88,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Hide();
         }
 
-        // The count times the per-unit rate IS the production: nothing in the
+        // The OWNED SUM times the per-unit rate IS the production: nothing in the
         // effect vocabulary reads the owned count, so one unit's term is what
-        // every unit pays (the Producer.UnitRate comment). This is per GAME
-        // second at the declaring scope, while the header's slope is the
-        // realized per-real-second figure - two honest numbers, neither
-        // converted into the other.
-        private string ProductionText(GameContext ctx, int owned)
+        // every unit pays, purchased or granted alike (the Producer.UnitRate
+        // comment). This is per GAME second at the declaring scope, while the
+        // header's slope is the realized per-real-second figure - two honest
+        // numbers, neither converted into the other.
+        private string ProductionText(GameContext ctx, BigNumber owned)
         {
             var line = new StringBuilder();
-            foreach (var (currency, amount) in Producer.UnitRate(ctx, generator))
+            foreach (var (target, amount) in Producer.UnitRate(ctx, generator))
             {
                 var product = amount * owned;
                 if (product == BigNumber.Zero)
@@ -104,7 +105,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 if (line.Length > 0)
                     line.Append(", ");
                 line.Append(NumberFormatter.Format(product)).Append(" ")
-                    .Append(currency.displayName).Append("/s");
+                    .Append(target.displayName).Append("/s");
             }
             return line.Length == 0 ? "nothing" : line.ToString();
         }

@@ -40,6 +40,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(new OwnedCountAtLeast { generator = tree.PracticeAmp, count = 4 }.Evaluate(ctx));
         }
 
+        // The count the condition compares against is the SUM (12.2), and its
+        // threshold is a BigNumber because that sum is one - a granted fraction
+        // counts toward a gate exactly as a purchase does.
+        [Test]
+        public void OwnedCountAtLeast_reads_the_purchased_count_plus_the_granted_one()
+        {
+            var tree = new TestTree();
+            tree.Tier1.generatorCounts["practice_amp"] = 2;
+            tree.Tier1.grantedCounts["practice_amp"] = 0.5;
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.IsTrue(new OwnedCountAtLeast { generator = tree.PracticeAmp, count = 2.5 }.Evaluate(ctx));
+            Assert.IsFalse(new OwnedCountAtLeast { generator = tree.PracticeAmp, count = 2.6 }.Evaluate(ctx));
+        }
+
         [Test]
         public void FlagSet_and_UpgradePurchased_read_the_chain()
         {

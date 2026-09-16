@@ -48,7 +48,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     internal class OwnedCountAtLeastDto : ConditionDto
     {
         public string generator;
-        public int count;
+        public BigNumber count;
     }
 
     internal class FlagSetDto : ConditionDto
@@ -123,6 +123,11 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public List<string> currencies = new();
         public BigNumber amount;
         public PayoutFormulaDto formula;
+    }
+
+    internal class FireGeneratorYieldDto : ActionDto
+    {
+        public string generator;
     }
 
     internal class SetFlagDto : ActionDto
@@ -231,9 +236,14 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public MultiplierFormulaDto formula;
     }
 
+    // Exactly one of the three names is authored: what this line pays into
+    // (12.2). The exactly-one rule is the validation pass's; the importer only
+    // refuses a line that names none, which has no field to write.
     internal class ProducesDto
     {
         public string currency;
+        public string generator;
+        public string bar;
         public string stat;
         public BigNumber value;
         public ConditionDto condition;
@@ -416,6 +426,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public static readonly Dictionary<string, Type> Actions = new()
         {
             { nameof(AddCurrency), typeof(AddCurrencyDto) },
+            { nameof(FireGeneratorYield), typeof(FireGeneratorYieldDto) },
             { nameof(SetFlag), typeof(SetFlagDto) },
             { nameof(ExtendTimer), typeof(ExtendTimerDto) },
             { nameof(AddModifier), typeof(AddModifierDto) },

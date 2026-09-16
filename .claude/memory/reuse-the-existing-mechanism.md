@@ -129,6 +129,19 @@ THE CHECK, before keeping a field the doc names: name a reader that could not be
 data already in hand. No such reader, no field - and the doc's list of parts gets corrected, not
 implemented.
 
+**A payment is a pull, not a push (2026-09-16, chapter primitives A-C).** Planning payments into a
+bar's progress, I modeled them as the payer writing into the bar and then found that "who fires
+onComplete when a payment completes a bar" had no answer - the tick settles only the bars its draw
+admitted - and recommended deferring the whole bar target. John: "why wouldn't the bar just collect
+any yield or rate bonuses when it's processing its tick? That's how modifiers work... The thing being
+modified collects everyone who modifies it." In the design's grain every number is collected by the
+thing it belongs to: a currency collects its payers and its stage-2 effects at its home, and a bar is
+no different - a rate into it is collected at its draw beside its fillRate, a yield into it is
+handed to the bar's own settle, and a generator's granted count collects under its own stat
+("count"), which also dissolved the "querying, rate" double-meaning I had raised. The mechanism
+problem was an artifact of modeling against the grain. THE CHECK, before reporting a "gap" in a
+design: restate the feature as the target collecting, and see whether the gap survives.
+
 2026-09-10, `AcknowledgeStory`: asked why a root flag write is root-owned, I produced a fake caller
 (the log), then a new scope test, then a pipeline theory - three inventions in one conversation,
 when the answer was one fact the design already states: the flag is declared on root, root is live

@@ -615,6 +615,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         private static IdleOfferLine Line(Chapter1 f, CurrencyDefinition currency) =>
-            f.Session.CurrentOffer.lines.Find(l => l.currency == currency);
+            f.Session.CurrentOffer.lines.Find(l => l.target == currency);
     }
 }

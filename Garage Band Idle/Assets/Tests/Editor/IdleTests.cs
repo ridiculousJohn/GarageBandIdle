@@ -88,7 +88,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         private static IdleOfferLine Line(GameSession session, CurrencyDefinition currency) =>
-            session.CurrentOffer.lines.Find(l => l.currency == currency);
+            session.CurrentOffer.lines.Find(l => l.target == currency);
 
         // ---- the stamps ----
 
@@ -257,6 +257,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(f.Tree.Root, records.home);
             AssertClose(250, cash.amount);                     // 0.5/s halved by the base, x1000
             Assert.AreSame(f.Tree.Tier1, cash.home);
+        }
+
+        // Idle pays every rate target the tick would, one line per target
+        // (12.9), and the claim lands each through the write its kind takes.
+        [Test]
+        public void An_offer_carries_a_generator_target_line_and_the_claim_grants_it()
+        {
+            var f = new Fixture(author: tree =>
+            {
+                var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
+                crew.produces.Add(TestTree.Entry(tree.PracticeAmp, Stat.Rate, 1));
+                tree.Tier1Def.producers.Add(crew);
+            });
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            var line = f.Session.CurrentOffer.lines.Find(l => l.target == f.Tree.PracticeAmp);
+            Assert.IsNotNull(line, "the amp is a rate target like any other");
+            Assert.AreSame(f.Tree.Tier1, line.home, "the generator's declaring scope");
+            // Away pays half of all of it (section 9): the idle base's count
+            // wildcard halves the grant as its rate wildcard halves a currency.
+            AssertClose(500, line.amount, "1/s over the window, halved while away");
+
+            f.Session.ClaimIdle(f.Tree.Now);
+
+            AssertClose(500, f.Tree.Tier1.grantedCounts["practice_amp"]);
         }
 
         [Test]
@@ -462,8 +489,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var session = new GameSession(loaded, Config());
             session.SwitchChapter(loadedCh1, f.Tree.Now.AddSeconds(1000));
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, session.Phase);
-            AssertClose(500, session.CurrentOffer.lines.Find(l => l.currency == f.Tree.Cash).amount);      // 0.25/s x 2000
-            AssertClose(1000, session.CurrentOffer.lines.Find(l => l.currency == f.Tree.Records).amount);  // 0.5/s x 2000
+            AssertClose(500, session.CurrentOffer.lines.Find(l => l.target == f.Tree.Cash).amount);      // 0.25/s x 2000
+            AssertClose(1000, session.CurrentOffer.lines.Find(l => l.target == f.Tree.Records).amount);  // 0.5/s x 2000
 
             session.ClaimIdle(f.Tree.Now.AddSeconds(1000));
             AssertClose(500, loadedTier1.balances["cash"]);
