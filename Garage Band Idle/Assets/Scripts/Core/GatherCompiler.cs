@@ -40,23 +40,26 @@ namespace RidiculousGaming.GarageBandIdle
     // One definition's compiled plans at its home, one per stat it is ever asked
     // for (12.2): a currency's rate and yield totals, a bar's fill rate (also
     // what a rate paid into it collects) and the yield paid into it, a
-    // generator's granted count and its cost, an upgrade's cost. Null where a
-    // kind is never asked; For throws on a null, since asking is a code bug
-    // (requirement 7). Filed under ONE key - the definition itself - because a
-    // definition has one home and its totals are modified per stat.
+    // generator's granted count, its cost and its autobuy switch, an upgrade's
+    // cost. Null where a kind is never asked; For throws on a null, since asking
+    // is a code bug (requirement 7). Filed under ONE key - the definition itself
+    // - because a definition has one home and its totals are modified per stat.
     public sealed class StatPlans
     {
         public CoordinatePlan Rate { get; }
         public CoordinatePlan Yield { get; }
         public CoordinatePlan Count { get; }
         public CoordinatePlan Cost { get; }
+        public CoordinatePlan AutoBuy { get; }
 
-        internal StatPlans(CoordinatePlan rate, CoordinatePlan yield, CoordinatePlan count, CoordinatePlan cost)
+        internal StatPlans(CoordinatePlan rate, CoordinatePlan yield, CoordinatePlan count, CoordinatePlan cost,
+                           CoordinatePlan autoBuy)
         {
             Rate = rate;
             Yield = yield;
             Count = count;
             Cost = cost;
+            AutoBuy = autoBuy;
         }
 
         // The plan for one stat. A stat this holder was never compiled for has
@@ -70,6 +73,7 @@ namespace RidiculousGaming.GarageBandIdle
                 Stat.Yield => Yield,
                 Stat.Count => Count,
                 Stat.Cost => Cost,
+                Stat.AutoBuy => AutoBuy,
                 _ => null
             };
             return plan ?? throw new InvalidOperationException(
@@ -85,6 +89,7 @@ namespace RidiculousGaming.GarageBandIdle
             if (Yield != null) answered.Add(Stat.Yield);
             if (Count != null) answered.Add(Stat.Count);
             if (Cost != null) answered.Add(Stat.Cost);
+            if (AutoBuy != null) answered.Add(Stat.AutoBuy);
             return answered.Count == 0 ? "no stat" : string.Join(", ", answered);
         }
     }
@@ -274,12 +279,14 @@ namespace RidiculousGaming.GarageBandIdle
                 node.StoreLink(currency, new StatPlans(
                     Plan(node, currency, currency, Stat.Rate, home, grantable),
                     Plan(node, currency, currency, Stat.Yield, home, grantable),
-                    null, null));
+                    null, null, null));
             }
 
             // A generator's count plan carries no currency coordinate - one
             // number however the grant arrives - and its cost plan names the
-            // cost currency, whose home the read never uses (12.2).
+            // cost currency, whose home the read never uses (12.2). The autobuy
+            // plan is the count plan's shape at the switch's own stat: one
+            // coordinate per generator, homed where the generator is declared.
             foreach (var generator in node.Definition.generators)
             {
                 if (generator == null)
@@ -287,7 +294,8 @@ namespace RidiculousGaming.GarageBandIdle
                 node.StoreLink(generator, new StatPlans(null, null,
                     Plan(node, generator, null, Stat.Count, node, grantable),
                     Plan(node, generator, generator.costCurrency, Stat.Cost,
-                         HomeOf(node, generator.costCurrency), grantable)));
+                         HomeOf(node, generator.costCurrency), grantable),
+                    Plan(node, generator, null, Stat.AutoBuy, node, grantable)));
             }
 
             foreach (var upgrade in node.Definition.upgrades)
@@ -296,7 +304,8 @@ namespace RidiculousGaming.GarageBandIdle
                     continue;
                 node.StoreLink(upgrade, new StatPlans(null, null, null,
                     Plan(node, upgrade, upgrade.costCurrency, Stat.Cost,
-                         HomeOf(node, upgrade.costCurrency), grantable)));
+                         HomeOf(node, upgrade.costCurrency), grantable),
+                    null));
             }
 
             foreach (var group in node.Definition.barGroups)
@@ -312,7 +321,7 @@ namespace RidiculousGaming.GarageBandIdle
                         node.StoreLink(bar, new StatPlans(
                             Plan(node, bar, bar.fillCurrency, Stat.Rate, node, grantable),
                             Plan(node, bar, null, Stat.Yield, node, grantable),
-                            null, null));
+                            null, null, null));
             }
 
             if (node is ChapterScopeState)

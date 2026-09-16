@@ -207,6 +207,82 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["rehearsal"]);
         }
 
+        // ---- autobuy (12.9) ----
+
+        // An autobuy carrier declared at tier1. Declaration and grant are two
+        // steps for the reason DeclareSpeed gives, and the multiplier is never
+        // read: the switch is the effect's liveness and nothing else (12.2).
+        private static void DeclareAutoBuy(TestTree tree, string id, string target)
+        {
+            var carrier = TestTree.MakeDefinition<ModifierDefinition>(id);
+            carrier.effects.Add(new Effect { target = target, stat = Stat.AutoBuy, multiplier = 1 });
+            tree.Tier1Def.modifiers.Add(carrier);
+        }
+
+        [Test]
+        public void The_tick_buys_the_largest_affordable_count_for_a_switched_on_generator()
+        {
+            var tree = new TestTree();
+            DeclareAutoBuy(tree, "hands_free", "gear");
+            tree.Rebuild();
+            tree.Tier1.modifierStacks["hands_free"] = 1;
+            tree.Tier1.balances["cash"] = 1000;
+            tree.Tier1.earnedTotals["cash"] = 1000;      // the amp's gate wants 100 earned
+
+            TickSystem.Tick(tree.Root, tree.Ch1, Config(), 1, tree.Now.AddSeconds(1));
+
+            // The same count MaxAffordable answers: 60 x 1.15^n summed, eight
+            // units fit under 1000 and nine do not.
+            Assert.AreEqual(8, tree.Tier1.generatorCounts["practice_amp"], "bought to max");
+            Assert.IsFalse(Purchasing.CanBuy(new GameContext(tree.Tier1, tree.Now), tree.PracticeAmp, 1),
+                "and the balance moved by the series sum");
+            // The drummer carries gear too and its gate opened on the eighth
+            // amp, but 250 is past what the amps left - a refusal is a no-op.
+            Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("drummer"), "nothing it could not pay for");
+        }
+
+        [Test]
+        public void A_generator_no_autobuy_effect_names_is_never_bought_by_the_tick()
+        {
+            var tree = new TestTree();
+            DeclareAutoBuy(tree, "hands_free", "gear");
+            tree.Rebuild();
+            tree.Tier1.balances["cash"] = 1000;
+            tree.Tier1.earnedTotals["cash"] = 1000;
+
+            // The carrier stands but nothing stacked it, so no link is live.
+            TickSystem.Tick(tree.Root, tree.Ch1, Config(), 1, tree.Now.AddSeconds(1));
+
+            Assert.IsFalse(tree.Tier1.generatorCounts.ContainsKey("practice_amp"));
+            Assert.AreEqual((BigNumber)1000, tree.Tier1.balances["cash"], "and nothing was spent");
+        }
+
+        // The purchase phase is the tick's last (12.9): every segment's bars
+        // have drunk before anything is spent, so a generator priced in the
+        // pool a bar drinks never starves it.
+        [Test]
+        public void The_tick_buys_after_every_bar_has_drunk()
+        {
+            var tree = new TestTree();
+            var kit = TestTree.MakeDefinition<GeneratorDefinition>("kit");
+            kit.availableWhen = new Always();
+            kit.costCurrency = tree.Rehearsal;
+            kit.baseCost = 30;
+            kit.growth = 1;                              // a flat price, so the count reads off the pool
+            tree.Tier1Def.generators.Add(kit);
+            DeclareAutoBuy(tree, "hands_free", "kit");
+            tree.Rebuild();
+            tree.Tier1.modifierStacks["hands_free"] = 1;
+            tree.Tier1.balances["rehearsal"] = 100;
+            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+
+            TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
+
+            Assert.AreEqual((BigNumber)20, tree.Tier1.barProgress["cover_1"], "the cover drank its whole 2/s window");
+            Assert.AreEqual(2, tree.Tier1.generatorCounts["kit"], "two at 30 out of the 80 left");
+            Assert.AreEqual((BigNumber)20, tree.Tier1.balances["rehearsal"], "and 20 stays in the pool");
+        }
+
         // ---- game_speed ----
 
         [Test]

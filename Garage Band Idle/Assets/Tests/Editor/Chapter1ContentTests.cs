@@ -275,7 +275,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.AreEqual("rehearsal", bar.fillCurrency.Id, bar.Id);
                 Assert.AreEqual((BigNumber)amounts[i], bar.fillAmount, bar.Id);
                 Assert.AreEqual((BigNumber)2, bar.fillRate, bar.Id);
-                Assert.IsFalse(bar.repeating, bar.Id);
+                Assert.IsNull(bar.repeatWhen, bar.Id);
                 // A non-repeating completion leaves no derivable effect-fact,
                 // so the fan-rate reward is a grant that clears with tier1.
                 var grant = (AddModifier)bar.onComplete.Single();
@@ -306,6 +306,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(new[] { "records", "ch1_records" }, Ids(pay.currencies));
             var curve = (RootCurveFormula)pay.formula;
             Assert.AreEqual("fans", curve.currency.Id);
+            // Fans are never spent and clear with the tier, so what the round
+            // earned and what stands are the same number here (12.5).
+            Assert.AreEqual(PayoutTotal.EarnedThisRound, curve.reads);
             Assert.AreEqual((BigNumber)5, curve.divisor);
             Assert.AreEqual(0.5, curve.exponent);
             Assert.AreEqual(tier1, ((ResetScope)release.actions[1]).scope, "the payout banks before the clear");

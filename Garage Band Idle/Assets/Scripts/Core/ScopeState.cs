@@ -119,14 +119,22 @@ namespace RidiculousGaming.GarageBandIdle
     }
 
     // A scope is a plain state container; the save IS the tree of these (design
-    // doc 12.3/12.10). The COMPLETE mutable state is the facts payload; a
-    // chapter adds lastActiveUtc OUTSIDE its payload on purpose - it is the one
-    // field a reset re-stamps rather than clears (a fresh chapter owes no idle).
+    // doc 12.3/12.10). The mutable state a reset destroys is the facts payload;
+    // what sits OUTSIDE it is what a reset must not clear - a chapter's
+    // lastActiveUtc, re-stamped rather than cleared (a fresh chapter owes no
+    // idle), and the lifetime totals, which count across rounds.
     public abstract class ScopeState
     {
         public readonly ScopeDefinition Definition;
         public readonly ScopeState Parent;
         public readonly List<ScopeState> Children = new();
+
+        // A currency's lifetime total, every deposit ever made at this home
+        // across rounds (design doc 12.3): the one economy fact a reset does not
+        // clear, so it lives beside the payload as a chapter's lastActiveUtc
+        // does rather than in it. Seeded per declared currency once, when the
+        // node is built.
+        public Dictionary<string, BigNumber> lifetimeTotals = new();
 
         // Readable anywhere, replaceable only through Clear and the load path:
         // the payload's TYPE is the placement invariant, so an assignment that
@@ -212,16 +220,19 @@ namespace RidiculousGaming.GarageBandIdle
             return state;
         }
 
-        // Declared currencies get their balance and earned-total entries at the
-        // home scope; a chain walk finds the holder by key presence. Virtual
-        // because Clear re-runs it: a derived payload with its own keys seeds
-        // them here or a reset leaves them missing.
+        // Declared currencies get their balance, earned-total and lifetime-total
+        // entries at the home scope; a chain walk finds the holder by key
+        // presence. Virtual because Clear re-runs it: a derived payload with its
+        // own keys seeds them here or a reset leaves them missing.
         internal virtual void InitializeDeclared()
         {
             foreach (var currencyId in Definition.currencyIds)
             {
                 facts.balances[currencyId] = BigNumber.Zero;
                 facts.earnedTotals[currencyId] = BigNumber.Zero;
+                // TryAdd, because Clear re-runs this method and the lifetime
+                // total survives it (12.3).
+                lifetimeTotals.TryAdd(currencyId, BigNumber.Zero);
             }
         }
 

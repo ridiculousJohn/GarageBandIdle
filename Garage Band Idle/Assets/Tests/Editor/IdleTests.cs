@@ -286,6 +286,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(500, f.Tree.Tier1.grantedCounts["practice_amp"]);
         }
 
+        // The purchase phase is the TICK's (12.9), and no offline simulation of
+        // the buys a window would have made is built - so a switch left on
+        // through a long away window pays the window's rate and nothing else.
+        [Test]
+        public void An_idle_window_pays_its_rate_and_buys_nothing()
+        {
+            var f = new Fixture(author: tree =>
+            {
+                var carrier = TestTree.MakeDefinition<ModifierDefinition>("hands_free");
+                carrier.effects.Add(new Effect { target = "practice_amp", stat = Stat.AutoBuy, multiplier = 1 });
+                tree.Tier1Def.modifiers.Add(carrier);
+            });
+            f.Tree.Tier1.modifierStacks["hands_free"] = 1;
+            f.Tree.Tier1.balances["cash"] = 1000;
+            f.Tree.Tier1.earnedTotals["cash"] = 1000;
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+            f.Session.ClaimIdle(f.Tree.Now);
+
+            AssertClose(1250, f.Tree.Tier1.balances["cash"], "the one amp's 0.25/s idle over the window");
+            Assert.AreEqual(1, f.Tree.Tier1.generatorCounts["practice_amp"], "the count the window began with");
+        }
+
         [Test]
         public void Elapsed_over_the_cap_pays_the_cap()
         {

@@ -41,6 +41,27 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return product;
         }
 
+        // A switch read off a plan: on when some effect naming the coordinate is
+        // live and no handicap on it is (design doc 12.2). The multiplier is not
+        // read - an autobuy effect is a yes, and a handicap on the same
+        // coordinate is a no for as long as its record exists, the design's
+        // "automation disabled".
+        public static bool GetSwitch(GameContext origin, CoordinatePlan plan)
+        {
+            var on = false;
+            var links = plan.Links;
+            for (var i = 0; i < links.Count; i++)
+            {
+                var link = links[i];
+                if (!link.Live(origin))
+                    continue;
+                if (link.Liveness == LivenessKind.Handicap)
+                    return false;
+                on = true;
+            }
+            return on;
+        }
+
         // An effect matches an owner plus coordinates when its target names the
         // owner - by id or by any of its tags - the queried stat is EXACTLY its
         // stat, and the optional currency coordinate agrees (design doc 12.2).

@@ -183,6 +183,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     internal class RootCurveFormulaDto : PayoutFormulaDto
     {
         public string currency;
+        public PayoutTotal reads = PayoutTotal.EarnedThisRound;
         public BigNumber divisor = 1;
         // Pow's POWER stays a double, by BigDouble's own signature - the runtime
         // cannot compute with a wider one either.
@@ -199,6 +200,13 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     {
         public string currency;
         public BigNumber coefficient;
+    }
+
+    internal class LinearOnOwnedCountDto : MultiplierFormulaDto
+    {
+        public string generator;
+        public BigNumber coefficient;
+        public bool purchasedOnly;
     }
 
     internal class RoadieTotalBoostDto : MultiplierFormulaDto
@@ -297,7 +305,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public string fillCurrency;
         public BigNumber fillAmount;
         public BigNumber fillRate;
-        public bool repeating;
+        public ConditionDto repeatWhen;
+        public string tap;
         public ConditionDto availableWhen;
         public List<ActionDto> onComplete = new();
         public List<PerFillDto> perFill = new();
@@ -445,6 +454,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public static readonly Dictionary<string, Type> MultiplierFormulas = new()
         {
             { nameof(Economy.LinearOnBalance), typeof(LinearOnBalanceDto) },
+            { nameof(Economy.LinearOnOwnedCount), typeof(LinearOnOwnedCountDto) },
             { nameof(Economy.RoadieTotalBoost), typeof(RoadieTotalBoostDto) },
             { nameof(Economy.RoadieActiveBoost), typeof(RoadieActiveBoostDto) },
         };

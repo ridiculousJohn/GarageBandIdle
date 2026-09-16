@@ -63,16 +63,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private readonly Dictionary<BarGroupDefinition, CurrencyDefinition> pools = new();
 
+        // The repeat is a condition judged at the bar's home (12.7), so the
+        // fixture takes one: null is the bar that fills once, Always is the
+        // repeating one, and a condition that refuses is the manual team.
         public BarDefinition Bar(BarGroupDefinition group, string id, double fillAmount, double fillRate,
-                                 bool repeating = false)
+                                 Condition repeatWhen = null)
         {
             var bar = TestTree.MakeDefinition<BarDefinition>(id);
             bar.fillCurrency = pools[group];
             bar.fillAmount = fillAmount;
             bar.fillRate = fillRate;
-            bar.repeating = repeating;
+            bar.repeatWhen = repeatWhen;
             group.bars.Add(bar);
             return bar;
+        }
+
+        // The upgrade a repeat condition can read, priced at nothing because no
+        // test here buys it - the latch is written as a fact.
+        public UpgradeDefinition Upgrade(ScopeDefinition scope, string id)
+        {
+            var upgrade = TestTree.MakeDefinition<UpgradeDefinition>(id);
+            upgrade.gate = new Always();
+            upgrade.costCurrency = Rehearsal;
+            upgrade.cost = 0;
+            scope.upgrades.Add(upgrade);
+            return upgrade;
         }
 
         // Selection written as a FACT, bypassing the entry point: a draw test is
@@ -417,7 +432,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
-            var bar = f.Bar(group, "loop_a", 10, 25, repeating: true);
+            var bar = f.Bar(group, "loop_a", 10, 25, repeatWhen: new Always());
             f.Build();
             CountFires(bar, f.Shared);
             f.Pour(f.Tier1, f.Rehearsal, 1000);
@@ -435,8 +450,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
-            var shortcut = f.Bar(group, "shortcut", 10, 35, repeating: true);
-            var iterative = f.Bar(group, "iterative", 10, 35, repeating: true);
+            var shortcut = f.Bar(group, "shortcut", 10, 35, repeatWhen: new Always());
+            var iterative = f.Bar(group, "iterative", 10, 35, repeatWhen: new Always());
             f.Build();
             CountFires(iterative, f.Shared);
             f.Pour(f.Tier1, f.Rehearsal, 1000);
@@ -456,7 +471,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
-            var bar = f.Bar(group, "loop_a", 10, 100, repeating: true);
+            var bar = f.Bar(group, "loop_a", 10, 100, repeatWhen: new Always());
             bar.availableWhen = new Not { condition = new FlagSet { flagId = "encore" } };
             f.Build();
             CountFires(bar, f.Shared);
@@ -471,6 +486,58 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1, f.Balance(f.Root, f.Shared), "one fire");
             Assert.AreEqual(1, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(90, f.Progress(f.Tier1, bar), "the rest stays as residual");
+        }
+
+        // A repeatWhen that refuses is the manual team (12.7): it pays once,
+        // returns to zero and leaves the active set, so selecting it again is
+        // the whole of how it runs a second cycle.
+        [Test]
+        public void A_manual_team_pays_once_returns_to_zero_and_leaves_the_active_set()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "teams", f.Rehearsal);
+            var bar = f.Bar(group, "team_a", 10, 25, repeatWhen: new Not { condition = new Always() });
+            f.Build();
+            CountFires(bar, f.Shared);
+            f.Pour(f.Tier1, f.Rehearsal, 1000);
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            AssertClose(1, f.Balance(f.Root, f.Shared), "one cycle, one payout");
+            Assert.AreEqual(1, f.Fills(f.Tier1, bar), "a present repeatWhen counts its fills either way");
+            AssertClose(0, f.Progress(f.Tier1, bar), "the excess past the threshold is discarded");
+            Assert.IsFalse(f.Tier1.activeBars[group.Id].Contains(bar.Id), "and it is no longer selected");
+        }
+
+        // One condition, so the same bar is a team or a loop by what the player
+        // has bought - which is what the repeat being a condition buys (12.7).
+        [Test]
+        public void A_repeatWhen_gated_on_an_upgrade_flips_a_team_from_manual_to_repeating()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "teams", f.Rehearsal);
+            var overtime = f.Upgrade(f.Tier1Def, "overtime");
+            var bar = f.Bar(group, "team_a", 10, 25, repeatWhen: new UpgradePurchased { upgrade = overtime });
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 1000);
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            AssertClose(0, f.Progress(f.Tier1, bar), "unbought, the condition refuses and one cycle ran");
+            Assert.AreEqual(1, f.Fills(f.Tier1, bar), "fill count");
+            Assert.IsFalse(f.Tier1.activeBars[group.Id].Contains(bar.Id), "and it left the set");
+
+            f.Tier1.purchasedUpgrades.Add(overtime.Id);
+            f.Select(f.Tier1, group, bar);
+            f.Segment(1);
+
+            // The same bar over the same second: the condition holds now, so
+            // both crossings pay and the residual is kept.
+            Assert.AreEqual(3, f.Fills(f.Tier1, bar), "two more crossings");
+            AssertClose(5, f.Progress(f.Tier1, bar), "residual is retained");
+            Assert.IsTrue(f.Tier1.activeBars[group.Id].Contains(bar.Id), "a repeating bar stays selected");
         }
 
         [Test]
@@ -574,7 +641,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
-            var bar = f.Bar(group, "loop_a", 10, 5, repeating: true);
+            var bar = f.Bar(group, "loop_a", 10, 5, repeatWhen: new Always());
             bar.availableWhen = new FlagSet { flagId = "encore" };
             f.Build();
             CountFires(bar, f.Shared);
@@ -617,7 +684,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
-            var bar = f.Bar(group, "loop_a", 0, 5, repeating: true);
+            var bar = f.Bar(group, "loop_a", 0, 5, repeatWhen: new Always());
             f.Build();
             if (withActions)
                 CountFires(bar, f.Shared);
@@ -686,7 +753,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
-            var bar = f.Bar(group, "loop_a", 10, 0, repeating: true);
+            var bar = f.Bar(group, "loop_a", 10, 0, repeatWhen: new Always());
             f.Build();
             CountFires(bar, f.Shared);
             f.Select(f.Tier1, group, bar);
@@ -696,6 +763,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(2, f.Balance(f.Root, f.Shared), "two thresholds crossed");
             Assert.AreEqual(2, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(5, f.Progress(f.Tier1, bar), "the residual is retained");
+        }
+
+        // The clamp belongs to the bar that completes once, whose progress is
+        // monotonic (12.7). A manual team takes the whole payment and then runs
+        // its one cycle, so the overshoot goes with the return to zero.
+        [Test]
+        public void A_payment_past_full_into_a_manual_team_pays_once_and_zeroes()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "teams", f.Rehearsal);
+            var bar = f.Bar(group, "team_a", 100, 0, repeatWhen: new Not { condition = new Always() });
+            f.Build();
+            CountFires(bar, f.Shared);
+            f.Select(f.Tier1, group, bar);
+
+            BarSystem.Deposit(new GameContext(f.Tier1, f.Now), bar, 250);
+
+            AssertClose(1, f.Balance(f.Root, f.Shared), "one crossing, settled at the write");
+            Assert.AreEqual(1, f.Fills(f.Tier1, bar), "fill count");
+            AssertClose(0, f.Progress(f.Tier1, bar), "back to zero, the excess discarded");
+            Assert.IsFalse(f.Tier1.activeBars[group.Id].Contains(bar.Id), "and out of the active set");
         }
 
         // Each mover settles only the crossing its own fill made (12.7). Here the
@@ -876,7 +964,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
             var once = f.Bar(group, "once", 100, 2);
-            var loop = f.Bar(group, "loop", 100, 2, repeating: true);
+            var loop = f.Bar(group, "loop", 100, 2, repeatWhen: new Always());
             f.Build();
             f.Tier1.barProgress[once.Id] = 100;
             f.Tier1.barProgress[loop.Id] = 100;

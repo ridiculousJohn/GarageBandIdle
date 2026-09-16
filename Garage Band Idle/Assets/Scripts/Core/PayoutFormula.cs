@@ -30,22 +30,44 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
-    // floor((balance / divisor) ^ exponent) - Chapter 1's album payout is
-    // RootCurve(fans, 5, 0.5) (design doc 5).
+    // Which of a currency's three totals a payout reads (design doc 12.5): what
+    // this round earned, the balance standing now, or everything ever earned
+    // across rounds. Earned this round is the default because a prestige payout
+    // is about the run just played; the balance is what a spend can have moved.
+    public enum PayoutTotal
+    {
+        EarnedThisRound,
+        Balance,
+        Lifetime
+    }
+
+    // floor((total / divisor) ^ exponent) over the total `reads` names - chapter
+    // 1's album is RootCurve over fans earned this round, the same number as its
+    // balance since fans are never spent and both clear with the tier (design
+    // doc 5).
     [Serializable]
     public class RootCurveFormula : PayoutFormula
     {
         public Economy.CurrencyDefinition currency;
+        public PayoutTotal reads = PayoutTotal.EarnedThisRound;
         public BigNumber divisor = 1;
         public double exponent = 1;   // BigDouble.Pow's power is a double by the library's own signature
 
-        public override BigNumber Compute(GameContext ctx) =>
-            BigNumber.Floor(BigNumber.Pow(ctx.GetBalance(currency.Id) / divisor, exponent));
+        public override BigNumber Compute(GameContext ctx)
+        {
+            var total = reads switch
+            {
+                PayoutTotal.Balance => ctx.GetBalance(currency.Id),
+                PayoutTotal.Lifetime => ctx.GetLifetimeTotal(currency.Id),
+                _ => ctx.GetEarnedTotal(currency.Id),
+            };
+            return BigNumber.Floor(BigNumber.Pow(total / divisor, exponent));
+        }
 
         public override void Validate(ValidationContext ctx)
         {
             ctx.RequireOnChain(currency, "RootCurveFormula");
-            // A negative exponent makes 0^n infinite, and the balance IS zero on
+            // A negative exponent makes 0^n infinite, and the total IS zero on
             // the first read after a reset - BigNumber refuses infinities at
             // construction, so this would throw on the first payout.
             if (ctx.RequireFiniteDouble(exponent, "RootCurveFormula exponent") && exponent < 0)

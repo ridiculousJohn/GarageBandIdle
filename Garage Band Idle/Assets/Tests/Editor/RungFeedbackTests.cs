@@ -86,7 +86,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var rung = Release(tree);
             tree.Tier1Def.rung = rung;
             tree.Rebuild();
+            // A payout reads what the round EARNED by default (12.5), and the
+            // gates read the balance, so a run standing at 60 carries both.
             tree.Tier1.balances["fans"] = 60;
+            tree.Tier1.earnedTotals["fans"] = 60;
             tree.Tier1.barProgress[tree.Cover1.Id] = 100;
             var ctx = tree.Ctx(tree.Tier1);
 
@@ -114,6 +117,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1Def.rung = rung;
             tree.Rebuild();
             tree.Tier1.balances["fans"] = 37;
+            tree.Tier1.earnedTotals["fans"] = 37;
             var ctx = tree.Ctx(tree.Tier1);
 
             // Both legs refuse, and the preview still answers - telling a player
@@ -178,6 +182,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1Def.rung = rung;
             tree.Rebuild();
             tree.Tier1.balances["fans"] = 20;
+            tree.Tier1.earnedTotals["fans"] = 20;
             var ctx = tree.Ctx(tree.Tier1);
 
             Assert.IsTrue(RungFeedback.TryPreviewPayout(rung, ctx, out var amount, out _));

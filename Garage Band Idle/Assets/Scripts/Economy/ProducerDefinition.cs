@@ -21,15 +21,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public const string GameSpeed = "game_speed"; // scales the tick's production dt; wall clocks never scale
         public const string Cost = "cost";            // a generator's or upgrade's price; stage 1 only, read by Purchasing.CostOf
         public const string Count = "count";          // a generator's granted count; the stage-2 coordinate of a payment into it
+        public const string AutoBuy = "autobuy";      // a generator's switch, not a factor: on while an effect naming it is live and no handicap is (12.2)
 
         public static bool IsProduced(string stat) => stat == Rate || stat == Yield;
 
-        public static bool IsEffectAddress(string stat) => stat == GameSpeed || stat == Cost || stat == Count;
+        public static bool IsEffectAddress(string stat) =>
+            stat == GameSpeed || stat == Cost || stat == Count || stat == AutoBuy;
 
         // For validation messages. An effect's stat coordinate may name any of
-        // the five; a produces entry only the first two.
+        // the six; a produces entry only the first two.
         public const string ProducedNames = Rate + ", " + Yield;
-        public const string EffectStatNames = ProducedNames + ", " + GameSpeed + ", " + Cost + ", " + Count;
+        public const string EffectStatNames =
+            ProducedNames + ", " + GameSpeed + ", " + Cost + ", " + Count + ", " + AutoBuy;
     }
 
     // One authored number: what it pays, which stat, the base value, plus an

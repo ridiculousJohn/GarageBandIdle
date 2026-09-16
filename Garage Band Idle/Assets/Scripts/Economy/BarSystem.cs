@@ -124,7 +124,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return false;
             if (bar.fillAmount <= BigNumber.Zero)
                 return false;
-            if (!bar.repeating && progress >= bar.fillAmount)
+            if (bar.repeatWhen == null && progress >= bar.fillAmount)
                 return false;
             // A refused completion list excludes the bar from the WHOLE segment
             // (12.5): it draws nothing from the pool, its progress does not
@@ -213,10 +213,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     Debug.LogError($"BarSystem: bar '{bar.Id}' has fillAmount {bar.fillAmount} - not settled.");
                     continue;
                 }
-                if (bar.repeating)
+                // Which of the three settlements this bar takes, asked at its
+                // home the moment it completes (12.7): no condition is the bar
+                // that fills once, a condition holding is the repeating one,
+                // and a condition refusing is the manual team.
+                if (bar.repeatWhen == null)
+                    SettleOnce(entry, settlementUtc);
+                else if (bar.repeatWhen.Evaluate(new GameContext(entry.scope, settlementUtc)))
                     SettleRepeating(entry, settlementUtc);
                 else
-                    SettleOnce(entry, settlementUtc);
+                    SettleManual(entry, settlementUtc);
             }
         }
 
@@ -281,6 +287,31 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             }
         }
 
+        // The manual team: one cycle per selection (12.7). The crossing is the
+        // one SettleOnce tests, so a bar already full when the segment began
+        // fires nothing; then the progress returns to zero, the bar leaves the
+        // active set, and selecting it again is how the player runs it again.
+        // Excess past the threshold is discarded - the team ran one cycle, not
+        // a fraction of a second one. The fill count is bumped like a repeating
+        // bar's: a present repeatWhen counts fills whichever way it evaluated,
+        // since the cascade counts completions of a bar that can complete more
+        // than once. Writes before Execute, the same latch-first discipline the
+        // other two keep.
+        private static void SettleManual(BarFill entry, DateTime settlementUtc)
+        {
+            var bar = entry.bar;
+            if (entry.progressBefore >= bar.fillAmount)
+                return;
+            if (entry.progressBefore + entry.filled < bar.fillAmount)
+                return;
+
+            entry.scope.barProgress[bar.Id] = BigNumber.Zero;
+            if (entry.scope.activeBars.TryGetValue(entry.group.Id, out var selected))
+                selected.Remove(bar.Id);
+            Bump(entry, bar, 1);
+            Execute(entry, bar, settlementUtc);
+        }
+
         // The settlement entry gate is asymmetric: the snapshot ADMITS a bar and
         // live state may only DISQUALIFY it. A repeating bar can sit at full
         // progress with its gate closed - its own onComplete flipped it last
@@ -341,7 +372,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             // past full takes nothing, and one below full stops at the threshold.
             var progress = home.barProgress.TryGetValue(bar.Id, out var stored) ? stored : BigNumber.Zero;
             var moved = progress + amount;
-            if (!bar.repeating && moved > bar.fillAmount)
+            if (bar.repeatWhen == null && moved > bar.fillAmount)
                 moved = BigNumber.Max(progress, bar.fillAmount);
             home.barProgress[bar.Id] = moved;
 
@@ -384,7 +415,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 if (bar.availableWhen != null && !bar.availableWhen.Evaluate(declaringCtx))
                     return false;
                 var progress = declaring.barProgress.TryGetValue(bar.Id, out var stored) ? stored : BigNumber.Zero;
-                if (!bar.repeating && progress >= bar.fillAmount)
+                if (bar.repeatWhen == null && progress >= bar.fillAmount)
                     return false;
                 chosen.Add(bar.Id);
             }

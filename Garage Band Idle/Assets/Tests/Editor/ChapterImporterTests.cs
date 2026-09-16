@@ -818,6 +818,193 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             StringAssert.Contains("names no target", thrown.Message);
         }
 
+        // ---- a bar's repeat and its tap ----
+
+        // A bar's repeat is a condition (12.7) and its tap is an ordinary
+        // producer reference (12.11), both resolved from the bar's own scope.
+        private const string BarJson = @"{
+            ""type"": ""ChapterDefinition"",
+            ""id"": ""ch1"",
+            ""displayName"": ""The Garage"",
+            ""currencies"": [{ ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] }],
+            ""flags"": [""auto_repeat""],
+            ""producers"": [
+                {
+                    ""id"": ""roadie"",
+                    ""displayName"": ""Roadie"",
+                    ""produces"": [{ ""bar"": ""cover_1"", ""stat"": ""yield"", ""value"": 25 }]
+                }
+            ],
+            ""barGroups"": [
+                {
+                    ""id"": ""learn_covers"",
+                    ""displayName"": ""Learn a Cover"",
+                    ""maxActive"": 1,
+                    ""bars"": [
+                        {
+                            ""id"": ""cover_1"",
+                            ""displayName"": ""Three-Chord Anthem"",
+                            ""repeatWhen"": { ""type"": ""FlagSet"", ""flagId"": ""auto_repeat"" },
+                            ""tap"": ""roadie"",
+                            ""fillCurrency"": ""cash"",
+                            ""fillAmount"": 100,
+                            ""fillRate"": 2
+                        }
+                    ]
+                }
+            ]
+        }";
+
+        [Test]
+        public void A_bars_repeat_condition_and_tap_producer_import()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", BarJson);
+
+            Import();
+
+            var bar = Load<BarDefinition>("ch1/Bars/cover_1.asset");
+            var roadie = Load<ProducerDefinition>("ch1/Producers/roadie.asset");
+            Assert.AreEqual("auto_repeat", ((FlagSet)bar.repeatWhen).flagId, "the condition, not a bool");
+            Assert.AreSame(roadie, bar.tap, "the reference is the asset, not a copy");
+        }
+
+        [Test]
+        public void A_bar_with_no_repeat_or_tap_imports_both_as_absent()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", BarJson.Replace(@"""repeatWhen"": { ""type"": ""FlagSet"", ""flagId"": ""auto_repeat"" },", "")
+                                    .Replace(@"""tap"": ""roadie"",", ""));
+
+            Import();
+
+            var bar = Load<BarDefinition>("ch1/Bars/cover_1.asset");
+            Assert.IsNull(bar.repeatWhen, "a bar that fills once and stays full");
+            Assert.IsNull(bar.tap, "and a row that is not a tap target");
+        }
+
+        // The bool is gone from the JSON too: a document still authoring it
+        // names a key the strict reader does not know.
+        [Test]
+        public void A_bar_authoring_repeating_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", BarJson.Replace(
+                @"""repeatWhen"": { ""type"": ""FlagSet"", ""flagId"": ""auto_repeat"" }", @"""repeating"": true"));
+
+            Assert.Throws<ContentImportException>(Import);
+        }
+
+        [Test]
+        public void A_bar_naming_a_tap_producer_no_scope_declares_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", BarJson.Replace(@"""tap"": ""roadie""", @"""tap"": ""ghost"""));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("ghost", thrown.Message);
+        }
+
+        // ---- the two formula selectors ----
+
+        // The owned-count factor with all three of its fields, and a payout
+        // naming which of a currency's totals it reads (12.2/12.5).
+        private const string FormulaJson = @"{
+            ""type"": ""ChapterDefinition"",
+            ""id"": ""ch1"",
+            ""displayName"": ""The Garage"",
+            ""currencies"": [{ ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] }],
+            ""generators"": [
+                {
+                    ""id"": ""amp"",
+                    ""displayName"": ""Practice Amp"",
+                    ""availableWhen"": { ""type"": ""Always"" },
+                    ""costCurrency"": ""cash"",
+                    ""baseCost"": 60,
+                    ""growth"": 1.15,
+                    ""produces"": [{ ""currency"": ""cash"", ""stat"": ""rate"", ""value"": 0.5 }]
+                }
+            ],
+            ""modifiers"": [
+                {
+                    ""id"": ""economies"",
+                    ""displayName"": ""Economies Of Scale"",
+                    ""effects"": [
+                        {
+                            ""target"": ""amp"",
+                            ""stat"": ""rate"",
+                            ""formula"": {
+                                ""type"": ""LinearOnOwnedCount"",
+                                ""generator"": ""amp"",
+                                ""coefficient"": 0.1,
+                                ""purchasedOnly"": true
+                            }
+                        }
+                    ]
+                }
+            ],
+            ""permanentModifiers"": [""economies""],
+            ""triggers"": [
+                {
+                    ""id"": ""payday"",
+                    ""condition"": { ""type"": ""Always"" },
+                    ""actions"": [
+                        {
+                            ""type"": ""AddCurrency"",
+                            ""currencies"": [""cash""],
+                            ""formula"": {
+                                ""type"": ""RootCurveFormula"",
+                                ""currency"": ""cash"",
+                                ""reads"": ""Lifetime"",
+                                ""divisor"": 5,
+                                ""exponent"": 0.5
+                            }
+                        }
+                    ]
+                }
+            ]
+        }";
+
+        [Test]
+        public void An_owned_count_formula_and_a_payout_selector_import()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", FormulaJson);
+
+            Import();
+
+            var amp = Load<GeneratorDefinition>("ch1/Generators/amp.asset");
+            var economies = Load<ModifierDefinition>("ch1/Modifiers/economies.asset");
+            var formula = (LinearOnOwnedCount)economies.effects[0].formula;
+            Assert.AreSame(amp, formula.generator, "the reference is the asset, not a copy");
+            Assert.AreEqual((BigNumber)0.1, formula.coefficient);
+            Assert.IsTrue(formula.purchasedOnly);
+
+            var payday = Load<TriggerDefinition>("ch1/Triggers/payday.asset");
+            var payout = (RootCurveFormula)((AddCurrency)payday.actions.Single()).formula;
+            Assert.AreEqual(PayoutTotal.Lifetime, payout.reads, "read by name");
+        }
+
+        [Test]
+        public void A_payout_naming_no_such_total_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", FormulaJson.Replace(@"""reads"": ""Lifetime""", @"""reads"": ""Everything"""));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("Everything", thrown.Message);
+        }
+
+        [Test]
+        public void An_owned_count_formula_naming_no_such_generator_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", FormulaJson.Replace(@"""generator"": ""amp""", @"""generator"": ""ghost"""));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("ghost", thrown.Message);
+        }
+
         [Test]
         public void An_ordinary_number_lands_exactly()
         {

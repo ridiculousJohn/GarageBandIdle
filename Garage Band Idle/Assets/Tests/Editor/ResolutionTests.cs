@@ -731,6 +731,134 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(2, Producer.GetMultiplier(tree.Ctx(tree.Tier1), Stage1(tree.Tier1, tree.PracticeAmp.produces, tree.Cash, Stat.Rate)), "two stacks");
         }
 
+        // A generator nothing produces from, plus a permanent CHAPTER modifier
+        // carrying the owned-count factor over the amp's cash rate. The count
+        // lives a level below the modifier, which is what makes the origin
+        // chain visible: rebased to its own node the chapter reads zero.
+        private static LinearOnOwnedCount DeclareOwnedCountScale(TestTree tree, double coefficient)
+        {
+            var crew = TestTree.MakeDefinition<GeneratorDefinition>("crew");
+            crew.availableWhen = new Always();
+            crew.costCurrency = tree.Cash;
+            crew.baseCost = 10;
+            crew.growth = 1.15;
+            tree.Tier1Def.generators.Add(crew);
+
+            var formula = new LinearOnOwnedCount { generator = crew, coefficient = coefficient };
+            var scale = TestTree.MakeDefinition<ModifierDefinition>("crew_scale");
+            scale.effects.Add(new Effect { target = "practice_amp", stat = Stat.Rate, formula = formula });
+            tree.Ch1Def.modifiers.Add(scale);
+            tree.Ch1Def.permanentModifiers.Add(scale);
+            tree.Rebuild();
+            return formula;
+        }
+
+        [Test]
+        public void An_owned_count_formula_reads_purchased_plus_granted_from_the_origins_chain()
+        {
+            var tree = new TestTree();
+            DeclareOwnedCountScale(tree, 0.1);
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+            tree.Tier1.generatorCounts["crew"] = 2;
+            tree.Tier1.grantedCounts["crew"] = 0.5;
+
+            // 1 + 0.1 x 2.5, on a count the TIER holds and a modifier the
+            // chapter declares - a formula computes against the gather origin.
+            AssertClose(0.5 * 1.25, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
+        }
+
+        [Test]
+        public void An_owned_count_formula_reading_purchased_only_ignores_the_granted_half()
+        {
+            var tree = new TestTree();
+            var formula = DeclareOwnedCountScale(tree, 0.1);
+            formula.purchasedOnly = true;
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+            tree.Tier1.generatorCounts["crew"] = 2;
+            tree.Tier1.grantedCounts["crew"] = 0.5;
+
+            // 1 + 0.1 x 2: purchased and granted are separate facts, and the
+            // flag picks one of them rather than rounding the other away.
+            AssertClose(0.5 * 1.2, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "cash rate");
+        }
+
+        // ---- the autobuy switch (12.2) ----
+
+        // A carrier naming the autobuy coordinate, granted at tier1 so a test
+        // turns it live by writing one stack.
+        private static ModifierDefinition DeclareAutoBuy(TestTree tree, string id, string target,
+                                                         double multiplier = 1)
+        {
+            var carrier = TestTree.MakeDefinition<ModifierDefinition>(id);
+            carrier.effects.Add(new Effect { target = target, stat = Stat.AutoBuy, multiplier = multiplier });
+            tree.Tier1Def.modifiers.Add(carrier);
+            return carrier;
+        }
+
+        private static bool Switch(TestTree tree, GeneratorDefinition generator) =>
+            Producer.GetSwitch(tree.Ctx(tree.Tier1), tree.Tier1.Link<StatPlans>(generator).AutoBuy);
+
+        [Test]
+        public void An_autobuy_effect_on_a_tag_switches_on_the_generators_carrying_it_and_no_others()
+        {
+            var tree = new TestTree();
+            var loose = TestTree.MakeDefinition<GeneratorDefinition>("crew");   // no gear tag
+            loose.availableWhen = new Always();
+            loose.costCurrency = tree.Cash;
+            loose.baseCost = 10;
+            loose.growth = 1.15;
+            tree.Tier1Def.generators.Add(loose);
+            DeclareAutoBuy(tree, "hands_free", "gear");
+            tree.Rebuild();
+
+            Assert.IsFalse(Switch(tree, tree.PracticeAmp), "the carrier is not live yet");
+
+            tree.Tier1.modifierStacks["hands_free"] = 1;
+
+            // The multiplier is not read: a factor of 1 is a no-op as a factor
+            // and still a yes as a switch, which is the whole of what it is.
+            Assert.IsTrue(Switch(tree, tree.PracticeAmp), "the amp carries gear");
+            Assert.IsTrue(Switch(tree, tree.Drummer), "and so does the drummer");
+            Assert.IsFalse(Switch(tree, loose), "the untagged generator is nobody's coordinate");
+        }
+
+        [Test]
+        public void A_wildcard_autobuy_effect_switches_every_generator_on()
+        {
+            var tree = new TestTree();
+            DeclareAutoBuy(tree, "hands_free", null);
+            tree.Rebuild();
+            tree.Tier1.modifierStacks["hands_free"] = 1;
+
+            Assert.IsTrue(Switch(tree, tree.PracticeAmp), "amp");
+            Assert.IsTrue(Switch(tree, tree.Drummer), "drummer");
+        }
+
+        [Test]
+        public void A_handicap_on_the_autobuy_coordinate_switches_it_off_while_the_record_stands()
+        {
+            var tree = new TestTree();
+            DeclareAutoBuy(tree, "hands_free", "gear");
+            tree.TimedGig.handicaps.Add(new Effect { target = "gear", stat = Stat.AutoBuy, multiplier = 0 });
+            tree.Rebuild();
+            tree.Tier1.modifierStacks["hands_free"] = 1;
+            Assert.IsTrue(Switch(tree, tree.PracticeAmp), "on before the record");
+
+            tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig" };
+            Assert.IsFalse(Switch(tree, tree.PracticeAmp), "the design's automation disabled");
+
+            tree.Tier1.activeEvent = null;
+            Assert.IsTrue(Switch(tree, tree.PracticeAmp), "and back on when the record goes");
+        }
+
+        [Test]
+        public void The_autobuy_switch_is_off_with_nothing_authored()
+        {
+            var tree = new TestTree();
+
+            Assert.IsFalse(Switch(tree, tree.PracticeAmp), "no effect names the coordinate");
+        }
+
         [Test]
         public void A_chapters_permanent_modifier_applies_on_its_own_chain_and_not_a_siblings()
         {
@@ -922,7 +1050,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bar.fillCurrency = tree.Rehearsal;
             bar.fillAmount = 10;
             bar.fillRate = 1;
-            bar.repeating = true;
+            bar.repeatWhen = new Always();
             bar.perFill.Add(new PerFillEntry
             {
                 effect = new Effect { target = "practice_amp", stat = Stat.Rate, multiplier = multiplier },

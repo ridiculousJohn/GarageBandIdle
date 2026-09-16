@@ -45,6 +45,33 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         }
     }
 
+    // 1 + coefficient * the generator's count, read outward from the gather
+    // origin - the source scope in stage 1, the target's home in stage 2 - like
+    // every count read (design doc 12.2). A generator that multiplies another by
+    // how many of it are owned is a permanent modifier carrying this; the flag
+    // picks the purchased count alone or purchased plus granted, since the two
+    // are separate facts.
+    [Serializable]
+    public class LinearOnOwnedCount : MultiplierFormula
+    {
+        public GeneratorDefinition generator;
+        public BigNumber coefficient;
+        public bool purchasedOnly;
+
+        public override BigNumber Compute(GameContext ctx) =>
+            BigNumber.One + coefficient * (purchasedOnly
+                ? (BigNumber)ctx.GetPurchasedCount(generator.Id)
+                : ctx.GetOwnedCount(generator.Id));
+
+        public override void Validate(ValidationContext ctx)
+        {
+            ctx.RequireOnChain(generator, "LinearOnOwnedCount");
+            if (coefficient < BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"LinearOnOwnedCount coefficient is {coefficient} - a formula factor never shrinks with the fact it derives from.");
+        }
+    }
+
     // The product over chapters of (1 + perRoadie * stationed there) - additive
     // within a chapter, multiplicative across them (design doc 8.2). The
     // concavity is the point: the next Roadie is worth more in a chapter that

@@ -1482,6 +1482,39 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
+        public void OwnedCountFormula_NegativeCoefficient_Error()
+        {
+            var f = new ValidatorFixture();
+            var scale = TestTree.MakeDefinition<ModifierDefinition>("amp_scale");
+            scale.effects.Add(new Effect { target = "cash", stat = Stat.Rate,
+                formula = new LinearOnOwnedCount { generator = f.Amp, coefficient = -0.1 } });
+            f.Tier1.modifiers.Add(scale);
+            f.Tier1.permanentModifiers.Add(scale);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never shrinks");
+        }
+
+        [Test]
+        public void OwnedCountFormula_GeneratorOffTheChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            var theirs = TestTree.MakeDefinition<GeneratorDefinition>("their_amp");
+            theirs.availableWhen = new Always();
+            theirs.costCurrency = sibling.Cash;
+            theirs.baseCost = 60;
+            theirs.growth = 1.15;
+            theirs.produces.Add(TestTree.Entry(sibling.Cash, Stat.Rate, 0.5));
+            sibling.Tier2.generators.Add(theirs);
+
+            var scale = TestTree.MakeDefinition<ModifierDefinition>("amp_scale");
+            scale.effects.Add(new Effect { target = "cash", stat = Stat.Rate,
+                formula = new LinearOnOwnedCount { generator = theirs, coefficient = 0.1 } });
+            f.Tier1.modifiers.Add(scale);
+            f.Tier1.permanentModifiers.Add(scale);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "LinearOnOwnedCount");
+        }
+
+        [Test]
         public void RoadieBoost_NegativePerRoadie_Error()
         {
             var f = new ValidatorFixture();
@@ -1833,7 +1866,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Bar_NullPerFillEntry_Error()
         {
             var f = new ValidatorFixture();
-            f.Cover1.repeating = true;
+            f.Cover1.repeatWhen = new Always();
             f.Cover1.perFill.Add(null);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "null perFill entry");
         }
@@ -1845,6 +1878,42 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Cover1.onComplete.Add(new SetFlag { flagId = "ghost_flag" });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
                 "SetFlag names flag 'ghost_flag'");
+        }
+
+        // The repeat is a condition judged at the bar's home (12.7), so its
+        // operands take the reach rules the gate's do.
+        [Test]
+        public void Bar_RepeatWhenIsJudgedInTheDeclaringScope_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = f.AddSiblingChapter();
+            f.Cover1.repeatWhen = new CurrencyAtLeast { currency = sibling.Cash, threshold = 1 };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "CurrencyAtLeast");
+        }
+
+        // The cascade scales by fillCount, and a bar that can complete more than
+        // once is exactly the bar that acquires one - so a present repeatWhen
+        // makes the same perFill entry live rather than unreachable.
+        [Test]
+        public void Bar_PerFillOnABarWithARepeatWhen_ReportsNoInertOperand()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.repeatWhen = new Always();
+            f.Cover1.perFill.Add(new PerFillEntry { effect = new Effect { target = "fans", stat = Stat.Rate, multiplier = 1.1 } });
+            AssertNoFinding(f.Run(), ValidationCheck.InertOperand);
+        }
+
+        // The tap producer is an ordinary reference resolved outward from the
+        // bar's own scope (12.11), so a sibling tier's producer is off the chain.
+        [Test]
+        public void Bar_TapProducerOffTheDeclaringChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var theirs = TestTree.MakeDefinition<ProducerDefinition>("their_tap");
+            theirs.produces.Add(TestTree.Entry(f.Ch1Records, Stat.Yield, 1));
+            f.Tier1b.producers.Add(theirs);
+            f.Cover1.tap = theirs;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "tap addresses 'their_tap'");
         }
 
         [Test]

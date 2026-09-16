@@ -20,7 +20,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void AddCurrency_pays_every_target_from_one_evaluation()
         {
             var tree = new TestTree();
+            // A payout reads what the round EARNED by default (12.5), and the
+            // gates read the balance, so a run standing at 50 carries both.
             tree.Tier1.balances["fans"] = 50;
+            tree.Tier1.earnedTotals["fans"] = 50;
             // The formula reads fans, and fans is ALSO the first target: with one
             // evaluation both targets get 50; per-target re-evaluation would pay
             // records 100 after the first deposit doubles fans.
@@ -317,6 +320,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             };
             var fire = tree.Author(tree.Ch1Def, new ExecuteRung { tier = tree.Tier1Def });
             tree.Tier1.balances["fans"] = 60;
+            tree.Tier1.earnedTotals["fans"] = 60;   // what the payout reads
 
             fire.Execute(tree.Ctx(tree.Ch1));
 
@@ -386,6 +390,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Rebuild();   // both rungs were authored after construction
             tree.Ch1.balances["ch1_records"] = 29;
             tree.Tier1.balances["fans"] = 60;
+            tree.Tier1.earnedTotals["fans"] = 60;   // what the payout reads
 
             Assert.IsFalse(capstone.TryExecute(tree.Ctx(tree.Ch1)));            // gate unmet at 29
 

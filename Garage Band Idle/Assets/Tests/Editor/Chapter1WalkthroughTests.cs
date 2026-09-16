@@ -191,7 +191,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 // The two counters track together through a first playthrough:
                 // one AddCurrency evaluation pays both.
                 Ch1.balances[Ch1Records.Id] = records;
+                // A deposit writes the balance and the earned total together
+                // (12.3), and the album reads what the round earned (12.5).
                 Tier1.balances[Fans.Id] = fans;
+                Tier1.earnedTotals[Fans.Id] = fans;
                 Tier1.barProgress[Cover1.Id] = Cover1.fillAmount;
                 Tier1.flags.Add("fans_revealed");
             }

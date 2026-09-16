@@ -49,6 +49,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static TestTree Populate(TestTree tree)
         {
+            tree.Tier1.lifetimeTotals["cash"] = 900;   // rounds before this one, which no reset cleared
             tree.Tier1.balances["cash"] = 123.45;
             tree.Tier1.earnedTotals["cash"] = 300;
             tree.Tier1.balances["fans"] = BigNumber.FromMantissaExponent(1.5, 320);   // beyond double range
@@ -61,7 +62,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // A fill count is a REPEATING bar's fact and Chapter 1 authors no
             // repeating bar, so a round trip that carries one says so on both
             // sides of the save.
-            tree.Cover1.repeating = true;
+            tree.Cover1.repeatWhen = new Always();
             tree.Tier1.fillCounts["cover_1"] = 2;
             tree.Tier1.activeBars["learn_covers"] = new System.Collections.Generic.HashSet<string> { "cover_1" };
             tree.Tier1.modifierStacks["gj_tap_1"] = 2;
@@ -89,7 +90,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var json = SaveSystem.Serialize(saved.Root);
 
             var fresh = new TestTree();
-            fresh.Cover1.repeating = true;
+            fresh.Cover1.repeatWhen = new Always();
             fresh.RootDef.declaredTimers.Add("encore_timer");
             Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.Content, out var root));
 
@@ -97,6 +98,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = (ChapterScopeState)TestNavigation.Node(root, fresh.Ch1Def);
             Assert.AreEqual((BigNumber)123.45, tier1.balances["cash"]);
             Assert.AreEqual((BigNumber)300, tier1.earnedTotals["cash"]);
+            Assert.AreEqual((BigNumber)900, tier1.lifetimeTotals["cash"]);
             Assert.AreEqual(BigNumber.FromMantissaExponent(1.5, 320), tier1.balances["fans"]);
             Assert.AreEqual(3, tier1.generatorCounts["drummer"]);
             Assert.AreEqual((BigNumber)2.5, tier1.grantedCounts["drummer"]);
@@ -472,6 +474,55 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)3, new GameContext(tier1, loaded.Now).GetOwnedCount("drummer"));
         }
 
+        // A save written before the lifetime total existed carries no block, so
+        // the earned total is the best figure it holds and each declared
+        // currency starts its lifetime there (12.3). No schema move is needed:
+        // a missing block reads as this, and nothing else changed shape.
+        [Test]
+        public void A_save_carrying_no_lifetime_totals_reads_them_as_the_earned_total()
+        {
+            var saved = new TestTree();
+            saved.Tier1.earnedTotals["cash"] = 300;
+            saved.Tier1.balances["cash"] = 100;
+            var envelope = Newtonsoft.Json.Linq.JObject.Parse(SaveSystem.Serialize(saved.Root));
+            var payload = Newtonsoft.Json.Linq.JToken.Parse(envelope.Value<string>("payload"));
+            var maps = new List<Newtonsoft.Json.Linq.JToken>(payload.SelectTokens("$..lifetimeTotals"));
+            Assert.IsNotEmpty(maps, "the payload carries the block this test removes");
+            foreach (var map in maps)
+                map.Parent.Remove();
+            envelope["payload"] = payload.ToString(Newtonsoft.Json.Formatting.None);
+
+            Assert.IsTrue(Load(Rechecksum(envelope), out var root, out var loaded));
+
+            var tier1 = TestNavigation.Node(root, loaded.Tier1Def);
+            var ctx = new GameContext(tier1, loaded.Now);
+            Assert.AreEqual((BigNumber)300, ctx.GetLifetimeTotal("cash"), "the earned total, not the balance");
+            Assert.AreEqual(BigNumber.Zero, ctx.GetLifetimeTotal("fans"), "a currency that earned nothing");
+        }
+
+        // The lifetime total takes the filter every other keyed fact takes: a
+        // currency this scope does not declare goes, and so does a negative,
+        // which no sum of deposits can ever reach. Zero is a real total.
+        [Test]
+        public void An_undeclared_or_negative_lifetime_total_is_dropped_and_a_zero_is_kept()
+        {
+            var saved = new TestTree();
+            saved.Tier1.lifetimeTotals["cash"] = 0;
+            saved.Tier1.lifetimeTotals["fans"] = -1;
+            saved.Tier1.lifetimeTotals["ghost"] = 5;
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("lifetime total 'fans'"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("lifetime total 'ghost' is not declared"));
+            Assert.IsTrue(Load(json, out var root, out var loaded));
+
+            var tier1 = TestNavigation.Node(root, loaded.Tier1Def);
+            Assert.AreEqual(BigNumber.Zero, tier1.lifetimeTotals["cash"], "zero is legal and kept");
+            Assert.IsFalse(tier1.lifetimeTotals.ContainsKey("ghost"), "tier1 declares no such currency");
+            Assert.AreEqual(BigNumber.Zero, tier1.lifetimeTotals["fans"],
+                "the tampered value went, leaving the zero the build seeded");
+        }
+
         // A record's id is a TIMER's, so it takes the rule the stacks take: one
         // no scope on the chain declares can never be read and is dropped. The
         // declaration has to stand on the tree the LOAD reads, which is the
@@ -541,11 +592,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_fill_count_belongs_only_to_a_repeating_bar()
         {
             var saved = new TestTree();
-            saved.Tier1.fillCounts["cover_1"] = 2;                    // cover_1 is non-repeating
+            saved.Tier1.fillCounts["cover_1"] = 2;                    // cover_1 carries no repeatWhen
             saved.Tier1.fillCounts["ghost_bar"] = 1;
             var json = SaveSystem.Serialize(saved.Root);
 
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cover_1' names a non-repeating bar"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'cover_1' names a bar that completes once"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not declared"));
             Assert.IsTrue(Load(json, out var root, out var loaded));
 

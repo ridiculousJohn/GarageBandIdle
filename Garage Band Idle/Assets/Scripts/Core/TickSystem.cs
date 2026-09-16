@@ -33,8 +33,44 @@ namespace RidiculousGaming.GarageBandIdle
             var tickStartUtc = tickEndUtc.AddTicks(-(long)Math.Round(realSeconds * TimeSpan.TicksPerSecond));
             foreach (var (start, end) in Segments(root, foregroundChapter, tickStartUtc, tickEndUtc))
                 RunSegment(root, foregroundChapter, config, start, end, report);
+            AutoBuy(root, foregroundChapter, tickEndUtc);
             PruneExpiredBuffs(root, foregroundChapter, tickEndUtc);
             return report;
+        }
+
+        // The tick's one purchase phase (12.9), after every segment so the bars
+        // have drunk before anything is spent: for each generator in the swept
+        // set - root, then the foreground subtree in tree order, each scope's
+        // generators in declaration order - whose autobuy switch is on, buy the
+        // largest affordable count through the same path the row's button
+        // takes, so the sweep at the close sees the buys and a refusal is an
+        // ordinary no-op. Every tick is the only rate; nothing is timed.
+        private static void AutoBuy(RootScopeState root, ChapterScopeState foregroundChapter, DateTime tickEndUtc)
+        {
+            Visit(root);
+            Walk(foregroundChapter);
+
+            void Walk(ScopeState node)
+            {
+                Visit(node);
+                foreach (var child in node.Children)
+                    Walk(child);
+            }
+
+            void Visit(ScopeState node)
+            {
+                foreach (var generator in node.Definition.generators)
+                {
+                    if (generator == null)
+                        continue;
+                    var ctx = new GameContext(node, tickEndUtc);
+                    if (!Producer.GetSwitch(ctx, node.Link<StatPlans>(generator).AutoBuy))
+                        continue;
+                    var count = Purchasing.MaxAffordable(ctx, generator);
+                    if (count >= 1)
+                        Purchasing.TryBuy(ctx, generator, count);
+                }
+            }
         }
 
         // The consecutive segments of [startUtc, endUtc], cut at every boundary

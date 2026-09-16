@@ -55,6 +55,11 @@ namespace RidiculousGaming.GarageBandIdle
 
         public BigNumber GetEarnedTotal(string currencyId) => HomeOf(currencyId).earnedTotals[currencyId];
 
+        // Every deposit ever made at the home, across rounds (design doc 12.3):
+        // the one economy fact a reset leaves standing, which is why it sits
+        // beside the payload rather than in it.
+        public BigNumber GetLifetimeTotal(string currencyId) => HomeOf(currencyId).lifetimeTotals[currencyId];
+
         // The count PRICES read: a granted copy never raises the next unit's
         // cost (design doc 12.2).
         public int GetPurchasedCount(string generatorId)
@@ -200,11 +205,13 @@ namespace RidiculousGaming.GarageBandIdle
         // resolve time, once, and the commit honors what it answered rather
         // than re-asking against state the commit itself is moving.
         //
-        // Deposits at the currency's home: balance and earned total together.
-        // A deposit is a grant; spending moves the balance alone. A negative
-        // amount would drive an earned total DOWNWARD, and section 2's
-        // strobe-proofing - a threshold met once stays met - stands on that
-        // never happening; authored negatives are refused at load.
+        // Deposits at the currency's home: balance, earned total and lifetime
+        // total together. A deposit is a grant; spending moves the balance
+        // alone, and a reset clears the first two while the lifetime total
+        // counts across rounds (12.3). A negative amount would drive an earned
+        // total DOWNWARD, and section 2's strobe-proofing - a threshold met once
+        // stays met - stands on that never happening; authored negatives are
+        // refused at load.
         public void DepositResolved(string currencyId, BigNumber amount)
         {
             if (amount < BigNumber.Zero)
@@ -213,6 +220,7 @@ namespace RidiculousGaming.GarageBandIdle
             var home = HomeOf(currencyId);
             home.balances[currencyId] += amount;
             home.earnedTotals[currencyId] += amount;
+            home.lifetimeTotals[currencyId] += amount;
         }
 
         // A payment into a generator's granted count, written at the generator's

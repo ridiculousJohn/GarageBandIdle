@@ -67,6 +67,23 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Root.Add(fill);
             Root.Add(progressLabel);
             Root.Add(selectButton);
+
+            // The row is the tap target when the bar names a producer (12.11):
+            // the same command the Jam button issues, on a fresh context per
+            // press, since the command is a clock sample. The select button's
+            // own click is never also a tap - choosing is the button's and
+            // paying is the row's, so a click on it or inside it is ignored.
+            if (bar.tap != null)
+            {
+                Root.AddToClassList("bar-tappable");
+                Root.RegisterCallback<ClickEvent>(evt =>
+                {
+                    if (evt.target is VisualElement clicked
+                        && (clicked == selectButton || selectButton.Contains(clicked)))
+                        return;
+                    this.session.FireProducer(Context(), this.bar.tap);
+                });
+            }
         }
 
         // The list's filter, asked with the list's own context: a list module's
@@ -95,7 +112,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             descriptionLabel.style.display = string.IsNullOrEmpty(bar.description)
                 ? DisplayStyle.None
                 : DisplayStyle.Flex;
-            var complete = !bar.repeating && truth >= bar.fillAmount;
+            var complete = bar.repeatWhen == null && truth >= bar.fillAmount;
             var active = scope.activeBars.TryGetValue(group.Id, out var selected) && selected.Contains(bar.Id);
             selectButton.text = complete ? "Done" : active ? "Selected" : "Select";
             selectButton.SetEnabled(!complete && !active);

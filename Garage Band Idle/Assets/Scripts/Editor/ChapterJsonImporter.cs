@@ -540,7 +540,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                         : Resolve<CurrencyDefinition>(build, scope, barDto.fillCurrency, "fillCurrency");
                     bar.fillAmount = barDto.fillAmount;
                     bar.fillRate = barDto.fillRate;
-                    bar.repeating = barDto.repeating;
+                    bar.repeatWhen = BuildCondition(build, scope, barDto.repeatWhen);
+                    bar.tap = string.IsNullOrEmpty(barDto.tap)
+                        ? null
+                        : Resolve<ProducerDefinition>(build, scope, barDto.tap, "tap");
                     bar.availableWhen = BuildCondition(build, scope, barDto.availableWhen);
                     bar.onComplete = barDto.onComplete.Select(a => BuildAction(build, scope, a)).ToList();
                     bar.perFill = barDto.perFill
@@ -793,6 +796,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             RootCurveFormulaDto d => new RootCurveFormula
             {
                 currency = Resolve<CurrencyDefinition>(build, scope, d.currency, "RootCurveFormula"),
+                reads = d.reads,
                 divisor = d.divisor,
                 exponent = d.exponent,
             },
@@ -804,6 +808,12 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             null => null,
             LinearOnBalanceDto d => new LinearOnBalance
                 { currency = Resolve<CurrencyDefinition>(build, scope, d.currency, "LinearOnBalance"), coefficient = d.coefficient },
+            LinearOnOwnedCountDto d => new LinearOnOwnedCount
+            {
+                generator = Resolve<GeneratorDefinition>(build, scope, d.generator, "LinearOnOwnedCount"),
+                coefficient = d.coefficient,
+                purchasedOnly = d.purchasedOnly,
+            },
             RoadieTotalBoostDto d => new RoadieTotalBoost { perRoadie = d.perRoadie },
             RoadieActiveBoostDto d => new RoadieActiveBoost { perRoadie = d.perRoadie },
             _ => throw new ContentImportException($"multiplier formula kind '{dto.type}' has no builder."),

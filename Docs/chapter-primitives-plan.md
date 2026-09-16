@@ -153,6 +153,14 @@ Recorded so no one builds them again.
     root's `idle_base` carries `{stat: count, x0.5}` beside its rate line. The tick records a granted
     deposit like a currency's, so the row's count interpolates between ticks.
 
+20. (2026-09-16, D-H) The tap producer is authored on the bar (`tap`), since a row is per bar and
+    the one bar-group module renders every bar of its scope; the select button stays the
+    activation, the tap pays.
+21. (2026-09-16, D-H) The `repeating` bool is gone from the JSON too: `repeatWhen: {type: Always}`
+    is how a repeating bar is authored, one spelling and no conflict rule.
+22. (2026-09-16, D-H) Autobuy runs once at the tick's end, after every segment, so the bars have
+    drunk before anything is spent; then the sweep.
+
 ## The changes
 
 Ordered by what a Ctrl C-shaped chapter 2 hits first. A, B and C are its first day of authoring.
@@ -234,10 +242,11 @@ Ordered by what a Ctrl C-shaped chapter 2 hits first. A, B and C are its first d
   what the covers and `BarsCompleted` want. Present and true is today's repeating bar. Present and
   false is the manual team: on completion it pays, returns to zero and is removed from the active
   set; `SetActiveBars` is how the player runs it again.
-- Importer: `repeating: true` authors `Always`; `false` or missing authors nothing. Chapter 1's
-  assets reimport to the same behavior.
-- Validation: `repeatWhen` follows the gate rules for reach; a repeating bar with an empty
-  `onComplete` and no `perFill` stays the existing warning.
+- Importer: `repeatWhen` is a condition block and the `repeating` key is gone (decision 21), so a
+  document still authoring it is refused as an unknown key. Chapter 1 authors no repeating bar, so
+  its assets reimport to the same behavior.
+- Validation: `repeatWhen` follows the gate rules for reach; `perFill` on a bar with no `repeatWhen`
+  is the error it was on a non-repeating one.
 
 ### F. Autobuy (decision 12; 12.2, 12.9)
 
@@ -246,13 +255,16 @@ Ordered by what a Ctrl C-shaped chapter 2 hits first. A, B and C are its first d
   handicap on it is. An upgrade's effect `{target: line_generators, stat: autobuy}` turns it on for
   every generator carrying the tag; an event handicap on the same coordinate turns it off for the
   record's life. Nothing fires: the tick reads it.
-- A new tick phase after production and before the trigger sweep: for every generator on the
-  foreground chain whose autobuy reads yes, `Purchasing.TryBuy(ctx, generator,
+- The tick's one purchase phase, once at the tick's end after every segment (decision 22): for
+  every generator in the swept set whose autobuy reads yes, `Purchasing.TryBuy(ctx, generator,
   MaxAffordable(ctx, generator))` when that count is at least one. The same purchase path the
-  button uses, so the sweep at the transaction's close sees the buys, and a refused buy is a no-op.
-- Ordering within the phase is declaration order on the chain, root outward, so a chapter that
-  wants Variables bought before Functions declares them so. Ctrl C's per-second and five-per-second
-  tiers are not built: every tick is the only rate.
+  button uses, so the sweep at the transaction's close sees the buys, and a refused buy is a no-op;
+  the bars have drunk before anything is spent. The switch is read off the plan's links' liveness
+  (`EffectLink.Live`, `Producer.GetSwitch`): the multiplier on an autobuy effect is not read.
+- Ordering within the phase is the sweep's: root, then the foreground subtree in tree order, each
+  scope's generators in declaration order, so a chapter that wants Variables bought before
+  Functions declares them so. Ctrl C's per-second and five-per-second tiers are not built: every
+  tick is the only rate.
 - Outside: the payback-time threshold, and Work From Home's fastest-round offline simulation.
 
 ### G. Payout selector (decision 6; 12.5)
@@ -264,16 +276,18 @@ Ordered by what a Ctrl C-shaped chapter 2 hits first. A, B and C are its first d
 - `Lifetime` reads a per-currency running sum at the currency's home that every deposit adds to
   and no reset clears (decision 10). The reset today swaps the home's `ScopeFacts` payload so new
   fields clear by construction (12.3); the lifetime sum is the first fact that must NOT, so it is
-  kept in a second payload beside `facts` that `Reset` leaves alone and the save carries. Missing
-  in an old save reads as the earned total at load, the best figure the save holds. A condition
+  kept beside `facts` on the scope (`ScopeState.lifetimeTotals`, seeded once at build) that `Clear`
+  leaves alone and the save carries as its own block. Missing in an old save reads as the earned
+  total at load, the best figure the save holds; the schema version does not move. A condition
   over it, `LifetimeTotalAtLeast`, is one more kind when a gate wants it.
 
 ### H. Tapping a bar (sentence 12; 12.11)
 
-- The bar row module gains an optional producer attribute. When present the row is a tap target
-  issuing the same command the Jam button issues, `FireProducer` on that producer. The producer's
-  yield entry pays the bar's progress (C) for a time-fed bar, or the fill currency for a
-  currency-fed one, which chapter 1's Jam already does for Rehearsal.
+- The bar names the producer its row fires (`BarDefinition.tap`, decision 20), resolved outward
+  from the bar's scope and validated on its chain. When present the row is a tap target issuing the
+  same command the Jam button issues, `FireProducer` on that producer, on a click outside the
+  select button. The producer's yield entry pays the bar's progress (C) for a time-fed bar, or the
+  fill currency for a currency-fed one, which chapter 1's Jam already does for Rehearsal.
 - Nothing on the domain side beyond C.
 
 ### I. Debt (decisions 7 and 11)
@@ -340,4 +354,13 @@ the tick records granted deposits so the row's count interpolates, and the save'
 warning names a granted count. External review, same day: a payment landing inside a tick's
 settlement fired a non-repeating bar's crossing twice, since `SettleOnce` compared the snapshot with
 live progress; it compares the snapshot with its own fill, so each mover settles only its own
-crossing (one test). D, E, F, G, H open.
+crossing (one test).
+
+**D, E, F, G, H DONE 2026-09-16** - 878/878 green (+34: 34 added, 0 deleted), with decisions 20-22
+asked and ruled before the contract was written. Three fixture fixes after the first run, no runtime
+corrections: the walkthrough's run seeder wrote a fans balance without the earned total the album
+reads by default; an importer fixture named a flag `encore`, which collides with root's `encore`
+modifier on the chain (`DuplicateHome`); and two expected save warnings were listed against the
+dictionary's iteration order. The reimport rewrote the three cover assets (`repeatWhen` null and
+`tap` empty where `repeating: 0` was) and regenerated rids everywhere else. I (debt) stays deferred
+to the Van chapter.

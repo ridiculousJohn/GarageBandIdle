@@ -1320,14 +1320,30 @@ namespace RidiculousGaming.GarageBandIdle
                 bar.availableWhen.Validate(ctx);
             }
 
+            // Whether the bar goes again is a condition judged at its home
+            // (12.7), so its operands take the reach rules every other gate's
+            // do. Absent is the bar that fills once, which is not a finding.
+            if (bar.repeatWhen != null)
+            {
+                ctx.SetSite($"{site} repeatWhen");
+                bar.repeatWhen.Validate(ctx);
+            }
+
             ctx.SetSite(site);
+
+            // The producer a tap fires is an ordinary reference, so it resolves
+            // outward from the bar's own scope (12.11). Nothing checks that it
+            // pays this bar: a tap producer paying something else is authoring,
+            // not a fault.
+            if (bar.tap != null)
+                ctx.RequireOnChain(bar.tap, $"{site} tap");
 
             // The cascade count is fillCounts, which only a repeating bar ever
             // acquires (12.6's row is titled "Repeating bars"). A non-repeating
             // bar's completion leaves no derivable effect-fact, which is why its
             // reward is an AddModifier grant instead - so the authored effect
             // here is unreachable rather than merely inert.
-            if (!bar.repeating && bar.perFill.Count > 0)
+            if (bar.repeatWhen == null && bar.perFill.Count > 0)
                 ctx.AddError(ValidationCheck.InertOperand,
                     "perFill entries on a non-repeating bar: the cascade scales by fillCount, and only a repeating bar acquires one (12.6).");
 

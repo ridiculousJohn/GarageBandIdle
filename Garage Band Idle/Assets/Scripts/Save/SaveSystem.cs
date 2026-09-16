@@ -34,14 +34,15 @@ namespace RidiculousGaming.GarageBandIdle.Save
         private static readonly Dictionary<int, Func<JObject, JObject>> Migrations = new();
 
         // One node per scope: identity, the re-stamped-not-cleared timestamp
-        // (chapters only), and the complete mutable payload (design doc 12.3).
-        // The payload stays a raw token here and is read against the type the
-        // scope's position in the definition tree dictates - a save never names
-        // its own payload type.
+        // (chapters only), the lifetime totals a reset leaves standing, and the
+        // mutable payload (design doc 12.3). The payload stays a raw token here
+        // and is read against the type the scope's position in the definition
+        // tree dictates - a save never names its own payload type.
         private class SaveNode
         {
             public string scopeId;
             public DateTime lastActiveUtc;
+            public Dictionary<string, BigNumber> lifetimeTotals;    // null when the file carries no such block
             public JObject facts;
             public List<SaveNode> children = new();
         }
@@ -78,6 +79,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
             {
                 scopeId = state.ScopeId,
                 lastActiveUtc = state is ChapterScopeState chapter ? chapter.lastActiveUtc : default,
+                lifetimeTotals = state.lifetimeTotals,
                 facts = JObject.FromObject(state.facts, JsonSerializer.Create(MakeSettings())),
             };
             foreach (var child in state.Children)
@@ -177,6 +179,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 FilterToDeclared(state.facts, state);
                 FilterTreeScopedFacts(state.facts, state);
             }
+            ApplyLifetimeTotals(node, state);
             if (state is ChapterScopeState chapter)
                 chapter.lastActiveUtc = node.lastActiveUtc;
 
@@ -200,6 +203,32 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
             // A definition child with no saved node keeps its freshly built
             // state - content added since the save simply starts new.
+        }
+
+        // The lifetime totals sit beside the payload (12.3), so they arrive
+        // beside the facts and take the same filter every declared-id family
+        // takes: an undeclared key goes, and a negative one is tampering. Zero
+        // is legal and kept - a currency nothing has earned yet still has a
+        // lifetime total. A file carrying no block at all holds no better figure
+        // than the earned total, so that is what seeds it.
+        private static void ApplyLifetimeTotals(SaveNode node, ScopeState state)
+        {
+            var definition = state.Definition;
+            if (node.lifetimeTotals == null)
+            {
+                foreach (var currencyId in definition.currencyIds)
+                    state.lifetimeTotals[currencyId] = state.earnedTotals[currencyId];
+                return;
+            }
+            foreach (var pair in node.lifetimeTotals)
+            {
+                if (!definition.DeclaresCurrency(pair.Key))
+                    Debug.LogWarning($"SaveSystem: lifetime total '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
+                else if (pair.Value < BigNumber.Zero)
+                    Debug.LogWarning($"SaveSystem: lifetime total '{pair.Key}' is {pair.Value} - dropped.");
+                else
+                    state.lifetimeTotals[pair.Key] = pair.Value;
+            }
         }
 
         // Fills the payload the node already holds, whose type its own definition
@@ -416,8 +445,8 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 var bar = FindBar(definition, pair.Key);
                 if (bar == null)
                     Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
-                else if (!bar.repeating)
-                    Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' names a non-repeating bar, which acquires none - dropped.");
+                else if (bar.repeatWhen == null)
+                    Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' names a bar that completes once, which acquires none - dropped.");
                 else if (pair.Value <= 0)
                     Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' is {pair.Value} - dropped.");
                 else

@@ -102,6 +102,38 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
+        // A click is panel time: UI Toolkit dispatches an event through the
+        // panel an element is attached to, and the widgets here are built off
+        // one. The shipping PanelSettings under a UIDocument is the smallest
+        // real panel an EditMode test can stand up, so a row's own handler runs
+        // rather than a stand-in for it.
+        private sealed class PanelHost : IDisposable
+        {
+            private readonly GameObject host;
+
+            public PanelHost(VisualElement content)
+            {
+                var settings = AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/Settings/PanelSettings.asset");
+                Assert.IsNotNull(settings, "Assets/Settings/PanelSettings.asset is missing");
+                host = new GameObject("panel_host");
+                var document = host.AddComponent<UIDocument>();
+                document.panelSettings = settings;
+                Assert.IsNotNull(document.rootVisualElement, "the document built no panel to dispatch through");
+                document.rootVisualElement.Add(content);
+            }
+
+            public void Dispose() => UnityEngine.Object.DestroyImmediate(host);
+        }
+
+        // The press itself: a click carries the element it landed on, and the
+        // row's handler reads that target to tell a tap from a selection.
+        private static void Click(VisualElement target)
+        {
+            using var click = ClickEvent.GetPooled();
+            click.target = target;
+            target.SendEvent(click);
+        }
+
         // A pool drained faster than it fills: the negative slope is honest
         // motion and the display follows it down, but a balance is never
         // negative, so the extrapolation stops at zero instead of drawing a debt.
@@ -223,6 +255,73 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // line paying nothing is not a line.
             Assert.AreEqual("+1.00 cash, +2.00 practice_amp",
                 widget.Root.Q<Label>("yield").text);
+        }
+
+        // The row is the tap target when the bar names a producer (12.11): the
+        // press issues the same command the Jam button does, and the producer's
+        // yield entry naming the bar is how a tap adds time.
+        [Test]
+        public void ATapOnTheRowFiresTheBarsProducerAndTheSelectButtonDoesNot()
+        {
+            var fx = new Fixture(tree =>
+            {
+                var roadie = TestTree.MakeDefinition<Economy.ProducerDefinition>("roadie");
+                roadie.produces.Add(TestTree.Entry(tree.Cover1, Economy.Stat.Yield, 25));
+                tree.Tier1Def.producers.Add(roadie);
+                tree.Cover1.tap = roadie;
+            });
+
+            var widget = fx.Widget("bar_group", "BarGroup.uxml", null);
+            widget.Refresh();
+            var row = widget.Root.Q<VisualElement>(className: "bar-row");
+            Assert.IsTrue(row.ClassListContains("bar-tappable"), "the bar names a producer");
+            using var panel = new PanelHost(widget.Root);
+
+            Click(row.Q<Label>(className: "bar-name"));
+            AssertClose(25, fx.Tree.Tier1.barProgress["cover_1"].ToDouble(), "one firing of the tap producer");
+
+            // Choosing stays the button's and paying is the row's, so the
+            // button's own press is never also a tap.
+            Click(row.Q<Button>(className: "bar-select"));
+            AssertClose(25, fx.Tree.Tier1.barProgress["cover_1"].ToDouble(), "the select button paid nothing in");
+        }
+
+        [Test]
+        public void ARowWhoseBarNamesNoProducerIgnoresAClick()
+        {
+            var fx = new Fixture();
+
+            var widget = fx.Widget("bar_group", "BarGroup.uxml", null);
+            widget.Refresh();
+            var row = widget.Root.Q<VisualElement>(className: "bar-row");
+            Assert.IsFalse(row.ClassListContains("bar-tappable"), "cover_1 names no producer");
+            using var panel = new PanelHost(widget.Root);
+
+            Click(row.Q<Label>(className: "bar-name"));
+
+            Assert.IsFalse(fx.Tree.Tier1.barProgress.ContainsKey("cover_1"), "a row with no tap is not a tap target");
+        }
+
+        // A row reads completion off the repeat condition (12.7): the bar that
+        // fills once and stays full is finished, and one that goes again is
+        // between fills however full it stands.
+        [Test]
+        public void OnlyABarThatCompletesOnceEverPrintsDone()
+        {
+            var fx = new Fixture(tree => tree.Cover2.repeatWhen = new Always());
+            fx.Tree.Tier1.barProgress["cover_1"] = 100;
+            fx.Tree.Tier1.barProgress["cover_2"] = 300;
+
+            var widget = fx.Widget("bar_group", "BarGroup.uxml", null);
+            widget.Refresh();
+            var rows = widget.Root.Query<VisualElement>(className: "bar-row").ToList();
+            var once = rows[0].Q<Button>(className: "bar-select");
+            var loop = rows[1].Q<Button>(className: "bar-select");
+
+            Assert.AreEqual("Done", once.text, "cover_1 fills once and stays full");
+            Assert.IsFalse(once.enabledSelf, "and nothing reselects it");
+            Assert.AreEqual("Select", loop.text, "cover_2 goes again, so full is between fills");
+            Assert.IsTrue(loop.enabledSelf);
         }
 
         // A command leaves the tick's report standing: the tap's yield snaps in

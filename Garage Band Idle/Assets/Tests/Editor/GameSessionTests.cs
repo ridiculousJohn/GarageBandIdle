@@ -197,6 +197,32 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "the count crossed three inside the buy and the close's sweep latched it");
         }
 
+        // The tick's purchase phase goes through the same path the row's button
+        // takes (12.9), so the transaction's own close sweeps over what it
+        // bought rather than leaving the crossing for the next tick.
+        [Test]
+        public void A_ticks_autobuy_is_latched_by_the_sweep_at_the_transactions_close()
+        {
+            var tree = new TestTree();
+            var carrier = TestTree.MakeDefinition<ModifierDefinition>("hands_free");
+            carrier.effects.Add(new Effect { target = "practice_amp", stat = Stat.AutoBuy, multiplier = 1 });
+            tree.Tier1Def.modifiers.Add(carrier);
+            tree.Tier1Trigger.condition = new OwnedCountAtLeast { generator = tree.PracticeAmp, count = 3 };
+            tree.Tier1Trigger.actions.Add(new SetFlag { flagId = "fans_revealed" });
+            tree.Rebuild();
+            tree.Tier1.modifierStacks["hands_free"] = 1;
+            tree.Tier1.balances["cash"] = 1000;
+            tree.Tier1.earnedTotals["cash"] = 1000;                  // the amp's gate wants 100 earned
+            var session = new GameSession(tree.Root, Config());
+            session.SwitchChapter(tree.Ch1, tree.Now);               // the entry sweep sees no amps
+
+            session.Tick(1, tree.Now.AddSeconds(1));
+
+            Assert.AreEqual(8, tree.Tier1.generatorCounts["practice_amp"], "the largest count 1000 cash affords");
+            Assert.IsTrue(tree.Tier1.flags.Contains("fans_revealed"),
+                "the count crossed three inside the tick and the close's sweep latched it");
+        }
+
         [Test]
         public void Backgrounding_commits_and_refreshes_without_sweeping()
         {

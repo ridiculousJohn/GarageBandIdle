@@ -3,7 +3,7 @@
 ## The project
 - [Project layout and workflow](project-layout-and-workflow.md) - a rewind doesn't revert the filesystem; heredocs mangle C#; old commits are a dead architecture
 - [Design review revisions](design-review-revisions.md) - register of designs the twelve review passes DELETED, plus the deferred questions; the doc cannot show an absence
-- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when the editor is closed; the script is COPIED from this file, never retyped; process checks by PATH, foreground run, read the log while it runs; exit 0 proves nothing, grep for `error CS`; a reimport churns rids and trailing whitespace
+- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when the editor is closed; the script is COPIED from this file, never retyped; process checks by PATH and by PROJECT (another project's editor does not block), foreground run, read the log while it runs; exit 0 proves nothing, grep for `error CS`; a reimport churns rids and trailing whitespace
 - [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - names resolve outward from the acting scope; cross-chain aliasing is the feature; a node-kind restriction on an economy read ("only chapters") is a deviation even when my own plan wrote it
 - [Currency values are BigNumber](currency-values-are-bignumber.md) - anything the runtime could compute past a double, authored fields included; only counts and Pow's power are exempt
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20: venue assets and stationing caps deleted, payloads typed by authored kind, currencies by direct reference

@@ -81,7 +81,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bar.fillCurrency = coin;
             bar.fillAmount = 10;
             bar.fillRate = 1;
-            bar.repeating = true;
+            bar.repeatWhen = new Always();
             bar.perFill.Add(new PerFillEntry
             {
                 effect = new Effect { target = "amp", stat = Stat.Rate, multiplier = 11 },
@@ -142,7 +142,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bar.fillCurrency = coin;
             bar.fillAmount = 10;
             bar.fillRate = 1;
-            bar.repeating = true;
+            bar.repeatWhen = new Always();
             bar.perFill.Add(new PerFillEntry
             {
                 effect = new Effect { target = "amp", stat = Stat.Rate, multiplier = 7 },
@@ -256,7 +256,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 bar.fillCurrency = Coin;
                 bar.fillAmount = 10;
                 bar.fillRate = 1;
-                bar.repeating = true;
+                bar.repeatWhen = new Always();
                 bar.perFill.Add(new PerFillEntry
                 {
                     effect = new Effect { target = "amp", stat = Stat.Rate, multiplier = multiplier },
@@ -567,15 +567,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     Assert.AreSame(plans.Yield, plans.For(Stat.Yield));
                 }
 
-                // A generator holds the two plans it is ever asked for: the
-                // stage-2 coordinate of a payment into its count, and its price.
+                // A generator holds the three plans it is ever asked for: the
+                // stage-2 coordinate of a payment into its count, its price,
+                // and the autobuy switch the tick reads.
                 foreach (var generator in node.Definition.generators)
                 {
                     var plans = node.Link<StatPlans>(generator);
                     Assert.IsNotNull(plans.Count, $"{generator.Id} count stage");
                     Assert.IsNotNull(plans.Cost, $"{generator.Id} cost");
+                    Assert.IsNotNull(plans.AutoBuy, $"{generator.Id} autobuy");
                     Assert.AreSame(plans.Count, plans.For(Stat.Count));
                     Assert.AreSame(plans.Cost, plans.For(Stat.Cost));
+                    Assert.AreSame(plans.AutoBuy, plans.For(Stat.AutoBuy));
                 }
 
                 foreach (var upgrade in node.Definition.upgrades)

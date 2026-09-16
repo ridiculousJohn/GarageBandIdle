@@ -9,9 +9,10 @@ namespace RidiculousGaming.GarageBandIdle
     // is LIVE - purchased, stacked, filled, recorded, its appliesWhen holding -
     // and that is the whole of what this reads.
     //
-    // One operation, Factor: my fact at my node, or One. The liveness kind is
-    // the LINK's own, so no reader ever switches on a carrier kind and nothing
-    // but a link reads a carrier's fact.
+    // Two readings of that one fact: Live, whether it exists at my node, and
+    // Factor, my contribution to the product - the fact's own arithmetic, or
+    // One. The liveness kind is the LINK's own, so no reader ever switches on a
+    // carrier kind and nothing but a link reads a carrier's fact.
     public sealed class EffectLink
     {
         // The node whose fact decides this link. Not the gather's origin: the
@@ -52,14 +53,10 @@ namespace RidiculousGaming.GarageBandIdle
         // stack or the membership, which is the site validation judges it from.
         public BigNumber Factor(GameContext origin)
         {
+            if (!Live(origin))
+                return BigNumber.One;
             switch (Liveness)
             {
-                case LivenessKind.Upgrade:
-                    // The effects apply for as long as the latch exists (12.6).
-                    return Node.purchasedUpgrades.Contains(Carrier.Id)
-                        ? Producer.FactorOf(Effect, origin)
-                        : BigNumber.One;
-
                 case LivenessKind.Permanent:
                 {
                     // An implicit application count of 1, MERGED with this
@@ -67,8 +64,6 @@ namespace RidiculousGaming.GarageBandIdle
                     // through its own stacking kind: Replace means
                     // permanent-plus-granted is still one application (12.5).
                     var permanent = (ModifierDefinition)Carrier;
-                    if (!Applies(permanent, origin))
-                        return BigNumber.One;
                     Node.modifierStacks.TryGetValue(permanent.Id, out var stacks);
                     return Producer.Stacked(Producer.FactorOf(Effect, origin), 1 + stacks, permanent.stacking);
                 }
@@ -76,30 +71,57 @@ namespace RidiculousGaming.GarageBandIdle
                 case LivenessKind.Granted:
                 {
                     var granted = (ModifierDefinition)Carrier;
-                    if (!Node.modifierStacks.TryGetValue(granted.Id, out var count))
-                        return BigNumber.One;
-                    if (!Applies(granted, origin))
-                        return BigNumber.One;
+                    Node.modifierStacks.TryGetValue(granted.Id, out var count);
                     return Producer.Stacked(Producer.FactorOf(Effect, origin), count, granted.stacking);
                 }
 
                 case LivenessKind.Cascade:
                     // A completed fill applies the carrying entry's effect
                     // again, scaled by the entry's own growth kind (12.6/12.7).
-                    return Node.fillCounts.TryGetValue(Carrier.Id, out var fills) && fills > 0
-                        ? Producer.Grown(Producer.FactorOf(Effect, origin), fills, Growth)
-                        : BigNumber.One;
+                    Node.fillCounts.TryGetValue(Carrier.Id, out var fills);
+                    return Producer.Grown(Producer.FactorOf(Effect, origin), fills, Growth);
+
+                default:
+                    // An upgrade's latch and an event's record scale nothing:
+                    // there is one of each, so the live fact IS the factor
+                    // (12.6/12.8). A kind with no liveness never reaches here -
+                    // Live throws on one.
+                    return Producer.FactorOf(Effect, origin);
+            }
+        }
+
+        // Whether this link's fact exists at its node: the latch, the membership
+        // with its gate holding, a stack, a fill, the record. Factor is this
+        // answer times the effect's scaled factor, and the autobuy switch reads
+        // this answer alone (12.2).
+        public bool Live(GameContext origin)
+        {
+            switch (Liveness)
+            {
+                case LivenessKind.Upgrade:
+                    // The effects apply for as long as the latch exists (12.6).
+                    return Node.purchasedUpgrades.Contains(Carrier.Id);
+
+                case LivenessKind.Permanent:
+                    // The membership is the declaration itself, so the gate is
+                    // the whole of what can withdraw it (12.5).
+                    return Applies((ModifierDefinition)Carrier, origin);
+
+                case LivenessKind.Granted:
+                    return Node.modifierStacks.ContainsKey(Carrier.Id)
+                        && Applies((ModifierDefinition)Carrier, origin);
+
+                case LivenessKind.Cascade:
+                    return Node.fillCounts.TryGetValue(Carrier.Id, out var fills) && fills > 0;
 
                 case LivenessKind.Handicap:
                 {
                     // Handicaps ride on the record EXISTING - no expiry check,
                     // because a failed attempt sits one tap from a reset and
                     // briefly lifting the handicap there would be the worse
-                    // state (12.8). No count scaling: there is one record.
+                    // state (12.8).
                     var record = ((InteriorScopeState)Node).activeEvent;
-                    return record != null && record.eventId == Carrier.Id
-                        ? Producer.FactorOf(Effect, origin)
-                        : BigNumber.One;
+                    return record != null && record.eventId == Carrier.Id;
                 }
 
                 default:

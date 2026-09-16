@@ -891,9 +891,22 @@ no takers, which is also what a root buff looks like before any chapter carrying
 a currency's total under `rate` or `yield`; a bar's under `rate` - the same plan as its fill rate, so
 "10x this bar" speeds its own fill and what is paid into it alike - and `yield`; a generator's
 granted count under `count`, one stat however the grant arrives, so an effect naming a generator
-with `rate` keeps meaning that generator's own output. `cost` and `count` are effect addresses like
-`game_speed`: an effect may name them, a produces entry may not, and a wildcard reaches every
-generator's count or every price, as the paragraph above says.
+with `rate` keeps meaning that generator's own output. `cost`, `count` and `autobuy` are effect
+addresses like `game_speed`: an effect may name them, a produces entry may not, and a wildcard
+reaches every generator's count, every price or every generator's switch, as the paragraph above says.
+
+**`autobuy` is a switch, not a factor.** A generator's coordinate, homed where the generator is
+declared, read by the tick alone (12.9): on when an effect naming the generator - by id, tag or the
+wildcard - is live and no handicap on the same coordinate is, the multiplier unread. The upgrade
+that grants automation carries the effect and names its targets as its other effects do; the
+generator declares nothing; an event handicap on the coordinate is section 6's "automation
+disabled" for as long as its record exists.
+
+**A generator that multiplies another by how many of it are owned** is a permanent modifier carrying
+`LinearOnOwnedCount` - `1 + coefficient x count`, the count read outward from the gather origin like
+every count read, purchased alone or purchased plus granted by its `purchasedOnly` flag, since the
+two are separate facts. Add and multiply are the two shapes: a produces entry adds, an Effect
+multiplies, and the factor inside an Effect is a formula kind; there is no expression language.
 
 **Both stages are compiled, once, when the tree is built.** Everything above but liveness is authored
 and validated, so the load pass (12.14.8) asks the question for every coordinate the content authors
@@ -906,8 +919,8 @@ plan: those are the same plan asked with a different owner. The queries compiled
 the content authors - each source entry at its declaring scope (stage 1), each currency at its home
 for `rate` and `yield` (stage 2, the currency its own owner, so its own tags match), each bar at its
 declaring scope for `rate` (its fill, and what is paid into it; stage 1 for the fill itself, 12.7)
-and `yield`, each generator for `count` and `cost`, each upgrade for `cost`, and `game_speed` at
-each chapter. A definition's plans sit under the definition itself at its home, one per stat it is
+and `yield`, each generator for `count`, `cost` and `autobuy`, each upgrade for `cost`, and
+`game_speed` at each chapter. A definition's plans sit under the definition itself at its home, one per stat it is
 ever asked for. A
 coordinate no content authors has no plan, and a consumer asking for one throws rather than
 answering 1x.
@@ -945,7 +958,7 @@ never crossing into siblings. The tick enumerates rates from that subtree's decl
 generators, never from what the UI happens to show. Runtime state per scope:
 
 ```csharp
-class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these payloads (§12.10)
+class ScopeFacts   // the mutable state a reset DESTROYS; what a reset keeps sits beside it (below, §12.10)
 {
     Dictionary<string, BigDouble> balances;
     Dictionary<string, BigDouble> earnedTotals;     // per currency, same home as its balance
@@ -955,7 +968,7 @@ class ScopeFacts   // the COMPLETE mutable state — nothing lives outside these
     HashSet<string>               purchasedUpgrades;
     HashSet<string>               firedTriggers;    // one-shot trigger latches — a reset re-arms (§12.5)
     Dictionary<string, BigDouble> barProgress;      // uncapped — overfill is allowed
-    Dictionary<string, int>       fillCounts;       // repeating bars
+    Dictionary<string, int>       fillCounts;       // bars with a repeatWhen, the ones that complete more than once
     Dictionary<string, HashSet<string>> activeBars; // per group
     Dictionary<string, int>       modifierStacks;   // AddModifier grants, keyed like every other count
     List<TimedBuff>               timedBuffs;       // {buffId, expiresAt}, the id a declared TIMER's: the timer's value; root's encore_timer lives here
@@ -994,8 +1007,11 @@ root fact on a tier unrepresentable rather than filtered at load, and the exclus
 way too: root cannot host an event and so does not carry the record. The rule the placement follows:
 **if a kind of scope cannot have a feature, its definition declares no data for that feature** - the
 rung lives on `InteriorDefinition`, not on the base with a validation check behind it.
-`lastActiveUtc` (§12.9) is a chapter field OUTSIDE the payload — the one thing a reset re-stamps
-instead of clearing. A reset installs a fresh payload of the same type.
+`lastActiveUtc` (§12.9) is a chapter field OUTSIDE the payload, re-stamped instead of cleared, and
+so is every scope's `lifetimeTotals`: a currency's every deposit across rounds, seeded per declared
+currency once when the node is built, written beside the balance and the earned total by every
+deposit, read by the payout selector (§12.5), carried by the save beside the payload, and cleared by
+no reset. A reset installs a fresh payload of the same type and leaves both standing.
 
 The tree: **root** (Records, Roadies, entitlements, completion flags, Discography, any counters a
 chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique along a CHAIN** — a read walks
@@ -1208,7 +1224,11 @@ refused at load and thrown at Build, since the recursion it would start is unbou
 
 **PayoutFormula** — a polymorphic family computing an amount from readable state
 (`floor((fans/5)^0.5)`, piecewise diminishing-returns curves). Pure functions, so UI previews call
-the same code the rung runs.
+the same code the rung runs. `RootCurveFormula` names which of the currency's three totals it reads
+- `reads: EarnedThisRound | Balance | Lifetime` - and the default is what this round earned, since a
+prestige payout is about the run just played and a spend never lowers it; `Balance` is what a spend
+left standing, `Lifetime` the total across rounds (§12.3). Chapter 1's album reads fans earned this
+round, the same number as the balance because fans are never spent and both clear with the tier.
 
 **Trigger** — the one sanctioned condition-observer: `TriggerDefinition {id, condition, actions}`,
 declared per scope. A trigger firing is a *moment*: when its condition holds and its id is not in
@@ -1272,9 +1292,9 @@ A root-declared formula that reads chapter state is unimplementable any other wa
 chain-only either way, so no sibling reach opens up - and it is why an effect whose formula depends
 on the producing chapter must target the SOURCES rather than the currency total (§8.2).
 
-The fill-count row is REPEATING bars only: a non-repeating bar's completion is a moment that leaves
-no count to scale, so its reward is an `AddModifier` grant and a `perFill` entry on one is an error
-(12.12). Like the upgrade row, the read walks the declaring scope's own list, so a stray count for a
+The fill-count row is for bars with a `repeatWhen`, the ones that can complete more than once: a
+bar with none completes once, a moment that leaves no count to scale, so its reward is an
+`AddModifier` grant and a `perFill` entry on one is an error (12.12). Like the upgrade row, the read walks the declaring scope's own list, so a stray count for a
 bar that scope never declared cannot contribute.
 
 Every row is the same pattern: a fact in state, effects computed from it. All of these exist from the
@@ -1283,7 +1303,7 @@ serialized except the facts column.
 
 ### 12.7 Bars
 
-Generic fillable bars: pacing bars (learn covers), repeating currency bars, cascade bars.
+Generic fillable bars: pacing bars (learn covers), currency bars that go again, cascade bars.
 
 ```csharp
 class BarDefinition : Definition
@@ -1291,7 +1311,9 @@ class BarDefinition : Definition
     CurrencyDefinition fillCurrency; // what it drinks; null = fills from time alone
     BigDouble    fillAmount;
     BigDouble    fillRate;        // this bar's own fill speed (units/sec)
-    bool         repeating;       // fill → fire onComplete → reset to 0 → go again
+    Condition    repeatWhen;      // null: fill once, stay full; true: pay, keep the residual, go again;
+                                  // false: the manual team - pay once, zero, leave the active set
+    ProducerDefinition tap;       // the producer the row fires when tapped (12.11); null: not a tap target
     Condition    availableWhen;
     List<Action> onComplete;      // fires at each threshold crossing
     List<PerFillEntry> perFill;   // cascade: {effect, growth}, applied fillCount times on read
@@ -1339,21 +1361,27 @@ buffed bar drinks proportionally faster.
 **Selection is state**: `activeBars` per group; empty = the pool accrues and nothing drains.
 `SetActiveBars` is **fail-closed** like every entry point (§12.11): it rejects a set that exceeds
 `maxActive`, names a bar outside the group, names an unavailable bar (`availableWhen` false), or
-names a completed non-repeating bar. On completion the stream **stops** - choosing is the mechanic in
+names a completed bar that has no `repeatWhen`. On completion the stream **stops** - choosing is the mechanic in
 Ch. 1, and letting more run in parallel is `maxActive` rising, which is an unlock rather than a
 multiplier.
 
-**Completion is derived**: complete ⇔ `progress ≥ fillAmount`. For a non-repeating bar, progress is
-monotonic until reset and **uncapped** — overfill is allowed and readable — so the crossing happens
+**Completion is derived**: complete ⇔ `progress ≥ fillAmount`. For a bar with no `repeatWhen`,
+progress is monotonic until reset and **uncapped** — overfill is allowed and readable — so the crossing happens
 once, and that is when `onComplete` fires. No completed-set is stored; `BarsCompleted(n)` counts
-bars at full. **Repeating bars settle a tick iteratively**: while `progress ≥ fillAmount` and the
-bar is still active and available, subtract `fillAmount`, increment `fillCount`, execute
+bars at full. **Whether a bar goes again is its `repeatWhen`**, judged at its home the moment it
+completes; one condition, so an upgrade or a handicap flips a team between the two shapes below
+without a second field. **A bar whose `repeatWhen` holds settles a tick iteratively**: while
+`progress ≥ fillAmount` and the bar is still active and available, subtract `fillAmount`, increment `fillCount`, execute
 `onComplete` — re-reading state each iteration, so a completion action that resets the host or
 flips availability stops the loop honestly instead of executing precomputed fires against a changed
 world. Residual progress is retained; a buffed rate crossing several thresholds in one tick pays
 every crossing. (The arithmetic shortcut `fires = floor((progress + Δ)/fillAmount)` is a valid
 optimization only when `onComplete` cannot affect the bar's environment, which in practice means an
-EMPTY list; a bar with actions iterates.)
+EMPTY list; a bar with actions iterates.) **A `repeatWhen` that refuses is the manual team**: the
+crossing pays once, progress returns to zero - the excess past the threshold is discarded, the team
+ran one cycle - the bar leaves the active set, and its fill count is bumped as a repeating bar's is,
+since a present `repeatWhen` counts completions whichever way it evaluated. Selecting it again is
+how the player runs it again; there is no new command.
 
 **A bar is a payment target** (12.2), and it collects what pays it the way a currency does. A rate
 entry naming a bar is collected by the bar at its draw beside its own `fillRate`, so it fills only
@@ -1364,8 +1392,8 @@ because the tick settles only the bars its draw admitted and would read a bar fi
 as one that fired earlier. Each mover settles only the crossing its own fill made - a settlement
 compares the progress before its fill with that fill, never with live progress - so a payment
 landing inside a tick's settlement fires once and not again when the pass reaches that bar.
-Clamped at `fillAmount` for a non-repeating bar; a repeating bar keeps the excess and pays every
-threshold it crossed. Selection and availability do not gate a paid
+Clamped at `fillAmount` for a bar with no `repeatWhen`; a bar with one takes the whole payment and
+settles by the condition's answer - every threshold crossed, or the manual team's one cycle. Selection and availability do not gate a paid
 completion - they govern drinking from a pool, and a payment is not a drink. A refused completion
 list leaves the payment undelivered, as the draw excludes the bar for its segment.
 
@@ -1445,8 +1473,12 @@ foreground chapter, the same set the sweep walks. Root sweeps for its triggers b
 event (§12.3), so only the foreground chapter's subtree contributes timers, and a dormant
 chapter's does not advance. No event can be born mid-segment now that starting one is a command
 rather than an action. A handicap or buff live at segment start governs the whole segment, expiring
-only at its edge. After the last segment: the sweep, commit, and refresh
-(§12.11).
+only at its edge. After the last segment, the tick's one purchase phase: every generator in the
+swept set - root, then the foreground subtree in tree order, each scope's generators in declaration
+order - whose `autobuy` switch reads on (§12.2) buys the largest count it can afford through the
+same path the row's button takes, so every segment's bars have drunk before anything is spent and
+the sweep at the close sees the buys; a refusal is a no-op, every tick is the only rate, and the
+idle claim buys nothing. Then the sweep, commit, and refresh (§12.11).
 `lastActiveUtc` stamped when leaving a LIVE chapter — switch-away or backgrounding — and, for the
 foreground chapter only and only while Live, on save (a save under the dialog must leave the
 unpaid window); every write is monotonic (max), so a rolled-back clock can delay
@@ -1649,6 +1681,11 @@ per-feature: any kind an author gates with explains itself for free.
 
 **Widgets interpolate** displayed numbers and bar fills between ticks; presentation only.
 
+**A bar row is a tap target when its bar names a producer** (`tap`, §12.7): a click on the row
+outside the select button submits `FireProducer` on that producer, the same command the Jam button
+issues, and the producer's yield entry naming the bar is how a tap adds time. Choosing stays the
+button's and paying is the row's, so the button's own click is never also a tap.
+
 ### 12.12 Validation at content load
 
 - The scope tree is a tree, and it is **root, then chapters, then tiers all the way down**: exactly
@@ -1746,7 +1783,11 @@ per-feature: any kind an author gates with explains itself for free.
 - A bar group's `maxActive` is at least 1, and it lists no null bars. A bar's `fillAmount` and
   `fillRate` are positive - a nonpositive threshold is an unbounded settlement loop, and a zero rate
   is a bar no multiplier can move - and a named `fillCurrency` must be reachable on its own chain
-  (none is legal: it fills from time). `perFill` on a NON-REPEATING bar is an error (12.6).
+  (none is legal: it fills from time). `perFill` on a bar with no `repeatWhen` is an error (12.6); a
+`repeatWhen` is validated as `availableWhen` is, its operands under the reach rules; a `tap` producer
+must be on the bar's own chain, and nothing checks that it pays this bar. A `LinearOnOwnedCount`
+names a generator on the chain and a nonnegative coefficient, as `LinearOnBalance`'s currency and
+coefficient are checked.
   `BarsCompleted` reaches like every other scope-attached read: the group's declaring scope is the
   acting scope or an ancestor. A group is not an effect target (§12.7), but nothing checks a
   selector for naming one:

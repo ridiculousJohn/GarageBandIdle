@@ -21,6 +21,11 @@ Resolve the editor rather than hardcoding it: read the version from `<repo>/Gara
   compile error the log had shown in the first minute. The wait loop and the pre-check are the SAME
   predicate - path under `Hub\Editor` - and the log gets read while the run is in progress, never
   waited on. Reading the rule is not applying it: check the script against this file before launching.
+  **Refined 2026-09-16:** the predicate is path under `Hub\Editor` AND a command line naming THIS
+  project. John opened another project's editor (la-summer-games) mid-slice and the path-only check
+  read it as a block; an editor on another project does not collide (the lockfile is per project),
+  and its AssetImportWorker children are also named Unity.exe. `Get-CimInstance Win32_Process` gives
+  both the executable path and the command line; `Get-Process` gives only the path.
 - **The lockfile is NOT that check.** `<repo>/Garage Band Idle/Temp/UnityLockfile` - ONE level down, not doubly nested (a stray empty `Garage Band Idle/Garage Band Idle/Logs/` exists and invites the wrong path) - is left behind by BATCHMODE too whenever it exits on compile errors, and the next run then aborts without writing a log - leaving the PREVIOUS run's log sitting there to be grepped as if it were this run's. That is how a false green happens: delete the log before launching and refuse any log whose timestamp predates the launch. Treating its presence as "the editor is open" stalls the loop; treating its absence as "safe to run" misses an editor that has not written it yet. Check the process, then delete a stale lockfile before launching.
 - **Unity batchmode is the ONLY compiler allowed here** (John, 2026-08-20). No Roslyn/csc, no
   dotnet, no hand-assembled reference list, ever, unless he asks for it by name. Its result is
@@ -77,8 +82,9 @@ $results = Join-Path $env:USERPROFILE 'AppData\LocalLow\DefaultCompany\Garage Ba
 
 if (-not (Test-Path $unity)) { Write-Output "NO UNITY AT $unity"; exit 2 }
 # By PATH, never by name: the CLI MCP process is also named unity.
-$editor = Get-Process | Where-Object { $_.Path -like '*Hub\Editor*' }
-if ($editor) { Write-Output "EDITOR RUNNING: $($editor.Path)"; exit 3 }
+# By PATH and by PROJECT: another project's editor (and its import workers, also Unity.exe) does not block.
+$editor = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like '*Hub\Editor*' -and $_.CommandLine -like '*Garage Band Idle*' }
+if ($editor) { Write-Output "EDITOR RUNNING: $($editor.CommandLine)"; exit 3 }
 
 $lock = Join-Path $project 'Temp\UnityLockfile'
 if (Test-Path $lock) { Remove-Item $lock -Force }
@@ -88,10 +94,12 @@ $launched = Get-Date
 
 # Tests: no -quit. For an import instead, swap -runTests... for
 # -quit -executeMethod RidiculousGaming.GarageBandIdle.Editor.ChapterJsonImporter.ImportAll
+# One test by full name: add -testFilter '<Namespace.Class.Method>' (a failing fixture's findings are
+# cheapest to read by making that one test fail with them, then reverting).
 & $unity -batchmode -nographics -projectPath $project -runTests -testPlatform EditMode -testResults $results -logFile $log | Out-Null
 
 # Same predicate as the pre-check. -Name 'Unity' matches the MCP server and spins forever.
-while (Get-Process | Where-Object { $_.Path -like '*Hub\Editor*' }) { Start-Sleep -Seconds 2 }
+while (Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like '*Hub\Editor*' -and $_.CommandLine -like '*Garage Band Idle*' }) { Start-Sleep -Seconds 2 }
 Start-Sleep -Seconds 5
 
 Write-Output "--- compile errors ---"
