@@ -139,7 +139,11 @@ lives somewhere other than a conversation.
   the fakes; the SDK adapters, receipt handling and the platform's restore flow are their own work.
 - **Chapters 2-8**, thematic sketches today, and the authoring decisions deferred with them: the
   Ch. 6 song operations and selection rule, the late-game Cash to Roadie sink, the reserved
-  `bought <= earned` cap. Step 11's orphan sweep lands as content grows.
+  `bought <= earned` cap. Step 11's orphan sweep lands as content grows. The runtime support
+  those chapters need, surveyed against Ctrl C's eight chapters on 2026-09-15, is
+  `chapter-primitives-plan.md` (PLANNED): cost as a multiplier target, a bar firing a
+  generator's yield, payments into an owned count or a bar's progress, an owned-count formula, a
+  bar's repeat as a condition, autobuy, and the payout formula reading the round's earned total.
 - **A higher speed tier** stays undecided (design 9). Timers landed 2026-09-14 (`timers-plan.md`),
   so if it is ever decided it is content alone: one more root modifier reading `encore_timer` with
   `activeAfterSeconds: 86400`, and removing it is deleting that modifier.

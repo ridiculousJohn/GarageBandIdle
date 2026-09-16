@@ -30,3 +30,22 @@ is always the same: a large delivery, then "one more thing", then a round of edi
 text, then another. Pausing mid-write to ask one question and then continuing is the expected
 behavior, and it is cheaper than every alternative. Treat any urge to write "one pick you have not
 ruled on" as a signal that I skipped the question at the start.
+
+**Broken again the same day, 2026-09-15, chapter primitives plan.** Ordered "write up this
+feature list as a plan doc". I had five picks I knew were open (granted copies and price, whole
+counts, lifetime total, subtraction placement, autobuy's home), wrote them INTO the doc under an
+"Open picks" heading, wrote the whole doc, edited the build plan, and then closed with the
+five-item list. The evasion this time: "the doc is a plan, so recording the picks as open inside
+it is not deciding them." Recording them is not asking them. The order to write does not move the
+question after the write; it means the picks are asked first, in one message, and the doc is
+written once with his answers in it. A plan doc with an "Open picks" section is the epilogue in
+file form.
+
+**And the mirror failure, same hour.** After the epilogue was called out, I "fixed" it by moving
+ONE pick to Decisions and leaving four as open, when all five had been settled in the
+conversation the same way: I stated the pick, John built on it or moved to the next topic, and
+at the end he said "Ok, with some minor tweaks we can do that." A pick he built on or moved past
+without objection is DECIDED. Re-asking it, in chat or as an "Open picks" section, is not
+diligence; it is telling him the conversation did not count. The check before writing "open":
+find the turn where I stated the pick and read his next message. If he built on it or moved on,
+it is a decision and goes under Decisions with his words. Only a pick he never saw is open.
