@@ -1,0 +1,444 @@
+{
+  "_meta": {
+    "file": "Chapter 3 — Local Venues. DRAFT.",
+    "status": "DRAFT — not tuned and not ready to import. It carries the rooms design that was cut from Chapter 2 so it is not lost. Numbers are placeholders scaled off Ch2's; the shape is the part worth reviewing.",
+    "theChapterInOneLine": "Chapter 2 gave you a calendar of gigs that would take anyone. This chapter gives you venues with opinions: rooms that want a kind of song, and crowds that tire of hearing it.",
+    "newInThisChapter": [
+      "ROOMS — the stage group grows from one bar to several. Each room is a bar you tap to play, with its own size, payout and fatigue.",
+      "GENRE — songs gain tags and rooms gain taste. A room drinks ONE genre of setlist currency, so which songs you learn decides which rooms you can work. This is why Ch2's songs deliberately had no tags: there was nothing to match against.",
+      "FAN FATIGUE debuts here: each room carries a perFill factor below 1 scaled by its own fillCount, so the same room pays less every time you work it. Rotation is the answer, and this is the chapter that has rooms to rotate.",
+      "maxActive rises 1 → 2 → 3. Working several rooms at once is the chapter's arc and the mechanical meaning of 'a local circuit'. (Needs a setMaxActive payload; Ch2 sidestepped this by setting maxActive to the bar count.)",
+      "MERCH — a second income stream (provisional placement; it could equally sit in Ch4 with touring)."
+    ],
+    "continuityFromCh2": "Chapter 2 is a gig-cycle economy (timed bars, standing bookings, Buzz). This chapter keeps the bar-as-gig shape but the bars are now ROOMS with genre taste, and FAN FATIGUE debuts here — the same crowd tires of you, so rotating rooms is the play. Do not assume fatigue was taught earlier; it was not.",
+    "openQuestions": [
+      "Does merch belong here or in Ch4? Here it is a second income stream in a chapter that already has rooms, genre and automation. Ch4 (touring) may need it more.",
+      "Three genres or four? Three keeps the song list short; four makes room taste more distinctive.",
+      "Should the booking agent automate the ROOM (fills on its own) or the TAP (fires the set for you)? The second is closer to Ch1's automation feel; the first is closer to an actual agent."
+    ]
+  },
+  "chapter": {
+    "id": "ch03_local_venues",
+    "index": 3,
+    "name": "Local Venues",
+    "theme": "The club on Third, the record store's back room, the legion hall. Places that book bands, each with its own crowd and its own idea of a good night.",
+    "storyBeatOpenDraft": "Turns out there are four stages in this town that will book a band, and every one of them wants something slightly different. You have a van, a set, and a phone number for a woman who books Thursdays."
+  },
+  "constants": {
+    "generatorCostGrowth": 1.2,
+    "recordBuff": {
+      "perRecord": 0.02,
+      "mode": "additive",
+      "affects": [
+        "cash"
+      ]
+    },
+    "roomPayoutRecordBuff": {
+      "perRecord": 0.012,
+      "mode": "additive",
+      "affects": [
+        "room_payout"
+      ],
+      "note": "The chapter's prestige lever: Records raise what winning a room pays, never how fast a room fills (§11). Chapter 2 gets the same effect from the root Records modifier on Cash, since its payouts are Cash yields; rooms here pay Fans, so a chapter-local buff is needed and is deliberately NOT on the fan rate."
+    },
+    "fatigueFactorPerWin": 0.85,
+    "fatigueGrowthMode": "multiply",
+    "fatigueNote": "0.85 per win. Fatigue is introduced in THIS chapter, with rotation available from the start as its answer. With three rooms the player routes around it rather than hitting a wall."
+  },
+  "currencies": [
+    {
+      "id": "cash",
+      "group": "run"
+    },
+    {
+      "id": "fans",
+      "group": "run"
+    },
+    {
+      "id": "rehearsal",
+      "group": "run"
+    },
+    {
+      "id": "set_loud",
+      "group": "run",
+      "note": "One setlist currency per genre. A room names one as its fillCurrency — a direct reference, never an intersected target. This is how room taste is expressed without a preference table."
+    },
+    {
+      "id": "set_sad",
+      "group": "run"
+    },
+    {
+      "id": "set_fast",
+      "group": "run"
+    },
+    {
+      "id": "merch",
+      "group": "run",
+      "note": "Provisional — see openQuestions."
+    }
+  ],
+  "producers": [
+    {
+      "id": "set",
+      "contributions": [
+        {
+          "id": "set_loud_line",
+          "currency": "set_loud",
+          "amount": 1,
+          "feeds": "yield",
+          "gate": {
+            "type": "flagSet",
+            "flag": "songs_loud"
+          }
+        },
+        {
+          "id": "set_sad_line",
+          "currency": "set_sad",
+          "amount": 1,
+          "feeds": "yield",
+          "gate": {
+            "type": "flagSet",
+            "flag": "songs_sad"
+          }
+        },
+        {
+          "id": "set_fast_line",
+          "currency": "set_fast",
+          "amount": 1,
+          "feeds": "yield",
+          "gate": {
+            "type": "flagSet",
+            "flag": "songs_fast"
+          }
+        }
+      ],
+      "note": "Fired by a room's `tap`. Pays every genre the player has songs for; each room drinks only its own, so a set you cannot play pays nothing into a room that wants it."
+    }
+  ],
+  "bars": {
+    "scope": "run",
+    "groups": [
+      {
+        "id": "song_list",
+        "name": "The Song List",
+        "maxActive": 1,
+        "note": "As Ch2, but songs now carry a genre tag and their reward multiplies that genre's line. The first song of a genre sets that genre's flag and opens its line.",
+        "bars": [
+          {
+            "id": "loud_1",
+            "name": "Feedback Symphony",
+            "tags": [
+              "loud"
+            ],
+            "fillCurrency": "rehearsal",
+            "fillAmount": 400,
+            "reward": "set_loud_x1_6",
+            "alsoSets": "songs_loud"
+          },
+          {
+            "id": "sad_1",
+            "name": "Basement Ballad",
+            "tags": [
+              "sad"
+            ],
+            "fillCurrency": "rehearsal",
+            "fillAmount": 400,
+            "reward": "set_sad_x1_6",
+            "alsoSets": "songs_sad"
+          },
+          {
+            "id": "fast_1",
+            "name": "Two-Minute Sprint",
+            "tags": [
+              "fast"
+            ],
+            "fillCurrency": "rehearsal",
+            "fillAmount": 400,
+            "reward": "set_fast_x1_6",
+            "alsoSets": "songs_fast"
+          },
+          {
+            "id": "loud_2",
+            "name": "The Loud One",
+            "tags": [
+              "loud"
+            ],
+            "fillCurrency": "rehearsal",
+            "fillAmount": 2400,
+            "reward": "set_loud_x2"
+          },
+          {
+            "id": "sad_2",
+            "name": "The Slow One",
+            "tags": [
+              "sad"
+            ],
+            "fillCurrency": "rehearsal",
+            "fillAmount": 2400,
+            "reward": "set_sad_x2"
+          },
+          {
+            "id": "fast_2",
+            "name": "Closing Number",
+            "tags": [
+              "fast"
+            ],
+            "fillCurrency": "rehearsal",
+            "fillAmount": 2400,
+            "reward": "set_fast_x2"
+          }
+        ]
+      },
+      {
+        "id": "the_circuit",
+        "name": "The Circuit",
+        "maxActive": 1,
+        "maxActiveUnlocks": [
+          {
+            "value": 2,
+            "grantedBy": "upgrade:book_two_nights"
+          },
+          {
+            "value": 3,
+            "grantedBy": "upgrade:the_circuit_run"
+          }
+        ],
+        "maxActiveNote": "The chapter's arc. One room is a residency; three is a circuit. §12.7: raising maxActive is an unlock, not a multiplier. `setMaxActive` as an upgrade payload does not exist in code yet.",
+        "bars": [
+          {
+            "id": "the_club_on_third",
+            "name": "The Club on Third",
+            "tags": [
+              "room",
+              "loud"
+            ],
+            "fillCurrency": "set_loud",
+            "fillAmount": 60,
+            "tap": "set",
+            "repeatWhen": {
+              "type": "always"
+            },
+            "reward": "room_won_small",
+            "perFill": [
+              {
+                "effect": "room_fatigue",
+                "growth": "multiply"
+              }
+            ]
+          },
+          {
+            "id": "the_back_room",
+            "name": "The Record Store Back Room",
+            "tags": [
+              "room",
+              "sad"
+            ],
+            "fillCurrency": "set_sad",
+            "fillAmount": 60,
+            "tap": "set",
+            "repeatWhen": {
+              "type": "always"
+            },
+            "reward": "room_won_small",
+            "perFill": [
+              {
+                "effect": "room_fatigue",
+                "growth": "multiply"
+              }
+            ]
+          },
+          {
+            "id": "the_all_ages",
+            "name": "The All-Ages Matinee",
+            "tags": [
+              "room",
+              "fast"
+            ],
+            "fillCurrency": "set_fast",
+            "fillAmount": 60,
+            "tap": "set",
+            "repeatWhen": {
+              "type": "always"
+            },
+            "reward": "room_won_small",
+            "perFill": [
+              {
+                "effect": "room_fatigue",
+                "growth": "multiply"
+              }
+            ]
+          },
+          {
+            "id": "the_legion_hall",
+            "name": "The Legion Hall",
+            "tags": [
+              "room",
+              "loud"
+            ],
+            "fillCurrency": "set_loud",
+            "fillAmount": 400,
+            "tap": "set",
+            "repeatWhen": {
+              "type": "always"
+            },
+            "reward": "room_won_large",
+            "perFill": [
+              {
+                "effect": "room_fatigue",
+                "growth": "multiply"
+              }
+            ],
+            "availableWhen": {
+              "type": "currency",
+              "currency": "fans",
+              "value": 1500
+            },
+            "note": "A big room of a genre the player already has. Two loud rooms is deliberate — it tests whether genre or room size drives the choice."
+          }
+        ]
+      }
+    ]
+  },
+  "rewards": [
+    {
+      "id": "set_loud_x1_6",
+      "type": "multiplier",
+      "value": 1.6,
+      "targets": [
+        "set_loud_line"
+      ]
+    },
+    {
+      "id": "set_sad_x1_6",
+      "type": "multiplier",
+      "value": 1.6,
+      "targets": [
+        "set_sad_line"
+      ]
+    },
+    {
+      "id": "set_fast_x1_6",
+      "type": "multiplier",
+      "value": 1.6,
+      "targets": [
+        "set_fast_line"
+      ]
+    },
+    {
+      "id": "set_loud_x2",
+      "type": "multiplier",
+      "value": 2.0,
+      "targets": [
+        "set_loud_line"
+      ]
+    },
+    {
+      "id": "set_sad_x2",
+      "type": "multiplier",
+      "value": 2.0,
+      "targets": [
+        "set_sad_line"
+      ]
+    },
+    {
+      "id": "set_fast_x2",
+      "type": "multiplier",
+      "value": 2.0,
+      "targets": [
+        "set_fast_line"
+      ]
+    },
+    {
+      "id": "room_won_small",
+      "name": "Room Won",
+      "type": "grantCurrency",
+      "currency": "fans",
+      "amount": 60,
+      "tags": [
+        "room_payout"
+      ]
+    },
+    {
+      "id": "room_won_large",
+      "name": "Big Room Won",
+      "type": "grantCurrency",
+      "currency": "fans",
+      "amount": 450,
+      "tags": [
+        "room_payout"
+      ]
+    },
+    {
+      "id": "room_fatigue",
+      "name": "Same Crowd Again",
+      "type": "multiplier",
+      "value": 0.85,
+      "targets": [
+        "room_payout"
+      ]
+    }
+  ],
+  "upgradesDraft": [
+    {
+      "id": "book_two_nights",
+      "name": "Book Two Nights",
+      "type": "contentUnlock",
+      "payload": {
+        "effect": "setMaxActive",
+        "group": "the_circuit",
+        "value": 2
+      },
+      "gate": {
+        "type": "recordsCumulative",
+        "value": 15
+      }
+    },
+    {
+      "id": "the_circuit_run",
+      "name": "The Circuit",
+      "type": "contentUnlock",
+      "payload": {
+        "effect": "setMaxActive",
+        "group": "the_circuit",
+        "value": 3
+      },
+      "gate": {
+        "type": "recordsCumulative",
+        "value": 70
+      }
+    },
+    {
+      "id": "the_booking_agent",
+      "name": "The Booking Agent",
+      "type": "contentUnlock",
+      "payload": {
+        "effect": "unlockAutomation",
+        "target": "the_circuit"
+      },
+      "gate": {
+        "type": "recordsCumulative",
+        "value": 110
+      },
+      "note": "The chapter's idle step. See openQuestions on whether the agent fills rooms or fires the set."
+    }
+  ],
+  "capstoneDraft": {
+    "id": "the_big_room",
+    "name": "Headline the Ballroom",
+    "unlock": {
+      "type": "recordsCumulative",
+      "value": 300
+    },
+    "onComplete": {
+      "grantRoadies": 1,
+      "completionFlag": "chapter_4_unlocked"
+    },
+    "note": "The regional 'big' private venue — the room everyone in town plays once they matter."
+  },
+  "importerExtensionsNeeded": [
+    "grantCurrency as a reward type (shared with Ch2)",
+    "tags on a reward, so fatigue targets the payouts as a set (shared with Ch2)",
+    "setMaxActive as an upgrade payload — §12.7 sanctions the concept, no code yet",
+    "unlockAutomation for the booking agent — shape undecided"
+  ]
+}

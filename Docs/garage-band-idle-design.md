@@ -58,11 +58,11 @@ Records earned within the chapter.
 | # | Chapter | New mechanic | Capstone gig |
 |---|---|---|---|
 | 1 | Garage / Basement | Tap, gear/bandmate buffs, "learn covers" bars | First backyard / house party |
-| 2 | Open Mic / Talent Show | Fans scoring, rehearsal, bigger song list | Win an open-mic / talent-show slot |
-| 3 | House Parties | Merch (second income stream) | Headline the house-show circuit |
-| 4 | Local Venues / Small Gigs | Booking agent (automation) | First booked venue gig |
-| 5 | Regional Tour | The Van: routing across towns | Complete a regional tour / festival slot |
-| 6 | Record Deal / Studio | Songwriting & Catalog (§7) | Sign the deal & cut the record |
+| 2 | Open Mic | Gigs as timed bars you book then automate; taps add time; Buzz multiplies payouts; Roadie allocation opens | Win the talent-show slot |
+| 3 | Local Venues | The circuit: rooms with genre taste and fan fatigue; booking agent automates | Headline the ballroom |
+| 4 | The Local Tour | The Van: routing across nearby cities; merch on the road | Complete the local circuit |
+| 5 | Record Deal / Studio | Songwriting & Catalog (§7) | Sign the deal & cut the record |
+| 6 | The Coast Tour | Sponsorships; long-haul routing, west to east | Festival main stage |
 | 7 | Radio / Streaming | Royalty catalog scaling; large idle income | First charting single / radio play |
 | 8 | Arenas / Stadiums | World tours, endgame scaling | Sell out a stadium (Hall of Fame) |
 
@@ -652,6 +652,16 @@ Catalog multipliers) still takes
 meaningful play time per chapter and breaks nothing. Timed events feel Encore fully — speed
 scales production but never timers (§9), so a 4× player meets a timed goal in a quarter of the
 clock; author timed goals with that end in mind.
+
+**Prestige raises the payout, never the fill rate.** A chapter's prestige currency may raise what a
+completion pays, or how many completions a run affords before diminishing returns bite — that is what
+raises the curve so each run reaches further, which is the point of prestige. It may NOT raise how
+fast a pacing bar or a fan meter fills. The wall-clock floor §8.1 relies on is the time a clear takes,
+not the size of what it pays, so buffing a payout keeps the floor while buffing a rate removes it and
+lets a late replay collapse to seconds. A per-chapter payout buff is also the safer shape than a
+global one: it is chapter-local, so nothing leaks across chapters and no narrowing rule is needed to
+keep it out of the fan rate. Chapter 2's gigs are the first instance: Records and Buzz multiply what a
+completed gig pays (the generator yield its bar fires), and nothing multiplies a gig's cycle.
 
 **Per-chapter economy template (to fill in):**
 - 4–6 themed generators (exponential cost, growth ~1.15, Cash in the thousands–millions).
