@@ -142,7 +142,10 @@ lives somewhere other than a conversation.
 - **Chapters 2-8.** Chapter 2 is authored (`chapter-02-open-mic.json`, 2026-09-17) on primitives A-H
   with no new runtime: gigs as time-fed bars firing a draw generator's yield, standing bookings as
   `repeatWhen` over a permanent flag, taps paying bar progress, Buzz as `LinearOnBalance`, autobuy and
-  a cost multiplier as upgrades, one five-minute staged event. Chapter 3 is a draft
+  a cost multiplier as upgrades, one five-minute staged event. Its typed translation waits on
+  `groups-consumption-idle-plan.md` (2026-09-18): a group of members of any kind with an active
+  set, consumption as a list on the bar and a stat, and the idle claim computing bar fill and
+  completions - without which the chapter pays nothing while away. Chapter 3 is a draft
   (`chapter-03-local-venues.json`) carrying rooms, genre currencies and fan fatigue; it needs a
   `setMaxActive` payload and a shape for the booking agent. The rest are thematic sketches, and the
   authoring decisions deferred with them: the

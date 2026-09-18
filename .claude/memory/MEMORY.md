@@ -15,6 +15,8 @@
 - [Step 10 playthrough notes](step-10-playthrough-notes.md) - second playthrough 2026-09-15 clean (one note, the fresh-game entry, landed); John's ten notes from the 2026-09-11 hand playthrough, each with the fact behind it and its kind (code / architecture / content); all landed 2026-09-11 (row modules, descriptions, Encore close, Demo Tapes, the release trigger) except the colors, which are the polish pass
 - [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) - merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
 
+- [Reference survey checks the idle path](reference-survey-checks-idle-path.md) - "already covered" must trace the live tick AND the idle claim; chapter 2's time-fed bars pay nothing while away; record John's losing shape too
+
 ## Gates
 - [Quote directive before editing](quote-directive-before-editing.md) - the rule is in the repo CLAUDE.md; this is the failure record: every evasion, and why the check is mechanical
 - [Commit means the whole tree](commit-means-the-whole-tree.md) - "commit" means MY changes - every file the work dirtied, memory included, and nothing I did not change; no AI attribution; small enough to read; no preference inferred from repo state
@@ -34,6 +36,7 @@
 - [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - "did you miss anything?" is a command to grep; Scripts, Tests, the live docs, the chapter JSON
 
 ## Disagreement
+- [Systems, not tasks](systems-not-tasks.md) - RECURRING, John furious 2026-09-18: a mechanism is justified only by a statement true of every instance of its kind, never by what one chapter needed; "it was what chapter N needed" is banned
 - [Never cave to pressure](never-cave-to-pressure.md) - the substance changes only when the facts do; and when I do concede, the concession leads; defending machinery I built without asking what it is FOR is not judgment, and a reversal after his pushback is his finding, not mine; inflating a finding under pressure is caving too; "consistent with the plan I wrote" is never a verdict; "you found it" is a flourish, not a concession - the fact leads in one sentence, and "what did you do" gets the action named
 - [Pushback means re-derive](pushback-means-rederive.md) - his dispute of my model of HIS design means produce a discriminator; on same-but-different, split the bundle
 - [Root cause means question the structure](root-cause-means-question-the-structure.md) - on "bandaid"/"root cause": derive from what the player is doing, question MY design's structure, give ONE simpler fix; never a menu. RULE, broken twice in one day: a command owns its mutation and the flush and touches NOTHING the tick owns (clock, sample, bank, report) - check every command site and every "guard" sentence before a contract ships
