@@ -1,0 +1,171 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c947fe0ee4f7fe946aac97903f711dd9, type: 3}
+  m_Name: tier2
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.TierDefinition
+  id: tier2
+  tags: []
+  displayName: 
+  description: 
+  children: []
+  declaredCurrencies:
+  - {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
+  - {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+  - {fileID: 11400000, guid: df8d154a476df3d4b8f6eb1f40268b0f, type: 2}
+  declaredFlags:
+  - promo_revealed
+  declaredTimers: []
+  declaredTags:
+  - gig
+  - gig_draw
+  - promo
+  - work_the_crowd
+  triggers:
+  - {fileID: 11400000, guid: 7dba4431407d98540b52fede765427e9, type: 2}
+  - {fileID: 11400000, guid: d69aafeda4004294985f836140d463e6, type: 2}
+  - {fileID: 11400000, guid: b468cbf5a4c5e824182d4a72e1f2ab03, type: 2}
+  - {fileID: 11400000, guid: 0e59e2cd0e649e14189548ee99deab1e, type: 2}
+  - {fileID: 11400000, guid: 9b879899ddaba254fbb187cb477c6af1, type: 2}
+  - {fileID: 11400000, guid: 678e34aea8cc40849adf379cc4d2448f, type: 2}
+  - {fileID: 11400000, guid: 4d3b8b73d9856124fb50b078c3ec6bd0, type: 2}
+  - {fileID: 11400000, guid: 3c3bf08cdefc48743a80deb3d8784db5, type: 2}
+  - {fileID: 11400000, guid: 190d2c42fe67de746881148d9e9d1de4, type: 2}
+  - {fileID: 11400000, guid: 4ee93bcd91055a84fbfe6febd84a6db5, type: 2}
+  - {fileID: 11400000, guid: e88e26d846f1cd64eafa5c3b15c32599, type: 2}
+  - {fileID: 11400000, guid: 0753f447f234d094aaf8f3f01f658705, type: 2}
+  - {fileID: 11400000, guid: 4ffc517491dbc0746b83f834e47f8b16, type: 2}
+  - {fileID: 11400000, guid: adba26c3429162d45860166aa1d6f962, type: 2}
+  - {fileID: 11400000, guid: 1aae0a0c8f34f58418b76f88735b1e45, type: 2}
+  - {fileID: 11400000, guid: e6cb03b32018e924fae2587b04d7256b, type: 2}
+  - {fileID: 11400000, guid: 4319c6833516b3e4a8c4c4e8c8224df4, type: 2}
+  - {fileID: 11400000, guid: e41390fe5d3ccf344a29d0e6f9afb8bc, type: 2}
+  - {fileID: 11400000, guid: d462bbaac25735c4ca986a4f7cdb96cb, type: 2}
+  - {fileID: 11400000, guid: 8a0fa06976259674d99166d26470dfff, type: 2}
+  - {fileID: 11400000, guid: ed84055aab7d16141a99289ebc896f0b, type: 2}
+  - {fileID: 11400000, guid: 0b47764a6184543438ad984095b0301f, type: 2}
+  - {fileID: 11400000, guid: e7dd4fc57a1e7c140a72283d027d21a1, type: 2}
+  - {fileID: 11400000, guid: e4f32aef2bef41a48b933164001d63ca, type: 2}
+  producers:
+  - {fileID: 11400000, guid: 044fb53cce915364c8bbe54bc02d5d0e, type: 2}
+  - {fileID: 11400000, guid: 2675b161346a69a40bd0ebb4cb1caff1, type: 2}
+  - {fileID: 11400000, guid: 63787a60551063248a2fa959b6d2e8e1, type: 2}
+  - {fileID: 11400000, guid: f6833b00ce91caa43b7d0395728c9b08, type: 2}
+  - {fileID: 11400000, guid: 321b5cbac38b1934ab7a4c18692a061a, type: 2}
+  - {fileID: 11400000, guid: c59db6327d263bf41b910126a4c66bd1, type: 2}
+  modifiers:
+  - {fileID: 11400000, guid: 08a0b147f49d24c4a87a963eda9a3f3b, type: 2}
+  permanentModifiers:
+  - {fileID: 11400000, guid: 08a0b147f49d24c4a87a963eda9a3f3b, type: 2}
+  generators:
+  - {fileID: 11400000, guid: edf09e3dfa9244647bc2776a145bd91f, type: 2}
+  - {fileID: 11400000, guid: a00a688a672517d4c8b5efe0a103308c, type: 2}
+  - {fileID: 11400000, guid: 97bc67d21c04db846b435e7addb83fb4, type: 2}
+  - {fileID: 11400000, guid: d2306a9b3c4af8b4ea7da43322186594, type: 2}
+  - {fileID: 11400000, guid: 061e3a40d4c09a04584f0d2b2c0d609b, type: 2}
+  - {fileID: 11400000, guid: 049eeb882fc155e49b9a04441fd62303, type: 2}
+  - {fileID: 11400000, guid: 2262fbb2c3ec52b4ca3407c95ae4a438, type: 2}
+  - {fileID: 11400000, guid: c0e13c501547f704e8454a858786bc36, type: 2}
+  - {fileID: 11400000, guid: 4a1a3728b5e04f946a2f9e66e4c10409, type: 2}
+  - {fileID: 11400000, guid: b7ba86c6dbae44e40ac1bc4f47e5277d, type: 2}
+  bars:
+  - {fileID: 11400000, guid: 6a62170f567d83a4386de32230584fae, type: 2}
+  - {fileID: 11400000, guid: d0d745ced9f51704ea1b31912b44fb75, type: 2}
+  - {fileID: 11400000, guid: e092c52f03d87a543aed0025b0a54127, type: 2}
+  - {fileID: 11400000, guid: 390b81e6d250e974bac33fcc62a94395, type: 2}
+  - {fileID: 11400000, guid: 9b03c1c624d2a174c8e6e9fa8d014afc, type: 2}
+  - {fileID: 11400000, guid: fca102f2b99198b459c1a1c19d8373d4, type: 2}
+  groups:
+  - {fileID: 11400000, guid: b8e8d2340df4c1d498c25306d708e2c8, type: 2}
+  upgrades:
+  - {fileID: 11400000, guid: 21caf779427e37843b7d2fe233df07b0, type: 2}
+  - {fileID: 11400000, guid: 38242f434c18ddd478a088c8b4d01a96, type: 2}
+  - {fileID: 11400000, guid: b7e3f72c55db8844bbe05b15916e408c, type: 2}
+  - {fileID: 11400000, guid: e78f1db2afcd50b408f40212337fb6e0, type: 2}
+  - {fileID: 11400000, guid: d79d2d0d04ab85e4caa37ab0c541f71d, type: 2}
+  - {fileID: 11400000, guid: 76449147113c4464c87cdf6676385827, type: 2}
+  - {fileID: 11400000, guid: d142acf5f2ed21d46af505aa3c5d85df, type: 2}
+  - {fileID: 11400000, guid: 96fcab3ac7d4d44478fe23ef61235636, type: 2}
+  - {fileID: 11400000, guid: c1eafd604418c9b43b44eaea2cd87239, type: 2}
+  - {fileID: 11400000, guid: 66c10a2973d349f4cafa95b6b0c12af7, type: 2}
+  - {fileID: 11400000, guid: f07ebed0242cba946b38bade2bc3c84f, type: 2}
+  - {fileID: 11400000, guid: e335570ec3271244989e7b7e829e4d28, type: 2}
+  - {fileID: 11400000, guid: 41c13b81cfaa8924a98ff17cdce96258, type: 2}
+  rung:
+    rid: 7579425558579642672
+  events:
+  - {fileID: 11400000, guid: e2265816330582e40becab1596191495, type: 2}
+  - {fileID: 11400000, guid: 8920797fc0b077147b1af67d369b5ccf, type: 2}
+  - {fileID: 11400000, guid: d5b72bdb7a9823a438fa05cf97fae37e, type: 2}
+  references:
+    version: 2
+    RefIds:
+    - rid: 7579425558579642672
+      type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        label: Record an EP
+        offerCondition:
+          rid: 7579425558579642673
+        actions:
+        - rid: 7579425558579642674
+        - rid: 7579425558579642675
+    - rid: 7579425558579642673
+      type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        conditions:
+        - rid: 7579425558579642676
+        - rid: 7579425558579642677
+    - rid: 7579425558579642674
+      type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        currencies:
+        - {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}
+        - {fileID: 11400000, guid: 36e81a4a255237449b1208248dc1a127, type: 2}
+        amount:
+          _value:
+            mantissa: 0
+            exponent: 0
+        formula:
+          rid: 7579425558579642678
+    - rid: 7579425558579642675
+      type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        scope: {fileID: 11400000}
+    - rid: 7579425558579642676
+      type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 300 fans
+        currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+        threshold:
+          _value:
+            mantissa: 3
+            exponent: 2
+    - rid: 7579425558579642677
+      type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Claim your Battle of the Bands reward first
+        condition:
+          rid: 7579425558579642679
+    - rid: 7579425558579642678
+      type: {class: RootCurveFormula, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+        reads: 0
+        divisor:
+          _value:
+            mantissa: 1
+            exponent: 1
+        exponent: 0.5
+    - rid: 7579425558579642679
+      type: {class: EventRewardPending, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 

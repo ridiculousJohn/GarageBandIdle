@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cee62cb24f128f140a7eec89dc895b33, type: 3}
+  m_Name: botb_qualifier
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.BarDefinition
+  id: botb_qualifier
+  tags:
+  - gig
+  displayName: Battle of the Bands Qualifier
+  description: Twelve minutes at the top of the ladder, paying your qualifier draw
+    every time it fills.
+  consumes: []
+  fillAmount:
+    _value:
+      mantissa: 7.2
+      exponent: 2
+  fillRate:
+    _value:
+      mantissa: 1
+      exponent: 0
+  repeatWhen:
+    rid: 7579425558579642387
+  tap: {fileID: 11400000, guid: c59db6327d263bf41b910126a4c66bd1, type: 2}
+  availableWhen:
+    rid: 7579425558579642388
+  onComplete:
+  - rid: 7579425558579642389
+  perFill: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 7579425558579642387
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: booked_botb_qualifier
+    - rid: 7579425558579642388
+      type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Book a Battle of the Bands Qualifier
+        generator: {fileID: 11400000, guid: 049eeb882fc155e49b9a04441fd62303, type: 2}
+        count:
+          _value:
+            mantissa: 1
+            exponent: 0
+    - rid: 7579425558579642389
+      type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        generator: {fileID: 11400000, guid: 049eeb882fc155e49b9a04441fd62303, type: 2}

@@ -182,14 +182,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The two roadie effects, composed at different levels: the global
             // product on the income currency, the per-chapter factor on the
             // SOURCES, narrowed to income so a bandmate's fans line stays out.
+            // Each carries rate and yield, so a tap's lump is boosted too (8.2).
             RoadieTotal = MakeDefinition<ModifierDefinition>("roadie_total");
             RoadieTotal.effects.Add(new Effect { target = "income", stat = Stat.Rate,
+                formula = new RoadieTotalBoost { perRoadie = 0.05 } });
+            RoadieTotal.effects.Add(new Effect { target = "income", stat = Stat.Yield,
                 formula = new RoadieTotalBoost { perRoadie = 0.05 } });
             RootDef.modifiers.Add(RoadieTotal);
             RootDef.permanentModifiers.Add(RoadieTotal);
 
             RoadieActive = MakeDefinition<ModifierDefinition>("roadie_active");
             RoadieActive.effects.Add(new Effect { target = "production", currencyId = "income", stat = Stat.Rate,
+                formula = new RoadieActiveBoost { perRoadie = 0.05 } });
+            RoadieActive.effects.Add(new Effect { target = "production", currencyId = "income", stat = Stat.Yield,
                 formula = new RoadieActiveBoost { perRoadie = 0.05 } });
             RootDef.modifiers.Add(RoadieActive);
             RootDef.permanentModifiers.Add(RoadieActive);

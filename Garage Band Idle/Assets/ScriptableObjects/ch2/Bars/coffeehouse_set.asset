@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cee62cb24f128f140a7eec89dc895b33, type: 3}
+  m_Name: coffeehouse_set
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.BarDefinition
+  id: coffeehouse_set
+  tags:
+  - gig
+  displayName: Coffeehouse Set
+  description: Forty seconds for the coffee crowd, paying your coffeehouse draw when
+    the set finishes.
+  consumes: []
+  fillAmount:
+    _value:
+      mantissa: 4
+      exponent: 1
+  fillRate:
+    _value:
+      mantissa: 1
+      exponent: 0
+  repeatWhen:
+    rid: 7579425558579642680
+  tap: {fileID: 11400000, guid: 63787a60551063248a2fa959b6d2e8e1, type: 2}
+  availableWhen:
+    rid: 7579425558579642681
+  onComplete:
+  - rid: 7579425558579642682
+  perFill: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 7579425558579642680
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: booked_coffeehouse
+    - rid: 7579425558579642681
+      type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Book a Coffeehouse Set
+        generator: {fileID: 11400000, guid: 97bc67d21c04db846b435e7addb83fb4, type: 2}
+        count:
+          _value:
+            mantissa: 1
+            exponent: 0
+    - rid: 7579425558579642682
+      type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        generator: {fileID: 11400000, guid: 97bc67d21c04db846b435e7addb83fb4, type: 2}

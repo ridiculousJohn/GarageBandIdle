@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine.UIElements;
@@ -136,8 +137,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
             var line = new StringBuilder();
             line.Append(NumberFormatter.Format(Purchasing.CostOf(generator, ctx, 1)))
                 .Append(" ").Append(generator.costCurrency.displayName);
+            // Rate entries then yield entries, each one unit's figure: per second
+            // for a rate, per firing for a yield a bar fires (12.11). The unit
+            // is implied on the row; the info screen names it.
             var yields = 0;
-            foreach (var (target, amount) in Producer.UnitRate(ctx, generator))
+            foreach (var (target, amount) in Producer.UnitRate(ctx, generator).Concat(Producer.UnitYield(ctx, generator)))
             {
                 if (amount == BigNumber.Zero)
                     continue;

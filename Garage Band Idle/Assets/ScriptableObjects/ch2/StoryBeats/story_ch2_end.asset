@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b406945f730a46e4f948f7462c928dfd, type: 3}
+  m_Name: story_ch2_end
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Story.StoryBeatDefinition
+  id: story_ch2_end
+  tags: []
+  displayName: The Club on Third
+  description: 
+  text: By now the calendar runs itself - Tuesdays, the house parties, the coffeehouse
+    guy who finally started calling you. The talent show is the one night that isn't
+    routine, and you win it anyway. A woman who books the club on Third finds you
+    at the load-out and asks what else you've got. Dave's already got the van running.
+  availableWhen:
+    rid: 7579425558579642537
+  seenFlag: story_ch2_end_seen
+  opensWhenAvailable: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: 7579425558579642537
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Win the Talent Show
+        flagId: ch2_complete

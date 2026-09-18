@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c35210d72fdb0f1449ed7fe2ca7504a1, type: 3}
+  m_Name: gig_payout_x2
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
+  id: gig_payout_x2
+  tags: []
+  displayName: 
+  description: 
+  stacking: 2
+  effects:
+  - target: gig_draw
+    currencyId: 
+    stat: yield
+    multiplier:
+      _value:
+        mantissa: 2
+        exponent: 0
+    formula:
+      rid: -2
+  appliesWhen:
+    rid: -2
+  timer: 
+  activeAfterSeconds: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }

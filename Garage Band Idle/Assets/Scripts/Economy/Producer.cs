@@ -276,6 +276,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             GameContext ctx, GeneratorDefinition generator) =>
             Resolve(ctx, generator, generator.produces, Stat.Rate, BigNumber.One);
 
+        // What ONE unit of a generator pays per firing of its yield: the same
+        // line's second half for a generator a bar fires (12.11), the same
+        // resolution over the yield entries with a count of one.
+        public static List<(Definition target, BigNumber amount)> UnitYield(
+            GameContext ctx, GeneratorDefinition generator) =>
+            Resolve(ctx, generator, generator.produces, Stat.Yield, BigNumber.One);
+
         // What one firing of a GENERATOR's yield would pay: the same resolution,
         // scaled by the owned count - purchased plus granted - read at the
         // declaring scope (12.2). A count of zero resolves every target to zero,

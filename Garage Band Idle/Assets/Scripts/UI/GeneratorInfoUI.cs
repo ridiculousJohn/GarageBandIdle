@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine.UIElements;
@@ -74,7 +75,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // The row's own formatter, so the screen and the row never print one
             // count two ways (12.11).
             ownedLabel.text = "Owned: " + GeneratorRowUI.CountText(ctx, generator);
-            production.text = "Producing: " + ProductionText(ctx, ctx.GetOwnedCount(generator.Id));
+            production.text = ProductionText(ctx, generator, ctx.GetOwnedCount(generator.Id));
         }
 
         public void Hide() => Root.style.display = DisplayStyle.None;
@@ -94,10 +95,28 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // comment). This is per GAME second at the declaring scope, while the
         // header's slope is the realized per-real-second figure - two honest
         // numbers, neither converted into the other.
-        private string ProductionText(GameContext ctx, BigNumber owned)
+        // Two lines when a generator has both kinds of entry, one when it has
+        // one: "Producing: 3.00 Cash/s" for its rates, "Pays: 9.00 Cash, 1.50
+        // Fans per gig" for the yield a bar fires. Public like CountText, so a
+        // test reads the screen's text through the screen's own formatter.
+        public static string ProductionText(GameContext ctx, GeneratorDefinition generator, BigNumber owned)
+        {
+            var producing = Owned(Producer.UnitRate(ctx, generator), owned, "/s");
+            var pays = Owned(Producer.UnitYield(ctx, generator), owned, "");
+            if (producing.Length == 0 && pays.Length == 0)
+                return "Producing: nothing";
+            var text = new StringBuilder();
+            if (producing.Length > 0)
+                text.Append("Producing: ").Append(producing);
+            if (pays.Length > 0)
+                text.Append(text.Length > 0 ? "\n" : "").Append("Pays: ").Append(pays).Append(" per gig");
+            return text.ToString();
+        }
+
+        private static string Owned(List<(Definition target, BigNumber amount)> unit, BigNumber owned, string suffix)
         {
             var line = new StringBuilder();
-            foreach (var (target, amount) in Producer.UnitRate(ctx, generator))
+            foreach (var (target, amount) in unit)
             {
                 var product = amount * owned;
                 if (product == BigNumber.Zero)
@@ -105,9 +124,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 if (line.Length > 0)
                     line.Append(", ");
                 line.Append(NumberFormatter.Format(product)).Append(" ")
-                    .Append(target.displayName).Append("/s");
+                    .Append(target.displayName).Append(suffix);
             }
-            return line.Length == 0 ? "nothing" : line.ToString();
+            return line.ToString();
         }
     }
 }

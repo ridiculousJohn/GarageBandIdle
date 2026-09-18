@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cee62cb24f128f140a7eec89dc895b33, type: 3}
+  m_Name: backyard_show
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.BarDefinition
+  id: backyard_show
+  tags:
+  - gig
+  displayName: Backyard Show
+  description: Two minutes in a backyard, paying your backyard show draw each time
+    the set lands.
+  consumes: []
+  fillAmount:
+    _value:
+      mantissa: 1.2
+      exponent: 2
+  fillRate:
+    _value:
+      mantissa: 1
+      exponent: 0
+  repeatWhen:
+    rid: 7579425558579642393
+  tap: {fileID: 11400000, guid: f6833b00ce91caa43b7d0395728c9b08, type: 2}
+  availableWhen:
+    rid: 7579425558579642394
+  onComplete:
+  - rid: 7579425558579642395
+  perFill: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 7579425558579642393
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: booked_backyard
+    - rid: 7579425558579642394
+      type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Book a Backyard Show
+        generator: {fileID: 11400000, guid: d2306a9b3c4af8b4ea7da43322186594, type: 2}
+        count:
+          _value:
+            mantissa: 1
+            exponent: 0
+    - rid: 7579425558579642395
+      type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        generator: {fileID: 11400000, guid: d2306a9b3c4af8b4ea7da43322186594, type: 2}

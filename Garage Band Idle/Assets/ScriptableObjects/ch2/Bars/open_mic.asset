@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cee62cb24f128f140a7eec89dc895b33, type: 3}
+  m_Name: open_mic
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.BarDefinition
+  id: open_mic
+  tags:
+  - gig
+  displayName: Tuesday Open Mic
+  description: A five-second set that fills on its own clock and pays your open mic
+    draw when it lands.
+  consumes: []
+  fillAmount:
+    _value:
+      mantissa: 5
+      exponent: 0
+  fillRate:
+    _value:
+      mantissa: 1
+      exponent: 0
+  repeatWhen:
+    rid: 7579425558579642635
+  tap: {fileID: 11400000, guid: 044fb53cce915364c8bbe54bc02d5d0e, type: 2}
+  availableWhen:
+    rid: 7579425558579642636
+  onComplete:
+  - rid: 7579425558579642637
+  perFill: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 7579425558579642635
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: booked_open_mic
+    - rid: 7579425558579642636
+      type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Book a Tuesday Open Mic
+        generator: {fileID: 11400000, guid: edf09e3dfa9244647bc2776a145bd91f, type: 2}
+        count:
+          _value:
+            mantissa: 1
+            exponent: 0
+    - rid: 7579425558579642637
+      type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        generator: {fileID: 11400000, guid: edf09e3dfa9244647bc2776a145bd91f, type: 2}

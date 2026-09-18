@@ -4,7 +4,8 @@
 
   "declaredTags": ["income", "production"],
 
-  "flags": ["ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen"],
+  "flags": ["ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen",
+            "ch2_complete", "story_ch2_open_seen", "story_ch2_end_seen"],
 
   "timers": ["encore_timer"],
 
@@ -42,6 +43,11 @@
           "target": "income",
           "stat": "rate",
           "formula": { "type": "RoadieTotalBoost", "perRoadie": 0.05 }
+        },
+        {
+          "target": "income",
+          "stat": "yield",
+          "formula": { "type": "RoadieTotalBoost", "perRoadie": 0.05 }
         }
       ]
     },
@@ -52,6 +58,12 @@
           "target": "production",
           "currencyId": "income",
           "stat": "rate",
+          "formula": { "type": "RoadieActiveBoost", "perRoadie": 0.05 }
+        },
+        {
+          "target": "production",
+          "currencyId": "income",
+          "stat": "yield",
           "formula": { "type": "RoadieActiveBoost", "perRoadie": 0.05 }
         }
       ]

@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b406945f730a46e4f948f7462c928dfd, type: 3}
+  m_Name: story_ch2_open
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Story.StoryBeatDefinition
+  id: story_ch2_open
+  tags: []
+  displayName: Three Songs on Tuesday
+  description: 
+  text: The garage was yours. This isn't. There's a sign-up sheet by the door, a
+    guy running sound who'd rather be anywhere else, and eleven other acts. You get
+    three songs on Tuesday. Take them. Then take Friday.
+  availableWhen:
+    rid: 7579425558579642466
+  seenFlag: story_ch2_open_seen
+  opensWhenAvailable: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: 7579425558579642466
+      type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 

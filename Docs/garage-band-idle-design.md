@@ -184,6 +184,11 @@ currencies as they become affordable.
 - **Prestige-bought content.** A generator or upgrade priced in a banked currency is simply declared
   one scope out from the tier that resets — it survives the reset that pays for it. A generator's
   cost currency is independent of what it produces ("buy with Cash, produce Merch" is a data shape).
+- **Run-priced content that outlives the run.** A purchase priced in the run's currency is declared
+  in the tier, where its price is, and its payload sets a flag declared on the chapter; whatever must
+  survive reads the flag - a bar's `repeatWhen` (a standing booking), a chapter permanent modifier's
+  `appliesWhen` (an automation switch, a discount). The purchase latch resets with the tier as every
+  tier purchase does, and the row hides on the flag.
 
 ---
 
@@ -458,7 +463,10 @@ against concentrating to sprint an active replay - both are real strategies. **B
 factors are ordinary effects whose target is authored data** — a tag (Ch. 1: `income`, carried by Cash
 and declared at root) — so
 *what* Roadies help with is a per-chapter design decision, never a code decision. Both carry
-`stat: rate`: Roadies are the passive-crew lever and scale production, never a tap's yield. They are
+`stat: rate` AND `stat: yield`, the pair `records_income` carries: Roadies scale every production
+of an income currency, a tap's yield and a gig's fired lump included. (Ctrl C's completion tokens
+boost the press: at a 2.5x token boost the chapter 1 copy/paste pays 30 Lines where the unboosted
+press pays 12 - John, 2026-09-18.) They are
 composed at different LEVELS, though. `roadie_total` is a currency-total effect - it is the same
 product everywhere, so the currency is where it belongs. `roadie_active` targets the production
 SOURCES (`{target: production, currencyId: income, stat: rate}`), because which chapter a number is
@@ -1674,8 +1682,9 @@ rate the balance is climbing at, zero before the first tick and for a currency n
 generator row is the name, the owned count - the purchased count in parentheses with the granted
 count added inside them when there is one, `(3)` and `(3+8.89e11)`, the reference game's shape - a
 line beneath the name reading the next unit's cost
-and what that one unit pays per second ("250.00 Cash => 3.00 Cash", through `Producer.UnitRate` at
-the declaring scope), and two buy buttons: "+1", and "+M" printing `Purchasing.MaxAffordable` at
+and what that one unit pays - per second for its rate entries, per firing for the yield entries a
+bar fires ("250.00 Cash => 3.00 Cash"; a draw's "5.00 Cash => 3.00 Cash, 0.50 Fans"), through
+`Producer.UnitRate` and `Producer.UnitYield` at the declaring scope, and two buy buttons: "+1", and "+M" printing `Purchasing.MaxAffordable` at
 the declaring scope, both disabled and both reading "+1" when M is zero, and both reading "+1"
 when one unit is affordable. A button buys the count printed on it: the tap submits `TryBuy` with that count, the
 command recomputes the series cost against the balance after its flush, and buys that count or
@@ -1684,8 +1693,9 @@ balance either way (production up, a bar's draw down), and the refresh at the tr
 repaints both labels. A long press on the row's text - a hold of
 `GameConfig.longPressSeconds`, judged by the element's own scheduler since it is presentation and
 never a game read - opens the generator's info screen, a host-owned overlay: the description, the
-same cost and yield line, the owned count in the row's form, and what the owned units produce per second, which is the
-owned sum times the per-unit rate because nothing in the effect vocabulary reads the count. The
+same cost and yield line, the owned count in the row's form, and what the owned units pay - per second for rates
+("Producing: 3.00 Cash/s") and per firing for yields ("Pays: 9.00 Cash, 1.50 Fans per gig"), each the
+owned sum times the per-unit figure because nothing in the effect vocabulary reads the count. The
 row reaches the host through `IGeneratorInfoOpener`, the shape `IStoryOpener` has, and the screen
 holds the generator and its declaring scope for as long as the request stands.
 
@@ -1979,9 +1989,12 @@ ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (1
     Currencies/  Modifiers/
   ch1/
     ch1.asset  tier1.asset
-    Currencies/  Producers/  Generators/  Upgrades/  Bars/  Groups/  Events/  Triggers/  StoryBeats/
+    Currencies/  Modifiers/  Producers/  Generators/  Upgrades/  Bars/  Groups/  Events/  Triggers/  StoryBeats/
+  ch2/
+    ch2.asset  tier2.asset
+    Currencies/  Modifiers/  Producers/  Generators/  Upgrades/  Bars/  Groups/  Events/  Triggers/  StoryBeats/
 Content/                 // the authored JSON the importer reads
-  root.json  chapter-01.json
+  root.json  chapter-01.json  chapter-02.json
 ```
 
 ### 12.14 Requirements

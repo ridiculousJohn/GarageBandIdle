@@ -1,0 +1,1964 @@
+{
+  "type": "ChapterDefinition",
+  "id": "ch2",
+  "displayName": "Open Mic",
+  "unlock": {
+    "type": "FlagSet",
+    "flagId": "ch1_complete",
+    "uiText": "Play the Backyard Party"
+  },
+  "flags": [
+    "album",
+    "botb1_done",
+    "botb2_done",
+    "botb3_done",
+    "booked_open_mic",
+    "booked_house_party",
+    "booked_coffeehouse",
+    "booked_backyard",
+    "booked_bar_opener",
+    "booked_botb_qualifier",
+    "bulk_booked",
+    "favors_owed",
+    "bookings_revealed",
+    "office_revealed",
+    "house_party_draw_revealed",
+    "coffeehouse_draw_revealed",
+    "backyard_draw_revealed",
+    "bar_opener_draw_revealed",
+    "botb_qualifier_draw_revealed",
+    "mailing_list_revealed",
+    "photographer_friend_revealed",
+    "zine_writeup_revealed",
+    "standing_open_mic_revealed",
+    "standing_house_party_revealed",
+    "standing_coffeehouse_revealed",
+    "standing_backyard_revealed",
+    "standing_bar_opener_revealed",
+    "standing_botb_qualifier_revealed",
+    "crowd_work_1_revealed",
+    "crowd_work_2_revealed",
+    "street_team_revealed",
+    "merch_table_revealed",
+    "the_van_revealed"
+  ],
+  "currencies": [
+    {
+      "id": "ch2_records",
+      "displayName": "EPs"
+    }
+  ],
+  "modifiers": [
+    {
+      "id": "gig_payout_x2",
+      "stacking": "Multiply",
+      "effects": [
+        {
+          "target": "gig_draw",
+          "stat": "yield",
+          "multiplier": 2
+        }
+      ]
+    },
+    {
+      "id": "bulk_booking_switch",
+      "appliesWhen": {
+        "type": "FlagSet",
+        "flagId": "bulk_booked"
+      },
+      "effects": [
+        {
+          "target": "gig_draw",
+          "stat": "autobuy"
+        }
+      ]
+    },
+    {
+      "id": "favors_discount",
+      "appliesWhen": {
+        "type": "FlagSet",
+        "flagId": "favors_owed"
+      },
+      "effects": [
+        {
+          "target": "gig_draw",
+          "stat": "cost",
+          "multiplier": 0.5
+        }
+      ]
+    }
+  ],
+  "permanentModifiers": [
+    "bulk_booking_switch",
+    "favors_discount"
+  ],
+  "rung": {
+    "label": "Win the Talent Show",
+    "offerCondition": {
+      "type": "CurrencyAtLeast",
+      "currency": "ch2_records",
+      "threshold": 120,
+      "uiText": "Record 120 EPs"
+    },
+    "actions": [
+      {
+        "type": "ExecuteRung",
+        "tier": "tier2"
+      },
+      {
+        "type": "AddCurrency",
+        "currencies": [
+          "roadies"
+        ],
+        "amount": 1
+      },
+      {
+        "type": "SetFlag",
+        "flagId": "ch2_complete"
+      },
+      {
+        "type": "ResetScope",
+        "scope": "ch2"
+      }
+    ]
+  },
+  "storyBeats": [
+    {
+      "id": "story_ch2_open",
+      "displayName": "Three Songs on Tuesday",
+      "availableWhen": {
+        "type": "Always"
+      },
+      "seenFlag": "story_ch2_open_seen",
+      "text": "The garage was yours. This isn't. There's a sign-up sheet by the door, a guy running sound who'd rather be anywhere else, and eleven other acts. You get three songs on Tuesday. Take them. Then take Friday."
+    },
+    {
+      "id": "story_ch2_end",
+      "displayName": "The Club on Third",
+      "availableWhen": {
+        "type": "FlagSet",
+        "flagId": "ch2_complete",
+        "uiText": "Win the Talent Show"
+      },
+      "seenFlag": "story_ch2_end_seen",
+      "text": "By now the calendar runs itself - Tuesdays, the house parties, the coffeehouse guy who finally started calling you. The talent show is the one night that isn't routine, and you win it anyway. A woman who books the club on Third finds you at the load-out and asks what else you've got. Dave's already got the van running."
+    }
+  ],
+  "sections": [
+    {
+      "title": "The Calendar",
+      "description": "The nights you have booked. Pick a gig to play it, tap its row to work the crowd, and read your running totals on the lines above.",
+      "visibleWhen": {
+        "type": "Always"
+      },
+      "scopeId": "tier2",
+      "modules": [
+        {
+          "prefabId": "currency_line",
+          "contentId": "cash"
+        },
+        {
+          "prefabId": "currency_line",
+          "contentId": "fans"
+        },
+        {
+          "prefabId": "currency_line",
+          "contentId": "buzz",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "promo_revealed"
+          }
+        },
+        {
+          "prefabId": "currency_line",
+          "contentId": "records",
+          "visibleWhen": {
+            "type": "CurrencyAtLeast",
+            "currency": "records",
+            "threshold": 1
+          }
+        },
+        {
+          "prefabId": "currency_line",
+          "contentId": "ch2_records",
+          "visibleWhen": {
+            "type": "CurrencyAtLeast",
+            "currency": "ch2_records",
+            "threshold": 1
+          }
+        },
+        {
+          "prefabId": "group",
+          "contentId": "the_calendar"
+        },
+        {
+          "prefabId": "story_row",
+          "contentId": "story_ch2_open"
+        },
+        {
+          "prefabId": "story_row",
+          "contentId": "story_ch2_end",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "ch2_complete"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Bookings",
+      "description": "A gig's draw is how many people turn up for it. Buy the draw and that gig pays more cash and more fans every time you finish the set.",
+      "visibleWhen": {
+        "type": "FlagSet",
+        "flagId": "bookings_revealed"
+      },
+      "scopeId": "tier2",
+      "modules": [
+        {
+          "prefabId": "generator_row",
+          "contentId": "open_mic_draw"
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "house_party_draw",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "house_party_draw_revealed"
+          }
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "coffeehouse_draw",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "coffeehouse_draw_revealed"
+          }
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "backyard_draw",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "backyard_draw_revealed"
+          }
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "bar_opener_draw",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "bar_opener_draw_revealed"
+          }
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "botb_qualifier_draw",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "botb_qualifier_draw_revealed"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Promotion",
+      "description": "Handbills, mailing lists and anyone who will write about you. They build Buzz on their own, and every point of Buzz adds a little to the cash a gig pays.",
+      "visibleWhen": {
+        "type": "FlagSet",
+        "flagId": "promo_revealed"
+      },
+      "scopeId": "tier2",
+      "modules": [
+        {
+          "prefabId": "generator_row",
+          "contentId": "flyers"
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "mailing_list",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "mailing_list_revealed"
+          }
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "photographer_friend",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "photographer_friend_revealed"
+          }
+        },
+        {
+          "prefabId": "generator_row",
+          "contentId": "zine_writeup",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "zine_writeup_revealed"
+          }
+        }
+      ]
+    },
+    {
+      "title": "The Office",
+      "description": "Where the band's business gets done. A standing booking makes a gig repeat itself, and the rest buys you more out of every night you play.",
+      "visibleWhen": {
+        "type": "FlagSet",
+        "flagId": "office_revealed"
+      },
+      "scopeId": "tier2",
+      "modules": [
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "standing_open_mic",
+          "visibleWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "FlagSet",
+                "flagId": "standing_open_mic_revealed"
+              },
+              {
+                "type": "Not",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "booked_open_mic"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "standing_house_party",
+          "visibleWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "FlagSet",
+                "flagId": "standing_house_party_revealed"
+              },
+              {
+                "type": "Not",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "booked_house_party"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "standing_coffeehouse",
+          "visibleWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "FlagSet",
+                "flagId": "standing_coffeehouse_revealed"
+              },
+              {
+                "type": "Not",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "booked_coffeehouse"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "standing_backyard",
+          "visibleWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "FlagSet",
+                "flagId": "standing_backyard_revealed"
+              },
+              {
+                "type": "Not",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "booked_backyard"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "standing_bar_opener",
+          "visibleWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "FlagSet",
+                "flagId": "standing_bar_opener_revealed"
+              },
+              {
+                "type": "Not",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "booked_bar_opener"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "standing_botb_qualifier",
+          "visibleWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "FlagSet",
+                "flagId": "standing_botb_qualifier_revealed"
+              },
+              {
+                "type": "Not",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "booked_botb_qualifier"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "crowd_work_1",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "crowd_work_1_revealed"
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "crowd_work_2",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "crowd_work_2_revealed"
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "street_team",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "street_team_revealed"
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "merch_table",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "merch_table_revealed"
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "the_van",
+          "visibleWhen": {
+            "type": "FlagSet",
+            "flagId": "the_van_revealed"
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "bulk_booking",
+          "visibleWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "CurrencyAtLeast",
+                "currency": "ch2_records",
+                "threshold": 8
+              },
+              {
+                "type": "Not",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "bulk_booked"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "prefabId": "upgrade_row",
+          "contentId": "favors",
+          "visibleWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "CurrencyAtLeast",
+                "currency": "ch2_records",
+                "threshold": 25
+              },
+              {
+                "type": "Not",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "favors_owed"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "The Release",
+      "description": "Record an EP once you have 300 fans. It banks Records and EPs and starts the run over with the calendar empty.",
+      "visibleWhen": {
+        "type": "FlagSet",
+        "flagId": "album"
+      },
+      "scopeId": "ch2",
+      "modules": [
+        {
+          "prefabId": "rung_button",
+          "scopeId": "tier2"
+        }
+      ]
+    },
+    {
+      "title": "Battle of the Bands",
+      "description": "Three timed rounds, one at a time. The run starts over for each one, and clearing a round doubles what every gig pays for the rest of the chapter.",
+      "visibleWhen": {
+        "type": "CurrencyAtLeast",
+        "currency": "ch2_records",
+        "threshold": 5
+      },
+      "scopeId": "tier2",
+      "modules": [
+        {
+          "prefabId": "event_row",
+          "contentId": "battle_1"
+        },
+        {
+          "prefabId": "event_row",
+          "contentId": "battle_2"
+        },
+        {
+          "prefabId": "event_row",
+          "contentId": "battle_3"
+        }
+      ]
+    },
+    {
+      "title": "The Talent Show",
+      "description": "The night that ends the chapter. Record 120 EPs to get on the bill, and you walk away with another Roadie.",
+      "visibleWhen": {
+        "type": "CurrencyAtLeast",
+        "currency": "ch2_records",
+        "threshold": 1
+      },
+      "scopeId": "ch2",
+      "modules": [
+        {
+          "prefabId": "rung_button"
+        }
+      ]
+    }
+  ],
+  "children": [
+    {
+      "type": "TierDefinition",
+      "id": "tier2",
+      "declaredTags": [
+        "gig",
+        "gig_draw",
+        "promo",
+        "work_the_crowd"
+      ],
+      "flags": [
+        "promo_revealed"
+      ],
+      "currencies": [
+        {
+          "id": "cash",
+          "displayName": "Cash",
+          "tags": [
+            "income"
+          ]
+        },
+        {
+          "id": "fans",
+          "displayName": "Fans"
+        },
+        {
+          "id": "buzz",
+          "displayName": "Buzz"
+        }
+      ],
+      "permanentModifiers": [
+        "buzz_buff"
+      ],
+      "modifiers": [
+        {
+          "id": "buzz_buff",
+          "effects": [
+            {
+              "target": "gig_draw",
+              "currencyId": "cash",
+              "stat": "yield",
+              "formula": {
+                "type": "LinearOnBalance",
+                "currency": "buzz",
+                "coefficient": 0.01
+              }
+            }
+          ]
+        }
+      ],
+      "producers": [
+        {
+          "id": "crowd_open_mic",
+          "displayName": "Work the Crowd",
+          "tags": [
+            "work_the_crowd"
+          ],
+          "produces": [
+            {
+              "bar": "open_mic",
+              "stat": "yield",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "crowd_house_party",
+          "displayName": "Work the Crowd",
+          "tags": [
+            "work_the_crowd"
+          ],
+          "produces": [
+            {
+              "bar": "house_party",
+              "stat": "yield",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "crowd_coffeehouse",
+          "displayName": "Work the Crowd",
+          "tags": [
+            "work_the_crowd"
+          ],
+          "produces": [
+            {
+              "bar": "coffeehouse_set",
+              "stat": "yield",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "crowd_backyard",
+          "displayName": "Work the Crowd",
+          "tags": [
+            "work_the_crowd"
+          ],
+          "produces": [
+            {
+              "bar": "backyard_show",
+              "stat": "yield",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "crowd_bar_opener",
+          "displayName": "Work the Crowd",
+          "tags": [
+            "work_the_crowd"
+          ],
+          "produces": [
+            {
+              "bar": "bar_opener",
+              "stat": "yield",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "crowd_botb_qualifier",
+          "displayName": "Work the Crowd",
+          "tags": [
+            "work_the_crowd"
+          ],
+          "produces": [
+            {
+              "bar": "botb_qualifier",
+              "stat": "yield",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "bars": [
+        {
+          "id": "open_mic",
+          "displayName": "Tuesday Open Mic",
+          "description": "A five-second set that fills on its own clock and pays your open mic draw when it lands.",
+          "tags": [
+            "gig"
+          ],
+          "consumes": [],
+          "fillAmount": 5,
+          "fillRate": 1,
+          "repeatWhen": {
+            "type": "FlagSet",
+            "flagId": "booked_open_mic"
+          },
+          "tap": "crowd_open_mic",
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "open_mic_draw",
+            "count": 1,
+            "uiText": "Book a Tuesday Open Mic"
+          },
+          "onComplete": [
+            {
+              "type": "FireGeneratorYield",
+              "generator": "open_mic_draw"
+            }
+          ]
+        },
+        {
+          "id": "house_party",
+          "displayName": "House Party",
+          "description": "Fifteen seconds in somebody's living room, paying your house party draw every time it fills.",
+          "tags": [
+            "gig"
+          ],
+          "consumes": [],
+          "fillAmount": 15,
+          "fillRate": 1,
+          "repeatWhen": {
+            "type": "FlagSet",
+            "flagId": "booked_house_party"
+          },
+          "tap": "crowd_house_party",
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "house_party_draw",
+            "count": 1,
+            "uiText": "Book a House Party"
+          },
+          "onComplete": [
+            {
+              "type": "FireGeneratorYield",
+              "generator": "house_party_draw"
+            }
+          ]
+        },
+        {
+          "id": "coffeehouse_set",
+          "displayName": "Coffeehouse Set",
+          "description": "Forty seconds for the coffee crowd, paying your coffeehouse draw when the set finishes.",
+          "tags": [
+            "gig"
+          ],
+          "consumes": [],
+          "fillAmount": 40,
+          "fillRate": 1,
+          "repeatWhen": {
+            "type": "FlagSet",
+            "flagId": "booked_coffeehouse"
+          },
+          "tap": "crowd_coffeehouse",
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "coffeehouse_draw",
+            "count": 1,
+            "uiText": "Book a Coffeehouse Set"
+          },
+          "onComplete": [
+            {
+              "type": "FireGeneratorYield",
+              "generator": "coffeehouse_draw"
+            }
+          ]
+        },
+        {
+          "id": "backyard_show",
+          "displayName": "Backyard Show",
+          "description": "Two minutes in a backyard, paying your backyard show draw each time the set lands.",
+          "tags": [
+            "gig"
+          ],
+          "consumes": [],
+          "fillAmount": 120,
+          "fillRate": 1,
+          "repeatWhen": {
+            "type": "FlagSet",
+            "flagId": "booked_backyard"
+          },
+          "tap": "crowd_backyard",
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "backyard_draw",
+            "count": 1,
+            "uiText": "Book a Backyard Show"
+          },
+          "onComplete": [
+            {
+              "type": "FireGeneratorYield",
+              "generator": "backyard_draw"
+            }
+          ]
+        },
+        {
+          "id": "bar_opener",
+          "displayName": "Bar Opening Slot",
+          "description": "Five minutes opening for somebody else, paying your bar opening slot draw when the set is done.",
+          "tags": [
+            "gig"
+          ],
+          "consumes": [],
+          "fillAmount": 300,
+          "fillRate": 1,
+          "repeatWhen": {
+            "type": "FlagSet",
+            "flagId": "booked_bar_opener"
+          },
+          "tap": "crowd_bar_opener",
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "bar_opener_draw",
+            "count": 1,
+            "uiText": "Book a Bar Opening Slot"
+          },
+          "onComplete": [
+            {
+              "type": "FireGeneratorYield",
+              "generator": "bar_opener_draw"
+            }
+          ]
+        },
+        {
+          "id": "botb_qualifier",
+          "displayName": "Battle of the Bands Qualifier",
+          "description": "Twelve minutes at the top of the ladder, paying your qualifier draw every time it fills.",
+          "tags": [
+            "gig"
+          ],
+          "consumes": [],
+          "fillAmount": 720,
+          "fillRate": 1,
+          "repeatWhen": {
+            "type": "FlagSet",
+            "flagId": "booked_botb_qualifier"
+          },
+          "tap": "crowd_botb_qualifier",
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "botb_qualifier_draw",
+            "count": 1,
+            "uiText": "Book a Battle of the Bands Qualifier"
+          },
+          "onComplete": [
+            {
+              "type": "FireGeneratorYield",
+              "generator": "botb_qualifier_draw"
+            }
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "id": "the_calendar",
+          "maxActive": 6,
+          "members": [
+            "open_mic",
+            "house_party",
+            "coffeehouse_set",
+            "backyard_show",
+            "bar_opener",
+            "botb_qualifier"
+          ]
+        }
+      ],
+      "generators": [
+        {
+          "id": "open_mic_draw",
+          "displayName": "Open Mic Draw",
+          "description": "How many people turn up for you on a Tuesday, and every level pays a bigger lump of Cash and Fans when the set ends.",
+          "tags": [
+            "gig_draw",
+            "production"
+          ],
+          "availableWhen": {
+            "type": "Always"
+          },
+          "costCurrency": "cash",
+          "baseCost": 5,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "cash",
+              "stat": "yield",
+              "value": 3
+            },
+            {
+              "currency": "fans",
+              "stat": "yield",
+              "value": 0.5
+            }
+          ]
+        },
+        {
+          "id": "house_party_draw",
+          "displayName": "House Party Draw",
+          "description": "How many people you pack into a house party, and every level pays a bigger lump of Cash and Fans when the party wraps.",
+          "tags": [
+            "gig_draw",
+            "production"
+          ],
+          "availableWhen": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 150
+          },
+          "costCurrency": "cash",
+          "baseCost": 60,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "cash",
+              "stat": "yield",
+              "value": 25
+            },
+            {
+              "currency": "fans",
+              "stat": "yield",
+              "value": 4
+            }
+          ]
+        },
+        {
+          "id": "coffeehouse_draw",
+          "displayName": "Coffeehouse Draw",
+          "description": "How many tables fill up for the coffeehouse set, and every level pays a bigger lump of Cash and Fans when the set finishes.",
+          "tags": [
+            "gig_draw",
+            "production"
+          ],
+          "availableWhen": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 2500
+          },
+          "costCurrency": "cash",
+          "baseCost": 700,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "cash",
+              "stat": "yield",
+              "value": 180
+            },
+            {
+              "currency": "fans",
+              "stat": "yield",
+              "value": 22
+            }
+          ]
+        },
+        {
+          "id": "backyard_draw",
+          "displayName": "Backyard Show Draw",
+          "description": "How much of the neighborhood walks over for the backyard show, and every level pays a bigger lump of Cash and Fans at the end of the night.",
+          "tags": [
+            "gig_draw",
+            "production"
+          ],
+          "availableWhen": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 40000
+          },
+          "costCurrency": "cash",
+          "baseCost": 9000,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "cash",
+              "stat": "yield",
+              "value": 1500
+            },
+            {
+              "currency": "fans",
+              "stat": "yield",
+              "value": 140
+            }
+          ]
+        },
+        {
+          "id": "bar_opener_draw",
+          "displayName": "Bar Opening Slot Draw",
+          "description": "How much of the bar's crowd sticks around for your opening slot, and every level pays a bigger lump of Cash and Fans when you come off.",
+          "tags": [
+            "gig_draw",
+            "production"
+          ],
+          "availableWhen": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 700000
+          },
+          "costCurrency": "cash",
+          "baseCost": 150000,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "cash",
+              "stat": "yield",
+              "value": 14000
+            },
+            {
+              "currency": "fans",
+              "stat": "yield",
+              "value": 900
+            }
+          ]
+        },
+        {
+          "id": "botb_qualifier_draw",
+          "displayName": "Battle of the Bands Qualifier Draw",
+          "description": "How many of your own people show up to the qualifier, and every level pays a bigger lump of Cash and Fans when the night ends.",
+          "tags": [
+            "gig_draw",
+            "production"
+          ],
+          "availableWhen": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 15000000
+          },
+          "costCurrency": "cash",
+          "baseCost": 3000000,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "cash",
+              "stat": "yield",
+              "value": 160000
+            },
+            {
+              "currency": "fans",
+              "stat": "yield",
+              "value": 7000
+            }
+          ]
+        },
+        {
+          "id": "flyers",
+          "displayName": "Flyers",
+          "description": "Another run of flyers stapled to the poles around town, each one building Buzz while you play.",
+          "tags": [
+            "promo"
+          ],
+          "availableWhen": {
+            "type": "FlagSet",
+            "flagId": "promo_revealed"
+          },
+          "costCurrency": "cash",
+          "baseCost": 80,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "buzz",
+              "stat": "rate",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "id": "mailing_list",
+          "displayName": "Mailing List",
+          "description": "Another page of names who hear about the next show first, and every page builds Buzz faster than a flyer.",
+          "tags": [
+            "promo"
+          ],
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "flyers",
+            "count": 5
+          },
+          "costCurrency": "cash",
+          "baseCost": 1200,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "buzz",
+              "stat": "rate",
+              "value": 0.3
+            }
+          ]
+        },
+        {
+          "id": "photographer_friend",
+          "displayName": "A Friend With a Camera",
+          "description": "Someone who shoots your shows for free, and the pictures going around build Buzz faster than a mailing list.",
+          "tags": [
+            "promo"
+          ],
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "mailing_list",
+            "count": 5
+          },
+          "costCurrency": "cash",
+          "baseCost": 20000,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "buzz",
+              "stat": "rate",
+              "value": 1.6
+            }
+          ]
+        },
+        {
+          "id": "zine_writeup",
+          "displayName": "Local Zine Write-Up",
+          "description": "Another write-up in the local zine, the loudest Buzz in town per printing.",
+          "tags": [
+            "promo"
+          ],
+          "availableWhen": {
+            "type": "OwnedCountAtLeast",
+            "generator": "photographer_friend",
+            "count": 5
+          },
+          "costCurrency": "cash",
+          "baseCost": 400000,
+          "growth": 1.3,
+          "produces": [
+            {
+              "currency": "buzz",
+              "stat": "rate",
+              "value": 8
+            }
+          ]
+        }
+      ],
+      "upgrades": [
+        {
+          "id": "standing_open_mic",
+          "displayName": "Standing Booking: Open Mic",
+          "description": "Puts you on the Tuesday bill for good, so the open mic re-books itself and keeps paying while you are away.",
+          "gate": {
+            "type": "OwnedCountAtLeast",
+            "generator": "open_mic_draw",
+            "count": 3
+          },
+          "costCurrency": "cash",
+          "cost": 120,
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "booked_open_mic"
+            }
+          ]
+        },
+        {
+          "id": "standing_house_party",
+          "displayName": "Standing Booking: House Party",
+          "description": "Gets your name on every party going around, so the house party re-books itself and keeps paying while you are away.",
+          "gate": {
+            "type": "OwnedCountAtLeast",
+            "generator": "house_party_draw",
+            "count": 3
+          },
+          "costCurrency": "cash",
+          "cost": 2500,
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "booked_house_party"
+            }
+          ]
+        },
+        {
+          "id": "standing_coffeehouse",
+          "displayName": "Standing Booking: Coffeehouse",
+          "description": "The coffeehouse starts calling you itself, so the set re-books itself and keeps paying while you are away.",
+          "gate": {
+            "type": "OwnedCountAtLeast",
+            "generator": "coffeehouse_draw",
+            "count": 3
+          },
+          "costCurrency": "cash",
+          "cost": 30000,
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "booked_coffeehouse"
+            }
+          ]
+        },
+        {
+          "id": "standing_backyard",
+          "displayName": "Standing Booking: Backyard",
+          "description": "The neighbors keep asking for another one, so the backyard show re-books itself and keeps paying while you are away.",
+          "gate": {
+            "type": "OwnedCountAtLeast",
+            "generator": "backyard_draw",
+            "count": 3
+          },
+          "costCurrency": "cash",
+          "cost": 400000,
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "booked_backyard"
+            }
+          ]
+        },
+        {
+          "id": "standing_bar_opener",
+          "displayName": "Standing Booking: Bar Opener",
+          "description": "The bar keeps you on its calendar, so the opening slot re-books itself and keeps paying while you are away.",
+          "gate": {
+            "type": "OwnedCountAtLeast",
+            "generator": "bar_opener_draw",
+            "count": 3
+          },
+          "costCurrency": "cash",
+          "cost": 6000000,
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "booked_bar_opener"
+            }
+          ]
+        },
+        {
+          "id": "standing_botb_qualifier",
+          "displayName": "Standing Booking: Qualifier",
+          "description": "Your name stays in the qualifier draw, so the night re-books itself and keeps paying while you are away.",
+          "gate": {
+            "type": "OwnedCountAtLeast",
+            "generator": "botb_qualifier_draw",
+            "count": 3
+          },
+          "costCurrency": "cash",
+          "cost": 120000000,
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "booked_botb_qualifier"
+            }
+          ]
+        },
+        {
+          "id": "bulk_booking",
+          "displayName": "Bulk Booking",
+          "description": "Hand the calendar over: every gig buys as many levels as you can afford on its own, for the rest of the chapter.",
+          "gate": {
+            "type": "CurrencyAtLeast",
+            "currency": "ch2_records",
+            "threshold": 8
+          },
+          "costCurrency": "cash",
+          "cost": 250000,
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "bulk_booked"
+            }
+          ]
+        },
+        {
+          "id": "favors",
+          "displayName": "Favors Owed",
+          "description": "Everyone in town owes you one, so every gig level costs half for the rest of the chapter.",
+          "gate": {
+            "type": "CurrencyAtLeast",
+            "currency": "ch2_records",
+            "threshold": 25
+          },
+          "costCurrency": "cash",
+          "cost": 2000000,
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "favors_owed"
+            }
+          ]
+        },
+        {
+          "id": "crowd_work_1",
+          "displayName": "Stage Banter",
+          "description": "Talk to the room between songs, and every tap on a gig pushes its bar twice as far.",
+          "gate": {
+            "type": "CurrencyAtLeast",
+            "currency": "cash",
+            "threshold": 300
+          },
+          "costCurrency": "cash",
+          "cost": 300,
+          "effects": [
+            {
+              "target": "work_the_crowd",
+              "stat": "yield",
+              "multiplier": 2
+            }
+          ]
+        },
+        {
+          "id": "crowd_work_2",
+          "displayName": "Call and Response",
+          "description": "Get the crowd singing back at you, and every tap pushes a gig's bar further still.",
+          "gate": {
+            "type": "CurrencyAtLeast",
+            "currency": "cash",
+            "threshold": 25000
+          },
+          "costCurrency": "cash",
+          "cost": 25000,
+          "effects": [
+            {
+              "target": "work_the_crowd",
+              "stat": "yield",
+              "multiplier": 2.5
+            }
+          ]
+        },
+        {
+          "id": "street_team",
+          "displayName": "Street Team",
+          "description": "Kids who hand out your flyers for you, so everything in Promotion builds Buzz twice as fast.",
+          "gate": {
+            "type": "CurrencyAtLeast",
+            "currency": "buzz",
+            "threshold": 40
+          },
+          "costCurrency": "cash",
+          "cost": 15000,
+          "effects": [
+            {
+              "target": "promo",
+              "stat": "rate",
+              "multiplier": 2
+            }
+          ]
+        },
+        {
+          "id": "merch_table",
+          "displayName": "A Merch Table",
+          "description": "Shirts and tapes by the door, so every gig pays more Cash when it ends.",
+          "gate": {
+            "type": "CurrencyAtLeast",
+            "currency": "fans",
+            "threshold": 200
+          },
+          "costCurrency": "cash",
+          "cost": 120000,
+          "effects": [
+            {
+              "target": "gig_draw",
+              "currencyId": "cash",
+              "stat": "yield",
+              "multiplier": 1.5
+            }
+          ]
+        },
+        {
+          "id": "the_van",
+          "displayName": "Borrow the Van",
+          "description": "Dave's van gets the gear and a carload of friends to the show, so every gig brings more Fans.",
+          "gate": {
+            "type": "CurrencyAtLeast",
+            "currency": "fans",
+            "threshold": 5000
+          },
+          "costCurrency": "cash",
+          "cost": 3000000,
+          "effects": [
+            {
+              "target": "gig_draw",
+              "currencyId": "fans",
+              "stat": "yield",
+              "multiplier": 1.5
+            }
+          ]
+        }
+      ],
+      "triggers": [
+        {
+          "id": "opening_cash",
+          "condition": {
+            "type": "Always"
+          },
+          "actions": [
+            {
+              "type": "AddCurrency",
+              "currencies": [
+                "cash"
+              ],
+              "amount": 5
+            }
+          ]
+        },
+        {
+          "id": "reveal_promo",
+          "condition": {
+            "type": "CurrencyAtLeast",
+            "currency": "cash",
+            "threshold": 200
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "promo_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_bookings",
+          "condition": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 1
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "bookings_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_office",
+          "condition": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 100
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "office_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_house_party_draw",
+          "condition": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 150
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "house_party_draw_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_coffeehouse_draw",
+          "condition": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 2500
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "coffeehouse_draw_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_backyard_draw",
+          "condition": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 40000
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "backyard_draw_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_bar_opener_draw",
+          "condition": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 700000
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "bar_opener_draw_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_botb_qualifier_draw",
+          "condition": {
+            "type": "EarnedTotalAtLeast",
+            "currency": "cash",
+            "threshold": 15000000
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "botb_qualifier_draw_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_mailing_list",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "flyers",
+            "count": 5
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "mailing_list_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_photographer_friend",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "mailing_list",
+            "count": 5
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "photographer_friend_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_zine_writeup",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "photographer_friend",
+            "count": 5
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "zine_writeup_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_standing_open_mic",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "open_mic_draw",
+            "count": 3
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "standing_open_mic_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_standing_house_party",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "house_party_draw",
+            "count": 3
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "standing_house_party_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_standing_coffeehouse",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "coffeehouse_draw",
+            "count": 3
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "standing_coffeehouse_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_standing_backyard",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "backyard_draw",
+            "count": 3
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "standing_backyard_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_standing_bar_opener",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "bar_opener_draw",
+            "count": 3
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "standing_bar_opener_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_standing_botb_qualifier",
+          "condition": {
+            "type": "OwnedCountAtLeast",
+            "generator": "botb_qualifier_draw",
+            "count": 3
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "standing_botb_qualifier_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_crowd_work_1",
+          "condition": {
+            "type": "CurrencyAtLeast",
+            "currency": "cash",
+            "threshold": 300
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "crowd_work_1_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_crowd_work_2",
+          "condition": {
+            "type": "CurrencyAtLeast",
+            "currency": "cash",
+            "threshold": 25000
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "crowd_work_2_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_street_team",
+          "condition": {
+            "type": "CurrencyAtLeast",
+            "currency": "buzz",
+            "threshold": 40
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "street_team_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_merch_table",
+          "condition": {
+            "type": "CurrencyAtLeast",
+            "currency": "fans",
+            "threshold": 200
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "merch_table_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_the_van",
+          "condition": {
+            "type": "CurrencyAtLeast",
+            "currency": "fans",
+            "threshold": 5000
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "the_van_revealed"
+            }
+          ]
+        },
+        {
+          "id": "reveal_release",
+          "condition": {
+            "type": "CurrencyAtLeast",
+            "currency": "fans",
+            "threshold": 300
+          },
+          "actions": [
+            {
+              "type": "SetFlag",
+              "flagId": "album"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "id": "battle_1",
+          "displayName": "Battle of the Bands I",
+          "description": "Five minutes to pull 250 fans with no handicap at all - the clock is the whole contest.",
+          "availableWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "CurrencyAtLeast",
+                "currency": "ch2_records",
+                "threshold": 5,
+                "uiText": "5 EPs"
+              },
+              {
+                "type": "Not",
+                "uiText": "Already cleared",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "botb1_done"
+                }
+              }
+            ]
+          },
+          "goal": {
+            "type": "CurrencyAtLeast",
+            "currency": "fans",
+            "threshold": 250
+          },
+          "timeLimitSeconds": 300,
+          "handicaps": [],
+          "onEntry": [
+            {
+              "type": "RestartScope",
+              "scope": "tier2"
+            }
+          ],
+          "rewards": [
+            {
+              "type": "AddModifier",
+              "scope": "ch2",
+              "modifier": "gig_payout_x2"
+            },
+            {
+              "type": "SetFlag",
+              "flagId": "botb1_done"
+            }
+          ],
+          "onEnd": [
+            {
+              "type": "ResetScope",
+              "scope": "tier2"
+            }
+          ]
+        },
+        {
+          "id": "battle_2",
+          "displayName": "Battle of the Bands II",
+          "description": "Five minutes to pull 2500 fans while working the crowd counts half.",
+          "availableWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "FlagSet",
+                "flagId": "botb1_done",
+                "uiText": "Clear Battle of the Bands I first"
+              },
+              {
+                "type": "Not",
+                "uiText": "Already cleared",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "botb2_done"
+                }
+              },
+              {
+                "type": "CurrencyAtLeast",
+                "currency": "ch2_records",
+                "threshold": 5,
+                "uiText": "5 EPs"
+              }
+            ]
+          },
+          "goal": {
+            "type": "CurrencyAtLeast",
+            "currency": "fans",
+            "threshold": 2500
+          },
+          "timeLimitSeconds": 300,
+          "handicaps": [
+            {
+              "target": "work_the_crowd",
+              "stat": "yield",
+              "multiplier": 0.5
+            }
+          ],
+          "onEntry": [
+            {
+              "type": "RestartScope",
+              "scope": "tier2"
+            }
+          ],
+          "rewards": [
+            {
+              "type": "AddModifier",
+              "scope": "ch2",
+              "modifier": "gig_payout_x2"
+            },
+            {
+              "type": "SetFlag",
+              "flagId": "botb2_done"
+            }
+          ],
+          "onEnd": [
+            {
+              "type": "ResetScope",
+              "scope": "tier2"
+            }
+          ]
+        },
+        {
+          "id": "battle_3",
+          "displayName": "Battle of the Bands III",
+          "description": "Five minutes to pull 25000 fans with Bulk Booking off for the run.",
+          "availableWhen": {
+            "type": "All",
+            "conditions": [
+              {
+                "type": "FlagSet",
+                "flagId": "botb2_done",
+                "uiText": "Clear Battle of the Bands II first"
+              },
+              {
+                "type": "Not",
+                "uiText": "Already cleared",
+                "condition": {
+                  "type": "FlagSet",
+                  "flagId": "botb3_done"
+                }
+              },
+              {
+                "type": "CurrencyAtLeast",
+                "currency": "ch2_records",
+                "threshold": 5,
+                "uiText": "5 EPs"
+              }
+            ]
+          },
+          "goal": {
+            "type": "CurrencyAtLeast",
+            "currency": "fans",
+            "threshold": 25000
+          },
+          "timeLimitSeconds": 300,
+          "handicaps": [
+            {
+              "target": "gig_draw",
+              "stat": "autobuy"
+            }
+          ],
+          "onEntry": [
+            {
+              "type": "RestartScope",
+              "scope": "tier2"
+            }
+          ],
+          "rewards": [
+            {
+              "type": "AddModifier",
+              "scope": "ch2",
+              "modifier": "gig_payout_x2"
+            },
+            {
+              "type": "SetFlag",
+              "flagId": "botb3_done"
+            }
+          ],
+          "onEnd": [
+            {
+              "type": "ResetScope",
+              "scope": "tier2"
+            }
+          ]
+        }
+      ],
+      "rung": {
+        "label": "Record an EP",
+        "offerCondition": {
+          "type": "All",
+          "conditions": [
+            {
+              "type": "CurrencyAtLeast",
+              "currency": "fans",
+              "threshold": 300,
+              "uiText": "300 fans"
+            },
+            {
+              "type": "Not",
+              "uiText": "Claim your Battle of the Bands reward first",
+              "condition": {
+                "type": "EventRewardPending"
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "AddCurrency",
+            "currencies": [
+              "records",
+              "ch2_records"
+            ],
+            "formula": {
+              "type": "RootCurveFormula",
+              "currency": "fans",
+              "divisor": 10,
+              "exponent": 0.5
+            }
+          },
+          {
+            "type": "ResetScope",
+            "scope": "tier2"
+          }
+        ]
+      }
+    }
+  ]
+}

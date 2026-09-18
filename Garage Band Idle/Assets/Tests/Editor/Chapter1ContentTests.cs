@@ -21,6 +21,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     {
         private static RootDefinition root;
         private static ChapterDefinition ch1;
+        private static ChapterDefinition ch2;
         private static TierDefinition tier1;
         private static ComposedContent content;
 
@@ -31,9 +32,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 ChapterJsonImporter.AssetRootPath + "/root/root.asset");
             ch1 = AssetDatabase.LoadAssetAtPath<ChapterDefinition>(
                 ChapterJsonImporter.AssetRootPath + "/ch1/ch1.asset");
+            ch2 = AssetDatabase.LoadAssetAtPath<ChapterDefinition>(
+                ChapterJsonImporter.AssetRootPath + "/ch2/ch2.asset");
             Assert.IsNotNull(root, "root.json has not been imported - run Garage Band Idle/Import Content.");
             Assert.IsNotNull(ch1, "chapter-01.json has not been imported - run Garage Band Idle/Import Content.");
-            content = ComposedContent.Compose(root, new[] { ch1 });
+            Assert.IsNotNull(ch2, "chapter-02.json has not been imported - run Garage Band Idle/Import Content.");
+            // The roster boot composes: root declares chapter 2's latches too,
+            // and a pass over root with ch1 alone would report them unset.
+            content = ComposedContent.Compose(root, new[] { ch1, ch2 });
             tier1 = (TierDefinition)ch1.children.Single();
         }
 
@@ -56,7 +62,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void The_scope_shape_is_root_then_ch1_then_tier1()
         {
-            Assert.AreEqual(new[] { "ch1" }, content.Chapters.Select(c => c.Id).ToArray());
+            Assert.AreEqual(new[] { "ch1", "ch2" }, content.Chapters.Select(c => c.Id).ToArray());
             Assert.AreEqual(0, root.children.Count, "the roster is the label, never root's serialized list (12.14.5)");
             Assert.AreEqual("tier1", tier1.Id);
             Assert.AreEqual(0, tier1.children.Count);
@@ -483,8 +489,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 ch1.storyBeats.Select(b => b.displayName).ToArray());
             Assert.AreEqual(new[] { "story_ch1_open_seen", "story_ch1_end_seen" },
                 ch1.storyBeats.Select(b => b.seenFlag).ToArray());
-            Assert.AreEqual(new[] { "ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen" },
-                root.declaredFlags.ToArray(), "the latches are homed where no reset reaches them");
+            CollectionAssert.IsSubsetOf(new[] { "ch1_complete", "story_ch1_open_seen", "story_ch1_end_seen" },
+                root.declaredFlags, "the latches are homed where no reset reaches them");
 
             Assert.AreEqual(new[] { "Always", "flag ch1_complete" },
                 ch1.storyBeats.Select(b => Describe(b.availableWhen)).ToArray());

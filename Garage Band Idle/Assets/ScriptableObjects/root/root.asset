@@ -24,6 +24,9 @@ MonoBehaviour:
   - ch1_complete
   - story_ch1_open_seen
   - story_ch1_end_seen
+  - ch2_complete
+  - story_ch2_open_seen
+  - story_ch2_end_seen
   declaredTimers:
   - encore_timer
   declaredTags:
@@ -50,11 +53,11 @@ MonoBehaviour:
   entitlements:
   - backstage_pass
   encoreAdReward:
-  - rid: 7579425541347344397
+  - rid: 7579425558579642375
   references:
     version: 2
     RefIds:
-    - rid: 7579425541347344397
+    - rid: 7579425558579642375
       type: {class: ExtendTimer, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         timer: encore_timer

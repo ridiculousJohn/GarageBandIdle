@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425541347344427
+    rid: 7579425558579642616
   actions:
-  - rid: 7579425541347344428
+  - rid: 7579425558579642617
   references:
     version: 2
     RefIds:
-    - rid: 7579425541347344427
+    - rid: 7579425558579642616
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 7579425541347344428
+    - rid: 7579425558579642617
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: play_for_crowd_revealed

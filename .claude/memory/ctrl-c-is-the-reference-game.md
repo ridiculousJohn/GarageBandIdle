@@ -112,3 +112,11 @@ the screen shows nothing about the bars themselves (no progress, no completion c
 shape the groups/consumption/idle claim dialog matches: one row per currency the claim changes, bar
 entries carried for the claim's writes only and never printed. John: "as long as that is how it
 works, it's fine."
+
+**Completion tokens boost the press (John's test, 2026-09-18).** With 30 tokens the Tokens screen
+shows a 2.50x boost, and chapter 1's C-then-V press pays 30 Lines where the unboosted press pays 12.
+So the token multiplier reaches the tap, not only the generator rows. Our Roadie pair therefore
+carries `stat: yield` beside `stat: rate` at root (design 8.2), and "never a tap's yield" is gone.
+The decompile reference records the boost formula but not its scope; the press test is the fact.
+Also from the same screen: the Tokens screen is always reachable from settings and shows zero
+tokens and 1.00x on a fresh game, so no chapter gates the allocation screen.

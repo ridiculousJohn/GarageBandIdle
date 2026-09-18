@@ -467,14 +467,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void The_roadie_buff_lifts_no_yield()
+        public void The_roadie_buff_lifts_a_tap_yield_by_both_factors()
         {
             var tree = new TestTree();
             tree.Root.roadieAllocation["ch1"] = 2;
 
-            // stat: rate on both, so a tap is the player's own contribution.
+            // Both factors carry yield as well as rate (8.2), so the press
+            // pays 1 x 1.1 x 1.1, as Ctrl C's tokens boost its copy/paste.
             Producer.FireProducer(tree.Ctx(tree.Tier1), tree.TapProducer);
-            AssertClose(1, tree.Tier1.balances["cash"], "tap yield");
+            AssertClose(1.1 * 1.1, tree.Tier1.balances["cash"], "tap yield");
         }
 
         // ---- the two stages ----
