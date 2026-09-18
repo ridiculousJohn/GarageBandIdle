@@ -56,7 +56,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly TriggerDefinition Tier1Trigger;
         public readonly EventDefinition TimedGig;
         public readonly EventDefinition OpenMic;
-        public readonly BarGroupDefinition LearnCovers;
+        public readonly GroupDefinition LearnCovers;
         public readonly BarDefinition Cover1;
         public readonly BarDefinition Cover2;
         public readonly BarDefinition Cover3;
@@ -211,12 +211,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // caps it to ONE at a time, since choosing the next one is the
             // mechanic. Each completion grants its own fan-rate modifier, which
             // is what a one-shot completion has instead of a cascade.
-            LearnCovers = MakeDefinition<BarGroupDefinition>("learn_covers");
+            LearnCovers = MakeDefinition<GroupDefinition>("learn_covers");
             LearnCovers.maxActive = 1;
             Cover1 = Cover("cover_1", "cover_bonus_1", 100, 1.15);
             Cover2 = Cover("cover_2", "cover_bonus_2", 300, 1.15);
             Cover3 = Cover("cover_3", "cover_bonus_3", 600, 1.2);
-            Tier1Def.barGroups.Add(LearnCovers);
+            Tier1Def.groups.Add(LearnCovers);
 
             // The Garage Jam reward: +25% tap for the rest of the chapter, so
             // it is granted at ch1 and outlives the tier resets.
@@ -275,7 +275,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private int authored;
 
         // One cover and the modifier its completion grants. Both are filed at
-        // tier1, so a run reset clears the bonus along with the progress.
+        // tier1, so a run reset clears the bonus along with the progress. The
+        // cover is declared on the tier and LISTED by learn_covers: a member's
+        // home is its own scope, never the group's (12.7).
         private BarDefinition Cover(string id, string modifierId, double fillAmount, double bonus)
         {
             var modifier = MakeDefinition<ModifierDefinition>(modifierId);
@@ -283,11 +285,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Tier1Def.modifiers.Add(modifier);
 
             var bar = MakeDefinition<BarDefinition>(id);
-            bar.fillCurrency = Rehearsal;
+            bar.consumes.Add(new ConsumesEntry { currency = Rehearsal, amount = 1 });
             bar.fillAmount = fillAmount;
             bar.fillRate = 2;
             bar.onComplete.Add(new AddModifier { scope = Tier1Def, modifier = modifier });
-            LearnCovers.bars.Add(bar);
+            Tier1Def.bars.Add(bar);
+            LearnCovers.members.Add(bar);
             return bar;
         }
 

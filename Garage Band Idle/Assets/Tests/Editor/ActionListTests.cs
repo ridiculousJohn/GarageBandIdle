@@ -185,18 +185,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Cover1.onComplete.Add(new ResetScope { scope = tree.Tier1Def });
             tree.Rebuild();
             tree.Tier1.balances["rehearsal"] = 1000;
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "cover_1" };
             Arm(tree);
 
             Segment(tree, 100);
 
-            // Excluded before the fill math: it draws nothing from the pool and
+            // Excluded before the fill math: it drinks nothing and
             // its progress does not move.
-            Assert.AreEqual((BigNumber)1000, tree.Tier1.balances["rehearsal"], "the pool is untouched");
+            Assert.AreEqual((BigNumber)1000, tree.Tier1.balances["rehearsal"], "rehearsal is untouched");
             Assert.IsFalse(tree.Tier1.barProgress.ContainsKey("cover_1"), "and progress did not move");
 
             Dismiss(tree);
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "cover_1" };
             Segment(tree, 100);
 
             // It resumes on the first segment after the refusal lifts: 2/s over

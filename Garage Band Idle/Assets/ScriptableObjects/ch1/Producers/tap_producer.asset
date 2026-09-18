@@ -37,7 +37,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     condition:
-      rid: 7579425512644149305
+      rid: 7579425541347344441
   - currency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
     generator: {fileID: 0}
     bar: {fileID: 0}
@@ -63,7 +63,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425512644149305
+    - rid: 7579425541347344441
       type: {class: UpgradePurchased, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

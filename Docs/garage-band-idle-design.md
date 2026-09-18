@@ -518,11 +518,14 @@ app is not a
 mechanic**: it is the state where no chapter is active, and launching runs the same switch-in path.
 In-game chapter switching and time away are one mechanic.
 
-What accrues is settled by structure: every currency **rate** accrues (including Fans and the fill
-currency — progress while away is what an idle game is); a **yield** never accrues, because nothing
-fires a producer in the player's absence; and **bar progress never accrues**, because filling is
-consumption, not production. So **time away fills the pool, presence spends it**: the player returns
-to banked Rehearsal, chooses a bar, and watches it fill at the group's rate. No idle flags, no
+What accrues is settled by structure: every currency **rate** accrues (progress while away is what
+an idle game is), and **every bar that is on fills** at its rate over the same window, capped by what
+it consumes - the consumed currency's balance at the stamp plus what the window pays into it, less
+what earlier bars in settlement order drew - and a completion the fill crosses pays what its
+`onComplete` fires, resolved under the same context. A tap's **yield** never accrues, because nothing
+fires a producer in the player's absence. The offer carries the bars' draws beside its lines and each
+bar's carried progress and completions beside those; the claim deposits, spends, and writes them
+(12.9). A cover left running finishes while away if what it drinks was there to drink. No idle flags, no
 exempt lists — the rate/yield split answers everything.
 
 A dormant chapter with no generators accrues nothing (zero rate), so parking an untouched chapter
@@ -875,9 +878,10 @@ stat-less effect would claim to answer questions of different kinds with one fac
 yield alike" is two entries, an empty stat is a load-time error, and at runtime it matches nothing
 (fail-closed). **An empty `target` is
 the wildcard: every number of that stat**, at the one coordinate the stat has per number. For
-`rate` and `yield` that is the target's total, the currency's - a source's own term would otherwise
-meet it twice, since root sits on both gather walks, and a bar's fill stays out - so
-`{stat: rate, x2}` speeds every currency's rate. `count` has one coordinate per generator and `cost`
+`rate` and `yield` that is the target's total - a currency's, or a bar's, whose fill is a rate the away
+window accrues (section 9) and resolves stage 1 only, so the wildcard meets it once - while a source's
+own term stays out, since it would otherwise meet the factor twice with root on both gather walks; so
+`{stat: rate, x2}` speeds every currency's rate and every bar's fill. `count` has one coordinate per generator and `cost`
 one per price, so `{stat: count, x0.5}` halves every grant and `{stat: cost, x0.5}` halves every
 price - which is what lets root's idle fraction say "away pays half of all of it" in two lines.
 `{stat: game_speed, x2}` - Encore - is a wildcard read owner-less by the tick and the idle claim,
@@ -901,9 +905,11 @@ no takers, which is also what a root buff looks like before any chapter carrying
 a currency's total under `rate` or `yield`; a bar's under `rate` - the same plan as its fill rate, so
 "10x this bar" speeds its own fill and what is paid into it alike - and `yield`; a generator's
 granted count under `count`, one stat however the grant arrives, so an effect naming a generator
-with `rate` keeps meaning that generator's own output. `cost`, `count` and `autobuy` are effect
-addresses like `game_speed`: an effect may name them, a produces entry may not, and a wildcard
-reaches every generator's count, every price or every generator's switch, as the paragraph above says.
+with `rate` keeps meaning that generator's own output. `cost`, `count`, `autobuy` and `consumption` are
+effect addresses like `game_speed`: an effect may name them, a produces entry may not, and a wildcard
+reaches every generator's count, every price, every generator's switch or every drinking bar's per-unit
+price, as the paragraph above says. `consumption` is a bar's coordinate per consumed currency (12.7),
+stage 1 only as `cost` is.
 
 **`autobuy` is a switch, not a factor.** A generator's coordinate, homed where the generator is
 declared, read by the tick alone (12.9): on when an effect naming the generator - by id, tag or the
@@ -929,7 +935,7 @@ plan: those are the same plan asked with a different owner. The queries compiled
 the content authors - each source entry at its declaring scope (stage 1), each currency at its home
 for `rate` and `yield` (stage 2, the currency its own owner, so its own tags match), each bar at its
 declaring scope for `rate` (its fill, and what is paid into it; stage 1 for the fill itself, 12.7)
-and `yield`, each generator for `count`, `cost` and `autobuy`, each upgrade for `cost`, and
+and `yield` and once per consumes entry for `consumption`, each generator for `count`, `cost` and `autobuy`, each upgrade for `cost`, and
 `game_speed` at each chapter. A definition's plans sit under the definition itself at its home, one per stat it is
 ever asked for. A
 coordinate no content authors has no plan, and a consumer asking for one throws rather than
@@ -939,8 +945,10 @@ answering 1x.
 node over its own subtree: for each currency any source in that subtree pays at `rate`, its
 contributors in tree order (parent before child) then declaration order, each with the scope it sits
 at and the stage-1 plan its entries share, plus the currency's home resolved outward from a paying
-scope; and that subtree's bars in settlement order - scopes parent before child, then bar groups,
-then bars, each in declaration order - with each bar's group, pool home, and fill-rate plan.
+scope; and that subtree's bars in settlement order - scopes parent before child, then bars in
+declaration order - with each bar's fill-rate plan and its consumes entries, each carrying the consumed
+currency's home and its consumption plan. Every node also holds its membership: which of its groups
+list each definition it declares, so the seams of 12.7 read a link rather than search.
 `GetRate` sums that list and applies the currency stage, `RatePairs` is its currency column, bar
 settlement is its bar list. None of them walks the
 subtree, and each is asked at the scope whose subtree is meant; the tick asks the foreground chapter
@@ -979,7 +987,7 @@ class ScopeFacts   // the mutable state a reset DESTROYS; what a reset keeps sit
     HashSet<string>               firedTriggers;    // one-shot trigger latches — a reset re-arms (§12.5)
     Dictionary<string, BigDouble> barProgress;      // uncapped — overfill is allowed
     Dictionary<string, int>       fillCounts;       // bars with a repeatWhen, the ones that complete more than once
-    Dictionary<string, HashSet<string>> activeBars; // per group
+    Dictionary<string, HashSet<string>> activeMembers; // per group: the member ids that are ON (12.7)
     Dictionary<string, int>       modifierStacks;   // AddModifier grants, keyed like every other count
     List<TimedBuff>               timedBuffs;       // {buffId, expiresAt}, the id a declared TIMER's: the timer's value; root's encore_timer lives here
     List<SongEntry>               songs;            // tier = the run's Catalog; root = Discography (§7)
@@ -1288,7 +1296,7 @@ named list off it. Across the tree the sources are:
 | Timed records (Encore) | `{buffId, expiresAt}` list, the id a declared TIMER's | none directly - a record is a timer's value, a FACT the `BuffActive` condition reads through the modifier that names the timer and its band, and the modifier is a permanent membership with that condition in its `appliesWhen` (§9), the idle fraction's shape |
 | Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
-| Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `barGroups` |
+| Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `bars` |
 | Permanent modifiers | none - the `permanentModifiers` usage list is authored, not stored (§12.5) | the modifier's effects at an implicit application count of 1, merged with granted stacks; the career factors of §3/§7/§8 (Records balance, Roadie allocation) live here as formula-shaped effects |
 
 **An effect's factor is a constant or a formula**: the authored `multiplier` when no formula is
@@ -1318,7 +1326,7 @@ Generic fillable bars: pacing bars (learn covers), currency bars that go again, 
 ```csharp
 class BarDefinition : Definition
 {
-    CurrencyDefinition fillCurrency; // what it drinks; null = fills from time alone
+    List<ConsumesEntry> consumes;    // what it drinks per unit of fill: {currency, amount}; empty = fills from time alone
     BigDouble    fillAmount;
     BigDouble    fillRate;        // this bar's own fill speed (units/sec)
     Condition    repeatWhen;      // null: fill once, stay full; true: pay, keep the residual, go again;
@@ -1329,51 +1337,68 @@ class BarDefinition : Definition
     List<PerFillEntry> perFill;   // cascade: {effect, growth}, applied fillCount times on read
 }
 
-class BarGroupDefinition : Definition
+class GroupDefinition : Definition
 {
-    int             maxActive;
-    List<BarDefinition> bars;     // the group OWNS its bars: membership is placement
+    int              maxActive;
+    List<Definition> members;     // declared on the group's OWN scope: bars, generators, producers, currencies, upgrades
 }
 ```
 
-**A group owns its bars**, so a bar's declaring scope IS its group's: the progress fact and the
-`activeBars` set that selects it have one home and one lifetime. That is also what makes the
-settlement order below literal, and it gives `SetActiveBars` its membership test for free.
+**A bar is declared on its scope** in `bars`, like a generator, and its progress and fill count are
+homed there.
 
-**A group holds bars and caps how many run at once.** That is its entire job. It owns no currency
-and no throughput: a bar names what it drinks and fills at its own rate, and throttling a bar is that
-rate rather than a second cap over the set. A bar with no `fillCurrency` fills from time alone, which
-is the whole of the distinction a behavior class used to carry.
+**A group is a set of members with an active set.** A group is declared on a scope in `groups` and
+lists members that scope declares - a bar, a generator, a producer, a currency, an upgrade - so a
+member and the `activeMembers` set that holds it share one home and one lifetime, and a definition may
+be listed by more than one group. A member of a group is OFF unless the group's active set holds it,
+and one listed by several groups is on only while every one of them holds it. Membership is read at
+one seam per kind, each an existing check with one more clause: a bar draws only while on; a
+generator's terms are zero while off and its fired yield pays nothing; a producer fires nothing while
+off; a currency reads inactive while off; an upgrade's effects gather only while on. Buying is not
+gated. Which groups list what is compiled once per node when the tree is built, so every seam reads a
+link (12.14.8). A group caps how many of its members are active at once and owns nothing else: no
+currency, no throughput, and, owning no number, it is not an effect target - `maxActive` is an int
+outside the multiplier system, and buffing a set is a TAG its members share, the mechanism that
+already fans one effect out to many owners.
 
-**Owning no number, a group is not an effect target.** `maxActive` is an int and stays outside the
-multiplier system - nothing addresses it - and there is nothing else on a group to multiply. Buffing
-a set of bars is a TAG they share, which is the mechanism that already fans one effect out to many
-owners; a group target would instead mean "all my members", a second kind of target resolution the
-vocabulary does not need.
+**Consumption is a list on the bar.** Each `consumes` entry names a currency and an amount per unit of
+fill. A drawing bar wants `fillRate x dt`; each entry covers `balance / (amount x factor)` units, the
+fill is the smallest of the want and every cover, and each entry then spends `fill x amount x factor`
+from its currency's home, in the deterministic order below. An empty list is a bar that fills from time
+alone. Nothing banked in any one entry fills nothing, and the bar stalls until production refills it.
+`consumption` is a stat (12.2): an effect naming the bar by id or tag, with `currencyId` the consumed
+currency, multiplies that entry's per-unit price - `{target: cover_1, currencyId: rehearsal, stat:
+consumption, x0.1}` is "this bar consumes 90% less Rehearsal", a wildcard on the stat is efficiency on
+everything that drinks, and zero is legal and means free. Stage 1 only, as `cost` is: a buff on the
+consumed currency's total means its SUPPLY and never scales what drinks it.
 
-**A bar's rate resolves stage 1 ONLY**: `GetMultiplier(declaringScope, bar, bar.fillCurrency, rate)`,
-with no currency stage. Stage 2 is "effects on this currency's total production", and a bar CONSUMES -
-letting a currency-total buff through would speed the drain as well as the supply, which is not what
-either buff means. The bar's own currency is passed as the coordinate, so an effect may narrow to it
-(`{target: cover_1, currencyId: rehearsal, stat: rate}`); a bar that fills from time passes none, which no
-narrowing effect matches.
+**A bar's fill rate resolves stage 1 ONLY**, at the coordinate (bar, no currency, `rate`); a rate paid
+into the bar collects the same plan, so "10x this bar" speeds its own fill and what is paid into it
+alike. Stage 2 is "effects on this currency's total production", and a bar CONSUMES rather than
+produces. Per-bar speed is buffable by bar id or tag, and by the rate wildcard, which reaches a bar's
+fill as it reaches a currency's total (12.2); an effect narrowed by `currencyId` addresses the
+`consumption` stat, never the fill rate, which carries no currency coordinate.
 
 **A null `availableWhen` on a bar is OPEN**, the opposite of a purchase gate: fail-closed binds entry
 points that create value out of a spend, and a bar's availability is a selection filter.
 
-**A bar drinks what it names.** Each active, available, unfilled bar wants `fillRate × dt` and takes
-what is there, in the deterministic order below. When a pool cannot cover its bars, the ones later in
-the order simply stall - which is correct feedback, not unfairness: the amount delivered per second is
-the inflow whatever the split, so dividing it proportionally would deliver no more, it would only
-replace one bar visibly filling with three inching. Per-bar speed is buffable by bar id or tag, and a
-buffed bar drinks proportionally faster.
+**A bar drinks what it names.** Each on, available, unfilled bar wants `fillRate x dt` and takes
+what its tightest entry covers, in the deterministic order below. When a currency cannot cover its
+bars, the ones later in the order simply stall - which is correct feedback, not unfairness: the amount
+delivered per second is the inflow whatever the split, so dividing it proportionally would deliver no
+more, it would only replace one bar visibly filling with three inching. A buffed bar drinks
+proportionally faster.
 
-**Selection is state**: `activeBars` per group; empty = the pool accrues and nothing drains.
-`SetActiveBars` is **fail-closed** like every entry point (§12.11): it rejects a set that exceeds
-`maxActive`, names a bar outside the group, names an unavailable bar (`availableWhen` false), or
-names a completed bar that has no `repeatWhen`. On completion the stream **stops** - choosing is the mechanic in
-Ch. 1, and letting more run in parallel is `maxActive` rising, which is an unlock rather than a
-multiplier.
+**Activation is the player's fact**: `activeMembers` per group, at the group's scope; empty = nothing
+the group lists runs, and a consumed currency accrues undrunk. `SetActiveMembers(group, set)` is
+**fail-closed** like every entry point (12.11): it rejects a set that exceeds `maxActive`, names a
+member the group does not list, names a bar whose `availableWhen` is false, or names a completed bar
+that has no `repeatWhen`. The select control TOGGLES: pressing an off member adds it, pressing an on
+member removes it, and adding into a full group is refused - the player deselects first; one behavior
+for every cap. On a fill-once completion the stream **stops**: the completed bar leaves the active set
+of every group listing it, as the manual team does, so its slot is free for the next choice - choosing
+is the mechanic in Ch. 1, and letting more run in parallel is `maxActive` rising, which is an unlock
+rather than a multiplier.
 
 **Completion is derived**: complete ⇔ `progress ≥ fillAmount`. For a bar with no `repeatWhen`,
 progress is monotonic until reset and **uncapped** — overfill is allowed and readable — so the crossing happens
@@ -1389,7 +1414,7 @@ every crossing. (The arithmetic shortcut `fires = floor((progress + Δ)/fillAmou
 optimization only when `onComplete` cannot affect the bar's environment, which in practice means an
 EMPTY list; a bar with actions iterates.) **A `repeatWhen` that refuses is the manual team**: the
 crossing pays once, progress returns to zero - the excess past the threshold is discarded, the team
-ran one cycle - the bar leaves the active set, and its fill count is bumped as a repeating bar's is,
+ran one cycle - the bar leaves the active set of every group listing it, and its fill count is bumped as a repeating bar's is,
 since a present `repeatWhen` counts completions whichever way it evaluated. Selecting it again is
 how the player runs it again; there is no new command.
 
@@ -1403,8 +1428,8 @@ as one that fired earlier. Each mover settles only the crossing its own fill mad
 compares the progress before its fill with that fill, never with live progress - so a payment
 landing inside a tick's settlement fires once and not again when the pass reaches that bar.
 Clamped at `fillAmount` for a bar with no `repeatWhen`; a bar with one takes the whole payment and
-settles by the condition's answer - every threshold crossed, or the manual team's one cycle. Selection and availability do not gate a paid
-completion - they govern drinking from a pool, and a payment is not a drink. A refused completion
+settles by the condition's answer - every threshold crossed, or the manual team's one cycle. Membership and availability do not gate a paid
+completion - they govern drinking, and a payment is not a drink. A refused completion
 list leaves the payment undelivered, as the draw excludes the bar for its segment.
 
 **The snapshot admits; live state may only disqualify.** Every rate and gate the draw needs is
@@ -1414,8 +1439,8 @@ loop; they may never put one in. Without that asymmetry the seam has a second do
 can sit at full progress with its gate closed - its own `onComplete` shut it last segment and the
 residual is retained, and a save can load in that state - and a live-only test would let this
 segment's deposits open the gate and pay the whole backlog. Both the draw and the
-settlement run in one deterministic order — scopes in tree order (parent before child), then groups,
-then bars within a group, in declaration order — and a reset during settlement invalidates the
+settlement run in one deterministic order — scopes in tree order (parent before child), then bars in
+declaration order — and a reset during settlement invalidates the
 remaining completions from the old scope-life, exactly as the trigger sweep rule (§12.5).
 
 **Cascades** (bar B buffs bar A per fill): B declares `perFill: [{effect, growth}]` — e.g.
@@ -1472,11 +1497,11 @@ resolves with the multipliers live in that segment, so update order can never ha
 wrong multiplier. Within each segment the economy phases are **fixed**, resolved from a **start-of-segment snapshot
 of effects and entry conditions** — every rate entry is judged and sized against pre-deposit state
 before any deposit lands, so definition order never changes production: rate production deposits
-(pool currencies included) → bar
+(consumed currencies included) → bar
 consumption (§12.7) → iterative bar completion — production before
-consumption, so an empty pool fed at +1/sec serves a 1/sec bar demand in the same tick. Bar DEMAND
-is resolved BEFORE the deposits, from the same start-of-segment snapshot as everything else; the pool
-BALANCE is the one thing read live, which is exactly what that carve-out says. Resolving demand after
+consumption, so an empty consumed currency fed at +1/sec serves a 1/sec bar demand in the same tick.
+Bar DEMAND is resolved BEFORE the deposits, from the same start-of-segment snapshot as everything
+else; the consumed currency's BALANCE is the one thing read live, which is exactly what that carve-out says. Resolving demand after
 the deposits would let a segment's own production open a bar's gate and draw for the whole dt — then wall
 clocks advance to the segment boundary for every running timer in the swept set - root plus the
 foreground chapter, the same set the sweep walks. Root sweeps for its triggers but cannot host an
@@ -1494,7 +1519,16 @@ foreground chapter only and only while Live, on save (a save under the dialog mu
 unpaid window); every write is monotonic (max), so a rolled-back clock can delay
 a stamp but never regress one. **The stamp IS the pending claim** — nothing about an offer is ever
 saved. Switch-in computes
-`idleRate x game_speed x paid time` per rate target - a currency, or a generator's granted count; a bar collects only at a draw (12.7) - at current rates over the paid window - the first
+`idleRate x game_speed x paid time` per rate target - a currency, or a generator's granted count - and,
+per segment after that segment's rate lines, every on bar of the chapter's subtree in settlement
+order: its fill over the segment at its own rate under the same context (so root's idle fraction halves
+it as it halves every rate), capped by what it consumes - each consumed currency's balance at the
+stamp plus the window's inflow so far, less what earlier bars drew - the completions that fill crosses
+by the bar's `repeatWhen` (fill once and stop drinking; every threshold with the residual kept; the
+manual team's one cycle, then off), and the payout each completion's `FireGeneratorYield` resolves,
+times the completions, into the lines. What the bars drew is the offer's own list of DRAWS, one per
+consumed currency, and each moved bar is a bar entry (carried progress, completions, whether the manual
+team went off); progress is carried whether or not anything crossed. All of it at current rates over the paid window - the first
 `min(elapsed, cap)` REAL seconds after the stamp, segmented at the buff expiries inside it by the
 tick's own segment walk (`TickSystem.Segments`, the one place a window is divided) and reading
 `game_speed` through the tick's own clamped read, each segment paying its own length at the rate
@@ -1507,7 +1541,17 @@ rather than inspecting one) - into a **transient offer** for the idle dialog: th
 (target, home, amount - all references) and the window's end B, computed once
 over the explicit window [stamp, B], held by the session, never serialized. The lines hold what is
 paid: a Pass owner's are computed doubled, and the ad callback doubles them before it settles. The claim never
-computes anything: deposit pays the stored lines as they stand and advances the stamp to B, the window actually paid, in one transaction. That is the
+computes anything: it deposits the stored lines as they stand, spends the stored draws at their homes
+(a deposit is a grant and a draw is a spend, so the earned total moves by the inflow alone, 12.3),
+writes each bar entry - progress, the fill counts the crossings added, the manual team out of every
+group listing it, and its `onComplete` once per completion with the `FireGeneratorYield` actions skipped,
+since those were the lines - and advances the stamp to B, the window actually paid, in one
+transaction. The dialog prints one row per balance the claim changes, the line less the draw, signed;
+bar progress is a write and never a row. A window that changed no balance - a bar part-way through a
+cycle, a bar that drank exactly what came in - settles on entry with no dialog: the same claim, the
+progress and the stamp written, nothing shown, because the dialog exists for a balance the player is
+owed and is never empty. Double It and the Pass double the lines alone: twice the Cash, never twice
+the cover. That is the
 whole exactly-once mechanism: the save is the tree, so a kill anywhere keeps both writes or
 neither. A kill or backgrounding with the dialog up destroys the offer and leaves the stamp, so
 the next entry recomputes from the same window start — the unpaid window simply stays open,
@@ -1601,7 +1645,9 @@ delta (device clock moved backwards) clamps elapsed time to zero — rollback ca
 visibleWhen, scope, modules}`; a `ModuleDefinition {prefabId, content?, visibleWhen?, scope}` binds
 a widget to content. Both are inline serialized data on the `ChapterDefinition`, and both reference
 by direct object field (12.14.5): `scope` is a `ScopeDefinition`, `content` a base-typed
-`Definition` (a producer, a currency, an event), and only `prefabId` stays a string, since it names
+`Definition` (a producer, a currency, an event, a group - whose `group` module renders each member
+with the row its kind already has plus the control that toggles it, and one readout per currency its
+bar members consume, 12.7), and only `prefabId` stays a string, since it names
 a widget through the registry rather than a content asset. A section's `scope` is its **evaluation
 scope** - the context its conditions read from, which is how a chapter-owned section legally gates
 on a tier-declared flag. A module's `scope` is always concrete: the JSON may omit it, and the
@@ -1664,7 +1710,7 @@ query is what renders pressability and the feedback text, the command performs t
 refuses to run when the query says no. A reference that cannot resolve is never an answer either
 one returns - static content cannot legitimately be in that state, so those throw. The set:
 `IsOffered(rung)` / `ExecuteRung` / `TryRung(rung)`, `CanBuy` / `Buy` / `TryBuy(generator, count |
-upgrade)`, `FireProducer(producer)`, `SetActiveBars(group, set)`, the event operations
+upgrade)`, `FireProducer(producer)`, `SetActiveMembers(group, set)`, the event operations
 `StartEvent / DismissEvent (event)`, `SwitchChapter(chapterId)` (stamps
 `lastActiveUtc`, computes the idle offer, §12.9), `ClaimIdle(chapterId)` (settle the
 offer, §9 — the dialog's double button only *requests* the rewarded ad and its Backstage Pass button
@@ -1790,10 +1836,13 @@ button's and paying is the row's, so the button's own click is never also a tap.
   can never be passed a coordinate to match, and one applied below chapter level is never on that
   walk. Both are warnings, and both are answered by the site's own KIND with nothing enumerated -
   which is what makes them checks where the general case is not one.
-- A bar group's `maxActive` is at least 1, and it lists no null bars. A bar's `fillAmount` and
-  `fillRate` are positive - a nonpositive threshold is an unbounded settlement loop, and a zero rate
-  is a bar no multiplier can move - and a named `fillCurrency` must be reachable on its own chain
-  (none is legal: it fills from time). `perFill` on a bar with no `repeatWhen` is an error (12.6); a
+- A group's `maxActive` is at least 1, and it lists no null member, no member twice
+  (`DuplicateMember`) and only members its own scope declares (`MemberOffScope`) - the active set and
+  the member share a home. A bar's `fillAmount` and `fillRate` are positive - a nonpositive threshold
+  is an unbounded settlement loop, and a zero rate is a bar no multiplier can move; each `consumes`
+  entry names a currency reachable on the bar's chain with a positive per-unit amount, and no currency
+  twice (an empty list is legal: it fills from time). A group bound by a module needs no displayName:
+  it renders its members, not itself. `perFill` on a bar with no `repeatWhen` is an error (12.6); a
 `repeatWhen` is validated as `availableWhen` is, its operands under the reach rules; a `tap` producer
 must be on the bar's own chain, and nothing checks that it pays this bar. A `LinearOnOwnedCount`
 names a generator on the chain and a nonnegative coefficient, as `LinearOnBalance`'s currency and
@@ -1875,7 +1924,7 @@ Assets/Scripts/
     Purchasing.cs           // CostOf(generator, n) the series, MaxAffordable, TryBuy(generator, count | upgrade): fail-closed gate, one spend, count or latch, payload
     MultiplierFormula.cs    // the formula family an Effect's factor can compute from
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply) + optional appliesWhen
-    BarDefinition.cs  BarGroupDefinition.cs  BarSystem.cs
+    BarDefinition.cs  GroupDefinition.cs  BarSystem.cs   // a bar's consumes list; a group of members with an active set; the draw, the settlement, SetActiveMembers
   Loop/
     ChapterManager.cs      // forward-only advance, reacting to root completion flags
   Events/
@@ -1911,7 +1960,7 @@ Assets/Scripts/
     IGeneratorInfoOpener.cs // the one method a generator row asks of the host: open the info screen for a generator at its declaring scope
     LongPressManipulator.cs // the hold gesture over an element's own scheduler; no capture, no propagation change
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
-              BarGroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
+              GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
@@ -1930,7 +1979,7 @@ ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (1
     Currencies/  Modifiers/
   ch1/
     ch1.asset  tier1.asset
-    Currencies/  Producers/  Generators/  Upgrades/  BarGroups/  Bars/  Events/  Triggers/  StoryBeats/
+    Currencies/  Producers/  Generators/  Upgrades/  Bars/  Groups/  Events/  Triggers/  StoryBeats/
 Content/                 // the authored JSON the importer reads
   root.json  chapter-01.json
 ```
@@ -2032,8 +2081,9 @@ Content/                 // the authored JSON the importer reads
   `{target: id-or-tag, currencyId?, stat, multiplier-or-formula}` (the stat required and exact), gathered on read from
   facts (purchases, timed buffs, events, modifier grants, permanent memberships, fill counts) and never
   stored; flat bonuses are contributions; tags name sets from the member side.
-- **Bars:** generic fillables — each names an optional pool currency and its own fill rate, taking
-  what is there in declaration order; a group only caps how many run at once; repeating bars carry
+- **Bars:** generic fillables — each names the currencies it consumes per unit of fill and its own
+  fill rate, taking what is there in declaration order; a group lists members of any kind and caps how
+  many are active at once; repeating bars carry
   per-fill cascade effects scaled by fill count; uncapped overfill, completion derived from progress.
 - **Events:** data + one ActiveEvent record; `StartEvent`/`DismissEvent` are self-guarding
   commands, never Action kinds; entry runs `onEntry` (banking the run if the host rung's own
@@ -2053,7 +2103,8 @@ Content/                 // the authored JSON the importer reads
   `appliesWhen`, cap 4 h a `GameConfig` threshold) into a transient offer presented
   as the idle dialog — the stamp IS the pending claim, the ad callback doubles and settles
   atomically, a plain dismissal deposits the base, settlement advances the stamp; app close is not
-  special; yields and bar progress never accrue.
+  special; a tap's yield never accrues, while bars fill capped by what they consume and their
+  completions pay.
 - **Monetization:** opt-in ads only; double-the-claim idle ad; Encore = game speed 2x, a root buff
   reading root's declared `encore_timer` timer, which the ad's authored reward extends (`game_speed` stat,
   consumed by the tick and the idle claim over a real-time cap; wall clocks never scale; a higher

@@ -472,7 +472,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     ""modules"": [
                         { ""prefabId"": ""currency_line"", ""contentId"": ""cash"" },
                         { ""prefabId"": ""currency_line"", ""contentId"": ""records"" },
-                        { ""prefabId"": ""bar_group"" },
+                        { ""prefabId"": ""group"" },
                         {
                             ""prefabId"": ""rung_button"",
                             ""scopeId"": ""tier1"",
@@ -511,11 +511,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsInstanceOf<Always>(section.visibleWhen, "Always is how an author says the gate is open");
             Assert.AreSame(Load<TierDefinition>("ch1/tier1a.asset"), section.scope,
                 "the section's scope is the asset, not a copy");
-            Assert.AreEqual(new[] { "currency_line", "currency_line", "bar_group", "rung_button" },
+            Assert.AreEqual(new[] { "currency_line", "currency_line", "group", "rung_button" },
                 section.modules.Select(m => m.prefabId).ToArray());
             Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/cash.asset"), section.modules[0].content,
                 "the binding is the asset the tier declares");
-            Assert.IsNull(section.modules[2].content, "a contentless module reads its own scope's declarations");
+            Assert.IsNull(section.modules[2].content, "a module may bind nothing, and this one does");
             Assert.AreEqual("album", ((FlagSet)section.modules[3].visibleWhen).flagId,
                 "the module gate is built from the module's own scope, which reaches ch1's flag");
         }
@@ -598,7 +598,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void An_empty_prefab_id_aborts_through_the_preflight()
         {
             Write("root.json", RootJson);
-            Write("ch1.json", SectionsJson.Replace(@"""prefabId"": ""bar_group""", @"""prefabId"": """""));
+            Write("ch1.json", SectionsJson.Replace(@"""prefabId"": ""group""", @"""prefabId"": """""));
 
             // No LogAssert here: an expected refusal prints nothing, and an
             // unexpected error log would fail the row on its own. The findings
@@ -835,22 +835,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     ""produces"": [{ ""bar"": ""cover_1"", ""stat"": ""yield"", ""value"": 25 }]
                 }
             ],
-            ""barGroups"": [
+            ""bars"": [
+                {
+                    ""id"": ""cover_1"",
+                    ""displayName"": ""Three-Chord Anthem"",
+                    ""repeatWhen"": { ""type"": ""FlagSet"", ""flagId"": ""auto_repeat"" },
+                    ""tap"": ""roadie"",
+                    ""consumes"": [{ ""currency"": ""cash"", ""amount"": 1 }],
+                    ""fillAmount"": 100,
+                    ""fillRate"": 2
+                }
+            ],
+            ""groups"": [
                 {
                     ""id"": ""learn_covers"",
                     ""displayName"": ""Learn a Cover"",
                     ""maxActive"": 1,
-                    ""bars"": [
-                        {
-                            ""id"": ""cover_1"",
-                            ""displayName"": ""Three-Chord Anthem"",
-                            ""repeatWhen"": { ""type"": ""FlagSet"", ""flagId"": ""auto_repeat"" },
-                            ""tap"": ""roadie"",
-                            ""fillCurrency"": ""cash"",
-                            ""fillAmount"": 100,
-                            ""fillRate"": 2
-                        }
-                    ]
+                    ""members"": [""cover_1""]
                 }
             ]
         }";
@@ -867,6 +868,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var roadie = Load<ProducerDefinition>("ch1/Producers/roadie.asset");
             Assert.AreEqual("auto_repeat", ((FlagSet)bar.repeatWhen).flagId, "the condition, not a bool");
             Assert.AreSame(roadie, bar.tap, "the reference is the asset, not a copy");
+        }
+
+        // A bar names what it drinks per unit of fill, and the group beside it
+        // lists members its own scope declares (12.7) - so both sides land as
+        // references to the same asset.
+        [Test]
+        public void A_bars_consumes_list_and_its_groups_membership_import()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", BarJson);
+
+            Import();
+
+            var bar = Load<BarDefinition>("ch1/Bars/cover_1.asset");
+            var cash = Load<CurrencyDefinition>("ch1/Currencies/cash.asset");
+            var group = Load<GroupDefinition>("ch1/Groups/learn_covers.asset");
+            Assert.AreSame(cash, bar.consumes.Single().currency, "resolved outward from the bar's scope");
+            Assert.AreEqual(BigNumber.One, bar.consumes.Single().amount, "per unit of fill");
+            Assert.AreEqual(1, group.maxActive);
+            Assert.AreSame(bar, group.members.Single(), "the member is the asset, not a copy");
         }
 
         [Test]

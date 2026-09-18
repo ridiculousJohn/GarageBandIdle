@@ -53,7 +53,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly GeneratorDefinition PracticeAmp;
             public readonly UpgradeDefinition StagePresence;
             public readonly UpgradeDefinition PlayForCrowd;
-            public readonly BarGroupDefinition LearnCovers;
+            public readonly GroupDefinition LearnCovers;
             public readonly BarDefinition Cover1;
             public readonly EventDefinition GarageJam1;
             public readonly StoryBeatDefinition Opener;
@@ -103,8 +103,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 PracticeAmp = Find(Tier1Def.generators, "practice_amp");
                 StagePresence = Find(Tier1Def.upgrades, "stage_presence");
                 PlayForCrowd = Find(Tier1Def.upgrades, "play_for_crowd");
-                LearnCovers = Find(Tier1Def.barGroups, "learn_covers");
-                Cover1 = Find(LearnCovers.bars, "cover_1");
+                LearnCovers = Find(Tier1Def.groups, "learn_covers");
+                Cover1 = Find(Tier1Def.bars, "cover_1");
                 GarageJam1 = Find(Tier1Def.events, "garage_jam_1");
                 Opener = Find(Ch1Def.storyBeats, "story_ch1_open");
                 Capstone = Find(Ch1Def.storyBeats, "story_ch1_end");
@@ -154,6 +154,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // row is built per authored bar, so no UXML names one.
             public static List<VisualElement> BarRows(ScreenHost.ModuleView module) =>
                 module.Widget.Root.Query<VisualElement>(className: "bar-row").ToList();
+
+            // The wrapper the group widget draws per member: the member's own
+            // row, and the select button beside it (12.11).
+            public static List<VisualElement> MemberRows(ScreenHost.ModuleView module) =>
+                module.Widget.Root.Query<VisualElement>(className: "member-row").ToList();
 
             // What a gate is actually explaining right now: the leg labels are
             // built once and toggled, so the visible ones are the unmet set.
@@ -541,7 +546,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var lines = fx.Screen.Q<VisualElement>("lines");
             Assert.AreEqual(fx.Session.CurrentOffer.lines.Count, lines.childCount,
-                "one row per line the offer holds");
+                "nothing was drawn, so one row per line the offer holds");
             // Fans and rehearsal sit behind reveal flags a fresh state lacks, so
             // an inactive currency takes nothing from any source and the amp's
             // cash is the whole offer.
@@ -551,6 +556,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("Cash", labels[0].text, "the currency's authored name");
             Assert.AreEqual("+250.00", labels[1].text,
                 "one amp pays 0.5 cash/s, root's authored idle base halves it, over 1000s");
+        }
+
+        // The dialog prints one row per currency the window moved, and what it
+        // prints is the NET: the window's inflow less what its bars drew from
+        // it (section 9). A window that drank more than it earned reads below
+        // nothing, which is the honest thing to show the player returning.
+        [Test]
+        public void ARowPrintsTheNetOfTheWindowsInflowAndWhatItsBarsDrew()
+        {
+            var fx = new Fixture();
+            fx.Tier1.flags.Add("rehearsal_revealed");
+            fx.Tier1.balances["rehearsal"] = 500;
+            fx.Tier1.activeMembers[fx.LearnCovers.Id] = new HashSet<string> { "cover_3" };
+            fx.Ch1.lastActiveUtc = fx.Now.AddSeconds(-1000);
+            fx.Session.SwitchChapter(fx.Ch1, fx.Now);
+            Assert.AreEqual(SessionPhase.AwaitingIdleClaim, fx.Session.Phase);
+
+            // 250 of Rehearsal accrues over the window and the cover drinks 600
+            // of it, filling to its threshold and stopping there.
+            var lines = fx.Screen.Q<VisualElement>("lines");
+            Assert.AreEqual(1, lines.childCount, "rehearsal is the only currency the window moved");
+            var labels = lines.Children().Single().Query<Label>().ToList();
+            Assert.AreEqual("Rehearsal", labels[0].text);
+            Assert.AreEqual("-350.00", labels[1].text, "250 in, 600 drawn");
         }
 
         // The dialog's three actions (12.11): OK settles, and the two request
@@ -979,11 +1008,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var section = fx.Host.Sections[RehearsalSpace];
             Assert.IsTrue(section.Visible, "the reveal opened the rehearsal space");
             var module = section.Modules.Single();
-            var block = module.Widget.Root.Q<VisualElement>("groups").Children().Single();
 
-            // One readout per DISTINCT pool: the three covers all drink
-            // Rehearsal, and the name is the currency's authored one.
-            var readouts = block.Query<VisualElement>(className: "pool-readout").ToList();
+            // One readout per DISTINCT consumed currency: the three covers all
+            // drink Rehearsal, and the name is the currency's authored one.
+            var readouts = module.Widget.Root.Query<VisualElement>(className: "consumed-readout").ToList();
             CollectionAssert.AreEqual(new[] { "Rehearsal" }, readouts.Select(line => line.Q<Label>().text).ToArray());
 
             var rows = Fixture.BarRows(module);
@@ -996,9 +1024,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new[] { "0.00 / 100.00", "0.00 / 300.00", "0.00 / 600.00" },
                 rows.Select(row => row.Q<Label>(className: "bar-progress").text).ToArray(),
                 "the authored fill amounts, none of them started");
-            foreach (var row in rows)
+            foreach (var member in Fixture.MemberRows(module))
             {
-                var select = row.Q<Button>(className: "bar-select");
+                var select = member.Q<Button>(className: "member-select");
                 Assert.AreEqual("Select", select.text);
                 Assert.IsTrue(select.enabledSelf, "nothing is selected yet, so every cover is choosable");
             }
@@ -1012,18 +1040,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             fx.Tier1.flags.Add("rehearsal_revealed");
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
-            fx.Session.SetActiveBars(fx.Ctx(fx.Tier1), fx.LearnCovers, new[] { fx.Cover1 });
-            Assert.IsTrue(fx.Tier1.activeBars[fx.LearnCovers.Id].Contains(fx.Cover1.Id), "cover_1 was selected");
+            fx.Session.SetActiveMembers(fx.Ctx(fx.Tier1), fx.LearnCovers, new[] { fx.Cover1 });
+            Assert.IsTrue(fx.Tier1.activeMembers[fx.LearnCovers.Id].Contains(fx.Cover1.Id), "cover_1 was selected");
 
             // No Render call: the command's own refresh is what repaints.
-            var buttons = Fixture.BarRows(fx.Host.Sections[RehearsalSpace].Modules.Single())
-                .Select(row => row.Q<Button>(className: "bar-select"))
+            var buttons = Fixture.MemberRows(fx.Host.Sections[RehearsalSpace].Modules.Single())
+                .Select(member => member.Q<Button>(className: "member-select"))
                 .ToArray();
             Assert.AreEqual("Selected", buttons[0].text);
-            Assert.IsFalse(buttons[0].enabledSelf, "the running cover is not re-selectable");
+            Assert.IsTrue(buttons[0].enabledSelf, "the control toggles, so the running cover is how it is stopped");
             Assert.AreEqual("Select", buttons[1].text);
             Assert.AreEqual("Select", buttons[2].text);
-            Assert.IsTrue(buttons[1].enabledSelf, "a sibling stays pressable - pressing one replaces the choice");
+            Assert.IsTrue(buttons[1].enabledSelf, "a sibling stays pressable, and a full group refuses the press");
         }
 
         [Test]

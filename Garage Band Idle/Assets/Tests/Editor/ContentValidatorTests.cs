@@ -36,7 +36,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly CurrencyDefinition Records;
         public readonly CurrencyDefinition Ch1Records;
         public readonly CurrencyDefinition Rehearsal;
-        public readonly BarGroupDefinition Covers;
+        public readonly GroupDefinition Covers;
         public readonly BarDefinition Cover1;
 
         // The chapter's one story beat, which is also the setter for the root
@@ -74,14 +74,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Fans = TestTree.DeclareCurrency(Tier1, "fans");
             Rehearsal = TestTree.DeclareCurrency(Tier1, "rehearsal");
 
-            Covers = TestTree.MakeDefinition<BarGroupDefinition>("covers");
+            Covers = TestTree.MakeDefinition<GroupDefinition>("covers");
             Covers.maxActive = 1;
             Cover1 = TestTree.MakeDefinition<BarDefinition>("cover_1");
-            Cover1.fillCurrency = Rehearsal;
+            Cover1.consumes.Add(new ConsumesEntry { currency = Rehearsal, amount = 1 });
             Cover1.fillAmount = 100;
             Cover1.fillRate = 2;
-            Covers.bars.Add(Cover1);
-            Tier1.barGroups.Add(Covers);
+            Tier1.bars.Add(Cover1);
+            Covers.members.Add(Cover1);
+            Tier1.groups.Add(Covers);
 
             // Chapter-boundary content, declared on the chapter and latched by a
             // flag at root, which the outward walk from ch1 reaches (section 10).
@@ -873,7 +874,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             ((BarsCompleted)((All)f.Album.offerCondition).conditions[1]).group = null;
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "BarsCompleted names no bar group");
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "BarsCompleted names no group");
         }
 
         [Test]
@@ -1784,28 +1785,56 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- bars and groups ----
 
         [Test]
-        public void Bar_FillCurrencyOffTheChain_ChainReach_Error()
+        public void Bar_ConsumesCurrencyOffTheChain_ChainReach_Error()
         {
             var f = new ValidatorFixture();
             var sibling = f.AddSiblingChapter();
-            f.Cover1.fillCurrency = sibling.Cash;      // a sibling chapter's asset
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "fill currency");
+            f.Cover1.consumes[0].currency = sibling.Cash;      // a sibling chapter's asset
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "consumes[0] currency");
         }
 
-        // A bar that names no currency fills from time alone, which is the whole
-        // of what the deleted behavior classes used to say.
+        // An empty consumes list is a bar that fills from time alone, which is
+        // the whole of what the deleted behavior classes used to say.
         [Test]
-        public void Bar_WithNoFillCurrency_NoFindings()
+        public void Bar_WithNoConsumesEntries_NoFindings()
         {
             var f = new ValidatorFixture();
-            f.Cover1.fillCurrency = null;
+            f.Cover1.consumes.Clear();
             var report = f.Run();
             Assert.IsFalse(report.Findings.Any(finding => finding.Message.Contains("cover_1")),
                 $"expected nothing about cover_1; got:\n{Dump(report)}");
         }
 
         [Test]
-        public void BarGroup_MaxActiveBelowOne_Error()
+        public void Bar_NullConsumesEntry_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.consumes.Add(null);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "cover_1");
+        }
+
+        // A nonpositive per-unit amount is a bar that drinks nothing or mints
+        // (12.7), and neither is a consumption.
+        [Test]
+        public void Bar_NonpositiveConsumesAmount_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.consumes[0].amount = 0;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "cover_1");
+        }
+
+        // Two entries naming one currency are two drains on one balance with no
+        // way to say which is meant, so the list carries each currency once.
+        [Test]
+        public void Bar_SameCurrencyTwiceInOneConsumesList_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.consumes.Add(new ConsumesEntry { currency = f.Rehearsal, amount = 2 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateMember, "cover_1");
+        }
+
+        [Test]
+        public void Group_MaxActiveBelowOne_Error()
         {
             var f = new ValidatorFixture();
             f.Covers.maxActive = 0;
@@ -1813,11 +1842,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void BarGroup_NullBarEntry_Error()
+        public void Group_NullMemberEntry_Error()
         {
             var f = new ValidatorFixture();
-            f.Covers.bars.Add(null);
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "null bar entry");
+            f.Covers.members.Add(null);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "covers");
+        }
+
+        // A group lists what its OWN scope declares (12.7): the active set and
+        // the member share a home and a lifetime, so a member declared
+        // elsewhere would be selected at one scope and reset at another.
+        [Test]
+        public void Group_MemberDeclaredOnAnotherScope_MemberOffScope_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Covers.members.Add(f.Ch1Records);        // declared by the chapter, not the tier
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.MemberOffScope, "ch1_records");
+        }
+
+        [Test]
+        public void Group_SameMemberTwice_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Covers.members.Add(f.Cover1);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.DuplicateMember, "cover_1");
         }
 
         [Test]
@@ -1921,8 +1969,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new ValidatorFixture();
             var sibling = f.AddSiblingChapter();
-            var theirs = TestTree.MakeDefinition<BarGroupDefinition>("their_covers");
-            sibling.Tier2.barGroups.Add(theirs);
+            var theirs = TestTree.MakeDefinition<GroupDefinition>("their_covers");
+            sibling.Tier2.groups.Add(theirs);
             f.Trigger.condition = new BarsCompleted { group = theirs, count = 1 };
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "BarsCompleted");
         }

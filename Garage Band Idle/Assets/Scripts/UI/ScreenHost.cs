@@ -483,7 +483,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void CreateWidget(SectionView section, int index, ModuleView module)
         {
             var root = registry.Resolve(module.Definition.prefabId).Instantiate();
-            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, this, this);
+            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this);
             module.Widget.Bind(session, module.Scope, module.Definition.content, clock);
             section.ModulesContainer.Insert(PlacedBefore(section, index), root);
         }

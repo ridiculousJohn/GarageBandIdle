@@ -24,6 +24,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // Judged at this currency's own HOME, so every source gets one answer.
         // Shaped like GeneratorDefinition.IsAvailable and UpgradeDefinition
         // .IsOffered: the caller supplies the context the read walks from.
-        public bool IsActive(GameContext atHome) => activeWhen == null || activeWhen.Evaluate(atHome);
+        // A currency a group holds off reads inactive for as long as it is off
+        // (12.7) - the membership seam for this kind, and it says exactly what
+        // the gate above says.
+        public bool IsActive(GameContext atHome) =>
+            (activeWhen == null || activeWhen.Evaluate(atHome)) && atHome.IsOn(this);
     }
 }

@@ -497,7 +497,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Rebuild();
             tree.Tier1.generatorCounts["practice_amp"] = 2;
             tree.Tier1.balances["rehearsal"] = 1000;
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "cover_1" };
 
             var expected = Producer.ResolveGeneratorYield(tree.Ctx(tree.Tier1), tree.PracticeAmp).Single();
             Assert.AreSame(tree.Cash, expected.target, "the amp pays cash");

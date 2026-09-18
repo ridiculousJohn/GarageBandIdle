@@ -76,11 +76,16 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         //
         // An empty TARGET is the wildcard: every number of that stat, at the one
         // coordinate the stat has per number. For rate and yield that is the
-        // target's total, the currency's - a source's own term would otherwise
-        // meet it twice, since root sits on both gather walks, and a bar's fill
-        // stays out - while count, cost and game_speed have a single coordinate
-        // each, so any owner answers. An owner-less query (the tick's game_speed
-        // read) matches wildcards only.
+        // TARGET's total - a currency's, or a bar's - and a source's own term
+        // stays out, since it would otherwise meet the same factor twice with
+        // root on both gather walks. A bar answers because a bar's fill is a
+        // rate the away window accrues like every other: idle_base's
+        // {stat: rate, x0.5} halves it, so a gig completes half as often and
+        // away pays half of ALL of it (section 9). Its fill-rate plan is stage 1
+        // only and a rate paid INTO it takes its stage 2 at the bar, so the
+        // wildcard applies exactly once on either path. count, cost and
+        // game_speed have a single coordinate each, so any owner answers. An
+        // owner-less query (the tick's game_speed read) matches wildcards only.
         //
         // The currency coordinate matches by id OR tag, exactly as target does:
         // "every rate entry paying an income currency" is one effect rather than
@@ -94,7 +99,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 return false;
             if (string.IsNullOrEmpty(target))
             {
-                if (Stat.IsProduced(stat) && !(owner is CurrencyDefinition))
+                if (Stat.IsProduced(stat) && !(owner is CurrencyDefinition || owner is BarDefinition))
                     return false;
             }
             else if (owner == null || (target != owner.Id && !owner.HasTag(target)))
@@ -223,6 +228,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 var count = contributor.Source.CountAt(contributor.Node);
                 if (count <= BigNumber.Zero)
                     continue;
+                // A source a group holds off contributes nothing for as long as
+                // it is off (12.7), which is the same shape an unowned generator
+                // takes: the term is skipped, so the readout, the total and the
+                // balance agree at zero.
+                if (!ctx.Rebase(contributor.Node).IsOn(contributor.Source.Source))
+                    continue;
                 sum += SourceTerm(ctx.Rebase(contributor.Node), contributor.Entries, count, contributor.Plan);
             }
             if (sum == BigNumber.Zero)
@@ -285,6 +296,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             var declaring = DeclaringScope<ScopeState>(ctx.Scope, source);
             var declaringCtx = ctx.Rebase(declaring);
+            // A source a group holds off resolves every target at zero (12.7),
+            // so a firing pays nothing and a preview shows nothing - the one
+            // answer, from the one place the amounts are computed, rather than a
+            // refusal each caller would have to remember.
+            var on = declaringCtx.IsOn(source);
 
             var targets = new List<Definition>();
             var grouped = new List<List<ProducesEntry>>();
@@ -308,7 +324,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 // Entries naming one coordinate share one plan, so the first of
                 // the group names it for all of them.
                 var plan = declaring.Link<CoordinatePlan>(grouped[i][0]);
-                var term = SourceTerm(declaringCtx, grouped[i], countScale, plan);
+                var term = on ? SourceTerm(declaringCtx, grouped[i], countScale, plan) : BigNumber.Zero;
                 if (term == BigNumber.Zero)
                 {
                     amounts.Add((targets[i], BigNumber.Zero));

@@ -50,7 +50,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly GeneratorDefinition PracticeAmp, Drummer, Bassist;
             public readonly UpgradeDefinition StagePresence, PlayForCrowd, UnlockCovers;
             public readonly ModifierDefinition CoverBonus1, CoverBonus2, GjTap1;
-            public readonly BarGroupDefinition LearnCovers;
+            public readonly GroupDefinition LearnCovers;
             public readonly BarDefinition Cover1;
             public readonly EventDefinition GarageJam1;
 
@@ -102,8 +102,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 UnlockCovers = Find(Tier1Def.upgrades, "unlock_covers");
                 CoverBonus1 = Find(Tier1Def.modifiers, "cover_bonus_1");
                 CoverBonus2 = Find(Tier1Def.modifiers, "cover_bonus_2");
-                LearnCovers = Find(Tier1Def.barGroups, "learn_covers");
-                Cover1 = Find(LearnCovers.bars, "cover_1");
+                LearnCovers = Find(Tier1Def.groups, "learn_covers");
+                Cover1 = Find(Tier1Def.bars, "cover_1");
                 GarageJam1 = Find(Tier1Def.events, "garage_jam_1");
 
                 Root = ScopeState.Build(ComposedContent.Compose(RootDef, new[] { Ch1Def }));
@@ -283,14 +283,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Tier1.flags.Contains("rehearsal_revealed"));
             AssertClose(0.5, f.Rate(f.Rehearsal), "the passive trickle joins with the reveal");
 
-            // The cover drinks the pool the taps bank, at its OWN 2/s rather
-            // than the pool's - a press pays one Rehearsal every half second,
+            // The cover drinks the Rehearsal the taps bank, at its OWN 2/s
+            // rather than the supply's - a press pays one Rehearsal every half second,
             // which is exactly what the bar takes.
-            f.Session.SetActiveBars(f.Ctx(f.Tier1), f.LearnCovers, new[] { f.Cover1 });
-            Assert.IsTrue(f.Tier1.activeBars[f.LearnCovers.Id].Contains(f.Cover1.Id), "cover_1 is the running cover");
+            f.Session.SetActiveMembers(f.Ctx(f.Tier1), f.LearnCovers, new[] { f.Cover1 });
+            Assert.IsTrue(f.Tier1.activeMembers[f.LearnCovers.Id].Contains(f.Cover1.Id), "cover_1 is the running cover");
             f.TapUntil(() => f.Progress(f.Cover1) >= f.Cover1.fillAmount, "cover_1 filled");
             Assert.AreEqual(1, f.Tier1.modifierStacks[f.CoverBonus1.Id],
                 "a non-repeating completion leaves no derivable fact, so its reward is a grant");
+            // The finished cover releases its slot, so the screen's toggle - the
+            // current set with the next cover added - is accepted at maxActive 1.
+            Assert.IsEmpty(f.Tier1.activeMembers[f.LearnCovers.Id], "the completed cover left the set");
+            var next = new List<Definition>(f.LearnCovers.members.FindAll(
+                m => f.Tier1.activeMembers[f.LearnCovers.Id].Contains(m.Id) || m.Id == "cover_2"));
+            f.Session.SetActiveMembers(f.Ctx(f.Tier1), f.LearnCovers, next);
+            Assert.IsTrue(f.Tier1.activeMembers[f.LearnCovers.Id].Contains("cover_2"), "the next cover can be chosen from the screen's shape");
+            f.Session.SetActiveMembers(f.Ctx(f.Tier1), f.LearnCovers, new Definition[0]);
             AssertClose(0.37 * 1.15, f.Rate(f.Fans), "the cover bonus lifts the fan rate");
 
             // Both legs are required, and here the cover is the one that holds:
@@ -572,9 +580,40 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(f.Session.CurrentOffer);
             Assert.AreEqual(windowEnd, f.Ch1.lastActiveUtc, "the stamp advances to the window actually paid");
 
-            // Bar progress moved zero - the pool banked instead, so the
-            // returning player pours covers at their own rate.
+            // No cover was running, so bar progress moved zero and the
+            // Rehearsal banked instead, for the returning player to pour.
             Assert.IsEmpty(f.Tier1.barProgress);
+        }
+
+        // A cover left RUNNING across the same absence fills from the Rehearsal
+        // that accrues while away (section 9): the offer carries the bar beside
+        // its lines, the currency's line is short what the bar drank, and the
+        // claim writes the progress and runs the completion.
+        [Test]
+        public void Walkthrough_4_a_cover_left_selected_has_fill_on_return()
+        {
+            var f = new Chapter1();
+            f.Tier1.flags.Add("rehearsal_revealed");        // the passive trickle the cover drinks
+            f.Tier1.activeMembers[f.LearnCovers.Id] = new HashSet<string> { f.Cover1.Id };
+
+            f.Ch1.lastActiveUtc = f.Now.AddSeconds(-14400);
+            f.Session.SwitchChapter(f.Ch1, f.Now);
+
+            // 0.25/s of Rehearsal over the 4h cap is 3600 accrued; the cover
+            // fills at its own 2/s halved, crosses its 100, and stops there.
+            var bar = f.Session.CurrentOffer.bars.Single();
+            Assert.AreSame(f.Cover1, bar.bar);
+            AssertClose(100, bar.progress, "filled to its threshold and drank no further");
+            Assert.AreEqual(1, bar.completions);
+            AssertClose(3600, Line(f, f.Rehearsal).amount, "the window's whole inflow");
+            AssertClose(100, Draw(f, f.Rehearsal).amount, "and the 100 the cover drank of it");
+
+            f.Session.ClaimIdle(f.Now);
+
+            AssertClose(100, f.Progress(f.Cover1), "the claim writes the progress it computed");
+            Assert.AreEqual(1, f.Tier1.modifierStacks[f.CoverBonus1.Id],
+                "and runs the completion the crossing earned");
+            AssertClose(3500, f.Balance(f.Tier1, f.Rehearsal));
         }
 
         // The same four hours with an hour of Encore left on them. The buff
@@ -619,5 +658,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static IdleOfferLine Line(Chapter1 f, CurrencyDefinition currency) =>
             f.Session.CurrentOffer.lines.Find(l => l.target == currency);
+
+        // What the window's bars drew from one currency: a line is what the
+        // window paid and a draw is what it drank (section 9).
+        private static IdleOfferLine Draw(Chapter1 f, CurrencyDefinition currency) =>
+            f.Session.CurrentOffer.draws.Find(d => d.target == currency);
     }
 }

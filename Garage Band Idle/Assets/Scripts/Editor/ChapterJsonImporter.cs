@@ -383,12 +383,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 Declare<EventDefinition>(build, scope, evt, document, options, materialize);
             foreach (var beat in dto.storyBeats)
                 Declare<StoryBeatDefinition>(build, scope, beat, document, options, materialize);
-            foreach (var group in dto.barGroups)
-            {
-                Declare<BarGroupDefinition>(build, scope, group, document, options, materialize);
-                foreach (var bar in group.bars)
-                    Declare<BarDefinition>(build, scope, bar, document, options, materialize);
-            }
+            foreach (var bar in dto.bars)
+                Declare<BarDefinition>(build, scope, bar, document, options, materialize);
+            foreach (var group in dto.groups)
+                Declare<GroupDefinition>(build, scope, group, document, options, materialize);
 
             foreach (var child in dto.children)
                 MaterializeScope(build, child, scope, document, options, materialize);
@@ -448,7 +446,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             scope.upgrades.Clear();
             scope.modifiers.Clear();
             scope.permanentModifiers.Clear();
-            scope.barGroups.Clear();
+            scope.bars.Clear();
+            scope.groups.Clear();
             scope.triggers.Clear();
 
             scope.declaredFlags.AddRange(dto.flags);
@@ -527,31 +526,49 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             foreach (var id in dto.permanentModifiers)
                 scope.permanentModifiers.Add(Resolve<ModifierDefinition>(build, scope, id, "permanentModifiers"));
 
-            foreach (var groupDto in dto.barGroups)
+            foreach (var barDto in dto.bars)
             {
-                var group = (BarGroupDefinition)build.Built[groupDto];
+                var bar = (BarDefinition)build.Built[barDto];
+                // Each consumed currency resolves outward from the bar's scope,
+                // like every other currency operand (12.7).
+                bar.consumes = barDto.consumes
+                    .Select(c => new ConsumesEntry
+                    {
+                        currency = Resolve<CurrencyDefinition>(build, scope, c.currency, "consumes"),
+                        amount = c.amount,
+                    })
+                    .ToList();
+                bar.fillAmount = barDto.fillAmount;
+                bar.fillRate = barDto.fillRate;
+                bar.repeatWhen = BuildCondition(build, scope, barDto.repeatWhen);
+                bar.tap = string.IsNullOrEmpty(barDto.tap)
+                    ? null
+                    : Resolve<ProducerDefinition>(build, scope, barDto.tap, "tap");
+                bar.availableWhen = BuildCondition(build, scope, barDto.availableWhen);
+                bar.onComplete = barDto.onComplete.Select(a => BuildAction(build, scope, a)).ToList();
+                bar.perFill = barDto.perFill
+                    .Select(p => new PerFillEntry { effect = BuildEffect(build, scope, p.effect), growth = p.growth })
+                    .ToList();
+                scope.bars.Add(bar);
+            }
+
+            foreach (var groupDto in dto.groups)
+            {
+                var group = (GroupDefinition)build.Built[groupDto];
                 group.maxActive = groupDto.maxActive;
-                group.bars = new List<BarDefinition>();
-                foreach (var barDto in groupDto.bars)
+                group.members = new List<Definition>();
+                foreach (var memberId in groupDto.members)
                 {
-                    var bar = (BarDefinition)build.Built[barDto];
-                    bar.fillCurrency = string.IsNullOrEmpty(barDto.fillCurrency)
-                        ? null
-                        : Resolve<CurrencyDefinition>(build, scope, barDto.fillCurrency, "fillCurrency");
-                    bar.fillAmount = barDto.fillAmount;
-                    bar.fillRate = barDto.fillRate;
-                    bar.repeatWhen = BuildCondition(build, scope, barDto.repeatWhen);
-                    bar.tap = string.IsNullOrEmpty(barDto.tap)
-                        ? null
-                        : Resolve<ProducerDefinition>(build, scope, barDto.tap, "tap");
-                    bar.availableWhen = BuildCondition(build, scope, barDto.availableWhen);
-                    bar.onComplete = barDto.onComplete.Select(a => BuildAction(build, scope, a)).ToList();
-                    bar.perFill = barDto.perFill
-                        .Select(p => new PerFillEntry { effect = BuildEffect(build, scope, p.effect), growth = p.growth })
-                        .ToList();
-                    group.bars.Add(bar);
+                    // This scope's OWN declarations and no walk: a group lists
+                    // what its own scope declares, so a member found further out
+                    // would put the active set and the member in two homes
+                    // (12.7).
+                    if (!build.Declared[scope].TryGetValue(memberId, out var member))
+                        throw new ContentImportException(
+                            $"group '{group.Id}' lists '{memberId}', which scope '{scope.Id}' does not declare - a group lists what its own scope declares (12.7).");
+                    group.members.Add(member);
                 }
-                scope.barGroups.Add(group);
+                scope.groups.Add(group);
             }
 
             foreach (var triggerDto in dto.triggers)
@@ -745,7 +762,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     { modifier = Resolve<ModifierDefinition>(build, scope, d.modifier, "BuffActive") },
                 HasEntitlementDto d => new HasEntitlement { entitlementId = d.entitlementId },
                 BarsCompletedDto d => new BarsCompleted
-                    { group = Resolve<BarGroupDefinition>(build, scope, d.group, "BarsCompleted"), count = d.count },
+                    { group = Resolve<GroupDefinition>(build, scope, d.group, "BarsCompleted"), count = d.count },
                 EventRecordExistsDto => new EventRecordExists(),
                 EventRewardPendingDto => new EventRewardPending(),
                 AlwaysDto => new Always(),
@@ -960,7 +977,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             if (type == typeof(GeneratorDefinition)) return "Generators";
             if (type == typeof(UpgradeDefinition)) return "Upgrades";
             if (type == typeof(ModifierDefinition)) return "Modifiers";
-            if (type == typeof(BarGroupDefinition)) return "BarGroups";
+            if (type == typeof(GroupDefinition)) return "Groups";
             if (type == typeof(BarDefinition)) return "Bars";
             if (type == typeof(EventDefinition)) return "Events";
             if (type == typeof(StoryBeatDefinition)) return "StoryBeats";

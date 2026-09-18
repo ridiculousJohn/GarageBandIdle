@@ -101,8 +101,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(new[] { "stage_presence", "amp_strings", "kit_upgrade", "tight_set",
                                     "play_for_crowd", "unlock_covers" }, Ids(tier1.upgrades));
             Assert.AreEqual(new[] { "cover_bonus_1", "cover_bonus_2", "cover_bonus_3" }, Ids(tier1.modifiers));
-            Assert.AreEqual(new[] { "learn_covers" }, Ids(tier1.barGroups));
-            Assert.AreEqual(new[] { "cover_1", "cover_2", "cover_3" }, Ids(tier1.barGroups[0].bars));
+            Assert.AreEqual(new[] { "cover_1", "cover_2", "cover_3" }, Ids(tier1.bars));
+            Assert.AreEqual(new[] { "learn_covers" }, Ids(tier1.groups));
+            Assert.AreEqual(new[] { "cover_1", "cover_2", "cover_3" }, Ids(tier1.groups[0].members));
             Assert.AreEqual(new[] { "garage_jam_1", "garage_jam_2", "garage_jam_3" }, Ids(tier1.events));
 
             // Eleven triggers: ten reveals and the release (content doc section
@@ -265,14 +266,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void The_covers_fill_from_rehearsal_and_grant_their_own_bonus()
         {
-            var group = Find(tier1.barGroups, "learn_covers");
+            var group = Find(tier1.groups, "learn_covers");
             Assert.AreEqual(1, group.maxActive, "choosing the next cover is the mechanic (12.7)");
 
             var amounts = new[] { 100, 300, 600 };
-            for (var i = 0; i < group.bars.Count; i++)
+            for (var i = 0; i < tier1.bars.Count; i++)
             {
-                var bar = group.bars[i];
-                Assert.AreEqual("rehearsal", bar.fillCurrency.Id, bar.Id);
+                var bar = tier1.bars[i];
+                Assert.AreSame(bar, group.members[i], bar.Id);
+                Assert.AreEqual("rehearsal", bar.consumes.Single().currency.Id, bar.Id);
+                Assert.AreEqual(BigNumber.One, bar.consumes.Single().amount, bar.Id);
                 Assert.AreEqual((BigNumber)amounts[i], bar.fillAmount, bar.Id);
                 Assert.AreEqual((BigNumber)2, bar.fillRate, bar.Id);
                 Assert.IsNull(bar.repeatWhen, bar.Id);
@@ -510,7 +513,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // requires the name - `band`, which nothing renders, stays unnamed.
             Assert.AreEqual("Jam", Find(tier1.producers, "tap_producer").displayName);
             Assert.AreEqual("Practice Amp", Find(tier1.generators, "practice_amp").displayName);
-            Assert.AreEqual("Three-Chord Anthem", Find(tier1.barGroups[0].bars, "cover_1").displayName);
+            Assert.AreEqual("Three-Chord Anthem", Find(tier1.bars, "cover_1").displayName);
             Assert.AreEqual("Garage Jam I", Event("garage_jam_1").displayName);
 
             Assert.AreEqual("Cut a Demo", tier1.rung.label);
@@ -532,7 +535,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             foreach (var upgrade in tier1.upgrades)
                 Assert.IsFalse(string.IsNullOrEmpty(upgrade.description),
                     $"upgrade '{upgrade.Id}' has no description for its row to show");
-            foreach (var bar in tier1.barGroups[0].bars)
+            foreach (var bar in tier1.bars)
                 Assert.IsFalse(string.IsNullOrEmpty(bar.description),
                     $"cover '{bar.Id}' has no description for its row to show");
             foreach (var section in ch1.sections)
@@ -597,9 +600,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "upgrade_row unlock_covers @tier1",
             }, Modules(2));
 
-            // The group module binds nothing - its content is the evaluation
-            // scope's own declaration list - so it lands on its section.
-            Assert.AreEqual(new[] { "bar_group - @tier1" }, Modules(3));
+            // The group module binds ONE group, the way a generator row binds
+            // one generator, and renders each member it lists (12.11).
+            Assert.AreEqual(new[] { "group learn_covers @tier1" }, Modules(3));
 
             // The release rung is TIER1's, so this module authors its scope
             // even though the section around it evaluates at ch1.

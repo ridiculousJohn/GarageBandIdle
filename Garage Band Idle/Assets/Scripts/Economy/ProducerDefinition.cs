@@ -22,17 +22,18 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public const string Cost = "cost";            // a generator's or upgrade's price; stage 1 only, read by Purchasing.CostOf
         public const string Count = "count";          // a generator's granted count; the stage-2 coordinate of a payment into it
         public const string AutoBuy = "autobuy";      // a generator's switch, not a factor: on while an effect naming it is live and no handicap is (12.2)
+        public const string Consumption = "consumption"; // what one unit of a bar's fill costs in one currency; stage 1 only, read at the draw (12.7)
 
         public static bool IsProduced(string stat) => stat == Rate || stat == Yield;
 
         public static bool IsEffectAddress(string stat) =>
-            stat == GameSpeed || stat == Cost || stat == Count || stat == AutoBuy;
+            stat == GameSpeed || stat == Cost || stat == Count || stat == AutoBuy || stat == Consumption;
 
         // For validation messages. An effect's stat coordinate may name any of
-        // the six; a produces entry only the first two.
+        // the seven; a produces entry only the first two.
         public const string ProducedNames = Rate + ", " + Yield;
         public const string EffectStatNames =
-            ProducedNames + ", " + GameSpeed + ", " + Cost + ", " + Count + ", " + AutoBuy;
+            ProducedNames + ", " + GameSpeed + ", " + Cost + ", " + Count + ", " + AutoBuy + ", " + Consumption;
     }
 
     // One authored number: what it pays, which stat, the base value, plus an

@@ -99,8 +99,12 @@ namespace RidiculousGaming.GarageBandIdle
             switch (Liveness)
             {
                 case LivenessKind.Upgrade:
-                    // The effects apply for as long as the latch exists (12.6).
-                    return Node.purchasedUpgrades.Contains(Carrier.Id);
+                    // The effects apply for as long as the latch exists (12.6)
+                    // and the upgrade is ON: an upgrade a group holds off
+                    // gathers nothing, which is the membership seam for this
+                    // kind (12.7).
+                    return Node.purchasedUpgrades.Contains(Carrier.Id)
+                        && origin.Rebase(Node).IsOn(Carrier);
 
                 case LivenessKind.Permanent:
                     // The membership is the declaration itself, so the gate is

@@ -157,7 +157,7 @@
       "visibleWhen": { "type": "FlagSet", "flagId": "rehearsal_revealed" },
       "scopeId": "tier1",
       "modules": [
-        { "prefabId": "bar_group" }
+        { "prefabId": "group", "contentId": "learn_covers" }
       ]
     },
     {
@@ -355,45 +355,53 @@
         }
       ],
 
-      "barGroups": [
+      "bars": [
+        {
+          "id": "cover_1",
+          "displayName": "Three-Chord Anthem",
+          "description": "Your first cover, 100 Rehearsal to learn. Learning it pulls fans 15% faster.",
+          "consumes": [
+            { "currency": "rehearsal", "amount": 1 }
+          ],
+          "fillAmount": 100,
+          "fillRate": 2,
+          "onComplete": [
+            { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_1" }
+          ]
+        },
+        {
+          "id": "cover_2",
+          "displayName": "Parking-Lot Standard",
+          "description": "The one everybody knows, 300 Rehearsal to learn. Another 15% on your fan rate.",
+          "consumes": [
+            { "currency": "rehearsal", "amount": 1 }
+          ],
+          "fillAmount": 300,
+          "fillRate": 2,
+          "onComplete": [
+            { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_2" }
+          ]
+        },
+        {
+          "id": "cover_3",
+          "displayName": "The Crowd-Pleaser",
+          "description": "The big one, 600 Rehearsal to learn, and the best of the three: fans arrive 20% faster.",
+          "consumes": [
+            { "currency": "rehearsal", "amount": 1 }
+          ],
+          "fillAmount": 600,
+          "fillRate": 2,
+          "onComplete": [
+            { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_3" }
+          ]
+        }
+      ],
+
+      "groups": [
         {
           "id": "learn_covers",
           "maxActive": 1,
-          "bars": [
-            {
-              "id": "cover_1",
-              "displayName": "Three-Chord Anthem",
-              "description": "Your first cover, 100 Rehearsal to learn. Learning it pulls fans 15% faster.",
-              "fillCurrency": "rehearsal",
-              "fillAmount": 100,
-              "fillRate": 2,
-              "onComplete": [
-                { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_1" }
-              ]
-            },
-            {
-              "id": "cover_2",
-              "displayName": "Parking-Lot Standard",
-              "description": "The one everybody knows, 300 Rehearsal to learn. Another 15% on your fan rate.",
-              "fillCurrency": "rehearsal",
-              "fillAmount": 300,
-              "fillRate": 2,
-              "onComplete": [
-                { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_2" }
-              ]
-            },
-            {
-              "id": "cover_3",
-              "displayName": "The Crowd-Pleaser",
-              "description": "The big one, 600 Rehearsal to learn, and the best of the three: fans arrive 20% faster.",
-              "fillCurrency": "rehearsal",
-              "fillAmount": 600,
-              "fillRate": 2,
-              "onComplete": [
-                { "type": "AddModifier", "scope": "tier1", "modifier": "cover_bonus_3" }
-              ]
-            }
-          ]
+          "members": ["cover_1", "cover_2", "cover_3"]
         }
       ],
 

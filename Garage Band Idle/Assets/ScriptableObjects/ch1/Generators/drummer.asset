@@ -21,7 +21,7 @@ MonoBehaviour:
   description: Pays 3 cash a second and pulls in 0.02 fans. Three amps in the garage
     and someone shows up to play them.
   availableWhen:
-    rid: 7579425512644149338
+    rid: 7579425541347344474
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
   baseCost:
     _value:
@@ -57,7 +57,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425512644149338
+    - rid: 7579425541347344474
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

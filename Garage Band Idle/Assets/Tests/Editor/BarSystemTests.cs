@@ -5,10 +5,10 @@ using RidiculousGaming.GarageBandIdle.Economy;
 
 namespace RidiculousGaming.GarageBandIdle.Tests
 {
-    // The smallest tree a draw needs: root -> ch1 -> tier1, with one pool homed
-    // at tier1 and one at root for the shared-pool cases. Each test authors its
-    // own groups and THEN builds the state tree, because ScopeState.Build
-    // initializes declared facts from the definitions.
+    // The smallest tree a draw needs: root -> ch1 -> tier1, with one consumed
+    // currency homed at tier1 and one at root for the shared cases. Each test
+    // authors its own bars and groups and THEN builds the state tree, because
+    // ScopeState.Build initializes declared facts from the definitions.
     internal class BarFixture
     {
         public readonly DateTime Now = new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);
@@ -16,8 +16,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public readonly RootDefinition RootDef;
         public readonly ChapterDefinition Ch1Def;
         public readonly TierDefinition Tier1Def;
-        public readonly CurrencyDefinition Rehearsal;   // tier1's own pool
-        public readonly CurrencyDefinition Shared;      // root's, so every chapter draws the same one
+        public readonly CurrencyDefinition Rehearsal;   // tier1's own
+        public readonly CurrencyDefinition Shared;      // root's, so every chapter drinks the same one
         public readonly CurrencyDefinition Fans;
         public readonly List<ChapterDefinition> Chapters = new();
 
@@ -47,36 +47,44 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Tier1 = TestNavigation.Node(Root, Tier1Def);
         }
 
-        // A bar names what it drinks. Most tests give a group's bars the same
-        // currency, so the fixture takes it once here as the DEFAULT for members;
-        // a test that needs otherwise assigns `bar.fillCurrency` itself. Pass
-        // null for bars that fill from time alone.
-        public BarGroupDefinition Group(ScopeDefinition scope, string id, CurrencyDefinition pool,
-                                        int maxActive = 4)
+        // A group lists what its own scope declares (12.7), so the fixture
+        // remembers the scope a group was declared on and files its bars there.
+        // `consumed` is the currency the members drink by default, taken once
+        // here; a test that needs otherwise writes `bar.consumes` itself, and
+        // null is a group of bars that fill from time alone.
+        public GroupDefinition Group(ScopeDefinition scope, string id, CurrencyDefinition consumed,
+                                     int maxActive = 4)
         {
-            var group = TestTree.MakeDefinition<BarGroupDefinition>(id);
+            var group = TestTree.MakeDefinition<GroupDefinition>(id);
             group.maxActive = maxActive;
-            scope.barGroups.Add(group);
-            pools[group] = pool;
+            scope.groups.Add(group);
+            declared[group] = (scope, consumed);
             return group;
         }
 
-        private readonly Dictionary<BarGroupDefinition, CurrencyDefinition> pools = new();
+        private readonly Dictionary<GroupDefinition, (ScopeDefinition scope, CurrencyDefinition consumed)> declared = new();
 
         // The repeat is a condition judged at the bar's home (12.7), so the
         // fixture takes one: null is the bar that fills once, Always is the
         // repeating one, and a condition that refuses is the manual team.
-        public BarDefinition Bar(BarGroupDefinition group, string id, double fillAmount, double fillRate,
+        public BarDefinition Bar(GroupDefinition group, string id, double fillAmount, double fillRate,
                                  Condition repeatWhen = null)
         {
+            var (scope, consumed) = declared[group];
             var bar = TestTree.MakeDefinition<BarDefinition>(id);
-            bar.fillCurrency = pools[group];
+            if (consumed != null)
+                bar.consumes.Add(new ConsumesEntry { currency = consumed, amount = 1 });
             bar.fillAmount = fillAmount;
             bar.fillRate = fillRate;
             bar.repeatWhen = repeatWhen;
-            group.bars.Add(bar);
+            scope.bars.Add(bar);
+            group.members.Add(bar);
             return bar;
         }
+
+        // One entry of a bar's consumes list, per unit of fill (12.7).
+        public static void Drinks(BarDefinition bar, CurrencyDefinition currency, double amount) =>
+            bar.consumes.Add(new ConsumesEntry { currency = currency, amount = amount });
 
         // The upgrade a repeat condition can read, priced at nothing because no
         // test here buys it - the latch is written as a fact.
@@ -91,13 +99,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // Selection written as a FACT, bypassing the entry point: a draw test is
-        // not a SetActiveBars test.
-        public void Select(ScopeState scope, BarGroupDefinition group, params BarDefinition[] bars)
+        // not a SetActiveMembers test.
+        public void Select(ScopeState scope, GroupDefinition group, params Definition[] members)
         {
             var set = new HashSet<string>();
-            foreach (var bar in bars)
-                set.Add(bar.Id);
-            scope.activeBars[group.Id] = set;
+            foreach (var member in members)
+                set.Add(member.Id);
+            scope.activeMembers[group.Id] = set;
         }
 
         // Declared BEFORE the build, because the gather is compiled when the
@@ -107,6 +115,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var modifier = TestTree.MakeDefinition<ModifierDefinition>("mod_" + target + "_" + multiplier);
             modifier.effects.Add(new Effect { target = target, stat = Stat.Rate, multiplier = multiplier });
+            scope.modifiers.Add(modifier);
+            return modifier;
+        }
+
+        // A consumption factor: stage 1 at the bar's own coordinate, narrowed to
+        // the currency it drinks, so "this bar consumes 90% less X" is one
+        // authored effect (12.7). A null currencyId is the wildcard.
+        public ModifierDefinition DeclareConsumption(ScopeDefinition scope, string id, string target,
+                                                     string currencyId, double multiplier)
+        {
+            var modifier = TestTree.MakeDefinition<ModifierDefinition>(id);
+            modifier.effects.Add(new Effect
+            {
+                target = target,
+                currencyId = currencyId,
+                stat = Stat.Consumption,
+                multiplier = multiplier
+            });
             scope.modifiers.Add(modifier);
             return modifier;
         }
@@ -136,7 +162,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     }
 
     // The consumption half of the economy (design doc 12.7): what a bar drinks,
-    // what happens when its pool runs short, and what a crossing fires.
+    // what happens when what it drinks runs short, and what a crossing fires.
     public class BarSystemTests
     {
         private static void AssertClose(double expected, BigNumber actual, string what = null) =>
@@ -150,11 +176,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- the draw ----
 
         // What replaces the proportional split: bars take what they want in
-        // declaration order until the pool runs out. The total delivered is the
-        // same either way - it is whatever was in the pool - so the only
+        // declaration order until the currency runs out. The total delivered is
+        // the same either way - it is whatever was banked - so the only
         // difference is that one bar visibly moves instead of three inching.
         [Test]
-        public void A_short_pool_feeds_bars_in_declaration_order_until_it_runs_out()
+        public void A_short_consumed_currency_feeds_bars_in_declaration_order_until_it_runs_out()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
@@ -170,13 +196,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(4, f.Progress(f.Tier1, first), "took its whole rate");
             AssertClose(2, f.Progress(f.Tier1, second), "took what was left");
             AssertClose(0, f.Progress(f.Tier1, third), "stalled");
-            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "pool");
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "rehearsal");
         }
 
-        // The rule the whole shape turns on: a bar names its OWN currency, so one
-        // group holds bars drinking different things - including one that drinks
-        // nothing. An implementation resolving one currency per GROUP would pass
-        // every other test in this file.
+        // The rule the whole shape turns on: a bar names its OWN currencies, so
+        // one group holds bars drinking different things - including one that
+        // drinks nothing. An implementation resolving one currency per GROUP
+        // would pass every other test in this file.
         [Test]
         public void Bars_in_one_group_may_name_different_currencies()
         {
@@ -184,9 +210,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var group = f.Group(f.Tier1Def, "mixed", f.Rehearsal);
             var drinksRehearsal = f.Bar(group, "drinks_rehearsal", 1000, 3);
             var drinksShared = f.Bar(group, "drinks_shared", 1000, 5);
-            drinksShared.fillCurrency = f.Shared;       // homed at root, not tier1
+            drinksShared.consumes.Clear();
+            BarFixture.Drinks(drinksShared, f.Shared, 1);       // homed at root, not tier1
             var drinksNothing = f.Bar(group, "drinks_nothing", 1000, 7);
-            drinksNothing.fillCurrency = null;          // fills from time alone
+            drinksNothing.consumes.Clear();                     // fills from time alone
             f.Build();
             f.Pour(f.Tier1, f.Rehearsal, 100);
             f.Pour(f.Root, f.Shared, 100);
@@ -198,15 +225,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(10, f.Progress(f.Tier1, drinksShared), "drinks shared");
             AssertClose(14, f.Progress(f.Tier1, drinksNothing), "drinks nothing");
 
-            // Each spent from its OWN home, and the time-filled one spent nothing.
-            AssertClose(94, f.Balance(f.Tier1, f.Rehearsal), "rehearsal pool");
-            AssertClose(90, f.Balance(f.Root, f.Shared), "shared pool");
+            // Each spent at its OWN home, and the time-filled one spent nothing.
+            AssertClose(94, f.Balance(f.Tier1, f.Rehearsal), "rehearsal");
+            AssertClose(90, f.Balance(f.Root, f.Shared), "shared");
         }
 
-        // One pool, two groups at different scopes: the currency's balance is the
-        // only thing arbitrating, and it needs no group-level bookkeeping to do it.
+        // One currency, two groups at different scopes: the balance is the only
+        // thing arbitrating, and it needs no group-level bookkeeping to do it.
         [Test]
-        public void Bars_in_different_groups_draw_the_same_pool_in_tree_order()
+        public void Bars_in_different_groups_draw_the_same_currency_in_tree_order()
         {
             var f = new BarFixture();
             var outer = f.Group(f.Ch1Def, "outer", f.Shared);
@@ -223,11 +250,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Parent before child, so the chapter's bar drinks first.
             AssertClose(6, f.Progress(f.Ch1, chapterBar), "bar_outer");
             AssertClose(2, f.Progress(f.Tier1, tierBar), "bar_inner");
-            AssertClose(0, f.Balance(f.Root, f.Shared), "pool");
+            AssertClose(0, f.Balance(f.Root, f.Shared), "shared");
         }
 
         [Test]
-        public void An_exhausted_pool_pays_what_it_has_and_no_more()
+        public void An_exhausted_currency_pays_what_it_has_and_no_more()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
@@ -239,11 +266,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Segment(1);
 
             AssertClose(1, f.Progress(f.Tier1, bar), "progress");
-            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "pool");
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "rehearsal");
         }
 
         [Test]
-        public void A_fill_spends_the_pool_without_touching_its_earned_total()
+        public void A_fill_spends_the_consumed_currency_without_touching_its_earned_total()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
@@ -298,11 +325,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
             var bar = f.Bar(group, "cover_a", 1000, 2);
-            var poolBuff = f.Declare(f.Tier1Def, "rehearsal", 3);
+            var supplyBuff = f.Declare(f.Tier1Def, "rehearsal", 3);
             f.Build();
             f.Pour(f.Tier1, f.Rehearsal, 1000);
             f.Select(f.Tier1, group, bar);
-            f.Stack(f.Tier1, poolBuff);             // an effect on the POOL currency's total
+            f.Stack(f.Tier1, supplyBuff);           // an effect on the drunk currency's total
 
             f.Segment(1);
 
@@ -313,12 +340,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(2, f.Progress(f.Tier1, bar), "unchanged");
         }
 
+        // The fill-rate plan carries no currency coordinate (12.7): a bar's own
+        // speed is one number however many currencies it drinks, so an effect
+        // narrowed to a currency addresses the CONSUMPTION stat instead and the
+        // rate never sees it.
         [Test]
-        public void An_effect_may_narrow_to_a_bars_own_currency_and_one_without_has_none()
+        public void A_currency_narrowed_effect_never_matches_a_bars_fill_rate()
         {
             var f = new BarFixture();
-            var poured = f.Group(f.Tier1Def, "poured", f.Rehearsal);
-            var drinker = f.Bar(poured, "drinker", 1000, 2);
+            var group = f.Group(f.Tier1Def, "poured", f.Rehearsal);
+            var drinker = f.Bar(group, "drinker", 1000, 2);
             var timed = f.Group(f.Tier1Def, "timed", null);
             var ticker = f.Bar(timed, "ticker", 1000, 2);
             var modifier = TestTree.MakeDefinition<ModifierDefinition>("narrowed");
@@ -332,22 +363,122 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Build();
             f.Tier1.modifierStacks[modifier.Id] = 1;
             f.Pour(f.Tier1, f.Rehearsal, 1000);
-            f.Select(f.Tier1, poured, drinker);
+            f.Select(f.Tier1, group, drinker);
             f.Select(f.Tier1, timed, ticker);
 
             f.Segment(1);
 
-            // The same effect, the same tag: it narrows to a currency, so it
-            // reaches the bar that drinks it and nothing at all in the bar that
-            // fills from time.
-            AssertClose(8, f.Progress(f.Tier1, drinker), "narrowed to the pool it drinks");
-            AssertClose(2, f.Progress(f.Tier1, ticker), "no currency, so no coordinate to match");
+            AssertClose(2, f.Progress(f.Tier1, drinker), "no currency coordinate on a fill rate");
+            AssertClose(2, f.Progress(f.Tier1, ticker), "and none on a bar that fills from time");
+        }
+
+        // ---- consumption (12.7) ----
+
+        // The fill is the smallest of the want and EVERY entry's cover, and each
+        // entry then spends what that fill cost it.
+        [Test]
+        public void A_two_entry_bar_fills_the_tightest_cover_and_spends_both()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", null);
+            var bar = f.Bar(group, "cover_a", 1000, 10);
+            BarFixture.Drinks(bar, f.Rehearsal, 1);
+            BarFixture.Drinks(bar, f.Shared, 2);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 100);      // covers 100 units
+            f.Pour(f.Root, f.Shared, 12);           // covers 6, which is the binding one
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            AssertClose(6, f.Progress(f.Tier1, bar), "the tightest cover decides the fill");
+            AssertClose(94, f.Balance(f.Tier1, f.Rehearsal), "6 units at 1 each");
+            AssertClose(0, f.Balance(f.Root, f.Shared), "6 units at 2 each");
+        }
+
+        [Test]
+        public void A_bar_whose_consumed_currency_is_empty_fills_nothing()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 1000, 5);
+            f.Build();
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            AssertClose(0, f.Progress(f.Tier1, bar), "nothing banked is nothing to drink");
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "and nothing was spent");
+        }
+
+        // Consumption is a stat (12.7), so "this bar consumes 90% less Rehearsal"
+        // is one authored effect and the same fill costs a tenth.
+        [Test]
+        public void A_consumption_effect_leaves_the_fill_alone_and_spends_a_tenth()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 1000, 5);
+            var efficient = f.DeclareConsumption(f.Tier1Def, "efficient", "cover_a", "rehearsal", 0.1);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 100);
+            f.Select(f.Tier1, group, bar);
+            f.Stack(f.Tier1, efficient);
+
+            f.Segment(1);
+
+            AssertClose(5, f.Progress(f.Tier1, bar), "the rate is untouched");
+            AssertClose(99.5, f.Balance(f.Tier1, f.Rehearsal), "5 units at a tenth of one each");
+        }
+
+        // Stage 2 is the supply side (12.7): a buff on Rehearsal's total means
+        // more of it produced, never less of it drunk.
+        [Test]
+        public void A_currency_total_buff_never_changes_what_a_bar_spends()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 1000, 5);
+            var supplyBuff = f.Declare(f.Tier1Def, "rehearsal", 3);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 100);
+            f.Select(f.Tier1, group, bar);
+            f.Stack(f.Tier1, supplyBuff);
+
+            f.Segment(1);
+
+            AssertClose(95, f.Balance(f.Tier1, f.Rehearsal), "five units at one each");
+        }
+
+        // A wildcard on the stat is efficiency on everything that drinks: the
+        // effect names no target and no currency, so it reaches every bar's
+        // consumption coordinate (12.2).
+        [Test]
+        public void A_wildcard_consumption_effect_reaches_every_drinking_bar()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var first = f.Bar(group, "cover_a", 1000, 5);
+            var second = f.Bar(group, "cover_b", 1000, 5);
+            second.consumes.Clear();
+            BarFixture.Drinks(second, f.Shared, 1);
+            var thrifty = f.DeclareConsumption(f.Tier1Def, "thrifty", null, null, 0.5);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 100);
+            f.Pour(f.Root, f.Shared, 100);
+            f.Select(f.Tier1, group, first, second);
+            f.Stack(f.Tier1, thrifty);
+
+            f.Segment(1);
+
+            AssertClose(97.5, f.Balance(f.Tier1, f.Rehearsal), "half of five");
+            AssertClose(97.5, f.Balance(f.Root, f.Shared), "and half of the other five");
         }
 
         // ---- bars that fill from time ----
 
         [Test]
-        public void A_bar_with_no_currency_fills_from_time_alone()
+        public void A_bar_that_consumes_nothing_fills_from_time_alone()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "timers", null);
@@ -359,11 +490,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Segment(2);
 
             AssertClose(6, f.Progress(f.Tier1, bar), "progress");
-            AssertClose(7, f.Balance(f.Tier1, f.Rehearsal), "no pool is drained");
+            AssertClose(7, f.Balance(f.Tier1, f.Rehearsal), "nothing is drained");
         }
 
         [Test]
-        public void A_bar_with_no_currency_still_obeys_selection_availability_and_completion()
+        public void A_bar_that_consumes_nothing_still_obeys_selection_availability_and_completion()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "timers", null);
@@ -378,8 +509,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             f.Segment(1);
 
-            // With no pool to run dry, selection is the whole throttle - so it is
-            // the one test a currency-free bar must NOT skip.
+            // With nothing to run dry, selection is the whole throttle - so it is
+            // the one test a bar that drinks nothing must NOT skip.
             AssertClose(0, f.Progress(f.Tier1, unselected), "unselected");
             AssertClose(0, f.Progress(f.Tier1, unavailable), "gate closed");
             AssertClose(100, f.Progress(f.Tier1, finished), "already complete");
@@ -402,6 +533,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Segment(1);
             AssertClose(1, f.Balance(f.Root, f.Shared), "the crossing fires once");
             AssertClose(5, f.Progress(f.Tier1, bar), "progress");
+
+            // Complete, it has nothing left to run, so it leaves the active set
+            // and its slot is free for the next choice (12.7).
+            Assert.IsFalse(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "released on completion");
 
             // A second segment: the bar is complete, so it never draws again and
             // nothing crosses. No completed-set is stored and none is needed.
@@ -507,7 +642,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1, f.Balance(f.Root, f.Shared), "one cycle, one payout");
             Assert.AreEqual(1, f.Fills(f.Tier1, bar), "a present repeatWhen counts its fills either way");
             AssertClose(0, f.Progress(f.Tier1, bar), "the excess past the threshold is discarded");
-            Assert.IsFalse(f.Tier1.activeBars[group.Id].Contains(bar.Id), "and it is no longer selected");
+            Assert.IsFalse(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "and it is no longer selected");
+        }
+
+        // A definition may be listed by several groups (12.7), and the manual
+        // team's settlement leaves EVERY one of them - the member is off the
+        // moment any group holding it lets go, so leaving one would be a
+        // selection the player cannot see.
+        [Test]
+        public void A_manual_team_leaves_every_group_that_lists_it()
+        {
+            var f = new BarFixture();
+            var teams = f.Group(f.Tier1Def, "teams", f.Rehearsal);
+            var bar = f.Bar(teams, "team_a", 10, 25, repeatWhen: new Not { condition = new Always() });
+            var tonight = f.Group(f.Tier1Def, "tonight", f.Rehearsal);
+            tonight.members.Add(bar);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 1000);
+            f.Select(f.Tier1, teams, bar);
+            f.Select(f.Tier1, tonight, bar);
+
+            f.Segment(1);
+
+            Assert.IsFalse(f.Tier1.activeMembers[teams.Id].Contains(bar.Id), "teams");
+            Assert.IsFalse(f.Tier1.activeMembers[tonight.Id].Contains(bar.Id), "tonight");
         }
 
         // One condition, so the same bar is a team or a loop by what the player
@@ -527,7 +685,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             AssertClose(0, f.Progress(f.Tier1, bar), "unbought, the condition refuses and one cycle ran");
             Assert.AreEqual(1, f.Fills(f.Tier1, bar), "fill count");
-            Assert.IsFalse(f.Tier1.activeBars[group.Id].Contains(bar.Id), "and it left the set");
+            Assert.IsFalse(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "and it left the set");
 
             f.Tier1.purchasedUpgrades.Add(overtime.Id);
             f.Select(f.Tier1, group, bar);
@@ -537,7 +695,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // both crossings pay and the residual is kept.
             Assert.AreEqual(3, f.Fills(f.Tier1, bar), "two more crossings");
             AssertClose(5, f.Progress(f.Tier1, bar), "residual is retained");
-            Assert.IsTrue(f.Tier1.activeBars[group.Id].Contains(bar.Id), "a repeating bar stays selected");
+            Assert.IsTrue(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "a repeating bar stays selected");
         }
 
         [Test]
@@ -562,7 +720,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void Settlement_order_is_scopes_then_groups_then_bars_in_declaration_order()
+        public void Settlement_order_is_scopes_parent_before_child_then_bars_in_declaration_order()
         {
             var f = new BarFixture();
             var atRoot = f.Group(f.RootDef, "g_root", f.Shared);
@@ -585,8 +743,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             foreach (var entry in f.Resolve().bars)
                 order.Add(entry.bar.Id);
 
-            // Scopes parent before child, then groups, then bars - all in
-            // declaration order, whatever the ids sort as.
+            // Scopes parent before child, then the scope's own bar list in
+            // declaration order, whatever the ids sort as and whichever group
+            // lists them.
             Assert.AreEqual(
                 new[] { rootBar.Id, ch1a.Id, ch1b.Id, third.Id, first.Id, second.Id },
                 order);
@@ -615,7 +774,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- the snapshot seam ----
 
         [Test]
-        public void A_deposit_between_the_two_calls_moves_the_pool_but_opens_no_gate()
+        public void A_deposit_between_the_two_calls_moves_the_balance_but_opens_no_gate()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
@@ -625,15 +784,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Build();
             f.Select(f.Tier1, group, gated, open);
 
-            var demand = f.Resolve();               // pool empty, fans at zero
+            var demand = f.Resolve();               // nothing banked, fans at zero
             f.Tier1.balances[f.Fans.Id] = 100;      // this segment's own production
             f.Tier1.balances[f.Rehearsal.Id] = 3;
             f.Settle(demand, 1);
 
             // The balance read is live by design; the RATE and the GATE are not.
             AssertClose(0, f.Progress(f.Tier1, gated), "a gate opened mid-segment does not draw");
-            AssertClose(3, f.Progress(f.Tier1, open), "the pool it was fed is spent");
-            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "pool");
+            AssertClose(3, f.Progress(f.Tier1, open), "what it was fed is spent");
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "rehearsal");
         }
 
         [Test]
@@ -675,7 +834,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Segment(1);
 
             AssertClose(0, f.Progress(f.Tier1, bar), "progress");
-            AssertClose(50, f.Balance(f.Tier1, f.Rehearsal), "pool");
+            AssertClose(50, f.Balance(f.Tier1, f.Rehearsal), "rehearsal");
         }
 
         [TestCase(true)]
@@ -693,10 +852,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             f.Segment(1);
 
-            // The drawing test is what protects the pool: settlement would refuse
-            // to pay this bar, so admitting it would spend forever and settle
-            // none of it.
-            AssertClose(100, f.Balance(f.Tier1, f.Rehearsal), "pool");
+            // The drawing test is what protects the balance: settlement would
+            // refuse to pay this bar, so admitting it would spend forever and
+            // settle none of it.
+            AssertClose(100, f.Balance(f.Tier1, f.Rehearsal), "rehearsal");
             AssertClose(0, f.Progress(f.Tier1, bar), "progress");
             Assert.AreEqual(0, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(0, f.Balance(f.Root, f.Shared), "nothing fired");
@@ -731,8 +890,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1, f.Balance(f.Root, f.Shared), "no second fire");
         }
 
-        // Selection governs drinking from a POOL, and a payment is not a drink
-        // (12.7), so an unselected bar takes what is paid into it and settles.
+        // Selection governs DRINKING, and a payment is not a drink (12.7), so an
+        // unselected bar takes what is paid into it and settles.
         [Test]
         public void A_yield_into_an_unselected_bar_still_fires_its_crossing()
         {
@@ -783,7 +942,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1, f.Balance(f.Root, f.Shared), "one crossing, settled at the write");
             Assert.AreEqual(1, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(0, f.Progress(f.Tier1, bar), "back to zero, the excess discarded");
-            Assert.IsFalse(f.Tier1.activeBars[group.Id].Contains(bar.Id), "and out of the active set");
+            Assert.IsFalse(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "and out of the active set");
         }
 
         // Each mover settles only the crossing its own fill made (12.7). Here the
@@ -855,10 +1014,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreNotSame(facts, tree.Tier1.facts, "the completion ran, and its reset took the payload");
         }
 
-        // ---- SetActiveBars ----
+        // ---- SetActiveMembers ----
 
         [Test]
-        public void SetActiveBars_writes_the_set_at_the_groups_declaring_scope()
+        public void SetActiveMembers_writes_the_set_at_the_groups_declaring_scope()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal, 2);
@@ -868,13 +1027,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Asked from a DESCENDANT of nothing - the acting scope is the tier
             // itself here, but the write lands by declaration either way.
-            Assert.IsTrue(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { a, b }));
+            Assert.IsTrue(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { a, b }));
 
-            Assert.AreEqual(new HashSet<string> { a.Id, b.Id }, f.Tier1.activeBars[group.Id]);
+            Assert.AreEqual(new HashSet<string> { a.Id, b.Id }, f.Tier1.activeMembers[group.Id]);
+        }
+
+        // The command takes the whole set, so adding and removing are the same
+        // write with a different list - which is what lets the row's press be a
+        // toggle with no second entry point (12.7).
+        [Test]
+        public void SetActiveMembers_adds_removes_and_refuses_into_a_full_group()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal, 1);
+            var a = f.Bar(group, "cover_a", 100, 2);
+            var b = f.Bar(group, "cover_b", 100, 2);
+            f.Build();
+
+            Assert.IsTrue(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { a }));
+            Assert.AreEqual(new HashSet<string> { a.Id }, f.Tier1.activeMembers[group.Id], "added");
+
+            Assert.IsFalse(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { a, b }),
+                "the group is full, so the player deselects first");
+            Assert.AreEqual(new HashSet<string> { a.Id }, f.Tier1.activeMembers[group.Id], "a refusal changes nothing");
+
+            Assert.IsTrue(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new Definition[0]));
+            Assert.IsEmpty(f.Tier1.activeMembers[group.Id], "removed");
         }
 
         [Test]
-        public void SetActiveBars_resolves_the_group_outward_from_the_acting_scope()
+        public void SetActiveMembers_resolves_the_group_outward_from_the_acting_scope()
         {
             var f = new BarFixture();
             var group = f.Group(f.Ch1Def, "covers", f.Shared);
@@ -883,53 +1065,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Acting at the tier, group declared at the chapter: the outward walk
             // finds it, and the fact lands at the chapter that owns it.
-            Assert.IsTrue(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { bar }));
+            Assert.IsTrue(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { bar }));
 
-            Assert.AreEqual(new HashSet<string> { bar.Id }, f.Ch1.activeBars[group.Id]);
-            Assert.IsFalse(f.Tier1.activeBars.ContainsKey(group.Id));
+            Assert.AreEqual(new HashSet<string> { bar.Id }, f.Ch1.activeMembers[group.Id]);
+            Assert.IsFalse(f.Tier1.activeMembers.ContainsKey(group.Id));
         }
 
         [Test]
-        public void SetActiveBars_collapses_duplicates_before_counting_them()
+        public void SetActiveMembers_collapses_duplicates_before_counting_them()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal, 1);
             var bar = f.Bar(group, "cover_a", 100, 2);
             f.Build();
 
-            Assert.IsTrue(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { bar, bar }));
-            Assert.AreEqual(1, f.Tier1.activeBars[group.Id].Count);
+            Assert.IsTrue(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { bar, bar }));
+            Assert.AreEqual(1, f.Tier1.activeMembers[group.Id].Count);
         }
 
         [Test]
-        public void SetActiveBars_clears_the_selection_on_an_empty_set()
-        {
-            var f = new BarFixture();
-            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
-            var bar = f.Bar(group, "cover_a", 100, 2);
-            f.Build();
-            f.Select(f.Tier1, group, bar);
-
-            Assert.IsTrue(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new BarDefinition[0]));
-            Assert.AreEqual(0, f.Tier1.activeBars[group.Id].Count);
-        }
-
-        [Test]
-        public void SetActiveBars_refuses_a_set_over_maxActive()
-        {
-            var f = new BarFixture();
-            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal, 1);
-            var a = f.Bar(group, "cover_a", 100, 2);
-            var b = f.Bar(group, "cover_b", 100, 2);
-            f.Build();
-            f.Select(f.Tier1, group, a);
-
-            Assert.IsFalse(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { a, b }));
-            Assert.AreEqual(new HashSet<string> { a.Id }, f.Tier1.activeBars[group.Id], "a refusal changes nothing");
-        }
-
-        [Test]
-        public void SetActiveBars_refuses_a_bar_outside_the_group()
+        public void SetActiveMembers_refuses_a_member_outside_the_group()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
@@ -938,12 +1093,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var theirs = f.Bar(other, "other_a", 100, 2);
             f.Build();
 
-            Assert.IsFalse(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { mine, theirs }));
-            Assert.IsFalse(f.Tier1.activeBars.ContainsKey(group.Id), "all or nothing");
+            Assert.IsFalse(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { mine, theirs }));
+            Assert.IsFalse(f.Tier1.activeMembers.ContainsKey(group.Id), "all or nothing");
         }
 
         [Test]
-        public void SetActiveBars_refuses_an_unavailable_bar()
+        public void SetActiveMembers_refuses_an_unavailable_bar()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
@@ -951,15 +1106,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             bar.availableWhen = new FlagSet { flagId = "encore" };
             f.Build();
 
-            Assert.IsFalse(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { bar }));
+            Assert.IsFalse(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { bar }));
 
             f.Tier1.flags.Add("encore");
-            Assert.IsTrue(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { bar }),
+            Assert.IsTrue(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { bar }),
                 "the same call succeeds once the gate opens");
         }
 
         [Test]
-        public void SetActiveBars_refuses_a_completed_non_repeating_bar_but_not_a_repeating_one()
+        public void SetActiveMembers_refuses_a_completed_non_repeating_bar_but_not_a_repeating_one()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
@@ -969,26 +1124,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Tier1.barProgress[once.Id] = 100;
             f.Tier1.barProgress[loop.Id] = 100;
 
-            Assert.IsFalse(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { once }));
-            Assert.IsTrue(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { loop }),
+            Assert.IsFalse(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { once }));
+            Assert.IsTrue(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { loop }),
                 "a repeating bar at full progress is between fills, not finished");
         }
 
         [Test]
-        public void SetActiveBars_refuses_a_null_bar_and_a_null_list()
+        public void SetActiveMembers_refuses_a_null_member_and_a_null_list()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
             var bar = f.Bar(group, "cover_a", 100, 2);
             f.Build();
 
-            Assert.IsFalse(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, null));
-            Assert.IsFalse(BarSystem.SetActiveBars(new GameContext(f.Tier1, f.Now), group, new[] { bar, null }));
-            Assert.IsFalse(f.Tier1.activeBars.ContainsKey(group.Id));
+            Assert.IsFalse(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, null));
+            Assert.IsFalse(BarSystem.SetActiveMembers(new GameContext(f.Tier1, f.Now), group, new[] { bar, null }));
+            Assert.IsFalse(f.Tier1.activeMembers.ContainsKey(group.Id));
         }
 
         [Test]
-        public void SetActiveBars_throws_on_a_group_off_the_acting_chain()
+        public void SetActiveMembers_throws_on_a_group_off_the_acting_chain()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
@@ -998,7 +1153,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Asked from the CHAPTER, which cannot see its own tier's
             // declarations: content or a caller bug, not a state the player made.
             Assert.Throws<InvalidOperationException>(
-                () => BarSystem.SetActiveBars(new GameContext(f.Ch1, f.Now), group, new BarDefinition[0]));
+                () => BarSystem.SetActiveMembers(new GameContext(f.Ch1, f.Now), group, new Definition[0]));
         }
     }
 }

@@ -28,3 +28,12 @@ review before it reaches him, and the report is mine, not a relay.
   decisions with a second option someone would notice, questions, and findings with evidence.
 - The verify script is copied from [[unity-headless-verify-loop]] into the scratchpad with an
   import mode and a tests mode; check for an open editor by path before either.
+
+**2026-09-18 - an agent's "I could not trace this to a design rule" is a stop, not a note.** The
+runtime agent's report said of my contract's empty-dialog behavior: "no design sentence says a
+dialog may show nothing." I read it, kept the behavior, and listed it in the landing report as a
+decision. John: "you even overrode the coding agent's raising the concern, and made the WRONG
+decision, instead of saying 'hey, maybe John might want to answer this'." The agents are briefed to
+report every sentence they cannot trace precisely so that list reaches him; each item on it is
+either traced by me to a design sentence I can quote, or sent to him as a question before the suite
+runs. Never resolved by my own judgment and never filed under "decisions made".

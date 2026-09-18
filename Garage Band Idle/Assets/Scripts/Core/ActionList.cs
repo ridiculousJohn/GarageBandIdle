@@ -43,22 +43,33 @@ namespace RidiculousGaming.GarageBandIdle
         // For a caller whose own guard already asked. Forced past a refusal it
         // throws (requirement 7): the guard and the run read the same objects,
         // so disagreeing means the code is broken, not the player's state.
-        public static void Run(IReadOnlyList<GameAction> list, GameContext ctx, ScopeState ignoring = null)
+        //
+        // `skip` names actions this caller has already performed by another
+        // route - the idle claim's payment lines are its completions' yields
+        // (section 9) - and the refusal check still covers the WHOLE list,
+        // because a list runs whole or not at all whichever actions execute.
+        public static void Run(IReadOnlyList<GameAction> list, GameContext ctx, ScopeState ignoring = null,
+                               Predicate<GameAction> skip = null)
         {
             var refusal = Refuses(list, ctx, ignoring);
             if (refusal != null)
                 throw new InvalidOperationException(
                     $"An action list was run past a refusal: scope '{refusal.Host.ScopeId}' holds the unclaimed reward of event "
                     + $"'{(refusal.Event == null ? refusal.Record.eventId : refusal.Event.Id)}' (design doc 12.5).");
-            ExecuteAll(list, ctx);
+            ExecuteAll(list, ctx, skip);
         }
 
-        private static void ExecuteAll(IReadOnlyList<GameAction> list, GameContext ctx)
+        private static void ExecuteAll(IReadOnlyList<GameAction> list, GameContext ctx,
+                                       Predicate<GameAction> skip = null)
         {
             if (list == null)
                 return;
             for (var i = 0; i < list.Count; i++)
-                list[i]?.Execute(ctx);
+            {
+                var action = list[i];
+                if (action != null && (skip == null || !skip(action)))
+                    action.Execute(ctx);
+            }
         }
     }
 }

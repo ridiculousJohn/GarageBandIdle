@@ -20,13 +20,13 @@ MonoBehaviour:
     whole neighborhood is yours. Someone's already asking when the next one is \u2014
     and a guy named Dave offers to haul your gear. You've got your first roadie."
   availableWhen:
-    rid: 7579425512644149365
+    rid: 7579425541347344499
   seenFlag: story_ch1_end_seen
   opensWhenAvailable: 0
   references:
     version: 2
     RefIds:
-    - rid: 7579425512644149365
+    - rid: 7579425541347344499
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Play the Backyard Party

@@ -17,7 +17,12 @@ MonoBehaviour:
   displayName: Parking-Lot Standard
   description: The one everybody knows, 300 Rehearsal to learn. Another 15% on your
     fan rate.
-  fillCurrency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
+  consumes:
+  - currency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
+    amount:
+      _value:
+        mantissa: 1
+        exponent: 0
   fillAmount:
     _value:
       mantissa: 3
@@ -32,14 +37,14 @@ MonoBehaviour:
   availableWhen:
     rid: -2
   onComplete:
-  - rid: 7579425512644149311
+  - rid: 7579425541347344447
   perFill: []
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425512644149311
+    - rid: 7579425541347344447
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}

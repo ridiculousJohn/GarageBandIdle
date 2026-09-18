@@ -10,18 +10,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // line here, and a registry entry (design doc 12.11).
     public static class ModuleWidgetFactory
     {
-        private static readonly Dictionary<string, Func<VisualElement, IStoryOpener, IGeneratorInfoOpener,
-                                                        ModuleWidget>> Creators =
+        private static readonly Dictionary<string, Func<VisualElement, ModuleRegistry, IStoryOpener,
+                                                        IGeneratorInfoOpener, ModuleWidget>> Creators =
             new()
             {
-                ["currency_line"] = (root, stories, infos) => new CurrencyHeaderUI(root),
-                ["jam_button"] = (root, stories, infos) => new JamButtonUI(root),
-                ["generator_row"] = (root, stories, infos) => new GeneratorRowUI(root, infos),
-                ["upgrade_row"] = (root, stories, infos) => new UpgradeRowUI(root),
-                ["bar_group"] = (root, stories, infos) => new BarGroupUI(root),
-                ["rung_button"] = (root, stories, infos) => new RungButtonUI(root),
-                ["event_row"] = (root, stories, infos) => new EventUI(root),
-                ["story_row"] = (root, stories, infos) => new StoryRowUI(root, stories),
+                ["currency_line"] = (root, registry, stories, infos) => new CurrencyHeaderUI(root),
+                ["jam_button"] = (root, registry, stories, infos) => new JamButtonUI(root),
+                ["generator_row"] = (root, registry, stories, infos) => new GeneratorRowUI(root, infos),
+                ["upgrade_row"] = (root, registry, stories, infos) => new UpgradeRowUI(root),
+                ["group"] = (root, registry, stories, infos) => new GroupUI(root, registry, stories, infos),
+                ["rung_button"] = (root, registry, stories, infos) => new RungButtonUI(root),
+                ["event_row"] = (root, registry, stories, infos) => new EventUI(root),
+                ["story_row"] = (root, registry, stories, infos) => new StoryRowUI(root, stories),
             };
 
         // The registry cross-check enumerates the same closed set Create uses,
@@ -109,12 +109,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         //
         // `stories` is the card's owner and `infos` the info screen's, each
         // needed by one widget kind and ignored by the rest: the host is the one
-        // caller and hands itself in for both (12.11).
-        public static ModuleWidget Create(string prefabId, VisualElement root, IStoryOpener stories,
-                                          IGeneratorInfoOpener infos)
+        // caller and hands itself in for both (12.11). The registry rides along
+        // for the same reason - a group instantiates the layout each member's
+        // own kind already has, so it renders them through this same factory.
+        public static ModuleWidget Create(string prefabId, VisualElement root, ModuleRegistry registry,
+                                          IStoryOpener stories, IGeneratorInfoOpener infos)
         {
             if (prefabId != null && Creators.TryGetValue(prefabId, out var create))
-                return create(root, stories, infos);
+                return create(root, registry, stories, infos);
             throw new InvalidOperationException(
                 $"No widget controller answers prefabId '{prefabId}' (design doc 12.11).");
         }

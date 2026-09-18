@@ -44,16 +44,17 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7a6736d7cc6bcd649bc0c1ae88800f32, type: 2}
   - {fileID: 11400000, guid: 9702dbdcd1196d842af078dd2ddd6246, type: 2}
   generators: []
-  barGroups: []
+  bars: []
+  groups: []
   upgrades: []
   entitlements:
   - backstage_pass
   encoreAdReward:
-  - rid: 7579425512644149263
+  - rid: 7579425541347344397
   references:
     version: 2
     RefIds:
-    - rid: 7579425512644149263
+    - rid: 7579425541347344397
       type: {class: ExtendTimer, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         timer: encore_timer

@@ -144,6 +144,31 @@ namespace RidiculousGaming.GarageBandIdle
         // the top of every chain, and the entitlements are root's alone (12.3).
         public bool HasEntitlement(string entitlementId) => Scope.Root().entitlements.Contains(entitlementId);
 
+        // Whether a member of a group is ON (design doc 12.7): the walk finds
+        // the scope declaring it, which is the scope holding every group that
+        // can list it, and the compiled membership says which groups those are.
+        // A definition no group lists is on - membership is the whole of what
+        // the fact means, so an ungrouped thing has nothing to withhold it - and
+        // one listed by several is on only while EVERY one of them holds it.
+        // No declaring scope on the chain is a caller bug: every seam below is
+        // asked by something already holding the definition (requirement 7).
+        public bool IsOn(Definition definition)
+        {
+            for (var node = Scope; node != null; node = node.Parent)
+            {
+                if (!node.Definition.Declares(definition))
+                    continue;
+                var listing = node.Link<MembershipPlan>(GatherCompiler.Memberships).Listing(definition);
+                for (var i = 0; i < listing.Count; i++)
+                    if (!node.activeMembers.TryGetValue(listing[i].Id, out var active)
+                        || !active.Contains(definition.Id))
+                        return false;
+                return true;
+            }
+            throw new InvalidOperationException(
+                $"No scope on the chain from '{Scope.ScopeId}' declares '{definition.Id}' - membership is asked of a definition the caller holds (12.7).");
+        }
+
         public BigNumber GetBarProgress(string barId)
         {
             for (var node = Scope; node != null; node = node.Parent)

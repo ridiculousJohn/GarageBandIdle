@@ -134,31 +134,69 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
+    // One consumes entry compiled: the authored entry, the home its currency is
+    // spent at, and the stage-1 factor that scales the per-unit price (design
+    // doc 12.7). Stage 1 only, as a cost is: a currency-total buff means that
+    // currency's SUPPLY and must not scale what drinks it.
+    public sealed class ConsumesPlan
+    {
+        public ConsumesEntry Entry { get; }
+        public ScopeState Home { get; }
+        public CoordinatePlan Factor { get; }
+
+        internal ConsumesPlan(ConsumesEntry entry, ScopeState home, CoordinatePlan factor)
+        {
+            Entry = entry;
+            Home = home;
+            Factor = factor;
+        }
+    }
+
     // One bar in a scope's settlement order, with everything the draw needs
-    // that is static: where it lives, the group whose selection admits it, the
-    // pool it drinks from, and its fill-rate plan (design doc 12.7).
+    // that is static: where it lives, what it consumes, and its fill-rate plan
+    // (design doc 12.7).
     public sealed class BarPlan
     {
         public ScopeState Node { get; }
-        public BarGroupDefinition Group { get; }
         public BarDefinition Bar { get; }
 
-        // The pool currency's own home, carried beside the fill-rate plan
-        // because that plan is homed at the BAR (12.2). Null when the bar fills
-        // from time alone.
-        public ScopeState PoolHome { get; }
+        // The bar's consumes entries in authored order, each with its currency's
+        // own home - carried beside the fill-rate plan because that plan is
+        // homed at the BAR (12.2). Empty when the bar fills from time alone.
+        public IReadOnlyList<ConsumesPlan> Consumes { get; }
 
         public CoordinatePlan Rate { get; }
 
-        internal BarPlan(ScopeState node, BarGroupDefinition group, BarDefinition bar, CoordinatePlan rate,
-                         ScopeState poolHome)
+        internal BarPlan(ScopeState node, BarDefinition bar, CoordinatePlan rate,
+                         IReadOnlyList<ConsumesPlan> consumes)
         {
             Node = node;
-            Group = group;
             Bar = bar;
-            PoolHome = poolHome;
+            Consumes = consumes;
             Rate = rate;
         }
+    }
+
+    // Which groups at one node list each definition that node declares (design
+    // doc 12.7). Compiled at Build like every other static half, so the
+    // membership read behind every seam is a link read and never a search
+    // (12.14.8).
+    public sealed class MembershipPlan
+    {
+        private static readonly GroupDefinition[] None = Array.Empty<GroupDefinition>();
+
+        private readonly Dictionary<Definition, List<GroupDefinition>> listings;
+
+        internal MembershipPlan(Dictionary<Definition, List<GroupDefinition>> listings)
+        {
+            this.listings = listings;
+        }
+
+        // The groups declared on this node that list the definition, in
+        // declaration order. Empty for a definition no group lists, which is
+        // the answer "nothing gates it" rather than a miss.
+        public IReadOnlyList<GroupDefinition> Listing(Definition member) =>
+            member != null && listings.TryGetValue(member, out var groups) ? groups : None;
     }
 
     // A scope's compiled aggregation (design doc 12.2): which sources in its
@@ -173,8 +211,7 @@ namespace RidiculousGaming.GarageBandIdle
         // listed like any target; Producer.RatePairs is what excludes them.
         public IReadOnlyList<TargetContributors> Targets => targets;
 
-        // Scopes parent before child, then barGroups in declaration order, then
-        // bars in declaration order (12.7).
+        // Scopes parent before child, then bars in declaration order (12.7).
         public IReadOnlyList<BarPlan> Bars => bars;
 
         private readonly TargetContributors[] targets;
@@ -226,6 +263,13 @@ namespace RidiculousGaming.GarageBandIdle
         // identity, shared by every tree because a link is stored per NODE.
         public static readonly object GameSpeed = new object();
 
+        // The one holder every node's membership plan is filed under. A node
+        // has exactly one, covering every definition it declares (12.7), so
+        // there is no authored object to key it by - one static object is the
+        // whole identity, shared by every tree because a link is stored per
+        // NODE.
+        public static readonly object Memberships = new object();
+
         // Every plan the content authors, compiled onto the nodes that will be
         // asked for them. Coordinate plans first, since a scope's contributor
         // plan is assembled out of them.
@@ -242,8 +286,9 @@ namespace RidiculousGaming.GarageBandIdle
         // built: every source entry at its declaring node (stage 1), every
         // currency at its home for rate and yield (stage 2), every generator for
         // its granted count and its cost, every upgrade for its cost, every bar
-        // at its declaring node (its fill rate and the yield paid into it -
-        // 12.7), and game_speed at every chapter node.
+        // at its declaring node (its fill rate, the yield paid into it, and one
+        // per consumes entry - 12.7), and game_speed at every chapter node. The
+        // membership every seam reads is filed here too, one per node.
         private static void CompileCoordinates(ScopeState node,
                                                Dictionary<ScopeState, List<ModifierDefinition>> grantable)
         {
@@ -308,21 +353,34 @@ namespace RidiculousGaming.GarageBandIdle
                     null));
             }
 
-            foreach (var group in node.Definition.barGroups)
+            foreach (var bar in node.Definition.bars)
             {
-                if (group == null)
+                if (bar == null)
                     continue;
-                foreach (var bar in group.bars)
-                    if (bar != null)
-                        // The rate plan IS the fill-rate plan, and it is also
-                        // what a rate paid into the bar collects: "10x this bar"
-                        // speeds its own fill and what is paid into it alike
-                        // (12.7). Both are homed at the bar itself.
-                        node.StoreLink(bar, new StatPlans(
-                            Plan(node, bar, bar.fillCurrency, Stat.Rate, node, grantable),
-                            Plan(node, bar, null, Stat.Yield, node, grantable),
-                            null, null, null));
+                // The rate plan IS the fill-rate plan, and it is also what a
+                // rate paid into the bar collects: "10x this bar" speeds its own
+                // fill and what is paid into it alike (12.7). It carries no
+                // currency coordinate - a bar's speed is one number however many
+                // currencies it drinks - and both are homed at the bar itself.
+                node.StoreLink(bar, new StatPlans(
+                    Plan(node, bar, null, Stat.Rate, node, grantable),
+                    Plan(node, bar, null, Stat.Yield, node, grantable),
+                    null, null, null));
+
+                // One plan per consumes entry, at the coordinate (bar, the
+                // consumed currency, consumption): "this bar consumes 90% less
+                // Rehearsal" is an effect on that coordinate, and it is filed
+                // under the ENTRY, which is the object holding the reference
+                // (12.14.8).
+                foreach (var entry in bar.consumes)
+                    if (entry != null && entry.currency != null)
+                        node.StoreLink(entry,
+                            Plan(node, bar, entry.currency, Stat.Consumption, node, grantable));
             }
+
+            // Which groups here list what this node declares, asked once so
+            // every membership seam reads a link (12.7).
+            node.StoreLink(Memberships, MembershipsOf(node));
 
             if (node is ChapterScopeState)
                 node.StoreLink(GameSpeed, Plan(node, null, null, Stat.GameSpeed, null, grantable));
@@ -367,6 +425,31 @@ namespace RidiculousGaming.GarageBandIdle
             return chain;
         }
 
+        // The groups this node declares, indexed by the members they list - built
+        // from the node's OWN groups alone, because a group lists what its own
+        // scope declares, so the node declaring a member is the node holding
+        // every group that can list it (12.7). A member named twice by one group
+        // is a validation finding and is recorded once here.
+        private static MembershipPlan MembershipsOf(ScopeState node)
+        {
+            var listings = new Dictionary<Definition, List<GroupDefinition>>();
+            foreach (var group in node.Definition.groups)
+            {
+                if (group == null)
+                    continue;
+                foreach (var member in group.members)
+                {
+                    if (member == null)
+                        continue;
+                    if (!listings.TryGetValue(member, out var groups))
+                        listings[member] = groups = new List<GroupDefinition>();
+                    if (!groups.Contains(group))
+                        groups.Add(group);
+                }
+            }
+            return new MembershipPlan(listings);
+        }
+
         // The target's home: the first scope OUTWARD from here declaring this
         // exact asset (design doc 12.3). An entry, a currency stage, a bar or a
         // cost naming an asset off its chain is a content fault, so it throws
@@ -394,6 +477,7 @@ namespace RidiculousGaming.GarageBandIdle
             CurrencyDefinition => "currency",
             GeneratorDefinition => "generator",
             BarDefinition => "bar",
+            GroupDefinition => "group",
             UpgradeDefinition => "upgrade",
             _ => target.GetType().Name
         };
@@ -422,14 +506,16 @@ namespace RidiculousGaming.GarageBandIdle
                 foreach (var source in node.Definition.Sources())
                     Contribute(node, source);
 
-                foreach (var group in node.Definition.barGroups)
+                foreach (var bar in node.Definition.bars)
                 {
-                    if (group == null)
+                    if (bar == null)
                         continue;
-                    foreach (var bar in group.bars)
-                        if (bar != null)
-                            bars.Add(new BarPlan(node, group, bar, node.Link<StatPlans>(bar).Rate,
-                                                 HomeOf(node, bar.fillCurrency)));
+                    var consumes = new List<ConsumesPlan>();
+                    foreach (var entry in bar.consumes)
+                        if (entry != null && entry.currency != null)
+                            consumes.Add(new ConsumesPlan(entry, HomeOf(node, entry.currency),
+                                                          node.Link<CoordinatePlan>(entry)));
+                    bars.Add(new BarPlan(node, bar, node.Link<StatPlans>(bar).Rate, consumes));
                 }
 
                 foreach (var child in node.Children)

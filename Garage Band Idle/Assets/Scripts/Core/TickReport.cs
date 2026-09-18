@@ -6,8 +6,8 @@ namespace RidiculousGaming.GarageBandIdle
     // plain C#, never serialized, one instance per tick, recorded AT the
     // mutation sites and never as a balance delta. The gross gathers lie
     // exactly where display matters most - ch1's covers demand rehearsal at
-    // 2/s against 0.5/s of production, so the pool-limited draw holds the
-    // balance near zero while the bar fills at 0.5/s: a GetRate slope would
+    // 2/s against 0.5/s of production, so the balance-limited draw holds it
+    // near zero while the bar fills at 0.5/s: a GetRate slope would
     // show the balance climbing and a ResolveDemand slope would fill the bar
     // 4x too fast. Site recording also keeps one-shot mutations out of the
     // slope by construction - a bar completion's AddCurrency and the sweep's

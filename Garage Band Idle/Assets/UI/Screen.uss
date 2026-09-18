@@ -89,15 +89,23 @@ Label {
     min-width: 120px;
 }
 
-.pool-readout {
+.consumed-readout {
     flex-direction: row;
     justify-content: space-between;
     margin-bottom: 2px;
 }
 
+.member-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+/* A bar row sits beside its group's select control, so it takes the width the
+   control leaves. */
 .bar-row {
     flex-direction: row;
     align-items: center;
+    flex-grow: 1;
     margin-bottom: 4px;
 }
 
@@ -115,7 +123,7 @@ Label {
     min-width: 96px;
 }
 
-.bar-select {
+.member-select {
     min-width: 96px;
 }
 

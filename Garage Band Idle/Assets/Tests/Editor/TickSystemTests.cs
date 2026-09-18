@@ -138,12 +138,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var drill = TestTree.MakeDefinition<BarDefinition>("drill");
             drill.fillAmount = 1000;
             drill.fillRate = 1;
-            tree.LearnCovers.bars.Add(drill);
+            tree.Tier1Def.bars.Add(drill);
+            tree.LearnCovers.members.Add(drill);
             var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
             crew.produces.Add(TestTree.Entry(drill, Stat.Rate, 3));
             tree.Tier1Def.producers.Add(crew);
             tree.Rebuild();
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "drill" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "drill" };
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
 
@@ -157,7 +158,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var drill = TestTree.MakeDefinition<BarDefinition>("drill");
             drill.fillAmount = 1000;
             drill.fillRate = 1;
-            tree.LearnCovers.bars.Add(drill);
+            tree.Tier1Def.bars.Add(drill);
+            tree.LearnCovers.members.Add(drill);
             var crew = TestTree.MakeDefinition<ProducerDefinition>("road_crew");
             crew.produces.Add(TestTree.Entry(drill, Stat.Rate, 3));
             tree.Tier1Def.producers.Add(crew);
@@ -178,9 +180,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tree = new TestTree();
             AddRateSource(tree.Tier1Def, "riff_press", tree.Rehearsal, 1);
             tree.Rebuild();
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "cover_1" };
 
-            // The pool starts empty; the bar drinks this tick's own deposit.
+            // Rehearsal starts empty; the bar drinks this tick's own deposit.
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
 
             Assert.AreEqual((BigNumber)10, tree.Tier1.barProgress["cover_1"]);
@@ -194,7 +196,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AddRateSource(tree.Tier1Def, "riff_press", tree.Rehearsal, 1);
             tree.Cover1.availableWhen = new CurrencyAtLeast { currency = tree.Rehearsal, threshold = 1 };
             tree.Rebuild();
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "cover_1" };
 
             // The gate this tick's deposits open was judged closed in the
             // snapshot, so the bar draws nothing until the next tick sees it.
@@ -259,7 +261,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // The purchase phase is the tick's last (12.9): every segment's bars
         // have drunk before anything is spent, so a generator priced in the
-        // pool a bar drinks never starves it.
+        // currency a bar drinks never starves it.
         [Test]
         public void The_tick_buys_after_every_bar_has_drunk()
         {
@@ -268,19 +270,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             kit.availableWhen = new Always();
             kit.costCurrency = tree.Rehearsal;
             kit.baseCost = 30;
-            kit.growth = 1;                              // a flat price, so the count reads off the pool
+            kit.growth = 1;                              // a flat price, so the count reads off the balance
             tree.Tier1Def.generators.Add(kit);
             DeclareAutoBuy(tree, "hands_free", "kit");
             tree.Rebuild();
             tree.Tier1.modifierStacks["hands_free"] = 1;
             tree.Tier1.balances["rehearsal"] = 100;
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "cover_1" };
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
 
             Assert.AreEqual((BigNumber)20, tree.Tier1.barProgress["cover_1"], "the cover drank its whole 2/s window");
             Assert.AreEqual(2, tree.Tier1.generatorCounts["kit"], "two at 30 out of the 80 left");
-            Assert.AreEqual((BigNumber)20, tree.Tier1.balances["rehearsal"], "and 20 stays in the pool");
+            Assert.AreEqual((BigNumber)20, tree.Tier1.balances["rehearsal"], "and 20 is left banked");
         }
 
         // ---- game_speed ----
@@ -292,15 +294,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AddRateSource(tree.Tier1Def, "riff_press", tree.Fans, 1);
             DeclareSpeed(tree, "encore_x2", 2);
 
-            // A time-filled bar shows the scaled dt with no pool in the way.
+            // A time-filled bar shows the scaled dt with nothing drunk in the way.
             var drill = TestTree.MakeDefinition<BarDefinition>("drill");
             drill.fillAmount = 1000;
             drill.fillRate = 1;
-            tree.LearnCovers.bars.Add(drill);
+            tree.Tier1Def.bars.Add(drill);
+            tree.LearnCovers.members.Add(drill);
             tree.Rebuild();
 
             StackSpeed(tree, "encore_x2");
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "drill" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "drill" };
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 300 };
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
@@ -480,10 +483,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var drill = TestTree.MakeDefinition<BarDefinition>("drill");
             drill.fillAmount = 1000;
             drill.fillRate = 1;
-            tree.LearnCovers.bars.Add(drill);
+            tree.Tier1Def.bars.Add(drill);
+            tree.LearnCovers.members.Add(drill);
             tree.Rebuild();
             Record(tree, 3600);
-            tree.Tier1.activeBars["learn_covers"] = new HashSet<string> { "drill" };
+            tree.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "drill" };
 
             TickSystem.Tick(tree.Root, tree.Ch1, Config(), 10, tree.Now.AddSeconds(10));
             Assert.AreEqual((BigNumber)20, tree.Tier1.barProgress["drill"]);

@@ -45,19 +45,20 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 559a72c37a67974469e902b75ea5d0a4, type: 2}
   permanentModifiers: []
   generators: []
-  barGroups: []
+  bars: []
+  groups: []
   upgrades: []
   rung:
-    rid: 7579425512644149312
+    rid: 7579425541347344448
   events: []
   unlock:
-    rid: 7579425512644149313
+    rid: 7579425541347344449
   sections:
   - title: The Garage Floor
     description: Where you play. Tap Jam for cash, and read your running totals on
       the lines above it.
     visibleWhen:
-      rid: 7579425512644149314
+      rid: 7579425541347344450
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: currency_line
@@ -68,17 +69,17 @@ MonoBehaviour:
     - prefabId: currency_line
       content: {fileID: 11400000, guid: 8fcd19c799d152b4b95054ec949a12ff, type: 2}
       visibleWhen:
-        rid: 7579425512644149315
+        rid: 7579425541347344451
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: currency_line
       content: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
       visibleWhen:
-        rid: 7579425512644149316
+        rid: 7579425541347344452
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: currency_line
       content: {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}
       visibleWhen:
-        rid: 7579425512644149317
+        rid: 7579425541347344453
       scope: {fileID: 11400000}
     - prefabId: jam_button
       content: {fileID: 11400000, guid: 326d00bf3a76fde459700afcb61e75e9, type: 2}
@@ -93,13 +94,13 @@ MonoBehaviour:
     - prefabId: story_row
       content: {fileID: 11400000, guid: 0592b4d73c498014999053bb85a90a52, type: 2}
       visibleWhen:
-        rid: 7579425512644149318
+        rid: 7579425541347344454
       scope: {fileID: 11400000}
   - title: The Band
     description: Amps and the people to play them. They earn while you do nothing,
       and every bandmate brings fans of their own.
     visibleWhen:
-      rid: 7579425512644149319
+      rid: 7579425541347344455
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: generator_row
@@ -110,23 +111,23 @@ MonoBehaviour:
     - prefabId: generator_row
       content: {fileID: 11400000, guid: 5b005e8c874631040b8ac5ad50552de8, type: 2}
       visibleWhen:
-        rid: 7579425512644149320
+        rid: 7579425541347344456
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: generator_row
       content: {fileID: 11400000, guid: 37392b79405d15547ad98f94b778d49f, type: 2}
       visibleWhen:
-        rid: 7579425512644149321
+        rid: 7579425541347344457
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: generator_row
       content: {fileID: 11400000, guid: 2811931abd3f1fc4ba55e96cb5c1c947, type: 2}
       visibleWhen:
-        rid: 7579425512644149322
+        rid: 7579425541347344458
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
   - title: The Gear
     description: One-time buys that make everything else pay more. Cutting a demo
       clears them, and you buy them back faster each run.
     visibleWhen:
-      rid: 7579425512644149323
+      rid: 7579425541347344459
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: upgrade_row
@@ -137,37 +138,37 @@ MonoBehaviour:
     - prefabId: upgrade_row
       content: {fileID: 11400000, guid: 0ad19cd9b13d0114792adfa1f8f564b4, type: 2}
       visibleWhen:
-        rid: 7579425512644149324
+        rid: 7579425541347344460
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: upgrade_row
       content: {fileID: 11400000, guid: d82350864a3b75945b6f834329893031, type: 2}
       visibleWhen:
-        rid: 7579425512644149325
+        rid: 7579425541347344461
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: upgrade_row
       content: {fileID: 11400000, guid: 8729988d0452d204e87b823bce3b0331, type: 2}
       visibleWhen:
-        rid: 7579425512644149326
+        rid: 7579425541347344462
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: upgrade_row
       content: {fileID: 11400000, guid: d61f1735260c6a54e9835ac4d5c6e821, type: 2}
       visibleWhen:
-        rid: 7579425512644149327
+        rid: 7579425541347344463
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     - prefabId: upgrade_row
       content: {fileID: 11400000, guid: 497e5407cef7927409a0eb0395992db3, type: 2}
       visibleWhen:
-        rid: 7579425512644149328
+        rid: 7579425541347344464
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
   - title: The Rehearsal Space
     description: Rehearsal builds up while you play. Spend it learning covers, one
       at a time, and each one you learn draws a bigger crowd.
     visibleWhen:
-      rid: 7579425512644149329
+      rid: 7579425541347344465
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
-    - prefabId: bar_group
-      content: {fileID: 0}
+    - prefabId: group
+      content: {fileID: 11400000, guid: 83eeaad8455aa4343bc732ea8ed03e53, type: 2}
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
@@ -175,7 +176,7 @@ MonoBehaviour:
     description: Cut a demo when you have 50 fans and a cover. It banks Records and
       Demo Tapes and resets the run.
     visibleWhen:
-      rid: 7579425512644149330
+      rid: 7579425541347344466
     scope: {fileID: 11400000}
     modules:
     - prefabId: rung_button
@@ -188,7 +189,7 @@ MonoBehaviour:
       tap alone for the goal, and clearing one pays more cash per tap for the rest
       of the chapter.
     visibleWhen:
-      rid: 7579425512644149331
+      rid: 7579425541347344467
     scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
     modules:
     - prefabId: event_row
@@ -210,7 +211,7 @@ MonoBehaviour:
     description: The gig that ends the chapter. Hand out 30 Demo Tapes to get the
       show, and you walk away with your first Roadie.
     visibleWhen:
-      rid: 7579425512644149332
+      rid: 7579425541347344468
     scope: {fileID: 11400000}
     modules:
     - prefabId: rung_button
@@ -226,36 +227,36 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425512644149312
+    - rid: 7579425541347344448
       type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         label: Play the Backyard Party
         offerCondition:
-          rid: 7579425512644149333
+          rid: 7579425541347344469
         actions:
-        - rid: 7579425512644149334
-        - rid: 7579425512644149335
-        - rid: 7579425512644149336
-        - rid: 7579425512644149337
-    - rid: 7579425512644149313
+        - rid: 7579425541347344470
+        - rid: 7579425541347344471
+        - rid: 7579425541347344472
+        - rid: 7579425541347344473
+    - rid: 7579425541347344449
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-    - rid: 7579425512644149314
+    - rid: 7579425541347344450
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-    - rid: 7579425512644149315
+    - rid: 7579425541347344451
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: fans_revealed
-    - rid: 7579425512644149316
+    - rid: 7579425541347344452
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: rehearsal_revealed
-    - rid: 7579425512644149317
+    - rid: 7579425541347344453
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -264,72 +265,72 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 7579425512644149318
+    - rid: 7579425541347344454
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: ch1_complete
-    - rid: 7579425512644149319
+    - rid: 7579425541347344455
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: band_revealed
-    - rid: 7579425512644149320
+    - rid: 7579425541347344456
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: drummer_revealed
-    - rid: 7579425512644149321
+    - rid: 7579425541347344457
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: bassist_revealed
-    - rid: 7579425512644149322
+    - rid: 7579425541347344458
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: guitarist_revealed
-    - rid: 7579425512644149323
+    - rid: 7579425541347344459
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: gear_revealed
-    - rid: 7579425512644149324
+    - rid: 7579425541347344460
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: amp_strings_revealed
-    - rid: 7579425512644149325
+    - rid: 7579425541347344461
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: kit_upgrade_revealed
-    - rid: 7579425512644149326
+    - rid: 7579425541347344462
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: tight_set_revealed
-    - rid: 7579425512644149327
+    - rid: 7579425541347344463
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: play_for_crowd_revealed
-    - rid: 7579425512644149328
+    - rid: 7579425541347344464
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: unlock_covers_revealed
-    - rid: 7579425512644149329
+    - rid: 7579425541347344465
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: rehearsal_revealed
-    - rid: 7579425512644149330
+    - rid: 7579425541347344466
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: album
-    - rid: 7579425512644149331
+    - rid: 7579425541347344467
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -338,12 +339,12 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 7579425512644149332
+    - rid: 7579425541347344468
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: album
-    - rid: 7579425512644149333
+    - rid: 7579425541347344469
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Hand out 30 Demo Tapes
@@ -352,11 +353,11 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 1
-    - rid: 7579425512644149334
+    - rid: 7579425541347344470
       type: {class: ExecuteRung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         tier: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
-    - rid: 7579425512644149335
+    - rid: 7579425541347344471
       type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currencies:
@@ -367,11 +368,11 @@ MonoBehaviour:
             exponent: 0
         formula:
           rid: -2
-    - rid: 7579425512644149336
+    - rid: 7579425541347344472
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: ch1_complete
-    - rid: 7579425512644149337
+    - rid: 7579425541347344473
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000}

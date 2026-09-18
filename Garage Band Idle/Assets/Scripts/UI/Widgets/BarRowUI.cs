@@ -3,11 +3,12 @@ using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // One bar row (design doc 12.11): the authored name, the fill, and the
-    // button that selects it. Every fact is read where it lives - progress from
-    // the scope, completion derived from it rather than stored (12.7), the
-    // selection from the same activeBars read BarSystem.Eligible makes - and
-    // the fill rides the tick's realized bar slope between refreshes.
+    // One bar row (design doc 12.11): the authored name, the description, and
+    // the fill. Every fact is read where it lives - progress from the scope,
+    // completion derived from it rather than stored (12.7) - and the fill rides
+    // the tick's realized bar slope between refreshes. Making the bar active is
+    // the group widget's control, on the wrapper beside this row, because
+    // membership is a group's fact and a bar is only one kind of member.
     public sealed class BarRowUI
     {
         public VisualElement Root { get; }
@@ -19,25 +20,21 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly GameSession session;
         private readonly ScopeState scope;
         private readonly GameClock clock;
-        private readonly BarGroupDefinition group;
         private readonly BarDefinition bar;
         private readonly Label nameLabel;
         private readonly Label descriptionLabel;
         private readonly ProgressBar fill;
         private readonly Label progressLabel;
-        private readonly Button selectButton;
 
         private BigNumber truth = BigNumber.Zero;
         private BigNumber slope = BigNumber.Zero;
         private double stamp;
 
-        public BarRowUI(GameSession session, ScopeState scope, GameClock clock,
-                        BarGroupDefinition group, BarDefinition bar)
+        public BarRowUI(GameSession session, ScopeState scope, GameClock clock, BarDefinition bar)
         {
             this.session = session;
             this.scope = scope;
             this.clock = clock;
-            this.group = group;
             this.bar = bar;
 
             Root = new VisualElement();
@@ -56,39 +53,26 @@ namespace RidiculousGaming.GarageBandIdle.UI
             fill.AddToClassList("bar-fill");
             progressLabel = new Label();
             progressLabel.AddToClassList("bar-progress");
-            selectButton = new Button();
-            selectButton.AddToClassList("bar-select");
-            // The pressed bar BECOMES the selection: choosing is the mechanic
-            // (12.7), and SetActiveBars is fail-closed, so a refused set changes
-            // nothing. A chapter authoring maxActive above one wants a toggle
-            // here instead of a replacement; none does.
-            selectButton.clicked += () => this.session.SetActiveBars(Context(), this.group, new[] { this.bar });
             Root.Add(text);
             Root.Add(fill);
             Root.Add(progressLabel);
-            Root.Add(selectButton);
 
             // The row is the tap target when the bar names a producer (12.11):
             // the same command the Jam button issues, on a fresh context per
-            // press, since the command is a clock sample. The select button's
-            // own click is never also a tap - choosing is the button's and
-            // paying is the row's, so a click on it or inside it is ignored.
+            // press, since the command is a clock sample. Choosing is the
+            // group's control and paying is the row's, and the control sits
+            // outside this element, so its own click can never also be a tap.
             if (bar.tap != null)
             {
                 Root.AddToClassList("bar-tappable");
-                Root.RegisterCallback<ClickEvent>(evt =>
-                {
-                    if (evt.target is VisualElement clicked
-                        && (clicked == selectButton || selectButton.Contains(clicked)))
-                        return;
-                    this.session.FireProducer(Context(), this.bar.tap);
-                });
+                Root.RegisterCallback<ClickEvent>(evt => this.session.FireProducer(Context(), this.bar.tap));
             }
         }
 
-        // The list's filter, asked with the list's own context: a list module's
-        // evaluation scope IS the group's declaring scope, so nothing rebases.
-        // A null gate on a bar is OPEN, the opposite of a purchase gate (12.7).
+        // The list's filter, asked with the list's own context: a bar's
+        // declaring scope IS the group widget's evaluation scope, so nothing
+        // rebases. A null gate on a bar is OPEN, the opposite of a purchase
+        // gate (12.7).
         public bool Available(GameContext ctx) =>
             bar.availableWhen == null || bar.availableWhen.Evaluate(ctx);
 
@@ -112,10 +96,6 @@ namespace RidiculousGaming.GarageBandIdle.UI
             descriptionLabel.style.display = string.IsNullOrEmpty(bar.description)
                 ? DisplayStyle.None
                 : DisplayStyle.Flex;
-            var complete = bar.repeatWhen == null && truth >= bar.fillAmount;
-            var active = scope.activeBars.TryGetValue(group.Id, out var selected) && selected.Contains(bar.Id);
-            selectButton.text = complete ? "Done" : active ? "Selected" : "Select";
-            selectButton.SetEnabled(!complete && !active);
             Show(truth);
         }
 

@@ -80,12 +80,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public GameContext Ctx(double seconds) => new GameContext(Tree.Tier1, At(seconds));
 
             // A widget as the host builds one: the shipping UXML instantiated,
-            // the factory's controller over it, bound at tier1 by hand.
+            // the factory's controller over it, bound at tier1 by hand. The
+            // registry travels with the call, since a widget that renders its
+            // members resolves their layouts through it (12.11).
             public ModuleWidget Widget(string prefabId, string uxml, Definition content)
             {
                 var asset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Widgets/" + uxml);
                 Assert.IsNotNull(asset, "Assets/UI/Widgets/" + uxml + " is missing");
-                var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(),
+                var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
+                Assert.IsNotNull(registry, "Assets/Settings/ModuleRegistry.asset is missing.");
+                var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), registry,
                     NoStories.Instance, NoInfos.Instance);
                 widget.Bind(Session, Tree.Tier1, content, Clock);
                 return widget;
@@ -96,8 +100,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // does this before the tick it measures.
             public void SelectCover1()
             {
-                Session.SetActiveBars(Ctx(0), Tree.LearnCovers, new[] { Tree.Cover1 });
-                Assert.IsTrue(Tree.Tier1.activeBars[Tree.LearnCovers.Id].Contains(Tree.Cover1.Id),
+                Session.SetActiveMembers(Ctx(0), Tree.LearnCovers, new[] { Tree.Cover1 });
+                Assert.IsTrue(Tree.Tier1.activeMembers[Tree.LearnCovers.Id].Contains(Tree.Cover1.Id),
                     "cover_1 was selected");
             }
         }
@@ -134,11 +138,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             target.SendEvent(click);
         }
 
-        // A pool drained faster than it fills: the negative slope is honest
+        // A balance drained faster than it fills: the negative slope is honest
         // motion and the display follows it down, but a balance is never
         // negative, so the extrapolation stops at zero instead of drawing a debt.
         [Test]
-        public void ADrainingPoolInterpolatesDownAndStopsAtZero()
+        public void ADrainingBalanceInterpolatesDownAndStopsAtZero()
         {
             var fx = new Fixture();
             fx.Tree.Tier1.flags.Add("rehearsal_revealed");
@@ -177,7 +181,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Session.Tick(1, fx.At(1));
             AssertClose(101, fx.Tree.Tier1.barProgress["cover_1"].ToDouble(), "progress is uncapped");
 
-            var widget = fx.Widget("bar_group", "BarGroup.uxml", null);
+            var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
             widget.Refresh();
             var row = widget.Root.Q<VisualElement>(className: "bar-row");
             var progress = row.Q<Label>(className: "bar-progress");
@@ -271,18 +275,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 tree.Cover1.tap = roadie;
             });
 
-            var widget = fx.Widget("bar_group", "BarGroup.uxml", null);
+            var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
             widget.Refresh();
-            var row = widget.Root.Q<VisualElement>(className: "bar-row");
+            var member = widget.Root.Q<VisualElement>(className: "member-row");
+            var row = member.Q<VisualElement>(className: "bar-row");
             Assert.IsTrue(row.ClassListContains("bar-tappable"), "the bar names a producer");
             using var panel = new PanelHost(widget.Root);
 
             Click(row.Q<Label>(className: "bar-name"));
             AssertClose(25, fx.Tree.Tier1.barProgress["cover_1"].ToDouble(), "one firing of the tap producer");
 
-            // Choosing stays the button's and paying is the row's, so the
-            // button's own press is never also a tap.
-            Click(row.Q<Button>(className: "bar-select"));
+            // Choosing stays the select button's and paying is the row's, so
+            // the button's own press is never also a tap.
+            Click(member.Q<Button>(className: "member-select"));
             AssertClose(25, fx.Tree.Tier1.barProgress["cover_1"].ToDouble(), "the select button paid nothing in");
         }
 
@@ -291,7 +296,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var fx = new Fixture();
 
-            var widget = fx.Widget("bar_group", "BarGroup.uxml", null);
+            var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
             widget.Refresh();
             var row = widget.Root.Q<VisualElement>(className: "bar-row");
             Assert.IsFalse(row.ClassListContains("bar-tappable"), "cover_1 names no producer");
@@ -312,16 +317,70 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Tree.Tier1.barProgress["cover_1"] = 100;
             fx.Tree.Tier1.barProgress["cover_2"] = 300;
 
-            var widget = fx.Widget("bar_group", "BarGroup.uxml", null);
+            var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
             widget.Refresh();
-            var rows = widget.Root.Query<VisualElement>(className: "bar-row").ToList();
-            var once = rows[0].Q<Button>(className: "bar-select");
-            var loop = rows[1].Q<Button>(className: "bar-select");
+            var rows = widget.Root.Query<VisualElement>(className: "member-row").ToList();
+            var once = rows[0].Q<Button>(className: "member-select");
+            var loop = rows[1].Q<Button>(className: "member-select");
 
             Assert.AreEqual("Done", once.text, "cover_1 fills once and stays full");
             Assert.IsFalse(once.enabledSelf, "and nothing reselects it");
             Assert.AreEqual("Select", loop.text, "cover_2 goes again, so full is between fills");
             Assert.IsTrue(loop.enabledSelf);
+        }
+
+        // A group lists members of any kind (12.7), and the widget renders each
+        // one with the row its kind already has plus the select control - so a
+        // generator beside three covers draws a generator row and is choosable
+        // the same way they are.
+        [Test]
+        public void AMixedGroupDrawsEveryMembersOwnRowAndASelectButton()
+        {
+            var fx = new Fixture(tree => tree.LearnCovers.members.Add(tree.PracticeAmp));
+
+            var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
+            widget.Refresh();
+
+            var members = widget.Root.Query<VisualElement>(className: "member-row").ToList();
+            Assert.AreEqual(4, members.Count, "three covers and the amp");
+            foreach (var member in members)
+                Assert.IsNotNull(member.Q<Button>(className: "member-select"), "every member is choosable");
+            Assert.AreEqual(3, widget.Root.Query<VisualElement>(className: "bar-row").ToList().Count,
+                "a bar member draws a bar row");
+            Assert.IsNotNull(members[3].Q<Label>("count"), "and the generator draws its own row");
+
+            // One readout per distinct currency the bar members drink, named by
+            // the currency (12.11).
+            var readouts = widget.Root.Query<VisualElement>(className: "consumed-readout").ToList();
+            Assert.AreEqual(1, readouts.Count, "the three covers all drink rehearsal");
+            Assert.AreEqual("rehearsal", readouts[0].Q<Label>().text);
+        }
+
+        // The select control TOGGLES (12.7), so it reads the group's own set
+        // both ways and stays pressable while the member is on: letting go is
+        // the same control, which is what a group at maxActive 1 needs before
+        // another cover can run.
+        [Test]
+        public void TheSelectControlReadsMembershipBothWaysAndStaysPressable()
+        {
+            var fx = new Fixture();
+
+            var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
+            widget.Refresh();
+            var select = widget.Root.Q<VisualElement>(className: "member-row").Q<Button>(className: "member-select");
+            Assert.AreEqual("Select", select.text);
+            Assert.IsTrue(select.enabledSelf);
+
+            // No host is present to answer the command's refresh, so the
+            // repaint is asked for here.
+            fx.SelectCover1();
+            widget.Refresh();
+            Assert.AreEqual("Selected", select.text);
+            Assert.IsTrue(select.enabledSelf, "the same control is how the player lets go");
+
+            fx.Session.SetActiveMembers(fx.Ctx(0), fx.Tree.LearnCovers, new Definition[0]);
+            widget.Refresh();
+            Assert.AreEqual("Select", select.text, "and the set it reads is the group's own");
         }
 
         // A command leaves the tick's report standing: the tap's yield snaps in

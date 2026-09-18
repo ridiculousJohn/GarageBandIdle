@@ -68,7 +68,7 @@ namespace RidiculousGaming.GarageBandIdle
         public HashSet<string> firedTriggers = new();                  // one-shot trigger latches - a reset re-arms
         public Dictionary<string, BigNumber> barProgress = new();      // uncapped - overfill is allowed
         public Dictionary<string, int> fillCounts = new();             // repeating bars
-        public Dictionary<string, HashSet<string>> activeBars = new(); // per group
+        public Dictionary<string, HashSet<string>> activeMembers = new(); // per group, the member ids that are ON (12.7)
         public Dictionary<string, int> modifierStacks = new();   // granted stacks, keyed like every other count fact
         public List<TimedBuff> timedBuffs = new();
         public List<SongEntry> songs = new();
@@ -152,7 +152,7 @@ namespace RidiculousGaming.GarageBandIdle
         public HashSet<string> firedTriggers => facts.firedTriggers;
         public Dictionary<string, BigNumber> barProgress => facts.barProgress;
         public Dictionary<string, int> fillCounts => facts.fillCounts;
-        public Dictionary<string, HashSet<string>> activeBars => facts.activeBars;
+        public Dictionary<string, HashSet<string>> activeMembers => facts.activeMembers;
         public Dictionary<string, int> modifierStacks => facts.modifierStacks;
         public List<TimedBuff> timedBuffs => facts.timedBuffs;
         public List<SongEntry> songs => facts.songs;

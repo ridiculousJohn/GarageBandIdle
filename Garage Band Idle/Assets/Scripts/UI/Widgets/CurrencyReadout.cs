@@ -5,8 +5,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
 {
     // The interpolating display of one currency (design doc 12.11): truth at
     // the snap, the tick's realized slope between snaps. One implementation,
-    // used by the header line and by the bar group's pool readout, so the
-    // clamp rule lives once rather than in every widget that shows a balance.
+    // used by the header line and by a group's consumed-currency readout, so
+    // the clamp rule lives once rather than in every widget that shows a
+    // balance.
     public sealed class CurrencyReadout
     {
         private readonly Label label;
@@ -44,8 +45,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             label.text = NumberFormatter.Format(truth);
         }
 
-        // Clamped at zero: a draining pool's negative slope is honest motion, a
-        // negative balance is not. The same-frame rule holds by construction -
+        // Clamped at zero: a draining balance's negative slope is honest motion,
+        // a negative balance is not. The same-frame rule holds by construction -
         // a stamp equal to now gives exactly truth.
         public void Interpolate(double gameTimeSeconds)
         {

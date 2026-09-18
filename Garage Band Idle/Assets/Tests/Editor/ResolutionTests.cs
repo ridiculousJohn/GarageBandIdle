@@ -287,18 +287,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void A_wildcard_never_reaches_a_bars_fill_rate()
+        public void A_wildcard_reaches_a_bars_fill_rate_exactly_once()
         {
             var tree = new TestTree();
-            var everyCurrency = TestTree.MakeDefinition<ModifierDefinition>("every_currency");
-            everyCurrency.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });
-            tree.RootDef.modifiers.Add(everyCurrency);
+            var everyRate = TestTree.MakeDefinition<ModifierDefinition>("every_rate");
+            everyRate.effects.Add(new Effect { stat = Stat.Rate, multiplier = 2 });
+            tree.RootDef.modifiers.Add(everyRate);
             tree.Rebuild();
-            tree.Root.modifierStacks["every_currency"] = 1;
+            tree.Root.modifierStacks["every_rate"] = 1;
 
-            // A bar consumes: its rate resolves stage 1 only, with the bar as
-            // the owner, which a currency-stage wildcard never matches.
-            AssertClose(1, Producer.GetMultiplier(tree.Ctx(tree.Tier1),
+            // A bar's fill rate is a number of stat rate at its one coordinate
+            // (12.2), so the wildcard - every number of a stat - meets it. It
+            // meets it ONCE: a bar's fill resolves stage 1 only, and what stays
+            // out is the term of whatever source pays the bar, which carries
+            // its own coordinate.
+            AssertClose(2, Producer.GetMultiplier(tree.Ctx(tree.Tier1),
                 tree.Tier1.Link<StatPlans>(tree.Cover1).Rate));
         }
 
@@ -1044,10 +1047,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // A repeating bar carrying one cascade entry, filed at tier1.
         private static BarDefinition MakeCascadeBar(TestTree tree, double multiplier, GrowthKind growth)
         {
-            var group = TestTree.MakeDefinition<BarGroupDefinition>("cascades");
-
             var bar = TestTree.MakeDefinition<BarDefinition>("cascade_bar");
-            bar.fillCurrency = tree.Rehearsal;
+            bar.consumes.Add(new ConsumesEntry { currency = tree.Rehearsal, amount = 1 });
             bar.fillAmount = 10;
             bar.fillRate = 1;
             bar.repeatWhen = new Always();
@@ -1056,8 +1057,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 effect = new Effect { target = "practice_amp", stat = Stat.Rate, multiplier = multiplier },
                 growth = growth,
             });
-            group.bars.Add(bar);
-            tree.Tier1Def.barGroups.Add(group);
+            tree.Tier1Def.bars.Add(bar);
             // The gather is compiled when the tree is built, so a cascade
             // authored afterward joins a plan only once the tree is rebuilt.
             tree.Rebuild();

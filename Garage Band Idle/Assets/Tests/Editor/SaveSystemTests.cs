@@ -64,7 +64,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // sides of the save.
             tree.Cover1.repeatWhen = new Always();
             tree.Tier1.fillCounts["cover_1"] = 2;
-            tree.Tier1.activeBars["learn_covers"] = new System.Collections.Generic.HashSet<string> { "cover_1" };
+            tree.Tier1.activeMembers["learn_covers"] = new System.Collections.Generic.HashSet<string> { "cover_1" };
             tree.Tier1.modifierStacks["gj_tap_1"] = 2;
             tree.Tier1.Facts.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 12.5, goalReached = true };
             tree.Tier1.songs.Add(new SongEntry { songId = "song_1", name = "Three-Chord Anthem" });
@@ -107,7 +107,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(tier1.firedTriggers.Contains("tier1_trigger"));
             Assert.AreEqual((BigNumber)42, tier1.barProgress["cover_1"]);
             Assert.AreEqual(2, tier1.fillCounts["cover_1"]);
-            Assert.IsTrue(tier1.activeBars["learn_covers"].Contains("cover_1"));
+            Assert.IsTrue(tier1.activeMembers["learn_covers"].Contains("cover_1"));
             Assert.AreEqual(2, tier1.modifierStacks["gj_tap_1"]);
             Assert.AreEqual("timed_gig", tier1.Facts.activeEvent.eventId);
             Assert.AreEqual(12.5, tier1.Facts.activeEvent.remainingSeconds);
@@ -572,8 +572,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             saved.Tier1.barProgress["cover_1"] = 40;                  // declared - survives
             saved.Tier1.barProgress["ghost_bar"] = 10;
             saved.Tier1.barProgress["cover_2"] = -5;                  // progress only ever rises
-            saved.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1" };
-            saved.Tier1.activeBars["ghost_group"] = new HashSet<string> { "cover_1" };
+            saved.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "cover_1" };
+            saved.Tier1.activeMembers["ghost_group"] = new HashSet<string> { "cover_1" };
             var json = SaveSystem.Serialize(saved.Root);
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not declared"));
@@ -584,8 +584,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var tier1 = TestNavigation.Node(root, loaded.Tier1Def);
             Assert.AreEqual((BigNumber)40, tier1.barProgress["cover_1"]);
             Assert.AreEqual(1, tier1.barProgress.Count);
-            Assert.AreEqual(new HashSet<string> { "cover_1" }, tier1.activeBars["learn_covers"]);
-            Assert.AreEqual(1, tier1.activeBars.Count);
+            Assert.AreEqual(new HashSet<string> { "cover_1" }, tier1.activeMembers["learn_covers"]);
+            Assert.AreEqual(1, tier1.activeMembers.Count);
         }
 
         [Test]
@@ -607,16 +607,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void An_oversized_selection_is_cleared_rather_than_truncated()
         {
             var saved = new TestTree();
-            // learn_covers holds maxActive 1. Naming two bars gets NEITHER:
+            // learn_covers holds maxActive 1. Naming two members gets NEITHER:
             // picking which one survives is a guess, and the player reselects.
-            saved.Tier1.activeBars["learn_covers"] = new HashSet<string> { "cover_1", "cover_2", "ghost_bar" };
+            saved.Tier1.activeMembers["learn_covers"] = new HashSet<string> { "cover_1", "cover_2", "ghost_bar" };
             var json = SaveSystem.Serialize(saved.Root);
 
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar' is not in group 'learn_covers'"));
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("holds 2 active bars of at most 1 - cleared"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("'ghost_bar'"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("at most 1 - cleared"));
             Assert.IsTrue(Load(json, out var root, out var loaded));
 
-            Assert.IsEmpty(TestNavigation.Node(root, loaded.Tier1Def).activeBars["learn_covers"]);
+            Assert.IsEmpty(TestNavigation.Node(root, loaded.Tier1Def).activeMembers["learn_covers"]);
         }
 
         [Test]

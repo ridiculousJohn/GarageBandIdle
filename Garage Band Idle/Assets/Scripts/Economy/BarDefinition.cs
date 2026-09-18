@@ -22,16 +22,27 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public GrowthKind growth = GrowthKind.Multiply;
     }
 
+    // One currency a bar consumes as it fills, and how much of it one unit of
+    // fill costs (design doc 12.7). The amount is a per-unit price, so the
+    // draw's cover is the balance divided by it and the spend is the fill
+    // times it; a consumption effect on the bar scales the price (12.2).
+    [Serializable]
+    public class ConsumesEntry
+    {
+        public CurrencyDefinition currency;
+        public BigNumber amount;            // per unit of fill
+    }
+
     // A generic fillable (design doc 12.7): pacing bars, currency bars that go
     // again, cascade bars. Completion is derived - progress >= fillAmount -
     // never stored, and whether the bar goes again is repeatWhen's answer.
     [CreateAssetMenu(menuName = "Garage Band Idle/Bar")]
     public class BarDefinition : Definition
     {
-        // What this bar drinks, and how fast. A null currency fills from time
-        // alone - that is the whole difference between the two fill modes, so
-        // there is no behavior class (design doc 12.7).
-        public CurrencyDefinition fillCurrency;
+        // What this bar consumes as it fills, one entry per currency. An empty
+        // list is a bar that fills from time alone, and the fill is capped by
+        // the tightest entry's cover (design doc 12.7).
+        public List<ConsumesEntry> consumes = new();
         public BigNumber fillAmount;
         public BigNumber fillRate;          // this bar's own fill speed (units/sec)
         // Whether the bar goes again after a completion, judged at its home when
@@ -47,8 +58,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // The producer this bar's row fires when the row is tapped, resolved
         // outward from the bar's scope (design doc 12.11); its yield entry
         // naming this bar is how a tap adds time (12.7). Null is a row that is
-        // not a tap target. Selection stays the button's: the tap pays, it does
-        // not choose.
+        // not a tap target. Membership stays the group's control: the tap pays,
+        // it does not choose.
         public ProducerDefinition tap;
 
         [SerializeReference, SubclassPicker] public Condition availableWhen;

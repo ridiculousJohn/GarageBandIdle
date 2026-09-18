@@ -300,9 +300,15 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public Economy.GrowthKind growth = Economy.GrowthKind.Multiply;
     }
 
+    internal class ConsumesDto
+    {
+        public string currency;
+        public BigNumber amount;
+    }
+
     internal class BarDto : DefinitionDto
     {
-        public string fillCurrency;
+        public List<ConsumesDto> consumes = new();
         public BigNumber fillAmount;
         public BigNumber fillRate;
         public ConditionDto repeatWhen;
@@ -312,10 +318,13 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public List<PerFillDto> perFill = new();
     }
 
-    internal class BarGroupDto : DefinitionDto
+    // A group lists its members by id, and the ids are resolved against what
+    // the group's OWN scope declares - never an outward walk, because a group
+    // and its members share one home (12.7).
+    internal class GroupDto : DefinitionDto
     {
         public int maxActive = 1;
-        public List<BarDto> bars = new();
+        public List<string> members = new();
     }
 
     internal class TriggerDto : DefinitionDto
@@ -366,8 +375,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
 
     // One widget on a section. Both ids are optional: an absent scopeId is the
     // authoring convenience the importer normalizes away, and an absent
-    // contentId is a module that binds nothing, the rung button and the bar
-    // group, which render their scope's own rung and bar groups (12.11).
+    // contentId is a module that binds nothing - the rung button, which renders
+    // its scope's own rung (12.11).
     internal class ModuleDto
     {
         public string prefabId;
@@ -397,7 +406,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public List<ProducerDto> producers = new();
         public List<GeneratorDto> generators = new();
         public List<UpgradeDto> upgrades = new();
-        public List<BarGroupDto> barGroups = new();
+        public List<BarDto> bars = new();
+        public List<GroupDto> groups = new();
         public List<ModifierDto> modifiers = new();
         public List<string> permanentModifiers = new();
         public List<TriggerDto> triggers = new();

@@ -104,3 +104,11 @@ first principles and land somewhere Ctrl C already answered differently.
 handicaps, progression - ask how Ctrl C does it before proposing a mechanism, and say so when the
 answer comes from there. Never claim knowledge of its specifics; ask John, then record what he says
 here. Related: [[design-review-revisions]], [[project-layout-and-workflow]].
+
+**Idle payout screen with teams running (John, 2026-09-18, playing a fresh chapter 2).** Teams start
+as tap-to-run and each gets its own auto upgrade; with a couple of teams auto-running and a stretch
+idle, the idle payout screen listed Lines and nothing else - the teams' payout IS the currency, and
+the screen shows nothing about the bars themselves (no progress, no completion count). This is the
+shape the groups/consumption/idle claim dialog matches: one row per currency the claim changes, bar
+entries carried for the claim's writes only and never printed. John: "as long as that is how it
+works, it's fine."

@@ -120,7 +120,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.FireProducer(ctx, f.Tree.TapProducer);                                           // +1 cash
             f.Session.TryBuy(ctx, f.Tree.PracticeAmp, 1);                                              // -60
             f.Session.TryBuy(ctx, f.Tree.StagePresence);                                               // -250
-            f.Session.SetActiveBars(ctx, f.Tree.LearnCovers, new[] { f.Tree.Cover1 });
+            f.Session.SetActiveMembers(ctx, f.Tree.LearnCovers, new[] { f.Tree.Cover1 });
             f.Session.TryStartEvent(ctx, f.Tree.TimedGig);
             Assert.IsNotNull(f.Tree.Tier1.activeEvent, "the gig is the host's standing attempt");
             f.Session.TryDismissEvent(ctx, f.Tree.TimedGig);
@@ -130,7 +130,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // What each command wrote, which is how a void command is read.
             Assert.AreEqual(1, f.Tree.Tier1.generatorCounts["practice_amp"]);
             Assert.IsTrue(f.Tree.Tier1.purchasedUpgrades.Contains("stage_presence"));
-            Assert.IsTrue(f.Tree.Tier1.activeBars[f.Tree.LearnCovers.Id].Contains(f.Tree.Cover1.Id));
+            Assert.IsTrue(f.Tree.Tier1.activeMembers[f.Tree.LearnCovers.Id].Contains(f.Tree.Cover1.Id));
             Assert.IsTrue(f.Tree.Tier1.flags.Contains("fans_revealed"));
             Assert.IsNull(f.Tree.Tier1.activeEvent);
             Assert.AreEqual((BigNumber)696, f.Tree.Tier1.balances["cash"]);

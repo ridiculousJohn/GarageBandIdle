@@ -29,13 +29,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             trigger.actions.Add(new SetFlag { flagId = "trigger" });
             tier.triggers.Add(trigger);
 
-            var group = TestTree.MakeDefinition<BarGroupDefinition>("covers");
             var bar = TestTree.MakeDefinition<BarDefinition>("cover_1");
             bar.fillAmount = 10;
             bar.fillRate = 1;
             bar.onComplete.Add(new SetFlag { flagId = "bar" });
-            group.bars.Add(bar);
-            tier.barGroups.Add(group);
+            tier.bars.Add(bar);
 
             var upgrade = TestTree.MakeDefinition<UpgradeDefinition>("stage_presence");
             upgrade.actions.Add(new SetFlag { flagId = "upgrade" });

@@ -108,8 +108,6 @@ covers to `bars` and declares `learn_covers` as a group of them; the Rehearsal S
 - a member not declared on the group's own scope (new: `MemberOffScope`, error) - a group lists
   what its scope declares, so the active set and the member share a home and a lifetime;
 - the same member listed twice by one group (DuplicateMember, error);
-- a group no module binds is the ordinary unpresented-content warning the widget pass already
-  gives.
 
 Events keep their own one-active record; its lifecycle (timer, entry, exit) is not a membership.
 Out of scope here.
@@ -268,4 +266,17 @@ pointing at it. Memory: none beyond what is recorded.
 
 ## Status
 
-Planned 2026-09-18. Not started.
+DONE 2026-09-18 - 910/910 green (+32 net), landed as one slice with chapter 1's content and the design
+doc sections above. Three sentences of this plan were wrong and the code follows the design rule
+instead: (1) "idle_base's rate x0.5 halves a bar's fill" needed the rate wildcard to reach a bar's fill,
+which 12.2's "a bar's fill stays out" clause forbade - the clause dated from fill never accruing while
+away, a bar's fill is stage 1 only so the wildcard meets it once, and the clause is deleted; (2) "the
+currency's line is reduced by what the bar takes" nets a spend into a deposit, and a deposit writes the
+earned total (12.3) - the drink is the offer's own list of DRAWS, the claim deposits the lines and spends
+the draws, and the dialog prints each balance's net change signed; (3) no "unpresented content" warning
+exists in the widget pass, so the validation row citing one is gone and none was built. Decisions made
+in the landing: a group bound by a module needs no displayName (John, 2026-09-02: a group draws no
+heading); a window that changed no balance settles on entry with no dialog (John, 2026-09-18: "we should never
+show an empty dialog"; I had built the opposite without asking, and the dialog's row list moved onto
+the offer as `Changes()` so the session and the screen agree on what there is to show); a completed fill-once bar leaves the active set of every group listing it, live and at the claim, as the manual team does (review finding: the toggle otherwise left a Done cover holding the only slot, so no second cover could ever be chosen from the screen); Double It and the Pass double the lines alone; FireProducer on an off producer pays nothing
+rather than throwing.

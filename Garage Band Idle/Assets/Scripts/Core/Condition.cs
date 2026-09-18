@@ -216,7 +216,7 @@ namespace RidiculousGaming.GarageBandIdle
     [Serializable]
     public class BarsCompleted : Condition
     {
-        public Economy.BarGroupDefinition group;
+        public Economy.GroupDefinition group;
         public int count = 1;
 
         public override bool Evaluate(GameContext ctx) => Completed(ctx) >= count;
@@ -233,21 +233,25 @@ namespace RidiculousGaming.GarageBandIdle
         private int Completed(GameContext ctx)
         {
             var completed = 0;
-            foreach (var bar in group.bars)
-                if (bar != null && ctx.GetBarProgress(bar.Id) >= bar.fillAmount)
+            foreach (var member in group.members)
+                // A group holds members of any kind (12.7), and only a bar has a
+                // completion - the others are simply not counted, which is what
+                // "counts the group's bars at full" means.
+                if (member is Economy.BarDefinition bar && ctx.GetBarProgress(bar.Id) >= bar.fillAmount)
                     completed++;
             return completed;
         }
 
         // The count reads each bar's progress by walking OUTWARD from the
-        // acting scope, and a bar's progress is homed at its group's scope - so
-        // that scope must be the acting one or an ancestor, or the walk never
-        // reaches the fact and the count is permanently zero.
+        // acting scope, and a bar's progress is homed at the scope declaring it,
+        // which is the group's - so that scope must be the acting one or an
+        // ancestor, or the walk never reaches the fact and the count is
+        // permanently zero.
         public override void Validate(ValidationContext ctx)
         {
             if (group == null)
             {
-                ctx.AddError(ValidationCheck.NullEntry, "BarsCompleted names no bar group.");
+                ctx.AddError(ValidationCheck.NullEntry, "BarsCompleted names no group.");
                 return;
             }
             ctx.RequireOnChain(group, "BarsCompleted");

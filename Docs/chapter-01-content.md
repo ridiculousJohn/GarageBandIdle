@@ -143,16 +143,19 @@ The gear *region* has no unlock and no flag: it gates directly on `EarnedTotalAt
 
 ## 7. Bars (tier1)
 
-Group `learn_covers`: `{maxActive: 1}` — choosing the next cover is the mechanic (§12.7). The group
-carries nothing else; each cover names Rehearsal as its own fill currency.
+The three covers are tier1's `bars`, and group `learn_covers` `{maxActive: 1, members: [cover_1,
+cover_2, cover_3]}` lists them - choosing the next cover is the mechanic (§12.7). The group carries
+nothing else; each cover names what it consumes per unit of fill. The Rehearsal Space section binds
+the group with `{prefabId: group, contentId: learn_covers}`.
 
-| Bar | fillCurrency | fillAmount | fillRate | onComplete |
+| Bar | consumes | fillAmount | fillRate | onComplete |
 |---|---|---|---|---|
-| `cover_1` "Three-Chord Anthem" | rehearsal | 100 | 2/s | `AddModifier(tier1, cover_bonus_1)` |
-| `cover_2` "Parking-Lot Standard" | rehearsal | 300 | 2/s | `AddModifier(tier1, cover_bonus_2)` |
-| `cover_3` "The Crowd-Pleaser" | rehearsal | 600 | 2/s | `AddModifier(tier1, cover_bonus_3)` |
+| `cover_1` "Three-Chord Anthem" | rehearsal, 1 per unit | 100 | 2/s | `AddModifier(tier1, cover_bonus_1)` |
+| `cover_2` "Parking-Lot Standard" | rehearsal, 1 per unit | 300 | 2/s | `AddModifier(tier1, cover_bonus_2)` |
+| `cover_3` "The Crowd-Pleaser" | rehearsal, 1 per unit | 600 | 2/s | `AddModifier(tier1, cover_bonus_3)` |
 
-Non-repeating; 1,000 Rehearsal finishes all three. Completion is a moment that leaves no derivable
+Non-repeating; 1,000 Rehearsal finishes all three. A cover left selected fills while the player is
+away from the Rehearsal that accrues, and completes if it crosses (section 9). Completion is a moment that leaves no derivable
 effect-fact for a non-repeating bar, so the fan-rate reward is an `AddModifier` grant — cleared
 with tier1 like every run fact.
 

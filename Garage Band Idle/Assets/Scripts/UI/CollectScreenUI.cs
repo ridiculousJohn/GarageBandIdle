@@ -4,8 +4,9 @@ using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // The idle dialog (design doc 12.9): the offer's lines - the target's name
-    // and the amount, all references, formatted - and three actions. OK settles through
+    // The idle dialog (design doc 12.9): one row per balance the window moved -
+    // the target's name and the NET change, all references, formatted - and
+    // three actions. OK settles through
     // ClaimIdle; Double It and Backstage Pass only REQUEST, and the payout is
     // the ad's or the store's own callback transaction (12.11). The dialog
     // shows what the session holds and computes nothing: what is shown is what
@@ -66,14 +67,25 @@ namespace RidiculousGaming.GarageBandIdle.UI
             builtFor = offer;
             lines.Clear();
 
-            foreach (var line in offer.lines)
-            {
-                var row = new VisualElement();
-                row.AddToClassList("currency-line");
-                row.Add(new Label(line.target.displayName));
-                row.Add(new Label("+" + NumberFormatter.Format(line.amount)));
-                lines.Add(row);
-            }
+            // One row per balance the claim changes, which is what section 9
+            // means by shown is paid; the offer's own list, so the session and
+            // the screen agree on what there is to show.
+            foreach (var change in offer.Changes())
+                Row(change.target.displayName, change.amount);
         }
+
+        // One row, signed by the amount: the formatter only ever sees a
+        // magnitude, so the sign is written beside it.
+        private void Row(string name, BigNumber amount)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("currency-line");
+            row.Add(new Label(name));
+            row.Add(new Label(amount < BigNumber.Zero
+                ? "-" + NumberFormatter.Format(-amount)
+                : "+" + NumberFormatter.Format(amount)));
+            lines.Add(row);
+        }
+
     }
 }

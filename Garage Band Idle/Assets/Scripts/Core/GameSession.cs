@@ -21,12 +21,31 @@ namespace RidiculousGaming.GarageBandIdle
     // One line of the idle offer: the target, its home, and the amount - all
     // references, born from the same (target, home) enumeration GetRate sums,
     // because nothing about an offer ever crosses a save boundary. Idle pays
-    // every rate target the tick would, one line per target (12.9).
+    // every rate target the tick would, one line per target (12.9), plus what
+    // a window's completions fired. The same shape carries a draw, where the
+    // amount is what a currency LOST rather than gained; both are positive, and
+    // which list an entry sits in is which write it takes.
     public class IdleOfferLine
     {
         public Definition target;
         public ScopeState home;
         public BigNumber amount;
+    }
+
+    // One bar the window moved (section 9): the bar, its declaring node, the
+    // progress the window leaves it at, and how many thresholds it crossed.
+    // References like every other line, because nothing about an offer ever
+    // crosses a save boundary; the claim is where any of it is written.
+    public class IdleBarLine
+    {
+        public BarDefinition bar;
+        public ScopeState home;
+        public BigNumber progress;      // carried progress after the window's completions
+        public int completions;
+
+        // The manual team that completed: it leaves the active set of every
+        // group listing it, and the claim is where that write lands (12.7).
+        public bool off;
     }
 
     // The transient idle offer (design doc 12.9): computed once over the
@@ -39,6 +58,48 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public DateTime windowEndUtc;
         public List<IdleOfferLine> lines = new();
+
+        // What the window's bars drew from each currency, the fact the tick
+        // records at the same moment (TickReport.RecordDraw). A draw is a SPEND
+        // and a line is a deposit, so they are two lists and never one netted
+        // number: an earned total counts what was earned, and a spend never
+        // touches it (12.3).
+        public List<IdleOfferLine> draws = new();
+
+        // What the window's bars did, beside what it paid and what it drank:
+        // these are the writes that the fill earned (section 9).
+        public List<IdleBarLine> bars = new();
+
+        // What the claim CHANGES each balance by: a line less the draw on the
+        // same (target, home), signed, zero dropped, and a draw nothing paid
+        // into as its whole negative. This is the dialog's row list and the
+        // session's test for whether there is anything to show at all (section
+        // 9): bar progress is a write, never a report, so a window that changed
+        // no balance raises no dialog. Nothing about the economy is computed
+        // here - the two numbers are already stored, and this subtracts them.
+        public List<IdleOfferLine> Changes()
+        {
+            var changes = new List<IdleOfferLine>();
+            foreach (var line in lines)
+            {
+                var net = line.amount;
+                foreach (var draw in draws)
+                    if (draw.target == line.target && draw.home == line.home)
+                        net -= draw.amount;
+                if (net != BigNumber.Zero)
+                    changes.Add(new IdleOfferLine { target = line.target, home = line.home, amount = net });
+            }
+            foreach (var draw in draws)
+            {
+                var paidInto = false;
+                foreach (var line in lines)
+                    if (line.target == draw.target && line.home == draw.home)
+                        paidInto = true;
+                if (!paidInto)
+                    changes.Add(new IdleOfferLine { target = draw.target, home = draw.home, amount = -draw.amount });
+            }
+            return changes;
+        }
     }
 
     // The transient execution context (design doc 12.9): plain C#, never
@@ -212,7 +273,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         // The x2 written INTO the lines, because the lines are what settlement
         // pays and what the dialog shows - one amount, no second reader to keep
-        // in step.
+        // in step. The LINES alone: a draw is what the window's bars drank, and
+        // doubling it would charge twice for one fill, and a bar entry is never
+        // doubled either - twice the Cash, never twice the cover (section 9).
         private void DoubleOffer()
         {
             foreach (var line in CurrentOffer.lines)
@@ -227,8 +290,10 @@ namespace RidiculousGaming.GarageBandIdle
         // segmented at the buff expiries inside it exactly as the tick segments,
         // each segment paying its own length at the rate and speed live in it:
         // the cap bounds REAL seconds and speed multiplies what they pay.
+        // Every bar of the subtree fills over the same window, capped by what it
+        // consumes, and what its completions fire joins the lines (section 9).
         // Skipped entirely when the away time is under the minimum, a blocking
-        // record holds, every line computes zero, or the chapter has never been
+        // record holds, nothing at all moved, or the chapter has never been
         // left.
         private SessionPhase EnterChapter(ChapterScopeState chapter, DateTime nowUtc)
         {
@@ -260,10 +325,22 @@ namespace RidiculousGaming.GarageBandIdle
             var paidSeconds = Math.Min(elapsed, owner ? config.backstagePassIdleCapSeconds : config.idleCapSeconds);
             var windowStartUtc = chapter.lastActiveUtc;
             var windowEndUtc = windowStartUtc.AddSeconds(paidSeconds);
-            var pairs = Producer.RatePairs(chapter);
-            var amounts = new BigNumber[pairs.Count];
-            for (var i = 0; i < amounts.Length; i++)
-                amounts[i] = BigNumber.Zero;
+
+            // The accumulation, keyed by target AND home over the whole window.
+            // The rate pairs seed it, so the lines keep the tick's own order,
+            // and a completion's payout into anything else lands where it was
+            // first seen. Only the seeded ones take a rate: a target appended by
+            // a payout is one no source in this subtree pays per second.
+            var targets = Producer.RatePairs(chapter);
+            var amounts = new List<BigNumber>(targets.Count);
+            var drawn = new List<BigNumber>(targets.Count);
+            for (var i = 0; i < targets.Count; i++)
+            {
+                amounts.Add(BigNumber.Zero);
+                drawn.Add(BigNumber.Zero);
+            }
+            var rateCount = targets.Count;
+            var barLines = new List<IdleBarLine>();
 
             // The tick's own segmentation, over the tick's own code: each
             // segment is stamped at its start, so a record that expires inside
@@ -275,8 +352,11 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 var segCtx = new GameContext(chapter, start, idleAccumulation: true);
                 var effSeconds = (end - start).TotalSeconds * TickSystem.GameSpeed(segCtx, chapter, config);
-                for (var i = 0; i < pairs.Count; i++)
-                    amounts[i] += Producer.GetRate(segCtx, pairs[i].target) * effSeconds;
+                for (var i = 0; i < rateCount; i++)
+                    amounts[i] += Producer.GetRate(segCtx, targets[i].target) * effSeconds;
+                // AFTER the segment's rate amounts, so a bar drinks what the
+                // same segment produced - the tick's own phase order (12.9).
+                FillBars(segCtx, effSeconds);
             }
 
             // The offer's window ends at NOW even though the payment covers the
@@ -284,22 +364,195 @@ namespace RidiculousGaming.GarageBandIdle
             // time past the cap is a lost window either way (12.9's settled-
             // window rule), so nothing about settlement changes.
             var offer = new IdleOffer { windowEndUtc = nowUtc };
-            for (var i = 0; i < pairs.Count; i++)
+            for (var i = 0; i < targets.Count; i++)
             {
                 if (amounts[i] == BigNumber.Zero)
                     continue;
                 offer.lines.Add(new IdleOfferLine
                 {
-                    target = pairs[i].target,
-                    home = pairs[i].home,
+                    target = targets[i].target,
+                    home = targets[i].home,
+                    // A Pass owner's offer is computed already doubled - the
+                    // screen enters as if the ad had been watched (section 9).
                     amount = owner ? amounts[i] * 2 : amounts[i]
                 });
             }
-            if (offer.lines.Count == 0)
+            // The draws in the same order, as their own writes: what the bars
+            // drank is spent at the claim, never netted off a deposit (12.3).
+            for (var i = 0; i < targets.Count; i++)
+            {
+                if (drawn[i] == BigNumber.Zero)
+                    continue;
+                offer.draws.Add(new IdleOfferLine
+                {
+                    target = targets[i].target,
+                    home = targets[i].home,
+                    amount = drawn[i]
+                });
+            }
+            offer.bars.AddRange(barLines);
+            if (offer.lines.Count == 0 && offer.draws.Count == 0 && offer.bars.Count == 0)
                 return SessionPhase.Live;
 
+            // The dialog exists for a balance the player is owed. A window that
+            // changed none - a bar part-way through a cycle, or a bar that drank
+            // exactly what came in - has nothing to show, so it settles on entry:
+            // the same claim, the progress and the stamp written, no screen
+            // (section 9). Never an empty dialog.
             CurrentOffer = offer;
+            if (offer.Changes().Count == 0)
+            {
+                SettleOffer(chapter);
+                return SessionPhase.Live;
+            }
             return SessionPhase.AwaitingIdleClaim;
+
+            // Every bar of the chapter's subtree, in the tick's settlement
+            // order, for one segment: the fill the tick would have moved, capped
+            // by what the bar consumes, then the completions that fill crossed
+            // and what each one fires. Nothing is written - the whole of it
+            // lands in the offer (section 9).
+            void FillBars(GameContext segCtx, double effSeconds)
+            {
+                foreach (var plan in ContributorPlan.At(chapter).Bars)
+                {
+                    var line = BarLine(plan.Bar);
+                    // The manual team that completed ran its one cycle and is
+                    // off for the rest of the window (12.7).
+                    if (line != null && line.off)
+                        continue;
+                    var barCtx = segCtx.Rebase(plan.Node);
+                    var progress = line != null ? line.progress : Progress(plan);
+                    if (!BarSystem.Drawing(barCtx, plan.Bar, progress))
+                        continue;
+
+                    // idle_base's rate x0.5 halves the fill through the ordinary
+                    // gather, exactly as it halves every rate (section 9).
+                    var fill = BarSystem.FillRate(segCtx, plan) * effSeconds;
+
+                    // What each consumed currency can give: its balance at the
+                    // stamp, plus this window's inflow into it, minus what
+                    // earlier bars already drew - so the settlement order is the
+                    // tick's - divided by the per-unit price under its factor.
+                    var costs = new List<(int slot, BigNumber perUnit)>(plan.Consumes.Count);
+                    foreach (var consumes in plan.Consumes)
+                    {
+                        var perUnit = consumes.Entry.amount * Producer.GetMultiplier(barCtx, consumes.Factor);
+                        if (perUnit <= BigNumber.Zero)
+                            continue;       // free covers unboundedly
+                        var slot = Slot(consumes.Entry.currency, consumes.Home);
+                        var available = new GameContext(consumes.Home, segCtx.NowUtc)
+                            .GetBalance(consumes.Entry.currency.Id) + amounts[slot] - drawn[slot];
+                        costs.Add((slot, perUnit));
+                        fill = BigNumber.Min(fill, available / perUnit);
+                    }
+                    // Nothing to drink moves nothing, and a cover rounded a hair
+                    // below zero is the same answer.
+                    if (fill < BigNumber.Zero)
+                        fill = BigNumber.Zero;
+
+                    var completions = 0;
+                    var off = false;
+                    if (plan.Bar.repeatWhen == null)
+                    {
+                        // Fill once and stay full: the fill past the threshold is
+                        // never drawn, so the take is sized to what fits, and the
+                        // completed bar leaves its groups at the claim as it does
+                        // live (12.7).
+                        if (progress + fill >= plan.Bar.fillAmount)
+                        {
+                            fill = plan.Bar.fillAmount - progress;
+                            completions = 1;
+                            progress = plan.Bar.fillAmount;
+                            off = true;
+                        }
+                        else
+                        {
+                            progress += fill;
+                        }
+                    }
+                    else if (plan.Bar.repeatWhen.Evaluate(barCtx))
+                    {
+                        // Every threshold the window crosses pays and the
+                        // residual is kept - the same arithmetic the tick's own
+                        // settlement takes, over the counts this window adds.
+                        progress += fill;
+                        plan.Node.fillCounts.TryGetValue(plan.Bar.Id, out var recorded);
+                        completions = BarSystem.Crossings(plan.Bar, progress,
+                            recorded + (line == null ? 0 : line.completions));
+                        progress -= plan.Bar.fillAmount * completions;
+                    }
+                    else if (progress + fill >= plan.Bar.fillAmount)
+                    {
+                        // The manual team: one cycle, then zero, then off. The
+                        // excess past the threshold is discarded as it is live.
+                        completions = 1;
+                        progress = BigNumber.Zero;
+                        off = true;
+                    }
+                    else
+                    {
+                        progress += fill;
+                    }
+
+                    foreach (var (slot, perUnit) in costs)
+                        drawn[slot] += fill * perUnit;
+
+                    // What the completions fired, resolved once under the segment
+                    // context and multiplied - the resolution the live completion
+                    // uses, so the window pays what presence would have.
+                    for (var i = 0; completions > 0 && i < plan.Bar.onComplete.Count; i++)
+                    {
+                        if (plan.Bar.onComplete[i] is not FireGeneratorYield fire)
+                            continue;
+                        foreach (var (target, amount) in Producer.ResolveGeneratorYield(barCtx, fire.generator))
+                        {
+                            if (amount == BigNumber.Zero)
+                                continue;
+                            var home = Producer.DeclaringScope<ScopeState>(plan.Node, target);
+                            amounts[Slot(target, home)] += amount * completions;
+                        }
+                    }
+
+                    // Progress is carried whether or not anything crossed: a bar
+                    // that pays very slowly still moves while the player is away
+                    // (section 9).
+                    if (line == null)
+                    {
+                        line = new IdleBarLine { bar = plan.Bar, home = plan.Node };
+                        barLines.Add(line);
+                    }
+                    line.progress = progress;
+                    line.completions += completions;
+                    line.off = off;
+                }
+            }
+
+            // Where one (target, home) keeps its running inflow and its running
+            // draw, appended when this window is the first thing to move it. A
+            // slot the rate pairs did not seed takes no rate: nothing in this
+            // subtree pays it per second, and a payout or a draw found it.
+            int Slot(Definition target, ScopeState home)
+            {
+                for (var i = 0; i < targets.Count; i++)
+                    if (targets[i].target == target && targets[i].home == home)
+                        return i;
+                targets.Add((target, home));
+                amounts.Add(BigNumber.Zero);
+                drawn.Add(BigNumber.Zero);
+                return targets.Count - 1;
+            }
+
+            IdleBarLine BarLine(BarDefinition bar)
+            {
+                for (var i = 0; i < barLines.Count; i++)
+                    if (barLines[i].bar == bar)
+                        return barLines[i];
+                return null;
+            }
+
+            BigNumber Progress(BarPlan plan) =>
+                plan.Node.barProgress.TryGetValue(plan.Bar.Id, out var stored) ? stored : BigNumber.Zero;
         }
 
         // Settlement pays the stored lines as they stand, through their held
@@ -321,6 +574,39 @@ namespace RidiculousGaming.GarageBandIdle
                 // re-ask here would run under a live context instead and could
                 // refuse a line the offer already promised, mid-settlement.
                 Producer.PayResolved(new GameContext(line.home, offer.windowEndUtc), line.target, line.amount);
+            }
+
+            // Then what the bars drank, as the spend the tick makes: only a
+            // currency is ever drunk (requirement 7 on anything else). Clamped at
+            // the balance the production above landed in, as the live draw is:
+            // a cover sized as a quotient can put the product a last digit over
+            // it, and Spend throws on that.
+            foreach (var draw in offer.draws)
+            {
+                if (draw.target is not CurrencyDefinition consumed)
+                    throw new InvalidOperationException(
+                        $"Idle draw names '{draw.target.Id}', and only a currency is consumed (12.7).");
+                var ctx = new GameContext(draw.home, offer.windowEndUtc);
+                ctx.Spend(consumed.Id, BigNumber.Min(draw.amount, ctx.GetBalance(consumed.Id)));
+            }
+
+            // Then what the window's bars did: the progress, the fill counts the
+            // crossings added, the manual team leaving its groups, and each
+            // completion's own actions - with the payment ones skipped, because
+            // those were the lines (section 9).
+            foreach (var line in offer.bars)
+            {
+                var ctx = new GameContext(line.home, offer.windowEndUtc);
+                line.home.barProgress[line.bar.Id] = line.progress;
+                if (line.bar.repeatWhen != null && line.completions > 0)
+                {
+                    line.home.fillCounts.TryGetValue(line.bar.Id, out var recorded);
+                    line.home.fillCounts[line.bar.Id] = recorded + line.completions;
+                }
+                if (line.off)
+                    BarSystem.Deselect(line.home, line.bar);
+                for (var i = 0; i < line.completions; i++)
+                    ActionList.Run(line.bar.onComplete, ctx, skip: a => a is FireGeneratorYield);
             }
             chapter.StampActive(offer.windowEndUtc);
             CurrentOffer = null;
@@ -348,7 +634,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         // The driver's per-frame call (12.9): it holds no pacing state and only
         // passes the clock's real time. The sample advances every frame and
-        // only the bank is conditional, so time under a dialog never pools up
+        // only the bank is conditional, so time under a dialog never banks up
         // and dumps into the first live tick. One tick carries the WHOLE
         // accumulation ending at the sample, which is what keeps the simulated
         // windows contiguous and their timestamps exact - TickSystem already
@@ -445,9 +731,9 @@ namespace RidiculousGaming.GarageBandIdle
         public void FireProducer(GameContext ctx, ProducerDefinition producer, Action<bool> completed = null) =>
             RunCommand(ctx, c => { Producer.FireProducer(c, producer); return true; }, completed);
 
-        public void SetActiveBars(GameContext ctx, BarGroupDefinition group, IReadOnlyList<BarDefinition> bars,
-                                  Action<bool> completed = null) =>
-            RunCommand(ctx, c => BarSystem.SetActiveBars(c, group, bars), completed);
+        public void SetActiveMembers(GameContext ctx, GroupDefinition group, IReadOnlyList<Definition> members,
+                                     Action<bool> completed = null) =>
+            RunCommand(ctx, c => BarSystem.SetActiveMembers(c, group, members), completed);
 
         public void TryStartEvent(GameContext ctx, EventDefinition evt, Action<bool> completed = null) =>
             RunCommand(ctx, c => EventSystem.TryStart(c, evt), completed);

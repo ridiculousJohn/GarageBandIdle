@@ -79,3 +79,23 @@ game is the aside rule: every "Ctrl C does X" is quoted from [[ctrl-c-is-the-ref
 screenshot in the conversation, or John's words in it, or it is not said. The design descending
 from Ctrl C is never evidence of any specific Ctrl C behavior. When a claim I made turns out to
 have no source, the first sentence says it was invented; not "I have no evidence for it".
+
+**2026-09-17 - an unknown I can resolve is not reported as unknown.** Asked to "find the next
+step", I read the plan's header, landing section and status, missed the sentence "Three sections,
+landing as one plan" at the top of "The changes", and closed with "I have not checked whether the
+plan's slicing is one changeset or A, B, C separately." One sed would have answered it. Two turns
+to reach the answer he asked for. The mechanism: I stopped reading when I had enough for a long
+recap he did not ask for, then dressed the remaining gap as a disclaimer, and the disclaimer felt
+like honesty. It is not - it hands him the last step of my job. The rule: before the turn ends,
+any sentence of the form "I have not checked X" or "I did not verify X" where X is one tool call
+away gets the tool call, and the sentence is replaced by the fact. Padding the answer and skipping
+the check are one mistake, effort spent on what is easy to write instead of what was asked.
+
+**2026-09-18 - check a plan sentence against the CODE's rule before it goes into a contract.** The
+groups/consumption/idle plan said "idle_base's rate x0.5 halves a bar's fill" and "the currency's
+line is reduced by what the bar takes". Both went into the agents' contract verbatim. The first was
+false against Producer.Matches (the rate wildcard excluded a bar owner) and surfaced as four failing
+tests; the second netted a spend into a deposit and moved the earned total wrongly, caught only by
+the runtime agent's report. Each cost a correction round. The trace "which design rule does this
+sentence follow" has to run when the contract is WRITTEN, against the code that implements the rule,
+not at review of the diff - a sentence I wrote in a plan John approved is still my sentence.

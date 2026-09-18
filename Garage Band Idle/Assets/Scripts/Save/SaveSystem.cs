@@ -459,41 +459,41 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     facts.fillCounts.Remove(key);
             }
 
-            // Selection is the player's fact, so it is filtered rather than
-            // rebuilt: an unknown group goes, a bar outside its group goes, and a
-            // set still over maxActive after that is CLEARED rather than
-            // truncated - refusing a tampered selection beats picking which bars
-            // survive, and the player simply reselects.
+            // Membership is the player's fact, so it is filtered rather than
+            // rebuilt: an unknown group goes, a member the group does not list
+            // goes, and a set still over maxActive after that is CLEARED rather
+            // than truncated - refusing a tampered set beats picking which
+            // members survive, and the player simply chooses again.
             List<string> staleSelections = null;
-            foreach (var pair in facts.activeBars)
+            foreach (var pair in facts.activeMembers)
             {
                 var group = FindGroup(definition, pair.Key);
                 if (group == null)
                 {
-                    Debug.LogWarning($"SaveSystem: active-bar set for group '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
+                    Debug.LogWarning($"SaveSystem: active-member set for group '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
                     (staleSelections ??= new List<string>()).Add(pair.Key);
                     continue;
                 }
-                pair.Value.RemoveWhere(barId =>
+                pair.Value.RemoveWhere(memberId =>
                 {
-                    foreach (var bar in group.bars)
+                    foreach (var member in group.members)
                     {
-                        if (bar != null && bar.Id == barId)
+                        if (member != null && member.Id == memberId)
                             return false;
                     }
-                    Debug.LogWarning($"SaveSystem: active bar '{barId}' is not in group '{group.Id}' - dropped.");
+                    Debug.LogWarning($"SaveSystem: active member '{memberId}' is not listed by group '{group.Id}' - dropped.");
                     return true;
                 });
                 if (pair.Value.Count > group.maxActive)
                 {
-                    Debug.LogWarning($"SaveSystem: group '{group.Id}' holds {pair.Value.Count} active bars of at most {group.maxActive} - cleared.");
+                    Debug.LogWarning($"SaveSystem: group '{group.Id}' holds {pair.Value.Count} active members of at most {group.maxActive} - cleared.");
                     pair.Value.Clear();
                 }
             }
             if (staleSelections != null)
             {
                 foreach (var key in staleSelections)
-                    facts.activeBars.Remove(key);
+                    facts.activeMembers.Remove(key);
             }
 
             // A stack is a count of a modifier declared at this scope or an
@@ -560,26 +560,22 @@ namespace RidiculousGaming.GarageBandIdle.Save
             }
         }
 
-        // A bar and its group are found in this scope's OWN declaration lists:
-        // the group owns its bars, and the group's scope homes both their facts.
+        // A bar and a group are found in this scope's OWN declaration lists:
+        // declaration is ownership, so the scope that declares one homes the
+        // facts keyed by its id (12.3).
         private static Economy.BarDefinition FindBar(ScopeDefinition definition, string barId)
         {
-            foreach (var group in definition.barGroups)
+            foreach (var bar in definition.bars)
             {
-                if (group == null)
-                    continue;
-                foreach (var bar in group.bars)
-                {
-                    if (bar != null && bar.Id == barId)
-                        return bar;
-                }
+                if (bar != null && bar.Id == barId)
+                    return bar;
             }
             return null;
         }
 
-        private static Economy.BarGroupDefinition FindGroup(ScopeDefinition definition, string groupId)
+        private static Economy.GroupDefinition FindGroup(ScopeDefinition definition, string groupId)
         {
-            foreach (var group in definition.barGroups)
+            foreach (var group in definition.groups)
             {
                 if (group != null && group.Id == groupId)
                     return group;

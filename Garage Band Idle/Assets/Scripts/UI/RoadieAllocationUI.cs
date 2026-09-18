@@ -53,7 +53,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         // A grant or another authored write may repaint while this draft is
         // open. Keep the player's counts and refresh only what changed around
-        // them: the available pool and the buttons that depend on it.
+        // them: how many Roadies are left and the buttons that depend on it.
         public void Refresh()
         {
             if (Root.style.display.value == DisplayStyle.Flex)

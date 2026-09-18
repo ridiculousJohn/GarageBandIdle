@@ -87,6 +87,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(new BarsCompleted { group = tree.LearnCovers, count = 2 }.Evaluate(ctx));
         }
 
+        // A group lists members of any kind (12.7), and this condition counts
+        // the bars among them: a generator in the same group has no fillAmount
+        // to be at, so it is not a completion and cannot stand in for one.
+        [Test]
+        public void BarsCompleted_counts_the_bar_members_and_ignores_the_rest()
+        {
+            var tree = new TestTree();
+            tree.LearnCovers.members.Add(tree.PracticeAmp);
+            tree.Rebuild();
+            tree.Tier1.barProgress[tree.Cover1.Id] = 100;   // exactly full
+            tree.Tier1.generatorCounts["practice_amp"] = 5;
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.IsTrue(new BarsCompleted { group = tree.LearnCovers, count = 1 }.Evaluate(ctx));
+            Assert.IsFalse(new BarsCompleted { group = tree.LearnCovers, count = 2 }.Evaluate(ctx),
+                "the amp is a member, not a completion");
+        }
+
         // Both kinds are pure fact reads with NO operand: outward from the
         // acting scope to the first interior scope holding a record, the way
         // FlagSet reads a flag (12.4). Nothing looks down.

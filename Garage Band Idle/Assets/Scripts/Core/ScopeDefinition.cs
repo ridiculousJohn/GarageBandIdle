@@ -142,9 +142,13 @@ namespace RidiculousGaming.GarageBandIdle
         public List<Economy.ModifierDefinition> permanentModifiers = new();
         public List<Economy.GeneratorDefinition> generators = new();
 
-        // Bar groups homed here; each group owns its bars (design doc 12.7).
-        // The fill and settlement systems land with build step 5.
-        public List<Economy.BarGroupDefinition> barGroups = new();
+        // Bars homed here, a declaration list like generators: a bar's progress
+        // and its fill counts live and die with this scope (design doc 12.7).
+        public List<Economy.BarDefinition> bars = new();
+
+        // Groups homed here. A group lists what its OWN scope declares, so a
+        // member's active set sits at the same home its other facts do (12.7).
+        public List<Economy.GroupDefinition> groups = new();
         public List<Economy.UpgradeDefinition> upgrades = new();
 
         // The declared ids, in authored order. Every runtime fact is keyed by
@@ -185,14 +189,9 @@ namespace RidiculousGaming.GarageBandIdle
                 if (trigger != null)
                     yield return new ActionListSite(trigger.actions, $"trigger '{trigger.Id}'");
 
-            foreach (var group in barGroups)
-            {
-                if (group == null)
-                    continue;
-                foreach (var bar in group.bars)
-                    if (bar != null)
-                        yield return new ActionListSite(bar.onComplete, $"bar '{bar.Id}'");
-            }
+            foreach (var bar in bars)
+                if (bar != null)
+                    yield return new ActionListSite(bar.onComplete, $"bar '{bar.Id}'");
 
             foreach (var upgrade in upgrades)
                 if (upgrade != null)
@@ -259,18 +258,13 @@ namespace RidiculousGaming.GarageBandIdle
                 }
             }
 
-            foreach (var group in barGroups)
+            foreach (var bar in bars)
             {
-                if (group == null)
+                if (bar == null)
                     continue;
-                foreach (var bar in group.bars)
-                {
-                    if (bar == null)
-                        continue;
-                    foreach (var entry in bar.perFill)
-                        if (entry != null)
-                            yield return new CarrierEffect(LivenessKind.Cascade, bar, entry.effect, entry.growth);
-                }
+                foreach (var entry in bar.perFill)
+                    if (entry != null)
+                        yield return new CarrierEffect(LivenessKind.Cascade, bar, entry.effect, entry.growth);
             }
         }
 
@@ -289,8 +283,8 @@ namespace RidiculousGaming.GarageBandIdle
             || Holds(producers, definition)
             || Holds(modifiers, definition)
             || Holds(generators, definition)
-            || Holds(barGroups, definition)
-            || HoldsBar(definition)
+            || Holds(bars, definition)
+            || Holds(groups, definition)
             || Holds(upgrades, definition)
             || Holds(triggers, definition);
 
@@ -299,20 +293,6 @@ namespace RidiculousGaming.GarageBandIdle
             for (var i = 0; i < list.Count; i++)
                 if (list[i] == definition)
                     return true;
-            return false;
-        }
-
-        // A group owns its bars, so the scope declaring the group declares them
-        // too (design doc 12.7) - which is what lets the outward walk find a
-        // bar's home the way it finds a currency's.
-        private bool HoldsBar(Definition definition)
-        {
-            for (var i = 0; i < barGroups.Count; i++)
-            {
-                var group = barGroups[i];
-                if (group != null && Holds(group.bars, definition))
-                    return true;
-            }
             return false;
         }
     }

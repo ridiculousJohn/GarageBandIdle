@@ -11,7 +11,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // sites rather than measured as a balance delta. The arithmetic everywhere
     // is TestTree's: one practice_amp pays cash at 0.5/s, the Jam's reveal-gated
     // entry pays rehearsal at 0.5/s, and cover_1 drinks rehearsal at 2/s toward
-    // a fillAmount of 100. That pool-limited pair is the shape a gross gather
+    // a fillAmount of 100. That supply-and-drain pair is the shape a gross gather
     // gets wrong in both directions at once - the supply slope would show the
     // balance climbing while the demand slope would fill the bar 4x too fast.
     public class TickReportTests
@@ -59,9 +59,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void RevealRehearsal() => Tree.Tier1.flags.Add("rehearsal_revealed");
 
             // Selection written as a FACT, bypassing the entry point: a report
-            // test is not a SetActiveBars test.
+            // test is not a SetActiveMembers test.
             public void SelectCover1() =>
-                Tree.Tier1.activeBars[Tree.LearnCovers.Id] = new HashSet<string> { Tree.Cover1.Id };
+                Tree.Tier1.activeMembers[Tree.LearnCovers.Id] = new HashSet<string> { Tree.Cover1.Id };
 
             public BigNumber Balance(string currencyId) => Tree.Tier1.balances[currencyId];
 
@@ -69,10 +69,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Tree.Tier1.barProgress.TryGetValue(bar.Id, out var value) ? value : BigNumber.Zero;
         }
 
-        // ---- the pool-limited pair ----
+        // ---- the supply-and-drain pair ----
 
         [Test]
-        public void A_pool_limited_bar_reports_a_flat_pool_and_the_fill_it_actually_took()
+        public void A_supply_limited_bar_reports_a_flat_balance_and_the_fill_it_actually_took()
         {
             var f = new Fixture();
             f.RevealRehearsal();
@@ -80,8 +80,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var report = f.Tick(1);
 
-            // 0.5 deposited and 0.5 drawn in the same second: the pool is what
-            // limits the draw, so the net is zero and the bar fills at the
+            // 0.5 deposited and 0.5 drawn in the same second: the supply is
+            // what limits the draw, so the net is zero and the bar fills at the
             // supply rate rather than at its own 2/s demand.
             AssertClose(0, report.DepositNet(f.Tree.Tier1, "rehearsal"), "0.5 in, 0.5 out");
             AssertClose(0, report.DepositSlope(f.Tree.Tier1, "rehearsal"));
@@ -90,13 +90,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // And the facts agree with the report, which is the whole point of
             // recording at the sites: the balance never climbs and the bar
-            // never fills faster than the pool it drinks.
+            // never fills faster than the currency it drinks.
             AssertClose(0, f.Balance("rehearsal"), "drained as fast as it is fed");
             AssertClose(0.5, f.Progress(f.Tree.Cover1), "progress");
         }
 
         [Test]
-        public void A_draining_pool_reports_the_negative_net_the_balance_lost()
+        public void A_draining_currency_reports_the_negative_net_the_balance_lost()
         {
             var f = new Fixture();
             f.RevealRehearsal();

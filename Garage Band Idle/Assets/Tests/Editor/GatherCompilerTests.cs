@@ -76,9 +76,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             granted.effects.Add(new Effect { target = "amp", stat = Stat.Rate, multiplier = 7 });
             tier.modifiers.Add(granted);
 
-            var group = TestTree.MakeDefinition<BarGroupDefinition>("cascades");
             var bar = TestTree.MakeDefinition<BarDefinition>("cascade_bar");
-            bar.fillCurrency = coin;
+            bar.consumes.Add(new ConsumesEntry { currency = coin, amount = 1 });
             bar.fillAmount = 10;
             bar.fillRate = 1;
             bar.repeatWhen = new Always();
@@ -87,8 +86,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 effect = new Effect { target = "amp", stat = Stat.Rate, multiplier = 11 },
                 growth = GrowthKind.Linear,
             });
-            group.bars.Add(bar);
-            tier.barGroups.Add(group);
+            tier.bars.Add(bar);
 
             var evt = TestTree.MakeDefinition<EventDefinition>("gig");
             evt.handicaps.Add(new Effect { target = "amp", stat = Stat.Rate, multiplier = 0 });
@@ -137,9 +135,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             granted.effects.Add(new Effect { target = "amp", stat = Stat.Rate, multiplier = 5 });
             root.modifiers.Add(granted);
 
-            var group = TestTree.MakeDefinition<BarGroupDefinition>("cascades");
             var bar = TestTree.MakeDefinition<BarDefinition>("cascade_bar");
-            bar.fillCurrency = coin;
+            bar.consumes.Add(new ConsumesEntry { currency = coin, amount = 1 });
             bar.fillAmount = 10;
             bar.fillRate = 1;
             bar.repeatWhen = new Always();
@@ -147,8 +144,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             {
                 effect = new Effect { target = "amp", stat = Stat.Rate, multiplier = 7 },
             });
-            group.bars.Add(bar);
-            root.barGroups.Add(group);
+            root.bars.Add(bar);
 
             CollectionAssert.AreEqual(
                 new[]
@@ -251,9 +247,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             public BarDefinition Cascade(string id, double multiplier, GrowthKind growth)
             {
-                var group = TestTree.MakeDefinition<BarGroupDefinition>(id + "_group");
                 var bar = TestTree.MakeDefinition<BarDefinition>(id);
-                bar.fillCurrency = Coin;
+                bar.consumes.Add(new ConsumesEntry { currency = Coin, amount = 1 });
                 bar.fillAmount = 10;
                 bar.fillRate = 1;
                 bar.repeatWhen = new Always();
@@ -262,8 +257,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     effect = new Effect { target = "amp", stat = Stat.Rate, multiplier = multiplier },
                     growth = growth,
                 });
-                group.bars.Add(bar);
-                Tier1Def.barGroups.Add(group);
+                Tier1Def.bars.Add(bar);
                 return bar;
             }
 
@@ -584,14 +578,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 foreach (var upgrade in node.Definition.upgrades)
                     Assert.IsNotNull(node.Link<StatPlans>(upgrade).For(Stat.Cost), $"{upgrade.Id} cost");
 
-                foreach (var group in node.Definition.barGroups)
+                foreach (var bar in node.Definition.bars)
                 {
-                    foreach (var bar in group.bars)
-                    {
-                        var plans = node.Link<StatPlans>(bar);
-                        Assert.IsNotNull(plans.Rate, $"bar {bar.Id} fill rate");
-                        Assert.IsNotNull(plans.Yield, $"bar {bar.Id} yield");
-                    }
+                    var plans = node.Link<StatPlans>(bar);
+                    Assert.IsNotNull(plans.Rate, $"bar {bar.Id} fill rate");
+                    Assert.IsNotNull(plans.Yield, $"bar {bar.Id} yield");
                 }
 
                 foreach (var child in node.Children)
@@ -703,13 +694,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(plan.For(tree.Roadies), "nothing in the chapter pays roadies");
 
             // The bars, in settlement order: scopes parent before child, then
-            // groups, then bars, all in declaration order.
+            // the scope's own bar list in declaration order.
             CollectionAssert.AreEqual(
                 new[] { tree.Cover1, tree.Cover2, tree.Cover3 },
                 plan.Bars.Select(bar => bar.Bar).ToArray());
-            Assert.AreSame(tree.LearnCovers, plan.Bars[0].Group);
             Assert.AreSame(tree.Tier1, plan.Bars[0].Node);
-            Assert.AreSame(tree.Tier1, plan.Bars[0].PoolHome, "rehearsal is homed at tier1");
+            Assert.AreSame(tree.Rehearsal, plan.Bars[0].Consumes[0].Entry.currency);
+            Assert.AreSame(tree.Tier1, plan.Bars[0].Consumes[0].Home, "rehearsal is homed at tier1");
         }
 
         // A target is a target however it is spelled (12.2): the contributor

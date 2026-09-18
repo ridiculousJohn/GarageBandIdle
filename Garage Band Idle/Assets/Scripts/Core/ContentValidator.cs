@@ -33,7 +33,9 @@ namespace RidiculousGaming.GarageBandIdle
         BalanceGoalWithoutReset,// an event balance goal whose onEntry never resets the host (warn)
         RemoveWithoutGrant,     // RemoveModifier naming a stack nothing grants there (warn)
         UnconsumedStat,         // a stat outside its site's vocabulary (warn) - the typo guard a named vocabulary lacks
-        NumericRange            // an authored number outside its legal range: NaN, infinity, wrong sign
+        NumericRange,           // an authored number outside its legal range: NaN, infinity, wrong sign
+        MemberOffScope,         // a group lists a member its own scope does not declare
+        DuplicateMember         // one member listed twice by a group, or one currency twice by a bar's consumes list
     }
 
     public readonly struct ValidationFinding
@@ -152,10 +154,12 @@ namespace RidiculousGaming.GarageBandIdle
         private string site;
 
         // True only while validating a site the runtime can evaluate under the
-        // claim's idle-accumulation context: a modifier's appliesWhen, and a
-        // RATE entry's condition on a source some chapter's subtree contains.
-        // Everywhere else an IdleAccumulation condition reads a circumstance
-        // that is never set (12.5).
+        // claim's idle-accumulation context: a modifier's appliesWhen, a RATE
+        // entry's condition on a source some chapter's subtree contains, and a
+        // bar's availableWhen and repeatWhen, which the offer asks per segment
+        // and the claim asks again (section 9). Everywhere else an
+        // IdleAccumulation condition reads a circumstance that is never set
+        // (12.5).
         public bool IdleCircumstancePossible { get; internal set; }
 
         // True only while validating a currency's activeWhen, where
@@ -415,12 +419,8 @@ namespace RidiculousGaming.GarageBandIdle
                 foreach (var evt in interior.events) if (evt != null) yield return evt;
             if (scope is ChapterDefinition chapter)
                 foreach (var beat in chapter.storyBeats) if (beat != null) yield return beat;
-            foreach (var group in scope.barGroups)
-            {
-                if (group == null) continue;
-                yield return group;
-                foreach (var bar in group.bars) if (bar != null) yield return bar;
-            }
+            foreach (var bar in scope.bars) if (bar != null) yield return bar;
+            foreach (var group in scope.groups) if (group != null) yield return group;
         }
 
         // Every tag one definition carries, against the vocabulary its own chain
@@ -574,10 +574,8 @@ namespace RidiculousGaming.GarageBandIdle
                 CollectDeclared(scope, scope.triggers, "triggers");
                 CollectDeclared(scope, scope.producers, "producers");
                 CollectDeclared(scope, scope.modifiers, "modifiers");
-                CollectDeclared(scope, scope.barGroups, "barGroups");
-                foreach (var group in scope.barGroups)
-                    if (group != null)
-                        CollectDeclared(scope, group.bars, $"barGroup '{group.Id}' bars");
+                CollectDeclared(scope, scope.bars, "bars");
+                CollectDeclared(scope, scope.groups, "groups");
                 CollectDeclared(scope, scope.generators, "generators");
                 CollectDeclared(scope, scope.upgrades, "upgrades");
                 if (scope is InteriorDefinition interiorScope)
@@ -722,10 +720,8 @@ namespace RidiculousGaming.GarageBandIdle
                 RecordHome(scope, scope.declaredCurrencies, "a currency has one home");
                 RecordHome(scope, scope.triggers, "a trigger has one home");
                 RecordHome(scope, scope.modifiers);
-                RecordHome(scope, scope.barGroups);
-                foreach (var group in scope.barGroups)
-                    if (group != null)
-                        RecordHome(scope, group.bars);
+                RecordHome(scope, scope.bars);
+                RecordHome(scope, scope.groups);
                 RecordHome(scope, scope.producers);
                 RecordHome(scope, scope.generators);
                 RecordHome(scope, scope.upgrades);
@@ -763,13 +759,8 @@ namespace RidiculousGaming.GarageBandIdle
                     RequireDisplayName(named, scope);
                 foreach (var named in scope.upgrades)
                     RequireDisplayName(named, scope);
-                foreach (var namedGroup in scope.barGroups)
-                {
-                    if (namedGroup == null)
-                        continue;
-                    foreach (var named in namedGroup.bars)
-                        RequireDisplayName(named, scope);
-                }
+                foreach (var named in scope.bars)
+                    RequireDisplayName(named, scope);
                 if (scope is InteriorDefinition namedHost)
                     foreach (var named in namedHost.events)
                         RequireDisplayName(named, scope);
@@ -881,19 +872,20 @@ namespace RidiculousGaming.GarageBandIdle
                     ValidateGenerator(ctx, generator);
                 }
 
-                foreach (var group in scope.barGroups)
+                foreach (var bar in scope.bars)
+                {
+                    if (bar == null)
+                        continue;
+                    ctx.EnterScope(scope);
+                    ValidateBar(ctx, bar, scope);
+                }
+
+                foreach (var group in scope.groups)
                 {
                     if (group == null)
                         continue;
                     ctx.EnterScope(scope);
-                    ValidateBarGroup(ctx, group);
-                    foreach (var bar in group.bars)
-                    {
-                        if (bar == null)
-                            continue;
-                        ctx.EnterScope(scope);
-                        ValidateBar(ctx, bar, scope);
-                    }
+                    ValidateGroup(ctx, group, scope);
                 }
 
                 foreach (var upgrade in scope.upgrades)
@@ -1041,7 +1033,13 @@ namespace RidiculousGaming.GarageBandIdle
                                 // module's scope, so content off that chain is a
                                 // dark widget.
                                 ctx.RequireOnChain(module.content, "a module's bound content");
-                                if (string.IsNullOrEmpty(module.content.displayName))
+                                // A group is exempt: its widget renders its
+                                // MEMBERS, each under its own name, and the
+                                // section's title names the band - so a group
+                                // carries no heading of its own (John,
+                                // 2026-09-02).
+                                if (string.IsNullOrEmpty(module.content.displayName)
+                                    && module.content is not Economy.GroupDefinition)
                                     ctx.AddError(ValidationCheck.NullEntry,
                                         $"binds '{module.content.Id}', which has no displayName - the binding is the render site, so the requirement follows the binding (12.11).");
                             }
@@ -1274,23 +1272,40 @@ namespace RidiculousGaming.GarageBandIdle
                 ValidateEffect(ctx, upgrade.effects[i], $"{site} effects[{i}]", scope);
         }
 
-        // A group holds bars and caps how many run at once. That is the whole
-        // contract - what a bar drinks and how fast is the bar's own business
-        // (12.7).
-        private static void ValidateBarGroup(ValidationContext ctx, Economy.BarGroupDefinition group)
+        // A group lists members and caps how many are active at once. That is
+        // the whole contract - what a member does is its own business - and it
+        // lists what its OWN scope declares (12.7), so the active set and the
+        // member share a home and a lifetime, which is what lets the membership
+        // read be one link at one node.
+        private static void ValidateGroup(ValidationContext ctx, Economy.GroupDefinition group,
+                                          ScopeDefinition scope)
         {
-            var site = $"bar group '{group.Id}'";
+            var site = $"group '{group.Id}'";
             ctx.SetSite(site);
             if (group.maxActive < 1)
                 ctx.AddError(ValidationCheck.NumericRange,
-                    $"maxActive is {group.maxActive} - a group nothing can be selected in.");
+                    $"maxActive is {group.maxActive} - a group nothing can be made active in.");
 
-            for (var i = 0; i < group.bars.Count; i++)
-                if (group.bars[i] == null)
+            var listed = new HashSet<Definition>();
+            for (var i = 0; i < group.members.Count; i++)
+            {
+                var member = group.members[i];
+                ctx.SetSite($"{site} members[{i}]");
+                if (member == null)
                 {
-                    ctx.SetSite($"{site} bars[{i}]");
-                    ctx.AddError(ValidationCheck.NullEntry, "null bar entry.");
+                    ctx.AddError(ValidationCheck.NullEntry, "null member entry.");
+                    continue;
                 }
+                var home = ctx.DeclaringScope(member);
+                if (home != scope)
+                    ctx.AddError(ValidationCheck.MemberOffScope,
+                        home == null
+                            ? $"lists '{member.Id}', which no scope declares - a group lists what its own scope declares (12.7)."
+                            : $"lists '{member.Id}', declared at '{home.Id}' and not at '{scope.Id}' - a group lists what its own scope declares (12.7).");
+                if (!listed.Add(member))
+                    ctx.AddError(ValidationCheck.DuplicateMember,
+                        $"lists '{member.Id}' twice - membership is one fact per group, and the second entry says nothing the first does not.");
+            }
         }
 
         private static void ValidateBar(ValidationContext ctx, Economy.BarDefinition bar, ScopeDefinition scope)
@@ -1298,10 +1313,27 @@ namespace RidiculousGaming.GarageBandIdle
             var site = $"bar '{bar.Id}'";
             ctx.SetSite(site);
 
-            // A null fill currency is legal: that bar fills from time alone. A
-            // named one gets the reach check every other currency operand gets.
-            if (bar.fillCurrency != null)
-                ctx.RequireOnChain(bar.fillCurrency, $"{site} fill currency");
+            // An empty consumes list is legal: that bar fills from time alone.
+            // Each entry's currency gets the reach check every other currency
+            // operand gets, and a currency named twice is one price authored in
+            // two places.
+            var drunk = new HashSet<Economy.CurrencyDefinition>();
+            for (var i = 0; i < bar.consumes.Count; i++)
+            {
+                var entry = bar.consumes[i];
+                if (entry == null)
+                {
+                    ctx.AddError(ValidationCheck.NullEntry, $"consumes[{i}] is null.");
+                    continue;
+                }
+                ctx.RequireOnChain(entry.currency, $"{site} consumes[{i}] currency");
+                if (entry.amount <= BigNumber.Zero)
+                    ctx.AddError(ValidationCheck.NumericRange,
+                        $"consumes[{i}] amount is {entry.amount} - a nonpositive per-unit consumption is a bar that drinks nothing or mints.");
+                if (entry.currency != null && !drunk.Add(entry.currency))
+                    ctx.AddError(ValidationCheck.DuplicateMember,
+                        $"consumes[{i}] names '{entry.currency.Id}' twice - one entry is one per-unit price, and two would be a cost split across lines.");
+            }
 
             if (bar.fillAmount <= BigNumber.Zero)
                 ctx.AddError(ValidationCheck.NumericRange,
@@ -1314,6 +1346,11 @@ namespace RidiculousGaming.GarageBandIdle
             // gate: fail-closed binds entry points that create value out of a
             // spend, and a bar's availability is a selection filter. So an
             // unauthored one is not reported at all.
+            //
+            // Both gates are asked by the idle offer per segment and by the
+            // claim again (section 9), so an IdleAccumulation leg is coherent
+            // authoring here - the same bracket a modifier's appliesWhen gets.
+            ctx.IdleCircumstancePossible = true;
             if (bar.availableWhen != null)
             {
                 ctx.SetSite($"{site} availableWhen");
@@ -1328,6 +1365,7 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.SetSite($"{site} repeatWhen");
                 bar.repeatWhen.Validate(ctx);
             }
+            ctx.IdleCircumstancePossible = false;
 
             ctx.SetSite(site);
 

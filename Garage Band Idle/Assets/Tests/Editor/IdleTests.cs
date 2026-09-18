@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle;
 using RidiculousGaming.GarageBandIdle.Economy;
@@ -89,6 +90,54 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private static IdleOfferLine Line(GameSession session, CurrencyDefinition currency) =>
             session.CurrentOffer.lines.Find(l => l.target == currency);
+
+        // What the window's bars drew from one currency, held beside the lines:
+        // a line is what the window PAID and a draw is what it drank, and the
+        // claim deposits the one and spends the other (section 9).
+        private static IdleOfferLine Draw(GameSession session, CurrencyDefinition currency) =>
+            session.CurrentOffer.draws.Find(d => d.target == currency);
+
+        // A bar declared at tier1 with a group of its own, so a test selects it
+        // without touching the covers' group (12.7). Authored against the
+        // definitions, so it runs inside the fixture's `author` step.
+        private static BarDefinition AddBar(TestTree tree, string id, double fillAmount, double fillRate,
+                                            Condition repeatWhen = null)
+        {
+            var bar = TestTree.MakeDefinition<BarDefinition>(id);
+            bar.fillAmount = fillAmount;
+            bar.fillRate = fillRate;
+            bar.repeatWhen = repeatWhen;
+            tree.Tier1Def.bars.Add(bar);
+            var group = TestTree.MakeDefinition<GroupDefinition>(id + "_group");
+            group.maxActive = 1;
+            group.members.Add(bar);
+            tree.Tier1Def.groups.Add(group);
+            return bar;
+        }
+
+        // The generator a completion fires: one yield entry into fans, which
+        // nothing else pays while the reveal is shut, so the line the offer
+        // carries is the payout alone.
+        private static GeneratorDefinition AddCrew(TestTree tree, double perUnit)
+        {
+            var crew = TestTree.MakeDefinition<GeneratorDefinition>("road_crew");
+            crew.availableWhen = new Always();
+            crew.costCurrency = tree.Cash;
+            crew.baseCost = 10;
+            crew.growth = 1.15;
+            crew.produces.Add(TestTree.Entry(tree.Fans, Stat.Yield, perUnit));
+            tree.Tier1Def.generators.Add(crew);
+            return crew;
+        }
+
+        // Selection as a FACT, the way the covers are selected elsewhere: an
+        // offer test is not a SetActiveMembers test.
+        private static void Select(TestTree tree, params BarDefinition[] bars)
+        {
+            foreach (var bar in bars)
+                tree.Tier1.activeMembers[bar.Id + "_group"] =
+                    new System.Collections.Generic.HashSet<string> { bar.Id };
+        }
 
         // ---- the stamps ----
 
@@ -563,6 +612,293 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             w.Session.SwitchChapter(w.Ch2, w.Tree.Now);   // settles ch1 out, enters ch2
             AssertClose(1000, w.Session.CurrentOffer.lines[0].amount);   // 2/s halved by the base alone
+        }
+
+        // ---- bars over the window (section 9) ----
+
+        // A bar has everything the computation needs: a fill rate over time,
+        // and a dependency the same computation resolves first. Nothing runs
+        // the tick over the window - the value is computed.
+        [Test]
+        public void A_time_fed_repeating_bar_pays_its_yield_once_per_completion()
+        {
+            BarDefinition drill = null;
+            var f = new Fixture(author: tree =>
+            {
+                var crew = AddCrew(tree, 5);
+                drill = AddBar(tree, "drill", 10, 1, repeatWhen: new Always());
+                drill.onComplete.Add(new FireGeneratorYield { generator = crew });
+            });
+            f.Tree.Tier1.generatorCounts["road_crew"] = 1;
+            Select(f.Tree, drill);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            // The idle base halves the FILL, so the bar completes half as often
+            // and each lump is whole: half the income, one rule.
+            var bar = f.Session.CurrentOffer.bars.Single();
+            Assert.AreSame(drill, bar.bar);
+            Assert.AreSame(f.Tree.Tier1, bar.home);
+            Assert.AreEqual(50, bar.completions, "0.5/s of fill over 1000s, at 10 a completion");
+            AssertClose(0, bar.progress, "nothing left over");
+            AssertClose(250, Line(f.Session, f.Tree.Fans).amount, "5 fans a completion, whole");
+        }
+
+        // What a bar consumes is a dependency, not a payment: the currency can
+        // give what it holds at the stamp plus what the window pays into it,
+        // less what earlier bars already drew. The window's inflow stays the
+        // line and the take is its own draw, so the claim deposits one and
+        // spends the other - and a draw is a spend, so the earned total moves
+        // by the inflow alone.
+        [Test]
+        public void A_consuming_bar_is_capped_by_the_balance_plus_the_inflow_and_draws_what_it_took()
+        {
+            BarDefinition drill = null;
+            var f = new Fixture(author: tree =>
+            {
+                drill = AddBar(tree, "drill", 1000000, 1);
+                drill.consumes.Add(new ConsumesEntry { currency = tree.Rehearsal, amount = 1 });
+            });
+            f.Tree.Tier1.flags.Add("rehearsal_revealed");       // the Jam's 0.5/s rate entry joins
+            f.Tree.Tier1.balances["rehearsal"] = 100;
+            Select(f.Tree, drill);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            // It wants 500 over the window; 100 banked plus the 250 the window
+            // pays in is the whole of what it can have.
+            AssertClose(350, f.Session.CurrentOffer.bars.Single().progress, "capped by what it drinks");
+            AssertClose(250, Line(f.Session, f.Tree.Rehearsal).amount, "the window's own inflow");
+            AssertClose(350, Draw(f.Session, f.Tree.Rehearsal).amount, "and what the bar drank of it");
+
+            f.Session.ClaimIdle(f.Tree.Now);
+
+            AssertClose(0, f.Tree.Tier1.balances["rehearsal"], "100 banked plus 250 in, less the 350 drunk");
+            AssertClose(250, f.Tree.Tier1.earnedTotals["rehearsal"], "a draw is a spend, so only the inflow was earned");
+            AssertClose(350, f.Tree.Tier1.barProgress["drill"]);
+        }
+
+        // The tick's settlement order, over the window: the first bar drinks and
+        // the second sees what is left, exactly as a live segment gives them.
+        [Test]
+        public void Two_bars_on_one_consumed_currency_take_in_settlement_order()
+        {
+            BarDefinition first = null;
+            BarDefinition second = null;
+            var f = new Fixture(author: tree =>
+            {
+                first = AddBar(tree, "first", 1000000, 1);
+                first.consumes.Add(new ConsumesEntry { currency = tree.Rehearsal, amount = 1 });
+                second = AddBar(tree, "second", 1000000, 1);
+                second.consumes.Add(new ConsumesEntry { currency = tree.Rehearsal, amount = 1 });
+            });
+            f.Tree.Tier1.flags.Add("rehearsal_revealed");
+            Select(f.Tree, first, second);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            var bars = f.Session.CurrentOffer.bars;
+            Assert.AreSame(first, bars[0].bar, "declaration order is the settlement order");
+            Assert.AreSame(second, bars[1].bar);
+            AssertClose(250, bars[0].progress, "the whole window's inflow");
+            AssertClose(0, bars[1].progress, "and the one behind it stalls");
+            AssertClose(250, Line(f.Session, f.Tree.Rehearsal).amount, "the inflow is the line either way");
+            AssertClose(250, Draw(f.Session, f.Tree.Rehearsal).amount, "the first bar drew all of it");
+        }
+
+        // Some bars pay VERY slowly, and time away goes toward their progress:
+        // a window that crosses nothing still moves the bar.
+        [Test]
+        public void A_slow_bar_carries_its_progress_with_no_completion()
+        {
+            BarDefinition slow = null;
+            var f = new Fixture(author: tree => slow = AddBar(tree, "slow", 1000000, 1));
+            Select(f.Tree, slow);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            var bar = f.Session.CurrentOffer.bars.Single();
+            AssertClose(500, bar.progress, "0.5/s of fill over the window");
+            Assert.AreEqual(0, bar.completions);
+
+            f.Session.ClaimIdle(f.Tree.Now);
+
+            AssertClose(500, f.Tree.Tier1.barProgress["slow"]);
+            Assert.IsFalse(f.Tree.Tier1.fillCounts.ContainsKey("slow"), "a bar that fills once counts nothing");
+        }
+
+        // The dialog exists for a balance the player is owed, and bar progress
+        // is a write, never a row (section 9). A window in which nothing paid
+        // and nothing was drunk - the amp unowned, a time-fed bar part-way
+        // through its cycle - has nothing to show, so the claim runs on entry:
+        // the progress and the stamp are written and no dialog is raised.
+        [Test]
+        public void A_window_that_changes_no_balance_settles_on_entry_with_no_dialog()
+        {
+            BarDefinition slow = null;
+            var f = new Fixture(author: tree => slow = AddBar(tree, "slow", 1000000, 1));
+            f.Tree.Tier1.generatorCounts["practice_amp"] = 0;
+            Select(f.Tree, slow);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            Assert.AreEqual(SessionPhase.Live, f.Session.Phase, "nothing to show, so nothing to claim");
+            Assert.IsNull(f.Session.CurrentOffer);
+            AssertClose(500, f.Tree.Tier1.barProgress["slow"], "the fill the window earned is written on entry");
+            Assert.AreEqual(f.Tree.Now, f.Tree.Ch1.lastActiveUtc, "and the window is settled");
+        }
+
+        // Progress is monotonic for a bar that fills once (12.7), so the fill
+        // past the threshold is never drawn - and never paid for.
+        [Test]
+        public void A_fill_once_bar_completes_once_and_stops_drinking()
+        {
+            BarDefinition once = null;
+            var f = new Fixture(author: tree =>
+            {
+                once = AddBar(tree, "once", 100, 1);
+                once.consumes.Add(new ConsumesEntry { currency = tree.Rehearsal, amount = 1 });
+            });
+            f.Tree.Tier1.balances["rehearsal"] = 10000;
+            Select(f.Tree, once);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            var bar = f.Session.CurrentOffer.bars.Single();
+            AssertClose(100, bar.progress, "full, not the 500 the window would have filled");
+            Assert.AreEqual(1, bar.completions);
+            Assert.IsNull(Line(f.Session, f.Tree.Rehearsal), "nothing paid rehearsal over the window");
+            AssertClose(100, Draw(f.Session, f.Tree.Rehearsal).amount, "and it drew only the fill it took");
+            Assert.IsTrue(bar.off, "complete, so it leaves its groups at the claim");
+
+            f.Session.ClaimIdle(f.Tree.Now);
+            AssertClose(9900, f.Tree.Tier1.balances["rehearsal"]);
+            Assert.IsFalse(f.Tree.Tier1.activeMembers["once_group"].Contains("once"), "the slot is free for the next choice");
+        }
+
+        // The manual team ran one cycle while away, so it comes back off: the
+        // claim removes it from every group listing it, and selecting it again
+        // is how the player runs it again (12.7).
+        [Test]
+        public void The_manual_team_completes_once_and_is_off_after_the_claim()
+        {
+            BarDefinition team = null;
+            var f = new Fixture(author: tree =>
+                team = AddBar(tree, "team", 10, 1, repeatWhen: new Not { condition = new Always() }));
+            Select(f.Tree, team);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            var bar = f.Session.CurrentOffer.bars.Single();
+            Assert.AreEqual(1, bar.completions, "one cycle, whatever the window would have filled");
+            AssertClose(0, bar.progress, "back to zero, the excess discarded");
+            Assert.IsTrue(bar.off);
+            Assert.IsTrue(f.Tree.Tier1.activeMembers["team_group"].Contains("team"), "nothing is written yet");
+
+            f.Session.ClaimIdle(f.Tree.Now);
+
+            Assert.IsFalse(f.Tree.Tier1.activeMembers["team_group"].Contains("team"));
+        }
+
+        // The claim writes what the computation carried and runs the completion
+        // list once per completion, with the payment actions skipped - those
+        // were the lines.
+        [Test]
+        public void The_claim_writes_the_counts_and_runs_a_non_payment_completion_once_per_crossing()
+        {
+            BarDefinition loop = null;
+            var f = new Fixture(author: tree =>
+            {
+                loop = AddBar(tree, "loop", 10, 1, repeatWhen: new Always());
+                loop.onComplete.Add(new AddCurrency { currencies = { tree.Fans }, amount = 1 });
+            });
+            Select(f.Tree, loop);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+            Assert.IsEmpty(f.Tree.Tier1.fillCounts, "an offer writes nothing");
+
+            f.Session.ClaimIdle(f.Tree.Now);
+
+            Assert.AreEqual(50, f.Tree.Tier1.fillCounts["loop"], "one per crossing");
+            AssertClose(0, f.Tree.Tier1.barProgress["loop"], "the residual the computation carried");
+            AssertClose(50, f.Tree.Tier1.balances["fans"], "the completion action ran once per crossing");
+        }
+
+        // Twice the Cash, never twice the cover: the ad doubles what the window
+        // PAID, and a bar's progress and the drink that bought it are neither.
+        [Test]
+        public void Double_it_doubles_the_lines_and_leaves_the_draws_and_the_bars_alone()
+        {
+            BarDefinition once = null;
+            var f = new Fixture(author: tree =>
+            {
+                once = AddBar(tree, "once", 100, 1);
+                once.consumes.Add(new ConsumesEntry { currency = tree.Rehearsal, amount = 1 });
+            });
+            f.Tree.Tier1.balances["rehearsal"] = 10000;
+            Select(f.Tree, once);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+            f.Session.DoubleAndClaimIdle(f.Tree.Now);
+
+            AssertClose(500, f.Tree.Tier1.balances["cash"], "the amp's 250, doubled");
+            AssertClose(9900, f.Tree.Tier1.balances["rehearsal"], "the take is not doubled");
+            AssertClose(100, f.Tree.Tier1.barProgress["once"], "and neither is the progress");
+        }
+
+        // A Pass owner's offer is computed as if the ad had been watched, and
+        // the same rule holds at computation: the lines, and nothing else.
+        [Test]
+        public void A_Pass_owners_offer_doubles_its_lines_and_leaves_the_draws_alone()
+        {
+            BarDefinition once = null;
+            var f = new Fixture(author: tree =>
+            {
+                once = AddBar(tree, "once", 100, 1);
+                once.consumes.Add(new ConsumesEntry { currency = tree.Rehearsal, amount = 1 });
+            });
+            f.Tree.Root.entitlements.Add("backstage_pass");
+            f.Tree.Tier1.balances["rehearsal"] = 10000;
+            Select(f.Tree, once);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+
+            AssertClose(500, Line(f.Session, f.Tree.Cash).amount, "0.25/s over the window, doubled");
+            AssertClose(100, Draw(f.Session, f.Tree.Rehearsal).amount, "the take stands as computed");
+            AssertClose(100, f.Session.CurrentOffer.bars.Single().progress);
+        }
+
+        // Nothing is written at computation, bars included: the unpaid window
+        // simply stays open, and re-entry recomputes it over the grown one.
+        [Test]
+        public void An_unclaimed_offer_recomputes_its_bars_with_no_progress_written()
+        {
+            BarDefinition slow = null;
+            var f = new Fixture(author: tree => slow = AddBar(tree, "slow", 1000000, 1));
+            Select(f.Tree, slow);
+            var stamp = f.Tree.Now.AddSeconds(-1000);
+            f.Tree.Ch1.lastActiveUtc = stamp;
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+            AssertClose(500, f.Session.CurrentOffer.bars.Single().progress);
+            Assert.IsEmpty(f.Tree.Tier1.barProgress, "the offer wrote nothing");
+
+            f.Session.SwitchChapter(null, f.Tree.Now);
+            Assert.AreEqual(stamp, f.Tree.Ch1.lastActiveUtc, "the unpaid window stays open");
+            Assert.IsEmpty(f.Tree.Tier1.barProgress);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now.AddSeconds(1000));
+            AssertClose(1000, f.Session.CurrentOffer.bars.Single().progress, "the grown window, from the same stamp");
         }
 
         // ---- the current-chapter root fact ----

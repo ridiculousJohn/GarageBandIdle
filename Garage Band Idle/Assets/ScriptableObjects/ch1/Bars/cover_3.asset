@@ -17,7 +17,12 @@ MonoBehaviour:
   displayName: The Crowd-Pleaser
   description: 'The big one, 600 Rehearsal to learn, and the best of the three: fans
     arrive 20% faster.'
-  fillCurrency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
+  consumes:
+  - currency: {fileID: 11400000, guid: 5f735fa714da6ba46aea8169b34c5f39, type: 2}
+    amount:
+      _value:
+        mantissa: 1
+        exponent: 0
   fillAmount:
     _value:
       mantissa: 6
@@ -32,14 +37,14 @@ MonoBehaviour:
   availableWhen:
     rid: -2
   onComplete:
-  - rid: 7579425512644149304
+  - rid: 7579425541347344444
   perFill: []
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425512644149304
+    - rid: 7579425541347344444
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 7730b93caaf305b48bad38f664d1aca2, type: 2}
