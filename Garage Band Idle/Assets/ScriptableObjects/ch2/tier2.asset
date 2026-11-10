@@ -100,7 +100,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e335570ec3271244989e7b7e829e4d28, type: 2}
   - {fileID: 11400000, guid: 41c13b81cfaa8924a98ff17cdce96258, type: 2}
   rung:
-    rid: 7579425558579642672
+    rid: 1688710450278564143
   events:
   - {fileID: 11400000, guid: e2265816330582e40becab1596191495, type: 2}
   - {fileID: 11400000, guid: 8920797fc0b077147b1af67d369b5ccf, type: 2}
@@ -108,39 +108,38 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 7579425558579642672
+    - rid: 1688710450278564143
       type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         label: Record an EP
         offerCondition:
-          rid: 7579425558579642673
+          rid: 1688710450278564144
         actions:
-        - rid: 7579425558579642674
-        - rid: 7579425558579642675
-    - rid: 7579425558579642673
+        - rid: 1688710450278564145
+        - rid: 1688710450278564146
+    - rid: 1688710450278564144
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 7579425558579642676
-        - rid: 7579425558579642677
-    - rid: 7579425558579642674
+        - rid: 1688710450278564147
+        - rid: 1688710450278564148
+    - rid: 1688710450278564145
       type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currencies:
-        - {fileID: 11400000, guid: 2daa62d1876fc7040b9e13b3e641ebc4, type: 2}
-        - {fileID: 11400000, guid: 36e81a4a255237449b1208248dc1a127, type: 2}
+        - {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
         amount:
           _value:
             mantissa: 0
             exponent: 0
         formula:
-          rid: 7579425558579642678
-    - rid: 7579425558579642675
+          rid: 1688710450278564149
+    - rid: 1688710450278564146
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000}
-    - rid: 7579425558579642676
+    - rid: 1688710450278564147
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 300 fans
@@ -149,13 +148,13 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 2
-    - rid: 7579425558579642677
+    - rid: 1688710450278564148
       type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Claim your Battle of the Bands reward first
         condition:
-          rid: 7579425558579642679
-    - rid: 7579425558579642678
+          rid: 1688710450278564150
+    - rid: 1688710450278564149
       type: {class: RootCurveFormula, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
@@ -165,7 +164,7 @@ MonoBehaviour:
             mantissa: 1
             exponent: 1
         exponent: 0.5
-    - rid: 7579425558579642679
+    - rid: 1688710450278564150
       type: {class: EventRewardPending, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

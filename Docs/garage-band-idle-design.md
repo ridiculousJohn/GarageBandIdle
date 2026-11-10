@@ -17,43 +17,45 @@ declares one or more **prestige tiers**; Chapter 1 declares one (the album). A l
 declare several, either independent of each other or laddered so that pressing a deeper tier resets
 the shallower ones with it (§12.3).
 
-**The album loop (inner).** Within the current chapter the player taps for Cash, buys gear and
-bandmates, grows Fans, and then releases an album. Releasing an album resets the run — Cash, gear,
-Fans, and the working Catalog — and awards **Records**. Each Record permanently increases global
-income, so the next run is faster. The player repeats this loop several times within a chapter.
-A chapter with more than one tier may bank a different currency at each: a shallow tier's payout can
-be an intermediate currency spent inside the chapter, while only the deepest banks Records. Which tier
+**The album loop (inner).** Within the current chapter the player grows the chapter's **base
+resource**, spends it on generators and upgrades, fills the chapter's **release meter**, and then
+releases an album (section 3 names the roles); in Chapter 1 that is tapping for Cash, buying gear and
+bandmates, and growing Fans. Releasing an album resets the run - the base resource, gear, the release
+meter, and the working Catalog - and pays a **prestige currency** (Chapter 1: Demo Tapes). The
+chapter's **income boost** reads a prestige currency's balance (Chapter 1's Demo Tapes), so the next
+run is faster. The player repeats this loop several times within a chapter.
+A chapter with more than one tier may bank a different prestige currency at each, and a shallow
+tier's can be one spent inside the chapter. Which tier
 carries the income multiplier, which carries the advancement gate, and which is purely archival is a
 per-chapter authoring decision.
 
-**The chapter loop (outer).** Records earned within the chapter unlock its capstone gig. Playing
-the capstone **cuts the album as part of the show if the run has earned it** — the run's Fans bank
-as Records only when the album's own gate is met; an unfinished run is discarded — and then
-completes the chapter. Completion facts (the completion flag; optionally, counters a chapter's
+**The chapter loop (outer).** The chapter's **capstone gate** reads a prestige currency (Chapter 1:
+Demo Tapes) and unlocks its capstone gig. Playing the capstone completes the chapter. Completion
+facts (the completion flag; optionally, counters a chapter's
 reward curves read, §8.1) live at the **root** and survive everything; the capstone's reset clears
 the entire chapter, which is what makes the
 chapter immediately replayable (§8.1). Advancement to the next chapter is forward-only and reacts to
 the completion flag.
 
-Records are the link between the loops: they raise income, and the Records a chapter's albums earn
-gate its capstone. Chapter advancement therefore depends on releasing albums, not on a single large
-Cash total.
+Prestige currencies are the link between the loops: the income boost reads one and the capstone
+gate reads one - the same currency or two, as the chapter authors it. Chapter advancement therefore
+depends on releasing albums, not on a single large total of the base resource.
 
 ```
-   INNER (minutes):  tap → Cash → gear → Fans → release album ─┐
-                      ▲  reset run, +Records, repeat faster     │
-                      └─────────────────────────────────────────┘
-                                    │ this chapter's Records reach the gate
-                                    ▼
-   OUTER (hours/days): capstone gig → next chapter (forward only)
+   INNER (minutes):  tap -> base resource -> generators -> release meter -> release album --+
+                      ^  reset run, +prestige currency, repeat faster                        |
+                      +----------------------------------------------------------------------+
+                                    | the prestige currency the capstone gate reads reaches it
+                                    v
+   OUTER (hours/days): capstone gig -> next chapter (forward only)
 ```
 
 ---
 
 ## 2. Chapters
 
-Eight chapters. Each has its own gear, currencies, mechanic, and capstone gig, and is gated by
-Records earned within the chapter.
+Eight chapters. Each has its own gear, currencies, mechanic, and capstone gig, and is gated by one
+of its own prestige currencies.
 
 | # | Chapter | New mechanic | Capstone gig |
 |---|---|---|---|
@@ -66,8 +68,10 @@ Records earned within the chapter.
 | 7 | Radio / Streaming | Royalty catalog scaling; large idle income | First charting single / radio play |
 | 8 | Arenas / Stadiums | World tours, endgame scaling | Sell out a stadium (Hall of Fame) |
 
-Every chapter uses the same rhythm — tap, buy, grow Fans, release an album — with new gear, a new
-mechanic, and a higher Records gate.
+Every chapter uses the same rhythm - grow the base resource, buy, fill the release meter, release an
+album - with new gear, a new mechanic, and a capstone gate on one of its own prestige currencies. The names
+are the chapter's own (section 3): Chapter 1's are Cash, Fans and Demo Tapes, Chapter 2's Cash, Fans
+and EPs.
 
 **Chapter anatomy.** A chapter is a **scope** (§12.3): a state container holding the currencies,
 flags, producers, generators, upgrades, bars, and triggers declared to it, plus its tier scopes. The chapter level owns
@@ -125,8 +129,29 @@ Currency definitions are global content; **ids are unique across the whole tree*
 in two scopes is refused at load. Resetting a scope clears the balances it holds and never reaches a
 balance held further out.
 
+**Roles.** A chapter names its own resources and the engine fixes only their roles. Every chapter
+declares at least these three; it may declare more layers (several tiers, intermediate currencies,
+section 1), never fewer:
+- **Base resource** - what the chapter's generators produce and its purchases spend. It carries
+  root's `income` tag, which is how the Roadie boosts (section 8) reach it.
+- **Release meter** - what the release's payout formula reads. It never carries the `income` tag, so
+  no Roadie boost reaches it; that is the wall-clock floor of 8.1.
+- **Prestige currency** - what a release pays. It is declared outside the tier whose release pays
+  it, so that release's reset keeps it (lifetime is placement); in a single-tier chapter that is the
+  chapter scope, and the capstone's reset of the chapter zeroes it. A chapter with several tiers may
+  have several prestige currencies.
+
+Two jobs are done by prestige currencies, and which currency does each is the chapter's authoring:
+the **income boost** (a permanent modifier the chapter declares reads a currency's balance to
+multiply the chapter's income, section 5) and the **capstone gate** (the capstone's offer condition
+reads a currency, section 6). One currency may do both - Chapter 1's Demo Tapes and Chapter 2's EPs
+do - or two different currencies may. Nothing in the engine ties the two: each is an ordinary
+authored reference (a formula's currency, a condition's currency).
+
+Chapter 1's are Cash, Fans and Demo Tapes; Chapter 2's are Cash, Fans and EPs.
+
 **Run-scoped (Chapter 1 tier):**
-- **Cash** — earned by tapping and generators; spent on gear and upgrades.
+- **Cash** - the base resource: earned by tapping and generators; spent on gear and upgrades.
 - **Gear & bandmates** — generators bought with Cash, each contributing to one or more currencies'
   rates (§12.2). A bandmate is simply a generator with two outputs — cash and fans — plus a
   `bandmate` tag; there is no flag any system branches on.
@@ -134,25 +159,28 @@ balance held further out.
   consumed by learn-songs bars (§6). An ordinary currency; later chapters may define their own fill
   currencies.
 - **Learn-songs bars** — generic fillable bars that pace a chapter (§6, §12.7).
-- **Fans** — the run's performance meter; determines the album's Records payout on release. Accrue
+- **Fans** - the release meter: determines the album's Demo Tapes payout on release. Accrue
   passively once revealed; the fans rate composes a base contribution plus one from each bandmate,
   so it is a function of band size and time — never of Cash or income.
-- **Catalog (Ch. 6+)** — songs written during the run; a global income multiplier that converts to
-  Records on album release (§7).
+- **Catalog (Ch. 6+)** - songs written during the run; a global income multiplier and the main input
+  to the chapter's release payout (section 7).
+
+**Chapter-scoped (Chapter 1):**
+- **Demo Tapes** - the prestige currency, paid by the album release (section 5). Each Demo Tape
+  raises Chapter 1's income; the capstone gates on them. Accumulated, never spent.
 
 **Permanent (root):**
-- **Records** — each Record increases global income; the Records earned within a chapter (mirrored
-  into a chapter-declared counter, §5) gate its capstone. Accumulated, never spent.
-- **Roadies** — crew; a global multiplier allocated across unlocked chapters (§8).
+- **Roadies** - crew; a global multiplier allocated across unlocked chapters (section 8), and the only
+  currency that crosses chapters.
 - **Discography** — a list of the player's best named songs (§7). Display only.
 
 **Income.** Every produced number is computed on read as *the sum of its contributions times the
-product of the multipliers targeting it* (§12.2). The effective multiplier stack on Cash:
+product of the multipliers targeting it* (12.2). The effective multiplier stack on the base resource:
 
 ```
 income = Σ(generator base × owned × per-generator effects)
          × catalogBoost      (run-scoped fact, §7)
-         × recordsMultiplier (root fact, §5)
+         x prestigeMultiplier (chapter fact, 5)
          × roadieTotalBoost  (root fact, §8)
          × roadieChapterBoost (the played chapter's own stationing, §8.2)
 ```
@@ -203,31 +231,36 @@ Mechanically a release is a **rung**: `{offerCondition, List<Action>}` declared 
 ```
 tier1.release:
   offerCondition: All[ CurrencyAtLeast(fans, 50), BarsCompleted(1) ]
-  rungActions:    [ AddCurrency([records, ch1_records], PayoutFormula),  // one evaluation, both targets
+  rungActions:    [ AddCurrency([demo_tapes], PayoutFormula),
                     ResetScope(tier1) ]
 ```
 
-The payout is an ordinary `AddCurrency` action whose amount comes from a `PayoutFormula` (§12.5) —
+The payout is an ordinary `AddCurrency` action whose amount comes from a `PayoutFormula` (12.5) -
 there is no payout field and no distinguished award kind. An `AddCurrency` may name several targets
-paid from a single evaluation — the album pays root `records` and the chapter's gate counter
-`ch1_records` identical amounts that can never drift. **Order is authoring**: the payout action
+paid from a single evaluation, identical amounts that can never drift; Chapter 1's release names one.
+**Order is authoring**: the payout action
 precedes the `ResetScope`, so the formula reads the Fans the reset is about to destroy. Actions
 placed *after* a reset land in the fresh state, which is how a head-start reward ("start the next
 run with 500 Cash") is authored.
 
 - **Resets:** Cash, gear, learn-songs bars, Fans, working Catalog — everything the tier declares.
-- **Keeps:** Records, Roadies, Discography — declared at root, unreachable by the tier's reset.
-- **Awards Records** based on run performance:
+- **Keeps:** the prestige currency it pays, declared outside the tier (Ch. 1: on the chapter), and
+  Roadies and Discography, declared at root - all unreachable by the tier's reset.
+- **Awards the prestige currency** based on run performance:
   ```
-  early chapters:  recordsEarned = f(fansThisRun)        // Ch. 1: floor((fans/5)^0.5)
-  Ch. 6+:          recordsEarned = f(fansThisRun, totalCatalogQuality)
+  early chapters:  earned = f(releaseMeterThisRun)        // Ch. 1: floor((fans/5)^0.5) Demo Tapes
+  Ch. 6+:          earned = f(releaseMeterThisRun, totalCatalogQuality)
   ```
-- **Each Record** grants about `+2%` permanent global income (additive within the Records term).
-- **Records earned this chapter** unlock its capstone at a set threshold (§11). The counter is a
-  chapter-declared currency, so the capstone's own reset zeroes it — every replay faces the same
-  gate (§8.1).
+- **Each unit** raises the chapter's income where the chapter's income boost reads this currency,
+  as Chapter 1's does: a permanent modifier the chapter declares and lists in
+  its `permanentModifiers` reads the balance (Ch. 1: `demo_tapes_income`, `LinearOnBalance` at +2%
+  per Demo Tape, additive within the term, on the `income` tag at `stat: rate` and `stat: yield`).
+- **The prestige currency** unlocks the chapter's capstone at a set threshold where the capstone
+  gate reads it, as Chapter 1's does (section 11). In a single-tier chapter it is declared on the
+  chapter, so the capstone's own reset zeroes it - every replay faces the same gate from zero (8.1).
 
-An early album cycle takes seconds to minutes; cycles get faster as Records accumulate.
+An early album cycle takes seconds to minutes; cycles get faster as the currency the income boost
+reads accumulates.
 
 The release button is **pressable** exactly while its offer condition holds — its inputs are run
 values the release itself resets, so the offer disarms at every release and re-arms on the re-climb.
@@ -259,18 +292,18 @@ Moment-to-moment play:
   `FireProducer(tap_producer)`; every payout, gate, and base number is data on the producer. "Tap"
   is a UI gesture; the economy only knows a producer was fired.
 - **Generators** — exponential cost, `cost = base × growth^owned`, growth ~1.15; 4–6 themed per
-  chapter. Because runs reset, a chapter's Cash stays in the thousands–millions range; cross-chapter
-  growth comes from Records and Roadies.
+  chapter. Because runs reset, a chapter's base resource stays in a bounded range (Ch. 1's Cash in
+  the thousands-millions); growth within a chapter comes from its income boost, and across
+  chapters from Roadies.
 - **Upgrades (§4).**
 - **Learn-songs bars** — see below.
-- **Fans** — passive accrual, band-size driven (§3), tuned loosely relative to Cash so income alone
-  does not determine the album payout.
+- **Fans** (Ch. 1's release meter) - passive accrual, band-size driven (section 3), tuned loosely
+  relative to Cash so income alone does not determine the album payout.
 - **Capstone gig** — the chapter's rung (§12.5), declared on the chapter:
   ```
   chapter.capstone:
-    offerCondition: CurrencyAtLeast(chapterN_records, gate)  // same gate, first clear and every replay
-    rungActions:    [ ExecuteRung(tier1),          // cut the album if its own gate holds; else no-op
-                      AddCurrency(roadies, RewardFormula),    // Ch. 1: the constant 1 (§8.1)
+    offerCondition: CurrencyAtLeast(chapterN_gate_currency, gate)  // Ch. 1: demo_tapes, 30; every clear
+    rungActions:    [ AddCurrency(roadies, RewardFormula),    // Ch. 1: the constant 1 (8.1)
                       SetFlag(chapterN_complete),   // declared at ROOT
                       ResetScope(chapterN) ]        // the ENTIRE chapter, downward-closed
   ```
@@ -283,8 +316,8 @@ Moment-to-moment play:
 ### 6.1 Events
 
 An event is a self-contained challenge inside a chapter that the player enters by choice. Events do
-not gate chapter advancement — the gate is always Records — and their rewards are lateral (never
-Records), so no event is ever a hard requirement.
+not gate chapter advancement - the capstone gate always reads a prestige currency - and their rewards
+are lateral (never the prestige currency), so no event is ever a hard requirement.
 
 How essential an event feels is a **per-event tuning decision set by the size of its reward**: a
 small reward is a skippable bonus; a large one makes skipping a much slower grind. The chapter is
@@ -364,10 +397,12 @@ IS the host and the outward walk recovers it, exactly as for every other content
   bare `ResetScope(tier)` destroys it, and an empty `onEnd` leaves the leavings
   for the next reset to claim. And an event **dies with its scope**: any reset that reaches the host
   clears the record - a mid-event release, a capstone resetting the chapter from above.
-- **Reward constraint:** never Records or any advancement currency - an event's payout is lateral.
+- **Reward constraint:** never the chapter's prestige currency or any advancement currency - an
+  event's payout is lateral.
   Authoring, not a validated rule: nothing in the model marks a currency as advancement, so a check
   would have to invent that vocabulary, and one that followed rung references would flag the
-  legitimate case - an `onEnd` running `RestartScope` banks Records through the tier's own gate.
+  legitimate case - an `onEnd` running `RestartScope` banks the prestige currency through the tier's
+  own gate.
 - **Levels:** a harder rerun of an event is simply **another event** — `silent_stage_2` is its own
   definition whose `availableWhen` gates on `silent_stage_1_done`; there is no level machinery, no
   selection contract, and `StartEvent(event)` is always fully specified. The rising requirement
@@ -391,9 +426,8 @@ Songwriting unlocks at the Studio chapter.
   on read (§12.6) — it exists from Chapter 1 and contributes nothing until songs exist.
 - The multiplier is driven by song **quality**, not count, so songwriting is about improving songs.
   It applies to all income and feeds royalty/idle income.
-- **On album release,** total catalog quality is the main input to the Records payout (§5), and the
-  working Catalog resets with the run. Routing catalog value into Records keeps permanent progression
-  consolidated in one currency.
+- **On album release,** total catalog quality is the main input to that chapter's release payout
+  (section 5), and the working Catalog resets with the run.
 - **Discography** is a persistent root-level list of the player's best songs, kept for display.
   Songs reach it by **promotion: an action in the release rung, ordered before the `ResetScope`**,
   reading the dying run's Catalog and writing the chosen songs to the root list (`AddSong`). The
@@ -402,7 +436,8 @@ Songwriting unlocks at the Studio chapter.
   release).
 
 The three song systems are separate: learn-songs bars pace early chapters (run-scoped); Catalog is
-the studio-era multiplier (run-scoped, converts to Records); Discography is a persistent display list.
+the studio-era multiplier (run-scoped, feeds the release payout); Discography is a persistent display
+list.
 
 ---
 
@@ -420,18 +455,20 @@ Replaying cleared chapters is the main way to earn Roadies through play.
 The capstone's `ResetScope(chapter)` leaves the chapter freshly reset in place, so **replaying a
 chapter is just playing it again** — same container, same content, progression re-revealed as the
 player re-walks it. There are no separate replay instances and no frontier/replay distinction; the
-chapter scales with every root multiplier (Records, Roadies, Encore) because that is simply what
+chapter scales with every root multiplier (Roadies, Encore) because that is simply what
 resolution reaches, exactly as it did the first time when those totals happened to be zero.
 
 **One gate serves every clear.** The capstone's offer condition is
-`CurrencyAtLeast(chapterN_records, gate)` — a counter currency declared at the chapter level and
-fed by the album payout (§5). Because the capstone's own reset clears the counter with the rest of
-the chapter, every replay starts at zero against the same goal: no first-clear/replay switch, no
-clear count, no rising requirement. Replays get **faster, not harder** — banked Records and
-stationed Roadies speed the climb to the same gate — which is what makes replaying worth doing at
-all. Farming is throttled by **time**: the fan rate is band-size-and-time driven, deliberately not
-income-multiplied (§3), so a clear keeps a wall-clock floor no multiplier stack removes, and the
-concave roadie-spread multiplier (§8.2) favors rotating chapters over parking on one.
+`CurrencyAtLeast(chapterN_gate_currency, gate)` - a prestige currency declared at the chapter level
+and fed by a release payout (section 5). Because the capstone's own reset clears it with the
+rest of the chapter, every replay starts at zero against the same goal: no first-clear/replay switch,
+no clear count, no rising requirement. Replays get **faster, not harder** - a replay starts the
+gate's currency from zero as a first clear does, and what it carries in is Roadies, which speed the climb to
+the same gate - which is what makes replaying worth doing at all. Farming is throttled by **time**:
+the release meter never carries the `income` tag, so its rate is deliberately not income-multiplied
+(section 3; Ch. 1's Fans are band-size-and-time driven), a clear keeps a wall-clock floor no
+multiplier stack removes, and the concave roadie-spread multiplier (8.2) favors rotating chapters
+over parking on one.
 
 **Rewards and goals are formulas over stored facts.** The Roadie payout is an ordinary
 `AddCurrency(roadies, PayoutFormula)`; Chapter 1's formula is the constant 1 and its goal is the
@@ -460,10 +497,11 @@ inside the global product and again locally, which is what makes stationing Road
 chapter being worked (8 Roadies stacked: ~1.96x there, 1.40x everywhere else; spread 2/2/2/2: 1.46x
 globally and ~1.61x on the chapter being worked). Allocation balances spreading for the total
 against concentrating to sprint an active replay - both are real strategies. **Both
-factors are ordinary effects whose target is authored data** — a tag (Ch. 1: `income`, carried by Cash
-and declared at root) — so
+factors are ordinary effects whose target is authored data** - a tag (`income`, declared at root and
+carried by each chapter's base resource; Ch. 1: Cash) - so
 *what* Roadies help with is a per-chapter design decision, never a code decision. Both carry
-`stat: rate` AND `stat: yield`, the pair `records_income` carries: Roadies scale every production
+`stat: rate` AND `stat: yield`, the pair a chapter's prestige modifier carries (Ch. 1:
+`demo_tapes_income`): Roadies scale every production
 of an income currency, a tap's yield and a gig's fired lump included. (Ctrl C's completion tokens
 boost the press: at a 2.5x token boost the chapter 1 copy/paste pays 30 Lines where the unboosted
 press pays 12 - John, 2026-09-18.) They are
@@ -471,10 +509,11 @@ composed at different LEVELS, though. `roadie_total` is a currency-total effect 
 product everywhere, so the currency is where it belongs. `roadie_active` targets the production
 SOURCES (`{target: production, currencyId: income, stat: rate}`), because which chapter a number is
 produced in is a property of its source; a currency total has already summed across sources and can
-no longer name one chapter. **The fan rate must never carry a roadie-targeted tag**: the wall-clock
-throttle of §8.1 stands on Fans being unbuffable by Roadies, and the `currencyId: income` narrowing
-is what enforces it even on a bandmate that pays Cash and Fans from one definition. **Reallocation is present state** (decided 2026-09-10): a dormant chapter's idle claim is computed at
-switch-in over the allocation standing then, the same stance Records and Encore take - what was
+no longer name one chapter. **The release meter must never carry a roadie-targeted tag**: the
+wall-clock throttle of 8.1 stands on the release meter (Ch. 1 and 2: Fans) being unbuffable by
+Roadies, and the `currencyId: income` narrowing is what enforces it even on a bandmate that pays
+Cash and Fans from one definition. **Reallocation is present state** (decided 2026-09-10): a dormant chapter's idle claim is computed at
+switch-in over the allocation standing then, the same stance Encore takes - what was
 stationed while the chapter was dormant is not reconstructed. An offer already computed keeps its
 lines. Ctrl C offers no precedent; its Completion Tokens only "increase generator output".
 
@@ -507,8 +546,8 @@ of its currencies, `idleRate x game_speed x paid time` - the paid window is the 
 the tick segments (12.9), each segment paying its length times the rate and speed live in it;
 `idleRate` and `game_speed` are the ordinary gathers run
 under the idle-accumulation context (§12.5), so the ×0.5 base joins and live-only buffs excuse
-themselves - from *current* state, so Records earned
-elsewhere while away correctly boost the payout - into a **transient offer** (the lines, holding
+themselves - from *current* state, so a Roadie reallocated
+while away is what the payout reads - into a **transient offer** (the lines, holding
 what settlement pays, and the window's end; session-held, dead with the process), presented as the **idle
 dialog**: the amount earned, plus "Double it" (a rewarded
 ad that doubles *this offer*) and a Backstage Pass purchase button (buying it HERE doubles this
@@ -649,13 +688,16 @@ and persist.
 
 ## 11. Pacing & tuning
 
-Chapter pacing is set primarily by the per-chapter Records gate, which determines how many album
-cycles a chapter takes and therefore the overall game length. Records gates are the first tuning
-lever; generator curves are adjusted only after.
+Chapter pacing is set primarily by each chapter's capstone gate, which
+determines how many album cycles a chapter takes and therefore the overall game length. Capstone
+gates are the first tuning lever; generator curves are adjusted only after. A replay starts with the
+gate's currency at zero, so how much faster it runs than a first clear is set by Roadies.
 
 Two structural properties keep pacing stable against players with strong income multipliers:
-- Chapters gate on Records, not Cash. Multipliers raise Cash; advancement requires album releases.
-- Fan rate is tuned loosely relative to Cash, so income alone does not shortcut the album payout.
+- Chapters gate on a prestige currency, not the base resource. Multipliers raise the base
+  resource; advancement requires album releases.
+- The release meter's rate is tuned loosely relative to the base resource and never carries the
+  `income` tag, so income alone does not shortcut the album payout.
 
 Tuning must hold at both ends: an unbuffed player's pace is doable and never feels impossible, and
 a permanent-Encore player (2x game speed, with `maxGameSpeed` 4 as headroom above it, plus Roadie and
@@ -671,14 +713,16 @@ fast a pacing bar or a fan meter fills. The wall-clock floor §8.1 relies on is 
 not the size of what it pays, so buffing a payout keeps the floor while buffing a rate removes it and
 lets a late replay collapse to seconds. A per-chapter payout buff is also the safer shape than a
 global one: it is chapter-local, so nothing leaks across chapters and no narrowing rule is needed to
-keep it out of the fan rate. Chapter 2's gigs are the first instance: Records and Buzz multiply what a
+keep it out of the fan rate. Chapter 2's gigs are the first instance: EPs and Buzz multiply what a
 completed gig pays (the generator yield its bar fires), and nothing multiplies a gig's cycle.
 
 **Per-chapter economy template (to fill in):**
-- 4–6 themed generators (exponential cost, growth ~1.15, Cash in the thousands–millions).
-- A Fan target that makes an album cycle meaningful (seconds early, minutes later).
-- A Records payout formula (Fans early; Fans × catalog quality from Ch. 6).
-- A capstone gate on Records earned within the chapter.
+- A base resource, a release meter and a prestige currency, named for the chapter (section 3).
+- 4-6 themed generators producing the base resource (exponential cost, growth ~1.15, Ch. 1's Cash in
+  the thousands-millions).
+- A release meter target that makes an album cycle meaningful (seconds early, minutes later).
+- A prestige payout formula over the release meter (times catalog quality from Ch. 6).
+- An income boost and a capstone gate, each reading a prestige currency - one currency or two.
 - One new mechanic.
 
 ---
@@ -863,7 +907,8 @@ walk. An effect applies at the level of what
 it matches: on a producer or generator (by id or tag) it multiplies **inside the sum** (that
 source's term); on a currency (by id or tag) it multiplies **the total** — one rule, no double
 counting. "Global income" is this tag mechanism, not a wildcard: root declares `income`, income
-currencies carry it (Ch. 1: cash), the Records and Roadie modifiers of §3/§8 filter on it, and a
+currencies carry it (each chapter's base resource; Ch. 1: cash), the prestige and Roadie modifiers of
+3/5/8 filter on it, and a
 later income stream joins the stack by carrying the tag.
 
 **Consumer-owned stats:** `game_speed` (§9) — a stat in the same open vocabulary as `rate` and
@@ -1039,7 +1084,7 @@ currency once when the node is built, written beside the balance and the earned 
 deposit, read by the payout selector (§12.5), carried by the save beside the payload, and cleared by
 no reset. A reset installs a fresh payload of the same type and leaves both standing.
 
-The tree: **root** (Records, Roadies, entitlements, completion flags, Discography, any counters a
+The tree: **root** (Roadies, entitlements, completion flags, Discography, any counters a
 chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique along a CHAIN** — a read walks
 outward and stops at the first scope that declares what it names, so two sibling chapters may each
 declare their own `cash`; what must not repeat is an id visible from one scope. Scope ids stay
@@ -1108,8 +1153,8 @@ Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, 
 `BuffActive`, `HasEntitlement`, `BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `Always`, `All`, `Any`, `Not` (the story gate
 `chapterN_complete && !storyN_seen` is
 `All[FlagSet, Not[FlagSet]]`), plus a formula-threshold kind (threshold computed from state — e.g.
-a scaling goal or reward curve reading a per-clear counter, §8.1). Records need no special kind:
-they are a currency.
+a scaling goal or reward curve reading a per-clear counter, 8.1). A prestige currency needs no
+special kind: it is a currency.
 
 `BuffActive` names a modifier as `UpgradePurchased` names an upgrade and reads the TIMER that
 modifier declares (`ModifierDefinition.timer`) outward from the acting scope, true while the
@@ -1143,7 +1188,8 @@ met is a per-leg judgment - which is what lets the load pass compute every gate'
 in its declaring scope; an event in its host scope; a `produces` entry in its producer's declaring
 scope; a UI section or module in its authored `scopeId` (§12.11). Nested invocations **rebase** the
 context to the owning object's scope — `ExecuteRung` runs the referenced rung in *that rung's*
-declaring scope, which is how the capstone's rung legally reads tier-owned Fans. Reads walk outward
+declaring scope, which is how a chapter's rung invoking a tier's release legally reads the tier-owned
+release meter. Reads walk outward
 from there (§12.12).
 
 Authoring guidance: gate persistent UI on monotonic facts (flags, earned totals), never on spendable
@@ -1231,8 +1277,9 @@ Root's apply to everything; a chapter's apply exactly to its own chain, which is
 chapter-unique-buff case. Permanent membership contributes an implicit application count of 1,
 MERGED with the scope's stored stacks for the same modifier and resolved through the modifier's own
 stacking kind — `Replace` means permanent-plus-granted is still one application, so the two paths
-can never double-apply outside the vocabulary. The Records curve and the Roadie boosts of §3/§8 are
-this list's first content, as formula-shaped effects (§12.6) inside root-declared modifiers.
+can never double-apply outside the vocabulary. The Roadie boosts of 8, inside root-declared
+modifiers, and each chapter's prestige modifier of 5, inside a modifier its chapter declares, are
+this list's first content, as formula-shaped effects (12.6).
 
 **A rung** is `{offerCondition, List<Action>}` — the one shape behind the album release (declared
 on its tier) and the capstone (declared on the chapter): a rung of the prestige ladder. Event
@@ -1305,7 +1352,7 @@ named list off it. Across the tree the sources are:
 | Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `bars` |
-| Permanent modifiers | none - the `permanentModifiers` usage list is authored, not stored (§12.5) | the modifier's effects at an implicit application count of 1, merged with granted stacks; the career factors of §3/§7/§8 (Records balance, Roadie allocation) live here as formula-shaped effects |
+| Permanent modifiers | none - the `permanentModifiers` usage list is authored, not stored (12.5) | the modifier's effects at an implicit application count of 1, merged with granted stacks; the factors of 3/5/7/8 (a prestige currency's balance, the Roadie allocation) live here as formula-shaped effects |
 
 **An effect's factor is a constant or a formula**: the authored `multiplier` when no formula is
 present, a `MultiplierFormula` computed on read when one is - every effect site (upgrades, granted
@@ -1631,7 +1678,7 @@ pending dialogs never accumulate across chapters.
 ### 12.10 Save
 
 Serialize the ScopeState tree, nested as the scopes are — **and nothing else**: every root fact
-(Records, Roadies, the allocation, entitlements, timed buffs, the current chapter, Discography) is
+(Roadies, the allocation, entitlements, timed buffs, the current chapter, Discography) is
 a field of the root
 scope's state (§12.3), so principle 2 is literally the save format. JSON + checksum, validated on
 load (ids resolve; unknown ids from removed content are dropped with a warning). No grants, no
@@ -1660,7 +1707,7 @@ a widget through the registry rather than a content asset. A section's `scope` i
 scope** - the context its conditions read from, which is how a chapter-owned section legally gates
 on a tier-declared flag. A module's `scope` is always concrete: the JSON may omit it, and the
 importer normalizes to the home scope of the bound content **when that home lies within the
-chapter's subtree, else to the chapter itself** (root-owned content like Records is readable from
+chapter's subtree, else to the chapter itself** (root-owned content like Roadies is readable from
 any context - root is on every chain), so the runtime computes no default. Validated at load: the
 chapter itself or one of its descendants. A section's and a module's scope is LINKED at the chapter
 node when the tree is built (12.3), keyed by the `SectionDefinition` or `ModuleDefinition`, and
@@ -2078,16 +2125,18 @@ Content/                 // the authored JSON the importer reads
 - **Structure:** nested prestige on a tree of **state containers** — root / chapters / tiers (tiers
   may nest for ladders, sibling for independence). Lifetime is placement; ids unique per chain;
   everything derived is computed on read from stored facts.
-- **Records:** the single permanent progression currency; each Record raises global income ~+2%; the
-  capstone gates on Records earned within its chapter — a chapter-declared counter fed by the album
-  payout and zeroed by the capstone's own reset.
+- **Prestige:** a chapter names its base resource, release meter and prestige currency; a prestige
+  currency is paid by a release and declared outside that release's tier. The income boost (a chapter
+  permanent modifier, +2% per unit in Ch. 1 and 2) and the capstone gate each read a prestige
+  currency the chapter authors - the same one in Ch. 1 and 2, declared on the chapter and zeroed by
+  the capstone's own reset. Roadies are the only currency that crosses chapters.
 - **Rungs:** the album release and the capstone are `{offerCondition, List<Action>}`; events are
   lifecycle commands executing authored lists (§6.1). Payout-before-clear is list order; `ResetScope` is a bare
   downward-closed clear; every invocation — `TryRung` from the UI, `ExecuteRung` from another
   rung — is fail-closed against the rung's own gate (an unmet gate no-ops; unfinished runs
   discard, never bank). The capstone resets the **entire chapter**; completion facts live at root; replays are the same
-  chapter played again against the same gate — Records earned within the chapter, zeroed by the
-  capstone's own reset; rewards and goals are formulas over stored facts (§8.1).
+  chapter played again against the same gate - a prestige currency declared on the chapter, zeroed
+  by the capstone's own reset; rewards and goals are formulas over stored facts (§8.1).
 - **Economy:** producers are named definitions owning base contributions —
   `produces: [{currencyId, stat, value, condition?}]`, stats (`rate`, `yield`) named and extensible;
   generators contribute the same entry shape, scaled by owned count; **Effect** =
@@ -2106,7 +2155,7 @@ Content/                 // the authored JSON the importer reads
   dismissal is the one ending - record removed first, then `rewards` if the goal was reached, then
   `onEnd` either way, which is where the reset lives; any reset reaching the host kills it; expired
   records persist, occupying the host and still handicapping, until dismissed; rewards lateral,
-  never Records.
+  never the prestige currency.
 - **Triggers:** `{condition, actions}` per scope — the one sanctioned condition-observer; one-shot
   per scope-life (`firedTriggers` latch, a reset re-arms), swept after ticks and command
   transactions in live scopes only, never during idle; repeating behavior is a producer or a bar,

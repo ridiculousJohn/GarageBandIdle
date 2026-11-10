@@ -44,7 +44,7 @@
   ],
   "currencies": [
     {
-      "id": "ch2_records",
+      "id": "eps",
       "displayName": "EPs"
     }
   ],
@@ -86,25 +86,45 @@
           "multiplier": 0.5
         }
       ]
+    },
+    {
+      "id": "eps_income",
+      "effects": [
+        {
+          "target": "income",
+          "stat": "rate",
+          "formula": {
+            "type": "LinearOnBalance",
+            "currency": "eps",
+            "coefficient": 0.02
+          }
+        },
+        {
+          "target": "income",
+          "stat": "yield",
+          "formula": {
+            "type": "LinearOnBalance",
+            "currency": "eps",
+            "coefficient": 0.02
+          }
+        }
+      ]
     }
   ],
   "permanentModifiers": [
     "bulk_booking_switch",
-    "favors_discount"
+    "favors_discount",
+    "eps_income"
   ],
   "rung": {
     "label": "Win the Talent Show",
     "offerCondition": {
       "type": "CurrencyAtLeast",
-      "currency": "ch2_records",
+      "currency": "eps",
       "threshold": 120,
       "uiText": "Record 120 EPs"
     },
     "actions": [
-      {
-        "type": "ExecuteRung",
-        "tier": "tier2"
-      },
       {
         "type": "AddCurrency",
         "currencies": [
@@ -171,19 +191,10 @@
         },
         {
           "prefabId": "currency_line",
-          "contentId": "records",
+          "contentId": "eps",
           "visibleWhen": {
             "type": "CurrencyAtLeast",
-            "currency": "records",
-            "threshold": 1
-          }
-        },
-        {
-          "prefabId": "currency_line",
-          "contentId": "ch2_records",
-          "visibleWhen": {
-            "type": "CurrencyAtLeast",
-            "currency": "ch2_records",
+            "currency": "eps",
             "threshold": 1
           }
         },
@@ -476,7 +487,7 @@
             "conditions": [
               {
                 "type": "CurrencyAtLeast",
-                "currency": "ch2_records",
+                "currency": "eps",
                 "threshold": 8
               },
               {
@@ -497,7 +508,7 @@
             "conditions": [
               {
                 "type": "CurrencyAtLeast",
-                "currency": "ch2_records",
+                "currency": "eps",
                 "threshold": 25
               },
               {
@@ -514,7 +525,7 @@
     },
     {
       "title": "The Release",
-      "description": "Record an EP once you have 300 fans. It banks Records and EPs and starts the run over with the calendar empty.",
+      "description": "Record an EP once you have 300 fans. It banks EPs and starts the run over with the calendar empty.",
       "visibleWhen": {
         "type": "FlagSet",
         "flagId": "album"
@@ -532,7 +543,7 @@
       "description": "Three timed rounds, one at a time. The run starts over for each one, and clearing a round doubles what every gig pays for the rest of the chapter.",
       "visibleWhen": {
         "type": "CurrencyAtLeast",
-        "currency": "ch2_records",
+        "currency": "eps",
         "threshold": 5
       },
       "scopeId": "tier2",
@@ -556,7 +567,7 @@
       "description": "The night that ends the chapter. Record 120 EPs to get on the bill, and you walk away with another Roadie.",
       "visibleWhen": {
         "type": "CurrencyAtLeast",
-        "currency": "ch2_records",
+        "currency": "eps",
         "threshold": 1
       },
       "scopeId": "ch2",
@@ -1267,7 +1278,7 @@
           "description": "Hand the calendar over: every gig buys as many levels as you can afford on its own, for the rest of the chapter.",
           "gate": {
             "type": "CurrencyAtLeast",
-            "currency": "ch2_records",
+            "currency": "eps",
             "threshold": 8
           },
           "costCurrency": "cash",
@@ -1285,7 +1296,7 @@
           "description": "Everyone in town owes you one, so every gig level costs half for the rest of the chapter.",
           "gate": {
             "type": "CurrencyAtLeast",
-            "currency": "ch2_records",
+            "currency": "eps",
             "threshold": 25
           },
           "costCurrency": "cash",
@@ -1744,7 +1755,7 @@
             "conditions": [
               {
                 "type": "CurrencyAtLeast",
-                "currency": "ch2_records",
+                "currency": "eps",
                 "threshold": 5,
                 "uiText": "5 EPs"
               },
@@ -1811,7 +1822,7 @@
               },
               {
                 "type": "CurrencyAtLeast",
-                "currency": "ch2_records",
+                "currency": "eps",
                 "threshold": 5,
                 "uiText": "5 EPs"
               }
@@ -1876,7 +1887,7 @@
               },
               {
                 "type": "CurrencyAtLeast",
-                "currency": "ch2_records",
+                "currency": "eps",
                 "threshold": 5,
                 "uiText": "5 EPs"
               }
@@ -1943,8 +1954,7 @@
           {
             "type": "AddCurrency",
             "currencies": [
-              "records",
-              "ch2_records"
+              "eps"
             ],
             "formula": {
               "type": "RootCurveFormula",

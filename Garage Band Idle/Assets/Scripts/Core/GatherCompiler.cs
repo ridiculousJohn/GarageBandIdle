@@ -318,8 +318,8 @@ namespace RidiculousGaming.GarageBandIdle
                 if (currency == null)
                     continue;
                 // The currency's own definition is the owner, so its tags
-                // match - which is how the income tag carries the Records
-                // and Roadie factors (design doc 8.2).
+                // match - which is how the income tag carries the chapter's
+                // prestige-currency and Roadie factors (design doc 8.2).
                 var home = HomeOf(node, currency);
                 node.StoreLink(currency, new StatPlans(
                     Plan(node, currency, currency, Stat.Rate, home, grantable),

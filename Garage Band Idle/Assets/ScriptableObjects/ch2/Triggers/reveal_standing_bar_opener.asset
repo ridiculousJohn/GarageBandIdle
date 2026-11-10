@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425558579642542
+    rid: 1688710450278564013
   actions:
-  - rid: 7579425558579642543
+  - rid: 1688710450278564014
   references:
     version: 2
     RefIds:
-    - rid: 7579425558579642542
+    - rid: 1688710450278564013
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 0
-    - rid: 7579425558579642543
+    - rid: 1688710450278564014
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: standing_bar_opener_revealed

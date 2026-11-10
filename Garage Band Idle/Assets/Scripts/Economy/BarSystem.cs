@@ -113,7 +113,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // compiled plan is: owner the bar, no currency coordinate, stat rate,
         // with no currency stage. Stage 2 is "effects on this currency's total
         // production", and a bar consumes rather than produces: letting a
-        // currency-total buff through would mean records_income speeds the drain
+        // currency-total buff through would mean demo_tapes_income speeds the drain
         // on Rehearsal as well as its supply, which is not what either buff
         // means. Its own fill plus the rate entries paying it - those already
         // carry their own stage 1 and this bar's stage 2, and the bar is the one

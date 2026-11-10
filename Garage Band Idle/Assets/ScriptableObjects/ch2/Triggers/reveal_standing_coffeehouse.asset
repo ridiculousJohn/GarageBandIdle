@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425558579642483
+    rid: 1688710450278563953
   actions:
-  - rid: 7579425558579642484
+  - rid: 1688710450278563954
   references:
     version: 2
     RefIds:
-    - rid: 7579425558579642483
+    - rid: 1688710450278563953
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 0
-    - rid: 7579425558579642484
+    - rid: 1688710450278563954
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: standing_coffeehouse_revealed

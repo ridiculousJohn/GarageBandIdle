@@ -42,7 +42,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly ChapterDefinition Ch2Def;
             public readonly TierDefinition Tier2Def;
 
-            public readonly CurrencyDefinition Records, Roadies, Ch2Records, Cash, Fans;
+            public readonly CurrencyDefinition Roadies, Eps, Cash, Fans;
             public readonly ProducerDefinition CrowdOpenMic;
             public readonly GeneratorDefinition OpenMicDraw;
             public readonly UpgradeDefinition StandingOpenMic, CrowdWork1, BulkBooking;
@@ -85,9 +85,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsNotNull(Ch2Def, "chapter-02.json has not been imported - run Garage Band Idle/Import Content.");
                 Tier2Def = (TierDefinition)Ch2Def.children.Single();
 
-                Records = Find(RootDef.declaredCurrencies, "records");
                 Roadies = Find(RootDef.declaredCurrencies, "roadies");
-                Ch2Records = Find(Ch2Def.declaredCurrencies, "ch2_records");
+                Eps = Find(Ch2Def.declaredCurrencies, "eps");
                 StoryCh2End = Find(Ch2Def.storyBeats, "story_ch2_end");
                 Cash = Find(Tier2Def.declaredCurrencies, "cash");
                 Fans = Find(Tier2Def.declaredCurrencies, "fans");
@@ -254,7 +253,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Selected(f.OpenMic), "the gig is the one the calendar is running");
             f.Tick(5);
 
-            // One draw owned, no Records and no Buzz banked and no Roadies
+            // One draw owned, no EPs and no Buzz banked and no Roadies
             // stationed, so every factor on the lump is 1: the completion pays
             // the authored 3 Cash and 0.5 Fans times the owned count of 1.
             AssertClose(3, f.Balance(f.Tier2, f.Cash), "the gig's cash lump");
@@ -340,7 +339,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The fill is a rate, so idle_base's wildcard x0.5 halves it: 0.5
             // units per second over 3600 seconds is 1800, and the gig's 5 makes
             // that 360 completions. Each fires the draw at its owned count of 3,
-            // with no Records, Buzz or Roadies on the lump.
+            // with no EPs, Buzz or Roadies on the lump.
             var bar = f.Session.CurrentOffer.bars.Single();
             Assert.AreSame(f.OpenMic, bar.bar);
             Assert.AreEqual(360, bar.completions, "3600 s at 0.5/s over a 5 unit gig");
@@ -359,7 +358,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- 6. the EP ----
 
         [Test]
-        public void The_ep_pays_five_records_and_resets_the_run_leaving_the_booking()
+        public void The_ep_pays_five_eps_and_resets_the_run_leaving_the_booking()
         {
             var f = new Chapter2();
             f.BookTheOpenMic();
@@ -377,9 +376,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Tier2Def.rung.IsOffered(f.Ctx(f.Tier2)));
             f.Session.TryRung(f.Ctx(f.Tier2));
 
-            // One evaluation, two targets.
-            AssertClose(5, f.Balance(f.Root, f.Records), "records");
-            AssertClose(5, f.Balance(f.Ch2, f.Ch2Records), "ch2_records");
+            // The EP banks the chapter's own counter.
+            AssertClose(5, f.Balance(f.Ch2, f.Eps), "eps");
 
             // The reset re-arms opening_cash, and the transaction's own closing
             // sweep is what re-fires it - so the new run opens funded.
@@ -398,7 +396,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new Chapter2();
             f.Enter();
-            f.Ctx(f.Ch2).Deposit(f.Ch2Records.Id, 8);
+            f.Ctx(f.Ch2).Deposit(f.Eps.Id, 8);
             f.Ctx(f.Tier2).Deposit(f.Cash.Id, 250000);
             f.Session.TryBuy(f.Ctx(f.Tier2), f.BulkBooking);
             Assert.IsTrue(f.Ch2.flags.Contains("bulk_booked"), "the payload wrote the chapter-lifetime flag");
@@ -433,26 +431,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new Chapter2();
             f.BookTheOpenMic();
-            f.Ctx(f.Ch2).Deposit(f.Ch2Records.Id, 120);
+            f.Ctx(f.Ch2).Deposit(f.Eps.Id, 120);
 
-            // The capstone's ExecuteRung banks the live run through the EP's own
-            // gate before the wipe reaches it, so the run's fans are made to
-            // meet that gate: floor(sqrt(300 / 10)) = 5.
+            // A live run that meets the EP's own gate: the capstone pays no EP
+            // for it, and the chapter reset clears it with everything else.
             f.Ctx(f.Tier2).Deposit(f.Fans.Id, 300 - f.Earned(f.Tier2, f.Fans));
             Assert.IsTrue(f.Ch2Def.rung.IsOffered(f.Ctx(f.Ch2)), "120 EPs clears the capstone's gate");
             f.Session.TryRung(f.Ctx(f.Ch2));
 
-            AssertClose(5, f.Balance(f.Root, f.Records), "the live run banked");
             AssertClose(1, f.Balance(f.Root, f.Roadies), "chapter 2 pays one Roadie");
             Assert.IsTrue(f.Root.flags.Contains("ch2_complete"));
 
             // ResetScope(ch2) is downward closed: the chapter's own facts go
             // with the tier's, and the chapter sits immediately replayable.
-            AssertClose(0, f.Balance(f.Ch2, f.Ch2Records), "the gate counter zeroes");
+            AssertClose(0, f.Balance(f.Ch2, f.Eps), "the gate counter zeroes");
             Assert.IsFalse(f.Ch2.flags.Contains("booked_open_mic"), "the booking goes with the chapter");
             Assert.IsEmpty(f.Ch2.flags, "every ch2 flag with it - the reveals and the battle latches");
             Assert.IsEmpty(f.Tier2.generatorCounts);
             Assert.IsEmpty(f.Tier2.barProgress);
+            AssertClose(0, f.Balance(f.Tier2, f.Fans), "the run's fans go with the tier");
 
             // The closing beat reads the root flag the capstone set, which is
             // why it is homed where no chapter reset can reach it.

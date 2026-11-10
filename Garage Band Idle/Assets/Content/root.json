@@ -16,26 +16,10 @@
   ],
 
   "currencies": [
-    { "id": "records", "displayName": "Records" },
     { "id": "roadies", "displayName": "Roadies" }
   ],
 
   "modifiers": [
-    {
-      "id": "records_income",
-      "effects": [
-        {
-          "target": "income",
-          "stat": "rate",
-          "formula": { "type": "LinearOnBalance", "currency": "records", "coefficient": 0.02 }
-        },
-        {
-          "target": "income",
-          "stat": "yield",
-          "formula": { "type": "LinearOnBalance", "currency": "records", "coefficient": 0.02 }
-        }
-      ]
-    },
     {
       "id": "roadie_total",
       "effects": [
@@ -92,5 +76,5 @@
     }
   ],
 
-  "permanentModifiers": ["records_income", "roadie_total", "roadie_active", "idle_base", "encore"]
+  "permanentModifiers": ["roadie_total", "roadie_active", "idle_base", "encore"]
 }

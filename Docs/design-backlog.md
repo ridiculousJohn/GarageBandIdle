@@ -39,7 +39,8 @@ grow.
 stops drawing; a band people travel to see sells out four nights. Scaling the penalty down with
 popularity makes fatigue a through-line rather than a rule the player outgrows. **Scale the floor, not
 the per-play factor** — raising the floor keeps rotation better while removing the punishment for not
-rotating; driving the factor toward 1 deletes the decision. Cumulative Records is the obvious input.
+rotating; driving the factor toward 1 deletes the decision. The input would be a measure of the
+band's popularity that grows within the chapter.
 
 Caveat: a replay is just the chapter played again with root multipliers reaching in, so a late player
 re-entering would arrive at full popularity and no fatigue at all — the rotation would vanish on
@@ -125,6 +126,13 @@ Ctrl C is precedent — it scales the completion-token reward by a stored diffic
 (`1 + 0.1*d + 0.012*d^1.5`) rather than scaling the goal. One difference to carry over: its award is
 fractional, which is fine when the UI says "1 token" but wrong here, since Roadies are allocated as
 discrete units. Keep the payout integer.
+
+---
+
+## Records as a chapter's own resource
+
+A later chapter may use Records as its own local resource - for example a chapter about certifying a
+record, counting units sold toward gold and platinum.
 
 ---
 

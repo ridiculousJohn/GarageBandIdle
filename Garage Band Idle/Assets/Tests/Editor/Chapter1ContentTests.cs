@@ -85,18 +85,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void Each_scope_declares_the_families_the_content_doc_files_on_it()
         {
-            Assert.AreEqual(new[] { "records", "roadies" }, Ids(root.declaredCurrencies));
+            Assert.AreEqual(new[] { "roadies" }, Ids(root.declaredCurrencies));
             Assert.AreEqual(new[] { "income", "production" }, root.declaredTags.ToArray());
             // The store's products, declared like flags and root's alone (12.3).
             Assert.AreEqual(new[] { "backstage_pass" }, root.entitlements.ToArray());
 
-            Assert.AreEqual(new[] { "ch1_records" }, Ids(ch1.declaredCurrencies));
+            Assert.AreEqual(new[] { "demo_tapes" }, Ids(ch1.declaredCurrencies));
             Assert.AreEqual(new[] { "album", "gj1_done", "gj2_done", "gj3_done", "band_revealed",
                                     "drummer_revealed", "bassist_revealed", "guitarist_revealed",
                                     "gear_revealed", "amp_strings_revealed", "kit_upgrade_revealed",
                                     "tight_set_revealed", "play_for_crowd_revealed", "unlock_covers_revealed" },
                 ch1.declaredFlags.ToArray());
-            Assert.AreEqual(new[] { "gj_tap_1", "gj_tap_2", "gj_tap_3" }, Ids(ch1.modifiers));
+            Assert.AreEqual(new[] { "gj_tap_1", "gj_tap_2", "gj_tap_3", "demo_tapes_income" }, Ids(ch1.modifiers));
+            Assert.AreEqual(new[] { "demo_tapes_income" }, Ids(ch1.permanentModifiers));
             Assert.AreEqual(0, ch1.events.Count, "the Garage Jam chain hosts at tier1");
 
             Assert.AreEqual(new[] { "cash", "fans", "rehearsal" }, Ids(tier1.declaredCurrencies));
@@ -121,7 +122,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                                     "reveal_release" }, Ids(tier1.triggers));
         }
 
-        // The income tag is what the Records and Roadie modifiers target, and
+        // The income tag is what the Demo Tapes and Roadie modifiers target, and
         // fans carrying it would open the farm throttle (section 8.2).
         [Test]
         public void Cash_carries_income_and_fans_carries_nothing()
@@ -304,15 +305,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- section 9: the rungs ----
 
-        // One evaluation, both targets: the album pays root records and the
-        // chapter's gate counter amounts that can never drift.
+        // The album pays the chapter's own counter, the one currency both the
+        // capstone gate and the income lift read.
         [Test]
-        public void The_release_pays_both_record_currencies_from_one_root_curve()
+        public void The_release_pays_demo_tapes_from_one_root_curve()
         {
             var release = tier1.rung;
             var pay = (AddCurrency)release.actions[0];
 
-            Assert.AreEqual(new[] { "records", "ch1_records" }, Ids(pay.currencies));
+            Assert.AreEqual(new[] { "demo_tapes" }, Ids(pay.currencies));
             var curve = (RootCurveFormula)pay.formula;
             Assert.AreEqual("fans", curve.currency.Id);
             // Fans are never spent and clear with the tier, so what the round
@@ -328,58 +329,79 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)50, Threshold(legs[0]));
         }
 
+        // The chapter's permanent lift: +2% income per Demo Tape at both stats,
+        // so a tap's yield rides it as the rates do. It reads the chapter's own
+        // counter, which the capstone's reset clears with the chapter.
         [Test]
-        public void The_capstone_banks_the_live_run_then_pays_the_roadie()
+        public void Demo_tapes_lift_income_through_a_permanent_chapter_modifier()
+        {
+            var lift = Find(ch1.modifiers, "demo_tapes_income");
+
+            Assert.AreEqual(new[] { ("income", Stat.Rate), ("income", Stat.Yield) },
+                lift.effects.Select(e => (e.target, e.stat)).ToArray());
+            foreach (var effect in lift.effects)
+            {
+                var curve = (LinearOnBalance)effect.formula;
+                Assert.AreEqual("demo_tapes", curve.currency.Id, effect.stat.ToString());
+                Assert.AreEqual((BigNumber)0.02, curve.coefficient, effect.stat.ToString());
+            }
+            Assert.IsTrue(ch1.permanentModifiers.Contains(lift));
+        }
+
+        [Test]
+        public void The_capstone_pays_the_roadie_then_resets_the_chapter()
         {
             var capstone = ch1.rung;
 
             // One leg, so the gate is that leg and not an All wrapping it: a
             // parent cannot read a child's record, and the armed-reward guard
             // is the reset's own refusal rather than anything authored here.
-            Assert.AreEqual("balance ch1_records", Describe(capstone.offerCondition));
+            Assert.AreEqual("balance demo_tapes", Describe(capstone.offerCondition));
             // The primary pacing knob (section 11).
             Assert.AreEqual((BigNumber)30, Threshold(capstone.offerCondition));
 
-            Assert.AreEqual(tier1, ((ExecuteRung)capstone.actions[0]).tier,
-                "the live run banks through the release's own gate before the wipe");
-            var roadie = (AddCurrency)capstone.actions[1];
+            // The roadie, the completion flag, the chapter reset - and nothing
+            // else: the reset clears the chapter counter, so a release run here
+            // would pay into a balance the same list zeroes.
+            Assert.AreEqual(3, capstone.actions.Count);
+            var roadie = (AddCurrency)capstone.actions[0];
             Assert.AreEqual(new[] { "roadies" }, Ids(roadie.currencies));
             Assert.AreEqual((BigNumber)1, roadie.amount);
             Assert.IsNull(roadie.formula, "chapter 1's reward formula is the constant 1");
-            Assert.AreEqual("ch1_complete", ((SetFlag)capstone.actions[2]).flagId);
-            Assert.AreEqual(ch1, ((ResetScope)capstone.actions[3]).scope);
+            Assert.AreEqual("ch1_complete", ((SetFlag)capstone.actions[1]).flagId);
+            Assert.AreEqual(ch1, ((ResetScope)capstone.actions[2]).scope);
         }
 
         // ---- section 10: the Garage Jam chain ----
 
         // Each level gates on the previous one's completion flag AND a banked
-        // Records threshold, which is what makes "come back later" the
+        // Demo Tapes threshold, which is what makes "come back later" the
         // experience rather than a wall. The exclusion leg is what keeps at
         // most one jam startable at any moment - no selection rule anywhere.
         [Test]
-        public void The_garage_jam_chain_ladders_on_the_previous_flag_and_records()
+        public void The_garage_jam_chain_ladders_on_the_previous_flag_and_demo_tapes()
         {
-            // Level one has no predecessor, so banked Records is the whole of
-            // its entry requirement.
+            // Level one has no predecessor, so banked Demo Tapes is the whole
+            // of its entry requirement.
             var first = ((All)Event("garage_jam_1").availableWhen).conditions;
-            Assert.AreEqual(new[] { "balance records", "not flag gj1_done" }, first.Select(Describe).ToArray());
+            Assert.AreEqual(new[] { "balance demo_tapes", "not flag gj1_done" }, first.Select(Describe).ToArray());
             Assert.AreEqual((BigNumber)1, Threshold(first[0]));
             // The uiText sits on the leg itself, which is what a disabled row
             // lists (12.11).
-            Assert.AreEqual(new[] { "1 Records", "Already cleared" }, first.Select(c => c.uiText).ToArray());
+            Assert.AreEqual(new[] { "1 Demo Tape", "Already cleared" }, first.Select(c => c.uiText).ToArray());
 
-            var later = new (string id, string previousLeg, string ownLeg, double records, string previousText)[]
+            var later = new (string id, string previousLeg, string ownLeg, double tapes, string previousText)[]
             {
                 ("garage_jam_2", "flag gj1_done", "not flag gj2_done", 15, "Clear Garage Jam I first"),
                 ("garage_jam_3", "flag gj2_done", "not flag gj3_done", 30, "Clear Garage Jam II first"),
             };
-            foreach (var (id, previousLeg, ownLeg, records, previousText) in later)
+            foreach (var (id, previousLeg, ownLeg, tapes, previousText) in later)
             {
                 var legs = ((All)Event(id).availableWhen).conditions;
-                Assert.AreEqual(new[] { previousLeg, ownLeg, "balance records" },
+                Assert.AreEqual(new[] { previousLeg, ownLeg, "balance demo_tapes" },
                     legs.Select(Describe).ToArray(), id);
-                Assert.AreEqual((BigNumber)records, Threshold(legs[2]), id);
-                Assert.AreEqual(new[] { previousText, "Already cleared", $"{records} Records" },
+                Assert.AreEqual((BigNumber)tapes, Threshold(legs[2]), id);
+                Assert.AreEqual(new[] { previousText, "Already cleared", $"{tapes} Demo Tapes" },
                     legs.Select(c => c.uiText).ToArray(), id);
             }
 
@@ -424,10 +446,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var multipliers = new[] { 1.25, 1.5, 2 };
             for (var i = 0; i < multipliers.Length; i++)
             {
-                var effect = ch1.modifiers[i].effects.Single();
+                var id = $"gj_tap_{i + 1}";
+                var effect = Find(ch1.modifiers, id).effects.Single();
                 Assert.AreEqual(("tap_producer", "cash", Stat.Yield),
-                    (effect.target, effect.currencyId, effect.stat), ch1.modifiers[i].Id);
-                Assert.AreEqual((BigNumber)multipliers[i], effect.multiplier, ch1.modifiers[i].Id);
+                    (effect.target, effect.currencyId, effect.stat), id);
+                Assert.AreEqual((BigNumber)multipliers[i], effect.multiplier, id);
             }
         }
 
@@ -512,8 +535,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void The_authored_names_and_rung_labels_match_the_content_doc()
         {
             Assert.AreEqual("The Garage", ch1.displayName);
-            Assert.AreEqual("Records", Find(root.declaredCurrencies, "records").displayName);
-            Assert.AreEqual("Demo Tapes", Find(ch1.declaredCurrencies, "ch1_records").displayName);
+            Assert.AreEqual("Demo Tapes", Find(ch1.declaredCurrencies, "demo_tapes").displayName);
             Assert.AreEqual("Cash", Find(tier1.declaredCurrencies, "cash").displayName);
             // The Jam button binds the producer, and the binding is what
             // requires the name - `band`, which nothing renders, stays unnamed.
@@ -560,7 +582,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Every gate is a flag or a monotonic fact - nothing here strobes
             // with spending.
             Assert.AreEqual(new[] { "Always", "flag band_revealed", "flag gear_revealed", "flag rehearsal_revealed",
-                                    "flag album", "balance records", "flag album" },
+                                    "flag album", "balance demo_tapes", "flag album" },
                 ch1.sections.Select(s => Describe(s.visibleWhen)).ToArray());
             Assert.AreEqual((BigNumber)1, Threshold(ch1.sections[5].visibleWhen));
 
@@ -573,14 +595,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void Each_module_binds_its_content_and_carries_a_concrete_scope()
         {
-            // The Records line is the one module whose content is ROOT-owned,
-            // so it normalizes onto the chapter instead of the section's tier.
+            // The Demo Tapes line binds the chapter's own counter, so it
+            // normalizes onto its home, the chapter, instead of the section's
+            // tier.
             Assert.AreEqual(new[]
             {
                 "currency_line cash @tier1",
                 "currency_line fans @tier1",
                 "currency_line rehearsal @tier1",
-                "currency_line records @ch1",
+                "currency_line demo_tapes @ch1",
                 "jam_button tap_producer @tier1",
                 // A beat's home is the chapter, so its row normalizes there too.
                 "story_row story_ch1_open @ch1",
@@ -636,7 +659,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(lines[0].visibleWhen, "cash is on screen from the first press");
             Assert.AreEqual("flag fans_revealed", Describe(lines[1].visibleWhen));
             Assert.AreEqual("flag rehearsal_revealed", Describe(lines[2].visibleWhen));
-            Assert.AreEqual("balance records", Describe(lines[3].visibleWhen));
+            Assert.AreEqual("balance demo_tapes", Describe(lines[3].visibleWhen));
             Assert.AreEqual((BigNumber)1, Threshold(lines[3].visibleWhen));
             Assert.IsNull(lines[4].visibleWhen, "the Jam button rides the section's own gate");
             // The opener's row is there from the first press and the capstone's

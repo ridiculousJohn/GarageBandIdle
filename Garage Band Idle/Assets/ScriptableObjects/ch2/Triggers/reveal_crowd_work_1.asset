@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425558579642491
+    rid: 1688710450278563964
   actions:
-  - rid: 7579425558579642492
+  - rid: 1688710450278563965
   references:
     version: 2
     RefIds:
-    - rid: 7579425558579642491
+    - rid: 1688710450278563964
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 2
-    - rid: 7579425558579642492
+    - rid: 1688710450278563965
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: crowd_work_1_revealed

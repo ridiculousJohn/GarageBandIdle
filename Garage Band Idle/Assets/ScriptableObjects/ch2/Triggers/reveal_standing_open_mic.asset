@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 7579425558579642591
+    rid: 1688710450278564064
   actions:
-  - rid: 7579425558579642592
+  - rid: 1688710450278564065
   references:
     version: 2
     RefIds:
-    - rid: 7579425558579642591
+    - rid: 1688710450278564064
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 0
-    - rid: 7579425558579642592
+    - rid: 1688710450278564065
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: standing_open_mic_revealed

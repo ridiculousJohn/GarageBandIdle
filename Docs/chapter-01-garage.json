@@ -1,19 +1,19 @@
 {
   "_meta": {
     "file": "Chapter 1 — Garage. Buildable content data.",
-    "usage": "Maps to the ScriptableObjects in the design doc (ChapterDefinition, GeneratorDefinition, UpgradeDefinition, EventDefinition, BarDefinition, RewardDefinition). Either hand-author SOs from these values or write a small importer. Content is reached by DIRECT REFERENCE from the root scope: the importer materializes the assets AND wires them into the declaring scope's lists, and one Addressables load of the root scope brings the whole graph. There are no per-type labels and no id-to-definition lookup. All numbers are starter values for tuning; the Records capstone gate is the primary pacing knob.",
+    "usage": "Maps to the ScriptableObjects in the design doc (ChapterDefinition, GeneratorDefinition, UpgradeDefinition, EventDefinition, BarDefinition, RewardDefinition). Either hand-author SOs from these values or write a small importer. Content is reached by DIRECT REFERENCE from the root scope: the importer materializes the assets AND wires them into the declaring scope's lists, and one Addressables load of the root scope brings the whole graph. There are no per-type labels and no id-to-definition lookup. All numbers are starter values for tuning; the Demo Tapes capstone gate is the primary pacing knob.",
     "modelNotes": {
-      "conditions": "Every gate/unlock/visibility/availability rule is a single discriminated Condition shape — always an object with a `type` field — evaluated by ONE ConditionEvaluator. No bare/heterogeneous shapes. Types used in Ch1: `currency` (current balance ≥ value), `currencyEarnedTotal` (lifetime earned ≥ value), `ownedCount` (generator owned ≥ value), `flagSet` (a flag is set), `barsCompleted` (≥ value bars completed in a group), `recordsCumulative` (cumulative Records ≥ value), `compound` (all/any of nested Conditions).",
+      "conditions": "Every gate/unlock/visibility/availability rule is a single discriminated Condition shape - always an object with a `type` field - evaluated by ONE ConditionEvaluator. No bare/heterogeneous shapes. Types used in Ch1: `currency` (current balance >= value), `currencyEarnedTotal` (lifetime earned >= value), `ownedCount` (generator owned >= value), `flagSet` (a flag is set), `barsCompleted` (>= value bars completed in a group), `compound` (all/any of nested Conditions).",
       "conditionThresholds": "A condition states its threshold as `value`, always — a condition compares against one. `amount` is a cost block's key, where the number is a price, not a threshold: `cost: { currency, amount }`. A condition object carries no other keys, so the importer reports any key it does not recognize (`amount` copied from the cost block beside a gate, or a plain misspelling) instead of dropping it and leaving the threshold at zero. A threshold must also be positive — the importer reports a non-positive one, boot validation reports it on existing assets, and the condition evaluates as unmet, so a broken gate blocks content rather than standing open.",
       "flags": "One flag registry drives every progressive reveal. A content-unlock upgrade's payload is `setFlag`; a reward's payload can also be `setFlag`; sections, currencies, groups, and any gated content reveal on a `flagSet` Condition. There is no separate `unlockSystem` code path — revealing a system = setting its flag.",
       "bars": "A 'Learn Covers' cover is a generic fillable BAR declared on its scope. A bar declares `consumes` (a list of {currency, amount per unit of fill}; empty fills from time) + `fillRequirement` + `reward`; the fill logic reads the list and never hardcodes covers. A GROUP lists members of any kind its scope declares and caps how many are active at once; the covers are members of `learn_covers`. Rehearsal is an ordinary run-scoped currency; its per-press yield is a contribution on the jam producer and its passive per-sec trickle is a contribution on the `practice` producer (design §12 rule 13 — contributions live on contributors, never on the currency, and a contributor holds one kind of thing so its id is a promise a buff can rely on). Bars and the currency they consume meet only through the `consumes` entry - mirrors how generators declare `produces`. A bar left on fills while away, capped by what it consumes (§9).",
       "addressables": "There are no per-type labels and no registries built by label. Every definition hangs off the root scope by DIRECT REFERENCE - a scope declares its currencies, producers, generators, upgrades, bars, groups, modifiers, and triggers - so one Addressables load of the root scope brings the whole content graph. The importer materializes each asset AND wires it into its declaring scope's list; nothing is discovered at runtime."
     },
     "currencies": {
-      "cash": "run-scoped; earned by tap + generators; spent on gear/upgrades",
-      "fans": "run-scoped; performance meter; sets the album (demo) Records payout; loosely coupled to Cash by design",
+      "cash": "run-scoped; the base resource; earned by tap + generators; spent on gear/upgrades",
+      "fans": "run-scoped; the release meter; sets the album (demo) Demo Tapes payout; loosely coupled to Cash by design",
       "rehearsal": "run-scoped; earned by a passive tick + taps; consumed by the Learn Covers bars through each bar's consumes entry",
-      "records": "PERMANENT; each Record buffs global income; cumulative Records gate the capstone"
+      "demo_tapes": "chapter-scoped; the prestige currency; each Demo Tape buffs the chapter's income; Demo Tapes gate the capstone, whose reset of the chapter zeroes them"
     }
   },
 
@@ -27,13 +27,13 @@
 
   "constants": {
     "generatorCostGrowth": 1.15,
-    "recordBuff": {
-      "perRecord": 0.02,
+    "demoTapesBuff": {
+      "perDemoTape": 0.02,
       "mode": "additive",
       "affects": [ "cash" ],
-      "note": "A multiplier declares which currencies it affects; generator production of anything it doesn't name is untouched. The Records buff is Ch1's only global multiplier and affects Cash."
+      "note": "A multiplier declares which currencies it affects; generator production of anything it doesn't name is untouched. The Demo Tapes buff reads the chapter's own demo_tapes, is built as a permanent modifier declared on the chapter, and affects Cash."
     },
-    "incomeFormulaNote": "cashRate = sum(each cash `rate` contribution x its own multipliers) * (1 + 0.02 * records) * encoreBoost — the sum of the contributions times the product of the multipliers reaching `cash_rate`, which is the shape EVERY composed number in the game has (design doc rule 11). Catalog/Roadie multipliers are not present in Ch1. Cash's per-press yield is a separate number, `cash_yield`, summed from the jam line and stage_presence's; nothing multiplies a rate by seconds to reach it."
+    "incomeFormulaNote": "cashRate = sum(each cash `rate` contribution x its own multipliers) * (1 + 0.02 * demo_tapes) * encoreBoost - the sum of the contributions times the product of the multipliers reaching `cash_rate`, which is the shape EVERY composed number in the game has (design doc rule 11). Catalog/Roadie multipliers are not present in Ch1. Cash's per-press yield is a separate number, `cash_yield`, summed from the jam line and stage_presence's; nothing multiplies a rate by seconds to reach it."
   },
 
   "flags": [
@@ -89,8 +89,8 @@
       "id": "the_backyard",
       "name": "The Backyard",
       "modules": [ "module/capstone" ],
-      "visibleWhen": { "type": "recordsCumulative", "value": 1 },
-      "note": "The capstone offer (Play the Backyard Party), §5. Appears with the prestige loop — the first Record, the same moment garage_jam's availableWhen uses — and DELIBERATELY not at the capstone gate's own value: `capstone.unlock` is the SOLE home of the pacing knob, and a section threshold restating it would be a second copy able to drift. Region coarse, action precise, the exact the_release arrangement: the button's pressability is the capstone's authored unlock asked live, so the goal is visible (disarmed) through the mid-game climb and arms when the gate holds. Cumulative Records are monotonic and permanent, so the section can never strobe; after completion it stays, button dark, while the completion flag reveals the story beat."
+      "visibleWhen": { "type": "currency", "currency": "demo_tapes", "value": 1 },
+      "note": "The capstone offer (Play the Backyard Party), section 5. Appears with the prestige loop - the first Demo Tape, the same moment garage_jam's availableWhen uses - and DELIBERATELY not at the capstone gate's own value: `capstone.unlock` is the SOLE home of the pacing knob, and a section threshold restating it would be a second copy able to drift. Region coarse, action precise, the exact the_release arrangement: the button's pressability is the capstone's authored unlock asked live, so the goal is visible (disarmed) through the mid-game climb and arms when the gate holds. Demo Tapes are never spent, so the section can never strobe; the capstone's reset of the chapter zeroes them, and the section hides with the rest of the cleared chapter while the completion flag reveals the story beat."
     }
   ],
 
@@ -247,7 +247,7 @@
     {
       "id": "cash",
       "group": "run",
-      "note": "The chapter's full local currency roster (design doc §12 rule 12): the economy context builds its pool from THIS list, never from every imported currency, so a currency belongs to exactly one economy. Chapter-placed groups only - a global currency (records) is held by the startup pool and naming it here is refused."
+      "note": "The chapter's full local currency roster (design doc section 12 rule 12): the economy context builds its pool from THIS list, never from every imported currency, so a currency belongs to exactly one economy. Chapter-placed groups only - a global currency (roadies) is held by the startup pool and naming it here is refused."
     },
     {
       "id": "fans",
@@ -323,20 +323,20 @@
       ]
     },
     "resets": [ "cash", "fans", "rehearsal", "generators.owned", "upgrades.buff", "upgrades.contentUnlock (scope: run)", "flags (scope: run)", "bars (group scope: run)" ],
-    "keeps": [ "records", "upgrades.contentUnlock (scope: permanentInChapter)", "flags (scope: permanentInChapter)", "roadies" ],
-    "recordsFormula": "floor( (fansThisRun / 5) ^ 0.5 )",
-    "recordsFormulaExamples": { "50fans": 3, "125fans": 5, "500fans": 10, "2000fans": 20 },
-    "note": "Releasing resets the run and awards Records. Reset is driven by currency group `resetsOnAlbumRelease` + upgrade/bar/flag `scope`, not a hardcoded name list. Flags and content unlocks split by their DECLARED scope, so `keeps` above is not a blanket rule: `album` (set by cut_demo) is permanent and The Release section stays visible across demos, while `fans`, `covers` and `gear` are run-scoped and clear together with their run-scoped setters (play_for_crowd, learn_covers, browse_gear) - which is what makes the second run re-walk band -> fans -> covers -> gear instead of opening with everything revealed. Sections carry no scope of their own: visibility is a live read of `visibleWhen`, so a section goes dark exactly when the facts behind it reset, and an earned-total gate resets because its currency's group does. Each Record = +2% permanent global income, so the next run is faster. `unlock` is the release OFFER's live gate: the button is pressable only while it holds, so it disarms at every release (fans and cover completions are run facts) and re-arms on the re-climb — the release OPERATION itself stays ungated, since the capstone implicitly cuts an album regardless."
+    "keeps": [ "demo_tapes", "upgrades.contentUnlock (scope: permanentInChapter)", "flags (scope: permanentInChapter)", "roadies" ],
+    "demoTapesFormula": "floor( (fansThisRun / 5) ^ 0.5 )",
+    "demoTapesFormulaExamples": { "50fans": 3, "125fans": 5, "500fans": 10, "2000fans": 20 },
+    "note": "Releasing resets the run and awards Demo Tapes. Reset is driven by currency group `resetsOnAlbumRelease` + upgrade/bar/flag `scope`, not a hardcoded name list. Flags and content unlocks split by their DECLARED scope, so `keeps` above is not a blanket rule: `album` (set by cut_demo) is permanent and The Release section stays visible across demos, while `fans`, `covers` and `gear` are run-scoped and clear together with their run-scoped setters (play_for_crowd, learn_covers, browse_gear) - which is what makes the second run re-walk band -> fans -> covers -> gear instead of opening with everything revealed. Sections carry no scope of their own: visibility is a live read of `visibleWhen`, so a section goes dark exactly when the facts behind it reset, and an earned-total gate resets because its currency's group does. Each Demo Tape = +2% income for the rest of the chapter, so the next run is faster. `unlock` is the release OFFER's live gate: the button is pressable only while it holds, so it disarms at every release (fans and cover completions are run facts) and re-arms on the re-climb."
   },
 
   "events": [
     {
       "id": "garage_jam",
       "name": "Garage Jam Challenge",
-      "availableWhen": { "type": "recordsCumulative", "value": 1 },
-      "availableNote": "Introduced in Stage 6, after the player has released at least one demo, so the prestige loop is understood first. Same `recordsCumulative` Condition type the capstone uses — one evaluator, different threshold.",
+      "availableWhen": { "type": "currency", "currency": "demo_tapes", "value": 1 },
+      "availableNote": "Introduced in Stage 6, after the player has released at least one demo, so the prestige loop is understood first. The same `currency` Condition on demo_tapes the capstone uses - one evaluator, different threshold.",
       "baselineReset": true,
-      "baselineResetNote": "On entry the chapter economy resets to a fixed baseline for the event's duration, so tiers scale independently of the player's Records.",
+      "baselineResetNote": "On entry the chapter economy resets to a fixed baseline for the event's duration, so tiers scale independently of the player's Demo Tapes.",
       "tiers": [
         {
           "tier": 1,
@@ -387,7 +387,7 @@
   "capstone": {
     "id": "backyard_party",
     "name": "Play the Backyard Party",
-    "unlock": { "type": "recordsCumulative", "value": 30 },
+    "unlock": { "type": "currency", "currency": "demo_tapes", "value": 30 },
     "unlockNote": "The SOLE authored source of the chapter gate, and the primary pacing knob. Imported through the same ConditionEvaluator every other gate uses; the old scalar `chapter.capstoneRecordsGate` is deleted rather than kept in step, because two homes for one threshold meant the authored Condition was the one being ignored.",
     "onComplete": {
       "grantRoadies": 1,
@@ -403,9 +403,9 @@
     { "stage": 2, "name": "Play for a Crowd", "unlocks": "Fans (flag: fans)", "gate": "own 1 Drummer" },
     { "stage": 3, "name": "Learn Covers", "unlocks": "Rehearsal + cover bars (flag: covers)", "gate": "25 Fans" },
     { "stage": 4, "name": "Cut a Demo", "unlocks": "album/prestige button (flag: album)", "gate": "50 Fans + 1 cover", "target": "~5 min from install" },
-    { "stage": 5, "name": "The Loop", "unlocks": "repeat demos, accumulate Records", "gate": "first demo released" },
-    { "stage": 6, "name": "Garage Jam", "unlocks": "garage_jam event", "gate": "1+ Records" },
-    { "stage": 7, "name": "Backyard Party", "unlocks": "capstone → Chapter 2 + first Roadie", "gate": "30 cumulative Records" }
+    { "stage": 5, "name": "The Loop", "unlocks": "repeat demos, accumulate Demo Tapes", "gate": "first demo released" },
+    { "stage": 6, "name": "Garage Jam", "unlocks": "garage_jam event", "gate": "1 Demo Tape" },
+    { "stage": 7, "name": "Backyard Party", "unlocks": "capstone -> Chapter 2 + first Roadie", "gate": "30 Demo Tapes" }
   ],
 
   "balanceTargets": {
@@ -413,6 +413,6 @@
     "estDemoCyclesToCapstone": "8-12",
     "primaryPacingKnob": "capstone.unlock.value — raise/lower before touching generator or fan curves",
     "primaryPacingKnobNote": "This is a POINTER, not a second copy. It used to restate the threshold as `capstoneRecordsGate: 30` here as well, which is how a tuning number ends up with three homes and two of them stale.",
-    "tuneAgainst": "a player with full multiplier stack active (here just Encore up to 4x + records); confirm the chapter still takes meaningful play time"
+    "tuneAgainst": "a player with full multiplier stack active (here just Encore up to 4x + Demo Tapes); confirm the chapter still takes meaningful play time"
   }
 }

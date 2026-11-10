@@ -17,9 +17,9 @@ MonoBehaviour:
   displayName: Battle of the Bands III
   description: Five minutes to pull 25000 fans with Bulk Booking off for the run.
   availableWhen:
-    rid: 7579425558579642572
+    rid: 1688710450278564054
   goal:
-    rid: 7579425558579642573
+    rid: 1688710450278564055
   timeLimitSeconds: 300
   handicaps:
   - target: gig_draw
@@ -32,26 +32,26 @@ MonoBehaviour:
     formula:
       rid: -2
   onEntry:
-  - rid: 7579425558579642574
+  - rid: 1688710450278564056
   rewards:
-  - rid: 7579425558579642575
-  - rid: 7579425558579642576
+  - rid: 1688710450278564057
+  - rid: 1688710450278564058
   onEnd:
-  - rid: 7579425558579642577
+  - rid: 1688710450278564059
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425558579642572
+    - rid: 1688710450278564054
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 7579425558579642578
-        - rid: 7579425558579642579
-        - rid: 7579425558579642580
-    - rid: 7579425558579642573
+        - rid: 1688710450278564060
+        - rid: 1688710450278564061
+        - rid: 1688710450278564062
+    - rid: 1688710450278564055
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -60,44 +60,44 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 4
-    - rid: 7579425558579642574
+    - rid: 1688710450278564056
       type: {class: RestartScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
-    - rid: 7579425558579642575
+    - rid: 1688710450278564057
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 8129ef8281c5df34d9c003a7bf19531b, type: 2}
         modifier: {fileID: 11400000, guid: 542294a6db7f755418d58b2901c49ad7, type: 2}
-    - rid: 7579425558579642576
+    - rid: 1688710450278564058
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: botb3_done
-    - rid: 7579425558579642577
+    - rid: 1688710450278564059
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
-    - rid: 7579425558579642578
+    - rid: 1688710450278564060
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Clear Battle of the Bands II first
         flagId: botb2_done
-    - rid: 7579425558579642579
+    - rid: 1688710450278564061
       type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Already cleared
         condition:
-          rid: 7579425558579642581
-    - rid: 7579425558579642580
+          rid: 1688710450278564063
+    - rid: 1688710450278564062
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 5 EPs
-        currency: {fileID: 11400000, guid: 36e81a4a255237449b1208248dc1a127, type: 2}
+        currency: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
         threshold:
           _value:
             mantissa: 5
             exponent: 0
-    - rid: 7579425558579642581
+    - rid: 1688710450278564063
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

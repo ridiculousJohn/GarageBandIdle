@@ -284,10 +284,11 @@ namespace RidiculousGaming.GarageBandIdle
 
         // The incoming chapter's phase (12.9's point 4). The offer is computed
         // once over the paid window [stamp, stamp + min(elapsed, cap)] at
-        // current state, so Records earned while away boost it, under the
-        // idle-accumulation circumstance - the authored root base joins the
-        // gather and live-only modifiers excuse themselves. The window is
-        // segmented at the buff expiries inside it exactly as the tick segments,
+        // current state, so the chapter's prestige currency and the Roadies held
+        // now boost it, under the idle-accumulation circumstance - the authored
+        // root base joins the gather and live-only modifiers excuse themselves.
+        // The window is segmented at the buff expiries inside it exactly as the
+        // tick segments,
         // each segment paying its own length at the rate and speed live in it:
         // the cap bounds REAL seconds and speed multiplies what they pay.
         // Every bar of the subtree fills over the same window, capped by what it

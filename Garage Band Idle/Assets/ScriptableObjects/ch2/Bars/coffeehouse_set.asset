@@ -28,22 +28,22 @@ MonoBehaviour:
       mantissa: 1
       exponent: 0
   repeatWhen:
-    rid: 7579425558579642680
+    rid: 1688710450278564151
   tap: {fileID: 11400000, guid: 63787a60551063248a2fa959b6d2e8e1, type: 2}
   availableWhen:
-    rid: 7579425558579642681
+    rid: 1688710450278564152
   onComplete:
-  - rid: 7579425558579642682
+  - rid: 1688710450278564153
   perFill: []
   references:
     version: 2
     RefIds:
-    - rid: 7579425558579642680
+    - rid: 1688710450278564151
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: booked_coffeehouse
-    - rid: 7579425558579642681
+    - rid: 1688710450278564152
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Book a Coffeehouse Set
@@ -52,7 +52,7 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 7579425558579642682
+    - rid: 1688710450278564153
       type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         generator: {fileID: 11400000, guid: 97bc67d21c04db846b435e7addb83fb4, type: 2}

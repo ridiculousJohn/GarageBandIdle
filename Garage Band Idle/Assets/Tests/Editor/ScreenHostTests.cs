@@ -38,7 +38,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private const int CashLine = 0;
         private const int FansLine = 1;
         private const int RehearsalLine = 2;
-        private const int RecordsLine = 3;
+        private const int DemoTapesLine = 3;
         private const int JamButton = 4;
         private const int OpenStoryRow = 5;
         private const int EndStoryRow = 6;
@@ -710,7 +710,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(section.Modules[CashLine].Visible, "cash is ungated");
             Assert.IsFalse(section.Modules[FansLine].Visible, "fans sits behind its reveal");
             Assert.IsFalse(section.Modules[RehearsalLine].Visible, "rehearsal sits behind its reveal");
-            Assert.IsFalse(section.Modules[RecordsLine].Visible, "no records are held yet");
+            Assert.IsFalse(section.Modules[DemoTapesLine].Visible, "no demo tapes are held yet");
             Assert.IsTrue(section.Modules[JamButton].Visible, "the jam is ungated");
             Assert.IsTrue(section.Modules[OpenStoryRow].Visible, "the opener's row is ungated");
             Assert.IsFalse(section.Modules[EndStoryRow].Visible, "the capstone's row waits on the chapter flag");
@@ -1077,12 +1077,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var preview = module.Widget.Root.Q<Label>("preview");
             Assert.AreEqual(DisplayStyle.Flex, preview.style.display.value, "the rung opens with an AddCurrency");
-            Assert.AreEqual("Would bank: +0.00 Records, Demo Tapes", preview.text,
-                "the payout at zero fans, over both tied currencies' authored names");
+            Assert.AreEqual("Would bank: +0.00 Demo Tapes", preview.text,
+                "the payout at zero fans, over the paid currency's authored name");
         }
 
         [Test]
-        public void TheBackyardPartyShowsTheChaptersRungLegAndPreviewsNothing()
+        public void TheBackyardPartyShowsTheChaptersRungLegAndPreviewsTheRoadie()
         {
             var fx = new Fixture();
             fx.Enter();
@@ -1098,9 +1098,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The threshold leg carries its own uiText, so it renders as that
             // text with the progress beside it - the capstone's whole readout.
             CollectionAssert.AreEqual(new[] { "Hand out 30 Demo Tapes (0.00/30.00)" }, Fixture.VisibleLegs(module));
-            Assert.AreEqual(DisplayStyle.None,
-                module.Widget.Root.Q<Label>("preview").style.display.value,
-                "the capstone opens with ExecuteRung, which previews no number rather than a wrong one");
+            var preview = module.Widget.Root.Q<Label>("preview");
+            Assert.AreEqual(DisplayStyle.Flex, preview.style.display.value, "the capstone opens with an AddCurrency");
+            Assert.AreEqual("Would bank: +1.00 Roadies", preview.text,
+                "the constant roadie, over the paid currency's authored name");
         }
 
         [Test]
@@ -1109,26 +1110,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fx = new Fixture();
             fx.Enter();
 
-            // Records are root's, and the section's gate reads them by the
-            // outward walk from tier1 - so the deposit lands at root.
-            fx.Ctx(fx.Tier1).Deposit("records", 1);
+            // Demo Tapes are ch1's, and the section's gate reads them by the
+            // outward walk from tier1 - so the deposit lands at ch1.
+            fx.Ctx(fx.Tier1).Deposit("demo_tapes", 1);
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var section = fx.Host.Sections[GarageJam];
-            Assert.IsTrue(section.Visible, "the first record opened the section");
+            Assert.IsTrue(section.Visible, "the first demo tape opened the section");
             CollectionAssert.AreEqual(
                 new[] { "Garage Jam I", "Garage Jam II", "Garage Jam III" },
                 section.Modules.Select(module => Fixture.Text(module, "name")).ToArray(),
                 "one row per authored event, named from content");
 
             var first = section.Modules[0];
-            Assert.IsTrue(first.Widget.Root.Q<Button>("start").enabledSelf, "one record is jam I's whole gate");
+            Assert.IsTrue(first.Widget.Root.Q<Button>("start").enabledSelf, "one demo tape is jam I's whole gate");
             Assert.IsEmpty(Fixture.VisibleLegs(first), "a startable event has nothing left to explain");
 
             var second = section.Modules[1];
             Assert.IsFalse(second.Widget.Root.Q<Button>("start").enabledSelf);
             CollectionAssert.AreEqual(
-                new[] { "Clear Garage Jam I first", "15 Records (1.00/15.00)" }, Fixture.VisibleLegs(second),
+                new[] { "Clear Garage Jam I first", "15 Demo Tapes (1.00/15.00)" }, Fixture.VisibleLegs(second),
                 "the unmet legs in authored order; jam II is uncleared, so its own already-cleared leg holds");
         }
 
@@ -1138,7 +1139,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fx = new Fixture();
             fx.Enter();
 
-            fx.Ctx(fx.Tier1).Deposit("records", 1);
+            fx.Ctx(fx.Tier1).Deposit("demo_tapes", 1);
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
             fx.Session.TryStartEvent(fx.Ctx(fx.Tier1), fx.GarageJam1);
             Assert.IsNotNull(fx.Tier1.activeEvent, "the jam started");

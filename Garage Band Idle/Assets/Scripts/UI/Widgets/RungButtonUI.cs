@@ -97,7 +97,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         // The payout preview, through the rung's own first action - so a rung
         // opening with anything else previews nothing rather than a wrong
-        // number, which is what the capstone's ExecuteRung opening wants (12.5).
+        // number (12.5).
         private void ShowPreview(GameContext ctx)
         {
             if (!RungFeedback.TryPreviewPayout(rung, ctx, out var amount, out var currencies))

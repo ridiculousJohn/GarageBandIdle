@@ -89,8 +89,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void Each_scope_declares_the_families_the_chapter_files_on_it()
         {
-            // The chapter's own Records counter, paid beside root's (design 5).
-            Assert.AreEqual(new[] { "ch2_records" }, Ids(ch2.declaredCurrencies));
+            // The chapter's own counter, the one currency the EP pays.
+            Assert.AreEqual(new[] { "eps" }, Ids(ch2.declaredCurrencies));
             Assert.AreEqual(new[] { "EPs" }, ch2.declaredCurrencies.Select(c => c.displayName).ToArray());
 
             // Everything that survives an EP: the booked bookings, the two
@@ -112,8 +112,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "merch_table_revealed", "the_van_revealed",
             }, ch2.declaredFlags.ToArray());
 
-            Assert.AreEqual(new[] { "gig_payout_x2", "bulk_booking_switch", "favors_discount" }, Ids(ch2.modifiers));
-            Assert.AreEqual(new[] { "bulk_booking_switch", "favors_discount" }, Ids(ch2.permanentModifiers));
+            Assert.AreEqual(
+                new[] { "gig_payout_x2", "bulk_booking_switch", "favors_discount", "eps_income" }, Ids(ch2.modifiers));
+            Assert.AreEqual(
+                new[] { "bulk_booking_switch", "favors_discount", "eps_income" }, Ids(ch2.permanentModifiers));
             Assert.AreEqual(new[] { "story_ch2_open", "story_ch2_end" }, Ids(ch2.storyBeats));
             Assert.AreEqual(7, ch2.sections.Count, "only a chapter has a screen, and this is all of it");
             Assert.AreEqual(0, ch2.events.Count, "the Battle chain hosts at tier2, where its resets reach");
@@ -261,6 +263,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)0.5, discount.multiplier);
         }
 
+        // The chapter's permanent lift: +2% income per EP at both stats, so the
+        // fired gig yields ride it. It reads the chapter's own counter, which
+        // the capstone's reset clears with the chapter.
+        [Test]
+        public void EPs_lift_income_through_a_permanent_chapter_modifier()
+        {
+            var lift = Find(ch2.modifiers, "eps_income");
+
+            Assert.AreEqual(new[] { ("income", Stat.Rate), ("income", Stat.Yield) },
+                lift.effects.Select(e => (e.target, e.stat)).ToArray());
+            foreach (var effect in lift.effects)
+            {
+                var curve = (LinearOnBalance)effect.formula;
+                Assert.AreEqual("eps", curve.currency.Id, effect.stat.ToString());
+                Assert.AreEqual((BigNumber)0.02, curve.coefficient, effect.stat.ToString());
+            }
+            Assert.IsTrue(ch2.permanentModifiers.Contains(lift));
+        }
+
         // ---- the upgrades ----
 
         // A standing booking carries no effect at all: what it buys is the flag
@@ -280,16 +301,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- the rungs ----
 
-        // One evaluation, both targets: the EP pays root records and the
-        // chapter's gate counter amounts that can never drift (design 5).
+        // The EP pays the chapter's own counter, the one currency both the
+        // capstone gate and the income lift read.
         [Test]
-        public void The_EP_pays_both_record_currencies_from_one_root_curve()
+        public void The_EP_pays_eps_from_one_root_curve()
         {
             var ep = tier2.rung;
             var pay = (AddCurrency)ep.actions[0];
 
             Assert.AreEqual("Record an EP", ep.label);
-            Assert.AreEqual(new[] { "records", "ch2_records" }, Ids(pay.currencies));
+            Assert.AreEqual(new[] { "eps" }, Ids(pay.currencies));
             var curve = (RootCurveFormula)pay.formula;
             Assert.AreEqual("fans", curve.currency.Id);
             // Fans are never spent and clear with the tier, so what the round
@@ -307,24 +328,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void The_capstone_banks_the_live_run_then_pays_the_roadie()
+        public void The_capstone_pays_the_roadie_then_resets_the_chapter()
         {
             var capstone = ch2.rung;
 
             // One leg, so the gate is that leg and not an All wrapping it: the
             // chapter counter is the whole pacing knob.
             Assert.AreEqual("Win the Talent Show", capstone.label);
-            Assert.AreEqual("balance ch2_records", Describe(capstone.offerCondition));
+            Assert.AreEqual("balance eps", Describe(capstone.offerCondition));
             Assert.AreEqual((BigNumber)120, Threshold(capstone.offerCondition));
 
-            Assert.AreEqual(tier2, ((ExecuteRung)capstone.actions[0]).tier,
-                "the live run banks through the EP's own gate before the wipe");
-            var roadie = (AddCurrency)capstone.actions[1];
+            // The roadie, the completion flag, the chapter reset - and nothing
+            // else: the reset clears the chapter counter, so an EP recorded
+            // here would pay into a balance the same list zeroes.
+            Assert.AreEqual(3, capstone.actions.Count);
+            var roadie = (AddCurrency)capstone.actions[0];
             Assert.AreEqual(new[] { "roadies" }, Ids(roadie.currencies));
             Assert.AreEqual((BigNumber)1, roadie.amount);
             Assert.IsNull(roadie.formula, "the chapter reward is the constant 1");
-            Assert.AreEqual("ch2_complete", ((SetFlag)capstone.actions[2]).flagId);
-            Assert.AreEqual(ch2, ((ResetScope)capstone.actions[3]).scope);
+            Assert.AreEqual("ch2_complete", ((SetFlag)capstone.actions[1]).flagId);
+            Assert.AreEqual(ch2, ((ResetScope)capstone.actions[2]).scope);
         }
 
         // ---- the Battle chain ----

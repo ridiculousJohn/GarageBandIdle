@@ -25,8 +25,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public virtual void Validate(ValidationContext ctx) { }
     }
 
-    // 1 + coefficient * balance: additive within the term, so Records at 20 with
-    // 0.02 per Record gives 1.4x (design doc 3's records_income).
+    // 1 + coefficient * balance: additive within the term, so Demo Tapes at 20
+    // with 0.02 per Demo Tape gives 1.4x (chapter 1's demo_tapes_income).
     [Serializable]
     public class LinearOnBalance : MultiplierFormula
     {

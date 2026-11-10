@@ -32,9 +32,9 @@ namespace RidiculousGaming.GarageBandIdle
         public virtual void Validate(ValidationContext ctx) { }
     }
 
-    // Pays one or more target currencies from a SINGLE evaluation - the album
-    // pays root records and the chapter's gate counter identical amounts that
-    // can never drift (design doc 5). Amount is the constant unless a formula is
+    // Pays one or more target currencies from a SINGLE evaluation - every
+    // target receives the identical amount, so the currencies it pays can never
+    // drift apart (design doc 5). Amount is the constant unless a formula is
     // authored.
     [Serializable]
     public class AddCurrency : GameAction

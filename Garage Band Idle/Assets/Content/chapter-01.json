@@ -9,7 +9,7 @@
             "play_for_crowd_revealed", "unlock_covers_revealed"],
 
   "currencies": [
-    { "id": "ch1_records", "displayName": "Demo Tapes" }
+    { "id": "demo_tapes", "displayName": "Demo Tapes" }
   ],
 
   "modifiers": [
@@ -30,14 +30,30 @@
       "effects": [
         { "target": "tap_producer", "currencyId": "cash", "stat": "yield", "multiplier": 2 }
       ]
+    },
+    {
+      "id": "demo_tapes_income",
+      "effects": [
+        {
+          "target": "income",
+          "stat": "rate",
+          "formula": { "type": "LinearOnBalance", "currency": "demo_tapes", "coefficient": 0.02 }
+        },
+        {
+          "target": "income",
+          "stat": "yield",
+          "formula": { "type": "LinearOnBalance", "currency": "demo_tapes", "coefficient": 0.02 }
+        }
+      ]
     }
   ],
 
+  "permanentModifiers": ["demo_tapes_income"],
+
   "rung": {
     "label": "Play the Backyard Party",
-    "offerCondition": { "type": "CurrencyAtLeast", "currency": "ch1_records", "threshold": 30, "uiText": "Hand out 30 Demo Tapes" },
+    "offerCondition": { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 30, "uiText": "Hand out 30 Demo Tapes" },
     "actions": [
-      { "type": "ExecuteRung", "tier": "tier1" },
       { "type": "AddCurrency", "currencies": ["roadies"], "amount": 1 },
       { "type": "SetFlag", "flagId": "ch1_complete" },
       { "type": "ResetScope", "scope": "ch1" }
@@ -81,8 +97,8 @@
         },
         {
           "prefabId": "currency_line",
-          "contentId": "records",
-          "visibleWhen": { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1 }
+          "contentId": "demo_tapes",
+          "visibleWhen": { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 1 }
         },
         { "prefabId": "jam_button", "contentId": "tap_producer" },
         { "prefabId": "story_row", "contentId": "story_ch1_open" },
@@ -162,7 +178,7 @@
     },
     {
       "title": "The Release",
-      "description": "Cut a demo when you have 50 fans and a cover. It banks Records and Demo Tapes and resets the run.",
+      "description": "Cut a demo when you have 50 fans and a cover. It banks Demo Tapes and resets the run.",
       "visibleWhen": { "type": "FlagSet", "flagId": "album" },
       "scopeId": "ch1",
       "modules": [
@@ -172,7 +188,7 @@
     {
       "title": "Garage Jam",
       "description": "Three timed sprints, one at a time. The band goes quiet and you tap alone for the goal, and clearing one pays more cash per tap for the rest of the chapter.",
-      "visibleWhen": { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1 },
+      "visibleWhen": { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 1 },
       "scopeId": "tier1",
       "modules": [
         { "prefabId": "event_row", "contentId": "garage_jam_1" },
@@ -519,7 +535,7 @@
           "availableWhen": {
             "type": "All",
             "conditions": [
-              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 1, "uiText": "1 Records" },
+              { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 1, "uiText": "1 Demo Tape" },
               {
                 "type": "Not",
                 "uiText": "Already cleared",
@@ -555,7 +571,7 @@
                 "uiText": "Already cleared",
                 "condition": { "type": "FlagSet", "flagId": "gj2_done" }
               },
-              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 15, "uiText": "15 Records" }
+              { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 15, "uiText": "15 Demo Tapes" }
             ]
           },
           "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 300 },
@@ -587,7 +603,7 @@
                 "uiText": "Already cleared",
                 "condition": { "type": "FlagSet", "flagId": "gj3_done" }
               },
-              { "type": "CurrencyAtLeast", "currency": "records", "threshold": 30, "uiText": "30 Records" }
+              { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 30, "uiText": "30 Demo Tapes" }
             ]
           },
           "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 600 },
@@ -626,7 +642,7 @@
         "actions": [
           {
             "type": "AddCurrency",
-            "currencies": ["records", "ch1_records"],
+            "currencies": ["demo_tapes"],
             "formula": { "type": "RootCurveFormula", "currency": "fans", "divisor": 5, "exponent": 0.5 }
           },
           { "type": "ResetScope", "scope": "tier1" }

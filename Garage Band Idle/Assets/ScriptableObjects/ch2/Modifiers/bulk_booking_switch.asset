@@ -28,7 +28,7 @@ MonoBehaviour:
     formula:
       rid: -2
   appliesWhen:
-    rid: 7579425558579642482
+    rid: 1688710450278563942
   timer: 
   activeAfterSeconds: 0
   references:
@@ -36,7 +36,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 7579425558579642482
+    - rid: 1688710450278563942
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

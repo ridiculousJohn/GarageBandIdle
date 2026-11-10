@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c35210d72fdb0f1449ed7fe2ca7504a1, type: 3}
+  m_Name: demo_tapes_income
+  m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.ModifierDefinition
+  id: demo_tapes_income
+  tags: []
+  displayName: 
+  description: 
+  stacking: 0
+  effects:
+  - target: income
+    currencyId: 
+    stat: rate
+    multiplier:
+      _value:
+        mantissa: 1
+        exponent: 0
+    formula:
+      rid: 1688710450278564024
+  - target: income
+    currencyId: 
+    stat: yield
+    multiplier:
+      _value:
+        mantissa: 1
+        exponent: 0
+    formula:
+      rid: 1688710450278564025
+  appliesWhen:
+    rid: -2
+  timer: 
+  activeAfterSeconds: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 1688710450278564024
+      type: {class: LinearOnBalance, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
+      data:
+        currency: {fileID: 11400000, guid: abae6220a161cf84794258fa6b13c9f0, type: 2}
+        coefficient:
+          _value:
+            mantissa: 2
+            exponent: -2
+    - rid: 1688710450278564025
+      type: {class: LinearOnBalance, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
+      data:
+        currency: {fileID: 11400000, guid: abae6220a161cf84794258fa6b13c9f0, type: 2}
+        coefficient:
+          _value:
+            mantissa: 2
+            exponent: -2

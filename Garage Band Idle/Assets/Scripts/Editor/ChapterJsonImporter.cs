@@ -683,7 +683,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             else if (!string.IsNullOrEmpty(dto.contentId))
             {
                 content = ResolveWithHome(build, sectionScope, dto.contentId, "module content", out var home);
-                // Root-owned content (Records) is readable from every chain, so
+                // Root-owned content (Roadies) is readable from every chain, so
                 // a home outside this chapter's subtree lands the module on the
                 // chapter rather than off its own screen (12.11).
                 moduleScope = InSubtreeOf(build, chapter, home) ? home : chapter;
@@ -1029,7 +1029,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         // Two kinds of entry and nothing else (12.14.5). Both live in ONE
         // PackTogether group: root-owned assets are implicit dependencies of the
         // root entry AND every chapter entry, and Addressables duplicates an
-        // implicit dependency into every bundle referencing it - two `records`
+        // implicit dependency into every bundle referencing it - two `roadies`
         // instances at runtime would break the asset identity composition leans
         // on.
         private static void AssignAddressables(Build build, Options options)
@@ -1042,7 +1042,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 typeof(BundledAssetGroupSchema), typeof(ContentUpdateGroupSchema));
             // Not optional: without this schema the group builds no bundle at
             // all, and without PackTogether root's own assets duplicate into
-            // every chapter's bundle - two `records` instances at runtime, and
+            // every chapter's bundle - two `roadies` instances at runtime, and
             // the composition resolves by asset identity. A pre-existing group
             // missing it gets it, rather than the entries being registered under
             // a packing rule nobody set.

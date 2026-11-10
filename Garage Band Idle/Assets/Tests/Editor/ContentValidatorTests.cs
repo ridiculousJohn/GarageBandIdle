@@ -123,7 +123,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 offerCondition = new CurrencyAtLeast { currency = Ch1Records, threshold = 30 },
                 actions =
                 {
-                    new ExecuteRung { tier = Tier1 }, // cash the album before the reset, like the authored capstone
+                    new ExecuteRung { tier = Tier1 }, // cash the album before the reset
                     new AddCurrency { currencies = { Records }, amount = 1 },
                     new SetFlag { flagId = "ch1_complete" },
                     new ResetScope { scope = Ch1 },

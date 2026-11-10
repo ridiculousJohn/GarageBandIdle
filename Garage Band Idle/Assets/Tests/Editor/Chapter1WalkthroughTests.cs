@@ -45,7 +45,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly ChapterDefinition Ch1Def;
             public readonly TierDefinition Tier1Def;
 
-            public readonly CurrencyDefinition Records, Roadies, Ch1Records, Cash, Fans, Rehearsal;
+            public readonly CurrencyDefinition Roadies, DemoTapes, Cash, Fans, Rehearsal;
             public readonly ProducerDefinition TapProducer;
             public readonly GeneratorDefinition PracticeAmp, Drummer, Bassist;
             public readonly UpgradeDefinition StagePresence, PlayForCrowd, UnlockCovers;
@@ -86,9 +86,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsNotNull(Ch1Def, "chapter-01.json has not been imported - run Garage Band Idle/Import Content.");
                 Tier1Def = (TierDefinition)Ch1Def.children.Single();
 
-                Records = Find(RootDef.declaredCurrencies, "records");
                 Roadies = Find(RootDef.declaredCurrencies, "roadies");
-                Ch1Records = Find(Ch1Def.declaredCurrencies, "ch1_records");
+                DemoTapes = Find(Ch1Def.declaredCurrencies, "demo_tapes");
                 GjTap1 = Find(Ch1Def.modifiers, "gj_tap_1");
                 Cash = Find(Tier1Def.declaredCurrencies, "cash");
                 Fans = Find(Tier1Def.declaredCurrencies, "fans");
@@ -183,14 +182,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsTrue(Tier1.purchasedUpgrades.Contains(upgrade.Id), upgrade.Id);
             }
 
-            // The doc's mid-chapter run (13.2 and 13.3): a banked Records count
-            // with a live run at some fan total and one cover learned.
-            public void SeedRun(double records, double fans)
+            // The doc's mid-chapter run (13.2 and 13.3): a banked Demo Tapes
+            // count with a live run at some fan total and one cover learned.
+            public void SeedRun(double tapes, double fans)
             {
-                Root.balances[Records.Id] = records;
-                // The two counters track together through a first playthrough:
-                // one AddCurrency evaluation pays both.
-                Ch1.balances[Ch1Records.Id] = records;
+                Ch1.balances[DemoTapes.Id] = tapes;
                 // A deposit writes the balance and the earned total together
                 // (12.3), and the album reads what the round earned (12.5).
                 Tier1.balances[Fans.Id] = fans;
@@ -200,7 +196,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
 
             // The doc's 13.4 state: ten amps, five drummers, two bassists,
-            // covers 1 and 2 learned, both reveals set, twenty records, no
+            // covers 1 and 2 learned, both reveals set, twenty Demo Tapes, no
             // roadies.
             public void SeedIdleState()
             {
@@ -211,7 +207,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Tier1.modifierStacks[CoverBonus2.Id] = 1;
                 Tier1.flags.Add("fans_revealed");
                 Tier1.flags.Add("rehearsal_revealed");
-                Root.balances[Records.Id] = 20;
+                Ch1.balances[DemoTapes.Id] = 20;
             }
 
             public void AssertTierIsFresh()
@@ -230,7 +226,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- 13.1 normal release ----
 
         [Test]
-        public void Walkthrough_1_the_first_demo_pays_three_records_and_resets_the_run()
+        public void Walkthrough_1_the_first_demo_pays_three_demo_tapes_and_resets_the_run()
         {
             var f = new Chapter1();
             f.Enter();
@@ -317,9 +313,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Tier1Def.rung.IsOffered(f.Ctx(f.Tier1)));
             f.Session.TryRung(f.Ctx(f.Tier1));
 
-            // One evaluation, two targets.
-            AssertClose(3, f.Balance(f.Root, f.Records), "records");
-            AssertClose(3, f.Balance(f.Ch1, f.Ch1Records), "ch1_records");
+            // The album banks the chapter's own counter.
+            AssertClose(3, f.Balance(f.Ch1, f.DemoTapes), "demo_tapes");
             f.AssertTierIsFresh();
             Assert.IsTrue(f.Ch1.flags.Contains("album"), "the chapter flag survives the tier reset");
 
@@ -337,22 +332,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new Chapter1();
             f.Enter();
-            f.SeedRun(records: 17, fans: 60);
+            f.SeedRun(tapes: 17, fans: 60);
             f.Tier1.generatorCounts[f.PracticeAmp.Id] = 3;
 
             // What those three amps pay before the sprint, so the handicap
             // below is measured against a live number rather than an assumed
-            // one: 3 x 0.5, lifted by 17 banked Records.
+            // one: 3 x 0.5, lifted by 17 banked Demo Tapes.
             AssertClose(1.5 * 1.34, f.Rate(f.Cash), "the gear pays before the jam");
 
-            Assert.IsTrue(f.GarageJam1.IsAvailable(f.Ctx(f.Tier1)), "CurrencyAtLeast(records, 1) holds at 17");
+            Assert.IsTrue(f.GarageJam1.IsAvailable(f.Ctx(f.Tier1)), "CurrencyAtLeast(demo_tapes, 1) holds at 17");
             f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1);
 
             // onEntry's RestartScope banks through the release's OWN gate - 60
             // fans with a cover done meets it - and then clears the run, so
             // entry costs the player nothing already earned.
-            AssertClose(20, f.Balance(f.Root, f.Records), "17 + floor(sqrt(60/5)) = 20");
-            AssertClose(20, f.Balance(f.Ch1, f.Ch1Records));
+            AssertClose(20, f.Balance(f.Ch1, f.DemoTapes), "17 + floor(sqrt(60/5)) = 20");
             f.AssertTierIsFresh();
 
             var record = f.Tier1.activeEvent;
@@ -367,7 +361,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Tier1.generatorCounts[f.PracticeAmp.Id] = 3;
             AssertClose(0, f.Rate(f.Cash), "the gear x0 handicap");
             f.Tap();
-            AssertClose(1.4, f.Balance(f.Tier1, f.Cash), "the tap yield rides the Records multiplier");
+            AssertClose(1.4, f.Balance(f.Tier1, f.Cash), "the tap yield rides the Demo Tapes multiplier");
 
             f.TapUntil(() => f.Balance(f.Tier1, f.Cash) >= 150, "the 150 cash goal");
             Assert.Greater(f.Tier1.activeEvent.remainingSeconds, 0,
@@ -403,7 +397,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new Chapter1();
             f.Enter();
-            f.SeedRun(records: 17, fans: 60);
+            f.SeedRun(tapes: 17, fans: 60);
 
             f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1);
             f.TickUntil(() => f.Tier1.activeEvent.remainingSeconds <= 0, "the timer expiring", 120);
@@ -430,38 +424,38 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- 13.3 replay clear ----
 
         [Test]
-        public void Walkthrough_3_the_capstone_banks_the_run_pays_a_roadie_and_resets_the_chapter()
+        public void Walkthrough_3_the_capstone_pays_a_roadie_and_resets_the_chapter()
         {
             var f = new Chapter1();
             f.Enter();
-            f.SeedRun(records: 32, fans: 70);
+            f.SeedRun(tapes: 32, fans: 70);
             f.Ch1.flags.Add("album");
 
-            Assert.IsTrue(f.Ch1Def.rung.IsOffered(f.Ctx(f.Ch1)), "32 banked records clears the gate of 30");
+            Assert.IsTrue(f.Ch1Def.rung.IsOffered(f.Ctx(f.Ch1)), "32 banked Demo Tapes clears the gate of 30");
             f.Session.TryRung(f.Ctx(f.Ch1));
 
-            // ExecuteRung banks the live run through the release's own gate -
-            // floor(sqrt(70/5)) = 3 - before the wipe reaches it.
-            AssertClose(35, f.Balance(f.Root, f.Records), "the live run banked");
             AssertClose(1, f.Balance(f.Root, f.Roadies), "chapter 1's reward formula is the constant 1");
             Assert.IsTrue(f.Root.flags.Contains("ch1_complete"));
 
             // ResetScope(ch1) is downward closed: the chapter's own facts go
             // with the tier's, and the chapter sits immediately replayable.
-            AssertClose(0, f.Balance(f.Ch1, f.Ch1Records), "the gate counter zeroes");
+            AssertClose(0, f.Balance(f.Ch1, f.DemoTapes), "the gate counter zeroes");
             Assert.IsEmpty(f.Ch1.flags, "every ch1 flag goes with it - album, the gj latches, the ten reveals");
             Assert.IsEmpty(f.Ch1.modifierStacks);
             f.AssertTierIsFresh();
 
-            // The replay, with the new roadie stationed here: records x
-            // roadie_total x roadie_active = 1.7 x 1.05 x 1.05, about 1.87.
+            // The replay starts from zero Demo Tapes, so their income lift is
+            // x1 and the garage jams re-gate from nothing. The new roadie
+            // stationed here is the whole multiplier: roadie_total x
+            // roadie_active = 1.05 x 1.05, about 1.10.
+            Assert.IsFalse(f.GarageJam1.IsAvailable(f.Ctx(f.Tier1)), "CurrencyAtLeast(demo_tapes, 1) fails at 0");
             bool? allocated = null;
             f.Session.SetRoadieAllocation(
                 new Dictionary<string, int> { { f.Ch1.ScopeId, 1 } }, f.Now,
                 ran => allocated = ran);
             Assert.AreEqual(true, allocated, "the allocation command stations the earned Roadie");
             f.Tier1.generatorCounts[f.PracticeAmp.Id] = 1;
-            AssertClose(0.5 * 1.7 * 1.05 * 1.05, f.Rate(f.Cash), "the income multiplier comes back at ~1.87x");
+            AssertClose(0.5 * 1.05 * 1.05, f.Rate(f.Cash), "only the roadie lifts the replay's income, ~1.10x");
 
             // The fan floor does not move: fans carry no roadie-reachable tag,
             // which is the farm throttle.
@@ -483,16 +477,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new Chapter1();
             f.Enter();
-            f.SeedRun(records: 32, fans: 70);
+            f.SeedRun(tapes: 32, fans: 70);
             f.Ch1.flags.Add("album");
             var atCh1 = f.Ctx(f.Ch1);
 
-            Assert.IsTrue(f.Ch1Def.rung.IsOffered(atCh1), "32 banked records clears the gate of 30");
+            Assert.IsTrue(f.Ch1Def.rung.IsOffered(atCh1), "32 banked Demo Tapes clears the gate of 30");
 
             // The jam's entry restart banks the live run first, so the gate
             // stays met while the attempt runs.
             f.Session.TryStartEvent(f.Ctx(f.Tier1), f.GarageJam1);
-            AssertClose(35, f.Balance(f.Root, f.Records), "32 + floor(sqrt(70/5))");
+            AssertClose(35, f.Balance(f.Ch1, f.DemoTapes), "32 + floor(sqrt(70/5))");
             f.Ctx(f.Tier1).Deposit("cash", 150);
             f.Tick(1);
             Assert.IsTrue(f.Tier1.activeEvent.goalReached, "the sweep latched the goal");
@@ -508,31 +502,28 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(f.Tier1, refusal.Host, "the tier holding the record, not the chapter");
             Assert.AreEqual("Claim your Garage Jam I reward first", RungFeedback.RefusalText(refusal));
 
-            // A refused list runs nothing at all - not even the ExecuteRung it
+            // A refused list runs nothing at all - not even the roadie it
             // opens with.
             bool? released = null;
             f.Session.TryRung(f.Ctx(f.Ch1), ran => released = ran);
             Assert.AreEqual(false, released, "the refused list runs nothing at all");
-            AssertClose(35, f.Balance(f.Root, f.Records), "nothing banked");
+            AssertClose(35, f.Balance(f.Ch1, f.DemoTapes), "nothing cleared");
             AssertClose(0, f.Balance(f.Root, f.Roadies));
             Assert.IsFalse(f.Root.flags.Contains("ch1_complete"));
-            AssertClose(35, f.Balance(f.Ch1, f.Ch1Records), "and nothing cleared");
 
             // One tap of dismissal takes the reward and reopens the button.
             f.Session.TryDismissEvent(f.Ctx(f.Tier1), f.GarageJam1);
             Assert.AreEqual(1, f.Ch1.modifierStacks[f.GjTap1.Id], "the reward was paid, not stranded");
             Assert.IsTrue(f.Ch1Def.rung.IsOffered(f.Ctx(f.Ch1)));
 
-            // And the payouts are 13.3's, unchanged: the live run banks through
-            // the release's own gate, the roadie is the constant 1, and
-            // ResetScope(ch1) is downward closed.
-            f.SeedRun(records: 35, fans: 70);
+            // And the payouts are 13.3's, unchanged: the roadie is the constant
+            // 1, and ResetScope(ch1) is downward closed.
+            f.SeedRun(tapes: 35, fans: 70);
             f.Session.TryRung(f.Ctx(f.Ch1));
 
-            AssertClose(38, f.Balance(f.Root, f.Records), "35 + floor(sqrt(70/5))");
             AssertClose(1, f.Balance(f.Root, f.Roadies), "chapter 1's reward formula is the constant 1");
             Assert.IsTrue(f.Root.flags.Contains("ch1_complete"));
-            AssertClose(0, f.Balance(f.Ch1, f.Ch1Records), "the gate counter zeroes");
+            AssertClose(0, f.Balance(f.Ch1, f.DemoTapes), "the gate counter zeroes");
             Assert.IsEmpty(f.Ch1.modifierStacks, "and the chapter's own grants go with it");
             f.AssertTierIsFresh();
         }

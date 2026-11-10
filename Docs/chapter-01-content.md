@@ -17,7 +17,7 @@ numbers - expected to churn, and this file is their single home.
 | First demo (fresh install) | ~5–6 min (352s @ 2 taps/s, 293s @ 3 taps/s) | Walkthrough 1 |
 | Demo cycles to capstone | 7–10 | Walkthrough 1 |
 | First chapter clear | ~35–50 min active | Walkthrough 1 |
-| Replay clear | ~20–25 min → 1 Roadie | Walkthrough 3 |
+| Replay clear | untuned, set in the tuning pass -> 1 Roadie | Walkthrough 3 |
 | Primary pacing knob | the capstone gate (30) — raise/lower before touching curves | §11 |
 
 Tap-rate assumption throughout: 2–3 presses/sec sustained. Tune against both an unbuffed player and
@@ -33,13 +33,10 @@ root
 
 **Root content** (declared once, game-wide; listed here because Ch. 1 is the first consumer):
 
-- Currencies: `records` ("Records"), `roadies` ("Roadies") (both accumulate, never spent in
-  Ch. 1), `discography` ("Discography"; list, Ch. 6+).
+- Currencies: `roadies` ("Roadies") (accumulates, never spent in Ch. 1; the only currency that
+  crosses chapters), `discography` ("Discography"; list, Ch. 6+).
 - Permanent modifiers (§12.5/§12.6 — root-declared, root-applied via `permanentModifiers`;
   formula-shaped effects that exist from minute one):
-  - `records_income`: `{target: income, stat: rate, × (1 + 0.02 × records.balance)}` plus the same
-    entry at `stat: yield` — additive within the term, and "rate and yield alike" is one entry per
-    stat (§12.2).
   - `roadie_total`: `{target: income, stat: rate, × Π over chapters (1 + 0.05 × stationed there)}`
     (§8.2) — `perRoadie` lives on the formula.
   - `roadie_active`: `{target: production, currencyId: income, stat: rate,
@@ -67,10 +64,10 @@ root
 
 | Id | Declared in | Tags | activeWhen | Notes |
 |---|---|---|---|---|
-| `cash` ("Cash") | tier1 | `income` | - | The income tag is what the Records and Roadie modifiers target (§12.2). |
-| `fans` ("Fans") | tier1 | - | `FlagSet(fans_revealed)` | **Never income-tagged, never roadie-buffable** - the farm throttle (§8.2). |
+| `cash` ("Cash") | tier1 | `income` | - | The base resource. The income tag is what the Demo Tapes and Roadie modifiers target (design 12.2). |
+| `fans` ("Fans") | tier1 | - | `FlagSet(fans_revealed)` | The release meter. **Never income-tagged, never roadie-buffable** - the farm throttle (design 8.2). |
 | `rehearsal` ("Rehearsal") | tier1 | - | `FlagSet(rehearsal_revealed)` | Fill pool for the cover bars. |
-| `ch1_records` ("Demo Tapes") | ch1 | - | - | Capstone gate counter - what cutting a demo produces and what earns the party gig; fed by the release payout, zeroed by the capstone's own reset (§5). The capstone leg reads "Hand out 30 Demo Tapes" over its progress. |
+| `demo_tapes` ("Demo Tapes") | ch1 | - | - | The prestige currency - what cutting a demo produces, and ch1's currency for both jobs: what `demo_tapes_income` reads (the income boost, section 8) and what earns the party gig (the capstone gate); fed by the release payout, zeroed by the capstone's own reset (design 5). The capstone leg reads "Hand out 30 Demo Tapes" over its progress. |
 
 The two reveals are declared on the CURRENCY, not on the entries that pay it (§12.2). Fans is why:
 its sources are `band` plus every bandmate generator, so the per-entry form is a rule each new source
@@ -169,9 +166,12 @@ with tier1 like every run fact.
 | `gj_tap_1` | `{target: tap_producer, currencyId: cash, stat: yield, ×1.25}` |
 | `gj_tap_2` | `{target: tap_producer, currencyId: cash, stat: yield, ×1.5}` |
 | `gj_tap_3` | `{target: tap_producer, currencyId: cash, stat: yield, ×2}` |
+| `demo_tapes_income` | `{target: income, stat: rate, x (1 + 0.02 x demo_tapes.balance)}` plus the same entry at `stat: yield` - `LinearOnBalance`, additive within the term, one entry per stat (design 12.2) |
 
 Cover bonuses are three distinct ids, so all three stack multiplicatively (×1.587 total). The
 `gj_tap` chain swaps explicitly (`RemoveModifier` + `AddModifier`, §6.1) — one live at a time.
+`demo_tapes_income` is declared on ch1 and listed in ch1's `permanentModifiers` (design 12.5), so it
+applies from minute one and is never granted; the others are granted by `AddModifier`.
 
 ## 9. Rungs
 
@@ -180,13 +180,12 @@ tier1.release ("Cut a Demo"):
   offerCondition: All[ CurrencyAtLeast(fans, 50),             # uiText "50 fans"
                        BarsCompleted(learn_covers, 1),        # uiText "Learn a cover"
                        Not(EventRewardPending) ]              # uiText "Claim your Garage Jam reward first"
-  rungActions:    [ AddCurrency([records, ch1_records], floor((fans/5)^0.5)),   # one evaluation, both targets
+  rungActions:    [ AddCurrency([demo_tapes], floor((fans/5)^0.5)),
                     ResetScope(tier1) ]
 
 ch1.capstone ("Play the Backyard Party"):
-  offerCondition: CurrencyAtLeast(ch1_records, 30)        # same gate, first clear and every replay
-  rungActions:    [ ExecuteRung(tier1),                   # cut the album if its own gate holds
-                    AddCurrency(roadies, 1),              # Ch. 1's reward formula: the constant 1
+  offerCondition: CurrencyAtLeast(demo_tapes, 30)         # same gate, first clear and every replay
+  rungActions:    [ AddCurrency(roadies, 1),              # Ch. 1's reward formula: the constant 1
                     SetFlag(ch1_complete),                # root
                     ResetScope(ch1) ]
 ```
@@ -211,9 +210,9 @@ release would, an unfinished one is discarded.
 
 | Event | availableWhen | Goal | Timer | rewards |
 |---|---|---|---|---|
-| `garage_jam_1` ("Garage Jam I") | `All[CurrencyAtLeast(records, 1), Not(FlagSet(gj1_done))]` | `CurrencyAtLeast(cash, 150)` | 60s | `[AddModifier(ch1, gj_tap_1), SetFlag(gj1_done)]` |
-| `garage_jam_2` ("Garage Jam II") | `All[FlagSet(gj1_done), Not(FlagSet(gj2_done)), CurrencyAtLeast(records, 15)]` | `CurrencyAtLeast(cash, 300)` | 90s | `[RemoveModifier(ch1, gj_tap_1), AddModifier(ch1, gj_tap_2), SetFlag(gj2_done)]` |
-| `garage_jam_3` ("Garage Jam III") | `All[FlagSet(gj2_done), Not(FlagSet(gj3_done)), CurrencyAtLeast(records, 30)]` | `CurrencyAtLeast(cash, 600)` | 90s | `[RemoveModifier(ch1, gj_tap_2), AddModifier(ch1, gj_tap_3), SetFlag(gj3_done)]` |
+| `garage_jam_1` ("Garage Jam I") | `All[CurrencyAtLeast(demo_tapes, 1), Not(FlagSet(gj1_done))]` | `CurrencyAtLeast(cash, 150)` | 60s | `[AddModifier(ch1, gj_tap_1), SetFlag(gj1_done)]` |
+| `garage_jam_2` ("Garage Jam II") | `All[FlagSet(gj1_done), Not(FlagSet(gj2_done)), CurrencyAtLeast(demo_tapes, 15)]` | `CurrencyAtLeast(cash, 300)` | 90s | `[RemoveModifier(ch1, gj_tap_1), AddModifier(ch1, gj_tap_2), SetFlag(gj2_done)]` |
+| `garage_jam_3` ("Garage Jam III") | `All[FlagSet(gj2_done), Not(FlagSet(gj3_done)), CurrencyAtLeast(demo_tapes, 30)]` | `CurrencyAtLeast(cash, 600)` | 90s | `[RemoveModifier(ch1, gj_tap_2), AddModifier(ch1, gj_tap_3), SetFlag(gj3_done)]` |
 
 All three share `onEnd: [ResetScope(tier1)]`, which runs whether or not the goal was reached -
 dismissal pays the bonus if it was, then clears the sprint either way, and the next run starts fresh
@@ -224,10 +223,10 @@ The `Not(FlagSet(gjN_done))` legs make the three gates mutually exclusive: at mo
 startable at any moment - no selection rule anywhere, §12's rows merely render the facts. A
 cleared jam stops being startable for the rest of the chapter cycle, which the reward lists
 already assume (each removes its predecessor's modifier; a re-clear would pay nothing under
-`Replace` stacking); the capstone's `ResetScope(ch1)` clears the flags and re-arms the whole
-ladder for the replay.
+`Replace` stacking); the capstone's `ResetScope(ch1)` clears the flags and the Demo Tapes and
+re-arms the whole ladder for the replay, which re-gates from zero.
 Gate leg `uiText` (§12.11's unmet-legs contract, rendered on a disabled row):
-`CurrencyAtLeast(records, N)` reads "N Records" (1/15/30); `FlagSet(gj1_done)` "Clear Garage
+`CurrencyAtLeast(demo_tapes, N)` reads "1 Demo Tape" / "15 Demo Tapes" / "30 Demo Tapes"; `FlagSet(gj1_done)` "Clear Garage
 Jam I first"; `FlagSet(gj2_done)` "Clear Garage Jam II first"; each `Not(FlagSet(gjN_done))`
 "Already cleared".
 `gj*_done` flags and the reward modifiers live at **ch1** — they survive tier resets, die at the
@@ -237,7 +236,7 @@ reset can destroy an armed, unclaimed reward: tier1 refuses to be cleared while 
 the runner asks before either list runs (§12.5). The release carries
 `Not(EventRewardPending)` (§9) on top of that, reading its own record and saying so early; the
 capstone carries no such leg, since a parent cannot read a child's record.
-Goals scale with banked Records (tap yield rides the `income` multiplier); feasibility
+Goals scale with banked Demo Tapes (tap yield rides `demo_tapes_income` on the `income` tag); feasibility
 math in Walkthrough 2.
 
 ## 11. Triggers & story
@@ -285,8 +284,8 @@ Opening a card sets its latch through `AcknowledgeStory` - `story_ch1_open_seen`
 | `the_gear` | "The Gear" | `FlagSet(gear_revealed)` | tier1 | six `upgrade_row` modules, one per upgrade; Stage Presence's shows with the section, the rest gate on their reveal flags; a bought upgrade's row reads Bought |
 | `rehearsal_space` | "The Rehearsal Space" | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
 | `the_release` | "The Release" | `FlagSet(album)` | ch1 | release rung button (+ "would bank: N" preview via the same formula) |
-| `garage_jam` | "Garage Jam" | `CurrencyAtLeast(records, 1)` | tier1 | three event rows, one per jam, all always-visible (below) |
-| `backyard_party` | "The Backyard Party" | `FlagSet(album)` | ch1 | capstone rung button; its one leg reads "Hand out 30 Demo Tapes" over `ch1_records`/30 |
+| `garage_jam` | "Garage Jam" | `CurrencyAtLeast(demo_tapes, 1)` | tier1 | three event rows, one per jam, all always-visible (below) |
+| `backyard_party` | "The Backyard Party" | `FlagSet(album)` | ch1 | capstone rung button; its one leg reads "Hand out 30 Demo Tapes" over `demo_tapes`/30 |
 
 Every gate above is a flag or a monotonic fact — nothing strobes with spending (§2).
 
@@ -299,9 +298,7 @@ module's `visibleWhen`, the existing mechanism:
 | `cash` | always |
 | `fans` | `FlagSet(fans_revealed)` |
 | `rehearsal` | `FlagSet(rehearsal_revealed)` |
-| `records` (root's) | `CurrencyAtLeast(records, 1)` |
-
-No `ch1_records` line - the `backyard_party` readout is that currency's one presentation.
+| `demo_tapes` | `CurrencyAtLeast(demo_tapes, 1)` |
 
 **The story rows** (§10, §11): each is a `story_row` module binding one beat, evaluating at ch1
 where the beats are declared. Both live here rather than in `backyard_party`: the capstone
@@ -348,7 +345,7 @@ everything it renders as a row or a band:
 | `the_band` | Amps and the people to play them. They earn while you do nothing, and every bandmate brings fans of their own. |
 | `the_gear` | One-time buys that make everything else pay more. Cutting a demo clears them, and you buy them back faster each run. |
 | `rehearsal_space` | Rehearsal builds up while you play. Spend it learning covers, one at a time, and each one you learn draws a bigger crowd. |
-| `the_release` | Cut a demo when you have 50 fans and a cover. It banks Records and Demo Tapes and resets the run. |
+| `the_release` | Cut a demo when you have 50 fans and a cover. It banks Demo Tapes and resets the run. |
 | `garage_jam` | Three timed sprints, one at a time. The band goes quiet and you tap alone for the goal, and clearing one pays more cash per tap for the rest of the chapter. |
 | `backyard_party` | The gig that ends the chapter. Hand out 30 Demo Tapes to get the show, and you walk away with your first Roadie. |
 
@@ -366,10 +363,10 @@ everything it renders as a row or a band:
 | ~217s | buy `play_for_crowd` → fans accrue at 0.35 + 0.02/s | `SetFlag(fans_revealed)` — nothing pre-banked |
 | ~300s | 25 fans → buy `unlock_covers` → Rehearsal live (0.5/s + 1/press) | `SetFlag(rehearsal_revealed)` |
 | ~350s | `cover_1` fills (100 rehearsal at its own 2/s rate) → fan rate ×1.15 | `AddModifier(tier1, cover_bonus_1)` |
-| ~352s | 50 fans + 1 cover → `reveal_release` sets `album` in that sweep, the release region appears; **release**: `floor((50/5)^0.5)` = **3** → records 3, ch1_records 3; tier1 resets | one formula evaluation, two targets |
+| ~352s | 50 fans + 1 cover -> `reveal_release` sets `album` in that sweep, the release region appears; **release**: `floor((50/5)^0.5)` = **3** -> demo_tapes 3; tier1 resets | one formula evaluation |
 
 At 3 taps/s the same trace lands at ~293s. Second run re-buys band → fans → covers ~30% faster
-(income ×1.06 from 3 records); the band and gear rows revealed in the first run are on screen from
+(income x1.06 from 3 Demo Tapes); the band and gear rows revealed in the first run are on screen from
 the start, greyed until affordable (design §2).
 
 **To the capstone:** releasing at roughly 50 / 65 / 85 / 110 / 145 / 190 / 250 fans pays
@@ -377,17 +374,17 @@ the start, greyed until affordable (design §2).
 untouched by every income multiplier — keeps each cycle ≥ ~2.5 min, so the first clear runs
 ~35–50 min. Both targets in §1 hold.
 
-### 13.2 Event entry (mid-chapter, records = 17, mid-run: 60 fans, 1 cover done)
+### 13.2 Event entry (mid-chapter, 17 Demo Tapes, mid-run: 60 fans, 1 cover done)
 
 1. `StartEvent(garage_jam_1)` — `availableWhen` holds (17 ≥ 1), host empty ✓.
 2. `onEntry` runs `RestartScope(tier1)`, which checks the **release's own gate** — 60 ≥ 50 fans, 1 cover ✓
-   — so the run banks exactly as a manual release: `floor((60/5)^0.5)` = 3 → records 20,
-   ch1_records +3, and tier1 clears. Had the gate been unmet, the rung would have no-opped and the
+   - so the run banks exactly as a manual release: `floor((60/5)^0.5)` = 3 -> demo_tapes 20,
+   and tier1 clears. Had the gate been unmet, the rung would have no-opped and the
    clear would still have happened - the unfinished run *discarded*, never banked.
 3. The `ActiveEvent` record is created in the fresh state: `{garage_jam_1, 60, false}`.
    Handicap `{target: gear, stat: rate, ×0}` now zeroes every generator line by derivation — tap only.
 4. Tap yield = 1 × (1 + 0.02×20) = **1.4/press** (no stage_presence — the reset cleared it). Goal
-   150 cash ⇒ ~107 presses in 60s ≈ **1.8 taps/s** — a real but fair sprint. (At records = 1, the
+   150 cash => ~107 presses in 60s ~ **1.8 taps/s** - a real but fair sprint. (At 1 Demo Tape, the
    earliest possible attempt, it's 2.4 taps/s — intentionally brutal; "come back later" is the
    experience, §6.1.)
 5. Goal reached at t≈55s: the sweep latches `goalReached` — spending below 150 afterwards
@@ -405,25 +402,28 @@ untouched by every income multiplier — keeps each cycle ≥ ~2.5 min, so the f
 
 ### 13.3 Replay clear
 
-Capstone at end of cycle 7 (ch1_records 32, live run at 70 fans with a cover done):
-`ExecuteRung(tier1)` banks the run (+3 → records 35), `AddCurrency(roadies, 1)`,
-`SetFlag(ch1_complete)`, `ResetScope(ch1)` — ch1_records, the `album` flag, gj rewards and flags
-all zero; the chapter sits freshly reset, immediately replayable (§8.1).
+Capstone at end of cycle 7 (demo_tapes 32, live run at 70 fans with a cover done):
+`AddCurrency(roadies, 1)`, `SetFlag(ch1_complete)`, `ResetScope(ch1)` - demo_tapes, the live run
+with its 70 fans, the `album` flag, gj rewards and flags all zero; the chapter sits freshly reset,
+immediately replayable (design 8.1).
 
-Replay with `SetRoadieAllocation({ch1: 1})`: income multiplier = (1 + 0.02×35) × 1.05 × 1.05
-(records × roadie_total × roadie_active) ≈ **1.87×**. Cash milestones compress ~2× (first demo in
-~2.5–3 min); the fan floor doesn't move (fans carry no roadie-reachable tag); cycles settle at
-~2.5–3 min ⇒ **~20–25 min to the same 30-record gate** → Roadie #2. Faster, not harder — and the
-concave spread math (§8.2) says the *next* Roadie is better stationed elsewhere once other
+The replay starts from zero Demo Tapes with only the Roadie carried in. With
+`SetRoadieAllocation({ch1: 1})` the income multiplier starts at 1.05 x 1.05 (roadie_total x
+roadie_active) = 1.1025x, and `demo_tapes_income` climbs from zero as the replay's releases bank;
+the Garage Jams re-gate from zero. The fan floor doesn't move (fans carry no roadie-reachable tag).
+The replay's time is untuned: it is set in the tuning pass. The test pins the replay's opening:
+after the capstone Garage Jam I is not startable (`CurrencyAtLeast(demo_tapes, 1)` fails at 0), and
+with the Roadie stationed one Practice Amp pays 0.5 x 1.05 x 1.05 = 0.55125 Cash per second. The
+concave spread math (design 8.2) says the *next* Roadie is better stationed elsewhere once other
 chapters exist.
 
 ### 13.4 4-hour idle claim
 
 State when the player switches away: 10 amps, 5 drummers, 2 bassists; covers 1–2 done; both reveal
-flags set; records = 20; no roadies. `lastActiveUtc` stamps on switch-away.
+flags set; 20 Demo Tapes; no roadies. `lastActiveUtc` stamps on switch-away.
 
 Current rates at switch-in, 4h later:
-- cash: (10×0.5 + 5×3 + 2×20) × 1.40 = **84/s** (records multiplier applies — income tag)
+- cash: (10x0.5 + 5x3 + 2x20) x 1.40 = **84/s** (`demo_tapes_income` applies - income tag)
 - fans: (0.35 + 7×0.02) × 1.15 × 1.15 = **0.648/s** (no income multiplier — by design)
 - rehearsal: **0.5/s** (the rate entry; tap yields pay nothing while away — nothing fires)
 
@@ -441,9 +441,10 @@ expiring one hour after the stamp). The paid window is cut at the expiry, so 3,6
 tick's end collects it.
 
 **Tuning observation, no action needed:** a doubled 4h fan claim (9,332 fans) releases for
-`floor((9332/5)^0.5)` = 43 records — the whole capstone gate in one press. This is *not* the strong
-path: the concave payout makes cycling ~10× more record-efficient per fan (100 active cycles in
-the same 4h ≈ 300 records), so idle is the convenience path at ~10% efficiency, exactly the §5
+`floor((9332/5)^0.5)` = 43 Demo Tapes - the whole capstone gate in one press. This is *not* the
+strong path: the concave payout makes cycling ~10x more Demo-Tape-efficient per fan (100 active
+cycles in the same 4h ~ 300 Demo Tapes), so idle is the convenience path at ~10% efficiency,
+exactly the design 5
 intent. It does mean Ch. 1 can be cleared in one evening of check-ins — acceptable for the
 tutorial chapter; the gate is the knob if not.
 
@@ -463,8 +464,8 @@ tutorial chapter; the gate is the knob if not.
 - `browse_gear` upgrade deleted — the region's reveal is the `reveal_gear` trigger on the earned total (§2).
 - Garage Jam's internal tiers 1–3 → three `EventDefinition`s gated on completion flags (§6.1);
   `baselineReset` → `onEntry: [RestartScope]`; goals retuned 500/2500/10000 →
-  150/300/600 (the old goals needed 8+ taps/s; new ones sit at 1.8–2.8 taps/s against the intended
-  Records multipliers), timers 60/60/45 → 60/90/90.
+  150/300/600 (the old goals needed 8+ taps/s; new ones sit at 1.8-2.8 taps/s against the intended
+  Demo Tapes multiplier), timers 60/60/45 -> 60/90/90.
 - Retunes for the ~300s first-demo target: amp rate 0.4 → 0.5, drummer 500 → 250 with unlock at
   3 amps (was 5), base fan rate 0.2 → 0.35, `cover_1` 120 → 100.
 - Upgrade gates moved from spendable-balance to `EarnedTotalAtLeast` (persistent rows never strobe, §2).

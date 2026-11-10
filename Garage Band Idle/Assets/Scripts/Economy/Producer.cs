@@ -192,7 +192,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // generator's count is ONE number however the grant arrives, so its
         // stage reads the count plan whatever the entry's stat says. The
         // target's own definition is the owner, so its tags match - which is how
-        // the income tag carries the Records and Roadie factors (8.2).
+        // the income tag carries the chapter's prestige-currency and Roadie
+        // factors (8.2).
         private static BigNumber TargetStage(GameContext atHome, Definition target, string stat)
         {
             if (target is CurrencyDefinition || target is BarDefinition)
