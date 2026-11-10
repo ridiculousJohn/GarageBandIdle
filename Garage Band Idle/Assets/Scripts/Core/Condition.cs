@@ -105,6 +105,31 @@ namespace RidiculousGaming.GarageBandIdle
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(currency, "EarnedTotalAtLeast");
     }
 
+    // One balance strictly ahead of another, both read outward from the acting
+    // scope. Its use is a scope that resets itself when a counter declared
+    // further out is ahead of its own copy: the outer counter records a moment
+    // in a sibling, the inner copy records the last one this scope answered,
+    // and the gap between them is how one scope's reset answers a moment in a
+    // sibling without either reaching the other (design doc 12.5). No Progress
+    // override: the target moves with the other balance, so the default stands.
+    [Serializable]
+    public class CurrencyExceeds : Condition
+    {
+        public Economy.CurrencyDefinition currency;
+        public Economy.CurrencyDefinition other;
+
+        public override bool Evaluate(GameContext ctx) => ctx.GetBalance(currency.Id) > ctx.GetBalance(other.Id);
+
+        public override void Validate(ValidationContext ctx)
+        {
+            ctx.RequireOnChain(currency, "CurrencyExceeds");
+            ctx.RequireOnChain(other, "CurrencyExceeds");
+            if (currency != null && other != null && currency == other)
+                ctx.AddError(ValidationCheck.InertOperand,
+                    $"CurrencyExceeds compares '{currency.Id}' with itself - a currency never exceeds itself, so the gate is closed for good.");
+        }
+    }
+
     [Serializable]
     public class OwnedCountAtLeast : Condition
     {

@@ -23,17 +23,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public const string Count = "count";          // a generator's granted count; the stage-2 coordinate of a payment into it
         public const string AutoBuy = "autobuy";      // a generator's switch, not a factor: on while an effect naming it is live and no handicap is (12.2)
         public const string Consumption = "consumption"; // what one unit of a bar's fill costs in one currency; stage 1 only, read at the draw (12.7)
+        public const string Payout = "payout";        // what an AddCurrency pays into a currency; read by AddCurrency at the currency's home (12.5)
+        public const string Exponent = "exponent";    // the exponent of the payout formula paying a currency; read by AddCurrency at the currency's home (12.5)
 
         public static bool IsProduced(string stat) => stat == Rate || stat == Yield;
 
         public static bool IsEffectAddress(string stat) =>
-            stat == GameSpeed || stat == Cost || stat == Count || stat == AutoBuy || stat == Consumption;
+            stat == GameSpeed || stat == Cost || stat == Count || stat == AutoBuy || stat == Consumption
+            || stat == Payout || stat == Exponent;
 
         // For validation messages. An effect's stat coordinate may name any of
-        // the seven; a produces entry only the first two.
+        // the nine; a produces entry only the first two.
         public const string ProducedNames = Rate + ", " + Yield;
         public const string EffectStatNames =
-            ProducedNames + ", " + GameSpeed + ", " + Cost + ", " + Count + ", " + AutoBuy + ", " + Consumption;
+            ProducedNames + ", " + GameSpeed + ", " + Cost + ", " + Count + ", " + AutoBuy + ", " + Consumption
+            + ", " + Payout + ", " + Exponent;
     }
 
     // One authored number: what it pays, which stat, the base value, plus an

@@ -32,10 +32,10 @@ namespace RidiculousGaming.GarageBandIdle
         public virtual void Validate(ValidationContext ctx) { }
     }
 
-    // Pays one or more target currencies from a SINGLE evaluation - every
-    // target receives the identical amount, so the currencies it pays can never
-    // drift apart (design doc 5). Amount is the constant unless a formula is
-    // authored.
+    // Pays one or more target currencies (design doc 5/12.5). Every target is
+    // paid the same formula or constant, each under the factors addressed to
+    // that currency at its home, so two targets differ only where their own
+    // multipliers do. Amount is the constant unless a formula is authored.
     [Serializable]
     public class AddCurrency : GameAction
     {
@@ -43,16 +43,31 @@ namespace RidiculousGaming.GarageBandIdle
         public BigNumber amount;
         [SerializeReference, SubclassPicker] public PayoutFormula formula;
 
-        // The single evaluation every tied target shares (design doc 5): the
-        // formula when one is authored, else the constant. Execute deposits it;
-        // the rung feedback contract previews it through the same call (12.11).
-        public BigNumber Compute(GameContext ctx) => formula != null ? formula.Compute(ctx) : amount;
+        // What this action pays one of its targets (design doc 12.5): the formula
+        // when one is authored, else the constant, under the two factors the paid
+        // currency collects at its home - `exponent` on the formula's exponent and
+        // `payout` on the amount. Execute deposits it; the rung feedback contract
+        // previews it through the same call (12.11).
+        public BigNumber AmountFor(GameContext ctx, Economy.CurrencyDefinition currency)
+        {
+            var home = Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, currency);
+            var atHome = ctx.Rebase(home);
+            var plans = home.Link<StatPlans>(currency);
+            var paid = formula != null
+                ? formula.Compute(ctx, Economy.Producer.GetMultiplier(atHome, plans.For(Economy.Stat.Exponent)))
+                : amount;
+            return paid * Economy.Producer.GetMultiplier(atHome, plans.For(Economy.Stat.Payout));
+        }
 
         public override void Execute(GameContext ctx)
         {
-            // One evaluation, and one all-or-nothing commit: the targets are
-            // tied, so a refusal on the second may not leave the first paid.
-            ctx.DepositAll(currencies, Compute(ctx));
+            // Every amount is computed before anything is paid, and committed
+            // all-or-nothing: the targets are tied, so a refusal on the second
+            // may not leave the first paid.
+            var amounts = new List<BigNumber>(currencies.Count);
+            foreach (var currency in currencies)
+                amounts.Add(AmountFor(ctx, currency));
+            ctx.DepositAll(currencies, amounts);
         }
 
         public override void Validate(ValidationContext ctx)
@@ -65,6 +80,75 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"AddCurrency amount is {amount} - a grant never subtracts.");
             formula?.Validate(ctx);
+        }
+    }
+
+    // Overwrites one currency's balance with a value (design doc 12.5): the
+    // formula when one is authored, else the constant, computed in the acting
+    // context and written as it stands. No multiplier applies - the payout and
+    // exponent factors belong to AddCurrency alone, since this records a number
+    // rather than paying one. The write lands at the currency's home, found
+    // outward like every write, and moves neither the earned nor the lifetime
+    // total. Its use is a recorded time: a run's clock, kept in a currency fed
+    // at one per second, is written into a currency further out when the run
+    // completes, and another currency is written to zero.
+    [Serializable]
+    public class SetCurrency : GameAction
+    {
+        public Economy.CurrencyDefinition currency;
+        public BigNumber amount;
+        [SerializeReference, SubclassPicker] public PayoutFormula formula;
+
+        public override void Execute(GameContext ctx) =>
+            ctx.SetBalance(currency.Id, formula != null ? formula.Compute(ctx) : amount);
+
+        public override void Validate(ValidationContext ctx)
+        {
+            ctx.RequireOnChain(currency, "SetCurrency");
+            if (amount < BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange, $"SetCurrency amount is {amount} - a balance is never negative.");
+            formula?.Validate(ctx);
+        }
+    }
+
+    // Writes one song into the Discography, the song list the root scope keeps
+    // forever (design doc 7/12.5). The title is a pattern over the song's
+    // number: "Untitled #{0}" writes "Untitled #1", and a title with no
+    // placeholder is the song's name as it stands. Songs are never removed, so
+    // the count plus one is a number no earlier song holds. Display only:
+    // nothing in the economy reads a song. The player renames one afterwards
+    // through the session's RenameSong command.
+    [Serializable]
+    public class AddSong : GameAction
+    {
+        public string title;
+
+        public override void Execute(GameContext ctx)
+        {
+            var songs = ctx.Scope.Root().songs;
+            var number = songs.Count + 1;
+            songs.Add(new SongEntry { songId = "song_" + number, name = string.Format(title, number) });
+        }
+
+        // The pattern is formatted once here with a stand-in number, the way
+        // the load pass formats every uiText, so a malformed title is a content
+        // fault at load rather than a throw the first time a song is written.
+        public override void Validate(ValidationContext ctx)
+        {
+            if (string.IsNullOrEmpty(title))
+            {
+                ctx.AddError(ValidationCheck.NullEntry, "AddSong has no title");
+                return;
+            }
+            try
+            {
+                _ = string.Format(title, 1);
+            }
+            catch (FormatException)
+            {
+                ctx.AddError(ValidationCheck.UnresolvedReference,
+                    $"AddSong title '{title}' is not a format over the song's number - the one placeholder is {{0}}, and a literal brace is written doubled (12.11).");
+            }
         }
     }
 

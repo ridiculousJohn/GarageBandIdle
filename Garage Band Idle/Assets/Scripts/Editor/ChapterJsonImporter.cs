@@ -753,6 +753,11 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     { currency = Resolve<CurrencyDefinition>(build, scope, d.currency, "CurrencyAtLeast"), threshold = d.threshold },
                 EarnedTotalAtLeastDto d => new EarnedTotalAtLeast
                     { currency = Resolve<CurrencyDefinition>(build, scope, d.currency, "EarnedTotalAtLeast"), threshold = d.threshold },
+                CurrencyExceedsDto d => new CurrencyExceeds
+                {
+                    currency = Resolve<CurrencyDefinition>(build, scope, d.currency, "CurrencyExceeds"),
+                    other = Resolve<CurrencyDefinition>(build, scope, d.other, "CurrencyExceeds"),
+                },
                 OwnedCountAtLeastDto d => new OwnedCountAtLeast
                     { generator = Resolve<GeneratorDefinition>(build, scope, d.generator, "OwnedCountAtLeast"), count = d.count },
                 FlagSetDto d => new FlagSet { flagId = d.flagId },
@@ -785,6 +790,13 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 amount = d.amount,
                 formula = BuildPayoutFormula(build, scope, d.formula),
             },
+            SetCurrencyDto d => new SetCurrency
+            {
+                currency = Resolve<CurrencyDefinition>(build, scope, d.currency, "SetCurrency"),
+                amount = d.amount,
+                formula = BuildPayoutFormula(build, scope, d.formula),
+            },
+            AddSongDto d => new AddSong { title = d.title },
             FireGeneratorYieldDto d => new FireGeneratorYield
                 { generator = Resolve<GeneratorDefinition>(build, scope, d.generator, "FireGeneratorYield") },
             SetFlagDto d => new SetFlag { flagId = d.flagId },
@@ -831,6 +843,17 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 coefficient = d.coefficient,
                 purchasedOnly = d.purchasedOnly,
             },
+            DebtFactorDto d => new DebtFactor
+            {
+                currencies = d.currencies.Select(id => Resolve<CurrencyDefinition>(build, scope, id, "DebtFactor")).ToList(),
+                combine = d.combine,
+                coefficient = d.coefficient,
+                relief = string.IsNullOrEmpty(d.relief) ? null : Resolve<CurrencyDefinition>(build, scope, d.relief, "DebtFactor"),
+            },
+            LogOnBalanceDto d => new LogOnBalance
+                { currency = Resolve<CurrencyDefinition>(build, scope, d.currency, "LogOnBalance"), coefficient = d.coefficient },
+            InverseOfBalanceDto d => new InverseOfBalance
+                { currency = Resolve<CurrencyDefinition>(build, scope, d.currency, "InverseOfBalance") },
             RoadieTotalBoostDto d => new RoadieTotalBoost { perRoadie = d.perRoadie },
             RoadieActiveBoostDto d => new RoadieActiveBoost { perRoadie = d.perRoadie },
             _ => throw new ContentImportException($"multiplier formula kind '{dto.type}' has no builder."),

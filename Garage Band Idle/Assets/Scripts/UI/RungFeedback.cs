@@ -10,22 +10,25 @@ namespace RidiculousGaming.GarageBandIdle.UI
     public static class RungFeedback
     {
         // "would bank: N" (design doc 5): the rung's FIRST action through the
-        // same Compute the execution runs, and only when it is an AddCurrency.
-        // First-only is what makes parity hold by construction - nothing has
-        // mutated when the first action evaluates, while even a second
-        // AddCurrency may read what the first deposited. Any other opening kind
-        // previews nothing rather than a wrong number. ctx is the rung's own
-        // scope, as for Execute.
+        // same AmountFor the execution runs, one amount per target and parallel
+        // to currencies, and only when it is an AddCurrency. First-only is what
+        // makes parity hold by construction - nothing has mutated when the
+        // first action evaluates, while even a second AddCurrency may read what
+        // the first deposited. Any other opening kind previews nothing rather
+        // than a wrong number. ctx is the rung's own scope, as for Execute.
         public static bool TryPreviewPayout(Rung rung, GameContext ctx,
-            out BigNumber amount, out IReadOnlyList<CurrencyDefinition> currencies)
+            out IReadOnlyList<BigNumber> amounts, out IReadOnlyList<CurrencyDefinition> currencies)
         {
             if (rung.actions.Count == 0 || rung.actions[0] is not AddCurrency payout)
             {
-                amount = BigNumber.Zero;
+                amounts = System.Array.Empty<BigNumber>();
                 currencies = System.Array.Empty<CurrencyDefinition>();
                 return false;
             }
-            amount = payout.Compute(ctx);
+            var computed = new List<BigNumber>(payout.currencies.Count);
+            foreach (var currency in payout.currencies)
+                computed.Add(payout.AmountFor(ctx, currency));
+            amounts = computed;
             currencies = payout.currencies;
             return true;
         }

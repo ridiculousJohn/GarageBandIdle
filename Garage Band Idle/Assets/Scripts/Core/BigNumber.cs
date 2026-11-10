@@ -67,6 +67,7 @@ namespace RidiculousGaming.GarageBandIdle
         public static BigNumber Max(BigNumber a, BigNumber b) => new BigNumber(BigDouble.Max(a._value, b._value));
         public static BigNumber Min(BigNumber a, BigNumber b) => new BigNumber(BigDouble.Min(a._value, b._value));
         public static BigNumber Floor(BigNumber value) => new BigNumber(BigDouble.Floor(value._value));
+        public static BigNumber Log10(BigNumber value) => new BigNumber(BigDouble.Log10(value._value));
 
         public int CompareTo(BigNumber other) => _value.CompareTo(other._value);
         public bool Equals(BigNumber other) => _value.Equals(other._value);

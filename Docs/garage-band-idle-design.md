@@ -236,8 +236,9 @@ tier1.release:
 ```
 
 The payout is an ordinary `AddCurrency` action whose amount comes from a `PayoutFormula` (12.5) -
-there is no payout field and no distinguished award kind. An `AddCurrency` may name several targets
-paid from a single evaluation, identical amounts that can never drift; Chapter 1's release names one.
+there is no payout field and no distinguished award kind. An `AddCurrency` may name several targets,
+each paid the same formula under the multipliers addressed to that currency (12.5) and all committed
+together; Chapter 1's release names one.
 **Order is authoring**: the payout action
 precedes the `ResetScope`, so the formula reads the Fans the reset is about to destroy. Actions
 placed *after* a reset land in the fresh state, which is how a head-start reward ("start the next
@@ -417,6 +418,11 @@ IS the host and the outward walk recovers it, exactly as for every other content
 
 Songwriting unlocks at the Studio chapter.
 
+> **State of this section (2026-11-10).** The Discography paragraph below is what the code does.
+> The quality roll and the Catalog boost are the earlier sketch: John dropped them on 2026-11-10
+> (the Studio's economy is ideas into tracks, build plan "Runtime work to do before chapters 3-8 are
+> implemented"), and nothing about songs crosses chapters but the Discography's display.
+
 - **Writing a song** rolls a quality tier — Common, Hit, or Classic — and the player names it. Song
   quality feeds a run-scoped global multiplier:
   ```
@@ -428,9 +434,16 @@ Songwriting unlocks at the Studio chapter.
   It applies to all income and feeds royalty/idle income.
 - **On album release,** total catalog quality is the main input to that chapter's release payout
   (section 5), and the working Catalog resets with the run.
-- **Discography** is a persistent root-level list of the player's best songs, kept for display.
-  Songs reach it by **promotion: an action in the release rung, ordered before the `ResetScope`**,
-  reading the dying run's Catalog and writing the chosen songs to the root list (`AddSong`). The
+- **Discography** is the list of songs the root scope keeps forever, display only: nothing in the
+  economy reads a song. A song is written by an authored action, `AddSong(title)` (12.5), from
+  whatever list a chapter places it in; the title is a pattern over the song's number
+  (`"Untitled #{0}"` writes "Untitled #1"), so a release nobody is watching still names its song.
+  The player renames any song afterwards from the Discography window - a session command,
+  `RenameSong`, which trims the name, holds it to 40 characters and refuses a blank one. The window
+  opens from a top-bar button that stands only while a song exists, and the save carries the list
+  in order.
+- *Earlier sketch, dropped with the quality roll:* songs reaching the Discography by promotion from
+  the dying run's Catalog. The
   selection rule is a Ch. 6 authoring decision, deferred (candidates we considered: auto-by-quality —
   Classics always chart, Hits at a threshold; best-N-of-run; player picks a song to immortalize at
   release).
@@ -767,10 +780,9 @@ Re-asking there would be a filter inside a commit loop whose own earlier deposit
 gate reads: one output could abort a sibling's write mid-firing, which is the atomicity this section
 promises, and a settlement could refuse a line the offer already presented, leaving the stamp
 unadvanced and the offer live to pay twice. An AUTHORED payment has no gather to have judged it, so
-`AddCurrency` is refused at the write or nowhere - and because its targets are TIED to one
-evaluation (§5), every one of them is checked before any is written. A per-target check-then-write
-loop would bank the first and refuse the second, which is the drift the single evaluation exists to
-prevent, and the command exits without closing its transaction, so a retry pays the first again.
+`AddCurrency` is refused at the write or nowhere - and because its targets are TIED, paid together
+or not at all (§5), every one of them, and every amount, is checked before any is written. A per-target
+check-then-write loop would bank the first and refuse the second, and the command exits without closing its transaction, so a retry pays the first again.
 
 `IdleAccumulation` is refused inside one, at any depth. It is the one condition whose answer depends
 on which GATHER is asking rather than on the tree, and a gate deciding whether a currency takes
@@ -964,6 +976,14 @@ reaches every generator's count, every price, every generator's switch or every 
 price, as the paragraph above says. `consumption` is a bar's coordinate per consumed currency (12.7),
 stage 1 only as `cost` is.
 
+**`payout` and `exponent` are a currency's coordinates too**, compiled at its home beside `rate` and
+`yield`. `payout` multiplies what an `AddCurrency` pays into the currency; `exponent` multiplies the
+exponent of the payout formula paying it (12.5), so a Linear-stacking modifier at 1.05 raises an
+exponent of 0.20 by 0.01 a grant. Both are read at the currency's home, so an effect on either lives
+at that home or further out. Nothing reaches a payout but an effect naming the stat: a `rate` or
+`yield` effect on the same currency leaves an authored grant exactly what it says, which is why a
+capstone pays one Roadie whatever multiplies income.
+
 **`autobuy` is a switch, not a factor.** A generator's coordinate, homed where the generator is
 declared, read by the tick alone (12.9): on when an effect naming the generator - by id, tag or the
 wildcard - is live and no handicap on the same coordinate is, the multiplier unread. The upgrade
@@ -976,6 +996,31 @@ disabled" for as long as its record exists.
 every count read, purchased alone or purchased plus granted by its `purchasedOnly` flag, since the
 two are separate facts. Add and multiply are the two shapes: a produces entry adds, an Effect
 multiplies, and the factor inside an Effect is a formula kind; there is no expression language.
+
+**Debt is a factor that shrinks, not a term that subtracts.** `DebtFactor` is
+`max(0, 1 - coefficient x debt)`, where debt is a list of currencies' balances combined by sum or by
+maximum (`combine`), read outward from the gather origin. A source authors `coefficient` as one over
+its own base value, which makes the factor equal to subtracting the debt from that source's output
+before every other factor: `(base - debt) x count x m` is `base x (1 - debt / base) x count x m`. The
+floor at zero is what keeps a debt larger than the base from running production backwards. The mode
+is fixed per effect; content that changes mode partway through authors two modifiers, one per mode,
+switched by `appliesWhen`. An optional `relief` currency divides the combined debt once its balance
+passes one. Debt accruing is an ordinary produces entry paying the debt currency.
+
+**`LogOnBalance`** is `1 + coefficient x log10(1 + balance)`: a factor that keeps growing with a
+balance at a falling rate, exactly one at a zero balance.
+
+**`InverseOfBalance`** is one over a balance, and zero while the balance is zero. It turns a recorded
+value into a rate: a rate entry worth an amount per run, under this factor over a recorded run time,
+pays that amount per second, and pays nothing while there is no record. **A recorded pace** is this
+with `SetCurrency` (12.5) and no further mechanism: a run keeps its clock as a currency fed at one
+per second in the tier its reset clears; the list that completes the run writes that clock into a
+currency further out and writes the other runs' records to zero; and a producer's rate entry
+conditioned on `IdleAccumulation` pays the run's amount under `InverseOfBalance` of its record, so
+an absence repeats the run last completed, at the time it actually took, and the idle claim is
+unchanged. The record must be written by a list that runs while the chapter is live: a bar's
+`onComplete` runs once per completion at the claim, every run against the clock as the window left
+it (12.9), so a run that completes during an absence would record the wrong time.
 
 **Both stages are compiled, once, when the tree is built.** Everything above but liveness is authored
 and validated, so the load pass (12.14.8) asks the question for every coordinate the content authors
@@ -1020,8 +1065,8 @@ anything up in. A scope also carries `permanentModifiers` — a USAGE list, not 
 each entry references a modifier declared on the reachable chain and applies it permanently
 (§12.5), so the list joins no id space and homes nothing. Events are declared on `InteriorDefinition` rather than the base,
 since root cannot host one: the definition is placed, the record is a fact of the host. Songs are
-undecided until Chapter 6 (§7) — a `SongDefinition` may not exist at all, since a song is written at
-runtime rather than authored. A producer's `produces`
+facts on root and nothing else (§7) - there is no `SongDefinition`: a song is written at runtime by `AddSong`
+(12.5) rather than authored. A producer's `produces`
 entries are live exactly while its declaring scope belongs to the foreground chapter's **live
 subtree** — activation is placement, several sibling or nested scopes participate in the same tick,
 and each contribution resolves its facts and effects outward from its own declaring scope to root,
@@ -1043,7 +1088,7 @@ class ScopeFacts   // the mutable state a reset DESTROYS; what a reset keeps sit
     Dictionary<string, HashSet<string>> activeMembers; // per group: the member ids that are ON (12.7)
     Dictionary<string, int>       modifierStacks;   // AddModifier grants, keyed like every other count
     List<TimedBuff>               timedBuffs;       // {buffId, expiresAt}, the id a declared TIMER's: the timer's value; root's encore_timer lives here
-    List<SongEntry>               songs;            // tier = the run's Catalog; root = Discography (§7)
+    List<SongEntry>               songs;            // root = the Discography; unused on other scopes (§7)
 }
 
 class InteriorFacts : ScopeFacts     // every scope inside another: chapters and tiers
@@ -1149,7 +1194,8 @@ public abstract class Condition
 }
 ```
 
-Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `OwnedCountAtLeast`, `FlagSet`, `UpgradePurchased`,
+Kinds: `CurrencyAtLeast`, `EarnedTotalAtLeast`, `CurrencyExceeds` (one balance strictly ahead of
+another, 12.5), `OwnedCountAtLeast`, `FlagSet`, `UpgradePurchased`,
 `BuffActive`, `HasEntitlement`, `BarsCompleted`, `EventRewardPending`, `EventRecordExists`, `Always`, `All`, `Any`, `Not` (the story gate
 `chapterN_complete && !storyN_seen` is
 `All[FlagSet, Not[FlagSet]]`), plus a formula-threshold kind (threshold computed from state — e.g.
@@ -1208,14 +1254,19 @@ public abstract class Action
 }
 ```
 
-Kinds: `AddCurrency` (one or more target currencies paid from a single evaluation; amount constant
-or from a `PayoutFormula`), `AddModifier(scope, modifier)`, `RemoveModifier(scope, modifier)`,
+Kinds: `AddCurrency` (one or more target currencies; each is paid the constant or the
+`PayoutFormula`'s amount under the `payout` and `exponent` factors that currency collects, 12.2, every
+amount computed before any is paid and the targets committed together), `SetCurrency(currency,
+amount or formula)` (overwrites the balance at the currency's home with a recorded value, under no
+multiplier, moving neither the earned nor the lifetime total and never asking `activeWhen` - a
+record, not income), `AddModifier(scope, modifier)`, `RemoveModifier(scope, modifier)`,
 `SetFlag(flagId)`, `ExtendTimer(timer, seconds, capSeconds)` (adds to a declared timer at its home
 through the flag's outward walk, remaining time clamped to the cap - the Encore ad's reward, §9),
 `FireGeneratorYield(generator)` (fires a generator's yield entries the way `FireProducer` fires a
 producer's, at the generator's declaring scope and scaled by its owned count - on a bar's
 `onComplete` a team paying per cycle, on an upgrade or a rung a one-shot grant that scales),
-`AddSong`, `ResetScope(scope)`, `ExecuteRung(tier)` and `RestartScope(scope)`
+`AddSong(title)` (appends a song to root's list under the title formatted over the song's number,
+section 7), `ResetScope(scope)`, `ExecuteRung(tier)` and `RestartScope(scope)`
 (fire that scope's rung through its own gate, then clear it - the restart idiom as one action; a
 bare `ResetScope` remains for a pure wipe). The event lifecycle operations are commands rather than
 Action kinds (§6.1, §12.11). Authored inline via
@@ -1249,6 +1300,15 @@ command. Chapter 1 is the worked case: the Garage Jam is hosted at tier1 and its
 tier1, rather than anything below the tier reaching up. Wanting a child to reset its parent is the
 signal that the moment belongs one level up; the child's condition gets there as a fact, never as a
 reference.
+
+A moment in one scope that must clear a SIBLING is the same rule. The acting scope adds one to a
+counter declared on their common ancestor, and the sibling declares a trigger gated on
+`CurrencyExceeds(counter, its own copy)` whose list is `ResetScope` of itself followed by an
+`AddCurrency` paying the copy the counter's balance. The reset clears the copy and re-arms the
+trigger; the deposit after it lands in the fresh state and closes the condition until the counter
+moves again. Several scopes may add to one counter, so several prestiges can each clear their own
+scope and a shared one: reset sets that overlap, with one rung per scope and no reset reaching
+sideways.
 
 **`AddModifier`** counts a stack under the modifier's id in the target scope's
 `modifierStacks`. A modifier is declared content like everything else — `ScopeDefinition.modifiers` —
@@ -1747,7 +1807,7 @@ row reaches the host through `IGeneratorInfoOpener`, the shape `IStoryOpener` ha
 holds the generator and its declaring scope for as long as the request stands.
 
 **Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
-Encore, the story log or a generator's info screen is open, the host does not run the automatic story walk. The modal and any unsubmitted
+Encore, the story log, the Discography or a generator's info screen is open, the host does not run the automatic story walk. The modal and any unsubmitted
 allocation draft remain intact. A waiting marked beat stays unseen and opens on the first refresh
 after the last overlay closes, if it is still available. The walk reads state, not a transition.
 
@@ -1992,8 +2052,6 @@ Assets/Scripts/
     RoadieAllocation.cs    // SetRoadieAllocation; the boost arithmetic is Economy's
     BackstagePass.cs       // the backstage_pass entitlement id, the one Owned(root) read, and its CodeReferences check
     Roadies.cs             // the roadies currency id and its CodeReferences check
-  Content/
-    SongDefinition.cs      // Catalog (run) + Discography (root)
   Save/
     SaveSystem.cs          // JSON + checksum; serializes the ScopeState tree
   Editor/
@@ -2021,6 +2079,7 @@ Assets/Scripts/
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
+    DiscographyUI.cs        // the Discography overlay: one row per song root keeps, a name field and a button that renames through the session
     NumberFormatter.cs
     TopBarUI.cs             // the two pills; the countdown pill's timer, authored in Screen.uxml, is read by the window too
     TimerPill.cs            // the countdown pill element: a Button with a `timer` UXML attribute, so the chrome names its timer once

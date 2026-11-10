@@ -196,22 +196,29 @@ namespace RidiculousGaming.GarageBandIdle
         }
 
         // The authored write for TIED targets: an AddCurrency pays several
-        // currencies from a single evaluation, and design doc 5 is that those
-        // amounts can never drift. A per-target check-then-write loop breaks
-        // that as surely as re-evaluating the amount would - the second target
-        // refusing after the first has banked is exactly the drift, and the
-        // command exits without closing its transaction, so a retry pays the
-        // first one twice. So every target is checked before any is written:
+        // currencies at one moment, each its own amount, and they are committed
+        // together. A per-target check-then-write loop would let the second
+        // target refuse after the first has banked, and the command exits
+        // without closing its transaction, so a retry pays the first one twice.
+        // So every target and every amount is checked before any is written:
         // the same resolve-then-commit shape a gather uses, for the same reason.
-        public void DepositAll(IReadOnlyList<Economy.CurrencyDefinition> currencies, BigNumber amount)
+        // amounts is parallel to currencies; a length mismatch is a caller bug.
+        public void DepositAll(IReadOnlyList<Economy.CurrencyDefinition> currencies, IReadOnlyList<BigNumber> amounts)
         {
-            foreach (var currency in currencies)
-                RequireActive(currency.Id);
-            // A negative amount is refused by the first DepositResolved, before
-            // it writes - one amount pays every target, so there is no later
-            // call that could find it negative after an earlier one landed.
-            foreach (var currency in currencies)
-                DepositResolved(currency.Id, amount);
+            if (currencies.Count != amounts.Count)
+                throw new InvalidOperationException(
+                    $"DepositAll: {currencies.Count} currencies but {amounts.Count} amounts - each target is paid its own amount.");
+            for (var i = 0; i < currencies.Count; i++)
+                RequireActive(currencies[i].Id);
+            // DepositResolved refuses a negative amount too, but only as it
+            // reaches it - a later target's negative would land after an
+            // earlier one banked, so the refusal is asked of every amount here.
+            for (var i = 0; i < amounts.Count; i++)
+                if (amounts[i] < BigNumber.Zero)
+                    throw new InvalidOperationException(
+                        $"Deposit of {amounts[i]} for currency '{currencies[i].Id}': a grant is never negative.");
+            for (var i = 0; i < currencies.Count; i++)
+                DepositResolved(currencies[i].Id, amounts[i]);
         }
 
         private void RequireActive(string currencyId)
@@ -315,6 +322,22 @@ namespace RidiculousGaming.GarageBandIdle
                 return false;
             Spend(currencyId, amount);
             return true;
+        }
+
+        // Overwrites the balance at the currency's home with a recorded value
+        // (design doc 12.5): a stored number replaced, never accumulated. It
+        // NEVER touches earnedTotals or lifetimeTotals: an overwrite is neither
+        // earning nor spending, so the monotonic totals the reveal gates stand
+        // on stay where they are. It does not ask the currency's activeWhen
+        // gate either - that gate is about income, and this is a record. A
+        // negative amount is a caller bug, since a balance is never negative.
+        public void SetBalance(string currencyId, BigNumber amount)
+        {
+            if (amount < BigNumber.Zero)
+                throw new InvalidOperationException(
+                    $"SetBalance of {amount} for currency '{currencyId}': a balance is never negative.");
+            var home = HomeOf(currencyId);
+            home.balances[currencyId] = amount;
         }
 
         // Writes to the flag's declared home (design doc 12.3). A flag no scope

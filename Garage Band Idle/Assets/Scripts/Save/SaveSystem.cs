@@ -82,6 +82,10 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 lifetimeTotals = state.lifetimeTotals,
                 facts = JObject.FromObject(state.facts, JsonSerializer.Create(MakeSettings())),
             };
+            // The song list sits on every payload, but only root keeps songs
+            // (the Discography, design doc 7), so only root's list is written.
+            if (state.Parent != null)
+                node.facts.Remove("songs");
             foreach (var child in state.Children)
                 node.children.Add(ToNode(child));
             return node;
@@ -312,9 +316,9 @@ namespace RidiculousGaming.GarageBandIdle.Save
         // Bar facts come through here too: a bar's home is its GROUP's home,
         // so a scope's own groups are the whole question. The roadie allocation
         // and the recorded current chapter validate against the tree instead
-        // (above). Event ids and song ids gain their filters WITH their
-        // definition families - the same incremental contract as the validation
-        // pass.
+        // (above). Event ids gain their filters WITH their definition families -
+        // the same incremental contract as the validation pass. A song names no
+        // definition, so its filter is the entry's own shape (below).
         private static void FilterToDeclared(ScopeFacts facts, ScopeState state)
         {
             var definition = state.Definition;
@@ -528,6 +532,29 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 Debug.LogWarning($"SaveSystem: timed buff '{buff?.buffId}' is not a timer declared on the chain from '{state.ScopeId}' - dropped.");
                 return true;
             });
+
+            // Songs are the Discography, kept on root alone (design doc 7), so a
+            // song on any other scope is a stale write. A song names no declared
+            // content: on root it needs only an id and a name, the order on disk
+            // is the order written, and a name past MaxNameLength is cut to it -
+            // the hold a rename applies.
+            facts.songs.RemoveAll(song =>
+            {
+                if (facts is not RootFacts)
+                    Debug.LogWarning($"SaveSystem: song '{song?.songId}' is held by scope '{definition.Id}', and only root keeps songs - dropped.");
+                else if (song == null || string.IsNullOrEmpty(song.songId))
+                    Debug.LogWarning("SaveSystem: song with no id - dropped.");
+                else if (string.IsNullOrEmpty(song.name))
+                    Debug.LogWarning($"SaveSystem: song '{song.songId}' has no name - dropped.");
+                else
+                    return false;
+                return true;
+            });
+            foreach (var song in facts.songs)
+            {
+                if (song.name.Length > SongEntry.MaxNameLength)
+                    song.name = song.name.Substring(0, SongEntry.MaxNameLength);
+            }
 
             // The event record is the interior payload's single field. A record
             // for an event this scope never declares is dropped, and a timer is

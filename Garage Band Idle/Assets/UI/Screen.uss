@@ -329,6 +329,29 @@ Label {
     opacity: 0.8;
 }
 
+.discography-panel {
+    min-width: 480px;
+}
+
+.discography-entries {
+    max-height: 400px;
+    margin-bottom: 8px;
+}
+
+.discography-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.discography-name {
+    flex-grow: 1;
+}
+
+.discography-rename {
+    min-width: 96px;
+}
+
 .overlay-close {
     margin-top: 8px;
 }

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 9bcd0e53-5626-49e8-9aa2-6f02854d91fd
-  modified: 2026-11-10T22:46:58.364Z
+  modified: 2026-11-10T23:42:59.979Z
 ---
 
 On 2026-11-10 John approved a remap of Ctrl C chapters 3-8 onto Garage Band chapters 3-8 as the
@@ -69,7 +69,16 @@ JSON were not touched and still show the earlier sketch.
 - Not built: an action that stores a value when the tour completes, and a formula turning the
   stored value into the away rate. Field shapes not worked out. The idle claim does not change.
 
-**The code-change list as of 2026-11-10 (none built)**
+**All seven code changes were BUILT on 2026-11-10** (1092/1092; build-plan rows "Pre-chapter
+runtime: ..."; design 5, 7, 12.2, 12.4, 12.5). Built names: `DebtFactor`, `CurrencyExceeds`,
+`LogOnBalance`, the `payout` and `exponent` stats (a currency's plans at its home, read by
+`AddCurrency.AmountFor`), `SetCurrency` + `InverseOfBalance` (the recorded pace), `AddSong` +
+`GameSession.RenameSong` + `DiscographyUI`. John chose "Rename later" for songs. Not done: the
+Discography window has not been looked at in the running game; design sections 2, 3, 5 and 11 still
+carry the Catalog-boost sketch; the chapters themselves are not designed. The "not built" wording
+in the notes below describes the state before that day's work.
+
+**The code-change list as it stood before building**
 - Agreed: (1) the debt formula, (2) the currency-against-currency condition, (3) the recorded tour
   pace (a store-value action plus a formula reading it).
 - Agreed as plain needs ("5 is just 'we need that new formula'... 6 is just 'yes, we need that'. 7

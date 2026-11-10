@@ -17,16 +17,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static IReadOnlyList<GameAction> Only(params GameAction[] actions) => actions;
 
         [Test]
-        public void AddCurrency_pays_every_target_from_one_evaluation()
+        public void AddCurrency_computes_every_amount_before_paying_any()
         {
             var tree = new TestTree();
             // A payout reads what the round EARNED by default (12.5), and the
             // gates read the balance, so a run standing at 50 carries both.
             tree.Tier1.balances["fans"] = 50;
             tree.Tier1.earnedTotals["fans"] = 50;
-            // The formula reads fans, and fans is ALSO the first target: with one
-            // evaluation both targets get 50; per-target re-evaluation would pay
-            // records 100 after the first deposit doubles fans.
+            // The formula reads fans, and fans is ALSO the first target: every
+            // amount is computed before any is paid, so both targets get 50;
+            // computing the second after the first deposit would pay records
+            // 100, since that deposit doubles fans.
             var action = new AddCurrency
             {
                 currencies = { tree.Fans, tree.Records },

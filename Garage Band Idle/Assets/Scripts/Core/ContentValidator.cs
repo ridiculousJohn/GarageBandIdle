@@ -1158,6 +1158,7 @@ namespace RidiculousGaming.GarageBandIdle
         private static bool ReadsABalance(Condition condition) => condition switch
         {
             CurrencyAtLeast => true,
+            CurrencyExceeds => true,
             All all => all.conditions.Any(c => c != null && ReadsABalance(c)),
             Any any => any.conditions.Any(c => c != null && ReadsABalance(c)),
             Not not => not.condition != null && ReadsABalance(not.condition),

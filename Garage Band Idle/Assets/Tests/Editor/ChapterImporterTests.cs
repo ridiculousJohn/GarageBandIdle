@@ -1026,6 +1026,271 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             StringAssert.Contains("ghost", thrown.Message);
         }
 
+        // ---- the debt, log and comparison kinds ----
+
+        // A debt factor with every field, a log factor beside it on the same
+        // amp, and a trigger gated on one balance passing another.
+        private const string DebtJson = @"{
+            ""type"": ""ChapterDefinition"",
+            ""id"": ""ch1"",
+            ""displayName"": ""The Garage"",
+            ""currencies"": [
+                { ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] },
+                { ""id"": ""debt_a"", ""displayName"": ""Loan"" },
+                { ""id"": ""debt_b"", ""displayName"": ""Tab"" },
+                { ""id"": ""relief"", ""displayName"": ""Relief"" },
+                { ""id"": ""hype"", ""displayName"": ""Hype"" }
+            ],
+            ""generators"": [
+                {
+                    ""id"": ""amp"",
+                    ""displayName"": ""Practice Amp"",
+                    ""availableWhen"": { ""type"": ""Always"" },
+                    ""costCurrency"": ""cash"",
+                    ""baseCost"": 60,
+                    ""growth"": 1.15,
+                    ""produces"": [{ ""currency"": ""cash"", ""stat"": ""rate"", ""value"": 0.5 }]
+                }
+            ],
+            ""modifiers"": [
+                {
+                    ""id"": ""owed"",
+                    ""displayName"": ""Owed"",
+                    ""effects"": [
+                        {
+                            ""target"": ""amp"",
+                            ""stat"": ""rate"",
+                            ""formula"": {
+                                ""type"": ""DebtFactor"",
+                                ""currencies"": [""debt_a"", ""debt_b""],
+                                ""coefficient"": 0.5, ""combine"": ""Maximum"", ""relief"": ""relief""
+                            }
+                        },
+                        {
+                            ""target"": ""amp"",
+                            ""stat"": ""rate"",
+                            ""formula"": { ""type"": ""LogOnBalance"", ""currency"": ""hype"", ""coefficient"": 2 }
+                        }
+                    ]
+                }
+            ],
+            ""permanentModifiers"": [""owed""],
+            ""triggers"": [
+                {
+                    ""id"": ""overdrawn"",
+                    ""condition"": { ""type"": ""CurrencyExceeds"", ""currency"": ""debt_a"", ""other"": ""cash"" },
+                    ""actions"": [{ ""type"": ""AddCurrency"", ""currencies"": [""relief""], ""amount"": 1 }]
+                }
+            ],
+            ""children"": [{ ""type"": ""TierDefinition"", ""id"": ""tier1"" }]
+        }";
+
+        [Test]
+        public void A_DebtFactor_imports_with_every_field()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", DebtJson);
+
+            Import();
+
+            var owed = Load<ModifierDefinition>("ch1/Modifiers/owed.asset");
+            var debt = (DebtFactor)owed.effects[0].formula;
+            Assert.AreEqual(new[]
+            {
+                Load<CurrencyDefinition>("ch1/Currencies/debt_a.asset"),
+                Load<CurrencyDefinition>("ch1/Currencies/debt_b.asset"),
+            }, debt.currencies.ToArray(), "the references are the assets, in authored order");
+            Assert.AreEqual(DebtCombine.Maximum, debt.combine, "read by name");
+            Assert.AreEqual((BigNumber)0.5, debt.coefficient);
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/relief.asset"), debt.relief);
+        }
+
+        [Test]
+        public void A_DebtFactor_without_combine_or_relief_imports_as_an_unrelieved_sum()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", DebtJson.Replace(@", ""combine"": ""Maximum"", ""relief"": ""relief""", ""));
+
+            Import();
+
+            var debt = (DebtFactor)Load<ModifierDefinition>("ch1/Modifiers/owed.asset").effects[0].formula;
+            Assert.AreEqual(DebtCombine.Sum, debt.combine, "an omitted combine is the sum");
+            Assert.IsNull(debt.relief, "an omitted relief is none");
+            Assert.AreEqual(2, debt.currencies.Count);
+        }
+
+        [Test]
+        public void A_DebtFactor_naming_no_such_combine_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", DebtJson.Replace(@"""combine"": ""Maximum""", @"""combine"": ""Largest"""));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("Largest", thrown.Message);
+        }
+
+        [Test]
+        public void A_LogOnBalance_formula_imports()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", DebtJson);
+
+            Import();
+
+            var log = (LogOnBalance)Load<ModifierDefinition>("ch1/Modifiers/owed.asset").effects[1].formula;
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/hype.asset"), log.currency);
+            Assert.AreEqual((BigNumber)2, log.coefficient);
+        }
+
+        [Test]
+        public void A_CurrencyExceeds_condition_imports()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", DebtJson);
+
+            Import();
+
+            var exceeds = (CurrencyExceeds)Load<TriggerDefinition>("ch1/Triggers/overdrawn.asset").condition;
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/debt_a.asset"), exceeds.currency);
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/cash.asset"), exceeds.other);
+        }
+
+        // ---- the recorded value and its inverse ----
+
+        // A run's clock recorded into a best time by formula, the clock written
+        // back by constant, and the amp's rate over the recorded time.
+        private const string RecordJson = @"{
+            ""type"": ""ChapterDefinition"",
+            ""id"": ""ch1"",
+            ""displayName"": ""The Garage"",
+            ""currencies"": [
+                { ""id"": ""cash"", ""displayName"": ""Cash"", ""tags"": [""income""] },
+                { ""id"": ""run_clock"", ""displayName"": ""Run Clock"" },
+                { ""id"": ""best_time"", ""displayName"": ""Best Time"" }
+            ],
+            ""generators"": [
+                {
+                    ""id"": ""amp"",
+                    ""displayName"": ""Practice Amp"",
+                    ""availableWhen"": { ""type"": ""Always"" },
+                    ""costCurrency"": ""cash"",
+                    ""baseCost"": 60,
+                    ""growth"": 1.15,
+                    ""produces"": [{ ""currency"": ""cash"", ""stat"": ""rate"", ""value"": 0.5 }]
+                }
+            ],
+            ""modifiers"": [
+                {
+                    ""id"": ""pace"",
+                    ""displayName"": ""Pace"",
+                    ""effects"": [
+                        {
+                            ""target"": ""amp"",
+                            ""stat"": ""rate"",
+                            ""formula"": { ""type"": ""InverseOfBalance"", ""currency"": ""best_time"" }
+                        }
+                    ]
+                }
+            ],
+            ""permanentModifiers"": [""pace""],
+            ""triggers"": [
+                {
+                    ""id"": ""record"",
+                    ""condition"": { ""type"": ""Always"" },
+                    ""actions"": [
+                        {
+                            ""type"": ""SetCurrency"",
+                            ""currency"": ""best_time"",
+                            ""formula"": {
+                                ""type"": ""RootCurveFormula"",
+                                ""currency"": ""run_clock"",
+                                ""reads"": ""Balance"",
+                                ""divisor"": 1,
+                                ""exponent"": 1
+                            }
+                        },
+                        { ""type"": ""SetCurrency"", ""currency"": ""run_clock"", ""amount"": 5 }
+                    ]
+                }
+            ]
+        }";
+
+        [Test]
+        public void A_SetCurrency_with_a_formula_imports_with_every_field()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", RecordJson);
+
+            Import();
+
+            var record = Load<TriggerDefinition>("ch1/Triggers/record.asset");
+            var set = (SetCurrency)record.actions[0];
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/best_time.asset"), set.currency,
+                "the reference is the asset, not a copy");
+            var curve = (RootCurveFormula)set.formula;
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/run_clock.asset"), curve.currency);
+            Assert.AreEqual(PayoutTotal.Balance, curve.reads, "read by name");
+            Assert.AreEqual((BigNumber)1, curve.divisor);
+            Assert.AreEqual(1.0, curve.exponent);
+        }
+
+        [Test]
+        public void A_SetCurrency_with_an_amount_imports_with_every_field()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", RecordJson);
+
+            Import();
+
+            var set = (SetCurrency)Load<TriggerDefinition>("ch1/Triggers/record.asset").actions[1];
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/run_clock.asset"), set.currency);
+            Assert.AreEqual((BigNumber)5, set.amount);
+            Assert.IsNull(set.formula, "an omitted formula is none");
+        }
+
+        [Test]
+        public void A_SetCurrency_naming_no_such_currency_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", RecordJson.Replace(@"""currency"": ""best_time"",", @"""currency"": ""ghost"","));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("ghost", thrown.Message);
+        }
+
+        // A song write's one field is its title, the format the song's number
+        // fills, imported as authored.
+        [Test]
+        public void An_AddSong_imports_with_its_title()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ChapterJson.Replace(@"""children"":", @"""triggers"": [
+                    {
+                        ""id"": ""write"",
+                        ""condition"": { ""type"": ""Always"" },
+                        ""actions"": [{ ""type"": ""AddSong"", ""title"": ""Untitled #{0}"" }]
+                    }
+                ],
+                ""children"":"));
+
+            Import();
+
+            var write = (AddSong)Load<TriggerDefinition>("ch1/Triggers/write.asset").actions.Single();
+            Assert.AreEqual("Untitled #{0}", write.title);
+        }
+
+        [Test]
+        public void An_InverseOfBalance_formula_imports()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", RecordJson);
+
+            Import();
+
+            var inverse = (InverseOfBalance)Load<ModifierDefinition>("ch1/Modifiers/pace.asset").effects[0].formula;
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/best_time.asset"), inverse.currency);
+        }
+
         [Test]
         public void An_ordinary_number_lands_exactly()
         {

@@ -14,13 +14,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly RootScopeState root;
         private readonly GameClock clock;
         private readonly TimerPill encore;
+        private readonly Button discography;
 
         // The id the chrome counts down, authored on the pill and handed on to the
         // window, so the screen names its timer once and the code names none.
         public string TimerId => encore.Timer;
 
         public TopBarUI(VisualElement rootElement, RootScopeState root, GameClock clock,
-                        Action openEncore, Action openStoryLog, Action openChapterSelect, Action openSettings)
+                        Action openEncore, Action openStoryLog, Action openDiscography, Action openChapterSelect,
+                        Action openSettings)
         {
             Root = rootElement;
             this.root = root;
@@ -37,6 +39,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             var story = ScreenHost.Require<Button>(rootElement, "story-log");
             story.tooltip = "Story log";
             story.clicked += openStoryLog;
+            discography = ScreenHost.Require<Button>(rootElement, "discography");
+            discography.tooltip = "Discography";
+            discography.clicked += openDiscography;
+            ShowDiscography();
             var chapters = ScreenHost.Require<Button>(rootElement, "chapter-select");
             chapters.tooltip = "Chapters";
             chapters.clicked += openChapterSelect;
@@ -45,9 +51,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
             settings.clicked += openSettings;
         }
 
-        public void Refresh() => Interpolate();
+        public void Refresh()
+        {
+            ShowDiscography();
+            Interpolate();
+        }
 
         public void Interpolate() => encore.text = "\u23F1  " + EncoreTime.Text(root, encore.Timer, clock.RealTimeUtc);
+
+        // The discography button stands only while root keeps a song, so a
+        // player with none never opens an empty window.
+        private void ShowDiscography() =>
+            discography.style.display = root.songs.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
     // One display answer shared by the pill and window. It is deliberately not

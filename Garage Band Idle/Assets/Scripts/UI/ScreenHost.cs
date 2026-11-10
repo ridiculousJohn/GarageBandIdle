@@ -89,6 +89,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly RoadieAllocationUI allocation;
         private readonly EncoreWindowUI encore;
         private readonly StoryLogUI storyLog;
+        private readonly DiscographyUI discography;
         private readonly GeneratorInfoUI generatorInfo;
         private readonly List<SectionView> sections = new();
 
@@ -100,6 +101,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Roadies,
             Encore,
             StoryLog,
+            Discography,
             GeneratorInfo,
         }
 
@@ -125,6 +127,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public StoryLogUI StoryLog => storyLog;
 
+        public DiscographyUI Discography => discography;
+
         public GeneratorInfoUI GeneratorInfo => generatorInfo;
 
         // Over the screen's own root: the host owns every app-owned screen and
@@ -142,7 +146,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             collect = new CollectScreenUI(Require<VisualElement>(screenRoot, "collect"), session, clock, ads, store);
             story = new StoryBeatUI(Require<VisualElement>(screenRoot, "story"), CloseStory);
             topBar = new TopBarUI(Require<VisualElement>(screenRoot, "top-bar"), session.Root, clock,
-                OpenEncore, OpenStoryLog, OpenChapterSelect, OpenSettings);
+                OpenEncore, OpenStoryLog, OpenDiscography, OpenChapterSelect, OpenSettings);
             settings = new SettingsUI(Require<VisualElement>(screenRoot, "settings"), OpenRoadies, CloseOverlay);
             allocation = new RoadieAllocationUI(Require<VisualElement>(screenRoot, "roadie-allocation"),
                 session, clock, CloseOverlay);
@@ -150,6 +154,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 session.Root, topBar.TimerId, clock, ads, store, CloseOverlay);
             storyLog = new StoryLogUI(Require<VisualElement>(screenRoot, "story-log-window"),
                 session.Root, clock, this, CloseOverlay);
+            discography = new DiscographyUI(Require<VisualElement>(screenRoot, "discography-window"),
+                session.Root, session, clock, CloseOverlay);
             generatorInfo = new GeneratorInfoUI(Require<VisualElement>(screenRoot, "generator-info"),
                 clock, CloseOverlay);
             session.Refreshed += Render;
@@ -286,6 +292,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public void OpenStoryLog() => OpenOverlay(LiveOverlay.StoryLog);
 
+        public void OpenDiscography() => OpenOverlay(LiveOverlay.Discography);
+
         public void OpenChapterSelect() => OpenOverlay(LiveOverlay.ChapterSelect);
 
         public void OpenSettings() => OpenOverlay(LiveOverlay.Settings);
@@ -343,6 +351,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             allocation.Hide();
             encore.Hide();
             storyLog.Hide();
+            discography.Hide();
             generatorInfo.Hide();
         }
 
@@ -364,6 +373,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     break;
                 case LiveOverlay.StoryLog:
                     storyLog.Show();
+                    break;
+                case LiveOverlay.Discography:
+                    discography.Show();
                     break;
                 // Every refresh while it stands re-reads the count and the
                 // production: a purchase beneath it, a tick, a Roadie change.

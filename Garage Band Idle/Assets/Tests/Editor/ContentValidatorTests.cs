@@ -256,6 +256,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static void AssertClean(ValidationReport report) =>
             Assert.AreEqual(0, report.Findings.Count, Dump(report));
 
+        // An error whose message names the fragment, whatever check files it -
+        // for a fault whose category the kind's own Validate decides.
+        private static void AssertErrorNaming(ValidationReport report, string fragment)
+        {
+            Assert.IsTrue(
+                report.Findings.Any(f => f.Severity == ValidationSeverity.Error && f.Message.Contains(fragment)),
+                $"expected an error containing '{fragment}'; got:\n{Dump(report)}");
+        }
+
         // ---- keystone ----
 
         [Test]
@@ -587,6 +596,74 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new ValidatorFixture();
             f.Capstone.actions.Add(new AddCurrency { currencies = { f.Cash }, amount = 5 });
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "AddCurrency");
+        }
+
+        // The album records the fans balance into ch1_records and zeroes the
+        // rehearsal it leaves behind: both shapes, each on the chain.
+        [Test]
+        public void SetCurrency_WellFormed_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Album.actions.Insert(0, new SetCurrency
+            {
+                currency = f.Ch1Records,
+                formula = new RootCurveFormula { currency = f.Fans, reads = PayoutTotal.Balance, divisor = 1, exponent = 1 },
+            });
+            f.Album.actions.Insert(1, new SetCurrency { currency = f.Rehearsal, amount = 0 });
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void SetCurrency_HomeBelowActing_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Capstone.actions.Add(new SetCurrency { currency = f.Cash, amount = 5 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "SetCurrency");
+        }
+
+        [Test]
+        public void SetCurrency_NegativeAmount_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Album.actions.Insert(0, new SetCurrency { currency = f.Ch1Records, amount = -1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "SetCurrency");
+        }
+
+        // The formula validates itself, wherever it is authored.
+        [Test]
+        public void SetCurrency_FormulaFault_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Album.actions.Insert(0, new SetCurrency
+            {
+                currency = f.Ch1Records,
+                formula = new RootCurveFormula { currency = f.Fans, reads = PayoutTotal.Balance, divisor = 0, exponent = 1 },
+            });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "RootCurveFormula divisor");
+        }
+
+        // A song's title is a format over one argument, the song's number: a
+        // placeholder for it, or none at all, is clean.
+        [TestCase("Untitled #{0}")]
+        [TestCase("Greatest Hits")]
+        public void AddSong_FormattableTitle_NoFindings(string title)
+        {
+            var f = new ValidatorFixture();
+            f.Album.actions.Insert(0, new AddSong { title = title });
+            AssertClean(f.Run());
+        }
+
+        // No title, or one string.Format cannot format over a single argument:
+        // the write would throw the first time it ran, so it is refused at load.
+        [TestCase("")]
+        [TestCase((string)null)]
+        [TestCase("{1}")]
+        [TestCase("{")]
+        public void AddSong_UnformattableTitle_Error(string title)
+        {
+            var f = new ValidatorFixture();
+            f.Album.actions.Insert(0, new AddSong { title = title });
+            AssertErrorNaming(f.Run(), "AddSong");
         }
 
         [Test]
@@ -1372,6 +1449,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClean(f.Run());
         }
 
+        // payout and exponent are effect addresses too (12.5), read by an
+        // AddCurrency at the paid currency's home, so naming either is a stat
+        // a consumer reads.
+        [Test]
+        public void Effect_PayoutAndExponentStats_NoUnconsumedStat()
+        {
+            var f = new ValidatorFixture();
+            f.Boost.effects.Add(new Effect { target = "cash", stat = Stat.Payout, multiplier = 2 });
+            f.Boost.effects.Add(new Effect { target = "cash", stat = Stat.Exponent, multiplier = 1.5 });
+            AssertNoFinding(f.Run(), ValidationCheck.UnconsumedStat);
+        }
+
+        [TestCase(Stat.Payout)]
+        [TestCase(Stat.Exponent)]
+        public void PayoutAndExponent_AreEffectAddresses_NotProduced(string stat)
+        {
+            Assert.IsTrue(Stat.IsEffectAddress(stat));
+            Assert.IsFalse(Stat.IsProduced(stat));
+        }
+
         // The one stat where zero is not legal: a price repeats, so a free
         // generator is an unbounded rate printer.
         [Test]
@@ -1472,6 +1569,49 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "UpgradePurchased addresses 'merch_deal' declared at 'tier1b'");
         }
 
+        // ---- the balance comparison ----
+
+        // Composed onto the trigger's own gate, so the fixture's flag keeps
+        // its reader and the comparison is the only thing added.
+        private static void GateTriggerOn(ValidatorFixture f, CurrencyExceeds exceeds) =>
+            f.Trigger.condition = new All { conditions = { f.Trigger.condition, exceeds } };
+
+        [Test]
+        public void CurrencyExceeds_OnTheChain_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            // ch1_records sits a level above cash, and both are on tier1's chain.
+            GateTriggerOn(f, new CurrencyExceeds { currency = f.Ch1Records, other = f.Cash });
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void CurrencyExceeds_CurrencyOffActingChain_Error()
+        {
+            var f = new ValidatorFixture();
+            var theirs = TestTree.DeclareCurrency(f.Tier1b, "their_coin");
+            GateTriggerOn(f, new CurrencyExceeds { currency = theirs, other = f.Cash });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "'their_coin'");
+        }
+
+        [Test]
+        public void CurrencyExceeds_OtherOffActingChain_Error()
+        {
+            var f = new ValidatorFixture();
+            var theirs = TestTree.DeclareCurrency(f.Tier1b, "their_coin");
+            GateTriggerOn(f, new CurrencyExceeds { currency = f.Cash, other = theirs });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "'their_coin'");
+        }
+
+        // A balance never exceeds itself, so the gate could never open.
+        [Test]
+        public void CurrencyExceeds_SameCurrencyOnBothSides_Error()
+        {
+            var f = new ValidatorFixture();
+            GateTriggerOn(f, new CurrencyExceeds { currency = f.Cash, other = f.Cash });
+            AssertErrorNaming(f.Run(), "CurrencyExceeds");
+        }
+
         // ---- permanent modifiers and formula effects ----
 
         [Test]
@@ -1525,6 +1665,133 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Root.modifiers.Add(roadie);
             f.Root.permanentModifiers.Add(roadie);
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never shrinks");
+        }
+
+        // A permanent tier1 modifier carrying one formula on the cash rate, the
+        // shape the owned-count rows above author.
+        private static void ApplyFormula(ValidatorFixture f, MultiplierFormula formula)
+        {
+            var scale = TestTree.MakeDefinition<ModifierDefinition>("formula_scale");
+            scale.effects.Add(new Effect { target = "cash", stat = Stat.Rate, formula = formula });
+            f.Tier1.modifiers.Add(scale);
+            f.Tier1.permanentModifiers.Add(scale);
+        }
+
+        // Two debts and a relief balance on tier1, combined by the maximum: every
+        // field authored, each on the chain.
+        private static DebtFactor WellFormedDebt(ValidatorFixture f) => new DebtFactor
+        {
+            currencies = new List<CurrencyDefinition>
+            {
+                TestTree.DeclareCurrency(f.Tier1, "debt"),
+                TestTree.DeclareCurrency(f.Tier1, "loan"),
+            },
+            combine = DebtCombine.Maximum,
+            coefficient = 0.25,
+            relief = TestTree.DeclareCurrency(f.Tier1, "relief"),
+        };
+
+        [Test]
+        public void DebtFactor_WellFormed_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            ApplyFormula(f, WellFormedDebt(f));
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void DebtFactor_NoCurrencies_Error()
+        {
+            var f = new ValidatorFixture();
+            var debt = WellFormedDebt(f);
+            debt.currencies.Clear();
+            ApplyFormula(f, debt);
+            AssertErrorNaming(f.Run(), "DebtFactor");
+        }
+
+        [Test]
+        public void DebtFactor_NullCurrency_Error()
+        {
+            var f = new ValidatorFixture();
+            var debt = WellFormedDebt(f);
+            debt.currencies.Add(null);
+            ApplyFormula(f, debt);
+            AssertErrorNaming(f.Run(), "DebtFactor");
+        }
+
+        [Test]
+        public void DebtFactor_CurrencyOffTheChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var debt = WellFormedDebt(f);
+            debt.currencies.Add(TestTree.DeclareCurrency(f.Tier1b, "their_debt"));
+            ApplyFormula(f, debt);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "'their_debt'");
+        }
+
+        // A factor that never falls is no debt; one that rises with the debt
+        // is a bonus misfiled.
+        [TestCase(0.0)]
+        [TestCase(-0.25)]
+        public void DebtFactor_NonpositiveCoefficient_Error(double coefficient)
+        {
+            var f = new ValidatorFixture();
+            var debt = WellFormedDebt(f);
+            debt.coefficient = coefficient;
+            ApplyFormula(f, debt);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "DebtFactor");
+        }
+
+        [Test]
+        public void DebtFactor_ReliefOffTheChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var debt = WellFormedDebt(f);
+            debt.relief = TestTree.DeclareCurrency(f.Tier1b, "their_relief");
+            ApplyFormula(f, debt);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "'their_relief'");
+        }
+
+        [Test]
+        public void LogOnBalance_WellFormed_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            ApplyFormula(f, new LogOnBalance { currency = f.Ch1Records, coefficient = 0.5 });
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void LogOnBalance_NegativeCoefficient_Error()
+        {
+            var f = new ValidatorFixture();
+            ApplyFormula(f, new LogOnBalance { currency = f.Ch1Records, coefficient = -0.5 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "LogOnBalance");
+        }
+
+        [Test]
+        public void LogOnBalance_CurrencyOffTheChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var theirs = TestTree.DeclareCurrency(f.Tier1b, "their_hype");
+            ApplyFormula(f, new LogOnBalance { currency = theirs, coefficient = 0.5 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "'their_hype'");
+        }
+
+        [Test]
+        public void InverseOfBalance_WellFormed_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            ApplyFormula(f, new InverseOfBalance { currency = f.Ch1Records });
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void InverseOfBalance_CurrencyOffTheChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var theirs = TestTree.DeclareCurrency(f.Tier1b, "their_pace");
+            ApplyFormula(f, new InverseOfBalance { currency = theirs });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "'their_pace'");
         }
 
         [Test]

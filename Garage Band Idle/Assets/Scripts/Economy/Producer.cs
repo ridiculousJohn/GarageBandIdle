@@ -83,8 +83,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // {stat: rate, x0.5} halves it, so a gig completes half as often and
         // away pays half of ALL of it (section 9). Its fill-rate plan is stage 1
         // only and a rate paid INTO it takes its stage 2 at the bar, so the
-        // wildcard applies exactly once on either path. count, cost and
-        // game_speed have a single coordinate each, so any owner answers. An
+        // wildcard applies exactly once on either path. count, cost,
+        // game_speed, payout and exponent have a single coordinate each, so any
+        // owner answers. An
         // owner-less query (the tick's game_speed read) matches wildcards only.
         //
         // The currency coordinate matches by id OR tag, exactly as target does:

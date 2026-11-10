@@ -842,6 +842,38 @@ namespace RidiculousGaming.GarageBandIdle
                 c => Meta.RoadieAllocation.TrySet(c, requested), completed);
         }
 
+        // The player's rename of a song in the Discography (design doc 7): a
+        // root-context command, since root is the one scope that keeps songs.
+        // The name is trimmed and held to SongEntry.MaxNameLength; a blank name
+        // or an id root's list does not hold is refused, and a refusal commits
+        // nothing. The entry is found in the list the root already holds - a
+        // read of a fact at a node the session has, not a search of the tree.
+        // The completed callback is told the command's answer.
+        public void RenameSong(string songId, string name, DateTime nowUtc, Action<bool> completed = null)
+        {
+            RunCommand(new GameContext(Root, nowUtc), c =>
+            {
+                var trimmed = (name ?? string.Empty).Trim();
+                if (trimmed.Length == 0)
+                    return false;
+                SongEntry entry = null;
+                foreach (var song in Root.songs)
+                {
+                    if (song != null && song.songId == songId)
+                    {
+                        entry = song;
+                        break;
+                    }
+                }
+                if (entry == null)
+                    return false;
+                if (trimmed.Length > SongEntry.MaxNameLength)
+                    trimmed = trimmed.Substring(0, SongEntry.MaxNameLength);
+                entry.name = trimmed;
+                return true;
+            }, completed);
+        }
+
         // ---- the pipeline ----
 
         // Submission: append, and when the entry is the only one, run it now.

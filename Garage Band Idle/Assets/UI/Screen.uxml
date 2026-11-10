@@ -4,6 +4,7 @@
         <RidiculousGaming.GarageBandIdle.UI.TimerPill name="encore" timer="encore_timer" class="top-pill encore-pill" />
         <ui:VisualElement class="top-pill top-actions">
             <ui:Button name="story-log" text="&#x2709;" class="top-action" />
+            <ui:Button name="discography" text="&#x266B;" class="top-action" />
             <ui:Button name="chapter-select" text="&#x2630;" class="top-action" />
             <ui:Button name="settings-button" text="&#x2699;" class="top-action" />
         </ui:VisualElement>
@@ -64,6 +65,13 @@
             <ui:ScrollView name="story-log-entries" class="story-log-entries" />
             <ui:Label name="story-log-empty" text="No story yet." class="story-log-empty" />
             <ui:Button name="story-log-close" text="Back" class="overlay-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="discography-window" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel discography-panel">
+            <ui:Label text="Discography" class="modal-title" />
+            <ui:ScrollView name="discography-entries" class="discography-entries" />
+            <ui:Button name="discography-close" text="Back" class="overlay-close" />
         </ui:VisualElement>
     </ui:VisualElement>
     <ui:VisualElement name="generator-info" class="overlay modal" style="display: none;">

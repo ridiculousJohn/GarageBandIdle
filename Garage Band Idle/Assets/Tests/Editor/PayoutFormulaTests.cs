@@ -85,5 +85,42 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual(BigNumber.One, new ConstantFormula { value = 1 }.Compute(tree.Ctx(tree.Root)));
         }
+
+        // The exponent factor the paid currency's exponent stat gathers scales
+        // the authored exponent inside the floor: 1024 ^ 0.2 is 4, and
+        // 1024 ^ (0.2 x 1.5) is 8.
+        [TestCase(1.0, 4)]
+        [TestCase(1.5, 8)]
+        public void RootCurve_scales_its_exponent_by_the_exponent_factor(double factor, double expected)
+        {
+            var tree = new TestTree();
+            tree.Tier1.earnedTotals["fans"] = 1024;
+            var formula = new RootCurveFormula { currency = tree.Fans, divisor = 1, exponent = 0.2 };
+
+            Assert.AreEqual((BigNumber)expected, formula.Compute(tree.Ctx(tree.Tier1), factor));
+        }
+
+        [Test]
+        public void RootCurve_one_argument_Compute_is_a_factor_of_one()
+        {
+            var tree = new TestTree();
+            tree.Tier1.earnedTotals["fans"] = 1024;
+            var formula = new RootCurveFormula { currency = tree.Fans, divisor = 1, exponent = 0.2 };
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.AreEqual(formula.Compute(ctx, BigNumber.One), formula.Compute(ctx));
+            Assert.AreEqual((BigNumber)4, formula.Compute(ctx));
+        }
+
+        // A constant has no exponent, so no factor moves it.
+        [TestCase(0.5)]
+        [TestCase(1.0)]
+        [TestCase(3.0)]
+        public void Constant_ignores_the_exponent_factor(double factor)
+        {
+            var tree = new TestTree();
+
+            Assert.AreEqual((BigNumber)7, new ConstantFormula { value = 7 }.Compute(tree.Ctx(tree.Root), factor));
+        }
     }
 }

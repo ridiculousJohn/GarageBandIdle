@@ -42,11 +42,13 @@ namespace RidiculousGaming.GarageBandIdle
         public DateTime expiresAtUtc;
     }
 
-    // A song written during a run (tier = the run's Catalog) or kept forever
-    // (root = Discography). Chapter 6 machinery; the field exists because the
-    // schema is complete from day one (design doc 12.3).
+    // A song: a title the player may rename, kept forever on the root scope as
+    // the Discography. Display only - nothing in the economy reads one (design
+    // doc 7). A rename and a loaded name are both held to MaxNameLength.
     public class SongEntry
     {
+        public const int MaxNameLength = 40;
+
         public string songId;
         public string name;
     }

@@ -10,6 +10,10 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public abstract BigNumber Compute(GameContext ctx);
 
+        // The amount under a factor on the formula's exponent (design doc 12.5).
+        // A formula with no exponent answers with its plain amount.
+        public virtual BigNumber Compute(GameContext ctx, BigNumber exponentFactor) => Compute(ctx);
+
         // Load-time reference and reach checks (design doc 12.12), driven
         // through the owning action's Validate.
         public virtual void Validate(ValidationContext ctx) { }
@@ -53,7 +57,9 @@ namespace RidiculousGaming.GarageBandIdle
         public BigNumber divisor = 1;
         public double exponent = 1;   // BigDouble.Pow's power is a double by the library's own signature
 
-        public override BigNumber Compute(GameContext ctx)
+        public override BigNumber Compute(GameContext ctx) => Compute(ctx, BigNumber.One);
+
+        public override BigNumber Compute(GameContext ctx, BigNumber exponentFactor)
         {
             var total = reads switch
             {
@@ -61,7 +67,7 @@ namespace RidiculousGaming.GarageBandIdle
                 PayoutTotal.Lifetime => ctx.GetLifetimeTotal(currency.Id),
                 _ => ctx.GetEarnedTotal(currency.Id),
             };
-            return BigNumber.Floor(BigNumber.Pow(total / divisor, exponent));
+            return BigNumber.Floor(BigNumber.Pow(total / divisor, exponent * exponentFactor.ToDouble()));
         }
 
         public override void Validate(ValidationContext ctx)

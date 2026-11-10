@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RidiculousGaming.GarageBandIdle.Economy
 {
@@ -70,6 +71,104 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"LinearOnOwnedCount coefficient is {coefficient} - a formula factor never shrinks with the fact it derives from.");
         }
+    }
+
+    // How a debt factor combines the balances it reads: their sum, or the
+    // largest of them.
+    public enum DebtCombine { Sum, Maximum }
+
+    // max(0, 1 - coefficient * debt), where debt is the listed balances read
+    // outward from the gather origin and combined by the mode: a factor that
+    // shrinks as debt grows and never goes below zero (design doc 12.2). A
+    // show authors coefficient as one over its own base yield, which makes the
+    // factor equal to subtracting the debt from that show's yield before every
+    // other factor applies. The mode is fixed per effect; content changes mode
+    // with two modifiers, one per mode, switched by appliesWhen. Relief is an
+    // optional balance that divides the combined debt once it passes one, so a
+    // relief at or below one changes nothing.
+    [Serializable]
+    public class DebtFactor : MultiplierFormula
+    {
+        public List<CurrencyDefinition> currencies = new();
+        public DebtCombine combine = DebtCombine.Sum;
+        public BigNumber coefficient;
+        public CurrencyDefinition relief;     // optional; null means none
+
+        public override BigNumber Compute(GameContext ctx)
+        {
+            var debt = BigNumber.Zero;
+            foreach (var currency in currencies)
+            {
+                var balance = ctx.GetBalance(currency.Id);
+                debt = combine == DebtCombine.Sum ? debt + balance : BigNumber.Max(debt, balance);
+            }
+            if (relief != null)
+            {
+                var r = ctx.GetBalance(relief.Id);
+                if (r > BigNumber.One)
+                    debt = debt / r;
+            }
+            return BigNumber.Max(BigNumber.Zero, BigNumber.One - coefficient * debt);
+        }
+
+        public override void Validate(ValidationContext ctx)
+        {
+            if (currencies.Count == 0)
+                ctx.AddError(ValidationCheck.NullEntry,
+                    "DebtFactor lists no currencies - a debt factor reading no debt is inert.");
+            for (var i = 0; i < currencies.Count; i++)
+            {
+                if (currencies[i] == null)
+                    ctx.AddError(ValidationCheck.NullEntry, $"DebtFactor has a null currencies[{i}] entry.");
+                else
+                    ctx.RequireOnChain(currencies[i], "DebtFactor");
+            }
+            if (coefficient <= BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"DebtFactor coefficient is {coefficient} - a nonpositive coefficient leaves the factor at one or raises production with debt.");
+            if (relief != null)
+                ctx.RequireOnChain(relief, "DebtFactor");
+        }
+    }
+
+    // 1 + coefficient * log10(1 + balance): a factor that keeps growing with
+    // the balance at a falling rate, and is exactly one at a zero balance
+    // (design doc 12.2).
+    [Serializable]
+    public class LogOnBalance : MultiplierFormula
+    {
+        public CurrencyDefinition currency;
+        public BigNumber coefficient;
+
+        public override BigNumber Compute(GameContext ctx) =>
+            BigNumber.One + coefficient * BigNumber.Log10(BigNumber.One + ctx.GetBalance(currency.Id));
+
+        public override void Validate(ValidationContext ctx)
+        {
+            ctx.RequireOnChain(currency, "LogOnBalance");
+            if (coefficient < BigNumber.Zero)
+                ctx.AddError(ValidationCheck.NumericRange,
+                    $"LogOnBalance coefficient is {coefficient} - a formula factor never shrinks with the fact it derives from.");
+        }
+    }
+
+    // One over the balance, read outward from the gather origin (design doc
+    // 12.2). Zero while the balance is zero, so a value that has not been
+    // recorded pays nothing rather than dividing by zero. A rate entry whose
+    // value is an amount per run, under this factor over a recorded run time,
+    // is that amount per second.
+    [Serializable]
+    public class InverseOfBalance : MultiplierFormula
+    {
+        public CurrencyDefinition currency;
+
+        public override BigNumber Compute(GameContext ctx)
+        {
+            var balance = ctx.GetBalance(currency.Id);
+            return balance > BigNumber.Zero ? BigNumber.One / balance : BigNumber.Zero;
+        }
+
+        public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(currency, "InverseOfBalance");
     }
 
     // The product over chapters of (1 + perRoadie * stationed there) - additive

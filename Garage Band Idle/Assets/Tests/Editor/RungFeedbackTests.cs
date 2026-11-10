@@ -8,7 +8,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // The rung half of the feedback contract (design doc 12.11) over the
     // standing test tree: pressability is the rung's own IsOffered, the disarmed
     // legs come from GateFeedback over offerCondition, and the "would bank"
-    // preview runs the same Compute the execution runs (design doc 5).
+    // preview runs the same AmountFor the execution runs, one amount per paid
+    // currency (design doc 5).
     public class RungFeedbackTests
     {
         // Computed amounts within tolerance, never bit-exact: BigDouble's
@@ -93,19 +94,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.barProgress[tree.Cover1.Id] = 100;
             var ctx = tree.Ctx(tree.Tier1);
 
-            Assert.IsTrue(RungFeedback.TryPreviewPayout(rung, ctx, out var amount, out var currencies));
-            AssertClose(3, amount, "would bank");            // floor(sqrt(60 / 5))
+            Assert.IsTrue(RungFeedback.TryPreviewPayout(rung, ctx, out var amounts, out var currencies));
             Assert.AreEqual(2, currencies.Count);
+            Assert.AreEqual(2, amounts.Count, "one amount per currency");
             Assert.AreSame(tree.Records, currencies[0]);
             Assert.AreSame(tree.Ch1Records, currencies[1]);
+            AssertClose(3, amounts[0], "would bank records");          // floor(sqrt(60 / 5))
+            AssertClose(3, amounts[1], "would bank the chapter counter");
 
             rung.Execute(ctx);
 
             // The reset clears tier1, so the banked amounts are read where they
-            // landed: root records and the chapter counter both carry exactly
-            // the number the preview showed.
-            Assert.AreEqual(amount, tree.Root.balances["records"]);
-            Assert.AreEqual(amount, tree.Ch1.balances["ch1_records"]);
+            // landed: root records and the chapter counter each carry exactly
+            // the number the preview showed for it.
+            Assert.AreEqual(amounts[0], tree.Root.balances["records"]);
+            Assert.AreEqual(amounts[1], tree.Ch1.balances["ch1_records"]);
             Assert.AreEqual(BigNumber.Zero, tree.Tier1.balances["fans"]);
         }
 
@@ -124,9 +127,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // holding at 37 fans what a release would bank is the point of it
             // (design doc 5).
             Assert.IsFalse(rung.IsOffered(ctx));
-            Assert.IsTrue(RungFeedback.TryPreviewPayout(rung, ctx, out var amount, out var currencies));
-            AssertClose(2, amount, "would bank while disarmed");   // floor(sqrt(37 / 5))
+            Assert.IsTrue(RungFeedback.TryPreviewPayout(rung, ctx, out var amounts, out var currencies));
             Assert.AreEqual(2, currencies.Count);
+            Assert.AreEqual(2, amounts.Count);
+            AssertClose(2, amounts[0], "would bank records while disarmed");   // floor(sqrt(37 / 5))
+            AssertClose(2, amounts[1], "would bank the chapter counter while disarmed");
         }
 
         [Test]
@@ -150,14 +155,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Rebuild();
             var ctx = tree.Ctx(tree.Ch1);
 
-            Assert.IsFalse(RungFeedback.TryPreviewPayout(capstone, ctx, out var amount, out var currencies));
-            Assert.AreEqual(BigNumber.Zero, amount);
+            Assert.IsFalse(RungFeedback.TryPreviewPayout(capstone, ctx, out var amounts, out var currencies));
+            Assert.IsEmpty(amounts);
             Assert.IsEmpty(currencies);
 
             // An empty list has no first action to run, and answers the same way.
             var silent = new Rung { label = "Nothing", offerCondition = new Always() };
             Assert.IsFalse(RungFeedback.TryPreviewPayout(silent, ctx, out var none, out var noCurrencies));
-            Assert.AreEqual(BigNumber.Zero, none);
+            Assert.IsEmpty(none);
             Assert.IsEmpty(noCurrencies);
         }
 
@@ -185,8 +190,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.earnedTotals["fans"] = 20;
             var ctx = tree.Ctx(tree.Tier1);
 
-            Assert.IsTrue(RungFeedback.TryPreviewPayout(rung, ctx, out var amount, out _));
-            AssertClose(5, amount, "would bank");
+            Assert.IsTrue(RungFeedback.TryPreviewPayout(rung, ctx, out var amounts, out _));
+            Assert.AreEqual(1, amounts.Count);
+            AssertClose(5, amounts[0], "would bank");
 
             rung.Execute(ctx);
 
@@ -194,6 +200,45 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // action reads what the first deposited, which is why the preview
             // stops at the first and never sums the list.
             AssertClose(27, tree.Tier1.balances["fans"], "fans after both actions");
+        }
+
+        // Parity holds under the stats that scale a payout: a payout effect on
+        // the chapter counter and an exponent effect on records, each at its
+        // currency's home, and each target previewed as what it is then paid.
+        [Test]
+        public void The_preview_under_payout_and_exponent_effects_is_what_the_execution_deposits()
+        {
+            var tree = new TestTree();
+            var rung = Release(tree);
+            tree.Tier1Def.rung = rung;
+
+            var payout = TestTree.MakeDefinition<Economy.ModifierDefinition>("triple_payout");
+            payout.effects.Add(new Effect { target = "ch1_records", stat = Economy.Stat.Payout, multiplier = 3 });
+            tree.Ch1Def.modifiers.Add(payout);
+            tree.Ch1Def.permanentModifiers.Add(payout);
+
+            var exponent = TestTree.MakeDefinition<Economy.ModifierDefinition>("exponent_boost");
+            exponent.effects.Add(new Effect { target = "records", stat = Economy.Stat.Exponent, multiplier = 1.5 });
+            tree.RootDef.modifiers.Add(exponent);
+            tree.RootDef.permanentModifiers.Add(exponent);
+
+            tree.Rebuild();
+            tree.Tier1.balances["fans"] = 60;
+            tree.Tier1.earnedTotals["fans"] = 60;
+            tree.Tier1.barProgress[tree.Cover1.Id] = 100;
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.IsTrue(RungFeedback.TryPreviewPayout(rung, ctx, out var amounts, out var currencies));
+            Assert.AreEqual(2, amounts.Count);
+            Assert.AreSame(tree.Records, currencies[0]);
+            Assert.AreSame(tree.Ch1Records, currencies[1]);
+            AssertClose(6, amounts[0], "floor(12 ^ (0.5 x 1.5))");
+            AssertClose(9, amounts[1], "floor(sqrt(12)) x 3");
+
+            rung.Execute(ctx);
+
+            Assert.AreEqual(amounts[0], tree.Root.balances["records"]);
+            Assert.AreEqual(amounts[1], tree.Ch1.balances["ch1_records"]);
         }
 
         // The refusal is not a condition, so it is not a GateFeedback leg: the

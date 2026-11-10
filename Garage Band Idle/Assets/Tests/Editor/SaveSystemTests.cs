@@ -67,7 +67,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             tree.Tier1.activeMembers["learn_covers"] = new System.Collections.Generic.HashSet<string> { "cover_1" };
             tree.Tier1.modifierStacks["gj_tap_1"] = 2;
             tree.Tier1.Facts.activeEvent = new ActiveEvent { eventId = "timed_gig", remainingSeconds = 12.5, goalReached = true };
-            tree.Tier1.songs.Add(new SongEntry { songId = "song_1", name = "Three-Chord Anthem" });
             tree.Ch1.balances["ch1_records"] = 17;
             tree.Ch1.flags.Add("album");
             tree.Ch1.lastActiveUtc = new DateTime(2026, 8, 18, 9, 0, 0, DateTimeKind.Utc);
@@ -112,7 +111,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("timed_gig", tier1.Facts.activeEvent.eventId);
             Assert.AreEqual(12.5, tier1.Facts.activeEvent.remainingSeconds);
             Assert.IsTrue(tier1.Facts.activeEvent.goalReached);
-            Assert.AreEqual("Three-Chord Anthem", tier1.songs[0].name);
             Assert.AreEqual((BigNumber)17, ch1.balances["ch1_records"]);
             Assert.IsTrue(ch1.flags.Contains("album"));
             Assert.AreEqual(new DateTime(2026, 8, 18, 9, 0, 0, DateTimeKind.Utc), ch1.lastActiveUtc);
@@ -709,6 +707,126 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("checksum"));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("checksum"));
             Assert.AreEqual(LoadOutcome.Failed, LoadDisk(out _));
+        }
+
+        // ---- the Discography (design doc 7) ----
+
+        // Root's songs travel in the order written, id and name, and a renamed
+        // song travels under its new name.
+        [Test]
+        public void The_roots_songs_round_trip_in_order_with_ids_and_names()
+        {
+            var saved = new TestTree();
+            var session = new GameSession(saved.Root, ScriptableObject.CreateInstance<GameConfig>());
+            var write = new AddSong { title = "Untitled #{0}" };
+            session.RunReward(new GameAction[] { write, write, write }, saved.Now);
+            bool? renamed = null;
+            session.RenameSong("song_2", "Garage Anthem", saved.Now, r => renamed = r);
+            Assert.AreEqual(true, renamed, "the rename ran");
+            var json = SaveSystem.Serialize(saved.Root);
+
+            Assert.IsTrue(Load(json, out var root));
+
+            Assert.AreEqual(3, root.songs.Count);
+            CollectionAssert.AreEqual(new[] { "song_1", "song_2", "song_3" },
+                root.songs.ConvertAll(song => song.songId));
+            CollectionAssert.AreEqual(new[] { "Untitled #1", "Garage Anthem", "Untitled #3" },
+                root.songs.ConvertAll(song => song.name));
+        }
+
+        [Test]
+        public void A_tree_with_no_songs_round_trips_to_an_empty_list()
+        {
+            var saved = new TestTree();
+
+            Assert.IsTrue(Load(SaveSystem.Serialize(saved.Root), out var root));
+
+            Assert.IsNotNull(root.songs);
+            Assert.IsEmpty(root.songs);
+        }
+
+        // A save written before the Discography existed carries no songs member:
+        // the seeded empty list stands, and nothing about that is worth a
+        // warning - the schema version never had to move.
+        [Test]
+        public void A_save_carrying_no_songs_member_loads_an_empty_list_without_a_warning()
+        {
+            var saved = new TestTree();
+            saved.Root.songs.Add(new SongEntry { songId = "song_1", name = "Untitled #1" });
+            var envelope = Newtonsoft.Json.Linq.JObject.Parse(SaveSystem.Serialize(saved.Root));
+            var payload = Newtonsoft.Json.Linq.JToken.Parse(envelope.Value<string>("payload"));
+            var lists = new List<Newtonsoft.Json.Linq.JToken>(payload.SelectTokens("$..songs"));
+            Assert.IsNotEmpty(lists, "the payload carries the member this test removes");
+            foreach (var list in lists)
+                list.Parent.Remove();
+            envelope["payload"] = payload.ToString(Newtonsoft.Json.Formatting.None);
+
+            Assert.IsTrue(Load(Rechecksum(envelope), out var root));
+
+            Assert.IsNotNull(root.songs);
+            Assert.IsEmpty(root.songs);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // A song needs an id and a name to stand in the Discography, so one
+        // missing either is dropped with a warning; the order of the rest is
+        // the order written, and a name past MaxNameLength is cut to it. The
+        // warnings are matched on "song" alone, the stable part of both.
+        [Test]
+        public void A_loaded_song_missing_an_id_or_a_name_is_dropped_and_a_long_name_is_cut()
+        {
+            var saved = new TestTree();
+            saved.Root.songs.Add(new SongEntry { songId = "song_1", name = "Untitled #1" });
+            saved.Root.songs.Add(new SongEntry { songId = "", name = "No Id" });
+            saved.Root.songs.Add(new SongEntry { songId = "song_3", name = "" });
+            saved.Root.songs.Add(new SongEntry { songId = "song_4", name = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRS" });
+            var json = SaveSystem.Serialize(saved.Root);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("song"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("song"));
+            Assert.IsTrue(Load(json, out var root));
+
+            CollectionAssert.AreEqual(new[] { "song_1", "song_4" }, root.songs.ConvertAll(song => song.songId));
+            Assert.AreEqual("Untitled #1", root.songs[0].name);
+            Assert.AreEqual("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN", root.songs[1].name, "the first 40 of 45");
+        }
+
+        // Only root keeps songs, so a song on a chapter's or a tier's own list
+        // is not written: neither node in the document carries one, and the
+        // loaded lists are empty while root's song stands.
+        [Test]
+        public void Songs_on_a_chapter_or_a_tier_are_not_saved()
+        {
+            var saved = new TestTree();
+            saved.Root.songs.Add(new SongEntry { songId = "song_1", name = "Untitled #1" });
+            saved.Ch1.songs.Add(new SongEntry { songId = "song_9", name = "Chapter Cut" });
+            saved.Tier1.songs.Add(new SongEntry { songId = "song_8", name = "Tier Cut" });
+            var json = SaveSystem.Serialize(saved.Root);
+
+            var envelope = Newtonsoft.Json.Linq.JObject.Parse(json);
+            var payload = Newtonsoft.Json.Linq.JToken.Parse(envelope.Value<string>("payload"));
+            var ch1Node = payload["children"][0];
+            var tier1Node = ch1Node["children"][0];
+            Assert.AreEqual("ch1", ch1Node.Value<string>("scopeId"));
+            Assert.AreEqual("tier1", tier1Node.Value<string>("scopeId"));
+            AssertNoSongs(ch1Node["facts"]["songs"], "the chapter's node");
+            AssertNoSongs(tier1Node["facts"]["songs"], "the tier's node");
+            Assert.AreEqual(1, ((Newtonsoft.Json.Linq.JArray)payload["facts"]["songs"]).Count, "root's song is written");
+
+            Assert.IsTrue(Load(json, out var root, out var loaded));
+
+            Assert.IsEmpty(TestNavigation.Node(root, loaded.Ch1Def).songs);
+            Assert.IsEmpty(TestNavigation.Node(root, loaded.Tier1Def).songs);
+            Assert.AreEqual(1, root.songs.Count);
+            Assert.AreEqual("song_1", root.songs[0].songId);
+        }
+
+        // Absent, null or an empty array: any of them writes no song.
+        private static void AssertNoSongs(Newtonsoft.Json.Linq.JToken songs, string where)
+        {
+            if (songs == null || songs.Type == Newtonsoft.Json.Linq.JTokenType.Null)
+                return;
+            Assert.AreEqual(0, ((Newtonsoft.Json.Linq.JArray)songs).Count, $"{where} carries no song");
         }
 
         // ---- the load path builds a LINKED tree ----

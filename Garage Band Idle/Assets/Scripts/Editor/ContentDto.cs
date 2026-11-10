@@ -45,6 +45,12 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public BigNumber threshold;
     }
 
+    internal class CurrencyExceedsDto : ConditionDto
+    {
+        public string currency;
+        public string other;
+    }
+
     internal class OwnedCountAtLeastDto : ConditionDto
     {
         public string generator;
@@ -123,6 +129,18 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public List<string> currencies = new();
         public BigNumber amount;
         public PayoutFormulaDto formula;
+    }
+
+    internal class SetCurrencyDto : ActionDto
+    {
+        public string currency;
+        public BigNumber amount;
+        public PayoutFormulaDto formula;
+    }
+
+    internal class AddSongDto : ActionDto
+    {
+        public string title;
     }
 
     internal class FireGeneratorYieldDto : ActionDto
@@ -207,6 +225,26 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public string generator;
         public BigNumber coefficient;
         public bool purchasedOnly;
+    }
+
+    // The relief id is optional: absent is a debt factor with no relief.
+    internal class DebtFactorDto : MultiplierFormulaDto
+    {
+        public List<string> currencies = new();
+        public Economy.DebtCombine combine = Economy.DebtCombine.Sum;
+        public BigNumber coefficient;
+        public string relief;
+    }
+
+    internal class LogOnBalanceDto : MultiplierFormulaDto
+    {
+        public string currency;
+        public BigNumber coefficient;
+    }
+
+    internal class InverseOfBalanceDto : MultiplierFormulaDto
+    {
+        public string currency;
     }
 
     internal class RoadieTotalBoostDto : MultiplierFormulaDto
@@ -427,6 +465,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         {
             { nameof(CurrencyAtLeast), typeof(CurrencyAtLeastDto) },
             { nameof(EarnedTotalAtLeast), typeof(EarnedTotalAtLeastDto) },
+            { nameof(CurrencyExceeds), typeof(CurrencyExceedsDto) },
             { nameof(OwnedCountAtLeast), typeof(OwnedCountAtLeastDto) },
             { nameof(FlagSet), typeof(FlagSetDto) },
             { nameof(UpgradePurchased), typeof(UpgradePurchasedDto) },
@@ -445,6 +484,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public static readonly Dictionary<string, Type> Actions = new()
         {
             { nameof(AddCurrency), typeof(AddCurrencyDto) },
+            { nameof(SetCurrency), typeof(SetCurrencyDto) },
+            { nameof(AddSong), typeof(AddSongDto) },
             { nameof(FireGeneratorYield), typeof(FireGeneratorYieldDto) },
             { nameof(SetFlag), typeof(SetFlagDto) },
             { nameof(ExtendTimer), typeof(ExtendTimerDto) },
@@ -465,6 +506,9 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         {
             { nameof(Economy.LinearOnBalance), typeof(LinearOnBalanceDto) },
             { nameof(Economy.LinearOnOwnedCount), typeof(LinearOnOwnedCountDto) },
+            { nameof(Economy.DebtFactor), typeof(DebtFactorDto) },
+            { nameof(Economy.LogOnBalance), typeof(LogOnBalanceDto) },
+            { nameof(Economy.InverseOfBalance), typeof(InverseOfBalanceDto) },
             { nameof(Economy.RoadieTotalBoost), typeof(RoadieTotalBoostDto) },
             { nameof(Economy.RoadieActiveBoost), typeof(RoadieActiveBoostDto) },
         };

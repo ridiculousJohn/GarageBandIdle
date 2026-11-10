@@ -97,23 +97,24 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         // The payout preview, through the rung's own first action - so a rung
         // opening with anything else previews nothing rather than a wrong
-        // number (12.5).
+        // number (12.5). Each target shows its own amount, since each is paid
+        // under its own factors.
         private void ShowPreview(GameContext ctx)
         {
-            if (!RungFeedback.TryPreviewPayout(rung, ctx, out var amount, out var currencies))
+            if (!RungFeedback.TryPreviewPayout(rung, ctx, out var amounts, out var currencies))
             {
                 preview.style.display = DisplayStyle.None;
                 return;
             }
-            var names = new StringBuilder();
-            foreach (var currency in currencies)
+            var paid = new StringBuilder();
+            for (var i = 0; i < currencies.Count; i++)
             {
-                if (names.Length > 0)
-                    names.Append(", ");
-                names.Append(currency.displayName);
+                if (paid.Length > 0)
+                    paid.Append(", ");
+                paid.Append('+').Append(NumberFormatter.Format(amounts[i])).Append(' ').Append(currencies[i].displayName);
             }
             preview.style.display = DisplayStyle.Flex;
-            preview.text = "Would bank: +" + NumberFormatter.Format(amount) + " " + names.ToString();
+            preview.text = "Would bank: " + paid.ToString();
         }
     }
 }

@@ -559,6 +559,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     Assert.IsNotNull(plans.Yield, $"{currency.Id} yield stage");
                     Assert.AreSame(plans.Rate, plans.For(Stat.Rate));
                     Assert.AreSame(plans.Yield, plans.For(Stat.Yield));
+                    // What an AddCurrency paying this currency reads at its
+                    // home: the payout factor and the exponent factor.
+                    Assert.IsNotNull(plans.Payout, $"{currency.Id} payout");
+                    Assert.IsNotNull(plans.Exponent, $"{currency.Id} exponent");
+                    Assert.AreSame(plans.Payout, plans.For(Stat.Payout));
+                    Assert.AreSame(plans.Exponent, plans.For(Stat.Exponent));
                 }
 
                 // A generator holds the three plans it is ever asked for: the
@@ -612,6 +618,29 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 () => tree.Root.Link<CoordinatePlan>(GatherCompiler.GameSpeed));
             Assert.Throws<InvalidOperationException>(
                 () => tree.Tier1.Link<CoordinatePlan>(GatherCompiler.GameSpeed));
+        }
+
+        // payout and exponent are a currency's to collect, so a generator, an
+        // upgrade and a bar hold neither, and asking one is the same thrown
+        // miss as any stat a holder was never compiled for.
+        [Test]
+        public void Only_a_currency_holds_payout_and_exponent_plans()
+        {
+            var tree = new TestTree();
+
+            var holders = new[]
+            {
+                tree.Tier1.Link<StatPlans>(tree.PracticeAmp),
+                tree.Tier1.Link<StatPlans>(tree.StagePresence),
+                tree.Tier1.Link<StatPlans>(tree.Cover1),
+            };
+            foreach (var plans in holders)
+            {
+                Assert.IsNull(plans.Payout);
+                Assert.IsNull(plans.Exponent);
+                Assert.Throws<InvalidOperationException>(() => plans.For(Stat.Payout));
+                Assert.Throws<InvalidOperationException>(() => plans.For(Stat.Exponent));
+            }
         }
 
         // The store holds objects now, so the read names the kind it expects:

@@ -1540,6 +1540,176 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "one button per candidate beat, whatever its latch says");
         }
 
+        // ---- the discography (design doc 7, 12.11) ----
+
+        // The window Screen.uxml names, and the rows a show builds in it - one
+        // per song, found by the class each row gives its own root.
+        private static VisualElement DiscographyWindow(VisualElement screen) =>
+            screen.Q<VisualElement>("discography-window");
+
+        private static List<VisualElement> DiscographyRows(VisualElement screen) =>
+            DiscographyWindow(screen).Q<ScrollView>("discography-entries")
+                .Query<VisualElement>(className: "discography-row").ToList();
+
+        private static TextField NameField(VisualElement row) =>
+            row.Q<TextField>(className: "discography-name");
+
+        // A song written the way content writes one: the real AddSong, run
+        // through the session as one transaction, whose refresh repaints.
+        private static void WriteSong(Fixture fx) =>
+            fx.Session.RunReward(new GameAction[] { new AddSong { title = "Untitled #{0}" } }, fx.Now);
+
+        // The pill stands only while root keeps a song: down at construction
+        // and on a live chapter with none, up from the refresh of the
+        // transaction that writes the first.
+        [Test]
+        public void TheDiscographyButtonStandsOnlyWhileRootKeepsASong()
+        {
+            var fx = new Fixture();
+            var button = fx.Screen.Q<Button>("discography");
+            Assert.AreEqual(DisplayStyle.None, button.style.display.value, "set at construction");
+
+            fx.Enter();
+            Assert.AreEqual(DisplayStyle.None, button.style.display.value, "a live chapter with no song");
+
+            WriteSong(fx);
+            Assert.AreEqual(1, fx.Root.songs.Count);
+            Assert.AreEqual(DisplayStyle.Flex, button.style.display.value, "the write's refresh raised it");
+        }
+
+        [Test]
+        public void TheDiscographyListsOneRowPerSongInOrder()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            WriteSong(fx);
+            WriteSong(fx);
+
+            fx.Host.OpenDiscography();
+
+            Assert.IsTrue(Fixture.Shown(DiscographyWindow(fx.Screen)), "the window is up over the chapter");
+            Assert.AreSame(DiscographyWindow(fx.Screen), fx.Host.Discography.Root);
+            var rows = DiscographyRows(fx.Screen);
+            Assert.AreEqual(2, rows.Count, "one row per song");
+            var expected = new[] { "Untitled #1", "Untitled #2" };
+            for (var i = 0; i < rows.Count; i++)
+            {
+                Assert.AreEqual(expected[i], NameField(rows[i]).value, $"row {i} shows its song's name");
+                Assert.AreEqual(fx.Root.songs[i].name, NameField(rows[i]).value);
+                Assert.AreEqual(40, NameField(rows[i]).maxLength, "the field holds MaxNameLength");
+                Assert.AreEqual("Rename", rows[i].Q<Button>(className: "discography-rename").text);
+            }
+            Assert.AreEqual(7, fx.Host.Sections.Count, "the sections stay up beneath the window");
+        }
+
+        // What a row's button calls; a headless test has no pointer. The field
+        // shows what is stored once the command has run: the name as given,
+        // and trimmed when it came with surrounding spaces. Rows are read again
+        // after each rename, since the field is the stored name's and not the
+        // element a test held before the command.
+        [Test]
+        public void ARenameFromTheWindowChangesTheSongAndTheRowShowsTheStoredName()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            WriteSong(fx);
+            WriteSong(fx);
+            fx.Host.OpenDiscography();
+
+            fx.Host.Discography.Rename("song_2", "Garage Anthem");
+
+            Assert.AreEqual("Garage Anthem", fx.Root.songs[1].name);
+            Assert.AreEqual("Untitled #1", fx.Root.songs[0].name, "the other song is untouched");
+            Assert.AreEqual("Garage Anthem", NameField(DiscographyRows(fx.Screen)[1]).value);
+            Assert.AreEqual("Untitled #1", NameField(DiscographyRows(fx.Screen)[0]).value);
+
+            fx.Host.Discography.Rename("song_1", "   Backyard Party  ");
+
+            Assert.AreEqual("Backyard Party", fx.Root.songs[0].name);
+            Assert.AreEqual("Backyard Party", NameField(DiscographyRows(fx.Screen)[0]).value, "the trimmed name");
+            Assert.IsTrue(Fixture.Shown(DiscographyWindow(fx.Screen)), "the window stays up");
+        }
+
+        // A refused rename stores nothing, and the field goes back to what is
+        // stored rather than keeping what was typed into it.
+        [Test]
+        public void ARefusedRenameLeavesTheSongAndTheRowShowsTheStoredName()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            WriteSong(fx);
+            fx.Host.OpenDiscography();
+            NameField(DiscographyRows(fx.Screen)[0]).value = string.Empty;
+
+            fx.Host.Discography.Rename("song_1", string.Empty);
+
+            Assert.AreEqual("Untitled #1", fx.Root.songs[0].name, "an empty name is refused");
+            Assert.AreEqual("Untitled #1", NameField(DiscographyRows(fx.Screen)[0]).value);
+        }
+
+        // The host shows the window again on every refresh while it stands, a
+        // tick's included, and the player may be mid-name: what is typed stays
+        // in the field until a rename or a reopen, and a reopen shows what is
+        // stored.
+        [Test]
+        public void TextTypedIntoANameFieldSurvivesARefreshAndAReopenShowsTheStoredName()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            WriteSong(fx);
+            fx.Host.OpenDiscography();
+            var field = NameField(DiscographyRows(fx.Screen)[0]);
+            field.value = "Half a na";
+
+            WriteSong(fx);   // a transaction's refresh, with the window up
+
+            Assert.AreSame(field, NameField(DiscographyRows(fx.Screen)[0]), "the row is kept, not built again");
+            Assert.AreEqual("Half a na", field.value, "a refresh leaves typed text alone");
+            Assert.AreEqual(2, DiscographyRows(fx.Screen).Count, "the song written meanwhile gained a row");
+            Assert.AreEqual("Untitled #1", fx.Root.songs[0].name, "nothing was stored");
+
+            fx.Host.CloseOverlay();
+            fx.Host.OpenDiscography();
+
+            Assert.AreEqual("Untitled #1", NameField(DiscographyRows(fx.Screen)[0]).value, "a reopen shows what is stored");
+        }
+
+        // A show builds a row for every song that has none, so a song written
+        // while the window was down is a row the next time it opens.
+        [Test]
+        public void ASongWrittenWhileTheWindowIsClosedIsListedOnTheNextOpen()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            WriteSong(fx);
+            fx.Host.OpenDiscography();
+            Assert.AreEqual(1, DiscographyRows(fx.Screen).Count);
+            fx.Host.CloseOverlay();
+
+            WriteSong(fx);
+            fx.Host.OpenDiscography();
+
+            var rows = DiscographyRows(fx.Screen);
+            Assert.AreEqual(2, rows.Count);
+            Assert.AreEqual("Untitled #1", NameField(rows[0]).value);
+            Assert.AreEqual("Untitled #2", NameField(rows[1]).value);
+        }
+
+        [Test]
+        public void ClosingTheDiscographyReturnsToTheChapter()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            WriteSong(fx);
+            fx.Host.OpenDiscography();
+            Assert.IsTrue(Fixture.Shown(DiscographyWindow(fx.Screen)));
+
+            fx.Host.CloseOverlay();
+
+            Assert.IsFalse(Fixture.Shown(DiscographyWindow(fx.Screen)), "the window's own Back returns to the chapter");
+            Assert.AreEqual(7, fx.Host.Sections.Count);
+        }
+
         // ---- the marked beat pops by itself (decision 7) ----
 
         // A second host over the standing test tree: the pop rows need a MARKED
