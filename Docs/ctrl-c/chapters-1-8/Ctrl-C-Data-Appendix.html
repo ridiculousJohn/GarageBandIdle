@@ -1,0 +1,1602 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ctrl C: recovered data appendix</title><style>
+:root{color-scheme:light;--ink:#22303b;--muted:#526776;--line:#d6dfe4;--accent:#126c67}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:#f6f8f9;color:var(--ink);font:17px/1.65 system-ui,Segoe UI,sans-serif}nav{position:fixed;inset:0 auto 0 0;width:285px;padding:30px 22px;overflow:auto;background:#142c36;color:#edf6f7}nav strong{font-size:25px}nav small{display:block;color:#a9c7cd;margin:4px 0 24px}nav a{display:block;color:#d5e8eb;text-decoration:none;padding:8px 0;font-size:14px;line-height:1.45}nav a:hover{color:#fff;text-decoration:underline}nav .toc ul{list-style:none;padding:0}nav .toc>ul>li>ul{padding-left:0}nav .toc>ul>li>a{font-weight:700}nav .toc li li li{display:none}main{max-width:1300px;margin-left:285px;padding:48px 56px 100px;background:#fff;min-height:100vh}h1{font-size:44px;line-height:1.12;letter-spacing:-1px;margin:0 0 18px}h2{font-size:29px;line-height:1.25;margin:58px 0 22px;border-top:2px solid var(--line);padding-top:30px}h3{font-size:21px;margin:32px 0 12px;color:#12635e}p{margin:0 0 18px}a{color:var(--accent)}li{margin:7px 0}table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.5;margin:22px 0 30px;display:block;overflow-x:auto}th{background:#173d48;color:white;text-align:left}th,td{padding:11px 13px;border:1px solid #d6dfe4;vertical-align:top}tr:nth-child(even){background:#f1f6f7}code{font:0.88em/1.5 Consolas,monospace;background:#edf2f4;border-radius:3px;padding:2px 4px;overflow-wrap:anywhere}main>ul:first-of-type{padding-left:24px}.toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:25px;font-size:13px}.toolbar a{background:#eaf3f2;border:1px solid #cfdfdd;border-radius:5px;padding:6px 10px;text-decoration:none}.topnote{font-size:13px;color:var(--muted);margin-bottom:24px}button{font:inherit;border:1px solid #cfdfdd;border-radius:5px;background:#eaf3f2;padding:6px 10px;color:#126c67;cursor:pointer}
+@media(max-width:950px){nav{position:static;width:auto;max-height:280px}main{margin:0;padding:32px 20px}h1{font-size:35px}h2{font-size:25px}table{font-size:13px}}@media print{nav,.toolbar,.topnote{display:none}body,main{background:white}main{margin:0;padding:0;max-width:none;font-size:10pt}h1{font-size:26pt}h2{font-size:18pt;break-before:page}h3{break-after:avoid}table{display:table;font-size:8pt}tr{break-inside:avoid}a{color:inherit;text-decoration:none}}
+</style></head><body><nav><strong>CTRL C</strong><small>Chapters 1-8 / APK 1.12.2</small><a href="Ctrl-C-Chapters-1-8-Reference.html">Guide</a><a href="Ctrl-C-Data-Appendix.html">Data tables</a><a href="Ctrl-C-Story-Transcript.html">Story transcript</a><div class="toc">
+<ul>
+<li><a href="#ctrl-c-recovered-data-appendix">Ctrl C: recovered data appendix</a><ul>
+<li><a href="#chapter-1">Chapter 1</a></li>
+<li><a href="#chapter-2">Chapter 2</a></li>
+<li><a href="#chapter-3">Chapter 3</a></li>
+<li><a href="#chapter-4">Chapter 4</a></li>
+<li><a href="#chapter-5">Chapter 5</a></li>
+<li><a href="#chapter-6">Chapter 6</a></li>
+<li><a href="#chapter-7">Chapter 7</a></li>
+<li><a href="#chapter-8">Chapter 8</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav><main><div class="toolbar"><a href="Ctrl-C-Chapters-1-8-Reference.html">Guide</a><a href="Ctrl-C-Data-Appendix.html">Data tables</a><a href="Ctrl-C-Story-Transcript.html">Story transcript</a><a href="Ctrl-C-Data-Appendix.md">Markdown</a><a href="Ctrl-C-Evidence.zip">Evidence ZIP</a><button onclick="window.print()">Print</button></div><p class="topnote">Recovered data and static code analysis. Use your browser's Find command to search this document.</p><h1 id="ctrl-c-recovered-data-appendix">Ctrl C: recovered data appendix</h1>
+<p>Version 1.12.2 (146). Values below are decoded static data, rounded for readability. This appendix supplements the interpreted guide. An absent field is not evidence of a zero value. Runtime-built objects are described in the guide instead. Object addresses identify entries in the supplied evidence archive.</p>
+<h2 id="chapter-1">Chapter 1</h2>
+<h3 id="constant-quest-records">Constant quest records</h3>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Target</th>
+<th>Restriction</th>
+<th>Reward</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="constant-generator-records">Constant generator records</h3>
+<p>The two cost columns preserve the separate fields rather than guessing their role for every UI type. In Chapter 2, field 28 is the level price and field 2c is the automatic-start purchase. Per-second generators and timed bars must not be compared without accounting for cycle duration.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align: right;">Cycle seconds</th>
+<th>Raw yield per cycle / unit rate</th>
+<th>Cost field 28</th>
+<th>Cost field 2c</th>
+<th>Cycle input field 30</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-literal-cost-records">Upgrade literal cost records</h3>
+<p>Only literal cost tuples adjacent to named upgrade construction are included here. A blank means that this pass did not resolve a literal schedule; it does not mean free. Some upgrade costs are computed by a closure. The guide explains effects and progression.</p>
+<table>
+<thead>
+<tr>
+<th>Upgrade / construction label</th>
+<th>Literal costs in construction order</th>
+<th>Code address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PARA Organization</td>
+<td>Stat.KNOWLEDGE, 328.594651</td>
+<td>6a6580</td>
+</tr>
+<tr>
+<td>Cloud Notes</td>
+<td>Stat.KNOWLEDGE, 4889.40026</td>
+<td>6a6704</td>
+</tr>
+<tr>
+<td>Markdown</td>
+<td>Stat.KNOWLEDGE, 21912.7717</td>
+<td>6a6924</td>
+</tr>
+<tr>
+<td>Syntax Highlighting</td>
+<td>Stat.KNOWLEDGE, 45615.37</td>
+<td>6a6a90</td>
+</tr>
+<tr>
+<td>Delegation</td>
+<td>runtime / not resolved</td>
+<td>6a7508</td>
+</tr>
+<tr>
+<td>Deadlines</td>
+<td>Stat.CAREER_CAPITAL, 456.231338</td>
+<td>6a7660</td>
+</tr>
+<tr>
+<td>Meetings</td>
+<td>Stat.CAREER_CAPITAL, 340184951.0</td>
+<td>6a7efc</td>
+</tr>
+<tr>
+<td>Snacks</td>
+<td>Stat.CAREER_CAPITAL, 186929990000.0</td>
+<td>6a8068</td>
+</tr>
+</tbody>
+</table>
+<h2 id="chapter-2">Chapter 2</h2>
+<h3 id="constant-quest-records_1">Constant quest records</h3>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Target</th>
+<th>Restriction</th>
+<th>Reward</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="constant-generator-records_1">Constant generator records</h3>
+<p>The two cost columns preserve the separate fields rather than guessing their role for every UI type. In Chapter 2, field 28 is the level price and field 2c is the automatic-start purchase. Per-second generators and timed bars must not be compared without accounting for cycle duration.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align: right;">Cycle seconds</th>
+<th>Raw yield per cycle / unit rate</th>
+<th>Cost field 28</th>
+<th>Cost field 2c</th>
+<th>Cycle input field 30</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Design</td>
+<td style="text-align: right;">250</td>
+<td>LINES: 1.32452e+17</td>
+<td>7.04e+42 LINES</td>
+<td>9.63667e+52 LINES</td>
+<td></td>
+<td>82ea11</td>
+</tr>
+<tr>
+<td>Marketing</td>
+<td style="text-align: right;">90</td>
+<td>LINES: 6.01333e+12</td>
+<td>1.99e+34 LINES</td>
+<td>5.48363e+38 LINES</td>
+<td></td>
+<td>82ea51</td>
+</tr>
+<tr>
+<td>Networking</td>
+<td style="text-align: right;">30</td>
+<td>LINES: 4.05356e+10</td>
+<td>7.42e+24 LINES</td>
+<td>2.04e+26 LINES</td>
+<td></td>
+<td>82ea91</td>
+</tr>
+<tr>
+<td>Sales</td>
+<td style="text-align: right;">25</td>
+<td>LINES: 1.00478e+08</td>
+<td>7.25e+15 LINES</td>
+<td>1.04e+19 LINES</td>
+<td></td>
+<td>82ead1</td>
+</tr>
+<tr>
+<td>Quality Assurance</td>
+<td style="text-align: right;">7</td>
+<td>LINES: 19,250</td>
+<td>55,000 LINES</td>
+<td>1.97e+14 LINES</td>
+<td></td>
+<td>82eb11</td>
+</tr>
+<tr>
+<td>Frontend Developer</td>
+<td style="text-align: right;">4</td>
+<td>LINES: 19.624</td>
+<td>24.53 LINES</td>
+<td>15,000 LINES</td>
+<td></td>
+<td>82eb51</td>
+</tr>
+<tr>
+<td>Backend Developer</td>
+<td style="text-align: right;">1</td>
+<td>LINES: 1.0575</td>
+<td>4.23 LINES</td>
+<td>500 LINES</td>
+<td></td>
+<td>82eb91</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-literal-cost-records_1">Upgrade literal cost records</h3>
+<p>Only literal cost tuples adjacent to named upgrade construction are included here. A blank means that this pass did not resolve a literal schedule; it does not mean free. Some upgrade costs are computed by a closure. The guide explains effects and progression.</p>
+<table>
+<thead>
+<tr>
+<th>Upgrade / construction label</th>
+<th>Literal costs in construction order</th>
+<th>Code address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HR</td>
+<td>6.08101e+08 LINES</td>
+<td>6abba4</td>
+</tr>
+<tr>
+<td>Task Switching</td>
+<td>1.01207e+13 LINES; 2.22922e+17 LINES; 4.91019e+21 LINES; 1.08154e+26 LINES; 2.38225e+30 LINES; 6.90029e+11 EXPERIENCE; 1.02145e+15 EXPERIENCE</td>
+<td>6abcd4</td>
+</tr>
+<tr>
+<td>Stand Up</td>
+<td>1.3565e+07 EXPERIENCE</td>
+<td>6ac784</td>
+</tr>
+<tr>
+<td>Micromanagement</td>
+<td>6.05038e+09 DATA</td>
+<td>6ac8b4</td>
+</tr>
+</tbody>
+</table>
+<h2 id="chapter-3">Chapter 3</h2>
+<h3 id="constant-quest-records_2">Constant quest records</h3>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Target</th>
+<th>Restriction</th>
+<th>Reward</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bureaucracy</td>
+<td>4.25152e+32 CAREER_CAPITAL</td>
+<td>When buying anything yields goes to zero and goes back to normal after a minute. Note: it may seem like purchases don't do anything for quite a long time upon buying them.</td>
+<td>Unlocks a new upgrade.</td>
+<td>828891</td>
+</tr>
+<tr>
+<td>Management Styles</td>
+<td>9.63471e+25 CAREER_CAPITAL</td>
+<td>The main bars for each division do nothing.</td>
+<td>10x Meeting Speed And Yields</td>
+<td>8288b1</td>
+</tr>
+</tbody>
+</table>
+<h3 id="constant-generator-records_2">Constant generator records</h3>
+<p>The two cost columns preserve the separate fields rather than guessing their role for every UI type. In Chapter 2, field 28 is the level price and field 2c is the automatic-start purchase. Per-second generators and timed bars must not be compared without accounting for cycle duration.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align: right;">Cycle seconds</th>
+<th>Raw yield per cycle / unit rate</th>
+<th>Cost field 28</th>
+<th>Cost field 2c</th>
+<th>Cycle input field 30</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rust</td>
+<td style="text-align: right;">not specified</td>
+<td>PROGRESS: 6,812.49</td>
+<td>5.05239e+31 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ec11</td>
+</tr>
+<tr>
+<td>C++</td>
+<td style="text-align: right;">not specified</td>
+<td>PROGRESS: 5,577.59</td>
+<td>5.82185e+28 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ec51</td>
+</tr>
+<tr>
+<td>C#</td>
+<td style="text-align: right;">not specified</td>
+<td>PROGRESS: 5,046.81</td>
+<td>1.20367e+25 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ec91</td>
+</tr>
+<tr>
+<td>Javascript</td>
+<td style="text-align: right;">not specified</td>
+<td>PROGRESS: 4,640.84</td>
+<td>1.0976e+22 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ecd1</td>
+</tr>
+<tr>
+<td>Scripting</td>
+<td style="text-align: right;">12</td>
+<td>PROGRESS: 80.158</td>
+<td></td>
+<td></td>
+<td></td>
+<td>82ed11</td>
+</tr>
+<tr>
+<td>Memory Cache</td>
+<td style="text-align: right;">not specified</td>
+<td>PROGRESS: 75.6799</td>
+<td>7.20049e+10 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ed51</td>
+</tr>
+<tr>
+<td>CDN</td>
+<td style="text-align: right;">not specified</td>
+<td>PROGRESS: 75.6799</td>
+<td>1.31882e+09 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ed91</td>
+</tr>
+<tr>
+<td>SSD</td>
+<td style="text-align: right;">not specified</td>
+<td>PROGRESS: 83.6392</td>
+<td>6.13076e+08 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82edd1</td>
+</tr>
+<tr>
+<td>HDD</td>
+<td style="text-align: right;">not specified</td>
+<td>PROGRESS: 85</td>
+<td>5.58735e+07 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ee11</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td style="text-align: right;">12</td>
+<td>PROGRESS: 10.8482</td>
+<td></td>
+<td></td>
+<td></td>
+<td>82ee51</td>
+</tr>
+<tr>
+<td>Networking Protocols</td>
+<td style="text-align: right;">10</td>
+<td>PROGRESS: 64.4008</td>
+<td>3.75521e+06 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ee91</td>
+</tr>
+<tr>
+<td>External Networking</td>
+<td style="text-align: right;">6</td>
+<td>PROGRESS: 38.5735</td>
+<td>9,897.13 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82eed1</td>
+</tr>
+<tr>
+<td>Internal Networking</td>
+<td style="text-align: right;">4</td>
+<td>PROGRESS: 25.2797</td>
+<td>30 CAREER_CAPITAL</td>
+<td></td>
+<td></td>
+<td>82ef11</td>
+</tr>
+<tr>
+<td>Networking</td>
+<td style="text-align: right;">12</td>
+<td>PROGRESS: 1</td>
+<td></td>
+<td></td>
+<td></td>
+<td>82ef51</td>
+</tr>
+<tr>
+<td>Attend Meeting</td>
+<td style="text-align: right;">1</td>
+<td>CAREER_CAPITAL: 1</td>
+<td></td>
+<td></td>
+<td>1 PROGRESS</td>
+<td>82ef91</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-literal-cost-records_2">Upgrade literal cost records</h3>
+<p>Only literal cost tuples adjacent to named upgrade construction are included here. A blank means that this pass did not resolve a literal schedule; it does not mean free. Some upgrade costs are computed by a closure. The guide explains effects and progression.</p>
+<table>
+<thead>
+<tr>
+<th>Upgrade / construction label</th>
+<th>Literal costs in construction order</th>
+<th>Code address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Schedules</td>
+<td>20 CAREER_CAPITAL</td>
+<td>6af104</td>
+</tr>
+<tr>
+<td>VIPs</td>
+<td>616 CAREER_CAPITAL; 1,346.14 CAREER_CAPITAL; 60,174.3 CAREER_CAPITAL; 543,074 CAREER_CAPITAL; 2.41508e+09 CAREER_CAPITAL</td>
+<td>6af224</td>
+</tr>
+<tr>
+<td>Faster Meetings</td>
+<td>4,044.73 CAREER_CAPITAL; 9,946.74 CAREER_CAPITAL; 20,030.3 CAREER_CAPITAL; 33,024.3 CAREER_CAPITAL; 109,645 CAREER_CAPITAL; 364,033 CAREER_CAPITAL; 2.43389e+06 CAREER_CAPITAL; 1.47242e+07 CAREER_CAPITAL; 1.2024e+08 CAREER_CAPITAL; 7.99902e+08 CAREER_CAPITAL; 4.85083e+10 CAREER_CAPITAL; 2.39065e+11 CAREER_CAPITAL; 4.35604e+11 CAREER_CAPITAL; 2.15756e+12 CAREER_CAPITAL; 1.7619e+13 CAREER_CAPITAL; 1.59012e+14 CAREER_CAPITAL; 5.83462e+14 CAREER_CAPITAL; 4.76465e+15 CAREER_CAPITAL; 4.75235e+16 CAREER_CAPITAL</td>
+<td>6af360</td>
+</tr>
+<tr>
+<td>Larger Meetings</td>
+<td>27,042.6 CAREER_CAPITAL; 66,171.2 CAREER_CAPITAL; 179,872 CAREER_CAPITAL; 543,166 CAREER_CAPITAL; 1.98755e+07 CAREER_CAPITAL; 1.2024e+08 CAREER_CAPITAL; 6.56488e+09 CAREER_CAPITAL; 1.78452e+10 CAREER_CAPITAL; 4.85083e+10 CAREER_CAPITAL; 1.31859e+11 CAREER_CAPITAL; 4.81417e+11 CAREER_CAPITAL; 6.49845e+11 CAREER_CAPITAL; 2.15756e+12 CAREER_CAPITAL; 4.3448e+12 CAREER_CAPITAL; 1.9472e+13 CAREER_CAPITAL; 6.46494e+13 CAREER_CAPITAL; 1.94218e+14 CAREER_CAPITAL</td>
+<td>6af49c</td>
+</tr>
+<tr>
+<td>Overtime</td>
+<td>203,995 CAREER_CAPITAL; 1.1109e+08 CAREER_CAPITAL; 3.01974e+08 CAREER_CAPITAL; 8.2085e+08 CAREER_CAPITAL; 4.48169e+10 CAREER_CAPITAL; 1.24593e+12 CAREER_CAPITAL; 1.01482e+14 CAREER_CAPITAL; 3.71405e+15 CAREER_CAPITAL; 1.14862e+18 CAREER_CAPITAL</td>
+<td>6af5d8</td>
+</tr>
+<tr>
+<td>WFH</td>
+<td>1.33162e+13 CAREER_CAPITAL; 1.20179e+14 CAREER_CAPITAL; 2.03648e+15 CAREER_CAPITAL; 1.06828e+17 CAREER_CAPITAL; 1.58547e+19 CAREER_CAPITAL; 8.65639e+20 CAREER_CAPITAL; 4.72623e+22 CAREER_CAPITAL</td>
+<td>6af714</td>
+</tr>
+<tr>
+<td>Better Cables</td>
+<td>3,050.31 CAREER_CAPITAL; 1.3565e+07 CAREER_CAPITAL; 3.57566e+10 CAREER_CAPITAL; 9.93828e+13 CAREER_CAPITAL; 2.96256e+17 CAREER_CAPITAL; 6.52547e+21 CAREER_CAPITAL</td>
+<td>6afda0</td>
+</tr>
+<tr>
+<td>Better Switches</td>
+<td>4.27417e+13 CAREER_CAPITAL; 3.01147e+14 CAREER_CAPITAL; 8.97707e+17 CAREER_CAPITAL; 2.24851e+20 CAREER_CAPITAL; 2.70407e+26 CAREER_CAPITAL; 4.14554e+29 CAREER_CAPITAL</td>
+<td>6aff08</td>
+</tr>
+<tr>
+<td>Optimization</td>
+<td>7.87382e+23 CAREER_CAPITAL</td>
+<td>6b1488</td>
+</tr>
+<tr>
+<td>Hardware Acceleration</td>
+<td>3.52918e+30 CAREER_CAPITAL</td>
+<td>6b15d4</td>
+</tr>
+<tr>
+<td>PTO</td>
+<td>3.15282e+30 CAREER_CAPITAL; 9.43751e+33 CAREER_CAPITAL</td>
+<td>6b4d4c</td>
+</tr>
+</tbody>
+</table>
+<h2 id="chapter-4">Chapter 4</h2>
+<h3 id="constant-quest-records_3">Constant quest records</h3>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Target</th>
+<th>Restriction</th>
+<th>Reward</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="constant-generator-records_3">Constant generator records</h3>
+<p>The two cost columns preserve the separate fields rather than guessing their role for every UI type. In Chapter 2, field 28 is the level price and field 2c is the automatic-start purchase. Per-second generators and timed bars must not be compared without accounting for cycle duration.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align: right;">Cycle seconds</th>
+<th>Raw yield per cycle / unit rate</th>
+<th>Cost field 28</th>
+<th>Cost field 2c</th>
+<th>Cycle input field 30</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Faster SSD</td>
+<td style="text-align: right;">not specified</td>
+<td>VELOCITY: 0.0117647</td>
+<td>6.28773 MONEY</td>
+<td></td>
+<td></td>
+<td>82de91</td>
+</tr>
+<tr>
+<td>Function</td>
+<td style="text-align: right;">not specified</td>
+<td>LINES: 4</td>
+<td>1,380 LINES</td>
+<td></td>
+<td></td>
+<td>82ded1</td>
+</tr>
+<tr>
+<td>Variable</td>
+<td style="text-align: right;">not specified</td>
+<td>LINES: 2</td>
+<td>690 LINES</td>
+<td></td>
+<td></td>
+<td>82df11</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-literal-cost-records_3">Upgrade literal cost records</h3>
+<p>Only literal cost tuples adjacent to named upgrade construction are included here. A blank means that this pass did not resolve a literal schedule; it does not mean free. Some upgrade costs are computed by a closure. The guide explains effects and progression.</p>
+<table>
+<thead>
+<tr>
+<th>Upgrade / construction label</th>
+<th>Literal costs in construction order</th>
+<th>Code address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The More You Buy</td>
+<td>Stat.MONEY, 149117437000.0; Stat.MONEY, 6.59715511e+16; Stat.MONEY, 1.32507403e+18; Stat.MONEY, 4.33169001e+24</td>
+<td>4ff3fc</td>
+</tr>
+<tr>
+<td>Ergonomics</td>
+<td>Stat.MONEY, 1101837110000.0; Stat.MONEY, 163527126000000.0; Stat.MONEY, 9.79104631e+18; Stat.MONEY, 7.933767e+22</td>
+<td>4ff530</td>
+</tr>
+<tr>
+<td>Clipboard History</td>
+<td>Stat.MONEY, 1000.0</td>
+<td>4ff684</td>
+</tr>
+<tr>
+<td>Notepad</td>
+<td>Stat.MONEY, 1000.0</td>
+<td>4ff6e8</td>
+</tr>
+<tr>
+<td>Persuasion</td>
+<td>Stat.MONEY, 3000.0</td>
+<td>4ff74c</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>6,000 MONEY</td>
+<td>4ff7e0</td>
+</tr>
+<tr>
+<td>Organization</td>
+<td>8,000 MONEY</td>
+<td>4ff874</td>
+</tr>
+<tr>
+<td>Series A</td>
+<td>13,000 MONEY</td>
+<td>4ff914</td>
+</tr>
+<tr>
+<td>Cost Cutting</td>
+<td>28,000 MONEY</td>
+<td>4ff9ac</td>
+</tr>
+<tr>
+<td>Autocomplete</td>
+<td>78,200 MONEY</td>
+<td>4ffa48</td>
+</tr>
+<tr>
+<td>Better Hardware</td>
+<td>173,000 MONEY</td>
+<td>4ffae4</td>
+</tr>
+<tr>
+<td>Dictionary</td>
+<td>336,000 MONEY</td>
+<td>4ffb80</td>
+</tr>
+<tr>
+<td>Longer Clipboard History</td>
+<td>584,000 MONEY</td>
+<td>4ffc1c</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>633,000 MONEY</td>
+<td>4ffcb8</td>
+</tr>
+<tr>
+<td>Marketing</td>
+<td>1.92e+06 MONEY</td>
+<td>4ffd54</td>
+</tr>
+<tr>
+<td>More Investors</td>
+<td>7.43e+06 MONEY</td>
+<td>4ffdf0</td>
+</tr>
+<tr>
+<td>Continuous Integration</td>
+<td>2.83e+07 MONEY</td>
+<td>4ffea4</td>
+</tr>
+<tr>
+<td>\'The Key\'\'</td>
+<td>4.54e+07 MONEY</td>
+<td>4fff44</td>
+</tr>
+<tr>
+<td>Review</td>
+<td>9.33e+07 MONEY</td>
+<td>4fffe0</td>
+</tr>
+<tr>
+<td>Delegation</td>
+<td>1.65e+08 MONEY</td>
+<td>50007c</td>
+</tr>
+<tr>
+<td>Series B</td>
+<td>2.92e+08 MONEY</td>
+<td>500124</td>
+</tr>
+<tr>
+<td>Text Expansion</td>
+<td>8.52e+08 MONEY</td>
+<td>5001c4</td>
+</tr>
+<tr>
+<td>IDE</td>
+<td>3.43e+09 MONEY</td>
+<td>500278</td>
+</tr>
+<tr>
+<td>Moore\'s Law</td>
+<td>9.33e+09 MONEY</td>
+<td>500330</td>
+</tr>
+<tr>
+<td>Work From Home</td>
+<td>2.58e+10 MONEY</td>
+<td>5003d0</td>
+</tr>
+<tr>
+<td>Retrospectives</td>
+<td>8.09e+10 MONEY</td>
+<td>50046c</td>
+</tr>
+<tr>
+<td>Bare Metal</td>
+<td>1.74e+11 MONEY</td>
+<td>500508</td>
+</tr>
+<tr>
+<td>Even More Investors</td>
+<td>3.83e+11 MONEY</td>
+<td>5005a4</td>
+</tr>
+<tr>
+<td>Institutionalized Knowledge</td>
+<td>9.21e+11 MONEY</td>
+<td>500640</td>
+</tr>
+<tr>
+<td>Sticky Keys</td>
+<td>2.74e+12 MONEY</td>
+<td>5006e0</td>
+</tr>
+<tr>
+<td>Improvements</td>
+<td>4.74e+12 MONEY</td>
+<td>500780</td>
+</tr>
+<tr>
+<td>Home Office</td>
+<td>5.58e+12 MONEY</td>
+<td>500820</td>
+</tr>
+<tr>
+<td>Templates</td>
+<td>6.24e+12 MONEY</td>
+<td>5008c0</td>
+</tr>
+<tr>
+<td>Meta Programming</td>
+<td>1.53e+13 MONEY</td>
+<td>500960</td>
+</tr>
+<tr>
+<td>Series C</td>
+<td>7.84e+13 MONEY</td>
+<td>500a0c</td>
+</tr>
+<tr>
+<td>Books</td>
+<td>3.96e+14 MONEY</td>
+<td>500ac8</td>
+</tr>
+<tr>
+<td>Keyboard Macros</td>
+<td>5.52e+15 MONEY</td>
+<td>500b6c</td>
+</tr>
+<tr>
+<td>More Retrospectives</td>
+<td>1.2e+17 MONEY</td>
+<td>500c0c</td>
+</tr>
+<tr>
+<td>Lighting</td>
+<td>7.58e+17 MONEY</td>
+<td>500cac</td>
+</tr>
+<tr>
+<td>Multi-Monitor</td>
+<td>1.55e+18 MONEY</td>
+<td>500d64</td>
+</tr>
+<tr>
+<td>Syntactic Sugar</td>
+<td>5.91e+18 MONEY</td>
+<td>500e08</td>
+</tr>
+<tr>
+<td>IPO</td>
+<td>1.85e+19 MONEY</td>
+<td>500eb4</td>
+</tr>
+<tr>
+<td>Analysis</td>
+<td>2.09e+19 MONEY</td>
+<td>500f58</td>
+</tr>
+<tr>
+<td>Fast Typing</td>
+<td>2.42e+19 MONEY</td>
+<td>500ff8</td>
+</tr>
+<tr>
+<td>Money</td>
+<td>4.85e+19 MONEY</td>
+<td>501098</td>
+</tr>
+<tr>
+<td>Insiders</td>
+<td>2.83e+20 MONEY</td>
+<td>501138</td>
+</tr>
+<tr>
+<td>Activist Investors</td>
+<td>5.25e+21 MONEY</td>
+<td>5011d4</td>
+</tr>
+</tbody>
+</table>
+<h2 id="chapter-5">Chapter 5</h2>
+<h3 id="constant-quest-records_4">Constant quest records</h3>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Target</th>
+<th>Restriction</th>
+<th>Reward</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Direct To Consumer</td>
+<td>3.42542e+15 POWER</td>
+<td>Generator generators generate search power instead of more generators</td>
+<td>Generator generators go 10× as fast</td>
+<td>8288d1</td>
+</tr>
+<tr>
+<td>Game Jam 2</td>
+<td>1.97764e+07 POWER</td>
+<td>No tech debt but level will reset in 1 minute</td>
+<td>Unlocks generator generator generators.</td>
+<td>8288f1</td>
+</tr>
+<tr>
+<td>Game Jam</td>
+<td>1,540.71 POWER</td>
+<td>No tech debt but level will reset in 1 minute</td>
+<td>Unlocks generator generators.</td>
+<td>828911</td>
+</tr>
+<tr>
+<td>Legacy Systems</td>
+<td>18,215 POWER</td>
+<td>Start with 0.1 Tech Debt</td>
+<td>Decreases the speed you accumulate tech debt by 50%</td>
+<td>828931</td>
+</tr>
+</tbody>
+</table>
+<h3 id="constant-generator-records_4">Constant generator records</h3>
+<p>The two cost columns preserve the separate fields rather than guessing their role for every UI type. In Chapter 2, field 28 is the level price and field 2c is the automatic-start purchase. Per-second generators and timed bars must not be compared without accounting for cycle duration.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align: right;">Cycle seconds</th>
+<th>Raw yield per cycle / unit rate</th>
+<th>Cost field 28</th>
+<th>Cost field 2c</th>
+<th>Cycle input field 30</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Analysis</td>
+<td style="text-align: right;">1320</td>
+<td>GENERATOR_8: 1</td>
+<td>1.05925e+11 POWER</td>
+<td></td>
+<td></td>
+<td>82dfd1</td>
+</tr>
+<tr>
+<td>Inverted Index</td>
+<td style="text-align: right;">1285</td>
+<td>GENERATOR_7: 1</td>
+<td>1.58431e+10 POWER</td>
+<td></td>
+<td></td>
+<td>82e011</td>
+</tr>
+<tr>
+<td>Document Indexing</td>
+<td style="text-align: right;">1260</td>
+<td>GENERATOR_6: 1</td>
+<td>2.55163e+09 POWER</td>
+<td></td>
+<td></td>
+<td>82e051</td>
+</tr>
+<tr>
+<td>Tokenization</td>
+<td style="text-align: right;">40.2</td>
+<td>GENERATOR_3: 1</td>
+<td>4.12852e+08 POWER</td>
+<td></td>
+<td></td>
+<td>82e111</td>
+</tr>
+<tr>
+<td>Ranking</td>
+<td style="text-align: right;">38.9</td>
+<td>GENERATOR_2: 1</td>
+<td>1.02336e+06 POWER</td>
+<td></td>
+<td></td>
+<td>82e151</td>
+</tr>
+<tr>
+<td>Scoring</td>
+<td style="text-align: right;">37.4</td>
+<td>GENERATOR_1: 1</td>
+<td>19,148.9 POWER</td>
+<td></td>
+<td></td>
+<td>82e191</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-literal-cost-records_4">Upgrade literal cost records</h3>
+<p>Only literal cost tuples adjacent to named upgrade construction are included here. A blank means that this pass did not resolve a literal schedule; it does not mean free. Some upgrade costs are computed by a closure. The guide explains effects and progression.</p>
+<table>
+<thead>
+<tr>
+<th>Upgrade / construction label</th>
+<th>Literal costs in construction order</th>
+<th>Code address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Micromanagement</td>
+<td>Chapter5Stat.KNOWLEDGE, 1.0; Chapter5Stat.KNOWLEDGE, 29799435.3</td>
+<td>501af4</td>
+</tr>
+<tr>
+<td>Cloud Computing</td>
+<td>Chapter5Stat.KNOWLEDGE, 3714.50238; Chapter5Stat.KNOWLEDGE, 202804.958; Chapter5Stat.KNOWLEDGE, 30098924.6; Chapter5Stat.KNOWLEDGE, 12142772800.0</td>
+<td>501c10</td>
+</tr>
+<tr>
+<td>Economies Of Scale</td>
+<td>Chapter5Stat.SERENDIPITY, 228661.952</td>
+<td>501d1c</td>
+</tr>
+<tr>
+<td>Planning</td>
+<td>Chapter5Stat.SERENDIPITY, 2501108820.0; Chapter5Stat.SERENDIPITY, 1009019320000.0; Chapter5Stat.FEATURE, 26.5757727; Chapter5Stat.FEATURE, 79221.2619</td>
+<td>501e2c</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>501f7c</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>5020cc</td>
+</tr>
+<tr>
+<td>Tech Debt</td>
+<td>runtime / not resolved</td>
+<td>502204</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>502334</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>50246c</td>
+</tr>
+<tr>
+<td>Tech Debt</td>
+<td>runtime / not resolved</td>
+<td>5025a4</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>5026d4</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>50280c</td>
+</tr>
+<tr>
+<td>Tech Debt</td>
+<td>runtime / not resolved</td>
+<td>502944</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>502a74</td>
+</tr>
+<tr>
+<td>Speed</td>
+<td>runtime / not resolved</td>
+<td>502bac</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>502ce4</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>502e1c</td>
+</tr>
+<tr>
+<td>Speed</td>
+<td>runtime / not resolved</td>
+<td>502f54</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>50308c</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>5031c4</td>
+</tr>
+<tr>
+<td>Speed</td>
+<td>runtime / not resolved</td>
+<td>5032fc</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>503434</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>50356c</td>
+</tr>
+<tr>
+<td>Speed</td>
+<td>runtime / not resolved</td>
+<td>5036a4</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>5037dc</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>503914</td>
+</tr>
+<tr>
+<td>Speed</td>
+<td>runtime / not resolved</td>
+<td>503a4c</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>503b84</td>
+</tr>
+<tr>
+<td>Yields</td>
+<td>runtime / not resolved</td>
+<td>503cbc</td>
+</tr>
+<tr>
+<td>Speed</td>
+<td>runtime / not resolved</td>
+<td>503df4</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>runtime / not resolved</td>
+<td>503f2c</td>
+</tr>
+</tbody>
+</table>
+<h2 id="chapter-6">Chapter 6</h2>
+<h3 id="constant-quest-records_5">Constant quest records</h3>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Target</th>
+<th>Restriction</th>
+<th>Reward</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Triage 2</td>
+<td>1.33416e+20 ISSUE</td>
+<td>Disables commits</td>
+<td>Another 10x generator generator speed.</td>
+<td>828951</td>
+</tr>
+<tr>
+<td>Triage</td>
+<td>4.47559e+16 ISSUE</td>
+<td>Disables commits</td>
+<td>10x generator generator speed.</td>
+<td>828971</td>
+</tr>
+<tr>
+<td>Internal Review 3</td>
+<td>2.40762e+16 COMMIT</td>
+<td>Increases all costs by 100x, complete in 3 minutes</td>
+<td>Increases each issue generator's yields by the number of non-bonus generators owned times 0.03.</td>
+<td>828991</td>
+</tr>
+<tr>
+<td>Internal Review 2</td>
+<td>6.13585e+10 COMMIT</td>
+<td>Increases all costs by 100x, complete in 3 minutes</td>
+<td>Increases each issue generator's yields by the number of non-bonus generators owned times 0.02.</td>
+<td>8289b1</td>
+</tr>
+<tr>
+<td>Internal Review</td>
+<td>9.22488e+07 COMMIT</td>
+<td>Increases all costs by 100x, complete in 3 minutes</td>
+<td>Increases each issue generator's yields by the number of non-bonus generators owned times 0.01.</td>
+<td>8289d1</td>
+</tr>
+<tr>
+<td>Bug Bash</td>
+<td>3.90973e+18 VELOCITY</td>
+<td>No special conditions.</td>
+<td>Unlocks Auto Buyers for issue and velocity generators</td>
+<td>8289f1</td>
+</tr>
+</tbody>
+</table>
+<h3 id="constant-generator-records_5">Constant generator records</h3>
+<p>The two cost columns preserve the separate fields rather than guessing their role for every UI type. In Chapter 2, field 28 is the level price and field 2c is the automatic-start purchase. Per-second generators and timed bars must not be compared without accounting for cycle duration.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align: right;">Cycle seconds</th>
+<th>Raw yield per cycle / unit rate</th>
+<th>Cost field 28</th>
+<th>Cost field 2c</th>
+<th>Cycle input field 30</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Wireframe Refinement</td>
+<td style="text-align: right;">277.2</td>
+<td>BONUS_UX_DESIGN: 1</td>
+<td>4.20857e+15 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e211</td>
+</tr>
+<tr>
+<td>API Design</td>
+<td style="text-align: right;">298.2</td>
+<td>BONUS_DOCUMENTATION: 1</td>
+<td>6.68445e+14 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e251</td>
+</tr>
+<tr>
+<td>Test Case Creation</td>
+<td style="text-align: right;">307.8</td>
+<td>BONUS_BUG_REPORT: 1</td>
+<td>3.1387e+14 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e291</td>
+</tr>
+<tr>
+<td>Requirements Definitions</td>
+<td style="text-align: right;">313.8</td>
+<td>BONUS_FEATURE_IDEA: 1</td>
+<td>1.67165e+14 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e2d1</td>
+</tr>
+<tr>
+<td>UX Design</td>
+<td style="text-align: right;">not specified</td>
+<td>ISSUE: 3.42123</td>
+<td>2.47067e+06 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e311</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td style="text-align: right;">not specified</td>
+<td>ISSUE: 3.12677</td>
+<td>186,461 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e351</td>
+</tr>
+<tr>
+<td>Bug Report</td>
+<td style="text-align: right;">not specified</td>
+<td>ISSUE: 2.80107</td>
+<td>31,539.6 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e391</td>
+</tr>
+<tr>
+<td>Feature Idea</td>
+<td style="text-align: right;">not specified</td>
+<td>ISSUE: 2.2705</td>
+<td>1,993.39 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e3d1</td>
+</tr>
+<tr>
+<td>Git Pull</td>
+<td style="text-align: right;">not specified</td>
+<td>VELOCITY: 2.38214</td>
+<td>5.86686e+08 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e411</td>
+</tr>
+<tr>
+<td>Git Push</td>
+<td style="text-align: right;">not specified</td>
+<td>VELOCITY: 2.18147</td>
+<td>5.55384e+06 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e451</td>
+</tr>
+<tr>
+<td>Git Commit</td>
+<td style="text-align: right;">not specified</td>
+<td>VELOCITY: 1.85893</td>
+<td>2.56893e+06 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e491</td>
+</tr>
+<tr>
+<td>Git Add</td>
+<td style="text-align: right;">not specified</td>
+<td>VELOCITY: 1.58407</td>
+<td>1,993.39 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e4d1</td>
+</tr>
+<tr>
+<td>Git Status</td>
+<td style="text-align: right;">not specified</td>
+<td>VELOCITY: 1.37713</td>
+<td>1,008.25 COMMIT</td>
+<td></td>
+<td></td>
+<td>82e511</td>
+</tr>
+<tr>
+<td>Main</td>
+<td style="text-align: right;">15.6</td>
+<td>COMMIT: 1</td>
+<td>230.973 ISSUE</td>
+<td></td>
+<td>1 ISSUE</td>
+<td>82e551</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-literal-cost-records_5">Upgrade literal cost records</h3>
+<p>Only literal cost tuples adjacent to named upgrade construction are included here. A blank means that this pass did not resolve a literal schedule; it does not mean free. Some upgrade costs are computed by a closure. The guide explains effects and progression.</p>
+<table>
+<thead>
+<tr>
+<th>Upgrade / construction label</th>
+<th>Literal costs in construction order</th>
+<th>Code address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Faster Issue Creation</td>
+<td>Chapter6Stat.COMMIT, 81633.9085; Chapter6Stat.COMMIT, 994504.597; Chapter6Stat.COMMIT, 3251052810000.0</td>
+<td>5061b4</td>
+</tr>
+<tr>
+<td>Collaboration</td>
+<td>Chapter6Stat.COMMIT, 29799435.3; Chapter6Stat.COMMIT, 8906079760.0</td>
+<td>5062dc</td>
+</tr>
+<tr>
+<td>QA Tools</td>
+<td>Chapter6Stat.COMMIT, 88830864500.0; Chapter6Stat.COMMIT, 10793875400000.0</td>
+<td>5063f8</td>
+</tr>
+<tr>
+<td>Wiki</td>
+<td>Chapter6Stat.COMMIT, 2641174240000000.0</td>
+<td>506530</td>
+</tr>
+</tbody>
+</table>
+<h2 id="chapter-7">Chapter 7</h2>
+<h3 id="constant-quest-records_6">Constant quest records</h3>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Target</th>
+<th>Restriction</th>
+<th>Reward</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No Comments Ever 2</td>
+<td>3.25105e+12 POWER</td>
+<td>All generators produce additional documentation tech debt if they do not already do so.</td>
+<td>Reduces the effect of efficiency on generating tech debt by 90%.</td>
+<td>828a11</td>
+</tr>
+<tr>
+<td>No Comments Ever</td>
+<td>7.34845e+06 POWER</td>
+<td>All generators produce additional documentation tech debt if they do not already do so.</td>
+<td>Reduces the effect of efficiency on generating tech debt by 90%.</td>
+<td>828a31</td>
+</tr>
+<tr>
+<td>Last Minute Optimizations 5</td>
+<td>1.4388e+14 POWER</td>
+<td>Halves efficiency boosts.</td>
+<td>Upon prestige start with one resource, innovation, development, test lab, and server farm generator. Doubles the effect of efficiency and reduces tech debt again.</td>
+<td>828a51</td>
+</tr>
+<tr>
+<td>Last Minute Optimizations 4</td>
+<td>1.30525e+13 POWER</td>
+<td>Halves efficiency boosts.</td>
+<td>Upon prestige start with one resource, innovation, development, and test lab generator. Doubles the effect of efficiency and reduces tech debt again.</td>
+<td>828a71</td>
+</tr>
+<tr>
+<td>Last Minute Optimizations 3</td>
+<td>3.56643e+11 POWER</td>
+<td>Halves efficiency boosts.</td>
+<td>Upon prestige start with one resource, innovation, and development generator. Doubles the effect of efficiency and reduces tech debt again.</td>
+<td>828a91</td>
+</tr>
+<tr>
+<td>Last Minute Optimizations 2</td>
+<td>3.96194e+09 POWER</td>
+<td>Halves efficiency boosts.</td>
+<td>Upon prestige start with one resource and innovation generator. Doubles the effect of efficiency and reduces tech debt again.</td>
+<td>828ab1</td>
+</tr>
+<tr>
+<td>Last Minute Optimizations</td>
+<td>2.19129e+06 POWER</td>
+<td>Halves efficiency boosts.</td>
+<td>Start with one resource generator. Doubles the effect of efficiency and reduces tech debt.</td>
+<td>828ad1</td>
+</tr>
+</tbody>
+</table>
+<h3 id="constant-generator-records_6">Constant generator records</h3>
+<p>The two cost columns preserve the separate fields rather than guessing their role for every UI type. In Chapter 2, field 28 is the level price and field 2c is the automatic-start purchase. Per-second generators and timed bars must not be compared without accounting for cycle duration.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align: right;">Cycle seconds</th>
+<th>Raw yield per cycle / unit rate</th>
+<th>Cost field 28</th>
+<th>Cost field 2c</th>
+<th>Cycle input field 30</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-literal-cost-records_6">Upgrade literal cost records</h3>
+<p>Only literal cost tuples adjacent to named upgrade construction are included here. A blank means that this pass did not resolve a literal schedule; it does not mean free. Some upgrade costs are computed by a closure. The guide explains effects and progression.</p>
+<table>
+<thead>
+<tr>
+<th>Upgrade / construction label</th>
+<th>Literal costs in construction order</th>
+<th>Code address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pair Programming</td>
+<td>Chapter7Stat.KNOWLEDGE, 3.70617371; Chapter7Stat.KNOWLEDGE, 49.898952; Chapter7Stat.KNOWLEDGE, 497.701251; Chapter7Stat.KNOWLEDGE, 8955.2927; Chapter7Stat.KNOWLEDGE, 29732.6189; Chapter7Stat.KNOWLEDGE, 1088161.36; Chapter7Stat.KNOWLEDGE, 59411596.9; Chapter7Stat.KNOWLEDGE, 8817462790.0; Chapter7Stat.KNOWLEDGE, 29275007400.0; Chapter7Stat.KNOWLEDGE, 291994265000.0</td>
+<td>5073c8</td>
+</tr>
+<tr>
+<td>Templates</td>
+<td>Chapter7Stat.KNOWLEDGE, 15.7998429; Chapter7Stat.KNOWLEDGE, 66.686331; Chapter7Stat.KNOWLEDGE, 1998.1959; Chapter7Stat.KNOWLEDGE, 6634.24401; Chapter7Stat.KNOWLEDGE, 362217.45; Chapter7Stat.KNOWLEDGE, 10853519.9; Chapter7Stat.KNOWLEDGE, 146128949.0; Chapter7Stat.KNOWLEDGE, 2935078390.0; Chapter7Stat.KNOWLEDGE, 21687458900.0; Chapter7Stat.KNOWLEDGE, 160249851000.0</td>
+<td>507548</td>
+</tr>
+<tr>
+<td>APIs</td>
+<td>Chapter7Stat.KNOWLEDGE, 27.3851255; Chapter7Stat.KNOWLEDGE, 249.635037; Chapter7Stat.KNOWLEDGE, 5431.65959; Chapter7Stat.KNOWLEDGE, 442413.392; Chapter7Stat.KNOWLEDGE, 80197267.4; Chapter7Stat.KNOWLEDGE, 929353741.0; Chapter7Stat.KNOWLEDGE, 6867046930.0; Chapter7Stat.KNOWLEDGE, 18666568900.0; Chapter7Stat.KNOWLEDGE, 137928325000.0</td>
+<td>5076c8</td>
+</tr>
+<tr>
+<td>Compartmentalization</td>
+<td>Chapter7Stat.KNOWLEDGE, 128027.453</td>
+<td>50783c</td>
+</tr>
+<tr>
+<td>Not Like That</td>
+<td>Chapter7Stat.KNOWLEDGE, 4457060.38; Chapter7Stat.KNOWLEDGE, 110441884.0; Chapter7Stat.KNOWLEDGE, 7364964010.0; Chapter7Stat.KNOWLEDGE, 147929257000.0; Chapter7Stat.KNOWLEDGE, 2971238540000.0</td>
+<td>50794c</td>
+</tr>
+<tr>
+<td>Protocols</td>
+<td>Chapter7Stat.KNOWLEDGE, 13389749.4; Chapter7Stat.KNOWLEDGE, 300212165.0; Chapter7Stat.KNOWLEDGE, 2403038940.0; Chapter7Stat.KNOWLEDGE, 9941661530.0; Chapter7Stat.KNOWLEDGE, 73459494800.0</td>
+<td>507a8c</td>
+</tr>
+</tbody>
+</table>
+<h2 id="chapter-8">Chapter 8</h2>
+<h3 id="constant-quest-records_7">Constant quest records</h3>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Target</th>
+<th>Restriction</th>
+<th>Reward</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="constant-generator-records_7">Constant generator records</h3>
+<p>The two cost columns preserve the separate fields rather than guessing their role for every UI type. In Chapter 2, field 28 is the level price and field 2c is the automatic-start purchase. Per-second generators and timed bars must not be compared without accounting for cycle duration.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th style="text-align: right;">Cycle seconds</th>
+<th>Raw yield per cycle / unit rate</th>
+<th>Cost field 28</th>
+<th>Cost field 2c</th>
+<th>Cycle input field 30</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bicho Generator</td>
+<td style="text-align: right;">1</td>
+<td>BICHO_SHARES: 1</td>
+<td>exp(9999.0) MONEY</td>
+<td></td>
+<td></td>
+<td>82e591</td>
+</tr>
+<tr>
+<td>Components</td>
+<td style="text-align: right;">1.21</td>
+<td>BONUS_PC: 1</td>
+<td>1.28207e+08 MONEY</td>
+<td></td>
+<td></td>
+<td>82e5d1</td>
+</tr>
+<tr>
+<td>Meetings</td>
+<td style="text-align: right;">not specified</td>
+<td>PRODUCTIVITY: 0.0308074</td>
+<td>4,105.16 MONEY</td>
+<td></td>
+<td></td>
+<td>82e611</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-literal-cost-records_7">Upgrade literal cost records</h3>
+<p>Only literal cost tuples adjacent to named upgrade construction are included here. A blank means that this pass did not resolve a literal schedule; it does not mean free. Some upgrade costs are computed by a closure. The guide explains effects and progression.</p>
+<table>
+<thead>
+<tr>
+<th>Upgrade / construction label</th>
+<th>Literal costs in construction order</th>
+<th>Code address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Discipline</td>
+<td>runtime / not resolved</td>
+<td>508744</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>Chapter8Stat.SHARES, 250.385067</td>
+<td>5088a8</td>
+</tr>
+<tr>
+<td>Bulk Buy</td>
+<td>Chapter8Stat.PRODUCTIVITY, 2571500.14</td>
+<td>5089d4</td>
+</tr>
+<tr>
+<td>Market Manipulation</td>
+<td>Chapter8Stat.SHARES, 92.7585611; Chapter8Stat.SHARES, 83283.0228; Chapter8Stat.SHARES, 1239229.04; Chapter8Stat.SHARES, 96013561.0</td>
+<td>508ae4</td>
+</tr>
+<tr>
+<td>Economies Of Scale</td>
+<td>Chapter8Stat.MONEY, 153966364000.0; Chapter8Stat.MONEY, 50855022300000.0; Chapter8Stat.MONEY, 1.62003412e+30; Chapter8Stat.MONEY, 7.8598417e+38</td>
+<td>508c60</td>
+</tr>
+<tr>
+<td>Metrication</td>
+<td>Chapter8Stat.MONEY, 9.19480373e+16</td>
+<td>508d94</td>
+</tr>
+<tr>
+<td>Market Power</td>
+<td>Chapter8Stat.SHARES, 2571500.14; Chapter8Stat.SHARES, 9435596.91; Chapter8Stat.SHARES, 38263232.3; Chapter8Stat.SHARES, 768537564.0</td>
+<td>508ea4</td>
+</tr>
+<tr>
+<td>Poison Pill</td>
+<td>Chapter8Stat.SHARES, 28566.7862; Chapter8Stat.SHARES, 384615.726; Chapter8Stat.SHARES, 4239686.98; Chapter8Stat.SHARES, 63085404.9; Chapter8Stat.SHARES, 197253448.0</td>
+<td>508ff4</td>
+</tr>
+<tr>
+<td>Snowballing Productivity</td>
+<td>Chapter8Stat.PRODUCTIVITY, 4206934200.0; Chapter8Stat.PRODUCTIVITY, 119909125000.0; Chapter8Stat.PRODUCTIVITY, 588004243000.0; Chapter8Stat.PRODUCTIVITY, 87267567200000.0</td>
+<td>509134</td>
+</tr>
+<tr>
+<td>Compound Interest</td>
+<td>Chapter8Stat.MONEY, 1.81370674e+25; Chapter8Stat.MONEY, 4.80434994e+35; Chapter8Stat.MONEY, 8.20178291e+37</td>
+<td>509268</td>
+</tr>
+<tr>
+<td>Benefits Program</td>
+<td>Chapter8Stat.SHARES, 569346631.0</td>
+<td>509390</td>
+</tr>
+</tbody>
+</table></main></body></html>

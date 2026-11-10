@@ -1,7 +1,7 @@
 # Chapter primitives
 
 Plan for the runtime support chapters 2 through 8 will need, 2026-09-15, from a survey of the Ctrl C
-reconstruction (`Ctrl-C-Chapter-1-8.zip`: the chapter reference, the data appendix, the story
+reconstruction (`Docs/ctrl-c/chapters-1-8/`: the chapter reference, the data appendix, the story
 transcript) against the primitives in `Core` and `Economy`. Sections cited are
 `garage-band-idle-design.md`. Suite at the start: 799/799, at commit c3930dc.
 

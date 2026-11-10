@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e6b3ee4e-601a-46e9-8b69-94d55b6fad6a
-  modified: 2026-09-14T17:07:21.183Z
+  modified: 2026-11-09T23:42:11.467Z
 ---
 
 Ctrl C is John's strong reference for Garage Band Idle. The design doc was built against it across
@@ -14,6 +14,12 @@ extensive conversations and two rewrites, so its shapes are inherited, not inven
 does, and I asserted that without checking.
 
 Where it survives in writing (thin, which is why this memory exists):
+
+- The reconstruction from the Android APKs (version 1.12.2) lives in `Docs/ctrl-c/`, added
+  2026-11-09: `chapters-1-8/` and `chapters-9-end/`, each a chapter reference, data appendix and
+  story transcript (.md and .html) plus the recovered data JSON; the 9-end evidence (disassembly)
+  stays zipped. Claims are tagged [D] data, [C] code-derived, [I] inference, [U] unresolved. Read
+  it before asking John how Ctrl C does something; his play is the fact where the two differ.
 
 - Design doc line 234 cites "Ctrl C's Lines to Knowledge" for the push-past-the-gate payout shape:
   bank at a threshold, keep accruing past it at a lower rate, so the offer condition sets the floor

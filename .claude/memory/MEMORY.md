@@ -7,7 +7,7 @@
 - [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - names resolve outward from the acting scope; cross-chain aliasing is the feature; a node-kind restriction on an economy read ("only chapters") is a deviation even when my own plan wrote it
 - [Currency values are BigNumber](currency-values-are-bignumber.md) - anything the runtime could compute past a double, authored fields included; only counts and Pow's power are exempt
 - [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20: venue assets and stationing caps deleted, payloads typed by authored kind, currencies by direct reference
-- [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from it; ask John how Ctrl C does it before reasoning from scratch; its meta layer (two-pill top bar, Overclock, Pro Unlock, story buttons, granted counts) recorded 2026-09-02
+- [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from it; its APK reconstruction (chapters 1-8 and 9-end) is in Docs/ctrl-c; ask John how Ctrl C does it before reasoning from scratch; its meta layer (two-pill top bar, Overclock, Pro Unlock, story buttons, granted counts) recorded 2026-09-02
 - [Closed sets are enums](closed-sets-are-enums.md) - code-defined vocabularies are C# enums; strings only for open designer ids
 - [Narrowing a member type](narrowing-a-member-type.md) - generic base class; covariant overrides don't compile in Unity (CS8831) and `new` hiding is rejected
 - [Step 9 open UI items](step-9-open-ui-items.md) - the digit font (measured: only "1" is narrower), the omitted group title and how to add one, the accepted chrome literals, bulk buy later

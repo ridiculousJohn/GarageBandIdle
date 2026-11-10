@@ -1,0 +1,2521 @@
+{
+  "provenance": {
+    "manifest": {
+      "versionCode": 146,
+      "versionName": "1.12.2",
+      "compileSdkVersion": 36,
+      "compileSdkVersionCodename": "16",
+      "requiredSplitTypes": "base__abi,base__density",
+      "splitTypes": "",
+      "package": "com.amorfatite.pretentious",
+      "platformBuildVersionCode": 36,
+      "platformBuildVersionName": 16
+    },
+    "apks": [
+      {
+        "name": "base.apk",
+        "bytes": 12060963,
+        "sha256": "bc62bf9b54a5dd872f73a4bd5b430698de9de7bd130aa27132cf3d676a1772c2"
+      },
+      {
+        "name": "split_config.xxhdpi.apk",
+        "bytes": 83323,
+        "sha256": "a6cb7e4c1c85fbb0b4172bc7e4d77a2fbc811ff7d0233d53857840d612f7ea61"
+      },
+      {
+        "name": "split_config.en.apk",
+        "bytes": 49561,
+        "sha256": "3677c831be984ede55e2e3b4f81c005a9c16e8f0d4aaa81967e6b1adb6c6fa1a"
+      },
+      {
+        "name": "split_config.arm64_v8a.apk",
+        "bytes": 22090455,
+        "sha256": "509c8773a12e31543ad08cbb7fe511b368f2d8f6e93f45a6acaa65e05e70bc29"
+      }
+    ]
+  },
+  "quest_records": [
+    {
+      "chapter": 3,
+      "type": "QuestLevel<Stat>",
+      "address": "828891",
+      "off_10": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827371",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 4.25152195e+32
+      },
+      "off_14": "Bureaucracy",
+      "off_18": "When buying anything yields goes to zero and goes back to normal after a minute. Note: it may seem like purchases don't do anything for quite a long time upon buying them.",
+      "off_1c": "Unlocks a new upgrade."
+    },
+    {
+      "chapter": 3,
+      "type": "QuestLevel<Stat>",
+      "address": "8288b1",
+      "off_10": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827391",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 9.63471455e+25
+      },
+      "off_14": "Management Styles",
+      "off_18": "The main bars for each division do nothing.",
+      "off_1c": "10x Meeting Speed And Yields"
+    },
+    {
+      "chapter": 5,
+      "type": "QuestLevel<Chapter5Stat>",
+      "address": "8288d1",
+      "off_10": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "827d91",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 3425418330000000.0
+      },
+      "off_14": "Direct To Consumer",
+      "off_18": "Generator generators generate search power instead of more generators",
+      "off_1c": "Generator generators go 10\u00d7 as fast"
+    },
+    {
+      "chapter": 5,
+      "type": "QuestLevel<Chapter5Stat>",
+      "address": "8288f1",
+      "off_10": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "827db1",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 19776402.7
+      },
+      "off_14": "Game Jam 2",
+      "off_18": "No tech debt but level will reset in 1 minute",
+      "off_1c": "Unlocks generator generator generators."
+    },
+    {
+      "chapter": 5,
+      "type": "QuestLevel<Chapter5Stat>",
+      "address": "828911",
+      "off_10": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "827dd1",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 1540.71211
+      },
+      "off_14": "Game Jam",
+      "off_18": "No tech debt but level will reset in 1 minute",
+      "off_1c": "Unlocks generator generators."
+    },
+    {
+      "chapter": 5,
+      "type": "QuestLevel<Chapter5Stat>",
+      "address": "828931",
+      "off_10": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "827df1",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 18214.9871
+      },
+      "off_14": "Legacy Systems",
+      "off_18": "Start with 0.1 Tech Debt",
+      "off_1c": "Decreases the speed you accumulate tech debt by 50%"
+    },
+    {
+      "chapter": 6,
+      "type": "QuestLevel<Chapter6Stat>",
+      "address": "828951",
+      "off_10": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "827e51",
+        "off_c": "Chapter6Stat.ISSUE",
+        "off_10": 1.33415501e+20
+      },
+      "off_14": "Triage 2",
+      "off_18": "Disables commits",
+      "off_1c": "Another 10x generator generator speed."
+    },
+    {
+      "chapter": 6,
+      "type": "QuestLevel<Chapter6Stat>",
+      "address": "828971",
+      "off_10": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "827e71",
+        "off_c": "Chapter6Stat.ISSUE",
+        "off_10": 4.47559146e+16
+      },
+      "off_14": "Triage",
+      "off_18": "Disables commits",
+      "off_1c": "10x generator generator speed."
+    },
+    {
+      "chapter": 6,
+      "type": "QuestLevel<Chapter6Stat>",
+      "address": "828991",
+      "off_10": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "827e91",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 2.40761953e+16
+      },
+      "off_14": "Internal Review 3",
+      "off_18": "Increases all costs by 100x, complete in 3 minutes",
+      "off_1c": "Increases each issue generator's yields by the number of non-bonus generators owned times 0.03."
+    },
+    {
+      "chapter": 6,
+      "type": "QuestLevel<Chapter6Stat>",
+      "address": "8289b1",
+      "off_10": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "827eb1",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 61358527700.0
+      },
+      "off_14": "Internal Review 2",
+      "off_18": "Increases all costs by 100x, complete in 3 minutes",
+      "off_1c": "Increases each issue generator's yields by the number of non-bonus generators owned times 0.02."
+    },
+    {
+      "chapter": 6,
+      "type": "QuestLevel<Chapter6Stat>",
+      "address": "8289d1",
+      "off_10": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "827ed1",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 92248815.4
+      },
+      "off_14": "Internal Review",
+      "off_18": "Increases all costs by 100x, complete in 3 minutes",
+      "off_1c": "Increases each issue generator's yields by the number of non-bonus generators owned times 0.01."
+    },
+    {
+      "chapter": 6,
+      "type": "QuestLevel<Chapter6Stat>",
+      "address": "8289f1",
+      "off_10": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "827ef1",
+        "off_c": "Chapter6Stat.VELOCITY",
+        "off_10": 3.90973003e+18
+      },
+      "off_14": "Bug Bash",
+      "off_18": "No special conditions.",
+      "off_1c": "Unlocks Auto Buyers for issue and velocity generators"
+    },
+    {
+      "chapter": 7,
+      "type": "QuestLevel<Chapter7Stat>",
+      "address": "828a11",
+      "off_10": {
+        "type": "Tuple2<Chapter7Stat, CustomNum>",
+        "address": "827f71",
+        "off_c": "Chapter7Stat.POWER",
+        "off_10": 3251052810000.0
+      },
+      "off_14": "No Comments Ever 2",
+      "off_18": "All generators produce additional documentation tech debt if they do not already do so.",
+      "off_1c": "Reduces the effect of efficiency on generating tech debt by 90%."
+    },
+    {
+      "chapter": 7,
+      "type": "QuestLevel<Chapter7Stat>",
+      "address": "828a31",
+      "off_10": {
+        "type": "Tuple2<Chapter7Stat, CustomNum>",
+        "address": "827f91",
+        "off_c": "Chapter7Stat.POWER",
+        "off_10": 7348450.26
+      },
+      "off_14": "No Comments Ever",
+      "off_18": "All generators produce additional documentation tech debt if they do not already do so.",
+      "off_1c": "Reduces the effect of efficiency on generating tech debt by 90%."
+    },
+    {
+      "chapter": 7,
+      "type": "QuestLevel<Chapter7Stat>",
+      "address": "828a51",
+      "off_10": {
+        "type": "Tuple2<Chapter7Stat, CustomNum>",
+        "address": "827fb1",
+        "off_c": "Chapter7Stat.POWER",
+        "off_10": 143879894000000.0
+      },
+      "off_14": "Last Minute Optimizations 5",
+      "off_18": "Halves efficiency boosts.",
+      "off_1c": "Upon prestige start with one resource, innovation, development, test lab, and server farm generator. Doubles the effect of efficiency and reduces tech debt again."
+    },
+    {
+      "chapter": 7,
+      "type": "QuestLevel<Chapter7Stat>",
+      "address": "828a71",
+      "off_10": {
+        "type": "Tuple2<Chapter7Stat, CustomNum>",
+        "address": "827fd1",
+        "off_c": "Chapter7Stat.POWER",
+        "off_10": 13052489500000.0
+      },
+      "off_14": "Last Minute Optimizations 4",
+      "off_18": "Halves efficiency boosts.",
+      "off_1c": "Upon prestige start with one resource, innovation, development, and test lab generator. Doubles the effect of efficiency and reduces tech debt again."
+    },
+    {
+      "chapter": 7,
+      "type": "QuestLevel<Chapter7Stat>",
+      "address": "828a91",
+      "off_10": {
+        "type": "Tuple2<Chapter7Stat, CustomNum>",
+        "address": "827ff1",
+        "off_c": "Chapter7Stat.POWER",
+        "off_10": 356642601000.0
+      },
+      "off_14": "Last Minute Optimizations 3",
+      "off_18": "Halves efficiency boosts.",
+      "off_1c": "Upon prestige start with one resource, innovation, and development generator. Doubles the effect of efficiency and reduces tech debt again."
+    },
+    {
+      "chapter": 7,
+      "type": "QuestLevel<Chapter7Stat>",
+      "address": "828ab1",
+      "off_10": {
+        "type": "Tuple2<Chapter7Stat, CustomNum>",
+        "address": "828011",
+        "off_c": "Chapter7Stat.POWER",
+        "off_10": 3961941420.0
+      },
+      "off_14": "Last Minute Optimizations 2",
+      "off_18": "Halves efficiency boosts.",
+      "off_1c": "Upon prestige start with one resource and innovation generator. Doubles the effect of efficiency and reduces tech debt again."
+    },
+    {
+      "chapter": 7,
+      "type": "QuestLevel<Chapter7Stat>",
+      "address": "828ad1",
+      "off_10": {
+        "type": "Tuple2<Chapter7Stat, CustomNum>",
+        "address": "828031",
+        "off_c": "Chapter7Stat.POWER",
+        "off_10": 2191287.88
+      },
+      "off_14": "Last Minute Optimizations",
+      "off_18": "Halves efficiency boosts.",
+      "off_1c": "Start with one resource generator. Doubles the effect of efficiency and reduces tech debt."
+    }
+  ],
+  "constant_generator_records": [
+    {
+      "chapter": 2,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ea11",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "false",
+      "off_1c": "Design",
+      "off_20": "250",
+      "off_24": {
+        "Stat.LINES": 1.32452436e+17
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827131",
+        "off_c": "Stat.LINES",
+        "off_10": 7.04e+42
+      },
+      "off_2c": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827111",
+        "off_c": "Stat.LINES",
+        "off_10": 9.63666567e+52
+      }
+    },
+    {
+      "chapter": 2,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ea51",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "false",
+      "off_1c": "Marketing",
+      "off_20": "90",
+      "off_24": {
+        "Stat.LINES": 6013331280000.0
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827171",
+        "off_c": "Stat.LINES",
+        "off_10": 1.99e+34
+      },
+      "off_2c": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827151",
+        "off_c": "Stat.LINES",
+        "off_10": 5.48362548e+38
+      }
+    },
+    {
+      "chapter": 2,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ea91",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "false",
+      "off_1c": "Networking",
+      "off_20": "30",
+      "off_24": {
+        "Stat.LINES": 40535606600.0
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8271b1",
+        "off_c": "Stat.LINES",
+        "off_10": 7.42e+24
+      },
+      "off_2c": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827191",
+        "off_c": "Stat.LINES",
+        "off_10": 2.04e+26
+      }
+    },
+    {
+      "chapter": 2,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ead1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "false",
+      "off_1c": "Sales",
+      "off_20": "25",
+      "off_24": {
+        "Stat.LINES": 100477723.0
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8271f1",
+        "off_c": "Stat.LINES",
+        "off_10": 7250000260000000.0
+      },
+      "off_2c": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8271d1",
+        "off_c": "Stat.LINES",
+        "off_10": 1.04000002e+19
+      }
+    },
+    {
+      "chapter": 2,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82eb11",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "false",
+      "off_1c": "Quality Assurance",
+      "off_20": "7",
+      "off_24": {
+        "Stat.LINES": 19250.0008
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827231",
+        "off_c": "Stat.LINES",
+        "off_10": 55000.002
+      },
+      "off_2c": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827211",
+        "off_c": "Stat.LINES",
+        "off_10": 196999991000000.0
+      }
+    },
+    {
+      "chapter": 2,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82eb51",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "false",
+      "off_1c": "Frontend Developer",
+      "off_20": "4",
+      "off_24": {
+        "Stat.LINES": 19.6240001
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827271",
+        "off_c": "Stat.LINES",
+        "off_10": 24.53
+      },
+      "off_2c": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827251",
+        "off_c": "Stat.LINES",
+        "off_10": 15000.0
+      }
+    },
+    {
+      "chapter": 2,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82eb91",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "false",
+      "off_1c": "Backend Developer",
+      "off_20": "1",
+      "off_24": {
+        "Stat.LINES": 1.0575
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8272b1",
+        "off_c": "Stat.LINES",
+        "off_10": 4.23
+      },
+      "off_2c": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "827291",
+        "off_c": "Stat.LINES",
+        "off_10": 500.0
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ec11",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Rust",
+      "off_24": {
+        "Stat.PROGRESS": 6812.48679
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "828191",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 5.05239363e+31
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ec51",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "C++",
+      "off_24": {
+        "Stat.PROGRESS": 5577.59244
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8281b1",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 5.82184602e+28
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ec91",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "C#",
+      "off_24": {
+        "Stat.PROGRESS": 5046.81434
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8281d1",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 1.20366693e+25
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ecd1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Javascript",
+      "off_24": {
+        "Stat.PROGRESS": 4640.84272
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8281f1",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 1.09760217e+22
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ed11",
+      "off_c": "true",
+      "off_10": "true",
+      "off_14": "true",
+      "off_1c": "Scripting",
+      "off_20": "12",
+      "off_24": {
+        "Stat.PROGRESS": 80.1580251
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ed51",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Memory Cache",
+      "off_24": {
+        "Stat.PROGRESS": 75.6798922
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "828211",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 72004899300.0
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ed91",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "CDN",
+      "off_24": {
+        "Stat.PROGRESS": 75.6798922
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "828231",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 1318815730.0
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82edd1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "SSD",
+      "off_24": {
+        "Stat.PROGRESS": 83.6392159
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "828251",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 613076327.0
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ee11",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "HDD",
+      "off_24": {
+        "Stat.PROGRESS": 84.9999994
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "828271",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 55873457.3
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ee51",
+      "off_c": "true",
+      "off_10": "true",
+      "off_14": "true",
+      "off_1c": "Storage",
+      "off_20": "12",
+      "off_24": {
+        "Stat.PROGRESS": 10.848209
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ee91",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Networking Protocols",
+      "off_20": "10",
+      "off_24": {
+        "Stat.PROGRESS": 64.4007738
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "828291",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 3755207.53
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82eed1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "External Networking",
+      "off_20": "6",
+      "off_24": {
+        "Stat.PROGRESS": 38.5734764
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8282b1",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 9897.12906
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ef11",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Internal Networking",
+      "off_20": "4",
+      "off_24": {
+        "Stat.PROGRESS": 25.279657
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8282d1",
+        "off_c": "Stat.CAREER_CAPITAL",
+        "off_10": 30.0
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ef51",
+      "off_c": "true",
+      "off_10": "true",
+      "off_14": "true",
+      "off_1c": "Networking",
+      "off_20": "12",
+      "off_24": {
+        "Stat.PROGRESS": 1.0
+      }
+    },
+    {
+      "chapter": 3,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ef91",
+      "off_c": "true",
+      "off_10": "true",
+      "off_14": "false",
+      "off_1c": "Attend Meeting",
+      "off_20": "1",
+      "off_24": {
+        "Stat.CAREER_CAPITAL": 1.0
+      },
+      "off_30": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "8282f1",
+        "off_c": "Stat.PROGRESS",
+        "off_10": 1.0
+      }
+    },
+    {
+      "chapter": 4,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82de91",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Faster SSD",
+      "off_24": {
+        "Stat.VELOCITY": 0.011764706
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "824b71",
+        "off_c": "Stat.MONEY",
+        "off_10": 6.28772928
+      }
+    },
+    {
+      "chapter": 4,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82ded1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Function",
+      "off_24": {
+        "Stat.LINES": 4.0
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "824bd1",
+        "off_c": "Stat.LINES",
+        "off_10": 1380.0
+      }
+    },
+    {
+      "chapter": 4,
+      "type": "GeneratorInfo<Stat>",
+      "address": "82df11",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Variable",
+      "off_24": {
+        "Stat.LINES": 2.0
+      },
+      "off_28": {
+        "type": "Tuple2<Stat, CustomNum>",
+        "address": "824bf1",
+        "off_c": "Stat.LINES",
+        "off_10": 690.0
+      }
+    },
+    {
+      "chapter": 5,
+      "type": "GeneratorInfo<Chapter5Stat>",
+      "address": "82dfd1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Analysis",
+      "off_20": "1320",
+      "off_24": {
+        "Chapter5Stat.GENERATOR_8": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "824c31",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 105925304000.0
+      }
+    },
+    {
+      "chapter": 5,
+      "type": "GeneratorInfo<Chapter5Stat>",
+      "address": "82e011",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Inverted Index",
+      "off_20": "1285",
+      "off_24": {
+        "Chapter5Stat.GENERATOR_7": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "824c51",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 15843101400.0
+      }
+    },
+    {
+      "chapter": 5,
+      "type": "GeneratorInfo<Chapter5Stat>",
+      "address": "82e051",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Document Indexing",
+      "off_20": "1260",
+      "off_24": {
+        "Chapter5Stat.GENERATOR_6": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "824c71",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 2551634570.0
+      }
+    },
+    {
+      "chapter": 5,
+      "type": "GeneratorInfo<Chapter5Stat>",
+      "address": "82e111",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Tokenization",
+      "off_20": "40.2",
+      "off_24": {
+        "Chapter5Stat.GENERATOR_3": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "824c91",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 412852110.0
+      }
+    },
+    {
+      "chapter": 5,
+      "type": "GeneratorInfo<Chapter5Stat>",
+      "address": "82e151",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Ranking",
+      "off_20": "38.9",
+      "off_24": {
+        "Chapter5Stat.GENERATOR_2": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "824cb1",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 1023358.07
+      }
+    },
+    {
+      "chapter": 5,
+      "type": "GeneratorInfo<Chapter5Stat>",
+      "address": "82e191",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Scoring",
+      "off_20": "37.4",
+      "off_24": {
+        "Chapter5Stat.GENERATOR_1": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter5Stat, CustomNum>",
+        "address": "824cd1",
+        "off_c": "Chapter5Stat.POWER",
+        "off_10": 19148.8894
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e211",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Wireframe Refinement",
+      "off_20": "277.2",
+      "off_24": {
+        "Chapter6Stat.BONUS_UX_DESIGN": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "824fb1",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 4208572870000000.0
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e251",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "API Design",
+      "off_20": "298.2",
+      "off_24": {
+        "Chapter6Stat.BONUS_DOCUMENTATION": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "824fd1",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 668445444000000.0
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e291",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Test Case Creation",
+      "off_20": "307.8",
+      "off_24": {
+        "Chapter6Stat.BONUS_BUG_REPORT": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "824ff1",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 313869999000000.0
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e2d1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Requirements Definitions",
+      "off_20": "313.8",
+      "off_24": {
+        "Chapter6Stat.BONUS_FEATURE_IDEA": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825011",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 167164588000000.0
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e311",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "UX Design",
+      "off_24": {
+        "Chapter6Stat.ISSUE": 3.42122954
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825031",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 2470670.18
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e351",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Documentation",
+      "off_24": {
+        "Chapter6Stat.ISSUE": 3.12676837
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825051",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 186460.724
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e391",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Bug Report",
+      "off_24": {
+        "Chapter6Stat.ISSUE": 2.80106583
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825071",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 31539.6259
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e3d1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Feature Idea",
+      "off_24": {
+        "Chapter6Stat.ISSUE": 2.27049984
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825091",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 1993.38604
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e411",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Git Pull",
+      "off_24": {
+        "Chapter6Stat.VELOCITY": 2.3821418
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "8250b1",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 586685817.0
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e451",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Git Push",
+      "off_24": {
+        "Chapter6Stat.VELOCITY": 2.18147227
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "8250d1",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 5553839.23
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e491",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Git Commit",
+      "off_24": {
+        "Chapter6Stat.VELOCITY": 1.85892804
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "8250f1",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 2568929.93
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e4d1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Git Add",
+      "off_24": {
+        "Chapter6Stat.VELOCITY": 1.58407398
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825091",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 1993.38604
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e511",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Git Status",
+      "off_24": {
+        "Chapter6Stat.VELOCITY": 1.37712776
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825111",
+        "off_c": "Chapter6Stat.COMMIT",
+        "off_10": 1008.2545
+      }
+    },
+    {
+      "chapter": 6,
+      "type": "GeneratorInfo<Chapter6Stat>",
+      "address": "82e551",
+      "off_c": "false",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Main",
+      "off_20": "15.6",
+      "off_24": {
+        "Chapter6Stat.COMMIT": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825151",
+        "off_c": "Chapter6Stat.ISSUE",
+        "off_10": 230.97281
+      },
+      "off_30": {
+        "type": "Tuple2<Chapter6Stat, CustomNum>",
+        "address": "825131",
+        "off_c": "Chapter6Stat.ISSUE",
+        "off_10": 1.0
+      }
+    },
+    {
+      "chapter": 8,
+      "type": "GeneratorInfo<Chapter8Stat>",
+      "address": "82e591",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Bicho Generator",
+      "off_20": "1",
+      "off_24": {
+        "Chapter8Stat.BICHO_SHARES": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter8Stat, CustomNum>",
+        "address": "825af1",
+        "off_c": "Chapter8Stat.MONEY",
+        "off_10": "exp(9999.0)"
+      }
+    },
+    {
+      "chapter": 8,
+      "type": "GeneratorInfo<Chapter8Stat>",
+      "address": "82e5d1",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Components",
+      "off_20": "1.21",
+      "off_24": {
+        "Chapter8Stat.BONUS_PC": 1.0
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter8Stat, CustomNum>",
+        "address": "825b71",
+        "off_c": "Chapter8Stat.MONEY",
+        "off_10": 128207392.0
+      }
+    },
+    {
+      "chapter": 8,
+      "type": "GeneratorInfo<Chapter8Stat>",
+      "address": "82e611",
+      "off_c": "true",
+      "off_10": "false",
+      "off_14": "true",
+      "off_1c": "Meetings",
+      "off_24": {
+        "Chapter8Stat.PRODUCTIVITY": 0.030807411
+      },
+      "off_28": {
+        "type": "Tuple2<Chapter8Stat, CustomNum>",
+        "address": "825bf1",
+        "off_c": "Chapter8Stat.MONEY",
+        "off_10": 4105.16001
+      }
+    }
+  ],
+  "story_records": [
+    {
+      "type": "StoryPoint",
+      "address": "82c781",
+      "off_8": "Introduction",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8225b1",
+          "off_c": "Character.BOSS",
+          "off_10": "Hey, I need you to do something for me."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820e91",
+          "off_c": "Character.PLAYER",
+          "off_10": "What?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822591",
+          "off_c": "Character.BOSS",
+          "off_10": "My dev just quit. I need you to manage the website."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822571",
+          "off_c": "Character.PLAYER",
+          "off_10": "But I don't know anything about coding."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822551",
+          "off_c": "Character.BOSS",
+          "off_10": "Neither do I."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822531",
+          "off_c": "Character.BOSS",
+          "off_10": "I'll try to hire a dev but for now I need you to manage the website."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822511",
+          "off_c": "Character.PLAYER",
+          "off_10": "But how?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8224f1",
+          "off_c": "Character.BOSS",
+          "off_10": "Just search it up online."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8224d1",
+          "off_c": "Character.BOSS",
+          "off_10": "I think there's a website the previous dev used. I think it was called stacklandia.com. See if it helps."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c771",
+      "off_8": "Moving On Up",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8224b1",
+          "off_c": "Character.BOSS",
+          "off_10": "How's it going?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822491",
+          "off_c": "Character.PLAYER",
+          "off_10": "Good. But the workload is getting a bit high. Would it be possible to hire a few more programmers?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822471",
+          "off_c": "Character.BOSS",
+          "off_10": "I think I can do that. But you're going to be in charge of training them. I'll give you one employee free but after that you're going to have to show that you're doing a good job to get more."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822451",
+          "off_c": "Character.PLAYER",
+          "off_10": "OK, great. Got it."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c761",
+      "off_8": "A Business Deal",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822431",
+          "off_c": "Character.BOSS",
+          "off_10": "Hey, there's someone I want you to meet. His name is Jeff Bicho. He runs an ecommerce company."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822411",
+          "off_c": "Character.BICHO",
+          "off_10": "I've heard a lot about your company. I'm interested in a possible collaboration."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8223f1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Well, I can give you a tour, but I don't really think we have much here that an ecommerce company would be interested in."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8223d1",
+          "off_c": "Character.BICHO",
+          "off_10": "Ecommerce is only one side of our business. We have another side called RWS. Originally it was the way we managed the backend of our store but we opened it to other companies. It's growing quite rapidly."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8223b1",
+          "off_c": "Character.PLAYER",
+          "off_10": "I think I've heard about it before. Never used it though."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822391",
+          "off_c": "Character.BICHO",
+          "off_10": "You should. We give you a custom Penny OS installation so you don't have to manage servers and we have many services you can integrate with."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822371",
+          "off_c": "Character.PLAYER",
+          "off_10": "What kind of services?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822351",
+          "off_c": "Character.BICHO",
+          "off_10": "Storage, databases, user management, load balancing. We're adding more stuff all the time. You should check it out."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822331",
+          "off_c": "Character.PLAYER",
+          "off_10": "It does sound interesting, but I'm happy with the server we have here though."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822311",
+          "off_c": "Character.BICHO",
+          "off_10": "Maybe you should reconsider."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821c31",
+          "off_c": "Character.PLAYER",
+          "off_10": "What does that mean?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8222f1",
+          "off_c": "Character.BICHO",
+          "off_10": "Oh, the software industry is just moving so fast. You need every advantage you can get."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8222d1",
+          "off_c": "Character.PLAYER",
+          "off_10": "I see why you named your company Relentless."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8222b1",
+          "off_c": "Character.BICHO",
+          "off_10": "So anyways, can I get that tour?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822291",
+          "off_c": "Character.PLAYER",
+          "off_10": "Sure, I'll show you around."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c751",
+      "off_8": "Meetings",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822271",
+          "off_c": "Character.PLAYER",
+          "off_10": "I think I have enough people now."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822251",
+          "off_c": "Character.BOSS",
+          "off_10": "You could say that again. I'm having trouble placing all these people."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822231",
+          "off_c": "Character.BOSS",
+          "off_10": "Say, could you help me manage them?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822211",
+          "off_c": "Character.PLAYER",
+          "off_10": "Sure, what do I need to do?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8221f1",
+          "off_c": "Character.BOSS",
+          "off_10": "Attend meetings."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8221d1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Just attend meetings?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8221b1",
+          "off_c": "Character.BOSS",
+          "off_10": "Well, there's a bit more to it, but that's the gist. Don't worry, you'll figure it out."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822191",
+          "off_c": "Character.BOSS",
+          "off_10": "Just focus on making a good product. I've also enabled a custom scenario editor for you to try out different things. It's in the chapter selection menu."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c741",
+      "off_8": "Middle Management",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822171",
+          "off_c": "Character.BOSS",
+          "off_10": "Are you having fun?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822151",
+          "off_c": "Character.PLAYER",
+          "off_10": "I wouldn't call it fun. How do you live with all these meetings?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822131",
+          "off_c": "Character.BOSS",
+          "off_10": "You get used to it. And the pay doesn't hurt."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822111",
+          "off_c": "Character.PLAYER",
+          "off_10": "How long does it take to get used to it?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8220f1",
+          "off_c": "Character.BOSS",
+          "off_10": "A year. Maybe two more."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8220d1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Two years!?!"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8220b1",
+          "off_c": "Character.BOSS",
+          "off_10": "It's not that bad."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822091",
+          "off_c": "Character.PLAYER",
+          "off_10": "OK, fine, I'll keep attending meetings."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c731",
+      "off_8": "Monotony",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822071",
+          "off_c": "Character.PLAYER",
+          "off_10": "There's something I wanted to talk about."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822051",
+          "off_c": "Character.BOSS",
+          "off_10": "You're quitting?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822031",
+          "off_c": "Character.PLAYER",
+          "off_10": "How'd you know?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "822011",
+          "off_c": "Character.BOSS",
+          "off_10": "There were signs. So what do you plan on doing now?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821ff1",
+          "off_c": "Character.PLAYER",
+          "off_10": "I have this idea for a project I want to do. It's actually inspired by what we're doing here, it's a distributed search system. I was thinking of calling it 'FlexiSearch'."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821fd1",
+          "off_c": "Character.BOSS",
+          "off_10": "Well, if you make a good product I'll be your first customer."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821fb1",
+          "off_c": "Character.BOSS",
+          "off_10": "But how are you going to get funding?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821f91",
+          "off_c": "Character.PLAYER",
+          "off_10": "Funding?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821f71",
+          "off_c": "Character.BOSS",
+          "off_10": "Yeah, you're going to need funding. To make a good product and to get an audience. You think if you just build it they will come?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821f51",
+          "off_c": "Character.PLAYER",
+          "off_10": "I have some cash saved up."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821f31",
+          "off_c": "Character.BOSS",
+          "off_10": "Be careful with self funding. If your company goes bust it's all over. I can hook you up with some investors I know."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821f11",
+          "off_c": "Character.PLAYER",
+          "off_10": "OK, thanks."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c721",
+      "off_8": "Just Getting Started",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821ef1",
+          "off_c": "Character.BOSS",
+          "off_10": "I found you your first investor. This is Joseph Steelman."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821ed1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "I promised I would look around, no promises."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821eb1",
+          "off_c": "Character.PLAYER",
+          "off_10": "It's nice to meet you."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821e91",
+          "off_c": "Character.STEELMAN",
+          "off_10": "I hear you have a company you need investors for."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821e71",
+          "off_c": "Character.PLAYER",
+          "off_10": "Yeah, I provide search services. I'm still trying to find a client though."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821e51",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Don't worry about that yet. First focus on having a good product. Then you can think about getting clients."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821e31",
+          "off_c": "Character.PLAYER",
+          "off_10": "But if I keep on doing that I'm going to run out of money."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821e11",
+          "off_c": "Character.STEELMAN",
+          "off_10": "I may be willing to help with that. So what does your company do again?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821df1",
+          "off_c": "Character.PLAYER",
+          "off_10": "It's a search company. It's based on software I worked on before, we focus on fast distributed searching using sharding."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821dd1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "That sounds more like a feature than a company. But it does sound interesting. Tell you what, you deliver on certain milestones and I'll provide you with funding."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c711",
+      "off_8": "Going For Gold",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821db1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "You've achieved your first series A round. I'm impressed. Most people don't get this far."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821d91",
+          "off_c": "Character.PLAYER",
+          "off_10": "So you'll fund the company?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821d71",
+          "off_c": "Character.STEELMAN",
+          "off_10": "I already have. But now I want you to go further."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821d51",
+          "off_c": "Character.PLAYER",
+          "off_10": "Further?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821d31",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Yes, I think FlexiSearch is going to be the next tech unicorn. I think you should keep going. You should IPO."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821d11",
+          "off_c": "Character.PLAYER",
+          "off_10": "I don't know, sounds like a lot of work."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821cf1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Yes it is a lot of work, but the payoff will be worth it."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821cd1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Keep on going through your funding rounds. You'll know when you're ready."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c701",
+      "off_8": "Bureaucracy",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821cb1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Looks like you made it. Most startups can't claim to be as successful as you."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821c91",
+          "off_c": "Character.PLAYER",
+          "off_10": "I couldn't have done it without your help."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821c71",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Software wants to be free. It was inevitable."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821c51",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Anyways now you're a publicly traded company."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821c31",
+          "off_c": "Character.PLAYER",
+          "off_10": "What does that mean?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821c11",
+          "off_c": "Character.STEELMAN",
+          "off_10": "It means you have to file quarterly financial reports. It means you have to tell your investors everything. No more coasting by with a hacked together product. You're in the big leagues now."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821bf1",
+          "off_c": "Character.PLAYER",
+          "off_10": "I can handle myself."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821bd1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "We'll see."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c6f1",
+      "off_8": "The Right Idea",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821bb1",
+          "off_c": "Character.PLAYER",
+          "off_10": "I have a question."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821b91",
+          "off_c": "Character.CTO",
+          "off_10": "Yeah?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821b71",
+          "off_c": "Character.PLAYER",
+          "off_10": "Why is our progress slowing down?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821b51",
+          "off_c": "Character.CTO",
+          "off_10": "Oh, that's because of technical debt."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821b31",
+          "off_c": "Character.PLAYER",
+          "off_10": "What do you mean technical debt?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821b11",
+          "off_c": "Character.CTO",
+          "off_10": "When programmers hurry to implement something too fast they can make the code harder to add to in the future. That's technical debt and it's slowing us down."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821af1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Then how do we get rid of it?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821ad1",
+          "off_c": "Character.CTO",
+          "off_10": "We can take a break and refactor the code base."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821ab1",
+          "off_c": "Character.PLAYER",
+          "off_10": "How long will that take?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821a91",
+          "off_c": "Character.CTO",
+          "off_10": "A week, maybe a month."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821a71",
+          "off_c": "Character.PLAYER",
+          "off_10": "That's too long, there must be a faster way."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821a51",
+          "off_c": "Character.CTO",
+          "off_10": "There is no faster way."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821a31",
+          "off_c": "Character.PLAYER",
+          "off_10": "There must be a way."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821a11",
+          "off_c": "Character.PLAYER",
+          "off_10": "The code's causing problems. So what if we just rewrote the code?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8219f1",
+          "off_c": "Character.CTO",
+          "off_10": "What? Throw it out?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820b91",
+          "off_c": "Character.PLAYER",
+          "off_10": "Yes."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8219d1",
+          "off_c": "Character.CTO",
+          "off_10": "That would take even longer."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8219b1",
+          "off_c": "Character.PLAYER",
+          "off_10": "But we will be able to continue moving immediately right?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821991",
+          "off_c": "Character.CTO",
+          "off_10": "Well, yes, but..."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821971",
+          "off_c": "Character.PLAYER",
+          "off_10": "Then do it."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c6e1",
+      "off_8": "Open Source",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821951",
+          "off_c": "Character.STEELMAN",
+          "off_10": "How is my favourite startup doing?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821931",
+          "off_c": "Character.PLAYER",
+          "off_10": "Not good."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821911",
+          "off_c": "Character.STEELMAN",
+          "off_10": "What's wrong?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8218f1",
+          "off_c": "Character.PLAYER",
+          "off_10": "We have a ton of tech debt. It's making it harder to build new features."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8218d1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "I can help with that."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8218b1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Oh?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821891",
+          "off_c": "Character.STEELMAN",
+          "off_10": "It's called open source. You put out your code into the world and other people can improve it for you."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821871",
+          "off_c": "Character.PLAYER",
+          "off_10": "Why would they do that?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821851",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Hardly anyone does. But the ones that do are very passionate about it. There's an entire open source community. You should try it. I'll use my contacts to get you started."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821831",
+          "off_c": "Character.PLAYER",
+          "off_10": "I guess. How do I get started?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821811",
+          "off_c": "Character.STEELMAN",
+          "off_10": "First of all you need to use an open source license. We have one we've developed over the years called the Standard Public License. Just slap that on and you're good to go."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8217f1",
+          "off_c": "Character.PLAYER",
+          "off_10": "OK, will do."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c6d1",
+      "off_8": "RJS",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8217d1",
+          "off_c": "Character.UNKNOWN",
+          "off_10": "Do not trust RJS."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8217b1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Who is this?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821791",
+          "off_c": "Character.PLAYER",
+          "off_10": "And who is RJS?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821771",
+          "off_c": "Character.PLAYER",
+          "off_10": "Hello?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8213d1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Great."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c6c1",
+      "off_8": "Rollback",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821751",
+          "off_c": "Character.CTO",
+          "off_10": "We have a problem."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "81f9f1",
+          "off_c": "Character.PLAYER",
+          "off_10": "What is it?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821731",
+          "off_c": "Character.CTO",
+          "off_10": "Jeff Bicho has cloned our product."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821711",
+          "off_c": "Character.PLAYER",
+          "off_10": "What do you mean cloned?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8216f1",
+          "off_c": "Character.CTO",
+          "off_10": "He stole our code."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8216d1",
+          "off_c": "Character.PLAYER",
+          "off_10": "He can't do that."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8216b1",
+          "off_c": "Character.CTO",
+          "off_10": "Well, you made the code open source so he can."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821691",
+          "off_c": "Character.PLAYER",
+          "off_10": "Then make it un-open source."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821671",
+          "off_c": "Character.CTO",
+          "off_10": "Can't do that either. The license you used has a clause that says that if people can access the code you have to make the source code available."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821651",
+          "off_c": "Character.PLAYER",
+          "off_10": "So there's nothing we can do?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821631",
+          "off_c": "Character.CTO",
+          "off_10": "We can roll back to before we adopted the new license. Or we can let Bicho continue to copy our code."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821611",
+          "off_c": "Character.PLAYER",
+          "off_10": "I guess we have to roll back."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8215f1",
+          "off_c": "Character.CTO",
+          "off_10": "Are you sure? It's months of work."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8215d1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Do it."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c6b1",
+      "off_8": "Not My Problem",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8215b1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Hey Bicho."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821591",
+          "off_c": "Character.BICHO",
+          "off_10": "Yeah?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821571",
+          "off_c": "Character.PLAYER",
+          "off_10": "You cloned our app."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821551",
+          "off_c": "Character.BICHO",
+          "off_10": "Oh, you saw it."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821531",
+          "off_c": "Character.PLAYER",
+          "off_10": "Not cool. We spent a lot of work developing it. You can't just steal it."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821511",
+          "off_c": "Character.BICHO",
+          "off_10": "But you made it open source. That means we're well within our rights to fork it and make our own version."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8214f1",
+          "off_c": "Character.BICHO",
+          "off_10": "You did read the license you added, right?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8214d1",
+          "off_c": "Character.PLAYER",
+          "off_10": "How are we supposed to compete when you're stealing our software?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8214b1",
+          "off_c": "Character.BICHO",
+          "off_10": "That's not our problem."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c6a1",
+      "off_8": "Progress",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821491",
+          "off_c": "Character.CTO",
+          "off_10": "I've made some progress."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "81fd11",
+          "off_c": "Character.PLAYER",
+          "off_10": "Yeah?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821471",
+          "off_c": "Character.CTO",
+          "off_10": "We've been able to create generators that create no tech debt and are not affected by tech debt."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821451",
+          "off_c": "Character.PLAYER",
+          "off_10": "OK, let's switch to those."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821431",
+          "off_c": "Character.CTO",
+          "off_10": "That's not how it works. These generators work as a multiplier for the generators that do create tech debt. However efficiency contributes more to the main yields and less to the tech debt."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821411",
+          "off_c": "Character.PLAYER",
+          "off_10": "So does that mean we will only need one of the old generators?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8213f1",
+          "off_c": "Character.CTO",
+          "off_10": "One will work but you can have more if you want."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8213d1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Great."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c691",
+      "off_8": "Takeover",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8213b1",
+          "off_c": "Character.PLAYER",
+          "off_10": "This is going so slow. Can't you make it go any faster?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821391",
+          "off_c": "Character.CTO",
+          "off_10": "No."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821371",
+          "off_c": "Character.PLAYER",
+          "off_10": "What if we went open source again?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821351",
+          "off_c": "Character.CTO",
+          "off_10": "Then Bicho would steal our work again."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821331",
+          "off_c": "Character.PLAYER",
+          "off_10": "What if we acquired his company?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821311",
+          "off_c": "Character.CTO",
+          "off_10": "You want to acquire the largest ecommerce company in the world?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8212f1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Yeah."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8212d1",
+          "off_c": "Character.CTO",
+          "off_10": "They're at least 10x our size."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8212b1",
+          "off_c": "Character.PLAYER",
+          "off_10": "But we could do it."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821291",
+          "off_c": "Character.CTO",
+          "off_10": "Yeah, but..."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821271",
+          "off_c": "Character.PLAYER",
+          "off_10": "If we acquire them I'll double your salary."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821251",
+          "off_c": "Character.CTO",
+          "off_10": "OK, let's do it."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c681",
+      "off_8": "Stonks",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821231",
+          "off_c": "Character.PLAYER",
+          "off_10": "OK, I bought a share. What now?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821211",
+          "off_c": "Character.CTO",
+          "off_10": "Well, there's 10 billion shares outstanding and we need over 50% of the shares for a hostile takeover so only 5 billion more."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8211f1",
+          "off_c": "Character.PLAYER",
+          "off_10": "5 billion?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8211d1",
+          "off_c": "Character.CTO",
+          "off_10": "I said it would be hard."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8211b1",
+          "off_c": "Character.PLAYER",
+          "off_10": "Can we speed it up?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821191",
+          "off_c": "Character.CTO",
+          "off_10": "Let me see, I think there are a few ways to speed it up."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c671",
+      "off_8": "Turnabout Is Fair Play",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821171",
+          "off_c": "Character.TAFFY",
+          "off_10": "Bicho, sir, we have a problem."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821151",
+          "off_c": "Character.BICHO",
+          "off_10": "What is it?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821131",
+          "off_c": "Character.TAFFY",
+          "off_10": "Someone is trying to buy up our shares."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821111",
+          "off_c": "Character.BICHO",
+          "off_10": "Who?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8210f1",
+          "off_c": "Character.TAFFY",
+          "off_10": "Some small company. It's a... they're called FlexiSearch."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8210d1",
+          "off_c": "Character.BICHO",
+          "off_10": "Them again. We cannot allow them to buy us out. What do we do?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "8210b1",
+          "off_c": "Character.TAFFY",
+          "off_10": "It looks like they're a publicly traded company and have about 100 million shares. I say we buy them out first."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821091",
+          "off_c": "Character.BICHO",
+          "off_10": "So we need 50 million shares?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821071",
+          "off_c": "Character.TAFFY",
+          "off_10": "Yep."
+        }
+      ]
+    },
+    {
+      "type": "StoryPoint",
+      "address": "82c661",
+      "off_8": "Class A",
+      "off_c": [
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821051",
+          "off_c": "Character.TAFFY",
+          "off_10": "Sir, FlexiSearch has bought a 51% stake in our company."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821031",
+          "off_c": "Character.BICHO",
+          "off_10": "What?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "821011",
+          "off_c": "Character.TAFFY",
+          "off_10": "They're requesting a meeting."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820ff1",
+          "off_c": "Character.BICHO",
+          "off_10": "Let them in I guess."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820fd1",
+          "off_c": "Character.PLAYER",
+          "off_10": "I'm exercising my 51% stake in your company and removing you as CEO."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820fb1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Already done."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820f91",
+          "off_c": "Character.PLAYER",
+          "off_10": "Steelman, what are you doing here?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820f71",
+          "off_c": "Character.BICHO",
+          "off_10": "RJS, have mercy on me."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820f51",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Sorry, Bicho. But your time is up. Taffy will be taking your spot. Go retire on your motor yacht or something."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820f31",
+          "off_c": "Character.BICHO",
+          "off_10": "It's a sailing yacht."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820f11",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Whatever."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820ef1",
+          "off_c": "Character.PLAYER",
+          "off_10": "What is going on here? I have a 51% stake. I should be making the decisions here."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820ed1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "Sorry buddy, but I own class A shares with significantly more voting power than you."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820eb1",
+          "off_c": "Character.STEELMAN",
+          "off_10": "I built this company. Or the Liberal Software Conservancy did and I am its leader. Speaking of which, the Liberal Software Conservancy invested a lot in FlexiSearch and I don't like you hounding my other companies."
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820e91",
+          "off_c": "Character.PLAYER",
+          "off_10": "What?"
+        },
+        {
+          "type": "Tuple2<Character, String>",
+          "address": "820e71",
+          "off_c": "Character.STEELMAN",
+          "off_10": "I think it's time to resign as CEO."
+        }
+      ]
+    }
+  ]
+}

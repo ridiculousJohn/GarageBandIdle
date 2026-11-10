@@ -1,0 +1,1683 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ctrl C: Chapters 1-8</title><style>
+:root{color-scheme:light;--ink:#22303b;--muted:#526776;--line:#d6dfe4;--accent:#126c67}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:#f6f8f9;color:var(--ink);font:17px/1.65 system-ui,Segoe UI,sans-serif}nav{position:fixed;inset:0 auto 0 0;width:285px;padding:30px 22px;overflow:auto;background:#142c36;color:#edf6f7}nav strong{font-size:25px}nav small{display:block;color:#a9c7cd;margin:4px 0 24px}nav a{display:block;color:#d5e8eb;text-decoration:none;padding:8px 0;font-size:14px;line-height:1.45}nav a:hover{color:#fff;text-decoration:underline}nav .toc ul{list-style:none;padding:0}nav .toc>ul>li>ul{padding-left:0}nav .toc>ul>li>a{font-weight:700}nav .toc li li li{display:none}main{max-width:1300px;margin-left:285px;padding:48px 56px 100px;background:#fff;min-height:100vh}h1{font-size:44px;line-height:1.12;letter-spacing:-1px;margin:0 0 18px}h2{font-size:29px;line-height:1.25;margin:58px 0 22px;border-top:2px solid var(--line);padding-top:30px}h3{font-size:21px;margin:32px 0 12px;color:#12635e}p{margin:0 0 18px}a{color:var(--accent)}li{margin:7px 0}table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.5;margin:22px 0 30px;display:block;overflow-x:auto}th{background:#173d48;color:white;text-align:left}th,td{padding:11px 13px;border:1px solid #d6dfe4;vertical-align:top}tr:nth-child(even){background:#f1f6f7}code{font:0.88em/1.5 Consolas,monospace;background:#edf2f4;border-radius:3px;padding:2px 4px;overflow-wrap:anywhere}main>ul:first-of-type{padding-left:24px}.toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:25px;font-size:13px}.toolbar a{background:#eaf3f2;border:1px solid #cfdfdd;border-radius:5px;padding:6px 10px;text-decoration:none}.topnote{font-size:13px;color:var(--muted);margin-bottom:24px}button{font:inherit;border:1px solid #cfdfdd;border-radius:5px;background:#eaf3f2;padding:6px 10px;color:#126c67;cursor:pointer}
+@media(max-width:950px){nav{position:static;width:auto;max-height:280px}main{margin:0;padding:32px 20px}h1{font-size:35px}h2{font-size:25px}table{font-size:13px}}@media print{nav,.toolbar,.topnote{display:none}body,main{background:white}main{margin:0;padding:0;max-width:none;font-size:10pt}h1{font-size:26pt}h2{font-size:18pt;break-before:page}h3{break-after:avoid}table{display:table;font-size:8pt}tr{break-inside:avoid}a{color:inherit;text-decoration:none}}
+</style></head><body><nav><strong>CTRL C</strong><small>Chapters 1-8 / APK 1.12.2</small><a href="Ctrl-C-Chapters-1-8-Reference.html">Guide</a><a href="Ctrl-C-Data-Appendix.html">Data tables</a><a href="Ctrl-C-Story-Transcript.html">Story transcript</a><div class="toc">
+<ul>
+<li><a href="#ctrl-c-chapters-1-8">Ctrl C: Chapters 1-8</a><ul>
+<li><a href="#gameplay-reference-reconstructed-from-android-version-1122-146">Gameplay reference reconstructed from Android version 1.12.2 (146)</a></li>
+<li><a href="#contents">Contents</a></li>
+<li><a href="#shared-systems-and-replay">Shared systems and replay</a></li>
+<li><a href="#chapter-1-library-of-stacklandia">Chapter 1: Library Of Stacklandia</a></li>
+<li><a href="#chapter-2-calling-yourself-agile-over-being-agile">Chapter 2: Calling Yourself Agile Over Being Agile</a></li>
+<li><a href="#chapter-3-embrace-the-yak-shave">Chapter 3: Embrace The Yak Shave</a></li>
+<li><a href="#chapter-4-unicorns-dont-exist">Chapter 4: Unicorns Don't Exist</a></li>
+<li><a href="#chapter-5-recurse-recurse-recurse">Chapter 5: Recurse, Recurse, Recurse</a></li>
+<li><a href="#chapter-6-free-as-in-beer">Chapter 6: Free As In Beer</a></li>
+<li><a href="#chapter-7-tldr">Chapter 7: TL;DR</a></li>
+<li><a href="#chapter-8-glory-to-the-coming-age-of-free-software">Chapter 8: Glory To The Coming Age Of Free Software</a></li>
+<li><a href="#coverage-uncertainties-and-source-map">Coverage, uncertainties, and source map</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav><main><div class="toolbar"><a href="Ctrl-C-Chapters-1-8-Reference.html">Guide</a><a href="Ctrl-C-Data-Appendix.html">Data tables</a><a href="Ctrl-C-Story-Transcript.html">Story transcript</a><a href="Ctrl-C-Chapters-1-8-Reference.md">Markdown</a><a href="Ctrl-C-Evidence.zip">Evidence ZIP</a><button onclick="window.print()">Print</button></div><p class="topnote">Recovered data and static code analysis. Use your browser's Find command to search this document.</p><h1 id="ctrl-c-chapters-1-8">Ctrl C: Chapters 1-8</h1>
+<h2 id="gameplay-reference-reconstructed-from-android-version-1122-146">Gameplay reference reconstructed from Android version 1.12.2 (146)</h2>
+<p>This is a static reconstruction of the four APKs you supplied. It covers the chapter economies, generator families, upgrades, challenges, reset layers, completion conditions, replay system, and story through Chapter 8. The intended progression routes are interpretations of those rules, not timed or experimentally optimized playthroughs.</p>
+<p><strong>The main finding:</strong> these are eight different incremental-game systems connected by achievement tokens. A chapter's local prestige currencies do not become the next chapter's currencies. The persistent benefit of finishing and replaying chapters is the shared token system.</p>
+<h3 id="how-to-read-the-evidence">How to read the evidence</h3>
+<ul>
+<li><strong>[D] Direct data:</strong> a recovered string, enum, object, price, target, or bundled configuration default.</li>
+<li><strong>[C] Code-derived:</strong> behavior reconstructed from named functions and their ARM64 instructions. Stronger than guessing from descriptions, but not a live gameplay test.</li>
+<li><strong>[I] Inference:</strong> a recommended approach or design interpretation.</li>
+<li><strong>[U] Unresolved:</strong> the available analysis does not establish the exact detail. These are called out rather than filled with plausible numbers.</li>
+</ul>
+<p>Tables of names, base prices, rates, and challenge text are <strong>[D]</strong> unless marked otherwise. Reset tables and formulas are <strong>[C]</strong>. The walkthrough steps are <strong>[I]</strong>. Story summaries are <strong>[D]</strong>, paraphrased from dialogue.</p>
+<p>The guide is detailed, but is <strong>not a claim that every visibility condition and every dynamically generated upgrade cost has been fully reconstructed</strong>. The remaining gaps are listed at the end. No APK was modified or executed, and no personal save or live remote settings were obtained.</p>
+<h3 id="companion-files">Companion files</h3>
+<ul>
+<li><a href="Ctrl-C-Data-Appendix.html">Data appendix</a>: constant generator and quest records and recovered upgrade cost schedules.</li>
+<li><a href="Ctrl-C-Story-Transcript.html">Story transcript</a>: recovered conversations through Chapter 8.</li>
+<li><a href="Ctrl-C-Recovered-Data.json">Structured recovered data</a>: machine-readable records and APK fingerprints.</li>
+<li><a href="Ctrl-C-Evidence.zip">Evidence archive</a>: annotated chapter assembly, resolved constants, shared mechanics, and provenance. The <code>.dart</code> filenames contain disassembly, not original Dart source. The whole-program constant dumps also contain later-chapter material.</li>
+</ul>
+<h2 id="contents">Contents</h2>
+<ol>
+<li><a href="#shared-systems-and-replay">Shared systems and replay</a></li>
+<li><a href="#chapter-1-library-of-stacklandia">Chapter 1: Library Of Stacklandia</a></li>
+<li><a href="#chapter-2-calling-yourself-agile-over-being-agile">Chapter 2: Calling Yourself Agile Over Being Agile</a></li>
+<li><a href="#chapter-3-embrace-the-yak-shave">Chapter 3: Embrace The Yak Shave</a></li>
+<li><a href="#chapter-4-unicorns-dont-exist">Chapter 4: Unicorns Don't Exist</a></li>
+<li><a href="#chapter-5-recurse-recurse-recurse">Chapter 5: Recurse, Recurse, Recurse</a></li>
+<li><a href="#chapter-6-free-as-in-beer">Chapter 6: Free As In Beer</a></li>
+<li><a href="#chapter-7-tldr">Chapter 7: TL;DR</a></li>
+<li><a href="#chapter-8-glory-to-the-coming-age-of-free-software">Chapter 8: Glory To The Coming Age Of Free Software</a></li>
+<li><a href="#coverage-uncertainties-and-source-map">Coverage, uncertainties, and source map</a></li>
+</ol>
+<h2 id="shared-systems-and-replay">Shared systems and replay</h2>
+<h3 id="what-was-in-the-apks">What was in the APKs</h3>
+<p>The package is <code>com.amorfatite.pretentious</code>, version <strong>1.12.2</strong>, build <strong>146</strong>. The bundled GitInfo names revision <code>fcf42ec5d6d259b671768f09a67ac5423c388625</code>, Flutter <code>3.44.4</code>, and date <code>2026-07-01</code>. [D]</p>
+<p><code>base.apk</code> contains the Android shell and Flutter assets. The ARM64 split contains the decisive gameplay artifact: <code>libapp.so</code>, a compiled Dart AOT snapshot. The language and density splits supply localized/platform and density resources. There is no complete, conveniently editable chapter JSON in the base APK. The rules were recovered from the native snapshot's objects and code. [C]</p>
+<h3 id="numbers-production-and-purchases">Numbers, production, and purchases</h3>
+<p>The game uses <code>CustomNum</code>, which stores the natural logarithm of large values. This lets it represent extreme quantities without ordinary floating-point overflow. In the tables, values decoded from rounded object dumps are shown approximately; the evidence retains logarithmic constants where available. For example, the Chapter 8 ending target decodes to about five billion, not a deliberately meaningful target of exactly 4,999,999,750. [C]</p>
+<p>Separate these concepts:</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Current currency</td>
+<td>The spendable balance now.</td>
+</tr>
+<tr>
+<td>Cumulative currency</td>
+<td>The amount accumulated within the relevant reset scope. Spending may leave this unchanged. Several prestige formulas use it.</td>
+</tr>
+<tr>
+<td>Purchased generators</td>
+<td>Copies bought with currency; commonly drive escalating prices.</td>
+</tr>
+<tr>
+<td>Bonus/generated generators</td>
+<td>Copies supplied by another generator or a reward. Often excluded from price growth or count-based bonuses.</td>
+</tr>
+<tr>
+<td>Timed bar</td>
+<td>Produces a batch after a cycle; may need an input or automatic-start unlock.</td>
+</tr>
+<tr>
+<td>Passive generator</td>
+<td>Produces continuously according to its rate and boosts.</td>
+</tr>
+</tbody>
+</table>
+<p>Generator purchase curves are geometric: <code>next cost = base cost * r^purchased count * applicable cost multipliers</code>. <strong>Chapters 1-3 use <code>r = 1.6</code>; Chapters 4, 5, 7, and 8 use <code>r = 1.3</code>. Chapter 6 uses <code>r = 1.1</code> for ordinary generators and <code>r = 10</code> for its upper, bonus-producing tier.</strong> Chapter 1's Literally Unusable reward changes its factor to 1.584. First-copy special cases and chapter-specific discounts can apply. These curves should not be substituted for every upgrade, share purchase, or funding round; those have separate rules. [C]</p>
+<p>For a geometric generator whose cost multiplier stays fixed during a bulk purchase, buying <code>k</code> copies at count <code>n</code> costs <code>base * multiplier * r^n * (r^k - 1) / (r-1)</code>. This is the mathematical consequence of that curve, not a separate extracted game rule. [I]</p>
+<h3 id="finishing-replaying-and-achievement-tokens">Finishing, replaying, and achievement tokens</h3>
+<p>The completion interface says that finishing resets the current chapter and awards an achievement token. Completion is distinct from a local Rewrite, Promotion, Rebase, or other prestige. Local prestige preserves selected chapter systems; a chapter restart recreates the chapter's local state. Other chapters and global achievement-token progress are separate. Story playback history is also stored globally. [D/C]</p>
+<p>The ordinary first completion initializes that chapter's token entry to <strong>1</strong>. For an existing entry, <code>CoreData.addCompletionToken</code> adds:</p>
+<p><code>1 + 0.1*d + 0.012*d^1.5</code></p>
+<p>where <code>d</code> is the chapter's stored difficulty index passed by the completion routine. At difficulty index zero, this is one token. Thus the UI's generic "1 token" wording is not the whole difficulty-dependent calculation. [C]</p>
+<p>The bundled default token bonus is <strong>5%</strong>. Ignoring bonus-token assignment, penalty settings, and chapter-specific overrides, the recovered boost calculation multiplies chapter contributions:</p>
+<p><code>global boost = product over chapter entries of (1 + 0.05 * tokens in that entry)</code></p>
+<p>Tokens within an entry add; factors across entries multiply. With this simplified default, one token in each of eight chapters gives <code>1.05^8</code>, about <strong>1.477x</strong>. Eight tokens concentrated in one entry give <strong>1.4x</strong>. These are illustrations, not a reconstruction of your save. [C/I]</p>
+<p>The actual calculation also handles assignable Bonus tokens, a configurable penalty, an optional <code>ch_&lt;chapter&gt;_multiplier</code>, and a user preference exponent clamped to 0-1. The final effective multiplier is floored at one before that exponent is applied. Do not assume that every visible +5% is an independent multiplicative factor. [C]</p>
+<p><strong>Practical replay implication [I]:</strong> replaying an earlier chapter can make a later chapter faster. It does not supply that later chapter's Knowledge, Money, Shares, or upgrades. Because each chapter has different local bottlenecks, raw token count alone does not predict its completion time.</p>
+<h3 id="remote-settings-and-time">Remote settings and time</h3>
+<p>Bundled defaults include <code>CompletionTokenBonusPercent = 5</code>, <code>NewCompletionTokenSystem = false</code>, <code>CompletionTokenPenaltyPercent = 0</code>, <code>show_waterfall_methods = false</code>, and Chapter 2 difficulty multiplier 1. Overclock defaults include a four-hour quantity, a 24-hour maximum, and a 2x multiplier. These are defaults, not proof of the values served to your phone. [D]</p>
+<p>Automatic bar cycling, automatic purchasing, automatic prestige, offline simulation, and overclocking are separate systems. A chapter offering one does not imply all the others. Chapter 4 explicitly implements offline funding-round automation; Chapter 1 Delegation explicitly describes purchases while the game is open. Exact global offline limits and all timing edge cases were not fully reconstructed. [D/U]</p>
+<h3 id="completion-overview">Completion overview</h3>
+<table>
+<thead>
+<tr>
+<th>Chapter</th>
+<th style="text-align: right;">Local finish condition recovered</th>
+<th>Main local reset layers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td style="text-align: right;">About <code>5.80416e52</code> Lines</td>
+<td>Rewrite; Project</td>
+</tr>
+<tr>
+<td>2</td>
+<td style="text-align: right;">About <code>3.16896e54</code> Lines</td>
+<td>Promotion</td>
+</tr>
+<tr>
+<td>3</td>
+<td style="text-align: right;">About <code>3.67856e35</code> Career Capital</td>
+<td>Networking, Storage, Scripting prestige</td>
+</tr>
+<tr>
+<td>4</td>
+<td style="text-align: right;">Complete an IPO round; about <code>2.67075e24</code> Lines</td>
+<td>Funding rounds</td>
+</tr>
+<tr>
+<td>5</td>
+<td style="text-align: right;">About <code>8.71080e11</code> Features</td>
+<td>Knowledge reset; Reorg; Deploy</td>
+</tr>
+<tr>
+<td>6</td>
+<td style="text-align: right;">About <code>6.27220e22</code> Commits</td>
+<td>Rebase; Conference</td>
+</tr>
+<tr>
+<td>7</td>
+<td style="text-align: right;">About <code>7.05844e15</code> Power</td>
+<td>Rewrite</td>
+</tr>
+<tr>
+<td>8</td>
+<td style="text-align: right;">About <code>5e9</code> Shares</td>
+<td>Liquidate; Buy Shares; Bicho failure reset</td>
+</tr>
+</tbody>
+</table>
+<p>These are completion targets, not the amount required for an intermediate prestige. Additional UI visibility/story gates can precede the final button. Finishing each chapter feeds the same global token system; there is no recovered chapter-specific permanent resource reward that replaces it.</p>
+<h2 id="chapter-1-library-of-stacklandia">Chapter 1: Library Of Stacklandia</h2>
+<h3 id="economy">Economy</h3>
+<p>The first chapter builds three production layers. <strong>Lines</strong> buy keyboards and other coding equipment. A <strong>Rewrite</strong> converts accumulated Lines into <strong>Knowledge</strong>. Knowledge buys generators of <strong>Data</strong>. A higher <strong>Project</strong> reset converts accumulated Data into <strong>Career Capital</strong>, which buys <strong>Tools</strong> generators. Tools strengthen the lower layers. [D/C]</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Generator</th>
+<th style="text-align: right;">Base cost</th>
+<th style="text-align: right;">Base output per second</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lines</td>
+<td>Mouse</td>
+<td style="text-align: right;">100 Lines</td>
+<td style="text-align: right;">10 Lines</td>
+</tr>
+<tr>
+<td>Lines</td>
+<td>Keyboard</td>
+<td style="text-align: right;">345 Lines</td>
+<td style="text-align: right;">About 34.9369 Lines</td>
+</tr>
+<tr>
+<td>Lines</td>
+<td>Mechanical Keyboard</td>
+<td style="text-align: right;">1,230 Lines</td>
+<td style="text-align: right;">About 125.81 Lines</td>
+</tr>
+<tr>
+<td>Lines</td>
+<td>Clickier Keyboard</td>
+<td style="text-align: right;">8,880 Lines</td>
+<td style="text-align: right;">About 917.412 Lines</td>
+</tr>
+<tr>
+<td>Lines</td>
+<td>RGB Keyboard</td>
+<td style="text-align: right;">87,400 Lines</td>
+<td style="text-align: right;"><code>87,400 * exp(-2.26)</code> Lines</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>Notes</td>
+<td style="text-align: right;">100 Knowledge</td>
+<td style="text-align: right;">1 Data</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>Files</td>
+<td style="text-align: right;">2,157.72 Knowledge</td>
+<td style="text-align: right;">About 19.4195 Data</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>Code Snippets</td>
+<td style="text-align: right;">14,426.3 Knowledge</td>
+<td style="text-align: right;">About 115.410 Data</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>Macros</td>
+<td style="text-align: right;">28,940.6 Knowledge</td>
+<td style="text-align: right;">About 202.584 Data</td>
+</tr>
+<tr>
+<td>Tools</td>
+<td>Wiki</td>
+<td style="text-align: right;">100 Career Capital</td>
+<td style="text-align: right;">1 Tool</td>
+</tr>
+<tr>
+<td>Tools</td>
+<td>Discussion Board</td>
+<td style="text-align: right;">2,157.72 Career Capital</td>
+<td style="text-align: right;">About 21.5772 Tools</td>
+</tr>
+<tr>
+<td>Tools</td>
+<td>Video Conferencing</td>
+<td style="text-align: right;">15,398.1 Career Capital</td>
+<td style="text-align: right;">About 153.981 Tools</td>
+</tr>
+<tr>
+<td>Tools</td>
+<td>Knowledge Bank</td>
+<td style="text-align: right;">197,600 Career Capital</td>
+<td style="text-align: right;">About 1,976 Tools</td>
+</tr>
+<tr>
+<td>Tools</td>
+<td>Time Tracking</td>
+<td style="text-align: right;">1.36001e6 Career Capital</td>
+<td style="text-align: right;">About 13,600.1 Tools</td>
+</tr>
+</tbody>
+</table>
+<p>These are pre-upgrade, pre-token rates. The RGB constructor uses 87,400 even though an internal static identifier resembles 87,480; the constructed value is what is reported here. [C]</p>
+<p>Recovered stat multipliers and prestige formulas, using cumulative quantities within the relevant reset scope: [C]</p>
+<ul>
+<li>Line production includes <code>(1 + 0.01*Knowledge) * (1 + 0.01*Data) * (1 + 0.01*Tools)</code>.</li>
+<li>Rewrite gain: <code>cumulative Lines * exp(-9.7245) * (1 + 0.01*Tools) * (1 + 0.01*Career Capital)</code>.</li>
+<li>Project gain: <code>cumulative Data * exp(-11.7245) * (1 + 0.01*Tools)</code>.</li>
+<li><code>exp(-9.7245)</code> is about <code>5.98003e-5</code>; <code>exp(-11.7245)</code> is about <code>8.09309e-6</code>.</li>
+</ul>
+<h3 id="upgrades-and-challenges">Upgrades and challenges</h3>
+<table>
+<thead>
+<tr>
+<th>Upgrade</th>
+<th style="text-align: right;">Cost</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PARA Organization</td>
+<td style="text-align: right;">328.595 Knowledge</td>
+<td>Five bonus copies of each tier-one generator, without increasing its purchase price.</td>
+</tr>
+<tr>
+<td>Cloud Notes</td>
+<td style="text-align: right;">4,889.40 Knowledge</td>
+<td>Doubles tier-one production.</td>
+</tr>
+<tr>
+<td>Markdown</td>
+<td style="text-align: right;">21,912.8 Knowledge</td>
+<td>Count-based tier-one production bonus; text specifies 1% per generator owned.</td>
+</tr>
+<tr>
+<td>Syntax Highlighting</td>
+<td style="text-align: right;">45,615.4 Knowledge</td>
+<td>Tier-one and tier-two generator costs reduced by 99%.</td>
+</tr>
+<tr>
+<td>Delegation, three levels</td>
+<td style="text-align: right;">130.843; 465.448; 3,885.47 Career Capital</td>
+<td>Tier-one autobuy while open: once per second, five times per second, then every tick.</td>
+</tr>
+<tr>
+<td>Deadlines</td>
+<td style="text-align: right;">456.231 Career Capital</td>
+<td>Tier-two cost reduction described as 1% per level.</td>
+</tr>
+<tr>
+<td>Meetings</td>
+<td style="text-align: right;">3.40185e8 Career Capital</td>
+<td>Tier-three costs reduced by 99.99%.</td>
+</tr>
+<tr>
+<td>Snacks</td>
+<td style="text-align: right;">1.86930e11 Career Capital</td>
+<td>Doubles all generator yields.</td>
+</tr>
+</tbody>
+</table>
+<p>Markdown/Deadlines' exact interpretation of every count/level operand is less certain than their text and the other fixed multipliers. [U]</p>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Restriction</th>
+<th style="text-align: right;">Target</th>
+<th>Reward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4 Day Work Week</td>
+<td>Lines 20% slower</td>
+<td style="text-align: right;"><code>1.50202e14</code> Lines</td>
+<td>100% increase to line speed.</td>
+</tr>
+<tr>
+<td>Waterfall Methods</td>
+<td>A purchase drops output to zero, recovering over one minute</td>
+<td style="text-align: right;"><code>2.85613e18</code> Lines</td>
+<td>Double all yields. Remote-gated; bundled visibility default is false.</td>
+</tr>
+<tr>
+<td>Literally Unusable</td>
+<td>RGB Keyboard and Macros yield zero</td>
+<td style="text-align: right;"><code>2.18229e25</code> Lines</td>
+<td>Lower per-copy price growth.</td>
+</tr>
+</tbody>
+</table>
+<p>Literally Unusable changes the geometric factor from <strong>1.6 to 1.584</strong>, so its effect compounds with purchased count. It is not simply a one-time 1% discount. [C]</p>
+<h3 id="reset-contract">Reset contract</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Cleared</th>
+<th>Preserved / awarded</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rewrite</td>
+<td>Current and cumulative Lines; purchased Mouse through RGB Keyboard</td>
+<td>Awards Knowledge. Keeps Knowledge/Data/Capital/Tools layers, their generators, upgrades, and completed challenges. Owned unlock callbacks run again, including starting bonuses.</td>
+</tr>
+<tr>
+<td>Project</td>
+<td>Current and cumulative Lines, Knowledge, Data; bought generators through Macros; tier-one bonus copies; PARA, Cloud Notes, Markdown, Syntax Highlighting</td>
+<td>Awards Career Capital. Keeps Capital, Tools, tool generators, Delegation and later upgrades, and quest completions. Remaining unlock callbacks are reapplied.</td>
+</tr>
+<tr>
+<td>Complete chapter</td>
+<td>Chapter-local run</td>
+<td>Global token progress and chapter access remain.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="progression-loop-i">Progression loop [I]</h3>
+<ol>
+<li>Establish Line production, then Rewrite once the resulting Knowledge buys a useful part of the Data layer.</li>
+<li>Develop Data while recycling the Line layer. PARA and the lower-layer cost reduction make restarts less expensive.</li>
+<li>Use the first Project resets to establish Tools. This creates a multiplier on both lower production and future prestige income.</li>
+<li>Add Delegation to reduce repeated clicking. Buy the very large tier-three discount before treating the last tool costs as a pure waiting problem.</li>
+<li>Complete available quests when their permanent benefit repays the restricted run. Use the final multiplicative growth to reach the Line target.</li>
+</ol>
+<h3 id="story">Story</h3>
+<p><strong>Introduction</strong> establishes the programming workplace and the copy/paste progression joke. <strong>Moving On Up</strong> carries the player into a more organizational role. The mechanics turn personal equipment, accumulated knowledge, and organizational tools into successive layers of leverage; this interpretation is thematic rather than an extra rule. [D/I]</p>
+<h2 id="chapter-2-calling-yourself-agile-over-being-agile">Chapter 2: Calling Yourself Agile Over Being Agile</h2>
+<h3 id="economy-and-teams">Economy and teams</h3>
+<p>This chapter replaces the first chapter's continuous keyboard economy with <strong>timed teams</strong>. Teams produce <strong>Lines</strong>. The secondary generators produce <strong>Data</strong>, which increases Lines. <strong>Promotion</strong> awards <strong>Experience</strong>, another line multiplier. Each Data earned and each Experience supplies a 1% line boost according to the UI; the separate boost factors combine in the production calculation. [D/C]</p>
+<table>
+<thead>
+<tr>
+<th>Team</th>
+<th style="text-align: right;">Base cycle</th>
+<th style="text-align: right;">Lines per cycle</th>
+<th style="text-align: right;">Base level cost, Lines</th>
+<th style="text-align: right;">Separate hire/auto cost, Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backend Developer</td>
+<td style="text-align: right;">1 s</td>
+<td style="text-align: right;">1.0575</td>
+<td style="text-align: right;">4.23</td>
+<td style="text-align: right;">500</td>
+</tr>
+<tr>
+<td>Frontend Developer</td>
+<td style="text-align: right;">4 s</td>
+<td style="text-align: right;">19.624</td>
+<td style="text-align: right;">24.53</td>
+<td style="text-align: right;">15,000</td>
+</tr>
+<tr>
+<td>Quality Assurance</td>
+<td style="text-align: right;">7 s</td>
+<td style="text-align: right;">19,250</td>
+<td style="text-align: right;">55,000</td>
+<td style="text-align: right;"><code>1.97e14</code></td>
+</tr>
+<tr>
+<td>Sales</td>
+<td style="text-align: right;">25 s</td>
+<td style="text-align: right;"><code>1.00478e8</code></td>
+<td style="text-align: right;"><code>7.25e15</code></td>
+<td style="text-align: right;"><code>1.04e19</code></td>
+</tr>
+<tr>
+<td>Networking</td>
+<td style="text-align: right;">30 s</td>
+<td style="text-align: right;"><code>4.05356e10</code></td>
+<td style="text-align: right;"><code>7.42e24</code></td>
+<td style="text-align: right;"><code>2.04e26</code></td>
+</tr>
+<tr>
+<td>Marketing</td>
+<td style="text-align: right;">90 s</td>
+<td style="text-align: right;"><code>6.01333e12</code></td>
+<td style="text-align: right;"><code>1.99e34</code></td>
+<td style="text-align: right;"><code>5.48363e38</code></td>
+</tr>
+<tr>
+<td>Design</td>
+<td style="text-align: right;">250 s</td>
+<td style="text-align: right;"><code>1.32452e17</code></td>
+<td style="text-align: right;"><code>7.04e42</code></td>
+<td style="text-align: right;"><code>9.63667e52</code></td>
+</tr>
+</tbody>
+</table>
+<p>The two price columns are distinct fields in <code>GeneratorInfo</code>; do not read the large second price as the team's first level price. Ordinary level costs grow geometrically and include boosts. Automatic-start state is separate from purchased levels. [C]</p>
+<table>
+<thead>
+<tr>
+<th>Data generator</th>
+<th style="text-align: right;">Base cost in Lines</th>
+<th style="text-align: right;">Base Data rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mondays</td>
+<td style="text-align: right;">1,500</td>
+<td style="text-align: right;">About 0.740818</td>
+</tr>
+<tr>
+<td>Tuesdays</td>
+<td style="text-align: right;">3,500</td>
+<td style="text-align: right;">About 2.33333</td>
+</tr>
+<tr>
+<td>TGIF</td>
+<td style="text-align: right;">4,000,000</td>
+<td style="text-align: right;">About 8.70525</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrades-and-sprints">Upgrades and sprints</h3>
+<ul>
+<li><strong>HR:</strong> about <code>6.08101e8</code> Lines; bulk purchase options and multipliers for progress upgrades.</li>
+<li><strong>Task Switching:</strong> taps add progress time to bars. The function computes <code>[0.23*(n+1)]^0.54</code> seconds for its integer argument <code>n</code>; caller indexing determines the current/next-level preview. Prices are five Line payments (<code>1.01207e13</code>, <code>2.22922e17</code>, <code>4.91019e21</code>, <code>1.08154e26</code>, <code>2.38225e30</code>), then two Experience payments (<code>6.90029e11</code>, <code>1.02145e15</code>).</li>
+<li><strong>Stand Up:</strong> about <code>1.35650e7</code> Experience; Promotion retains half of Data instead of deleting it, and permits repeated Sprint completions.</li>
+<li><strong>Micromanagement:</strong> about <code>6.05038e9</code> Data; all teams start with automation and Data gain is multiplied by ten.</li>
+</ul>
+<p>Each Sprint is a <strong>five-minute challenge</strong>. Failure automatically cancels it. The first reward doubles Lines and Data; subsequent levels double them again per completion. [D]</p>
+<table>
+<thead>
+<tr>
+<th>Sprint</th>
+<th style="text-align: right;">Line target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td style="text-align: right;"><code>5.62e11</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td style="text-align: right;"><code>7.76e20</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td style="text-align: right;"><code>2.93e24</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td style="text-align: right;"><code>2.30e27</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td style="text-align: right;"><code>3.33825e30</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td style="text-align: right;"><code>7.35299e34</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td style="text-align: right;"><code>2.40370e41</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="promotion-and-persistence">Promotion and persistence</h3>
+<p><code>Experience awarded = cumulative Lines * exp(-10.9241383)</code>, approximately <code>cumulative Lines / 55,500</code>. [C]</p>
+<p>Promotion clears current and cumulative Lines, bar progress, and the team-upgrade map. Data current/cumulative totals are deleted, or halved with Stand Up. The routine explicitly removes purchased Data generators 7-9 and purchased generator entries 1-3. Automation is cleared unless Micromanagement is owned, in which case it enables all seven teams. Experience, the persistent unlocks, and completed Sprint records survive. [C]</p>
+<p><strong>Implementation detail:</strong> Chapter 2 stores bar upgrades, continuous generators, and automation in separate containers. "Everything above" in the UI is less precise than the actual reset. The numeric entry removals are included so the rule is not falsely generalized to a single universal generator list.</p>
+<h3 id="progression-loop-i_1">Progression loop [I]</h3>
+<ol>
+<li>Cycle and upgrade the early developers while building Data.</li>
+<li>Promote to get enough Experience to materially shorten the rebuild, then invest in the next team.</li>
+<li>Use HR and Task Switching to make the slow bars manageable.</li>
+<li>Obtain Stand Up before leaning heavily on repeated Sprints or accumulating Data between Promotions.</li>
+<li>Treat Micromanagement as a major reduction in restart friction. Advance through the later teams and Sprint multipliers toward <code>3.16896e54</code> Lines.</li>
+</ol>
+<h3 id="story_1">Story</h3>
+<p><strong>A Business Deal</strong> introduces Jeff Bicho and the RWS business relationship. <strong>Meetings</strong> shifts the emphasis from doing work to coordinating it, leading into the management economy of Chapter 3. [D]</p>
+<h2 id="chapter-3-embrace-the-yak-shave">Chapter 3: Embrace The Yak Shave</h2>
+<h3 id="economy-and-divisions">Economy and divisions</h3>
+<p>Three divisions generate <strong>Progress</strong>, which meetings convert into <strong>Career Capital</strong>. <strong>Networking Boost</strong>, <strong>Storage Boost</strong>, and <strong>Scripting Boost</strong> are persistent local prestige resources. Their displayed effects are +1% Networking speed, +1% Storage yields, and +1% Scripting yields per point. [D]</p>
+<p><strong>Attend Meeting</strong> starts as a one-second cycle that consumes one Progress and produces one Career Capital. Faster/larger meetings alter this, and Pizza Rule rewards eventually remove the Progress consumption. [D/C]</p>
+<table>
+<thead>
+<tr>
+<th>Division / component</th>
+<th style="text-align: right;">Base cycle where specified</th>
+<th style="text-align: right;">Raw Progress value</th>
+<th style="text-align: right;">Base Career Capital price</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Networking main bar</td>
+<td style="text-align: right;">12 s</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">Opened by progression</td>
+</tr>
+<tr>
+<td>Internal Networking</td>
+<td style="text-align: right;">4 s</td>
+<td style="text-align: right;">25.2797</td>
+<td style="text-align: right;">30</td>
+</tr>
+<tr>
+<td>External Networking</td>
+<td style="text-align: right;">6 s</td>
+<td style="text-align: right;">38.5735</td>
+<td style="text-align: right;">9,897.13</td>
+</tr>
+<tr>
+<td>Networking Protocols</td>
+<td style="text-align: right;">10 s</td>
+<td style="text-align: right;">64.4008</td>
+<td style="text-align: right;">3.75521e6</td>
+</tr>
+<tr>
+<td>Storage main bar</td>
+<td style="text-align: right;">12 s</td>
+<td style="text-align: right;">10.8482</td>
+<td style="text-align: right;">Opened by progression</td>
+</tr>
+<tr>
+<td>HDD</td>
+<td style="text-align: right;">Passive component</td>
+<td style="text-align: right;">85</td>
+<td style="text-align: right;">5.58735e7</td>
+</tr>
+<tr>
+<td>SSD</td>
+<td style="text-align: right;">Passive component</td>
+<td style="text-align: right;">83.6392</td>
+<td style="text-align: right;">6.13076e8</td>
+</tr>
+<tr>
+<td>CDN</td>
+<td style="text-align: right;">Passive component</td>
+<td style="text-align: right;">75.6799</td>
+<td style="text-align: right;">1.31882e9</td>
+</tr>
+<tr>
+<td>Memory Cache</td>
+<td style="text-align: right;">Passive component</td>
+<td style="text-align: right;">75.6799</td>
+<td style="text-align: right;">7.20049e10</td>
+</tr>
+<tr>
+<td>Scripting main bar</td>
+<td style="text-align: right;">12 s</td>
+<td style="text-align: right;">80.1580</td>
+<td style="text-align: right;">Opened by progression</td>
+</tr>
+<tr>
+<td>Javascript</td>
+<td style="text-align: right;">Passive component</td>
+<td style="text-align: right;">4,640.84</td>
+<td style="text-align: right;">1.09760e22</td>
+</tr>
+<tr>
+<td>C#</td>
+<td style="text-align: right;">Passive component</td>
+<td style="text-align: right;">5,046.81</td>
+<td style="text-align: right;">1.20367e25</td>
+</tr>
+<tr>
+<td>C++</td>
+<td style="text-align: right;">Passive component</td>
+<td style="text-align: right;">5,577.59</td>
+<td style="text-align: right;">5.82185e28</td>
+</tr>
+<tr>
+<td>Rust</td>
+<td style="text-align: right;">Passive component</td>
+<td style="text-align: right;">6,812.49</td>
+<td style="text-align: right;">5.05239e31</td>
+</tr>
+</tbody>
+</table>
+<p>The division main bars and component upgrades also affect one another: the recovered interface describes component upgrades increasing the accompanying main bar's speed, and a separate multiplier on main-bar yields. The raw Progress column is not a complete marginal-output comparison. The exact per-component cross-boost coefficients remain unresolved. [D/U]</p>
+<h3 id="upgrades">Upgrades</h3>
+<table>
+<thead>
+<tr>
+<th>Upgrade</th>
+<th>Recovered role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Schedules</td>
+<td>Automates meetings.</td>
+</tr>
+<tr>
+<td>VIPs</td>
+<td>Additional tapping advances time.</td>
+</tr>
+<tr>
+<td>Faster Meetings</td>
+<td>Increases meeting speed.</td>
+</tr>
+<tr>
+<td>Larger Meetings</td>
+<td>Raises meeting yield and its Progress cost.</td>
+</tr>
+<tr>
+<td>Overtime</td>
+<td>Raises Progress growth.</td>
+</tr>
+<tr>
+<td>WFH</td>
+<td>Reduces all generator costs by 99%; later levels apply further reductions.</td>
+</tr>
+<tr>
+<td>Better Cables</td>
+<td>Component upgrades increase the speed of their accompanying main bar.</td>
+</tr>
+<tr>
+<td>Better Switches</td>
+<td>Increases the yields of each main bar.</td>
+</tr>
+<tr>
+<td>Optimization</td>
+<td>Large component/bar speed improvement; recovered fixed factor 10x in its upgrade path.</td>
+</tr>
+<tr>
+<td>Hardware Acceleration</td>
+<td>Large main-bar speed improvement; recovered fixed factor 50x in its upgrade path.</td>
+</tr>
+<tr>
+<td>PTO</td>
+<td>Unlocked by Bureaucracy; multiplies meeting yields and Progress growth.</td>
+</tr>
+</tbody>
+</table>
+<p>Some dynamic multipliers are explicitly recoverable. For an owned level <code>n</code>, Faster Meetings uses <code>1.397941876^n + 1.8^n</code>; Overtime uses <code>1.033456617^n + 2.873444387^n</code>. Larger Meetings starts from <code>1.262266763^n + 2.6^n</code>, then applies challenge adjustments. The unowned branch returns one; do not evaluate these formulas at zero and infer a free 2x bonus. [C]</p>
+<h3 id="challenges">Challenges</h3>
+<ul>
+<li><strong>Two / Four / Eight / Sixteen / Thirty Two Pizza Rule:</strong> meeting yields become 1/2, 1/4, 1/8, 1/16, and 1/32. Career Capital targets are respectively <code>8.66883e9</code>, <code>2.94728e19</code>, <code>5.05793e24</code>, <code>4.26253e31</code>, and <code>1.72854e32</code>. Rewards allow meetings without consuming Progress and make current Progress improve Career Capital production. The per-Progress coefficient doubles across these stages: <code>2^-24</code>, <code>2^-23</code>, <code>2^-22</code>, <code>2^-21</code>, <code>2^-20</code>. The resulting factor is <code>1 + current Progress * coefficient</code>. [D/C]</li>
+<li><strong>Management Styles:</strong> division main bars do nothing; target about <code>9.63471e25</code> Career Capital; reward 10x meeting speed and yields. [D]</li>
+<li><strong>Bureaucracy:</strong> purchasing makes yields fall to zero and recover over one minute; target about <code>4.25152e32</code> Career Capital; reward unlocks PTO. [D]</li>
+</ul>
+<h3 id="division-prestige">Division prestige</h3>
+<p>Each prestige consumes the common <strong>current and cumulative Progress and Career Capital</strong>, but clears its own division's purchased components rather than all three divisions. Prestige resources and other divisions' machinery survive. [C]</p>
+<table>
+<thead>
+<tr>
+<th>Reset</th>
+<th>Division-specific clearing / effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Networking</td>
+<td>Clears component entries 2-4 and Better Cables/Better Switches. Can initialize the Storage main bar.</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>Clears component entries 6-9.</td>
+</tr>
+<tr>
+<td>Scripting</td>
+<td>Clears component entries 11-14.</td>
+</tr>
+</tbody>
+</table>
+<p>The UI describes Scripting prestige as clearing scripting "generators/unlocks". The inspected routine explicitly removes the generator entries but does not explicitly remove the two named scripting unlock entries. This is a code/text discrepancy; I have not silently treated the UI sentence as the authoritative reset list. [C/U]</p>
+<p>Prestige gains derive from cumulative Progress, with base logarithmic factors <code>exp(-11.8)</code>, <code>exp(-15.8)</code>, and <code>exp(-24.8)</code> for Networking, Storage, and Scripting respectively, divided by <code>1 + 0.01*existing corresponding boost</code>. A shared softcap applies to a candidate gain <code>x</code> against <code>a = existing points + 100</code>:</p>
+<p><code>gain = x</code> if <code>x &lt;= a</code>; otherwise <code>gain = a + (x-a)*sqrt(a/x)</code>.</p>
+<p>This is a diminishing-return transformation, not a hard maximum of 100. [C]</p>
+<h3 id="progression-loop-i_2">Progression loop [I]</h3>
+<ol>
+<li>Balance Progress production against meeting consumption. Making meetings larger without enough Progress can create a supply bottleneck.</li>
+<li>Automate meetings and expand Networking; use Networking prestige to open and strengthen the next division.</li>
+<li>Develop Storage and Scripting while keeping useful machinery in the other divisions across each local reset.</li>
+<li>Pizza rewards change Progress from a consumed input toward a retained multiplier. That changes the value of banking Progress.</li>
+<li>Complete Management Styles and Bureaucracy for their major boosts, then reach about <code>3.67856e35</code> Career Capital.</li>
+</ol>
+<h3 id="story_2">Story</h3>
+<p><strong>Middle Management</strong> and <strong>Monotony</strong> satirize process overtaking productive work. The player leaves to build a search business, <strong>FlexiSearch</strong>, setting up Chapter 4's startup financing loop. [D]</p>
+<h2 id="chapter-4-unicorns-dont-exist">Chapter 4: Unicorns Don't Exist</h2>
+<h3 id="economy_1">Economy</h3>
+<p><strong>Lines</strong> are the round's immediate production target. <strong>Money</strong>, earned by completing funding rounds, pays for durable improvements. <strong>Velocity</strong> increases line speed by 1% per point. Line generators include <strong>Variables, Function, Class, Pattern</strong>; velocity generators include <strong>Faster SSD, More GHz, Larger Monitor</strong>. [D]</p>
+<table>
+<thead>
+<tr>
+<th>Generator</th>
+<th style="text-align: right;">Base cost</th>
+<th style="text-align: right;">Base rate before boosts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Variable</td>
+<td style="text-align: right;">690 Lines</td>
+<td style="text-align: right;">2 Lines/s</td>
+</tr>
+<tr>
+<td>Function</td>
+<td style="text-align: right;">1,380 Lines</td>
+<td style="text-align: right;">4 Lines/s</td>
+</tr>
+<tr>
+<td>Class</td>
+<td style="text-align: right;">About 50,950 Lines</td>
+<td style="text-align: right;">168.429 Lines/s</td>
+</tr>
+<tr>
+<td>Pattern</td>
+<td style="text-align: right;">About 1.51880e8 Lines</td>
+<td style="text-align: right;">378,001 Lines/s</td>
+</tr>
+<tr>
+<td>Faster SSD</td>
+<td style="text-align: right;">About 6.28773 Money</td>
+<td style="text-align: right;">0.0117647 Velocity/s</td>
+</tr>
+<tr>
+<td>More GHz</td>
+<td style="text-align: right;">About 6.28773 Money</td>
+<td style="text-align: right;">0.0117647 Velocity/s</td>
+</tr>
+<tr>
+<td>Larger Monitor</td>
+<td style="text-align: right;">About 6.28773 Money</td>
+<td style="text-align: right;">0.0117647 Velocity/s</td>
+</tr>
+</tbody>
+</table>
+<p>The three hardware records really do share the same raw cost and rate. Their availability and effective boosts differ; their final displayed prices are not necessarily identical. [D/C]</p>
+<h3 id="funding-rounds">Funding rounds</h3>
+<table>
+<thead>
+<tr>
+<th>Round</th>
+<th style="text-align: right;">Required Lines</th>
+<th style="text-align: right;">Base Money reward before upgrades</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Seed</td>
+<td style="text-align: right;">3,600</td>
+<td style="text-align: right;">1,000</td>
+</tr>
+<tr>
+<td>Series A</td>
+<td style="text-align: right;">300,000</td>
+<td style="text-align: right;">88,000</td>
+</tr>
+<tr>
+<td>Series B</td>
+<td style="text-align: right;">88,013,432</td>
+<td style="text-align: right;">25,865,000</td>
+</tr>
+<tr>
+<td>Series C</td>
+<td style="text-align: right;"><code>1.29057e13</code></td>
+<td style="text-align: right;"><code>3.93133e12</code></td>
+</tr>
+<tr>
+<td>IPO</td>
+<td style="text-align: right;"><code>2.67075e24</code></td>
+<td style="text-align: right;"><code>8.50405e23</code>; completes the chapter</td>
+</tr>
+</tbody>
+</table>
+<p>A higher series must be unlocked, and the preceding series must have been completed. IPO is explicitly manual: it does <strong>not</strong> autocomplete like ordinary funding rounds. [D/C]</p>
+<h3 id="upgrade-progression">Upgrade progression</h3>
+<p>These are the recovered named upgrades and their role. Their arrangement below follows the broad progression, not an asserted cheapest-first purchase order.</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Upgrades and effects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initial production</td>
+<td>Clipboard History: 5x copy/paste. Notepad: start each round with one Variable and Function. Documentation: triple all yields. Autocomplete: 2x Lines.</td>
+</tr>
+<tr>
+<td>Surplus fundraising</td>
+<td>Persuasion: extra Money for surplus Lines, described as 25% with a penalty on large surplus. Marketing increases the surplus conversion to 50%.</td>
+</tr>
+<tr>
+<td>Generator access</td>
+<td>Better Hardware adds a generator tier; IDE another line generator; Books the final tier-one generator. Multi-Monitor unlocks the last tier-two generator.</td>
+</tr>
+<tr>
+<td>Local upgrade access</td>
+<td>Organization unlocks Variable/Function upgrades that reset with rounds. Moore's Law adds a velocity upgrade. Improvements unlocks two more upgrades.</td>
+</tr>
+<tr>
+<td>Costs and count bonuses</td>
+<td>Cost Cutting: 90% cheaper generators. The More You Buy: line-generator yield bonus based on owned count. Ergonomics: velocity-generator cost reduction compounded with owned velocity generators.</td>
+</tr>
+<tr>
+<td>Autobuy</td>
+<td>Dictionary buys Variables/Functions; Templates buys Classes; Syntactic Sugar buys Patterns.</td>
+</tr>
+<tr>
+<td>Tap boosts</td>
+<td>Longer Clipboard History: 4x; The Key: 5x; Text Expansion: 5x; Sticky Keys: 2x; Keyboard Macros: 10x. Fast Typing: 100x copy/paste and 10x Lines.</td>
+</tr>
+<tr>
+<td>Line boosts</td>
+<td>Delegation: 10x Lines and 2x copy/paste. Bare Metal: 4x Lines. Meta Programming: 4x Lines. Activist Investors: a further small line boost.</td>
+</tr>
+<tr>
+<td>Round income</td>
+<td>More Investors: 2x Money. Even More Investors: 3x. Money: 10x. Insiders: another 10x.</td>
+</tr>
+<tr>
+<td>Velocity on restart</td>
+<td>Memory: seven hours of production. Review: twelve hours. Retrospectives: another twelve hours. More Retrospectives: another 24 hours. Analysis: another 24 hours when starting a round.</td>
+</tr>
+<tr>
+<td>Reset improvement</td>
+<td>Institutionalized Knowledge prevents the top two local upgrade tracks from resetting.</td>
+</tr>
+<tr>
+<td>Automation</td>
+<td>Continuous Integration automates eligible round completion. Work From Home simulates offline rounds using the recorded fastest round, for 10% of normal Money. Home Office doubles that yield; Lighting doubles it again.</td>
+</tr>
+<tr>
+<td>Series access</td>
+<td>Series A, Series B, Series C, IPO unlock the corresponding selectable round subject to the prior-round requirement.</td>
+</tr>
+</tbody>
+</table>
+<p>The local upgrade labels also include a build track (<strong>Build Scripts, Make File, Build Pipeline, Build Environment, Containerization</strong>) and a testing track (<strong>Manual Testing, Test Cases, Macros, Automated Testing</strong>). These are not additional independent prestige currencies. [D]</p>
+<h3 id="reset-contract-and-automation">Reset contract and automation</h3>
+<p>A funding round awards Money, removes current/cumulative Lines and Velocity, and removes the four line-generator purchases. Velocity-generator purchases survive. The two local upgrade entries reset unless Institutionalized Knowledge is owned. Durable main upgrades, Money, round access, and completed-round information survive. Notepad seeds the first two line generators; the velocity gifts are computed from retained production and applied to the new run. [C]</p>
+<p>Consequently, "seven hours of free velocity" means a production grant calculated from the current velocity-generating infrastructure, not a universal fixed amount of Velocity. Buying more retained hardware improves future grants. [C/I]</p>
+<p>Autobuy exposes a <strong>payback-time threshold</strong>. Work From Home uses the displayed fastest round time; switching round types resets the record. Do not assume it uses your best historical time across every funding series. [D]</p>
+<h3 id="progression-loop-i_3">Progression loop [I]</h3>
+<ol>
+<li>Repeat Seed rounds to buy permanent Money upgrades and velocity hardware.</li>
+<li>Invest in the upgrades that shorten restart time: initial generators, retained upgrades, and instant Velocity grants.</li>
+<li>Unlock and complete each series, then compare its Money reward against its cycle time rather than assuming the latest series is always best.</li>
+<li>Tune autobuy so it does not consume the Lines needed for an imminent round completion without paying itself back.</li>
+<li>Record a fast run of the series you intend to idle with before relying on Work From Home.</li>
+<li>Unlock IPO after Series C, reach the IPO Line requirement, and complete it manually.</li>
+</ol>
+<h3 id="story_3">Story</h3>
+<p><strong>Just Getting Started</strong> establishes the startup and investor Steelman. <strong>Going For Gold</strong> develops the fundraising story after the early financing progression. <strong>Bureaucracy</strong> brings the business into public-company constraints. [D]</p>
+<h2 id="chapter-5-recurse-recurse-recurse">Chapter 5: Recurse, Recurse, Recurse</h2>
+<h3 id="economy-and-recursion">Economy and recursion</h3>
+<p><strong>Power</strong> represents search capability. Producing it also accumulates <strong>Tech Debt</strong>. <strong>Knowledge</strong>, <strong>Serendipity</strong>, and <strong>Features</strong> are the three local prestige resources. The production ladder is recursive: the second tier makes first-tier generators, and the third tier makes second-tier generators. [D/C]</p>
+<table>
+<thead>
+<tr>
+<th>Generator</th>
+<th style="text-align: right;">Base Power price</th>
+<th>Base production</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Querying</td>
+<td style="text-align: right;">4.64918</td>
+<td>0.43 Power/s and <code>0.43*exp(-8)</code> Tech Debt/s</td>
+</tr>
+<tr>
+<td>Retrieval</td>
+<td style="text-align: right;">23.8075</td>
+<td>0.56 Power/s and <code>0.56*exp(-8)</code> Tech Debt/s</td>
+</tr>
+<tr>
+<td>Presentation</td>
+<td style="text-align: right;">86.4875</td>
+<td>0.62 Power/s and <code>0.62*exp(-8)</code> Tech Debt/s</td>
+</tr>
+<tr>
+<td>Scoring</td>
+<td style="text-align: right;">19,148.9</td>
+<td>One bonus Querying every 37.4 s</td>
+</tr>
+<tr>
+<td>Ranking</td>
+<td style="text-align: right;">1.02336e6</td>
+<td>One bonus Retrieval every 38.9 s</td>
+</tr>
+<tr>
+<td>Tokenization</td>
+<td style="text-align: right;">4.12852e8</td>
+<td>One bonus Presentation every 40.2 s</td>
+</tr>
+<tr>
+<td>Document Indexing</td>
+<td style="text-align: right;">2.55163e9</td>
+<td>One bonus Scoring every 1,260 s</td>
+</tr>
+<tr>
+<td>Inverted Index</td>
+<td style="text-align: right;">1.58431e10</td>
+<td>One bonus Ranking every 1,285 s</td>
+</tr>
+<tr>
+<td>Analysis</td>
+<td style="text-align: right;">1.05925e11</td>
+<td>One bonus Tokenization every 1,320 s</td>
+</tr>
+</tbody>
+</table>
+<p>Tech Debt is <strong>subtracted from each basic generator's per-second yield before stat boosts</strong>. It is not merely a percentage penalty on total Power. This makes debt disproportionately harmful to weak starting generators and explains the need for repeated resets and debt reduction. [D/C]</p>
+<p>Generated copies and manually purchased copies are distinct. Economies Of Scale explicitly uses the manually bought count, so an enormous generated population is not interchangeable with buying that many copies. [D/C]</p>
+<p>Serendipity's recovered debt factor is <code>min(1, 1/Serendipity)</code>, with a missing balance returning one. Above one Serendipity, more of it suppresses debt through this reciprocal factor. Knowledge primarily finances the upgrade system, while Features finance later Planning levels and supply the chapter's completion balance. [C]</p>
+<h3 id="upgrades-and-unlocks">Upgrades and unlocks</h3>
+<table>
+<thead>
+<tr>
+<th>Upgrade</th>
+<th>Recovered schedule / effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Micromanagement</td>
+<td>Costs 1 Knowledge, then about 2.97994e7 Knowledge; opens generator upgrade systems.</td>
+</tr>
+<tr>
+<td>Cloud Computing</td>
+<td>Knowledge costs about 3,714.50; 202,805; 3.00989e7; 1.21428e10. Each level reduces Tech Debt by 90%.</td>
+</tr>
+<tr>
+<td>Economies Of Scale</td>
+<td>About 228,662 Serendipity; rewards manually purchased generator counts with yield growth.</td>
+</tr>
+<tr>
+<td>Planning</td>
+<td>Costs about 2.50111e9 and 1.00902e12 Serendipity, then 26.5758 and 79,221.3 Features. Reorg starts generator upgrades at increasing baseline levels rather than zero.</td>
+</tr>
+<tr>
+<td>Basic-generator upgrades</td>
+<td>Yields, Cost, Tech Debt. Yield improvements also affect their debt-producing output; cost levels reduce price by 90%; debt upgrades leave 25% as much debt production (a 75% reduction).</td>
+</tr>
+<tr>
+<td>Recursive-generator upgrades</td>
+<td>Yields, Speed, Cost. Raising production here grows the lower tier over time.</td>
+</tr>
+</tbody>
+</table>
+<p>Planning's reset code seeds upgrade levels in increments of five per Planning level. It does not simply grant five physical copies of every generator. [C]</p>
+<table>
+<thead>
+<tr>
+<th>Quest</th>
+<th>Restriction</th>
+<th style="text-align: right;">Target Power</th>
+<th>Reward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Legacy Systems</td>
+<td>Start with 0.1 Tech Debt</td>
+<td style="text-align: right;">18,215</td>
+<td>Debt accumulation halved.</td>
+</tr>
+<tr>
+<td>Game Jam</td>
+<td>No Tech Debt, but a one-minute run/reset constraint</td>
+<td style="text-align: right;">1,540.71</td>
+<td>Unlock generators that produce generators.</td>
+</tr>
+<tr>
+<td>Game Jam 2</td>
+<td>Same challenge family</td>
+<td style="text-align: right;">1.97764e7</td>
+<td>Unlock generators that produce generator-generators.</td>
+</tr>
+<tr>
+<td>Direct To Consumer</td>
+<td>Recursive generators produce Power instead of their normal generators</td>
+<td style="text-align: right;">3.42542e15</td>
+<td>10x speed for the recursive generator layer.</td>
+</tr>
+</tbody>
+</table>
+<p>The appendix retains the exact recovered wording of these quests. A Game Jam is a short challenge that changes the economy; it is not permission to ignore debt in the ordinary run. [D/I]</p>
+<h3 id="three-reset-layers">Three reset layers</h3>
+<p>Prestige gains use cumulative Power: [C]</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Award formula</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Knowledge reset</td>
+<td><code>Power * exp(-6.42)</code> = about <code>Power * 0.001628656</code></td>
+</tr>
+<tr>
+<td>Reorg</td>
+<td><code>Power * exp(-8.42)</code> = about <code>Power * 0.0002204147</code> Serendipity</td>
+</tr>
+<tr>
+<td>Deploy</td>
+<td><code>Power * exp(-47.71)</code> = about <code>Power * 1.904628e-21</code> Features</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Cleared</th>
+<th>Preserved</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Knowledge reset</td>
+<td>Purchased generators at all three tiers; Power current/cumulative; Tech Debt; generated copies of the first two tiers; bar progress</td>
+<td>Adds Knowledge; keeps existing Knowledge, Serendipity, Features, upgrades, and quest completions. Active Legacy Systems reseeds its debt.</td>
+</tr>
+<tr>
+<td>Reorg</td>
+<td>The same production layer, plus Knowledge and generator upgrade levels</td>
+<td>Adds Serendipity; keeps Features, global unlocks, and quest completions. Planning seeds generator upgrade levels.</td>
+</tr>
+<tr>
+<td>Deploy</td>
+<td>Production layer, Knowledge, Serendipity, generator upgrades, global upgrade entries 1-5, <strong>Legacy Systems and Game Jam completion records</strong></td>
+<td>Adds Features; <strong>Direct To Consumer completion survives</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p>Deploy is therefore a substantial rebuild: the Game Jam unlock challenges must be redone. It is not just a Reorg that happens to award a different currency. This distinction is established by quest IDs in the reset routine and their construction sites. [C]</p>
+<h3 id="progression-loop-i_4">Progression loop [I]</h3>
+<ol>
+<li>Build Power only while debt permits useful growth; bank Knowledge instead of trying to wait indefinitely through a debt wall.</li>
+<li>Reduce debt and complete Legacy Systems. Use the first Game Jam to gain the second production tier.</li>
+<li>Obtain Serendipity and Planning so deeper resets rebuild generator upgrades faster.</li>
+<li>Complete Game Jam 2 and let third-tier production grow the second tier, which then grows the first.</li>
+<li>Complete Direct To Consumer for its persistent acceleration before relying heavily on Deploy cycles.</li>
+<li>Deploy for Features, rebuild the two cleared challenge families, and repeat toward about <code>8.71080e11</code> Features.</li>
+</ol>
+<h3 id="story_4">Story</h3>
+<p><strong>The Right Idea</strong> discusses the technical-debt problem and the rewrite approach. <strong>Open Source</strong> turns the project toward opening its code, which becomes the central business and licensing conflict of the following chapters. [D]</p>
+<h2 id="chapter-6-free-as-in-beer">Chapter 6: Free As In Beer</h2>
+<h3 id="economy_2">Economy</h3>
+<p>The project now revolves around <strong>Issues</strong>, <strong>Commits</strong>, and <strong>Velocity</strong>. The main Git progress bar is the commit-production bottleneck. <strong>Integration</strong> from Rebase boosts Velocity; <strong>Awareness</strong> from Conference boosts Issues. A further tier creates bonus issue generators. [D/C]</p>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Generator</th>
+<th style="text-align: right;">Base Commit price</th>
+<th style="text-align: right;">Base output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Velocity</td>
+<td>Git Status</td>
+<td style="text-align: right;">1,008.25</td>
+<td style="text-align: right;">1.37713 Velocity/s</td>
+</tr>
+<tr>
+<td>Velocity</td>
+<td>Git Add</td>
+<td style="text-align: right;">1,993.39</td>
+<td style="text-align: right;">1.58407 Velocity/s</td>
+</tr>
+<tr>
+<td>Velocity</td>
+<td>Git Commit</td>
+<td style="text-align: right;">2.56893e6</td>
+<td style="text-align: right;">1.85893 Velocity/s</td>
+</tr>
+<tr>
+<td>Velocity</td>
+<td>Git Push</td>
+<td style="text-align: right;">5.55384e6</td>
+<td style="text-align: right;">2.18147 Velocity/s</td>
+</tr>
+<tr>
+<td>Velocity</td>
+<td>Git Pull</td>
+<td style="text-align: right;">5.86686e8</td>
+<td style="text-align: right;">2.38214 Velocity/s</td>
+</tr>
+<tr>
+<td>Issues</td>
+<td>Feature Idea</td>
+<td style="text-align: right;">1,993.39</td>
+<td style="text-align: right;">2.27050 Issues/s</td>
+</tr>
+<tr>
+<td>Issues</td>
+<td>Bug Report</td>
+<td style="text-align: right;">31,539.6</td>
+<td style="text-align: right;">2.80107 Issues/s</td>
+</tr>
+<tr>
+<td>Issues</td>
+<td>Documentation</td>
+<td style="text-align: right;">186,461</td>
+<td style="text-align: right;">3.12677 Issues/s</td>
+</tr>
+<tr>
+<td>Issues</td>
+<td>UX Design</td>
+<td style="text-align: right;">2.47067e6</td>
+<td style="text-align: right;">3.42123 Issues/s</td>
+</tr>
+<tr>
+<td>Bonus copies</td>
+<td>Requirements Definitions</td>
+<td style="text-align: right;">1.67165e14</td>
+<td style="text-align: right;">One Feature Idea per 313.8 s</td>
+</tr>
+<tr>
+<td>Bonus copies</td>
+<td>Test Case Creation</td>
+<td style="text-align: right;">3.13870e14</td>
+<td style="text-align: right;">One Bug Report per 307.8 s</td>
+</tr>
+<tr>
+<td>Bonus copies</td>
+<td>API Design</td>
+<td style="text-align: right;">6.68445e14</td>
+<td style="text-align: right;">One Documentation per 298.2 s</td>
+</tr>
+<tr>
+<td>Bonus copies</td>
+<td>Wireframe Refinement</td>
+<td style="text-align: right;">4.20857e15</td>
+<td style="text-align: right;">One UX Design per 277.2 s</td>
+</tr>
+</tbody>
+</table>
+<p>The main bar, labeled <strong>git init</strong>, has a 15.6-second base cycle, consumes <strong>one Issue</strong>, and produces <strong>one Commit</strong>. Its separate base purchase/upgrade cost is about <strong>230.973 Issues</strong>. Velocity accelerates the rate at which Issues become Commits. The cycle-input and purchase-price fields are separate; 230.973 is not the base per-cycle consumption. [D/C]</p>
+<h3 id="upgrades-and-challenges_1">Upgrades and challenges</h3>
+<table>
+<thead>
+<tr>
+<th>Upgrade</th>
+<th style="text-align: right;">Commit costs</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Faster Issue Creation</td>
+<td style="text-align: right;">81,633.9; 994,505; 3.25105e12</td>
+<td>Opens more issue-generator options.</td>
+</tr>
+<tr>
+<td>Collaboration</td>
+<td style="text-align: right;">2.97994e7; 8.90608e9</td>
+<td>Issue speed +50% per described level.</td>
+</tr>
+<tr>
+<td>QA Tools</td>
+<td style="text-align: right;">8.88309e10; 1.07939e13</td>
+<td>Bonus issue-generator support, including restart seeding.</td>
+</tr>
+<tr>
+<td>Wiki</td>
+<td style="text-align: right;">2.64117e15</td>
+<td>All generator costs reduced by 90%.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Challenge</th>
+<th>Restriction and targets</th>
+<th>Reward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bug Bash</td>
+<td>No special restriction; <code>3.90973e18</code> Velocity</td>
+<td>Autobuy for Issue and Velocity generators.</td>
+</tr>
+<tr>
+<td>Internal Review 1-3</td>
+<td>Costs 100x; three-minute limit; <code>9.22488e7</code>, <code>6.13585e10</code>, <code>2.40762e16</code> Commits</td>
+<td>Issue-yield bonus based on manually bought issue-generator count, with coefficients 1%, 2%, 3%.</td>
+</tr>
+<tr>
+<td>Triage 1-2</td>
+<td>Commit production disabled; <code>4.47559e16</code>, <code>1.33416e20</code> Issues</td>
+<td>10x improvement to the upper generator layer per stage.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="two-prestiges">Two prestiges</h3>
+<ul>
+<li><strong>Rebase:</strong> <code>Integration gain = cumulative Commits * exp(-16.9)</code>, about <code>4.57534e-8</code> times cumulative Commits.</li>
+<li><strong>Conference:</strong> <code>Awareness gain = cumulative Issues * exp(-11.22)</code>, about <code>1.34034e-5</code> times cumulative Issues.</li>
+<li>Each Integration increases Velocity by 1%; each Awareness increases Issues by 1%. [C/D]</li>
+</ul>
+<p>Both resets clear current/cumulative Commits, Issues, and Velocity. They reset the main/ordinary production purchases and the first two upgrade tracks. The code removes generator IDs 1, 11-15, and 1001-1004; the upper generator IDs 1051-1054 are not removed by those lists. Integration and Awareness survive each other's reset, as do QA Tools, Wiki, and completed challenges. QA Tools rebuilds the appropriate bonus issue-generator state. [C]</p>
+<p>This makes Rebase and Conference <strong>parallel persistent investments</strong>, not two strictly nested reset depths. Use whichever resource is currently limiting the next run. [I]</p>
+<h3 id="progression-loop-i_5">Progression loop [I]</h3>
+<ol>
+<li>Develop issue supply and commit throughput together; a one-sided investment can leave the other side limiting output.</li>
+<li>Rebase for Integration and Conference for Awareness. Their persistent gains reinforce different halves of the loop.</li>
+<li>Unlock upper generators and QA Tools so repeated resets do not restart the issue economy from nothing.</li>
+<li>Complete Internal Reviews when you can meet the time limit despite 100x costs.</li>
+<li>Use Triage's issue-only run to strengthen the recursive layer, and Bug Bash to unlock purchasing automation.</li>
+<li>Push to about <code>6.27220e22</code> Commits.</li>
+</ol>
+<h3 id="story_5">Story</h3>
+<p><strong>RJS</strong> introduces the licensing warning as the open-source argument becomes concrete. <strong>Rollback</strong> follows Bicho's use of the released code: the prior release's licensing cannot simply be wished away by changing the current business plan. The story proposes returning to an earlier code state and rebuilding the product. These are the fictional game's story beats, not legal advice about real licenses. [D]</p>
+<h2 id="chapter-7-tldr">Chapter 7: TL;DR</h2>
+<h3 id="economy-three-kinds-of-debt">Economy: three kinds of debt</h3>
+<p>This is a redesigned Power economy with <strong>Bugs</strong>, <strong>Documentation Deficit</strong>, and <strong>Performance Issues</strong> tracked separately. <strong>Knowledge</strong> is the Rewrite resource. <strong>Efficiency</strong> is produced by a clean second tier and boosts Power production, while other upgrades reduce its adverse interaction with debt. [D/C]</p>
+<table>
+<thead>
+<tr>
+<th>Generator</th>
+<th style="text-align: right;">Base Power price</th>
+<th>Base output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rapid Development</td>
+<td style="text-align: right;">4.64918</td>
+<td>0.43 Power/s; <code>0.43*exp(-8)</code> Bugs/s</td>
+</tr>
+<tr>
+<td>Code Changes</td>
+<td style="text-align: right;">354.249</td>
+<td>0.56 Power/s; <code>0.56*exp(-10)</code> Documentation Deficit/s</td>
+</tr>
+<tr>
+<td>Advanced Algorithms</td>
+<td style="text-align: right;">1,422.26</td>
+<td>0.62 Power/s; <code>0.62*exp(-12)</code> Performance Issues/s</td>
+</tr>
+<tr>
+<td>Resources</td>
+<td style="text-align: right;">278,366</td>
+<td>0.13 Efficiency/s</td>
+</tr>
+<tr>
+<td>Innovation</td>
+<td style="text-align: right;">2.12104e7</td>
+<td>0.21 Efficiency/s</td>
+</tr>
+<tr>
+<td>Development</td>
+<td style="text-align: right;">1.26383e10</td>
+<td>0.32 Efficiency/s</td>
+</tr>
+<tr>
+<td>Test Lab</td>
+<td style="text-align: right;">1.55112e12</td>
+<td>0.46 Efficiency/s</td>
+</tr>
+<tr>
+<td>Server Farm</td>
+<td style="text-align: right;">1.02409e14</td>
+<td>0.62 Efficiency/s</td>
+</tr>
+</tbody>
+</table>
+<p>Initially, effective Tech Debt is the <strong>sum</strong> of its three components. <strong>Compartmentalization</strong> changes it to their <strong>maximum</strong>. The resulting value is subtracted from each basic generator's per-second output before stat boosts. It is not subtracted once from the chapter's grand total. The Efficiency producers form the route around the debt-limited first tier. [D/C]</p>
+<h3 id="upgrades_1">Upgrades</h3>
+<table>
+<thead>
+<tr>
+<th>Upgrade</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pair Programming</td>
+<td>Reduces Bugs by 90%.</td>
+</tr>
+<tr>
+<td>Templates</td>
+<td>Reduces Documentation Deficit by 90%.</td>
+</tr>
+<tr>
+<td>APIs</td>
+<td>Reduces Performance Issues by 90%.</td>
+</tr>
+<tr>
+<td>Compartmentalization</td>
+<td>Debt becomes the maximum component instead of their sum.</td>
+</tr>
+<tr>
+<td>Not Like That</td>
+<td>Reduces Efficiency's effect on debt by 50%.</td>
+</tr>
+<tr>
+<td>Protocols</td>
+<td>Doubles tier-one yields without doubling debt.</td>
+</tr>
+</tbody>
+</table>
+<p>These name/effect pairs were checked against the associated description closures rather than inferred from the order of strings in the binary. Knowledge-denominated level schedules are in the data appendix. [C]</p>
+<h3 id="challenges-and-rewrite">Challenges and Rewrite</h3>
+<p><strong>Last Minute Optimizations</strong> has five stages. Each halves Efficiency boosts during the challenge. Rewards double Efficiency's effect, reduce debt, and seed clean generators after Rewrite: first Resources, then Resources+Innovation, then Development, then Test Lab, then Server Farm. [D]</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th style="text-align: right;">Power target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td style="text-align: right;"><code>2.19129e6</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td style="text-align: right;"><code>3.96194e9</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td style="text-align: right;"><code>3.56643e11</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td style="text-align: right;"><code>1.30525e13</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td style="text-align: right;"><code>1.43880e14</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>No Comments Ever</strong>, two stages, makes generators that do not already create Documentation Deficit add it. Targets are about <code>7.34845e6</code> and <code>3.25105e12</code> Power. Each reward reduces Efficiency's debt influence by 90%. [D]</p>
+<p>Rewrite awards <code>cumulative Power * exp(-6.42)</code> Knowledge. It clears purchased generators, Power current/cumulative, all three debts, Efficiency, and transient progress. Knowledge, upgrades, and completed challenges survive. It then seeds the Efficiency-generator copies earned from Last Minute Optimizations. [C]</p>
+<h3 id="progression-loop-i_6">Progression loop [I]</h3>
+<ol>
+<li>Buy the appropriate debt reduction for the component actually restricting output, rather than treating every kind of debt as one indistinguishable number.</li>
+<li>Establish Knowledge through Rewrite and open the Efficiency tier.</li>
+<li>Compartmentalization prevents the three debt tracks from simply adding together; it does not remove the largest debt component.</li>
+<li>Complete early Last Minute Optimizations stages to make future restarts begin with clean production.</li>
+<li>Stack Not Like That, No Comments Ever, and the challenge rewards to separate productive Efficiency growth from debt growth.</li>
+<li>Use Protocols and the mature clean layer to reach about <code>7.05844e15</code> Power.</li>
+</ol>
+<h3 id="story_6">Story</h3>
+<p><strong>Not My Problem</strong> continues the dispute with Bicho over the fork and its license. <strong>Progress</strong> develops the cleaner design; <strong>Takeover</strong> turns the conflict toward control of the companies themselves. [D]</p>
+<h2 id="chapter-8-glory-to-the-coming-age-of-free-software">Chapter 8: Glory To The Coming Age Of Free Software</h2>
+<h3 id="economy_3">Economy</h3>
+<p><strong>Money</strong> buys machines. Machines accumulate <strong>Assets</strong>. <strong>Liquidate</strong> converts Assets into Money. <strong>Productivity</strong> boosts Asset generation by 1% per point. <strong>Buy Shares</strong> is a deeper reset that converts Money into <strong>Shares</strong>. A late opposing counter tracks <strong>Bicho's Shares</strong>, which can trigger a forced restart. [D/C]</p>
+<table>
+<thead>
+<tr>
+<th>Generator</th>
+<th style="text-align: right;">Base Money price</th>
+<th>Base output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Personal Computer</td>
+<td style="text-align: right;">3.59664</td>
+<td>0.52 Assets/s</td>
+</tr>
+<tr>
+<td>Computer Network</td>
+<td style="text-align: right;">208.513</td>
+<td>1.58 Assets/s</td>
+</tr>
+<tr>
+<td>Cloud Cache</td>
+<td style="text-align: right;">2,489.91</td>
+<td>5.32 Assets/s</td>
+</tr>
+<tr>
+<td>Server Farm</td>
+<td style="text-align: right;">11,614.4</td>
+<td>12.08 Assets/s</td>
+</tr>
+<tr>
+<td>Meetings</td>
+<td style="text-align: right;">4,105.16</td>
+<td>About 0.0308074 Productivity/s</td>
+</tr>
+<tr>
+<td>Breaks</td>
+<td style="text-align: right;">2.87051e6</td>
+<td>0.26 Productivity/s</td>
+</tr>
+<tr>
+<td>Organisation</td>
+<td style="text-align: right;">2.31479e8</td>
+<td>0.82 Productivity/s</td>
+</tr>
+<tr>
+<td>Deadlines</td>
+<td style="text-align: right;">7.72258e10</td>
+<td>2.76 Productivity/s</td>
+</tr>
+<tr>
+<td>Components</td>
+<td style="text-align: right;">1.28207e8</td>
+<td>One bonus PC per 1.21 s</td>
+</tr>
+<tr>
+<td>Switches</td>
+<td style="text-align: right;">2.32600e10</td>
+<td>2.32 bonus Networks per 1.42 s</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td style="text-align: right;">2.53848e11</td>
+<td>6.85 bonus Caches per 1.84 s</td>
+</tr>
+<tr>
+<td>Motherboards</td>
+<td style="text-align: right;">2.55737e12</td>
+<td>18.85 bonus Servers per 1.33 s</td>
+</tr>
+</tbody>
+</table>
+<p>The late Bicho generator has a base one-share-per-second record and an effectively unbuyable placeholder price. It is an internal opposing mechanism, not another normal machine for the player to purchase. Its effective rate is modified by progression and Poison Pill. [D/C]</p>
+<h3 id="liquidation-and-share-formulas">Liquidation and share formulas</h3>
+<p>Starting Money is <strong>10</strong>, or <strong>1e10</strong> when Market Power is owned. The recovered liquidation potential is based on 80% of Assets, modified by logarithmic Money/Share bonuses and a starting-Money floor. The balance assignment is more specific than the UI's generic reset text: [C]</p>
+<p><code>Money after liquidation = max(10, current Money + liquidation potential - 10)</code></p>
+<p>Thus Liquidate does not simply discard unspent Money and replace it with the displayed reward.</p>
+<p>Before Bulk Buy, at least <strong>10,000 Money</strong> permits buying <strong>one Share</strong> in a share reset. With Bulk Buy, the recovered gain is:</p>
+<p><code>Shares gained = (Money / 10,000)^q</code>, with <code>q = 0.20 + 0.01*min(Market Manipulation level, 6)</code>.</p>
+<p>Below 10,000 Money the result is zero. The routine returns a <code>CustomNum</code>; it does not explicitly floor the result in this function. The ordinary meaning of whole stock-market shares should not be used to invent integer rounding. The level cap in the formula is not evidence that six purchasable Market Manipulation levels exist in this build. [C]</p>
+<h3 id="upgrades_2">Upgrades</h3>
+<table>
+<thead>
+<tr>
+<th>Upgrade</th>
+<th>Currency / notable costs</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Discipline</td>
+<td>5 Shares</td>
+<td>Unlocks Productivity generators.</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>About 250.385 Shares</td>
+<td>Unlocks Productivity upgrades.</td>
+</tr>
+<tr>
+<td>Bulk Buy</td>
+<td>About 2.57150e6 Productivity</td>
+<td>Enables buying multiple Shares in a reset using the power-law formula.</td>
+</tr>
+<tr>
+<td>Market Manipulation</td>
+<td>Shares: 92.7586; 83,283.0; 1.23923e6; 9.60136e7</td>
+<td>Improves the bulk-share exponent / reduces additional-share cost.</td>
+</tr>
+<tr>
+<td>Economies Of Scale</td>
+<td>Money: 1.53966e11; 5.08550e13; 1.62003e30; 7.85984e38</td>
+<td>Manually bought tier-one count increases yields.</td>
+</tr>
+<tr>
+<td>Metrication</td>
+<td>About 9.19480e16 Money</td>
+<td>Allows owning both Discipline and Metrics.</td>
+</tr>
+<tr>
+<td>Market Power</td>
+<td>Shares: 2.57150e6; 9.43560e6; 3.82632e7; 7.68538e8</td>
+<td>Raises starting Money to 1e10 and supplies passive Money from liquidation potential.</td>
+</tr>
+<tr>
+<td>Poison Pill</td>
+<td>Shares: 28,566.8; 384,616; 4.23969e6; 6.30854e7; 1.97253e8</td>
+<td>Slows Bicho's share accumulation.</td>
+</tr>
+<tr>
+<td>Snowballing Productivity</td>
+<td>Productivity: 4.20693e9; 1.19909e11; 5.88004e11; 8.72676e13</td>
+<td>Manually bought Productivity-generator count improves total yields.</td>
+</tr>
+<tr>
+<td>Compound Interest</td>
+<td>Money: 1.81371e25; 4.80435e35; 8.20178e37</td>
+<td>Logarithmic current-Money bonus to liquidation income.</td>
+</tr>
+<tr>
+<td>Benefits Program</td>
+<td>About 5.69347e8 Shares</td>
+<td>Logarithmic current-Share bonus to liquidation income.</td>
+</tr>
+</tbody>
+</table>
+<p>Discipline and Metrics initially constitute a choice; Metrication removes that exclusivity. Market Power descriptions include passive rates of <strong>0.001%, 0.002%, 0.004%, 0.008%, 0.016%</strong> of liquidation potential per second. Only four literal purchase prices were recovered in this build's list. The presence of a fifth description branch is not enough to claim a fifth purchasable level. [D/C/U]</p>
+<p>No Chapter 8 QuestLevel challenge family was found. Its special challenge is the opposing Bicho counter. [C]</p>
+<h3 id="exactly-what-the-three-resets-do">Exactly what the three resets do</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Cleared / replaced</th>
+<th>Preserved</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Liquidate</td>
+<td>Assets; bought PC/Network/Cache/Server generators; bonus copies of those four; their cached boosts; bar progress. Money is updated by the formula above.</td>
+<td>Productivity and its generators; upper bonus-producing generators; Shares; all upgrades; Bicho's accumulated counter.</td>
+</tr>
+<tr>
+<td>Buy Shares</td>
+<td>Money replaced with starting Money; Assets; Productivity; all three ordinary generator tiers; bonus asset-generator copies; Discipline and Metrics; transient progress</td>
+<td>Adds Shares. Keeps higher upgrades and Bicho's counter.</td>
+</tr>
+<tr>
+<td>Bicho reaches 50 million Shares</td>
+<td>Clears current stat balances, purchased-generator map, cached boosts, upgrade map, and bar progress; seeds a specific upgrade preset</td>
+<td>Does not perform a full global or other-chapter reset. Global token progress remains. Cumulative/statistical history is not explicitly cleared by this routine.</td>
+</tr>
+</tbody>
+</table>
+<p>The Bicho preset is: <strong>Discipline 1, Metrics 1, Bulk Buy 1, Market Manipulation 2, Economies Of Scale 2, Metrication 1, Market Power 1</strong>. Starting Money is calculated before the upgrade map is cleared, which normally gives the Market Power starting balance at this point in progression. [C]</p>
+<p>The UI says it resets progress to the point before Bicho starts accumulating. The implementation uses a <strong>fixed preset</strong>, not an exact snapshot of your previous generator counts, Money, or purchased upgrades. [D/C]</p>
+<h3 id="progression-loop-i_7">Progression loop [I]</h3>
+<ol>
+<li>Buy the asset machines, accumulate Assets, and Liquidate to finance a larger machine base.</li>
+<li>Start buying Shares and choose the early Productivity path. Remember that buying Shares clears Productivity while Liquidate preserves it.</li>
+<li>Obtain Bulk Buy and Market Manipulation so a single share reset can produce substantial progress.</li>
+<li>Use Metrication to combine the previously exclusive paths. Establish the bonus-generator layer and count-based boosts.</li>
+<li>Market Power reduces dependence on manual liquidation, while logarithmic Money/Share bonuses reward larger balances.</li>
+<li>Once Bicho starts accumulating, evaluate Poison Pill purchases against the lost Share balance and the extra time gained. A high Share count alone is not enough if the opposing counter reaches its threshold first.</li>
+<li>Reach roughly <strong>five billion Shares</strong> for the Chapter 8 completion target. Bicho's <strong>50 million</strong> target belongs to the opposing company/counter; it is not your completion requirement.</li>
+</ol>
+<h3 id="story-and-ending">Story and ending</h3>
+<p><strong>Stonks</strong> frames the hostile-takeover plan around ten billion shares and obtaining control. <strong>Turnabout Is Fair Play</strong> has Bicho retaliate by acquiring shares in the player's company: fifty million out of one hundred million is the competing takeover threat. [D]</p>
+<p><strong>Class A</strong> supplies the reversal: economic ownership is not equivalent to voting control. Steelman's Class A voting position defeats the apparent victory; the CEOs are removed, and Taffy replaces Bicho. This is the Chapter 8 ending, not an additional Share-production rule. [D]</p>
+<h2 id="coverage-uncertainties-and-source-map">Coverage, uncertainties, and source map</h2>
+<h3 id="what-is-established">What is established</h3>
+<p>All eight named chapter implementations were located. The analysis recovered the currency families, main generator chains, named upgrade families, available challenge records, chapter targets, prestige gain constants, and reset mutations. The most important distinctions are backed by specific code paths: cumulative versus current resources; purchased versus bonus generators; parallel versus nested prestige; and the fixed Bicho reset preset.</p>
+<h3 id="what-remains-unresolved">What remains unresolved</h3>
+<p>This reference deliberately does not invent:</p>
+<ol>
+<li>Every exact <strong>UI reveal threshold</strong> for every section. An object existing in the chapter does not prove it is visible from the start.</li>
+<li>Every <strong>runtime-generated upgrade cost and multiplier</strong>, especially Chapter 3's interdependent divisions and Chapter 4's local upgrade tracks. Literal schedules are supplied where decoded.</li>
+<li>An experimentally tested reconciliation of Chapter 3's Scripting reset description with the code.</li>
+<li>Every interaction among boost order, automatic purchases, and partial progress bars during the same tick.</li>
+<li>All <strong>quest entry, cancellation, timeout, and resume edge cases</strong>, or the full global offline simulation contract.</li>
+<li>Your device's remote overrides, difficulty selections, token assignments, purchases, or save state. APKs contain the program, not those live values.</li>
+<li>An experimentally verified fastest route or exact completion times. The walkthroughs explain the progression implied by the recovered rules.</li>
+</ol>
+<p>These gaps limit the word "complete": this is a substantial chapter-by-chapter reconstruction with auditable evidence, not recovered original source or a validated executable simulator.</p>
+<h3 id="source-map">Source map</h3>
+<p>In the evidence archive, <code>annotated-assembly/ChapterNGameState.dart</code> is the primary source for chapter N. <code>resolved-analysis/ChapterN.txt</code> adds human-readable enum and numerical annotations. The original object/pool dumps provide cross-checks for those annotations.</p>
+<table>
+<thead>
+<tr>
+<th>Subject</th>
+<th>Named source / representative address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chapter 1 prices and resets</td>
+<td><code>getCostToBuyOneMoreGenerator</code>, <code>getUnlockCost</code>; <code>prestige1</code> 0x6aab84; <code>prestige2</code> 0x6a9830; <code>knowledgeOnRewrite</code> 0x6aadc0</td>
+</tr>
+<tr>
+<td>Chapter 2 Promotion</td>
+<td><code>_prestige1</code> around 0x6adf8c; <code>experienceOnPromotion</code>; <code>getCostToBuyOneMoreProgressBar</code> 0x6aecf0 region</td>
+</tr>
+<tr>
+<td>Chapter 3 prestige / softcap</td>
+<td><code>applyNetworkingPrestige</code>, <code>applyStoragePrestige</code>, <code>applyScriptingPrestige</code>; <code>applyPrestigePointPenalty</code> 0x6b21b8</td>
+</tr>
+<tr>
+<td>Chapter 4 funding</td>
+<td><code>prestige</code>, <code>completePrestigeDontReset</code>, <code>moneyOnPrestige</code>, <code>basePrestigeYields</code>, <code>linesRequiredForPrestige</code> 0x54b3b8 region</td>
+</tr>
+<tr>
+<td>Chapter 5 reset hierarchy</td>
+<td><code>applyPrestige1/2/3</code>, <code>prestigePoints1/2/3</code>; Deploy mutations at 0x6bac4c onward</td>
+</tr>
+<tr>
+<td>Chapter 6 dual prestige</td>
+<td><code>applyRebase</code>, <code>applyConference</code>, generator initialization and quest construction</td>
+</tr>
+<tr>
+<td>Chapter 7 effects</td>
+<td><code>ensureInitialized</code> 0x506b08; description closures 0x507c88-0x507cc4; Rewrite implementation</td>
+</tr>
+<tr>
+<td>Chapter 8 reset distinction</td>
+<td><code>bichoReset</code> 0x54ca28; <code>sharesCanBuy</code> 0x6c4a40; <code>quadraticBase</code> 0x6c4ba8; <code>applyLiquidate</code> 0x6c4cd0; <code>applyBuyShares</code></td>
+</tr>
+<tr>
+<td>Tokens</td>
+<td><code>CoreData.recomputeTokenBoost</code> 0x4802xx region; <code>addCompletionToken</code> 0x694e6c; <code>IPlayableGameState</code> completion caller</td>
+</tr>
+<tr>
+<td>Numerical representation</td>
+<td><code>custom_num.dart</code>; <code>root</code> 0x54b18c multiplies the stored logarithm by its argument, meaning exponentiation</td>
+</tr>
+<tr>
+<td>Story</td>
+<td><code>StoryPoint</code> objects; full selected dialogue in the separate transcript</td>
+</tr>
+</tbody>
+</table>
+<p>All APK byte lengths and SHA-256 hashes are included in the structured data and evidence archive so the analysis can be tied to this exact uploaded build.</p></main></body></html>
