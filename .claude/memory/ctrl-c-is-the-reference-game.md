@@ -1,128 +1,53 @@
 ---
 name: ctrl-c-is-the-reference-game
-description: Ctrl C is the reference game Garage Band Idle is modelled on; check design questions against it instead of reasoning from first principles
-metadata: 
+description: "Ctrl C is the game this design descends from - how to use the reference, and what John has reported from his own play"
+metadata:
   node_type: memory
-  type: project
-  originSessionId: e6b3ee4e-601a-46e9-8b69-94d55b6fad6a
-  modified: 2026-11-09T23:42:11.467Z
+  type: reference
+  originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
+  modified: 2026-11-10T20:46:57.938Z
 ---
 
-Ctrl C is John's strong reference for Garage Band Idle. The design doc was built against it across
-extensive conversations and two rewrites, so its shapes are inherited, not invented. Stated
-2026-08-24 after I failed to recognize the name and claimed it appeared nowhere in the repo - it
-does, and I asserted that without checking.
+The design descends from Ctrl C. Its Android reconstruction (version 1.12.2) is in `Docs/ctrl-c/`:
+`chapters-1-8/` and `chapters-9-end/`, each a chapter reference, data appendix, story transcript and
+recovered data JSON. Claims there are tagged [D] data, [C] code-derived, [I] inference, [U]
+unresolved.
 
-Where it survives in writing (thin, which is why this memory exists):
+**How to apply**
+- On an open design question (pacing, idle, events, progression, UI), read `Docs/ctrl-c/` and ask
+  John how Ctrl C does it before proposing a mechanism. His play is the fact where the two differ.
+- Every "Ctrl C does X" is quoted from this file, `Docs/ctrl-c/`, a screenshot in the conversation or
+  John's words in it. Otherwise it is not said. The design descending from Ctrl C is never evidence
+  of a specific behavior.
+- A reference feature is "already covered here" only when traced through every path that runs: the
+  live tick, the idle claim, the save and an event restart. Name the paths traced.
+- When John offers a shape and mine is chosen, record his shape too.
+- Record what he reports from play in this file.
 
-- The reconstruction from the Android APKs (version 1.12.2) lives in `Docs/ctrl-c/`, added
-  2026-11-09: `chapters-1-8/` and `chapters-9-end/`, each a chapter reference, data appendix and
-  story transcript (.md and .html) plus the recovered data JSON; the 9-end evidence (disassembly)
-  stays zipped. Claims are tagged [D] data, [C] code-derived, [I] inference, [U] unresolved. Read
-  it before asking John how Ctrl C does something; his play is the fact where the two differ.
-
-- Design doc line 234 cites "Ctrl C's Lines to Knowledge" for the push-past-the-gate payout shape:
-  bank at a threshold, keep accruing past it at a lower rate, so the offer condition sets the floor
-  and a piecewise formula makes press-now-or-push-on emerge from the curve.
-- Commit ca6d068 left one decision open "pending a check against Ctrl C" - whether a timed event's
-  timer pauses while unfocused.
-- 2026-08-24: untimed events accruing idle earnings is "all but required" in Ctrl C, which settled
-  the no-idle-earnings rule as applying to TIMED events only.
-
-- 2026-09-02, from John's own play of it: numbers render in FIXED SLOTS (two decimals below 1000,
-  one below 10000, then a two-decimal mantissa plus exponent) so a counting value churns in place;
-  a generator row reads "cost => per-unit yield" ("6.99e21 Money => 0.38 Prdty"), the yield being
-  ONE unit's contribution, not the owned total; most generators offer a buy mode of "+1" and "+N"
-  where N is the most the player can afford, with the cost summed over the rising per-unit series
-  (not yet built here - `Purchasing.CostOf` is one unit, the sum is the geometric series from it);
-  he knows of no Ctrl C generator paying two currencies, so our bandmates (cash + fans) extend it;
-  he does not know what font it uses.
-
-- 2026-09-02, the meta layer, from John's play (step 10's references): every chapter has a TOP
-  BAR with three buttons - a chapter selector, a "conversation" button listing the story beats
-  seen so far from every chapter, and settings. Settings holds many things; one is "Completion
-  tokens" (their Roadies), which opens the allocation menu - so our Roadie allocation lives under
-  settings, not on the chapter screen. Story beats appear at some cadence: some just show when
-  available, some show the goal to reach first; a watched beat's button stays active for a
-  rewatch. Their "Overclock" (our Encore) window: "While active, yields of all generators is
-  2.0x. Time remaining HH:MM:SS", with "Boost for 4 hours" (an ad, repeatable, cap unknown) and
-  "Boost forever" (buy "Pro Unlock"); note it is worded as a generator YIELD multiplier, while our
-  Encore is game_speed - John confirmed switching is a one-field content change. Their idle
-  window: the yield, then "Double this" (ad) and "Double All" (buy Pro Unlock). With Pro Unlock:
-  Overclock shows "Time remaining" as infinity, and the idle window shows the already-doubled
-  amount with a "Great!" button. John does NOT know whether Ctrl C's idle accrual includes the
-  Overclock buff; Cells to Singularity's does. He also described Cells to Singularity's stacking
-  buff: 2x extends in time per ad up to a cap, then further ads add a shorter 4x - and said that
-  if we ever do it, it should be ONE buff reporting 2x or 4x from its remaining time, never two
-  buffs relying on the clamp. Deferred, not planned.
-
-- 2026-09-02, two screenshots from John (chapter 2 "Money"/"Assets" and chapter 1 "Lines"): the top
-  bar is TWO pills above the content, on every chapter. Left pill: the Overclock widget - a
-  stopwatch icon plus the remaining time inline ("5:15:03"), or the infinity symbol when the Pro
-  Unlock makes it permanent; tapping it opens the Overclock window with the boost buttons. Right
-  pill: three icon buttons - story beat selector (phone icon), chapter selector (building icon),
-  settings (gear). The header shows the rate under the total ("Lines: 7.79e17" / "(4.42e13/s)");
-  the Money chapter shows no rate line. Generator rows: "Mouse (0+5)" / "100.00 lines => 8.65e9
-  lines" / "+1" "+76" - the row line is cost => the NEXT unit's yield per second with multipliers
-  applied ("100.00 lines -> 10.00 lines" on a fresh game), never the generator's total and never
-  the bulk count (John, 2026-09-14); the count is "(bought + granted)": the second number is the count given by
-  OTHER generators or buffs, since Ctrl C lets a generator generate count for another generator
-  and shows the two separately. John will likely want it, and it is authored, not built: a
-  currency the feeding generator pays (never spent, its balance IS the granted count) plus a
-  permanent modifier `{target: <fed generator id or tag>, stat: rate, formula:
-  LinearOnBalance(<currency>, k)}` - the `records_income` shape with a generator as the target.
-  Decided 2026-09-02: if that currency is ALSO spendable, the boost shrinking on spend is the
-  intended trade-off, so no earned-total formula is needed. The buy buttons are +1 and +max-affordable. The Money chapter has no rate
-  line because nothing produces Money per second: its loop is accrue Asset currencies through the
-  generators, then "Liquidate" the section (a prestige, our tier release rung) to convert them to
-  Money - our fans-to-records shape. The prestige button: "Liquidate (Gain
-  1.19e26 Money)" over "Currently: 2.01e19 Money" with a Confirm - the "would bank" preview. Tap
-  producers are three big orange keys: "Ctrl", "C", "V".
-
-- 2026-09-16, chapter 2 "Money" screenshot from John, deep in a run: every generator row prints its
-  count as "(bought+granted)" with the bought count a plain integer and the granted count in the
-  fixed-slot format - "Personal Co (180+8.89e11)", "Server Farm (169+4.81e12)" - so granted counts run
-  far past the bought ones; the row line below is "1.16e21 Money => 3.09e9 Assets" (cost then one
-  unit's yield); both buy buttons read "+1" when nothing more is affordable; the header is
-  "Money: 8.85e20" with no rate line; "Liquidate (Gain 3.02e26 Money)" over "Currently: 8.85e20
-  Money" with a Confirm. Decided the same day for our row (John: match Ctrl C, drop the x): the bought count in
-  parentheses, and "+" plus the formatted granted count inside them only when something has been
-  granted - "(3)", "(3+8.89e11)"; if there is no granted, print nothing for that field.
-
-- 2026-09-16, idle window screenshot from John (chapter 8, the Money/Assets chapter): "Idle Income" /
-  "Income Doubled" / "You earned:" then one line per thing paid - "Assets: 2.38e25", then the
-  GRANTED GENERATOR COUNTS as lines of their own ("Server: 5.70e10", "PC: 1.05e10", "Cache: 8.28e9",
-  "Network: 1.98e8"), then "Productivity: 9.15e6" - and a "Great!" button (Pro Unlock owner, already
-  doubled). So Ctrl C's idle pays payments into a generator's count exactly as it pays a currency.
-  Decided the same day for us: the idle claim pays every rate target the tick would, one offer line
-  per target, the line holding the target Definition.
-
-- 2026-09-10, on Roadie retroactivity (design 8.2): Ctrl C does not answer it. John: their
-  Completion Tokens "increase generator output, that's all it says", and their idle "doubles
-  yields"; whether a dormant chapter's idle payout reflects tokens moved in while it was dormant
-  is "a difficult thing to check". So the question is ours; the reference offers no precedent.
-
-**Why:** the doc names it once, as a parenthetical about one formula, so nothing tells a fresh
-session that the whole design descends from it. Without that, design questions get answered from
-first principles and land somewhere Ctrl C already answered differently.
-
-**How to apply:** when an open design question comes up - pacing, idle structure, event shape,
-handicaps, progression - ask how Ctrl C does it before proposing a mechanism, and say so when the
-answer comes from there. Never claim knowledge of its specifics; ask John, then record what he says
-here. Related: [[design-review-revisions]], [[project-layout-and-workflow]].
-
-**Idle payout screen with teams running (John, 2026-09-18, playing a fresh chapter 2).** Teams start
-as tap-to-run and each gets its own auto upgrade; with a couple of teams auto-running and a stretch
-idle, the idle payout screen listed Lines and nothing else - the teams' payout IS the currency, and
-the screen shows nothing about the bars themselves (no progress, no completion count). This is the
-shape the groups/consumption/idle claim dialog matches: one row per currency the claim changes, bar
-entries carried for the claim's writes only and never printed. John: "as long as that is how it
-works, it's fine."
-
-**Completion tokens boost the press (John's test, 2026-09-18).** With 30 tokens the Tokens screen
-shows a 2.50x boost, and chapter 1's C-then-V press pays 30 Lines where the unboosted press pays 12.
-So the token multiplier reaches the tap, not only the generator rows. Our Roadie pair therefore
-carries `stat: yield` beside `stat: rate` at root (design 8.2), and "never a tap's yield" is gone.
-The decompile reference records the boost formula but not its scope; the press test is the fact.
-Also from the same screen: the Tokens screen is always reachable from settings and shows zero
-tokens and 1.00x on a fresh game, so no chapter gates the allocation screen.
+**From John's play**
+- Numbers: fixed slots - two decimals below 1000, one below 10000, then a two-decimal mantissa and
+  exponent - so a counting value churns in place.
+- Generator row: name and count "(bought)" or "(bought+granted)", the granted part in the number
+  format and printed only when something was granted; then "cost => the next unit's yield" with
+  multipliers applied, never the owned total; then "+1" and "+N" where N is the most affordable.
+- A generator can pay count into another generator. He knows of none paying two currencies.
+- Header: the balance with the rate beneath it "(4.42e13/s)". A chapter whose currency has no rate
+  shows no rate line.
+- Top bar: two pills on every chapter. Left: Overclock (their Encore) with the remaining time, or
+  infinity when permanent; tapping opens its window. Right: story list, chapter select, settings.
+- Settings holds "Completion tokens" (their Roadies) and the allocation screen. It is always
+  reachable and shows zero tokens and 1.00x on a fresh game.
+- Completion tokens boost the press as well as the generators: at 30 tokens (2.50x) the chapter 1
+  press pays 30 Lines where the unboosted press pays 12.
+- Overclock window: "While active, yields of all generators is 2.0x", time remaining, "Boost for 4
+  hours" (an ad, repeatable) and "Boost forever" (the Pro Unlock purchase). It has no higher tier.
+- Idle window: what was earned, "Double this" (ad) and "Double All" (Pro Unlock). A Pro owner sees
+  the doubled amount and a "Great!" button. It lists one line per thing paid, granted generator
+  counts included, and never shows bars or teams.
+- Story: beats show when available, some after a goal; a watched beat stays available for rewatch.
+- Prestige button: "Liquidate (Gain X Money)" over "Currently: Y Money", with a confirm.
+- Chapter 2 teams start tap-to-run; each gets its own automation upgrade; automated teams earn while
+  away.
+- Untimed events accrue idle earnings.
+- Unknown to John: its font, whether idle accrual includes Overclock, and whether tokens moved while
+  a chapter was dormant change that chapter's idle payout.

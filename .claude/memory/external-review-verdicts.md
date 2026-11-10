@@ -1,41 +1,27 @@
 ---
 name: external-review-verdicts
-description: "How John wants any review he relays handled - findings from another agent, a reviewer, or himself, in whatever format: confirm or deny each finding against the code, approve or reject its proposed fix separately, no bandaids, and no edit until he says apply"
-metadata: 
+description: "How to answer a review John relays - verify, confirm or deny each defect, accept or reject each fix, then wait for apply"
+metadata:
   node_type: memory
   type: feedback
-  originSessionId: 201953d8-f0bc-43b1-8cd9-02e2c494385a
-  modified: 2026-09-02T20:35:12.124Z
+  originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
+  modified: 2026-11-10T20:47:52.092Z
 ---
 
-When John relays a review - findings from another agent, a colleague, or himself, in ANY format:
-`::code-comment{...}` blocks with priorities, a numbered list, a paragraph of prose, a single
-sentence - his instruction is: "Confirm or Deny, Approve or Reject. Confirm that this is actually
-a defect before inventing anything new. No bandaids." The format varies (John, 2026-09-02:
-"reviews might not always have that same format"); the shape of the answer does not. The tell is
-the content - a claim that something is wrong plus, usually, a suggested fix - not the markup.
-Later rounds arrive as "same acceptance rules" or "same approval rules".
+A relayed review (another agent's, a colleague's, his own; any format) is a request for verdicts,
+not a go. John: "Confirm or Deny, Approve or Reject. Confirm that this is actually a defect before
+inventing anything new. No bandaids." Later rounds arrive as "same acceptance rules".
 
-**Why:** a review is a request for a verdict, not a go (repo CLAUDE.md). The reviewer's proposed
-fix is usually heavier than the defect - in one round (2026-09-02, the step 10 plan) five of five
-findings were real and three of five proposed fixes were rejected: an activation-interval ledger
-for a bounded present-state inaccuracy, a boot gate on a network restore for one undoubled offer,
-a durable transaction ledger for a fake store that never replays. Applying reviewer fixes
-verbatim would have added three mechanisms to a plan whose whole point was adding none.
+**Why:** the reviewer's proposed fix is usually heavier than the defect. Applying fixes verbatim
+adds mechanisms.
 
-**How to apply:**
-1. Verify each claim against the code or the doc before answering - grep, read the test, read the
-   passage. State what was verified.
-2. Two verdicts per finding, separately: is the defect real (CONFIRM/DENY, with the evidence), and
-   is the proposed fix the right size (ACCEPT/REJECT). A confirmed defect with a rejected fix
-   gets ONE smaller fix named, usually a sentence in the plan or an existing mechanism used
-   differently - never a menu.
-3. Ask "do we even care?" about the defect's reach (what content can hit it TODAY) before sizing a
-   fix; John asked it himself and the answer closed a P1.
-4. End with the list of what would change and wait for "apply" / "make those changes". Then quote
-   it (`Acting on:`) and apply exactly the accepted set.
-5. A fix that removes a mechanism beats one that adds an ordering rule: the stale-record findings
-   were closed by judging a record against `ctx.NowUtc` (which every context carries) instead of
-   adding terminal prunes - see [[reuse-the-existing-mechanism]].
-
-Related: [[quote-directive-before-editing]], [[problems-not-issues]], [[pushback-means-rederive]].
+**How to apply**
+1. Verify each claim against the code or doc before answering, and say what was checked.
+2. Two verdicts per finding: is the defect real (CONFIRM / DENY, with evidence), and is the proposed
+   fix the right size (ACCEPT / REJECT).
+3. The reviewer's stated cause is a claim to check. Derive the cause from the code and from what the
+   player is doing.
+4. Ask what content or path can hit it today before sizing a fix ([[problems-not-issues]]).
+5. A confirmed defect with a rejected fix gets ONE smaller fix: an existing mechanism used
+   differently, or a mechanism removed ([[design-judgment]]). Never a menu.
+6. End with the list of what would change and wait for "apply". Then apply exactly the accepted set.

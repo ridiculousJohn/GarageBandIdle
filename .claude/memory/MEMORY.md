@@ -1,47 +1,23 @@
 # Memory index
 
 ## The project
-- [Design restart 2026-11](design-restart-2026-11.md) - John is starting the design over; universal Records dropped, chapter resources are roles with free labels, income boost and capstone gate may be different currencies, capstones run no release; landed in docs and code 2026-11-09 (2877a49); chapters 3-8 are still the old sketches
-- [Project layout and workflow](project-layout-and-workflow.md) - a rewind doesn't revert the filesystem; heredocs mangle C#; old commits are a dead architecture
-- [Design review revisions](design-review-revisions.md) - register of designs the twelve review passes DELETED, plus the deferred questions; the doc cannot show an absence
-- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when the editor is closed; the script is COPIED from this file, never retyped; process checks by PATH and by PROJECT (another project's editor does not block), foreground run, read the log while it runs; exit 0 proves nothing, grep for `error CS`; a reimport churns rids and trailing whitespace
-- [Fact addressing is id + outward walk](fact-addressing-is-id-plus-outward-walk.md) - names resolve outward from the acting scope; cross-chain aliasing is the feature; a node-kind restriction on an economy read ("only chapters") is a deviation even when my own plan wrote it
-- [Currency values are BigNumber](currency-values-are-bignumber.md) - anything the runtime could compute past a double, authored fields included; only counts and Pow's power are exempt
-- [Roadies and typed payloads](roadies-and-typed-payloads.md) - 2026-08-20: venue assets and stationing caps deleted, payloads typed by authored kind, currencies by direct reference
-- [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - the design descends from it; its APK reconstruction (chapters 1-8 and 9-end) is in Docs/ctrl-c; ask John how Ctrl C does it before reasoning from scratch; its meta layer (two-pill top bar, Overclock, Pro Unlock, story buttons, granted counts) recorded 2026-09-02
-- [Closed sets are enums](closed-sets-are-enums.md) - code-defined vocabularies are C# enums; strings only for open designer ids
-- [Narrowing a member type](narrowing-a-member-type.md) - generic base class; covariant overrides don't compile in Unity (CS8831) and `new` hiding is rejected
-- [Step 9 open UI items](step-9-open-ui-items.md) - the digit font (measured: only "1" is narrower), the omitted group title and how to add one, the accepted chrome literals, bulk buy later
-- [Orchestrated slice workflow](orchestrated-slice-workflow.md) - John: I orchestrate, Opus agents code, I review and approve; fixed API contract, runtime and tests agents in parallel, I run Unity, review traces each diff to a design rule not a plan sentence
-- [Step 10 playthrough notes](step-10-playthrough-notes.md) - second playthrough 2026-09-15 clean (one note, the fresh-game entry, landed); John's ten notes from the 2026-09-11 hand playthrough, each with the fact behind it and its kind (code / architecture / content); all landed 2026-09-11 (row modules, descriptions, Encore close, Demo Tapes, the release trigger) except the colors, which are the polish pass
-- [Other machine lacks ASCII rule](other-machine-lacks-ascii-rule.md) - merges from John's other computer bring non-ASCII glyphs into C# comments/strings; sweep after pulls
+- [Project layout and workflow](project-layout-and-workflow.md) - where things live, which docs are authority, editing mechanics that bite
+- [Design restart 2026-11](design-restart-2026-11.md) - decisions from the 2026-11-09 restart; chapters 3-8 are still old sketches
+- [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - read Docs/ctrl-c and ask John before reasoning from scratch; what he reported from play
+- [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode compile, import and tests; the checks that make a run trustworthy; the script to copy
+- [Code conventions](code-conventions.md) - BigNumber everywhere, enums for closed sets, generic base for narrowing, ASCII, what a test may contain
 
-- [Reference survey checks the idle path](reference-survey-checks-idle-path.md) - "already covered" must trace the live tick AND the idle claim; chapter 2's time-fed bars pay nothing while away; record John's losing shape too
-
-## Gates
-- [Quote directive before editing](quote-directive-before-editing.md) - the rule is in the repo CLAUDE.md; this is the failure record: every evasion, and why the check is mechanical
-- [Commit means the whole tree](commit-means-the-whole-tree.md) - "commit" means MY changes - every file the work dirtied, memory included, and nothing I did not change; no AI attribution; small enough to read; no preference inferred from repo state
-- [Verify your own prior statements](verify-your-own-prior-statements.md) - do what I said I would do or stop and say why; read the record back before describing it; the code too, and an aside gets the same grep or is left out; a plan I wrote is a prior statement too - review traces each plan sentence to a design rule, and an untraceable sentence is the defect; an "I have not checked X" that one tool call resolves is made into the fact before the turn ends, never sent as a hedge
-- [AGENTS.md is not a Claude file](agents-md-is-not-a-claude-file.md) - never read or cite it; it governs a different agent, and quoting it invents constraints John never set
-- [Asides do not close the main question](asides-do-not-close-the-main-question.md) - an aside resolves only itself; my own recommendation is never a decision John made
-- [No inaction epilogues](no-inaction-epilogues.md) - never narrate what you didn't do; repo state is a fact, restraint is not news
-- [External review verdicts](external-review-verdicts.md) - a pasted review gets confirm/deny per finding AND accept/reject per fix, checked against the code; no bandaids, no edit until "apply"
+## Before writing
+- [Quote directive before editing](quote-directive-before-editing.md) - what is never an order; what a commit contains; AGENTS.md is not mine
+- [Ask before the work, not after](ask-before-the-work-not-after.md) - four tests for an open point; picks asked in one message before the first write; nothing after the report
+- [External review verdicts](external-review-verdicts.md) - confirm or deny each defect, accept or reject each fix, wait for "apply"
+- [Orchestrated slice workflow](orchestrated-slice-workflow.md) - I orchestrate and review, Opus agents do the bulk, I run Unity, their work is mine
 
 ## Judgment
-- [Problems, not issues](problems-not-issues.md) - what breaks TODAY, not what is true, where "today" means PATHS that run and never the inputs content happens to supply; a reason for NOT doing something gets checked like any other claim; a question I raise needs a fact that changed behind it; a landing report lists only decisions with a second option someone would notice; a finding's weight is his call and does not move under pressure; a "one thing" gets checked against the actual project before it is reported, and if nothing has to be done there is nothing to report
-- [Reuse the existing mechanism](reuse-the-existing-mechanism.md) - name the primitive that already covers it, and when two shapes both work take the smaller MECHANISM - never the smaller edit; diff size is not a design reason; proposals and explanations pick the elaborate option too - answer "what is it" in domain words and propose the smallest change that makes the finding false; a field the doc's prose lists is built only for a reader nothing in hand can serve; a payment is a PULL - the target collects its payers and modifiers, so restate a "gap" as the target collecting before reporting it
-- [No new words for existing things](no-new-words-for-existing-things.md) - one thing, one name; "pool" for the currency a bar drains read as an undesigned mechanism; do not propagate an invented word, rename it
-- [No spec accumulation](no-spec-accumulation.md) - answer a finding by deleting the mechanism, not by adding a paragraph; cut argument, never a named check; two rounds on one operand means delete it; a restriction needs a mechanism it prevents from going wrong today, or it goes - a plan sentence is not a mechanism
-- [Tests exercise runtime code](tests-exercise-runtime-code.md) - fixtures are fine, a second implementation of runtime behavior is not; convert the call sites instead
-- [Slice landing updates the docs](slice-landing-updates-the-docs.md) - the build-plan status line and 12.13's file list are part of EVERY slice; John ordered it once and does not repeat it; the 12.13 walk is a find against the list, run before the landing report
-- [Doc decisions land when made](doc-decisions-land-when-made.md) - a settled decision goes in the design doc immediately; only code-describing edits wait for the code
-- [Sweep every tier of a defect class](sweep-every-tier-of-a-defect-class.md) - "did you miss anything?" is a command to grep; Scripts, Tests, the live docs, the chapter JSON
+- [Design judgment](design-judgment.md) - reuse what exists, smallest mechanism, true of every instance, one vocabulary, delete instead of specify
+- [Problems, not issues](problems-not-issues.md) - a finding matters when something breaks today on a path that runs; what belongs in a report
+- [Docs and sweeps](docs-and-sweeps.md) - size by grep count, docs and build-plan row are part of the change, sweep every place that states the rule
 
-## Disagreement
-- [Systems, not tasks](systems-not-tasks.md) - RECURRING, John furious 2026-09-18: a mechanism is justified only by a statement true of every instance of its kind, never by what one chapter needed; "it was what chapter N needed" is banned
-- [Never cave to pressure](never-cave-to-pressure.md) - the substance changes only when the facts do; and when I do concede, the concession leads; defending machinery I built without asking what it is FOR is not judgment, and a reversal after his pushback is his finding, not mine; inflating a finding under pressure is caving too; "consistent with the plan I wrote" is never a verdict; "you found it" is a flourish, not a concession - the fact leads in one sentence, and "what did you do" gets the action named
-- [Pushback means re-derive](pushback-means-rederive.md) - his dispute of my model of HIS design means produce a discriminator; on same-but-different, split the bundle
-- [Root cause means question the structure](root-cause-means-question-the-structure.md) - on "bandaid"/"root cause": derive from what the player is doing, question MY design's structure, give ONE simpler fix; never a menu. RULE, broken twice in one day: a command owns its mutation and the flush and touches NOTHING the tick owns (clock, sample, bank, report) - check every command site and every "guard" sentence before a contract ships
-- [Ask before the work, not after](ask-before-the-work-not-after.md) - RECURRING, John has said it many times: every open pick is asked in one message BEFORE the first write, or the write pauses to ask; "one pick you have not ruled on" at the end is the failure that spawns the multi-turn fix cycles
-- [Qualifiers describe, they do not specify](qualifiers-describe-they-do-not-specify.md) - "only one chapter unlocked (like now)" named the state he was in, not a predicate to build; a phrase must never grow a check that grows a parameter
-- [Size by what states the rule](size-by-what-states-the-rule.md) - a change is sized by every place that states the rule, never the code line; grep first, say the count, one batch of edits; a label the work outgrows is gaslighting
+## Talking to John
+- [Verify your own prior statements](verify-your-own-prior-statements.md) - every claim about code, docs, Ctrl C or my own words is checked first; shape of answers
+- [Never cave to pressure](never-cave-to-pressure.md) - facts change only with facts, one position, the fact leads, no apology formulas, one root-cause fix
