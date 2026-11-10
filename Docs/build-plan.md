@@ -157,7 +157,71 @@ lives somewhere other than a conversation.
   `chapter-primitives-plan.md`: cost as a multiplier target, a bar firing a generator's yield and
   payments into an owned count or a bar's progress (A-C, DONE 2026-09-16), then an owned-count
   formula, a bar's repeat as a condition, autobuy, the payout formula reading the round's earned
-  total, and the bar row's tap (D-H, DONE 2026-09-16). Debt (I) waits for the Van chapter.
+  total, and the bar row's tap (D-H, DONE 2026-09-16). Debt (I) is item 1 of the list below.
+- **Runtime work to do before chapters 3-8 are implemented.** Recorded 2026-11-10. Chapters 3-8
+  take their mechanics from Ctrl C's chapters 3-8 (`Docs/ctrl-c/chapters-1-8/`), mapped as below.
+  The chapters themselves are not designed yet, and design sections 2 and 7 predate this map.
+  - 3 Local Venues, from Ctrl C 3: three scenes, one per genre, each its own tier with its own
+    prestige; a room consumes its genre's material.
+  - 4 Local Tour, from Ctrl C 4: tours as short runs paying a durable take; the Van is the
+    hardware a tour's reset does not clear; merch is the take for draw beyond the target.
+  - 5 Studio, from Ctrl C 6: ideas become tracks through one session bar; two parallel prestiges.
+  - 6 Coast Tour, from Ctrl C 5: road wear as debt; generators that make generators; three nested
+    resets; sponsorships relieve the wear.
+  - 7 Radio, from Ctrl C 7: three debts; the back catalog as a tier that carries none.
+  - 8 Arenas, from Ctrl C 8: the box office inside a deeper reset that pays Records; a rival
+    counter that restarts the chapter.
+
+  Read against the code on 2026-11-10, the map needs seven things the runtime cannot author. Each
+  gets its own plan when it is picked up. Items 1, 2, 3, 5 and 6 are new kinds in existing
+  families: the class with its own load check, its import shape and type-table line, its importer
+  branch, and tests; none touches the tick, the idle claim, the multiplier gather or the save.
+  1. **Debt formula** (chapters 6, 7). A multiplier formula, `1 - coefficient x debt`, floored at
+     zero. It reads a list of debt currencies and combines them by sum or by maximum, the mode
+     fixed per effect. A show authors its coefficient as one over its own base yield, which makes
+     the factor equal to subtracting the debt from that show's yield before every other factor,
+     as Ctrl C does per generator. An optional currency divides the combined debt once its
+     balance passes one: sponsorships, Ctrl C's `min(1, 1/S)` debt factor. "Only the worst debt
+     counts" (Ctrl C's Compartmentalization) is content: two modifiers, one per mode, switched by
+     the upgrade through `appliesWhen`. Debt accruing is content today, a second produces entry
+     on the show. Debt is not a subtractive term on an Effect; this replaces decisions 7 and 11
+     of `chapter-primitives-plan.md`.
+  2. **A condition comparing one currency against another** (chapter 3). True while one balance
+     is ahead of the other. It is what lets a scene's prestige wipe the shared Cash, as Ctrl C's
+     division prestige wipes the common currency: each scene's rung adds one to a counter on the
+     chapter, and the tier holding Cash declares a trigger gated on that counter being ahead of
+     its own copy, whose list resets that tier and then copies the counter in. That is 12.5's
+     rule that the child writes a fact outward and the owning scope resets itself. One rung per
+     scope stays, and what a reset can reach does not widen.
+  3. **A recorded tour pace** (chapter 4). While the player is away the game repeats the tour
+     last run, at the time the player actually completed it, for a reduced take (Ctrl C's Work
+     From Home). The record belongs to the tour last run, so it is an overwrite and switching
+     tours resets it. Needed: an action that stores a value when the tour completes, and a
+     formula that turns the stored value into a rate. Their fields are not designed. Content
+     today: a rate entry conditioned on `IdleAccumulation`, the tour's clock as a currency fed
+     at one per second in the tour's tier, the fraction and its doublings as multipliers, and
+     completing a tour by trigger while the chapter is open.
+  4. **A `payout` stat** (chapters 4, 8). A computed `AddCurrency` amount takes the multipliers
+     that name `payout` on the currency paid, and no others. Nothing authored names it, so no
+     number changes; a grant stays what it says and a capstone still pays one Roadie. It is how
+     an upgrade raises merch or the box office. This one touches the deposit path.
+  5. **A logarithmic bonus formula** (chapter 8). A multiplier formula that grows with the
+     logarithm of a balance, for the box-office bonuses (Ctrl C's Compound Interest and Benefits
+     Program).
+  6. **An exponent an upgrade can raise** (chapter 8). The Records payout is
+     `(cash / divisor) ^ exponent`, and the exponent rises with an upgrade (Ctrl C's Market
+     Manipulation). `RootCurveFormula`'s exponent is one authored number today.
+  7. **Song naming and the Discography** (chapter 5). An action that writes a song (12.5 names
+     `AddSong`; the code has none), a naming prompt, a Discography screen, and the save carrying
+     the `songs` list. Display only: no quality roll, and nothing about songs crosses chapters.
+     This one touches the UI and the save.
+
+  Content on what exists, so nobody builds it again: chapter 3's sibling scene tiers and a
+  root-curve payout in place of Ctrl C's softcap; chapter 4's fixed tour rewards paid as a
+  generator's yield, and the van's head start as a yield entry on each van part worth N hours of
+  its own rate, fired after the reset; chapter 5's two prestiges through a wrapper tier; chapter
+  6's nested tiers and generators paying generator counts; chapter 8's exclusive pair, and the
+  restart after the rival wins as flags and granted counts set after the reset.
 - **A higher speed tier** stays undecided (design 9). Timers landed 2026-09-14 (`timers-plan.md`),
   so if it is ever decided it is content alone: one more root modifier reading `encore_timer` with
   `activeAfterSeconds: 86400`, and removing it is deleting that modifier.

@@ -3,6 +3,7 @@
 ## The project
 - [Project layout and workflow](project-layout-and-workflow.md) - where things live, which docs are authority, editing mechanics that bite
 - [Design restart 2026-11](design-restart-2026-11.md) - decisions from the 2026-11-09 restart; chapters 3-8 are still old sketches
+- [Ctrl C chapter remap 2026-11](ctrl-c-chapter-remap-2026-11.md) - the approved Ctrl C to Garage Band map for chapters 3-8 and John's three rulings; not yet in the docs
 - [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - read Docs/ctrl-c and ask John before reasoning from scratch; what he reported from play
 - [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode compile, import and tests; the checks that make a run trustworthy; the script to copy
 - [Code conventions](code-conventions.md) - BigNumber everywhere, enums for closed sets, generic base for narrowing, ASCII, what a test may contain

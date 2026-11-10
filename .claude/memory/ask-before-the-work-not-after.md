@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-10T20:47:40.741Z
+  modified: 2026-11-10T22:44:04.152Z
 ---
 
 **Why:** John's standing complaint is "one more thing" after every delivery. Each one costs him a
@@ -24,6 +24,15 @@ Run these in order on every unsettled point, BEFORE the first write:
    off by an aside; when an aside closes, return to the open question.
 4. **Otherwise it is a pick:** two shapes a player or reader would notice and prefer differently.
    Ask every pick in ONE message, each with a recommendation, then write once with his answers.
+
+**Before calling anything "open" or "not ruled on"** (2026-11-10: I listed four code changes as
+awaiting a ruling; three were plain needs and the fourth had a shape with no downside that I had not
+looked for. John: "none of your 'decisions' were really decisions".)
+- A missing piece the design needs is a need. State it as part of the work. His "yes" is not
+  required for something with no alternative.
+- When an option carries a consequence, look for the shape that removes the consequence before
+  presenting it as a trade-off. Only what is left after that search is a pick.
+- When the reference game answers it, follow the reference and say so.
 
 **During and after**
 - A pick that surfaces mid-work pauses the work for one question. Never finish and append it.

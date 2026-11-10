@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-10T20:47:20.983Z
+  modified: 2026-11-10T22:29:24.924Z
 ---
 
 **Why:** feature creep killed this project's first attempt, and every repair since has been removing
@@ -28,6 +28,16 @@ a mechanism I added. The repo `CLAUDE.md` states the lookup rule; this is the re
   payers and its modifiers. Before reporting a design "gap", restate it as the target collecting.
 - A field or table row that the doc's prose lists is built only if some reader cannot be served by
   data already in hand. Otherwise the doc's list is corrected, not implemented.
+
+**The design leads, the engine follows**
+- Never reshape a chapter's design so that it fits what the code can already do. On 2026-11-10 I
+  proposed that Cash survive chapter 3's scene prestige because a reset could not reach it, then
+  argued it "suited the chapter". John: "trying to change the design from what is designed in a way
+  that just 'makes it work' instead of makes sense."
+- Order of work on a gap: first say what the mechanic is conceptually and why it makes sense in
+  play; then say what the engine lacks; then the smallest engine piece that supplies it. A
+  no-code substitute is offered only if it also makes sense on its own, and it is labeled as a
+  change to the design.
 
 **Pick the smallest mechanism**
 - Weigh the options, then take the smallest MECHANISM that satisfies the constraint and state it as
