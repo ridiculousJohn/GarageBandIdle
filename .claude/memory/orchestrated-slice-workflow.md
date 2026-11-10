@@ -1,8 +1,11 @@
 ---
 name: orchestrated-slice-workflow
-description: How John wants a slice built - I orchestrate, Opus agents code, I review and approve; the split and the checks that worked for step 10 slice A
+description: "How John wants a slice built - I orchestrate, Opus agents code, I review and approve; the split and the checks that worked for step 10 slice A"
 metadata:
+  node_type: memory
   type: feedback
+  originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
+  modified: 2026-11-10T20:39:33.295Z
 ---
 
 John, 2026-09-09, ordering step 10 slice A: "you are the orchestrator. use Opus-5 agents as your
@@ -37,3 +40,16 @@ decision, instead of saying 'hey, maybe John might want to answer this'." The ag
 report every sentence they cannot trace precisely so that list reaches him; each item on it is
 either traced by me to a design sentence I can quote, or sent to him as a question before the suite
 runs. Never resolved by my own judgment and never filed under "decisions made".
+
+**2026-11-09 - but an authoring choice the engine already permits is not a question.** A docs agent
+left three sentences ("events never pay the prestige currency") unrestated because a chapter may now
+have several prestige currencies. I forwarded it as an open question with two options, AFTER reporting
+the work done. Both options were restrictions I invented. John: "there's literally no fucking reason to
+limit what it can pay in code. that limit is a fuckign design decision, as long as the engine allows
+you to specify what is paid or not paid, then that is the fucking decision." Before an agent's
+unsettled item reaches him, check: does anything break today, and does the engine already let content
+author it either way? If nothing breaks and it does, it is each chapter's design decision, made when
+that chapter is designed - not asked, not listed, and never answered with a new rule. The 2026-09-18
+case above was behavior the player sees today; this one was wording about a chapter nobody has
+designed. Also: I had the grep listing those sentences before I launched the agents - every hit is
+settled before launch ([[ask-before-the-work-not-after]], [[problems-not-issues]]).

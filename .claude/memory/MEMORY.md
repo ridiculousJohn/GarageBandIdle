@@ -1,7 +1,7 @@
 # Memory index
 
 ## The project
-- [Design restart 2026-11](design-restart-2026-11.md) - John is starting the design over; universal Records dropped, chapter resources are free labels; the docs and code still describe the old design
+- [Design restart 2026-11](design-restart-2026-11.md) - John is starting the design over; universal Records dropped, chapter resources are roles with free labels, income boost and capstone gate may be different currencies, capstones run no release; landed in docs and code 2026-11-09 (2877a49); chapters 3-8 are still the old sketches
 - [Project layout and workflow](project-layout-and-workflow.md) - a rewind doesn't revert the filesystem; heredocs mangle C#; old commits are a dead architecture
 - [Design review revisions](design-review-revisions.md) - register of designs the twelve review passes DELETED, plus the deferred questions; the doc cannot show an absence
 - [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode import+tests when the editor is closed; the script is COPIED from this file, never retyped; process checks by PATH and by PROJECT (another project's editor does not block), foreground run, read the log while it runs; exit 0 proves nothing, grep for `error CS`; a reimport churns rids and trailing whitespace

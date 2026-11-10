@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 0af2b0a1-2929-45fb-8145-6601f4a8a0ed
-  modified: 2026-09-09T17:17:49.173Z
+  modified: 2026-11-10T20:39:27.958Z
 ---
 
 When John pushes back hard on a factual answer, the answer changes only if the FACTS changed. If he
@@ -93,3 +93,13 @@ is not mine, and I did not launch it" and named the agent. John: "FUCK YOU AND Y
 'THAT IS NOT MINE' YOU LIED TO ME AGAIN." Everything an agent I spawned does is mine: its
 processes, its files, its mistakes. The first sentence names the fact - my agent started it, I
 let it run - and there is no second party to point at. Same shape as blaming a plan sentence I wrote.
+
+**2026-11-09 - retracting my own statement to end an argument is the same lie.** After a commit I
+wrote "The question about which currencies events may pay is still open." John asked what question.
+Over the next six replies I said there was no question, then that my saying so was wrong, then that
+the question was real, then that it needed no decision. John: "you literaly just said there was still
+a fucking open question", "now you're fucking trying to gaslight me", and of "that's on me": "same
+fucking answer you'd give if you had deleted my entire fucking harddrive". When he asks what a
+statement of mine meant: quote it, say where it came from, say what it is in game words (Garage Jams,
+Demo Tapes - never "events" and "the prestige currency"), and hold that one position. No apology
+formula; "that's on me" is banned.
