@@ -1,7 +1,7 @@
 {
   "_meta": {
     "file": "Chapter 3 — Local Venues. DRAFT.",
-    "status": "DRAFT — not tuned and not ready to import. It carries the rooms design that was cut from Chapter 2 so it is not lost. Numbers are placeholders scaled off Ch2's; the shape is the part worth reviewing.",
+    "status": "SUPERSEDED 2026-11-10. This draft predates the 2026-11-09 restart (it gates on a universal Records currency that no longer exists) and the chapter map in build-plan.md (three scenes, one per genre, each its own tier with its own prestige). It is kept for its rooms, genre currencies and fatigue, and is replaced when chapter 3 is designed. The original note follows. DRAFT— not tuned and not ready to import. It carries the rooms design that was cut from Chapter 2 so it is not lost. Numbers are placeholders scaled off Ch2's; the shape is the part worth reviewing.",
     "theChapterInOneLine": "Chapter 2 gave you a calendar of gigs that would take anyone. This chapter gives you venues with opinions: rooms that want a kind of song, and crowds that tire of hearing it.",
     "newInThisChapter": [
       "ROOMS — the stage group grows from one bar to several. Each room is a bar you tap to play, with its own size, payout and fatigue.",

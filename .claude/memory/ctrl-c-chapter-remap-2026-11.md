@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 9bcd0e53-5626-49e8-9aa2-6f02854d91fd
-  modified: 2026-11-11T01:04:57.084Z
+  modified: 2026-11-11T01:11:21.973Z
 ---
 
 On 2026-11-10 John approved a remap of Ctrl C chapters 3-8 onto Garage Band chapters 3-8 as the
@@ -47,8 +47,11 @@ fix. The built `AddSong` / Discography has no quality field yet.
 **The song design below is WRITTEN INTO THE DOCS** (2026-11-10, his order "Write it into docs"):
 design section 7 rewritten as 7.1-7.5, the Catalog boost removed from sections 1, 2, 3, 5, 6.1, 10
 and 11, section 1 gains the song loop, and the build plan has the entry "Songs: standing, sets and
-the Hall of Fame" with three steps. Not built. Still stale and untouched: the backlog (its branch
-pair entry still talks about the Catalog and old chapter numbers) and the chapter 3 draft JSON.
+the Hall of Fame" with three steps. Not built. The stale docs were fixed the same day (his order
+"Fix the stale docks first"): the backlog's chapter numbers, branch pair home (chapter 8), Records
+note and reference path; the build plan's chapter 2 and chapter 3 lines; the chapter 3 draft JSON
+is marked SUPERSEDED in its `_meta.status` and is replaced when chapter 3 is designed. John has
+played chapter 2 by hand: "chapter 2 is fine for now, it might change".
 
 **Songs, as John shaped them late on 2026-11-10**
 - The Studio is a pipeline: lay down tracks, mix them, master the mix into a song ("Probably made

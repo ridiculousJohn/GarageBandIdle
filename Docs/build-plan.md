@@ -151,20 +151,23 @@ lives somewhere other than a conversation.
   with no new runtime: gigs as time-fed bars firing a draw generator's yield, standing bookings as
   `repeatWhen` over a chapter flag, taps paying bar progress, Buzz as `LinearOnBalance`, autobuy and
   a cost multiplier as chapter modifiers switched by a flag, one five-minute staged event. It is
-  playable behind chapter 1's capstone and has not yet been played by hand. Chapter 3 is a draft
-  (`chapter-03-local-venues.json`) carrying rooms, genre currencies and fan fatigue; it needs a
-  `setMaxActive` payload and a shape for the booking agent. The rest are thematic sketches, and the
-  authoring decisions deferred with them: the
-  Ch. 6 song operations and selection rule, the late-game Cash to Roadie sink, the reserved
-  `bought <= earned` cap. Step 11's orphan sweep lands as content grows. The runtime support
-  those chapters need, surveyed against Ctrl C's eight chapters on 2026-09-15, is
+  playable behind chapter 1's capstone, and John has played it by hand (reported 2026-11-10: fine
+  for now, and it may change). Chapter 3 is a draft (`chapter-03-local-venues.json`) carrying
+  rooms, genre currencies and fan fatigue; it predates the 2026-11-09 restart (it gates on a
+  universal Records currency) and the chapter map below, and is replaced when chapter 3 is
+  designed. The rest are thematic sketches, and the authoring decisions deferred with them: the
+  late-game Cash to Roadie sink, the reserved `bought <= earned` cap. Songs are design 7 and the
+  entry "Songs: standing, sets and the Hall of Fame" below. Step 11's orphan sweep lands as
+  content grows. The runtime support those chapters need, surveyed against Ctrl C's eight
+  chapters on 2026-09-15, is
   `chapter-primitives-plan.md`: cost as a multiplier target, a bar firing a generator's yield and
   payments into an owned count or a bar's progress (A-C, DONE 2026-09-16), then an owned-count
   formula, a bar's repeat as a condition, autobuy, the payout formula reading the round's earned
   total, and the bar row's tap (D-H, DONE 2026-09-16). Debt (I) is item 1 of the list below.
 - **Runtime work to do before chapters 3-8 are implemented.** Recorded 2026-11-10. Chapters 3-8
   take their mechanics from Ctrl C's chapters 3-8 (`Docs/ctrl-c/chapters-1-8/`), mapped as below.
-  The chapters themselves are not designed yet, and design sections 2 and 7 predate this map.
+  The chapters themselves are not designed yet, and design section 2's rows for chapters 3 and 4
+  predate this map.
   - 3 Local Venues, from Ctrl C 3: three scenes, one per genre, each its own tier with its own
     prestige; a room consumes its genre's material.
   - 4 Local Tour, from Ctrl C 4: tours as short runs paying a durable take; the Van is the

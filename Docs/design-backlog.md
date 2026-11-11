@@ -48,21 +48,25 @@ exactly the replay it was meant to pace. Whatever feeds the floor has to be some
 own reset clears.
 
 **Ticket price as a second turnout lever.** Conditional on a ticket-price concept existing, which it
-does not yet; Ch4 (booked venues) or Ch5 (touring) are the plausible homes. Higher price means a
+does not yet; the touring chapters, 4 (the Local Tour) or 6 (the Coast Tour), are the plausible
+homes. Higher price means a
 thinner room but more Cash per head; lower means a fuller room, more Fans, less Cash. That turns the
 standing Cash-vs-Fans tension into a per-show decision and pairs with fatigue — a tired room at a high
 price is empty. Without that trade it is an income multiplier with extra steps. It would be a third
 lever on one action, so it belongs in a chapter that has retired something else.
 
-**Where fatigue recurs.** Ch3 house parties (same crowd, same houses). Ch5, where per-town fatigue is
-the breadth-vs-depth question the branch pair below poses. By Ch7–8 the floor should be high enough
-that fatigue is mostly flavor.
+**Where fatigue recurs.** Chapter 3's rooms (the same crowd in the same room). The touring chapters,
+4 and 6, where per-town fatigue is a breadth-vs-depth question. By chapters 7 and 8 the floor should
+be high enough that fatigue is mostly flavor.
 
 ---
 
 ## Branch pair — "exclusive at first, both eventually"
 
-Leading candidate home: **Chapter 5 (Regional Tour / The Van)**.
+Home in the chapter map: **chapter 8 (Arenas)**. Ctrl C's chapter 8 has exactly this pair
+(Discipline and Metrics, merged by Metrication), and the map takes chapter 8's mechanics from it
+(`build-plan.md`, "Runtime work to do before chapters 3-8 are implemented"). Chapter 8 is not
+designed yet; the requirements below are what its design has to meet.
 
 A chapter offers two mutually exclusive `contentUnlock` upgrades plus a third **merge** upgrade that
 removes the exclusivity. Each branch opens its own sub-system, so the choice changes how the chapter
@@ -93,13 +97,13 @@ Nothing new is required.
 3. **Open the fork early** and let it run most of the chapter.
 4. **Neither branch may gate advancement.**
 
-### Why Chapter 5
+### A second home: a touring chapter
 
-Its mechanic is routing across towns, so breadth vs depth is already the subject: play every town
+Before the map, the pair was aimed at a touring chapter - now chapter 4 (the Local Tour) or chapter
+6 (the Coast Tour). Routing across towns makes breadth vs depth the subject already: play every town
 (coverage) against camp the markets that respond (compounding). Joint optimum is a loop hitting strong
 markets repeatedly while still covering fresh ground. Per-town fan fatigue is the axis the branches
-are read against. **Alternative:** Ch4. Ch6 is a poor fit — Catalog is already the biggest new system
-and "write more vs polish fewer" would compete with the quality roll.
+are read against. Kept in case a touring chapter wants the shape as well.
 
 ### Worked example (was sketched for Ch2, kept because the shape is reusable)
 
@@ -132,13 +136,16 @@ discrete units. Keep the payout integer.
 ## Records as a chapter's own resource
 
 A later chapter may use Records as its own local resource - for example a chapter about certifying a
-record, counting units sold toward gold and platinum.
+record, counting units sold toward gold and platinum. The chapter map gives this to chapter 8
+(Arenas), where the deeper of the two resets pays Records (`build-plan.md`). Delete this entry when
+chapter 8 is designed.
 
 ---
 
 ## Reference
 
-`C:\Users\jsp73\Downloads\Ctrl-C-Chapters-1-8\` — Reference, Data Appendix, Story Transcript. A static
+`Docs/ctrl-c/` (`chapters-1-8/` and `chapters-9-end/`) - Reference, Data Appendix, Story Transcript
+and recovered data for each. A static
 reconstruction of Ctrl C (Android 1.12.2), tagged [D] direct data / [C] code-derived / [I] inference /
 [U] unresolved. Useful for comparison on prestige layering, per-chapter cost curves, and the
 completion-token system, which is structurally the same as Roadies at the same +5% rate.
