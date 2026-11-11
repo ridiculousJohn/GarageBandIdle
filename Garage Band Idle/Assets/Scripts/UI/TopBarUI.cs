@@ -20,6 +20,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // window, so the screen names its timer once and the code names none.
         public string TimerId => encore.Timer;
 
+        // The pill shows infinity.
+        public bool ShownPermanent { get; private set; }
+
+        // The seconds the pill's countdown shows; zero when ShownPermanent.
+        public long ShownSeconds { get; private set; }
+
         public TopBarUI(VisualElement rootElement, RootScopeState root, GameClock clock,
                         Action openEncore, Action openStoryLog, Action openDiscography, Action openChapterSelect,
                         Action openSettings)
@@ -57,7 +63,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Interpolate();
         }
 
-        public void Interpolate() => encore.text = "\u23F1  " + EncoreTime.Text(root, encore.Timer, clock.RealTimeUtc);
+        public void Interpolate()
+        {
+            ShownPermanent = EncoreTime.Permanent(root);
+            ShownSeconds = ShownPermanent ? 0 : EncoreTime.RemainingSeconds(root, encore.Timer, clock.RealTimeUtc);
+            encore.text = "\u23F1  " + EncoreTime.Format(ShownPermanent, ShownSeconds);
+        }
 
         // The discography button stands only while root keeps a song, so a
         // player with none never opens an empty window.
@@ -67,13 +78,21 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
     // One display answer shared by the pill and window. It is deliberately not
     // simulation truth: BuffActive remains the condition that judges gameplay.
-    internal static class EncoreTime
+    public static class EncoreTime
     {
         public static string Text(RootScopeState root, string timerId, DateTime nowUtc)
         {
-            if (BackstagePass.Owned(root))
-                return "\u221E";
+            var permanent = Permanent(root);
+            return Format(permanent, permanent ? 0 : RemainingSeconds(root, timerId, nowUtc));
+        }
 
+        // The Pass is owned, so the timer reads as infinity.
+        public static bool Permanent(RootScopeState root) => BackstagePass.Owned(root);
+
+        // Whole seconds left on the timer, rounded up, zero when root holds no
+        // such timer or it has expired. Meaningful when not Permanent.
+        public static long RemainingSeconds(RootScopeState root, string timerId, DateTime nowUtc)
+        {
             DateTime? expiry = null;
             foreach (var buff in root.timedBuffs)
             {
@@ -84,7 +103,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
             }
 
             var seconds = expiry.HasValue ? Math.Max(0, Math.Ceiling((expiry.Value - nowUtc).TotalSeconds)) : 0;
-            var whole = (long)seconds;
+            return (long)seconds;
+        }
+
+        // The text for an answer already read, so a caller that stores the
+        // answer prints exactly what it stored.
+        internal static string Format(bool permanent, long whole)
+        {
+            if (permanent)
+                return "\u221E";
             var hours = whole / 3600;
             return $"{hours:00}:{whole / 60 % 60:00}:{whole % 60:00}";
         }

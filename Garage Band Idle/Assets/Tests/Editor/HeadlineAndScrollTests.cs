@@ -163,16 +163,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             headline.Follow(a);
             Assert.DoesNotThrow(() => headline.Interpolate());
-            Assert.AreEqual("Cash", headline.Root.Q<Label>("headline-name").text);
-            Assert.AreEqual("1.00", headline.Root.Q<Label>("headline-value").text);
-            Assert.AreEqual("(0.00/s)", headline.Root.Q<Label>("headline-rate").text);
+            AssertMirrors(a, headline);
             Assert.AreEqual(DisplayStyle.Flex, headline.Root.style.display.value);
 
             headline.Follow(b);
             headline.Interpolate();
-            Assert.AreEqual("Fans", headline.Root.Q<Label>("headline-name").text, "the texts follow the source");
-            Assert.AreEqual("2.00", headline.Root.Q<Label>("headline-value").text);
-            Assert.AreEqual("(0.50/s)", headline.Root.Q<Label>("headline-rate").text);
+            AssertMirrors(b, headline, "the texts follow the source");
+        }
+
+        // Each of the headline's three labels carries the text of the source
+        // label it mirrors.
+        private static void AssertMirrors(VisualElement source, PinnedHeadlineUI headline, string what = "")
+        {
+            Assert.AreEqual(source.Q<Label>("name").text, headline.Root.Q<Label>("headline-name").text, what);
+            Assert.AreEqual(source.Q<Label>("value").text, headline.Root.Q<Label>("headline-value").text, what);
+            Assert.AreEqual(source.Q<Label>("rate").text, headline.Root.Q<Label>("headline-rate").text, what);
         }
 
         // A source without the three labels a currency line promises is not a

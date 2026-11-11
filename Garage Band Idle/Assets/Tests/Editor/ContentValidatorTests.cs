@@ -2231,6 +2231,63 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "tap addresses 'their_tap'");
         }
 
+        // The level generator and the automating upgrade are ordinary references
+        // resolved outward from the bar's own scope (12.7), the way its tap is.
+        [Test]
+        public void Bar_LevelAndAutomationOnTheDeclaringChain_ReportNothing()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.repeatWhen = new UpgradePurchased { upgrade = f.StagePresence };
+            f.Cover1.level = f.Amp;
+            f.Cover1.automation = f.StagePresence;
+            var report = f.Run();
+            AssertNoFinding(report, ValidationCheck.ChainReach);
+            AssertNoFinding(report, ValidationCheck.UnresolvedReference);
+            AssertNoFinding(report, ValidationCheck.InertOperand);
+        }
+
+        [Test]
+        public void Bar_LevelGeneratorOffTheDeclaringChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var theirs = TestTree.MakeDefinition<GeneratorDefinition>("their_draw");
+            theirs.availableWhen = new Always();
+            theirs.costCurrency = f.Cash;
+            theirs.baseCost = 5;
+            theirs.growth = 1.3;
+            f.Tier1b.generators.Add(theirs);
+            f.Cover1.level = theirs;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "level addresses 'their_draw'");
+        }
+
+        [Test]
+        public void Bar_AutomationUpgradeOffTheDeclaringChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var theirs = TestTree.MakeDefinition<UpgradeDefinition>("their_booking");
+            theirs.gate = new Always();
+            theirs.costCurrency = f.Cash;
+            theirs.cost = 10;
+            f.Tier1b.upgrades.Add(theirs);
+            f.Cover1.repeatWhen = new Always();
+            f.Cover1.automation = theirs;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "automation addresses 'their_booking'");
+        }
+
+        // A bar with no repeatWhen fills once and stays full, so an upgrade
+        // named as what makes it go again names nothing it could do (12.7).
+        [Test]
+        public void Bar_AutomationOnABarWithNoRepeatWhen_InertOperand_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Cover1.automation = f.StagePresence;
+            var report = f.Run();
+            Assert.IsTrue(report.Findings.Any(x => x.Severity == ValidationSeverity.Error
+                                                   && x.Check == ValidationCheck.InertOperand),
+                Dump(report));
+        }
+
         [Test]
         public void BarsCompleted_GroupOffTheActingChain_ChainReach_Error()
         {

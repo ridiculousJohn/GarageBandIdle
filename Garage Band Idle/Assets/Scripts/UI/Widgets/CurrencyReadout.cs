@@ -30,9 +30,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
             home = Producer.DeclaringScope<ScopeState>(scope, currency);
         }
 
-        // The slope the last Snap took, for a caller that prints the rate the
-        // balance is climbing by (12.11).
+        // The slope the last Snap took: the continuous income the balance rides
+        // between snaps, for a caller that prints a rate built on it (12.11).
         public BigNumber Slope => slope;
+
+        // The scope declaring the currency, for a caller that reads another of
+        // the report's ledgers at the same key rather than resolving it twice.
+        public ScopeState Home => home;
+
+        // The balance the label carries: truth at a Snap, the interpolated and
+        // clamped value at an Interpolate.
+        public BigNumber Shown { get; private set; } = BigNumber.Zero;
 
         // The refresh: truth, the report's realized slope, and the game-time
         // stamp the interpolation measures from. A null report means no tick has
@@ -42,7 +50,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             truth = ctx.GetBalance(currency.Id);
             slope = report == null ? BigNumber.Zero : report.DepositSlope(home, currency.Id);
             stamp = gameTimeSeconds;
-            label.text = NumberFormatter.Format(truth);
+            Shown = truth;
+            label.text = NumberFormatter.Format(Shown);
         }
 
         // Clamped at zero: a draining balance's negative slope is honest motion,
@@ -51,7 +60,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Interpolate(double gameTimeSeconds)
         {
             var display = BigNumber.Max(BigNumber.Zero, truth + slope * (gameTimeSeconds - stamp));
-            label.text = NumberFormatter.Format(display);
+            Shown = display;
+            label.text = NumberFormatter.Format(Shown);
         }
     }
 }

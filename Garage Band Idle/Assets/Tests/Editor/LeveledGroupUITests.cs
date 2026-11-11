@@ -1,0 +1,700 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using RidiculousGaming.GarageBandIdle.Economy;
+using RidiculousGaming.GarageBandIdle.Editor;
+using RidiculousGaming.GarageBandIdle.Monetization;
+using RidiculousGaming.GarageBandIdle.UI;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace RidiculousGaming.GarageBandIdle.Tests
+{
+    // The levelled group (design doc 12.11) over chapter 2's IMPORTED calendar,
+    // built from the shipping UXML and bound by hand at tier2 the way the host
+    // binds the Calendar's module. No host is present, so each test repaints
+    // with Refresh after the commands it issues, and every assertion reads the
+    // widget's shown values - never a label.
+    public class LeveledGroupUITests
+    {
+        private static void AssertClose(double expected, BigNumber actual, string what = null) =>
+            Assert.AreEqual(expected, actual.ToDouble(),
+                Math.Max(1e-9, Math.Abs(expected) * 1e-12), what ?? string.Empty);
+
+        // The one thing a row asks of the host, recorded: the hold hands over
+        // the level generator and its declaring scope.
+        private sealed class RecordingInfos : IGeneratorInfoOpener
+        {
+            public GeneratorDefinition Generator;
+            public ScopeState Scope;
+
+            public void OpenGeneratorInfo(GeneratorDefinition generator, ScopeState scope)
+            {
+                Generator = generator;
+                Scope = scope;
+            }
+        }
+
+        // The one thing the card's Auto asks of the host, recorded: the hold
+        // hands over the group and its declaring scope.
+        private sealed class RecordingAutomations : IAutomationOpener
+        {
+            public GroupDefinition Group;
+            public ScopeState Scope;
+
+            public void OpenAutomation(GroupDefinition group, ScopeState scope)
+            {
+                Group = group;
+                Scope = scope;
+            }
+        }
+
+        private sealed class NoStories : IStoryOpener
+        {
+            public void OpenStory(Story.StoryBeatDefinition beat, ScopeState scope) { }
+        }
+
+        private class Fixture
+        {
+            public static readonly DateTime Start = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
+
+            public readonly TierDefinition Tier2Def;
+            public readonly CurrencyDefinition Cash, Fans, Buzz;
+            public readonly GroupDefinition TheCalendar;
+            public readonly BarDefinition OpenMic, HouseParty;
+            public readonly GeneratorDefinition OpenMicDraw, HousePartyDraw;
+
+            public readonly RootScopeState Root;
+            public readonly ChapterScopeState Ch2;
+            public readonly TierScopeState Tier2;
+            public readonly GameSession Session;
+            public readonly GameClock Clock;
+            public readonly ModuleRegistry Registry;
+            public readonly RecordingInfos Infos = new();
+            public readonly RecordingAutomations Automations = new();
+
+            public DateTime Now = Start;
+
+            private static GameConfig Config()
+            {
+                var config = ScriptableObject.CreateInstance<GameConfig>();
+                config.maxGameSpeed = 4;
+                config.minimumAwaySeconds = 180;
+                config.idleCapSeconds = 14400;
+                return config;
+            }
+
+            // The roster boot composes, entered as a live player enters it:
+            // the root flag a finished chapter 1 leaves, the stamp at now so
+            // no idle window is owed. opening_cash pays its 5 Cash on entry.
+            public Fixture()
+            {
+                var rootDef = AssetDatabase.LoadAssetAtPath<RootDefinition>(
+                    ChapterJsonImporter.AssetRootPath + "/root/root.asset");
+                var ch1Def = AssetDatabase.LoadAssetAtPath<ChapterDefinition>(
+                    ChapterJsonImporter.AssetRootPath + "/ch1/ch1.asset");
+                var ch2Def = AssetDatabase.LoadAssetAtPath<ChapterDefinition>(
+                    ChapterJsonImporter.AssetRootPath + "/ch2/ch2.asset");
+                Assert.IsNotNull(rootDef, "root.json has not been imported - run Garage Band Idle/Import Content.");
+                Assert.IsNotNull(ch1Def, "chapter-01.json has not been imported - run Garage Band Idle/Import Content.");
+                Assert.IsNotNull(ch2Def, "chapter-02.json has not been imported - run Garage Band Idle/Import Content.");
+                Tier2Def = (TierDefinition)ch2Def.children.Single();
+
+                Cash = Find(Tier2Def.declaredCurrencies, "cash");
+                Fans = Find(Tier2Def.declaredCurrencies, "fans");
+                Buzz = Find(Tier2Def.declaredCurrencies, "buzz");
+                TheCalendar = Find(Tier2Def.groups, "the_calendar");
+                OpenMic = Find(Tier2Def.bars, "open_mic");
+                HouseParty = Find(Tier2Def.bars, "house_party");
+                OpenMicDraw = Find(Tier2Def.generators, "open_mic_draw");
+                HousePartyDraw = Find(Tier2Def.generators, "house_party_draw");
+
+                Root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { ch1Def, ch2Def }));
+                Ch2 = (ChapterScopeState)TestNavigation.Node(Root, ch2Def);
+                Tier2 = (TierScopeState)TestNavigation.Node(Root, Tier2Def);
+                Session = new GameSession(Root, Config());
+                Clock = new GameClock(Now);
+                Registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
+                Assert.IsNotNull(Registry, "Assets/Settings/ModuleRegistry.asset is missing.");
+
+                Root.flags.Add("ch1_complete");
+                Ch2.lastActiveUtc = Now;
+                Session.SwitchChapter(Ch2, Now);
+                Assert.AreEqual(SessionPhase.Live, Session.Phase);
+            }
+
+            private static T Find<T>(IEnumerable<T> definitions, string id) where T : Definition =>
+                definitions.Single(d => d.Id == id);
+
+            public GameContext Ctx => new GameContext(Tier2, Now);
+
+            // A widget as the host builds one: the shipping UXML instantiated,
+            // the factory's controller over it, bound at tier2.
+            public ModuleWidget Widget(string prefabId, string uxml, Definition content)
+            {
+                var asset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Widgets/" + uxml);
+                Assert.IsNotNull(asset, "Assets/UI/Widgets/" + uxml + " is missing");
+                var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), Registry, new NoStories(),
+                    Infos, Automations);
+                widget.Bind(Session, Tier2, content, Clock);
+                return widget;
+            }
+
+            public LeveledGroupUI Calendar()
+            {
+                var widget = (LeveledGroupUI)Widget("leveled_group", "LeveledGroup.uxml", TheCalendar);
+                widget.Refresh();
+                return widget;
+            }
+
+            // The shipping screen and its host over this session, rendered once:
+            // the card's hold reaches the host's window, and every command's
+            // refresh repaints both, as in the game. The chapter's opening
+            // story is read by the drain, so no card stands over the window.
+            public ScreenHost Host()
+            {
+                var screen = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screen.uxml");
+                Assert.IsNotNull(screen, "Assets/UI/Screen.uxml is missing");
+                var host = new ScreenHost(screen.Instantiate(), Registry, Session, Clock,
+                    new AdManager(Session, new FakeAdService(), () => { }),
+                    new IAPManager(Session, new FakeStoreService(), Session.Config, () => { }));
+                Session.Refresh();
+                Session.Drain();
+                return host;
+            }
+
+            // The calendar's card as the host built it.
+            public static LeveledGroupUI Calendar(ScreenHost host) =>
+                host.Sections.SelectMany(section => section.Modules)
+                    .Select(module => module.Widget).OfType<LeveledGroupUI>().Single();
+
+            // Real and game time move together, so a command the widget issues
+            // samples the same moment the test's own reads do.
+            public void Tick(double seconds)
+            {
+                Now = Now.AddSeconds(seconds);
+                Session.Tick(seconds, Now);
+                Clock.Frame(Now, seconds);
+            }
+
+            public void Give(BigNumber cash) => Ctx.Deposit(Cash.Id, cash);
+
+            public int Owned(GeneratorDefinition generator) =>
+                Tier2.generatorCounts.TryGetValue(generator.Id, out var count) ? count : 0;
+
+            public bool Active(BarDefinition bar) =>
+                Tier2.activeMembers.TryGetValue(TheCalendar.Id, out var active) && active.Contains(bar.Id);
+
+            public BigNumber Progress(BarDefinition bar) =>
+                Tier2.barProgress.TryGetValue(bar.Id, out var stored) ? stored : BigNumber.Zero;
+
+            public double GameSpeed => TickSystem.GameSpeed(new GameContext(Ch2, Now), Ch2, Session.Config);
+        }
+
+        // ---- the rows ----
+
+        [Test]
+        public void A_row_shows_only_while_its_bar_is_available()
+        {
+            var fx = new Fixture();
+            var calendar = fx.Calendar();
+            foreach (var bar in fx.Tier2Def.bars)
+                Assert.IsFalse(calendar.Row(bar).Visible, $"{bar.Id}: no draw bought, so no gig is booked");
+
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            calendar.Refresh();
+
+            Assert.IsTrue(calendar.Row(fx.OpenMic).Visible, "one draw opens the open mic");
+            foreach (var bar in fx.Tier2Def.bars.Where(b => b != fx.OpenMic))
+                Assert.IsFalse(calendar.Row(bar).Visible, $"{bar.Id} still wants its own draw");
+        }
+
+        [Test]
+        public void The_row_shows_its_level_as_the_level_generators_owned_count()
+        {
+            var fx = new Fixture();
+            fx.Give(100);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 3);
+            var calendar = fx.Calendar();
+            var row = calendar.Row(fx.OpenMic);
+
+            Assert.AreEqual(3, row.ShownPurchased);
+            Assert.AreEqual(fx.Owned(fx.OpenMicDraw), row.ShownPurchased);
+            Assert.AreEqual(BigNumber.Zero, row.ShownGranted, "nothing pays the draw a granted count");
+        }
+
+        [Test]
+        public void The_rates_inside_the_bar_are_the_bars_completion_rate()
+        {
+            var fx = new Fixture();
+            fx.Give(100);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 3);
+            var row = fx.Calendar().Row(fx.OpenMic);
+
+            var expected = BarSystem.CompletionRate(fx.Ctx, fx.OpenMic, fx.GameSpeed);
+            Assert.AreEqual(expected.Count, row.ShownRates.Count, "one line per currency the gig pays");
+            for (var i = 0; i < expected.Count; i++)
+            {
+                Assert.AreSame(expected[i].currency, row.ShownRates[i].currency);
+                Assert.AreEqual(expected[i].perSecond, row.ShownRates[i].perSecond, expected[i].currency.Id);
+            }
+            Assert.AreSame(fx.Cash, row.ShownRates[0].currency, "the draw pays Cash first");
+            Assert.Greater(row.ShownRates[0].perSecond.ToDouble(), 0, "three draws pay something");
+        }
+
+        [Test]
+        public void Tapping_an_idle_row_starts_the_gig_and_pays_nothing_into_it()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = fx.Calendar();
+            var row = calendar.Row(fx.OpenMic);
+            Assert.IsTrue(row.Idle, "available and not running");
+
+            row.Tap();
+            calendar.Refresh();
+
+            Assert.IsTrue(fx.Active(fx.OpenMic), "the tap put the gig on the calendar");
+            Assert.AreEqual(BigNumber.Zero, fx.Progress(fx.OpenMic), "and fired nothing into its bar");
+            Assert.IsFalse(row.Idle);
+        }
+
+        [Test]
+        public void Tapping_a_running_row_works_the_crowd_and_leaves_it_running()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = fx.Calendar();
+            var row = calendar.Row(fx.OpenMic);
+            row.Tap();
+            calendar.Refresh();
+
+            row.Tap();
+            calendar.Refresh();
+
+            // crowd_open_mic pays the bar 1 unit per press.
+            AssertClose(1, fx.Progress(fx.OpenMic), "one firing of the tap producer");
+            Assert.IsTrue(fx.Active(fx.OpenMic), "a tap never takes a gig off the calendar");
+            AssertClose(1, row.ShownProgress, "the fill draws it");
+        }
+
+        [Test]
+        public void The_buy_buttons_buy_the_level_generator()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Give(100);
+            var calendar = fx.Calendar();
+            var row = calendar.Row(fx.OpenMic);
+
+            AssertClose(Purchasing.CostOf(fx.OpenMicDraw, fx.Ctx, 1).ToDouble(), row.ShownCost, "the next level's price");
+            var max = Purchasing.MaxAffordable(fx.Ctx, fx.OpenMicDraw);
+            Assert.Greater(max, 1, "100 Cash covers several draws");
+            Assert.AreEqual(max, row.ShownMax);
+
+            row.BuyMax();
+            Assert.AreEqual(1 + max, fx.Owned(fx.OpenMicDraw), "+max bought the count it printed");
+
+            fx.Give(1000);
+            calendar.Refresh();
+            row.BuyOne();
+            Assert.AreEqual(2 + max, fx.Owned(fx.OpenMicDraw), "+1 bought one");
+        }
+
+        [Test]
+        public void Holding_the_title_opens_the_level_generators_info_at_its_home()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var row = fx.Calendar().Row(fx.OpenMic);
+
+            row.OpenInfo();
+
+            Assert.AreSame(fx.OpenMicDraw, fx.Infos.Generator);
+            Assert.AreSame(fx.Tier2, fx.Infos.Scope);
+        }
+
+        // ---- Book ----
+
+        [Test]
+        public void Book_offers_the_first_unbooked_gig_whose_draw_is_offered()
+        {
+            var fx = new Fixture();
+            var calendar = fx.Calendar();
+
+            Assert.AreSame(fx.OpenMic, calendar.BookTarget, "open_mic_draw is offered from the start");
+            AssertClose(Purchasing.CostOf(fx.OpenMicDraw, fx.Ctx, 1).ToDouble(), calendar.ShownBookCost);
+            Assert.IsTrue(calendar.BookEnabled, "the opening 5 Cash buys the first draw");
+
+            fx.Tier2.balances[fx.Cash.Id] = BigNumber.Zero;
+            calendar.Refresh();
+            Assert.AreSame(fx.OpenMic, calendar.BookTarget, "an unaffordable booking is still offered");
+            Assert.IsFalse(calendar.BookEnabled, "and disarmed");
+        }
+
+        [Test]
+        public void Book_buys_the_draw_and_starts_the_gig_then_waits_for_the_next_draw()
+        {
+            var fx = new Fixture();
+            var calendar = fx.Calendar();
+
+            calendar.Book();
+            calendar.Refresh();
+
+            Assert.AreEqual(1, fx.Owned(fx.OpenMicDraw), "one level bought");
+            Assert.IsTrue(fx.Active(fx.OpenMic), "and the gig started in the same press");
+            Assert.IsTrue(calendar.Row(fx.OpenMic).Visible);
+            Assert.IsNull(calendar.BookTarget, "house_party_draw is not offered before 150 Cash earned");
+
+            fx.Give(200);
+            calendar.Refresh();
+            Assert.AreSame(fx.HouseParty, calendar.BookTarget, "the next gig whose draw opened");
+            AssertClose(Purchasing.CostOf(fx.HousePartyDraw, fx.Ctx, 1).ToDouble(), calendar.ShownBookCost);
+            Assert.IsTrue(calendar.BookEnabled);
+
+            calendar.Book();
+            calendar.Refresh();
+            Assert.AreEqual(1, fx.Owned(fx.HousePartyDraw));
+            Assert.IsTrue(fx.Active(fx.HouseParty));
+            Assert.IsTrue(fx.Active(fx.OpenMic), "booking adds to the calendar and takes nothing off it");
+        }
+
+        // ---- Auto ----
+
+        [Test]
+        public void Auto_offers_the_first_visible_gig_that_does_not_go_again_and_moves_on_when_bought()
+        {
+            var fx = new Fixture();
+            fx.Give(200);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Session.TryBuy(fx.Ctx, fx.HousePartyDraw, 1);
+            fx.Tier2.balances[fx.Cash.Id] = BigNumber.Zero;
+            var calendar = fx.Calendar();
+
+            Assert.AreSame(fx.OpenMic, calendar.AutoTarget, "group order: the open mic first");
+            Assert.IsFalse(calendar.AutoEnabled, "no Cash, so the booking is unaffordable");
+
+            fx.Give(Purchasing.CostOf(fx.OpenMic.automation, fx.Ctx));
+            calendar.Refresh();
+            Assert.IsTrue(calendar.AutoEnabled, "exactly the price");
+
+            calendar.Auto();
+            calendar.Refresh();
+            Assert.IsTrue(fx.OpenMic.repeatWhen.Evaluate(fx.Ctx), "the purchase made the open mic go again");
+            Assert.AreSame(fx.HouseParty, calendar.AutoTarget, "and the button moved to the next gig");
+        }
+
+        [Test]
+        public void Auto_leaves_when_every_visible_gig_goes_again_and_returns_when_another_is_booked()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Give(Purchasing.CostOf(fx.OpenMic.automation, fx.Ctx));
+            var calendar = fx.Calendar();
+            calendar.Auto();
+            calendar.Refresh();
+
+            Assert.IsNull(calendar.AutoTarget, "the one visible gig repeats");
+            Assert.IsFalse(calendar.AutoEnabled);
+
+            fx.Give(200);
+            calendar.Refresh();
+            Assert.AreSame(fx.HouseParty, calendar.BookTarget);
+            calendar.Book();
+            calendar.Refresh();
+            Assert.AreSame(fx.HouseParty, calendar.AutoTarget, "a newly booked gig brings Auto back");
+        }
+
+        // A booking flag outlives the run while the upgrade's latch does not
+        // (chapter 2's EP), so "automated" is the bar's repeatWhen and never
+        // the purchase: a gig whose flag stands is skipped with no upgrade
+        // bought this run.
+        [Test]
+        public void Auto_skips_a_gig_whose_repeat_condition_holds_without_a_purchase()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Ch2.flags.Add(((FlagSet)fx.OpenMic.repeatWhen).flagId);
+            var calendar = fx.Calendar();
+
+            Assert.IsFalse(fx.Tier2.purchasedUpgrades.Contains(fx.OpenMic.automation.Id));
+            Assert.IsNull(calendar.AutoTarget, "the open mic already goes again");
+        }
+
+        // ---- the automation window ----
+
+        // What the hold on Auto calls: the group and the scope the card
+        // resolved, handed to the host.
+        [Test]
+        public void Holding_Auto_hands_the_host_the_group_at_its_declaring_scope()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = fx.Calendar();
+
+            calendar.OpenAutomation();
+
+            Assert.AreSame(fx.TheCalendar, fx.Automations.Group);
+            Assert.AreSame(fx.Tier2, fx.Automations.Scope);
+        }
+
+        [Test]
+        public void The_hold_opens_the_window_on_the_cards_group()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var host = fx.Host();
+            var window = host.AutomationWindow;
+            Assert.IsFalse(window.IsOpen);
+
+            Fixture.Calendar(host).OpenAutomation();
+
+            Assert.IsTrue(window.IsOpen);
+            Assert.AreSame(fx.TheCalendar, window.ShownGroup);
+            Assert.AreSame(fx.Tier2, window.HeldScope);
+        }
+
+        // A tap buys and nothing else: the window is the hold's alone.
+        [Test]
+        public void A_tap_on_Auto_buys_and_does_not_open_the_window()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Give(Purchasing.CostOf(fx.OpenMic.automation, fx.Ctx));
+            var host = fx.Host();
+            var calendar = Fixture.Calendar(host);
+            Assert.AreSame(fx.OpenMic, calendar.AutoTarget);
+
+            calendar.Auto();
+
+            Assert.IsTrue(fx.OpenMic.repeatWhen.Evaluate(fx.Ctx), "the tap bought the open mic's automation");
+            Assert.IsFalse(host.AutomationWindow.IsOpen);
+            Assert.IsNull(host.AutomationWindow.ShownGroup);
+        }
+
+        [Test]
+        public void The_rows_are_the_available_bars_naming_an_automation_in_group_order()
+        {
+            var fx = new Fixture();
+            fx.Give(200);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Session.TryBuy(fx.Ctx, fx.HousePartyDraw, 1);
+            var host = fx.Host();
+            var calendar = Fixture.Calendar(host);
+
+            calendar.OpenAutomation();
+
+            var expected = fx.TheCalendar.members.Cast<BarDefinition>()
+                .Where(bar => bar.automation != null && calendar.Row(bar).Visible).ToArray();
+            CollectionAssert.AreEqual(new[] { fx.OpenMic, fx.HouseParty }, expected, "two gigs booked");
+            CollectionAssert.AreEqual(expected, host.AutomationWindow.Rows.Select(row => row.Bar).ToArray());
+        }
+
+        // Price: neither repeating nor bought, and the purchase would be
+        // refused. Buy: the purchase would succeed. Purchased: the bar goes
+        // again, whether by the upgrade or by its flag alone.
+        [Test]
+        public void Each_row_reads_Price_Buy_or_Purchased_under_its_conditions()
+        {
+            var fx = new Fixture();
+            fx.Give(200);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Session.TryBuy(fx.Ctx, fx.HousePartyDraw, 1);
+            fx.Tier2.balances[fx.Cash.Id] = BigNumber.Zero;
+            var host = fx.Host();
+            Fixture.Calendar(host).OpenAutomation();
+            var window = host.AutomationWindow;
+
+            Assert.AreEqual(AutomationState.Price, Row(window, fx.OpenMic).State, "no Cash");
+            Assert.AreEqual(AutomationState.Price, Row(window, fx.HouseParty).State);
+            AssertClose(Purchasing.CostOf(fx.OpenMic.automation, fx.Ctx).ToDouble(), Row(window, fx.OpenMic).ShownCost);
+            AssertClose(Purchasing.CostOf(fx.HouseParty.automation, fx.Ctx).ToDouble(),
+                Row(window, fx.HouseParty).ShownCost);
+
+            // Cash arriving while the window stands flips the row it covers on
+            // the next refresh, with no reopen.
+            fx.Give(Purchasing.CostOf(fx.OpenMic.automation, fx.Ctx));
+            fx.Session.Refresh();
+            Assert.AreEqual(AutomationState.Buy, Row(window, fx.OpenMic).State, "exactly the open mic's price");
+            Assert.AreEqual(AutomationState.Price, Row(window, fx.HouseParty).State, "short of the house party's");
+
+            fx.Ch2.flags.Add(((FlagSet)fx.HouseParty.repeatWhen).flagId);
+            fx.Session.Refresh();
+            Assert.AreEqual(AutomationState.Purchased, Row(window, fx.HouseParty).State,
+                "the flag alone makes the house party go again");
+            Assert.IsFalse(fx.Tier2.purchasedUpgrades.Contains(fx.HouseParty.automation.Id));
+        }
+
+        [Test]
+        public void Buy_purchases_that_bars_automation_and_the_window_stays_open()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Give(Purchasing.CostOf(fx.OpenMic.automation, fx.Ctx));
+            var host = fx.Host();
+            Fixture.Calendar(host).OpenAutomation();
+            var window = host.AutomationWindow;
+            Assert.AreEqual(AutomationState.Buy, Row(window, fx.OpenMic).State);
+
+            window.Buy(fx.OpenMic);
+
+            Assert.IsTrue(fx.OpenMic.repeatWhen.Evaluate(fx.Ctx), "the purchase made the open mic go again");
+            Assert.IsTrue(window.IsOpen, "a purchase is not a close");
+            Assert.AreSame(fx.TheCalendar, window.ShownGroup);
+            Assert.AreEqual(AutomationState.Purchased, Row(window, fx.OpenMic).State,
+                "the command's own refresh repainted the row");
+        }
+
+        // Out of order: the second gig's automation bought from the window
+        // while the first's is not, and the card's button stays on the first,
+        // then leaves once the first is bought too.
+        [Test]
+        public void Buying_out_of_order_moves_the_cards_target_accordingly()
+        {
+            var fx = new Fixture();
+            fx.Give(200);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Session.TryBuy(fx.Ctx, fx.HousePartyDraw, 1);
+            fx.Give(Purchasing.CostOf(fx.HouseParty.automation, fx.Ctx));
+            var host = fx.Host();
+            var calendar = Fixture.Calendar(host);
+            Assert.AreSame(fx.OpenMic, calendar.AutoTarget);
+            calendar.OpenAutomation();
+            var window = host.AutomationWindow;
+
+            window.Buy(fx.HouseParty);
+
+            Assert.IsTrue(fx.HouseParty.repeatWhen.Evaluate(fx.Ctx));
+            Assert.IsFalse(fx.OpenMic.repeatWhen.Evaluate(fx.Ctx));
+            Assert.AreEqual(AutomationState.Purchased, Row(window, fx.HouseParty).State);
+            Assert.AreNotEqual(AutomationState.Purchased, Row(window, fx.OpenMic).State);
+            Assert.AreSame(fx.OpenMic, calendar.AutoTarget, "the tap still buys the first in order");
+
+            fx.Give(Purchasing.CostOf(fx.OpenMic.automation, fx.Ctx));
+            fx.Session.Refresh();
+            window.Buy(fx.OpenMic);
+
+            Assert.AreEqual(AutomationState.Purchased, Row(window, fx.OpenMic).State);
+            Assert.IsNull(calendar.AutoTarget, "both visible gigs go again");
+        }
+
+        [Test]
+        public void A_bar_that_becomes_available_while_the_window_is_open_appears_on_the_next_refresh()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var host = fx.Host();
+            Fixture.Calendar(host).OpenAutomation();
+            var window = host.AutomationWindow;
+            CollectionAssert.AreEqual(new[] { fx.OpenMic }, window.Rows.Select(row => row.Bar).ToArray());
+
+            fx.Give(200);
+            fx.Session.TryBuy(fx.Ctx, fx.HousePartyDraw, 1);
+
+            Assert.IsTrue(window.IsOpen);
+            CollectionAssert.AreEqual(new[] { fx.OpenMic, fx.HouseParty },
+                window.Rows.Select(row => row.Bar).ToArray());
+        }
+
+        [Test]
+        public void Dismiss_closes_the_window_and_drops_the_group()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var host = fx.Host();
+            Fixture.Calendar(host).OpenAutomation();
+            var window = host.AutomationWindow;
+            Assert.IsTrue(window.IsOpen);
+
+            window.Dismiss();
+
+            Assert.IsFalse(window.IsOpen);
+            Assert.IsNull(window.ShownGroup);
+            Assert.IsEmpty(window.Rows);
+
+            fx.Session.Refresh();
+            Assert.IsFalse(window.IsOpen, "a refresh does not bring a dismissed window back");
+        }
+
+        private static AutomationWindowUI.Row Row(AutomationWindowUI window, BarDefinition bar) =>
+            window.Rows.Single(row => row.Bar == bar);
+
+        // ---- binding ----
+
+        [Test]
+        public void Binding_a_group_with_a_member_that_is_not_a_bar_throws()
+        {
+            var fx = new Fixture();
+            var loose = TestTree.MakeDefinition<GroupDefinition>("loose_group");
+            try
+            {
+                loose.members.Add(fx.OpenMicDraw);
+                Assert.Throws<InvalidOperationException>(() =>
+                    fx.Widget("leveled_group", "LeveledGroup.uxml", loose));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(loose);
+            }
+        }
+
+        [Test]
+        public void Binding_a_group_with_a_bar_that_names_no_level_throws()
+        {
+            var fx = new Fixture();
+            var loose = TestTree.MakeDefinition<GroupDefinition>("loose_group");
+            var bare = TestTree.MakeDefinition<BarDefinition>("bare_bar");
+            try
+            {
+                loose.members.Add(bare);
+                Assert.Throws<InvalidOperationException>(() =>
+                    fx.Widget("leveled_group", "LeveledGroup.uxml", loose));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(bare);
+                UnityEngine.Object.DestroyImmediate(loose);
+            }
+        }
+
+        // ---- the header rate ----
+
+        // A running gig's completions are income the deposit ledger never sees
+        // (they land in lumps), so the header adds the completion slope to the
+        // deposit slope; the balance itself still rides the deposit slope.
+        [Test]
+        public void The_header_rate_adds_a_running_gigs_completion_slope_to_the_deposit_slope()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Session.SetActiveMembers(fx.Ctx, fx.TheCalendar, new Definition[] { fx.OpenMic });
+            fx.Tick(1);
+            var report = fx.Session.LastTick;
+            Assert.Greater(report.CompletionSlope(fx.Tier2, fx.Cash.Id).ToDouble(), 0, "the gig filled for a second");
+
+            var header = (CurrencyHeaderUI)fx.Widget("currency_line", "CurrencyLine.uxml", fx.Cash);
+            header.Refresh();
+
+            Assert.AreEqual(report.DepositSlope(fx.Tier2, fx.Cash.Id) + report.CompletionSlope(fx.Tier2, fx.Cash.Id),
+                header.ShownRate);
+        }
+
+        [Test]
+        public void The_header_rate_is_the_deposit_slope_alone_for_a_currency_no_bar_pays()
+        {
+            var fx = new Fixture();
+            fx.Tier2.generatorCounts["flyers"] = 1;
+            fx.Tick(1);
+            var report = fx.Session.LastTick;
+            Assert.AreEqual(BigNumber.Zero, report.CompletionSlope(fx.Tier2, fx.Buzz.Id), "no gig pays Buzz");
+            Assert.Greater(report.DepositSlope(fx.Tier2, fx.Buzz.Id).ToDouble(), 0, "a flyer builds Buzz");
+
+            var header = (CurrencyHeaderUI)fx.Widget("currency_line", "CurrencyLine.uxml", fx.Buzz);
+            header.Refresh();
+
+            Assert.AreEqual(report.DepositSlope(fx.Tier2, fx.Buzz.Id), header.ShownRate);
+        }
+    }
+}

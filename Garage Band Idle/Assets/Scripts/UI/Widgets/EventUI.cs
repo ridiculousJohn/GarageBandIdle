@@ -38,6 +38,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // the event, and declaration is ownership (12.3/12.8).
         private InteriorScopeState host;
 
+        // True when the ending button pays the reward (the goal latched); false
+        // when it only dismisses, and false while no attempt is running.
+        public bool ShowsClaim { get; private set; }
+
         public EventUI(VisualElement root) : base(root)
         {
             nameLabel = Require<Label>(root, "name", "EventRow.uxml");
@@ -79,7 +83,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             {
                 // A running attempt has no gate left to explain, and its one
                 // button is the ending - which pays when the goal latched.
-                dismiss.text = record.goalReached ? "Claim reward" : "Dismiss";
+                ShowsClaim = record.goalReached;
+                dismiss.text = ShowsClaim ? "Claim reward" : "Dismiss";
                 dismiss.SetEnabled(EventSystem.CanDismiss(ctx, evt));
                 statusLabel.text = Status(record, hostCtx);
                 foreach (var (_, label) in legViews)
@@ -88,6 +93,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
             }
 
+            ShowsClaim = false;
             start.SetEnabled(EventSystem.CanStart(ctx, evt));
             statusLabel.text = "";
             var unmet = GateFeedback.UnmetLegs(evt.availableWhen, hostCtx);

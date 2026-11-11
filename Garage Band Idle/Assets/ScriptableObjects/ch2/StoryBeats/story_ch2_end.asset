@@ -21,13 +21,13 @@ MonoBehaviour:
     routine, and you win it anyway. A woman who books the club on Third finds you
     at the load-out and asks what else you've got. Dave's already got the van running.
   availableWhen:
-    rid: 1688710450278564009
+    rid: 1688710475815583874
   seenFlag: story_ch2_end_seen
   opensWhenAvailable: 0
   references:
     version: 2
     RefIds:
-    - rid: 1688710450278564009
+    - rid: 1688710475815583874
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Win the Talent Show

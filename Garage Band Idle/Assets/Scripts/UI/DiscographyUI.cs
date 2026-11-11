@@ -22,6 +22,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // which songs already have one.
         private readonly Dictionary<string, TextField> fields = new();
 
+        private readonly List<string> shownSongIds = new();
+
+        // The song ids the window has a row for, in row order.
+        public IReadOnlyList<string> ShownSongIds => shownSongIds;
+
         public DiscographyUI(VisualElement rootElement, RootScopeState root, GameSession session, GameClock clock,
                              Action close)
         {
@@ -65,6 +70,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 row.Add(rename);
                 entries.Add(row);
                 fields[songId] = field;
+                shownSongIds.Add(songId);
             }
         }
 

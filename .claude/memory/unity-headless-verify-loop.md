@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-10T20:46:46.021Z
+  modified: 2026-11-11T03:19:59.549Z
 ---
 
 Unity batchmode is the ONLY compiler allowed here. No Roslyn, csc or dotnet. If batchmode cannot run,
@@ -55,7 +55,27 @@ compilation is unverified: say so and ask John to close the editor.
 - That runner fails about fifteen `ChapterImporterTests` rows every time; they pass headless.
   Batchmode is the verdict.
 
-**The script.** Copy it into the scratchpad as `verify.ps1`; never retype it from recall. Run with
+**Looking at the running game** (learned 2026-11-10; needs John's editor open, which blocks batchmode)
+- `editor_play`, then `capture_game_view` with `source: screen`. His game view is 1080 x 2340.
+- An edit to `Screen.uss` or a `.uxml` while playing blanks the UI: the document reloads and the
+  host is bound to the old tree. Stop, refresh, play again.
+- For a frame or two after a render, `worldBound` is zero or NaN. Wait a call before measuring.
+- Reach the session with reflection on `GameManager`'s private `session` field. Before
+  `editor_stop`, set that field to null: the quit hook then saves nothing, so John's save keeps
+  what he had. Say that I did it.
+- A real mouse gesture: build `UnityEngine.Event`s and send `PointerDownEvent.GetPooled(evt)` and
+  its kin through `root.panel.visualTree.SendEvent`. Setting `target` and sending on an element
+  skips the trickle-down path and proves nothing.
+- `run_tests` output lists every case; filter by class name or it floods the context.
+
+**Shell traps that cost time that day**
+- In `sed`, `\u` in a replacement uppercases the next character. To write a literal backslash,
+  build it with `printf '\134'`. The Edit tool turns `∞` in a replacement into the character
+  itself. After either, check the line with `cat -A`.
+- `python3` is not installed and `python` fails on writes. Use Edit, or `sed` / `awk`.
+
+**The script.** Copy it into the scratchpad as `verify.ps1`; never retype it from recall. The
+scratchpad path changes every session, so fix the `$log` path when copying. Run with
 `-Mode import` or `-Mode tests`.
 
 ```powershell

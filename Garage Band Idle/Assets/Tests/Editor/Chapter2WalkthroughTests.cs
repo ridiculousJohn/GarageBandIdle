@@ -219,14 +219,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new Chapter2();
             f.Enter();
 
-            // opening_cash is the only trigger the switch-in sweep collects:
-            // collection precedes execution, so the reveals reading what it
-            // deposits wait for the next pass (12.5).
+            // opening_cash is the only trigger the switch-in sweep collects.
             AssertClose(5, f.Balance(f.Tier2, f.Cash), "the chapter opens with 5 Cash");
             Assert.AreEqual((BigNumber)0, f.Balance(f.Tier2, f.Fans), "fans");
             Assert.IsEmpty(f.Tier2.generatorCounts, "nothing is hired yet");
-            Assert.IsFalse(f.Ch2.flags.Contains("bookings_revealed"),
-                "the earned total the deposit wrote is read by the NEXT sweep");
             Assert.IsFalse(f.OpenMic.availableWhen.Evaluate(f.Ctx(f.Tier2)),
                 "the gig wants a draw before it can be booked");
 
@@ -236,8 +232,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)0, f.Balance(f.Tier2, f.Cash), "the first draw costs the whole lump");
             Assert.IsTrue(f.OpenMic.availableWhen.Evaluate(f.Ctx(f.Tier2)),
                 "OwnedCountAtLeast(open_mic_draw, 1) opened the gig");
-            Assert.IsTrue(f.Ch2.flags.Contains("bookings_revealed"),
-                "and the buy's own sweep read the earned total");
         }
 
         // ---- 2. the first lump ----
@@ -260,7 +254,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(0.5, f.Balance(f.Tier2, f.Fans), "and its fans");
             Assert.AreEqual((BigNumber)0, f.Progress(f.OpenMic), "the manual team returns to zero");
             Assert.IsFalse(f.Selected(f.OpenMic), "and leaves the set until the player books it again");
-            Assert.IsTrue(f.Ch2.flags.Contains("bookings_revealed"), "the reveal is a ch2 flag a tier trigger set");
         }
 
         // ---- 3. working the crowd ----
@@ -297,10 +290,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var f = new Chapter2();
             f.BookTheOpenMic();
 
-            Assert.AreEqual(3, f.Owned(f.OpenMicDraw), "three draws is the booking's gate");
+            Assert.AreEqual(3, f.Owned(f.OpenMicDraw), "the three draws the fixture bought");
             Assert.IsTrue(f.Ch2.flags.Contains("booked_open_mic"), "the payload flag is a ch2 fact");
-            Assert.IsTrue(f.Ch2.flags.Contains("standing_open_mic_revealed"),
-                "and the reveal its own trigger set at three draws");
 
             var cash = f.Balance(f.Tier2, f.Cash);
             var fans = f.Balance(f.Tier2, f.Fans);

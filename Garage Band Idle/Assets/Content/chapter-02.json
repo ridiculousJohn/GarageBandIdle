@@ -20,22 +20,10 @@
     "booked_botb_qualifier",
     "bulk_booked",
     "favors_owed",
-    "bookings_revealed",
     "office_revealed",
-    "house_party_draw_revealed",
-    "coffeehouse_draw_revealed",
-    "backyard_draw_revealed",
-    "bar_opener_draw_revealed",
-    "botb_qualifier_draw_revealed",
     "mailing_list_revealed",
     "photographer_friend_revealed",
     "zine_writeup_revealed",
-    "standing_open_mic_revealed",
-    "standing_house_party_revealed",
-    "standing_coffeehouse_revealed",
-    "standing_backyard_revealed",
-    "standing_bar_opener_revealed",
-    "standing_botb_qualifier_revealed",
     "crowd_work_1_revealed",
     "crowd_work_2_revealed",
     "street_team_revealed",
@@ -167,7 +155,7 @@
   "sections": [
     {
       "title": "The Calendar",
-      "description": "The nights you have booked. Pick a gig to play it, tap its row to work the crowd, and read your running totals on the lines above.",
+      "description": "The nights you have booked. Tap a gig to play it, tap a playing gig to work the crowd, and use the buttons at the right to raise its draw. Book adds the next gig, and Auto makes the next gig re-book itself.",
       "visibleWhen": {
         "type": "Always"
       },
@@ -199,7 +187,7 @@
           }
         },
         {
-          "prefabId": "group",
+          "prefabId": "leveled_group",
           "contentId": "the_calendar"
         },
         {
@@ -212,61 +200,6 @@
           "visibleWhen": {
             "type": "FlagSet",
             "flagId": "ch2_complete"
-          }
-        }
-      ]
-    },
-    {
-      "title": "Bookings",
-      "description": "A gig's draw is how many people turn up for it. Buy the draw and that gig pays more cash and more fans every time you finish the set.",
-      "visibleWhen": {
-        "type": "FlagSet",
-        "flagId": "bookings_revealed"
-      },
-      "scopeId": "tier2",
-      "modules": [
-        {
-          "prefabId": "generator_row",
-          "contentId": "open_mic_draw"
-        },
-        {
-          "prefabId": "generator_row",
-          "contentId": "house_party_draw",
-          "visibleWhen": {
-            "type": "FlagSet",
-            "flagId": "house_party_draw_revealed"
-          }
-        },
-        {
-          "prefabId": "generator_row",
-          "contentId": "coffeehouse_draw",
-          "visibleWhen": {
-            "type": "FlagSet",
-            "flagId": "coffeehouse_draw_revealed"
-          }
-        },
-        {
-          "prefabId": "generator_row",
-          "contentId": "backyard_draw",
-          "visibleWhen": {
-            "type": "FlagSet",
-            "flagId": "backyard_draw_revealed"
-          }
-        },
-        {
-          "prefabId": "generator_row",
-          "contentId": "bar_opener_draw",
-          "visibleWhen": {
-            "type": "FlagSet",
-            "flagId": "bar_opener_draw_revealed"
-          }
-        },
-        {
-          "prefabId": "generator_row",
-          "contentId": "botb_qualifier_draw",
-          "visibleWhen": {
-            "type": "FlagSet",
-            "flagId": "botb_qualifier_draw_revealed"
           }
         }
       ]
@@ -312,133 +245,13 @@
     },
     {
       "title": "The Office",
-      "description": "Where the band's business gets done. A standing booking makes a gig repeat itself, and the rest buys you more out of every night you play.",
+      "description": "Where the band's business gets done: everything here buys you more out of every night you play.",
       "visibleWhen": {
         "type": "FlagSet",
         "flagId": "office_revealed"
       },
       "scopeId": "tier2",
       "modules": [
-        {
-          "prefabId": "upgrade_row",
-          "contentId": "standing_open_mic",
-          "visibleWhen": {
-            "type": "All",
-            "conditions": [
-              {
-                "type": "FlagSet",
-                "flagId": "standing_open_mic_revealed"
-              },
-              {
-                "type": "Not",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "booked_open_mic"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "prefabId": "upgrade_row",
-          "contentId": "standing_house_party",
-          "visibleWhen": {
-            "type": "All",
-            "conditions": [
-              {
-                "type": "FlagSet",
-                "flagId": "standing_house_party_revealed"
-              },
-              {
-                "type": "Not",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "booked_house_party"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "prefabId": "upgrade_row",
-          "contentId": "standing_coffeehouse",
-          "visibleWhen": {
-            "type": "All",
-            "conditions": [
-              {
-                "type": "FlagSet",
-                "flagId": "standing_coffeehouse_revealed"
-              },
-              {
-                "type": "Not",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "booked_coffeehouse"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "prefabId": "upgrade_row",
-          "contentId": "standing_backyard",
-          "visibleWhen": {
-            "type": "All",
-            "conditions": [
-              {
-                "type": "FlagSet",
-                "flagId": "standing_backyard_revealed"
-              },
-              {
-                "type": "Not",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "booked_backyard"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "prefabId": "upgrade_row",
-          "contentId": "standing_bar_opener",
-          "visibleWhen": {
-            "type": "All",
-            "conditions": [
-              {
-                "type": "FlagSet",
-                "flagId": "standing_bar_opener_revealed"
-              },
-              {
-                "type": "Not",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "booked_bar_opener"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "prefabId": "upgrade_row",
-          "contentId": "standing_botb_qualifier",
-          "visibleWhen": {
-            "type": "All",
-            "conditions": [
-              {
-                "type": "FlagSet",
-                "flagId": "standing_botb_qualifier_revealed"
-              },
-              {
-                "type": "Not",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "booked_botb_qualifier"
-                }
-              }
-            ]
-          }
-        },
         {
           "prefabId": "upgrade_row",
           "contentId": "crowd_work_1",
@@ -730,6 +543,8 @@
             "flagId": "booked_open_mic"
           },
           "tap": "crowd_open_mic",
+          "level": "open_mic_draw",
+          "automation": "standing_open_mic",
           "availableWhen": {
             "type": "OwnedCountAtLeast",
             "generator": "open_mic_draw",
@@ -758,6 +573,8 @@
             "flagId": "booked_house_party"
           },
           "tap": "crowd_house_party",
+          "level": "house_party_draw",
+          "automation": "standing_house_party",
           "availableWhen": {
             "type": "OwnedCountAtLeast",
             "generator": "house_party_draw",
@@ -786,6 +603,8 @@
             "flagId": "booked_coffeehouse"
           },
           "tap": "crowd_coffeehouse",
+          "level": "coffeehouse_draw",
+          "automation": "standing_coffeehouse",
           "availableWhen": {
             "type": "OwnedCountAtLeast",
             "generator": "coffeehouse_draw",
@@ -814,6 +633,8 @@
             "flagId": "booked_backyard"
           },
           "tap": "crowd_backyard",
+          "level": "backyard_draw",
+          "automation": "standing_backyard",
           "availableWhen": {
             "type": "OwnedCountAtLeast",
             "generator": "backyard_draw",
@@ -842,6 +663,8 @@
             "flagId": "booked_bar_opener"
           },
           "tap": "crowd_bar_opener",
+          "level": "bar_opener_draw",
+          "automation": "standing_bar_opener",
           "availableWhen": {
             "type": "OwnedCountAtLeast",
             "generator": "bar_opener_draw",
@@ -870,6 +693,8 @@
             "flagId": "booked_botb_qualifier"
           },
           "tap": "crowd_botb_qualifier",
+          "level": "botb_qualifier_draw",
+          "automation": "standing_botb_qualifier",
           "availableWhen": {
             "type": "OwnedCountAtLeast",
             "generator": "botb_qualifier_draw",
@@ -1169,9 +994,7 @@
           "displayName": "Standing Booking: Open Mic",
           "description": "Puts you on the Tuesday bill for good, so the open mic re-books itself and keeps paying while you are away.",
           "gate": {
-            "type": "OwnedCountAtLeast",
-            "generator": "open_mic_draw",
-            "count": 3
+            "type": "Always"
           },
           "costCurrency": "cash",
           "cost": 120,
@@ -1187,9 +1010,7 @@
           "displayName": "Standing Booking: House Party",
           "description": "Gets your name on every party going around, so the house party re-books itself and keeps paying while you are away.",
           "gate": {
-            "type": "OwnedCountAtLeast",
-            "generator": "house_party_draw",
-            "count": 3
+            "type": "Always"
           },
           "costCurrency": "cash",
           "cost": 2500,
@@ -1205,9 +1026,7 @@
           "displayName": "Standing Booking: Coffeehouse",
           "description": "The coffeehouse starts calling you itself, so the set re-books itself and keeps paying while you are away.",
           "gate": {
-            "type": "OwnedCountAtLeast",
-            "generator": "coffeehouse_draw",
-            "count": 3
+            "type": "Always"
           },
           "costCurrency": "cash",
           "cost": 30000,
@@ -1223,9 +1042,7 @@
           "displayName": "Standing Booking: Backyard",
           "description": "The neighbors keep asking for another one, so the backyard show re-books itself and keeps paying while you are away.",
           "gate": {
-            "type": "OwnedCountAtLeast",
-            "generator": "backyard_draw",
-            "count": 3
+            "type": "Always"
           },
           "costCurrency": "cash",
           "cost": 400000,
@@ -1241,9 +1058,7 @@
           "displayName": "Standing Booking: Bar Opener",
           "description": "The bar keeps you on its calendar, so the opening slot re-books itself and keeps paying while you are away.",
           "gate": {
-            "type": "OwnedCountAtLeast",
-            "generator": "bar_opener_draw",
-            "count": 3
+            "type": "Always"
           },
           "costCurrency": "cash",
           "cost": 6000000,
@@ -1259,9 +1074,7 @@
           "displayName": "Standing Booking: Qualifier",
           "description": "Your name stays in the qualifier draw, so the night re-books itself and keeps paying while you are away.",
           "gate": {
-            "type": "OwnedCountAtLeast",
-            "generator": "botb_qualifier_draw",
-            "count": 3
+            "type": "Always"
           },
           "costCurrency": "cash",
           "cost": 120000000,
@@ -1437,20 +1250,6 @@
           ]
         },
         {
-          "id": "reveal_bookings",
-          "condition": {
-            "type": "EarnedTotalAtLeast",
-            "currency": "cash",
-            "threshold": 1
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "bookings_revealed"
-            }
-          ]
-        },
-        {
           "id": "reveal_office",
           "condition": {
             "type": "EarnedTotalAtLeast",
@@ -1461,76 +1260,6 @@
             {
               "type": "SetFlag",
               "flagId": "office_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_house_party_draw",
-          "condition": {
-            "type": "EarnedTotalAtLeast",
-            "currency": "cash",
-            "threshold": 150
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "house_party_draw_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_coffeehouse_draw",
-          "condition": {
-            "type": "EarnedTotalAtLeast",
-            "currency": "cash",
-            "threshold": 2500
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "coffeehouse_draw_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_backyard_draw",
-          "condition": {
-            "type": "EarnedTotalAtLeast",
-            "currency": "cash",
-            "threshold": 40000
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "backyard_draw_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_bar_opener_draw",
-          "condition": {
-            "type": "EarnedTotalAtLeast",
-            "currency": "cash",
-            "threshold": 700000
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "bar_opener_draw_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_botb_qualifier_draw",
-          "condition": {
-            "type": "EarnedTotalAtLeast",
-            "currency": "cash",
-            "threshold": 15000000
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "botb_qualifier_draw_revealed"
             }
           ]
         },
@@ -1573,90 +1302,6 @@
             {
               "type": "SetFlag",
               "flagId": "zine_writeup_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_standing_open_mic",
-          "condition": {
-            "type": "OwnedCountAtLeast",
-            "generator": "open_mic_draw",
-            "count": 3
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "standing_open_mic_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_standing_house_party",
-          "condition": {
-            "type": "OwnedCountAtLeast",
-            "generator": "house_party_draw",
-            "count": 3
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "standing_house_party_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_standing_coffeehouse",
-          "condition": {
-            "type": "OwnedCountAtLeast",
-            "generator": "coffeehouse_draw",
-            "count": 3
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "standing_coffeehouse_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_standing_backyard",
-          "condition": {
-            "type": "OwnedCountAtLeast",
-            "generator": "backyard_draw",
-            "count": 3
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "standing_backyard_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_standing_bar_opener",
-          "condition": {
-            "type": "OwnedCountAtLeast",
-            "generator": "bar_opener_draw",
-            "count": 3
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "standing_bar_opener_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_standing_botb_qualifier",
-          "condition": {
-            "type": "OwnedCountAtLeast",
-            "generator": "botb_qualifier_draw",
-            "count": 3
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "standing_botb_qualifier_revealed"
             }
           ]
         },

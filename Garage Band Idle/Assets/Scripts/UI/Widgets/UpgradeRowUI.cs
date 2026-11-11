@@ -15,6 +15,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private UpgradeDefinition upgrade;
 
+        // True when the buy button reads as bought.
+        public bool ShownBought { get; private set; }
+
+        // The price on the buy button; zero while ShownBought.
+        public BigNumber ShownCost { get; private set; } = BigNumber.Zero;
+
         public UpgradeRowUI(VisualElement root) : base(root)
         {
             name = Require<Label>(root, "name", "UpgradeRow.uxml");
@@ -44,8 +50,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             var purchased = ctx.IsUpgradePurchased(upgrade.Id);
             Root.EnableInClassList("row-bought", purchased);
             Root.EnableInClassList("row-unaffordable", !purchased && !Purchasing.CanBuy(ctx, upgrade));
+            ShownBought = purchased;
             if (purchased)
             {
+                ShownCost = BigNumber.Zero;
                 buy.text = "Bought";
                 buy.SetEnabled(false);
             }
@@ -53,9 +61,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
             {
                 // The price the command would spend, factor included, read at the
                 // upgrade's declaring scope like the command reads it (12.2).
-                buy.text = NumberFormatter.Format(Purchasing.CostOf(upgrade,
-                               ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade))))
-                           + " " + upgrade.costCurrency.displayName;
+                ShownCost = Purchasing.CostOf(upgrade,
+                    ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade)));
+                buy.text = NumberFormatter.Format(ShownCost) + " " + upgrade.costCurrency.displayName;
                 buy.SetEnabled(Purchasing.CanBuy(ctx, upgrade));
             }
         }

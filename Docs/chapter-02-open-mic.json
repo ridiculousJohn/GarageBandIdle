@@ -8,7 +8,7 @@
     "newInThisChapter": [
       "GIGS are timed bars (`fillCurrency: null`, fill from time). A gig runs its cycle and on completion fires its DRAW generator's yield — the lump of Cash and Fans. Bigger gigs have longer cycles and bigger lumps.",
       "GIG LEVELS: each gig's payout is a generator (`*_draw`) you buy copies of. Owned count scales the lump (decision 2 / B). Buying the first copy is what unlocks the gig at all — Ctrl C's base level cost.",
-      "STANDING BOOKING: a manual gig pays once, returns to zero and drops out of the active set; you book it again by selecting it. A permanent-in-chapter upgrade per gig sets a flag its `repeatWhen` reads, and from then on it re-books itself (E). Auto-booked gigs are the only thing that earns while you are away.",
+      "STANDING BOOKING: a manual gig pays once, returns to zero and drops out of the active set; you book it again by tapping it. A permanent-in-chapter upgrade per gig sets a flag its `repeatWhen` reads, and from then on it re-books itself (E). Auto-booked gigs are the only thing that earns while you are away.",
       "WORK THE CROWD: tapping a gig row fires a producer whose yield pays the BAR — seconds of progress (C, H). Tap never pays Cash. Upgrades make each tap worth more time.",
       "BUZZ is the multiplier layer. Promo generators produce it as a rate; every point of Buzz is +1% on gig CASH payouts (LinearOnBalance). Buzz does not touch Fans — see fans.couplingNote.",
       "BULK BOOKING is autobuy on the draw generators (F). FAVORS is a cost multiplier on them (A).",
@@ -19,7 +19,7 @@
     "modelNotes": {
       "conditions": "Discriminated Condition objects with a `type` field, threshold always `value`. Types used: `currency`, `currencyEarnedTotal`, `ownedCount`, `flagSet`, `compound`, `always`.",
       "gigAsBarPlusGenerator": "Every gig is a PAIR: a bar (the booking, fills from time) and a generator (the draw, whose owned count is the gig's level and whose yield entries are the payout). The bar's `onComplete` is `fireGeneratorYield` naming the draw. Multipliers reach the payout by naming the yield lines (ids) or their tag `gig_payout`; a buff on the BAR (`stat: rate`) would speed the cycle, which nothing in this chapter does — see §11 on prestige never raising a fill rate.",
-      "manualVsStanding": "`repeatWhen: { type: flagSet, flag: booked_<gig> }`. False = the manual team (decision 5): pays, zeros, leaves the active set; the player selects it again to run it again, no new command. True = repeats, keeping the residual. The standing-booking upgrade sets the flag; because the upgrade and flag are permanent-in-chapter, every gig you have automated stays automated across EPs — Ctrl C needed a separate Micromanagement purchase for that, this game gets it from scope.",
+      "manualVsStanding": "`repeatWhen: { type: flagSet, flag: booked_<gig> }`. False = the manual team (decision 5): pays, zeros, leaves the active set; the player taps it again to run it again, no new command. True = repeats, keeping the residual. The standing-booking upgrade sets the flag; because the upgrade and flag are permanent-in-chapter, every gig you have automated stays automated across EPs — Ctrl C needed a separate Micromanagement purchase for that, this game gets it from scope.",
       "tap": "`bar.tap` names a producer (decision 20). The producer's single contribution names the BAR as its target with `feeds: yield`, amount in seconds of progress (C). One producer per gig so the tap lands on the row you tapped; they share the `work_the_crowd` tag so one buff reaches all of them.",
       "buzz": "`constants.buzzBuff` is the friendly shape Ch1 uses for `demoTapesBuff`: a per-point additive multiplier the importer builds as a permanent chapter modifier carrying `LinearOnBalance` on the `buzz` currency, targeting the tag named in `affects`. Buzz is run-scoped and resets with the EP.",
       "maxActive": "The calendar group's `maxActive` equals its bar count — there is no cap on concurrent bookings, exactly as Ctrl C runs every hired team at once. The chapter's decisions are level vs automate vs next tier, not which gigs to hold. Raising a cap by upgrade would need a payload that does not exist; it is not wanted here.",
@@ -80,15 +80,8 @@
     {
       "id": "the_calendar",
       "name": "The Calendar",
-      "modules": [ "module/currency-header", "module/bar-list" ],
-      "note": "Visible from chapter start. The gig rows: each shows its cycle, its progress, a select control that books it (SetActiveBars), and the row itself is the tap (bar.tap). There is NO module/tap here — the Jam button does not exist in this chapter."
-    },
-    {
-      "id": "the_bookings",
-      "name": "Bookings",
-      "modules": [ "module/generator-list" ],
-      "visibleWhen": { "type": "currencyEarnedTotal", "currency": "cash", "value": 1 },
-      "note": "The draw generators — a gig's levels. Appears the moment the first gig pays. UI NOTE: the ideal presentation merges a gig's draw row into its calendar row (level and price beside the bar); until that widget exists this is a separate list and the pairing is by name."
+      "modules": [ "module/currency-header", "module/leveled-group" ],
+      "note": "Visible from chapter start. One card, Ctrl C's levelled bars (design 12.11): each booked gig is one row - its name and draw level, its bar with its earnings per second inside, and the draw's +1 / +max buttons and next price at the right. Tapping a gig that is not running books it (SetActiveMembers); tapping a running gig works the crowd (bar.tap). At the foot, Book buys the first level of the next gig whose draw is offered and starts it, and Auto buys the standing booking of the first visible gig that does not re-book itself. The draws have no list of their own, and there is NO module/tap here - the Jam button does not exist in this chapter."
     },
     {
       "id": "promotion",
@@ -101,7 +94,8 @@
       "id": "the_office",
       "name": "The Office",
       "modules": [ "module/upgrade-list" ],
-      "visibleWhen": { "type": "currencyEarnedTotal", "currency": "cash", "value": 100 }
+      "visibleWhen": { "type": "currencyEarnedTotal", "currency": "cash", "value": 100 },
+      "note": "The run's upgrades and the two permanent switches. The standing bookings are not listed here: the calendar's Auto button sells them, one gig at a time."
     },
     {
       "id": "the_release",
@@ -266,7 +260,7 @@
             "repeatWhen": { "type": "flagSet", "flag": "booked_open_mic" },
             "onComplete": [ { "action": "fireGeneratorYield", "generator": "open_mic_draw" } ],
             "availableWhen": { "type": "ownedCount", "generator": "open_mic_draw", "value": 1 },
-            "note": "Five-second cycle, fills from time alone (fillCurrency null; fillAmount is seconds at fillRate 1). Tapping the row adds a second. On completion fires the draw's yield — count-scaled, multiplied — as the lump. Until the standing-booking flag is set it is the manual team: pays, zeros, drops out of the active set, and you select it to book it again."
+            "note": "Five-second cycle, fills from time alone (fillCurrency null; fillAmount is seconds at fillRate 1). Tapping the row adds a second. On completion fires the draw's yield — count-scaled, multiplied — as the lump. Until the standing-booking flag is set it is the manual team: pays, zeros, drops out of the active set, and you tap it to book it again."
           },
           {
             "id": "house_party",
@@ -358,9 +352,9 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 120 },
-      "gate": { "type": "ownedCount", "generator": "open_mic_draw", "value": 3 },
+      "gate": { "type": "always" },
       "payload": { "effect": "setFlag", "flag": "booked_open_mic" },
-      "note": "The first automation. From here the open mic re-books itself — and earns while you are away, since a repeating time-fed bar settles every crossing over an absence (§12.7, §9). Priced roughly like Ctrl C's hire/auto column: an order of magnitude above the gig's first levels."
+      "note": "The first automation. From here the open mic re-books itself — and earns while you are away, since a repeating time-fed bar settles every crossing over an absence (§12.7, §9). Priced roughly like Ctrl C's hire/auto column: an order of magnitude above the gig's first levels. The gate is open: price alone decides when the calendar's Auto button can buy it."
     },
     {
       "id": "standing_house_party",
@@ -368,7 +362,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 2500 },
-      "gate": { "type": "ownedCount", "generator": "house_party_draw", "value": 3 },
+      "gate": { "type": "always" },
       "payload": { "effect": "setFlag", "flag": "booked_house_party" }
     },
     {
@@ -377,7 +371,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 30000 },
-      "gate": { "type": "ownedCount", "generator": "coffeehouse_draw", "value": 3 },
+      "gate": { "type": "always" },
       "payload": { "effect": "setFlag", "flag": "booked_coffeehouse" }
     },
     {
@@ -386,7 +380,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 400000 },
-      "gate": { "type": "ownedCount", "generator": "backyard_draw", "value": 3 },
+      "gate": { "type": "always" },
       "payload": { "effect": "setFlag", "flag": "booked_backyard" }
     },
     {
@@ -395,7 +389,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 6000000 },
-      "gate": { "type": "ownedCount", "generator": "bar_opener_draw", "value": 3 },
+      "gate": { "type": "always" },
       "payload": { "effect": "setFlag", "flag": "booked_bar_opener" }
     },
     {
@@ -404,7 +398,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 120000000 },
-      "gate": { "type": "ownedCount", "generator": "botb_qualifier_draw", "value": 3 },
+      "gate": { "type": "always" },
       "payload": { "effect": "setFlag", "flag": "booked_botb_qualifier" }
     },
 
@@ -556,7 +550,7 @@
     { "stage": 0, "name": "Tuesday",            "unlocks": "buy the open mic's first level, book it, tap it",  "gate": "chapter open (5 Cash)", "goal": "first lump pays",              "target": "~30 s" },
     { "stage": 1, "name": "Level It",           "unlocks": "draw levels raise the lump",                       "gate": "first payout" },
     { "stage": 2, "name": "Friday",             "unlocks": "house_party_draw",                                 "gate": "150 Cash earned" },
-    { "stage": 3, "name": "Standing Booking",   "unlocks": "the open mic re-books itself; first idle income",  "gate": "3 levels + 120 Cash",   "target": "~3 min" },
+    { "stage": 3, "name": "Standing Booking",   "unlocks": "the open mic re-books itself; first idle income",  "gate": "120 Cash",              "target": "~3 min" },
     { "stage": 4, "name": "Flyers",             "unlocks": "Buzz layer (flag: promo)",                         "gate": "200 Cash held" },
     { "stage": 5, "name": "Record an EP",       "unlocks": "prestige",                                         "gate": "300 Fans",              "target": "~8-10 min from chapter open" },
     { "stage": 6, "name": "Hire the Crew",      "unlocks": "Roadie allocation",                                "gate": "1 EP" },
@@ -578,7 +572,7 @@
       "buzzBuff.perUnit (0.01) — how much the second spend matters."
     ],
     "watchList": [
-      "If the manual phase of each new gig feels like a chore rather than a hook, lower its standing booking's gate from 3 levels to 2 before touching prices.",
+      "If the manual phase of each new gig feels like a chore rather than a hook, lower its standing booking's price: the booking has no gate of its own, so the price is the whole knob.",
       "If Fans per run flatten because nothing multiplies them, that is by design - raise draw Fans lines or the_van, never add an EPs or Buzz term to Fans.",
       "If players park on the open mic and never buy up, the higher draws' unlock thresholds (currencyEarnedTotal) are too far apart.",
       "The chapter must not overstay: if estEpCyclesToCapstone drifts above ~14, lower the gate rather than adding content."

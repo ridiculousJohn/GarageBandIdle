@@ -94,4 +94,12 @@
             <ui:Button name="info-close" text="Back" class="overlay-close" />
         </ui:VisualElement>
     </ui:VisualElement>
+    <ui:VisualElement name="automation-window" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel automation-panel">
+            <ui:Label text="Auto" class="modal-title" />
+            <ui:Label text="Gigs with Auto re-book themselves: each one starts again the moment it finishes." class="info-description" />
+            <ui:VisualElement name="automation-rows" class="automation-rows" />
+            <ui:Button name="automation-close" text="Dismiss" class="overlay-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
 </ui:UXML>

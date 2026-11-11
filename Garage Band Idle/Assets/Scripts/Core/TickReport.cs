@@ -28,11 +28,20 @@ namespace RidiculousGaming.GarageBandIdle
         private readonly Dictionary<(ScopeState, string), BigNumber> depositNet = new();
         private readonly Dictionary<(ScopeState, string), BigNumber> barFill = new();
 
+        // What the drawing bars' completions are worth to each currency, keyed
+        // like depositNet by the currency's home and id (12.9): each bar's
+        // one-completion payout times the fraction of a cycle it filled. A
+        // ledger of its own and never a deposit, because the lump lands in
+        // bursts at the crossing - the deposit slope the readout interpolates
+        // by must not carry it, and a rate line that reads income must.
+        private readonly Dictionary<(ScopeState, string), BigNumber> completionIncome = new();
+
         public TickReport(double seconds) => Seconds = seconds;
 
-        // The three recording sites. The amounts are what actually landed, not
-        // what was wanted: a stalled bar records the short draw and the short
-        // fill, which is the pair a display needs.
+        // The recording sites. The amounts are what actually landed, not what
+        // was wanted: a stalled bar records the short draw and the short fill,
+        // which is the pair a display needs, and the income its short fill is
+        // worth.
         public void RecordDeposit(ScopeState home, string id, BigNumber amount) =>
             Add(depositNet, home, id, amount);
 
@@ -42,6 +51,9 @@ namespace RidiculousGaming.GarageBandIdle
         public void RecordFill(ScopeState scope, string barId, BigNumber amount) =>
             Add(barFill, scope, barId, amount);
 
+        public void RecordCompletionIncome(ScopeState home, string currencyId, BigNumber amount) =>
+            Add(completionIncome, home, currencyId, amount);
+
         // Unrecorded is zero, never a miss - a tick that moved nothing at a
         // key is indistinguishable from one that moved zero there.
         public BigNumber DepositNet(ScopeState home, string id) =>
@@ -50,6 +62,9 @@ namespace RidiculousGaming.GarageBandIdle
         public BigNumber BarFill(ScopeState scope, string barId) =>
             barFill.TryGetValue((scope, barId), out var value) ? value : BigNumber.Zero;
 
+        public BigNumber CompletionIncome(ScopeState home, string currencyId) =>
+            completionIncome.TryGetValue((home, currencyId), out var value) ? value : BigNumber.Zero;
+
         // Per real second. An empty report has no slope, so a nonpositive
         // Seconds answers zero rather than dividing by it.
         public BigNumber DepositSlope(ScopeState home, string id) =>
@@ -57,6 +72,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         public BigNumber BarSlope(ScopeState scope, string barId) =>
             Slope(BarFill(scope, barId));
+
+        public BigNumber CompletionSlope(ScopeState home, string currencyId) =>
+            Slope(CompletionIncome(home, currencyId));
 
         private BigNumber Slope(BigNumber moved) =>
             Seconds > 0 ? moved / (BigNumber)Seconds : BigNumber.Zero;

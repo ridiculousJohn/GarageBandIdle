@@ -62,6 +62,20 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // it does not choose.
         public ProducerDefinition tap;
 
+        // The generator whose owned count is this bar's level, resolved outward
+        // from the bar's scope (design doc 12.7); a row that shows the bar with
+        // its level reads the count, the cost and the buy buttons from it (12.11).
+        // Null is a bar with no level. The reference is the row's to read: what
+        // a completion pays is still its onComplete list's answer.
+        public GeneratorDefinition level;
+
+        // The upgrade whose purchase makes this bar go again by itself, resolved
+        // outward from the bar's scope (design doc 12.7). Null is a bar nothing
+        // automates. Whether the bar IS automated is never this reference's
+        // answer: it is repeatWhen holding at the bar's home, which is what the
+        // purchase flips.
+        public UpgradeDefinition automation;
+
         [SerializeReference, SubclassPicker] public Condition availableWhen;
         [SerializeReference, SubclassPicker] public List<GameAction> onComplete = new();
         public List<PerFillEntry> perFill = new();

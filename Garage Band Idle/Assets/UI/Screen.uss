@@ -134,8 +134,8 @@ Label {
     display: none;
 }
 
-/* A group sharing the headline's section (chapter 2's calendar) is still a
-   card of rows beneath it. */
+/* A group sharing the headline's section (chapter 2's calendar, a levelled
+   group) is still a card of rows beneath it. */
 .section-hero .members {
     background-color: rgb(31, 31, 31);
     border-radius: 38px;
@@ -345,6 +345,108 @@ Label {
     -unity-text-align: middle-right;
 }
 
+/* ---- the levelled group ---- */
+
+/* One row per gig: the name and level over a tall fill with the earnings
+   printed inside it, the level's buy buttons and price at the right. The
+   card itself is a group card (members). */
+.leveled-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 22px 0;
+}
+
+.leveled-text {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    margin-right: 24px;
+}
+
+.leveled-title {
+    margin-bottom: 10px;
+}
+
+.leveled-fill {
+    margin: 0;
+}
+
+/* The theme fixes the container's height and the background shrinks to it,
+   so the height is set on both. */
+.leveled-fill .unity-progress-bar__container {
+    height: 64px;
+    min-height: 64px;
+}
+
+.leveled-fill .unity-progress-bar__background {
+    height: 64px;
+    flex-shrink: 0;
+    background-color: rgb(58, 58, 58);
+    border-width: 0;
+    border-radius: 14px;
+}
+
+.leveled-fill .unity-progress-bar__progress {
+    background-color: rgb(226, 75, 74);
+    border-radius: 14px;
+}
+
+/* The earnings sit over the fill and stay legible on a dimmed row. */
+.leveled-fill .unity-progress-bar__title {
+    font-size: 32px;
+    color: rgb(242, 242, 242);
+    -unity-text-align: middle-center;
+}
+
+/* A gig that is available and not running waits for a tap: its bar is
+   outlined in the accent colour. */
+.leveled-idle .unity-progress-bar__background {
+    border-width: 4px;
+    border-color: rgb(226, 75, 74);
+}
+
+.leveled-buy {
+    align-items: flex-end;
+    min-width: 240px;
+}
+
+.leveled-buttons {
+    flex-direction: row;
+}
+
+.leveled-cost {
+    -unity-text-align: middle-right;
+}
+
+/* Book and Auto, side by side at the foot of the card, text actions in the
+   accent colour like every action that commits something. */
+.leveled-footer {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0 8px 0;
+}
+
+.leveled-book, .leveled-auto {
+    color: rgb(240, 149, 149);
+}
+
+.leveled-book {
+    flex-shrink: 1;
+    white-space: normal;
+    -unity-text-align: middle-left;
+}
+
+.leveled-auto {
+    -unity-text-align: middle-right;
+}
+
+/* Auto while its target cannot be afforded: dimmed like a disabled button,
+   and still pressable so the hold opens the window. */
+.leveled-auto-unaffordable {
+    color: rgb(111, 111, 111);
+}
+
 /* ---- gates, previews, the release ---- */
 
 .legs {
@@ -515,6 +617,42 @@ Label {
 
 .info-line {
     margin-bottom: 24px;
+}
+
+/* The automation window: each gig's name takes the width its action leaves
+   and wraps at a word; the action keeps its own width. Buy is the accent
+   text every committing action is; Purchased and a price are grey and not
+   pressable. */
+.automation-rows {
+    margin-bottom: 24px;
+}
+
+.automation-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 16px 0;
+}
+
+.automation-name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    white-space: normal;
+}
+
+.automation-action {
+    flex-shrink: 0;
+    margin-left: 24px;
+    padding: 18px 8px;
+    -unity-text-align: middle-right;
+}
+
+.automation-action:disabled {
+    color: rgb(168, 168, 168);
+}
+
+.automation-buy {
+    color: rgb(240, 149, 149);
 }
 
 .roadie-row {

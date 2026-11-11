@@ -102,12 +102,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "booked_open_mic", "booked_house_party", "booked_coffeehouse",
                 "booked_backyard", "booked_bar_opener", "booked_botb_qualifier",
                 "bulk_booked", "favors_owed",
-                "bookings_revealed", "office_revealed",
-                "house_party_draw_revealed", "coffeehouse_draw_revealed", "backyard_draw_revealed",
-                "bar_opener_draw_revealed", "botb_qualifier_draw_revealed",
+                "office_revealed",
                 "mailing_list_revealed", "photographer_friend_revealed", "zine_writeup_revealed",
-                "standing_open_mic_revealed", "standing_house_party_revealed", "standing_coffeehouse_revealed",
-                "standing_backyard_revealed", "standing_bar_opener_revealed", "standing_botb_qualifier_revealed",
                 "crowd_work_1_revealed", "crowd_work_2_revealed", "street_team_revealed",
                 "merch_table_revealed", "the_van_revealed",
             }, ch2.declaredFlags.ToArray());
@@ -117,7 +113,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(
                 new[] { "bulk_booking_switch", "favors_discount", "eps_income" }, Ids(ch2.permanentModifiers));
             Assert.AreEqual(new[] { "story_ch2_open", "story_ch2_end" }, Ids(ch2.storyBeats));
-            Assert.AreEqual(7, ch2.sections.Count, "only a chapter has a screen, and this is all of it");
+            Assert.AreEqual(6, ch2.sections.Count, "only a chapter has a screen, and this is all of it");
             Assert.AreEqual(0, ch2.events.Count, "the Battle chain hosts at tier2, where its resets reach");
 
             // The run: income is root's, so the tier declares only the four
@@ -145,18 +141,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Ids(tier2.upgrades));
             Assert.AreEqual(new[] { "battle_1", "battle_2", "battle_3" }, Ids(tier2.events));
 
-            // The opening grant plus twenty-three reveals, hosted at tier2 where
-            // the gates they copy read; the chapter hosts none.
+            // The opening grant plus eleven reveals, hosted at tier2 where the
+            // gates they copy read; the chapter hosts none. The gigs, their
+            // draws and their automations need no reveal: the calendar's own
+            // Book and Auto buttons show the next one (12.11).
             Assert.AreEqual(0, ch2.triggers.Count);
-            Assert.AreEqual(24, tier2.triggers.Count);
+            Assert.AreEqual(12, tier2.triggers.Count);
             CollectionAssert.AreEquivalent(new[]
             {
-                "opening_cash", "reveal_promo", "reveal_bookings", "reveal_office",
-                "reveal_house_party_draw", "reveal_coffeehouse_draw", "reveal_backyard_draw",
-                "reveal_bar_opener_draw", "reveal_botb_qualifier_draw",
+                "opening_cash", "reveal_promo", "reveal_office",
                 "reveal_mailing_list", "reveal_photographer_friend", "reveal_zine_writeup",
-                "reveal_standing_open_mic", "reveal_standing_house_party", "reveal_standing_coffeehouse",
-                "reveal_standing_backyard", "reveal_standing_bar_opener", "reveal_standing_botb_qualifier",
                 "reveal_crowd_work_1", "reveal_crowd_work_2", "reveal_street_team",
                 "reveal_merch_table", "reveal_the_van", "reveal_release",
             }, Ids(tier2.triggers));
@@ -286,7 +280,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // A standing booking carries no effect at all: what it buys is the flag
         // the bar's repeatWhen reads, homed at the chapter so the automation
-        // outlives the EP that clears the levels.
+        // outlives the EP that clears the levels. Automation is gated by price
+        // alone, so every booking's gate is open.
         [Test]
         public void The_standing_booking_buys_a_chapter_flag_and_nothing_else()
         {
@@ -294,9 +289,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual("cash", standing.costCurrency.Id);
             Assert.AreEqual((BigNumber)120, standing.cost);
-            Assert.AreEqual("owned open_mic_draw 3", Describe(standing.gate));
             Assert.AreEqual(0, standing.effects.Count);
             Assert.AreEqual("booked_open_mic", ((SetFlag)standing.actions.Single()).flagId);
+            foreach (var id in new[] { "standing_open_mic", "standing_house_party", "standing_coffeehouse",
+                                       "standing_backyard", "standing_bar_opener", "standing_botb_qualifier" })
+                Assert.IsInstanceOf<Always>(Find(tier2.upgrades, id).gate, id);
+        }
+
+        // Every gig names the draw its completion fires as its level and the
+        // booking whose flag its repeatWhen reads as its automation (12.7).
+        [Test]
+        public void Each_gig_names_its_draw_as_level_and_its_booking_as_automation()
+        {
+            foreach (var bar in tier2.bars)
+            {
+                Assert.AreSame(((FireGeneratorYield)bar.onComplete.Single()).generator, bar.level, bar.Id);
+                Assert.IsNotNull(bar.automation, bar.Id);
+                Assert.AreEqual(((FlagSet)bar.repeatWhen).flagId,
+                    ((SetFlag)bar.automation.actions.Single()).flagId, bar.Id);
+                Assert.IsTrue(tier2.generators.Contains(bar.level), bar.Id);
+                Assert.IsTrue(tier2.upgrades.Contains(bar.automation), bar.Id);
+            }
         }
 
         // ---- the rungs ----
@@ -384,18 +397,38 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         [Test]
         public void The_release_region_evaluates_at_the_chapter_and_presses_the_tier_rung()
         {
-            var release = ch2.sections[4];
+            var release = ch2.sections[3];
 
             Assert.AreEqual("The Release", release.title);
             Assert.AreEqual("flag album", Describe(release.visibleWhen));
             Assert.AreEqual("ch2", release.scope.Id);
-            Assert.AreEqual(new[] { "rung_button - @tier2" }, Modules(4));
+            Assert.AreEqual(new[] { "rung_button - @tier2" }, Modules(3));
 
             // The capstone button presses its own scope's rung, so the default -
             // the section's ch2 - is what it wants.
-            Assert.AreEqual("The Talent Show", ch2.sections[6].title);
-            Assert.AreEqual("ch2", ch2.sections[6].scope.Id);
-            Assert.AreEqual(new[] { "rung_button - @ch2" }, Modules(6));
+            Assert.AreEqual("The Talent Show", ch2.sections[5].title);
+            Assert.AreEqual("ch2", ch2.sections[5].scope.Id);
+            Assert.AreEqual(new[] { "rung_button - @ch2" }, Modules(5));
+        }
+
+        // The calendar is one levelled card: each gig with its draw, Book and
+        // Auto at its foot (12.11) - so no section lists the draws and the
+        // Office lists no standing booking.
+        [Test]
+        public void The_calendar_is_a_levelled_group_and_no_other_section_lists_a_gigs_draw_or_booking()
+        {
+            Assert.AreEqual("The Calendar", ch2.sections[0].title);
+            Assert.Contains("leveled_group the_calendar @tier2", Modules(0));
+
+            var levels = tier2.bars.Select(b => b.level).ToList();
+            var automations = tier2.bars.Select(b => b.automation).ToList();
+            foreach (var module in ch2.sections.SelectMany(s => s.modules))
+            {
+                Assert.IsFalse(levels.Contains(module.content as GeneratorDefinition),
+                    $"{module.prefabId} {module.content?.Id} shows a draw the calendar row already shows");
+                Assert.IsFalse(automations.Contains(module.content as UpgradeDefinition),
+                    $"{module.prefabId} {module.content?.Id} shows a booking the Auto button already sells");
+            }
         }
 
         // ---- helpers ----

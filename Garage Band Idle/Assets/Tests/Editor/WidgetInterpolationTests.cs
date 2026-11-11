@@ -35,13 +35,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void OpenGeneratorInfo(Economy.GeneratorDefinition generator, ScopeState scope) { }
         }
 
+        // The one thing a levelled group's Auto asks of the host, answered by
+        // nothing for the same reason.
+        private sealed class NoAutomations : IAutomationOpener
+        {
+            public static readonly NoAutomations Instance = new();
+
+            public void OpenAutomation(Economy.GroupDefinition group, ScopeState scope) { }
+        }
+
         // Computed amounts within tolerance, never bit-exact, for the reason
         // SessionPacingTests gives: BigDouble's base-10 mantissa is
-        // binary-inexact. Label strings are compared exactly - a display string
-        // is the thing under test.
+        // binary-inexact. What a widget shows is read as the number it holds
+        // for its label, never as the label's wording.
         private static void AssertClose(double expected, double actual, string what = null) =>
             Assert.AreEqual(expected, actual,
                 Math.Max(1e-9, Math.Abs(expected) * 1e-12), what ?? string.Empty);
+
+        private static void AssertClose(double expected, BigNumber actual, string what = null) =>
+            AssertClose(expected, actual.ToDouble(), what);
 
         // A live session over the standing tree, plus the clock the widgets
         // read. The stamp at Now makes the entry skip the idle offer.
@@ -90,7 +102,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
                 Assert.IsNotNull(registry, "Assets/Settings/ModuleRegistry.asset is missing.");
                 var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), registry,
-                    NoStories.Instance, NoInfos.Instance);
+                    NoStories.Instance, NoInfos.Instance, NoAutomations.Instance);
                 widget.Bind(Session, Tree.Tier1, content, Clock);
                 return widget;
             }
@@ -152,18 +164,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // 0.5/s produced against the cover's 2/s draw: truth 8.5, slope -1.5/s.
             fx.Session.Tick(1, fx.At(1));
 
-            var widget = fx.Widget("currency_line", "CurrencyLine.uxml", fx.Tree.Rehearsal);
-            var value = widget.Root.Q<Label>("value");
+            var widget = (CurrencyHeaderUI)fx.Widget("currency_line", "CurrencyLine.uxml", fx.Tree.Rehearsal);
             widget.Refresh();
-            Assert.AreEqual("8.50", value.text);
+            AssertClose(8.5, widget.ShownValue);
 
             fx.Clock.Frame(fx.At(1), 1);
             widget.Interpolate();
-            Assert.AreEqual("7.00", value.text);
+            AssertClose(7, widget.ShownValue);
 
             fx.Clock.Frame(fx.At(10), 9);
             widget.Interpolate();
-            Assert.AreEqual("0.00", value.text, "ten seconds of that slope would read -6.5");
+            AssertClose(0, widget.ShownValue, "ten seconds of that slope would read -6.5");
         }
 
         // A bar that overfilled in the tick that completed it: progress is
@@ -181,17 +192,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Session.Tick(1, fx.At(1));
             AssertClose(101, fx.Tree.Tier1.barProgress["cover_1"].ToDouble(), "progress is uncapped");
 
+            // The group draws the row and the row owns the clamp, so the group's
+            // fill is read beside a row over the same bar, session and clock,
+            // whose shown progress is the figure the label prints.
             var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
             widget.Refresh();
-            var row = widget.Root.Q<VisualElement>(className: "bar-row");
-            var progress = row.Q<Label>(className: "bar-progress");
-            var fill = row.Q<ProgressBar>(className: "bar-fill");
-            Assert.AreEqual("100.00 / 100.00", progress.text);
+            var fill = widget.Root.Q<VisualElement>(className: "bar-row").Q<ProgressBar>(className: "bar-fill");
+            var bar = new BarRowUI(fx.Session, fx.Tree.Tier1, fx.Clock, fx.Tree.Cover1);
+            bar.Refresh();
+            AssertClose(100, bar.ShownProgress);
             AssertClose(100, fill.value);
 
             fx.Clock.Frame(fx.At(2), 1);
             widget.Interpolate();
-            Assert.AreEqual("100.00 / 100.00", progress.text, "a second of the 2/s slope changes nothing");
+            bar.Interpolate();
+            AssertClose(100, bar.ShownProgress, "a second of the 2/s slope changes nothing");
             AssertClose(100, fill.value);
         }
 
@@ -206,13 +221,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Session.Tick(10, fx.At(10));
             fx.Clock.Frame(fx.At(10), 10);
 
-            var widget = fx.Widget("currency_line", "CurrencyLine.uxml", fx.Tree.Cash);
-            var value = widget.Root.Q<Label>("value");
+            var widget = (CurrencyHeaderUI)fx.Widget("currency_line", "CurrencyLine.uxml", fx.Tree.Cash);
             widget.Refresh();
-            Assert.AreEqual("5.00", value.text, "ten seconds at 0.5/s");
+            var truth = new GameContext(fx.Tree.Tier1, fx.At(10)).GetBalance("cash");
+            AssertClose(5, truth, "ten seconds at 0.5/s");
+            Assert.AreEqual(truth, widget.ShownValue, "the snap shows truth exactly");
 
             widget.Interpolate();
-            Assert.AreEqual("5.00", value.text);
+            Assert.AreEqual(truth, widget.ShownValue, "and so does the frame that refreshed");
         }
 
         // The row's count follows the granted slope the last tick realized,
@@ -233,14 +249,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Session.Tick(10, fx.At(10));
             fx.Clock.Frame(fx.At(10), 10);
 
-            var widget = fx.Widget("generator_row", "GeneratorRow.uxml", fx.Tree.PracticeAmp);
-            var count = widget.Root.Q<Label>("count");
+            var widget = (GeneratorRowUI)fx.Widget("generator_row", "GeneratorRow.uxml", fx.Tree.PracticeAmp);
             widget.Refresh();
-            Assert.AreEqual("(3+2.50)", count.text);
+            Assert.AreEqual(3, widget.ShownPurchased);
+            AssertClose(2.5, widget.ShownGranted);
 
             fx.Clock.Frame(fx.At(12), 2);
             widget.Interpolate();
-            Assert.AreEqual("(3+3.00)", count.text, "two seconds of the slope, the purchased three unmoved");
+            Assert.AreEqual(3, widget.ShownPurchased, "the purchased three unmoved");
+            AssertClose(3, widget.ShownGranted, "two seconds of the slope");
         }
 
         // The preview names the TARGET of each yield line whatever kind it is
@@ -252,13 +269,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fx = new Fixture(tree =>
                 tree.TapProducer.produces.Add(TestTree.Entry(tree.PracticeAmp, Economy.Stat.Yield, 2)));
 
-            var widget = fx.Widget("jam_button", "JamButton.uxml", fx.Tree.TapProducer);
+            var widget = (JamButtonUI)fx.Widget("jam_button", "JamButton.uxml", fx.Tree.TapProducer);
             widget.Refresh();
 
             // The rehearsal lines sit behind their reveal and pay nothing, and a
             // line paying nothing is not a line.
-            Assert.AreEqual("+1.00 cash, +2.00 practice_amp",
-                widget.Root.Q<Label>("yield").text);
+            var yields = widget.ShownYields;
+            Assert.AreEqual(2, yields.Count, "cash and the amp, and nothing else");
+            Assert.AreSame(fx.Tree.Cash, yields[0].target);
+            AssertClose(1, yields[0].amount);
+            Assert.AreSame(fx.Tree.PracticeAmp, yields[1].target, "the generator line names the generator");
+            AssertClose(2, yields[1].amount);
         }
 
         // The row is the tap target when the bar names a producer (12.11): the
@@ -311,21 +332,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // fills once and stays full is finished, and one that goes again is
         // between fills however full it stands.
         [Test]
-        public void OnlyABarThatCompletesOnceEverPrintsDone()
+        public void OnlyABarThatCompletesOnceEverIsMarkedDone()
         {
             var fx = new Fixture(tree => tree.Cover2.repeatWhen = new Always());
             fx.Tree.Tier1.barProgress["cover_1"] = 100;
             fx.Tree.Tier1.barProgress["cover_2"] = 300;
 
-            var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
+            var widget = (GroupUI)fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
             widget.Refresh();
             var rows = widget.Root.Query<VisualElement>(className: "member-row").ToList();
             var once = rows[0].Q<Button>(className: "member-select");
             var loop = rows[1].Q<Button>(className: "member-select");
 
-            Assert.AreEqual("Done", once.text, "cover_1 fills once and stays full");
+            Assert.AreEqual(MemberMark.Done, widget.Mark(fx.Tree.Cover1), "cover_1 fills once and stays full");
             Assert.IsFalse(once.enabledSelf, "and nothing reselects it");
-            Assert.AreEqual("Select", loop.text, "cover_2 goes again, so full is between fills");
+            Assert.AreEqual(MemberMark.Select, widget.Mark(fx.Tree.Cover2), "cover_2 goes again, so full is between fills");
             Assert.IsTrue(loop.enabledSelf);
         }
 
@@ -353,7 +374,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // the currency (12.11).
             var readouts = widget.Root.Query<VisualElement>(className: "consumed-readout").ToList();
             Assert.AreEqual(1, readouts.Count, "the three covers all drink rehearsal");
-            Assert.AreEqual("rehearsal", readouts[0].Q<Label>().text);
+            Assert.AreEqual(fx.Tree.Rehearsal.displayName, readouts[0].Q<Label>().text, "the currency's own name");
         }
 
         // The select control TOGGLES (12.7), so it reads the group's own set
@@ -365,22 +386,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var fx = new Fixture();
 
-            var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
+            var widget = (GroupUI)fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
             widget.Refresh();
             var select = widget.Root.Q<VisualElement>(className: "member-row").Q<Button>(className: "member-select");
-            Assert.AreEqual("Select", select.text);
+            Assert.AreEqual(MemberMark.Select, widget.Mark(fx.Tree.Cover1));
             Assert.IsTrue(select.enabledSelf);
 
             // No host is present to answer the command's refresh, so the
             // repaint is asked for here.
             fx.SelectCover1();
             widget.Refresh();
-            Assert.AreEqual("Selected", select.text);
+            Assert.AreEqual(MemberMark.Selected, widget.Mark(fx.Tree.Cover1));
             Assert.IsTrue(select.enabledSelf, "the same control is how the player lets go");
 
             fx.Session.SetActiveMembers(fx.Ctx(0), fx.Tree.LearnCovers, new Definition[0]);
             widget.Refresh();
-            Assert.AreEqual("Select", select.text, "and the set it reads is the group's own");
+            Assert.AreEqual(MemberMark.Select, widget.Mark(fx.Tree.Cover1), "and the set it reads is the group's own");
         }
 
         // A command leaves the tick's report standing: the tap's yield snaps in
@@ -398,14 +419,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Session.FireProducer(fx.Ctx(10), fx.Tree.TapProducer);
             Assert.AreSame(report, fx.Session.LastTick, "the tap touched nothing the tick owns");
 
-            var widget = fx.Widget("currency_line", "CurrencyLine.uxml", fx.Tree.Cash);
-            var value = widget.Root.Q<Label>("value");
+            var widget = (CurrencyHeaderUI)fx.Widget("currency_line", "CurrencyLine.uxml", fx.Tree.Cash);
             widget.Refresh();
-            Assert.AreEqual("6.00", value.text, "five from the tick plus the tap's yield");
+            AssertClose(6, widget.ShownValue, "five from the tick plus the tap's yield");
 
             fx.Clock.Frame(fx.At(14), 4);
             widget.Interpolate();
-            Assert.AreEqual("8.00", value.text, "four seconds at the amp's 0.5/s, on top of the tap");
+            AssertClose(8, widget.ShownValue, "four seconds at the amp's 0.5/s, on top of the tap");
         }
     }
 }

@@ -18,7 +18,7 @@ MonoBehaviour:
   description: Puts you on the Tuesday bill for good, so the open mic re-books itself
     and keeps paying while you are away.
   gate:
-    rid: 1688710450278564017
+    rid: 1688710475815583880
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
   cost:
     _value:
@@ -26,20 +26,15 @@ MonoBehaviour:
       exponent: 2
   effects: []
   actions:
-  - rid: 1688710450278564018
+  - rid: 1688710475815583881
   references:
     version: 2
     RefIds:
-    - rid: 1688710450278564017
-      type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+    - rid: 1688710475815583880
+      type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        generator: {fileID: 11400000, guid: edf09e3dfa9244647bc2776a145bd91f, type: 2}
-        count:
-          _value:
-            mantissa: 3
-            exponent: 0
-    - rid: 1688710450278564018
+    - rid: 1688710475815583881
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: booked_open_mic

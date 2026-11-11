@@ -902,6 +902,59 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var bar = Load<BarDefinition>("ch1/Bars/cover_1.asset");
             Assert.IsNull(bar.repeatWhen, "a bar that fills once and stays full");
             Assert.IsNull(bar.tap, "and a row that is not a tap target");
+            Assert.IsNull(bar.level, "a bar with no level");
+            Assert.IsNull(bar.automation, "and one nothing automates");
+        }
+
+        // A bar's level is a generator and its automation an upgrade, both
+        // ordinary references resolved from the bar's own scope like its tap
+        // (12.7).
+        private static string LevelledBarJson => BarJson
+            .Replace(@"""tap"": ""roadie"",", @"""tap"": ""roadie"", ""level"": ""draw"", ""automation"": ""standing"",")
+            .Replace(@"""groups"": [", @"""generators"": [
+                {
+                    ""id"": ""draw"",
+                    ""displayName"": ""Draw"",
+                    ""availableWhen"": { ""type"": ""Always"" },
+                    ""costCurrency"": ""cash"",
+                    ""baseCost"": 5,
+                    ""growth"": 1.3,
+                    ""produces"": [{ ""currency"": ""cash"", ""stat"": ""rate"", ""value"": 1 }]
+                }
+            ],
+            ""upgrades"": [
+                {
+                    ""id"": ""standing"",
+                    ""displayName"": ""Standing Booking"",
+                    ""gate"": { ""type"": ""Always"" },
+                    ""costCurrency"": ""cash"",
+                    ""cost"": 10,
+                    ""actions"": [{ ""type"": ""SetFlag"", ""flagId"": ""auto_repeat"" }]
+                }
+            ],
+            ""groups"": [");
+
+        [Test]
+        public void A_bars_level_generator_and_automation_upgrade_import()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson);
+
+            Import();
+
+            var bar = Load<BarDefinition>("ch1/Bars/cover_1.asset");
+            Assert.AreSame(Load<GeneratorDefinition>("ch1/Generators/draw.asset"), bar.level,
+                "the reference is the asset, not a copy");
+            Assert.AreSame(Load<UpgradeDefinition>("ch1/Upgrades/standing.asset"), bar.automation);
+        }
+
+        [Test]
+        public void A_bars_level_naming_an_upgrade_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson.Replace(@"""level"": ""draw""", @"""level"": ""standing"""));
+
+            Assert.Throws<ContentImportException>(Import);
         }
 
         // The bool is gone from the JSON too: a document still authoring it

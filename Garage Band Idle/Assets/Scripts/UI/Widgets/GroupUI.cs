@@ -5,6 +5,10 @@ using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
+    // The state a member's select button shows: Done for a fill-once bar at
+    // full, Selected for an active member, Select for the rest.
+    public enum MemberMark { Select, Selected, Done }
+
     // The module over ONE group (design doc 12.11), bound by contentId exactly
     // as a generator row binds one generator: the currencies its bars consume,
     // then every member rendered with the row its own kind already has and one
@@ -24,13 +28,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
             public BarRowUI Row;                // a bar member's, null for the rest
             public ModuleWidget Widget;         // every other kind's, null for a bar
             public Button Select;
+            public MemberMark Mark;             // the state the Select button's text reads as
         }
 
         private readonly ModuleRegistry registry;
         private readonly IStoryOpener stories;
         private readonly IGeneratorInfoOpener infos;
+        private readonly IAutomationOpener automations;
         private readonly VisualElement members;
         private readonly List<CurrencyReadout> readouts = new();
+        private readonly List<CurrencyDefinition> readoutCurrencies = new();   // parallel to readouts
         private readonly List<MemberView> views = new();
 
         private GroupDefinition group;
@@ -40,11 +47,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private ScopeState declaring;
 
         public GroupUI(VisualElement root, ModuleRegistry registry, IStoryOpener stories,
-                       IGeneratorInfoOpener infos) : base(root)
+                       IGeneratorInfoOpener infos, IAutomationOpener automations) : base(root)
         {
             this.registry = registry;
             this.stories = stories;
             this.infos = infos;
+            this.automations = automations;
             members = Require<VisualElement>(root, "members", "Group.uxml");
         }
 
@@ -76,6 +84,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     line.Add(value);
                     members.Add(line);
                     readouts.Add(new CurrencyReadout(value, Scope, entry.currency));
+                    readoutCurrencies.Add(entry.currency);
                 }
             }
 
@@ -114,9 +123,37 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 var complete = view.Member is BarDefinition bar
                                && bar.repeatWhen == null && ctx.GetBarProgress(bar.Id) >= bar.fillAmount;
                 var on = active != null && active.Contains(view.Member.Id);
-                view.Select.text = complete ? "Done" : on ? "Selected" : "Select";
+                view.Mark = complete ? MemberMark.Done : on ? MemberMark.Selected : MemberMark.Select;
+                // The wording is the button's own and chosen here: the mark is a
+                // state a caller reads, and its name is not what a player reads.
+                view.Select.text = view.Mark switch
+                {
+                    MemberMark.Done => "Done",
+                    MemberMark.Selected => "Selected",
+                    _ => "Select"
+                };
                 view.Select.SetEnabled(!complete);
             }
+        }
+
+        // The state the member's select button shows.
+        public MemberMark Mark(Definition member)
+        {
+            foreach (var view in views)
+                if (view.Member == member)
+                    return view.Mark;
+            throw new InvalidOperationException(
+                $"The group '{group?.Id}' does not list '{member?.Id}'.");
+        }
+
+        // The balance the consumed-currency readout for this currency carries.
+        public BigNumber ShownConsumed(CurrencyDefinition currency)
+        {
+            for (var i = 0; i < readoutCurrencies.Count; i++)
+                if (readoutCurrencies[i] == currency)
+                    return readouts[i].Shown;
+            throw new InvalidOperationException(
+                $"The group '{group?.Id}' shows no readout for '{currency?.Id}'.");
         }
 
         public override void Interpolate()
@@ -151,7 +188,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             {
                 var prefabId = PrefabIdOf(member);
                 var root = registry.Resolve(prefabId).Instantiate();
-                view.Widget = ModuleWidgetFactory.Create(prefabId, root, registry, stories, infos);
+                view.Widget = ModuleWidgetFactory.Create(prefabId, root, registry, stories, infos, automations);
                 view.Widget.Bind(Session, Scope, member, Clock);
                 view.Wrapper.Add(root);
             }

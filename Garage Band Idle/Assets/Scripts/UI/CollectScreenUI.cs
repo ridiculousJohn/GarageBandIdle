@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RidiculousGaming.GarageBandIdle.Meta;
 using RidiculousGaming.GarageBandIdle.Monetization;
 using UnityEngine.UIElements;
@@ -27,6 +28,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // object per entry (12.9), so this is what tells a repaint under the
         // dialog apart from a dialog being raised over a different offer.
         private IdleOffer builtFor;
+
+        private readonly List<(Definition target, BigNumber amount)> shownLines = new();
+
+        // One entry per row, in row order: what the claim changes and by how
+        // much, signed.
+        public IReadOnlyList<(Definition target, BigNumber amount)> ShownLines => shownLines;
 
         public CollectScreenUI(VisualElement root, GameSession session, GameClock clock,
                                AdManager ads, IAPManager store)
@@ -66,21 +73,23 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
             builtFor = offer;
             lines.Clear();
+            shownLines.Clear();
 
             // One row per balance the claim changes, which is what section 9
             // means by shown is paid; the offer's own list, so the session and
             // the screen agree on what there is to show.
             foreach (var change in offer.Changes())
-                Row(change.target.displayName, change.amount);
+                Row(change.target, change.amount);
         }
 
         // One row, signed by the amount: the formatter only ever sees a
         // magnitude, so the sign is written beside it.
-        private void Row(string name, BigNumber amount)
+        private void Row(Definition target, BigNumber amount)
         {
+            shownLines.Add((target, amount));
             var row = new VisualElement();
             row.AddToClassList("currency-line");
-            row.Add(new Label(name));
+            row.Add(new Label(target.displayName));
             row.Add(new Label(amount < BigNumber.Zero
                 ? "-" + NumberFormatter.Format(-amount)
                 : "+" + NumberFormatter.Format(amount)));

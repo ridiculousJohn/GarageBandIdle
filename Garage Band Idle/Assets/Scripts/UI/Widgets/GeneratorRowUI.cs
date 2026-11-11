@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using RidiculousGaming.GarageBandIdle.Economy;
@@ -46,6 +47,25 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private BigNumber grantedSlope = BigNumber.Zero;
         private double stamp;
 
+        private readonly List<(Definition target, BigNumber amount)> shownYields = new();
+
+        // The purchased count inside the count label's parentheses.
+        public int ShownPurchased { get; private set; }
+
+        // The granted count added inside the count label's parentheses; zero
+        // when the label prints none.
+        public BigNumber ShownGranted { get; private set; } = BigNumber.Zero;
+
+        // The N on the max button's "+N", as printed.
+        public int ShownMax { get; private set; }
+
+        // The cost at the head of the "cost => yield" line.
+        public BigNumber ShownCost { get; private set; } = BigNumber.Zero;
+
+        // The yields the "cost => yield" line prints after the arrow, in printed
+        // order, zeros left out as the line leaves them out.
+        public IReadOnlyList<(Definition target, BigNumber amount)> ShownYields => shownYields;
+
         public GeneratorRowUI(VisualElement root, IGeneratorInfoOpener infos) : base(root)
         {
             name = Require<Label>(root, "name", "GeneratorRow.uxml");
@@ -81,16 +101,24 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 ? BigNumber.Zero
                 : Session.LastTick.DepositSlope(home, generator.Id);
             stamp = Clock.GameTimeSeconds;
-            count.text = CountText(purchased, granted);
-            yieldLine.text = CostAndYieldText(ctx, generator);
+            ShownPurchased = purchased;
+            ShownGranted = granted;
+            count.text = CountText(ShownPurchased, ShownGranted);
+            // One read answers both the line and the shown cost and yields.
+            var (cost, yields) = CostAndYields(ctx, generator);
+            ShownCost = cost;
+            shownYields.Clear();
+            shownYields.AddRange(yields);
+            yieldLine.text = FormatCostAndYields(generator, ShownCost, shownYields);
 
             // One read answers both the labels and the pressability: M is zero
             // exactly when a single unit is unbuyable, and at zero the max
             // button reads "+1" disabled beside its neighbor (12.11).
             var max = Purchasing.MaxAffordable(ctx, generator);
             shownMax = max;
+            ShownMax = Math.Max(max, 1);
             buy.text = "+1";
-            buyMax.text = "+" + Math.Max(max, 1);
+            buyMax.text = "+" + ShownMax;
             buy.SetEnabled(max >= 1);
             buyMax.SetEnabled(max >= 1);
             // The whole row dims while not one unit can be bought (12.11).
@@ -126,7 +154,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (grantedSlope == BigNumber.Zero)
                 return;
             var display = BigNumber.Max(BigNumber.Zero, granted + grantedSlope * (Clock.GameTimeSeconds - stamp));
-            count.text = CountText(purchased, display);
+            ShownGranted = display;
+            count.text = CountText(ShownPurchased, ShownGranted);
         }
 
         // "cost => yield", the reference game's row: the next unit's cost and
@@ -136,19 +165,38 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // identical line.
         public static string CostAndYieldText(GameContext ctx, GeneratorDefinition generator)
         {
-            var line = new StringBuilder();
-            line.Append(NumberFormatter.Format(Purchasing.CostOf(generator, ctx, 1)))
-                .Append(" ").Append(generator.costCurrency.displayName);
-            // Rate entries then yield entries, each one unit's figure: per second
-            // for a rate, per firing for a yield a bar fires (12.11). The unit
-            // is implied on the row; the info screen names it.
-            var yields = 0;
+            var (cost, yields) = CostAndYields(ctx, generator);
+            return FormatCostAndYields(generator, cost, yields);
+        }
+
+        // The data the "cost => yield" line prints: the next unit's cost, then
+        // rate entries and yield entries, each one unit's figure - per second
+        // for a rate, per firing for a yield a bar fires (12.11). A target the
+        // unit pays nothing is left out here, so the list is the line's own.
+        public static (BigNumber cost, List<(Definition target, BigNumber amount)> yields) CostAndYields(
+            GameContext ctx, GeneratorDefinition generator)
+        {
+            var cost = Purchasing.CostOf(generator, ctx, 1);
+            var yields = new List<(Definition target, BigNumber amount)>();
             foreach (var (target, amount) in Producer.UnitRate(ctx, generator).Concat(Producer.UnitYield(ctx, generator)))
+                if (amount != BigNumber.Zero)
+                    yields.Add((target, amount));
+            return (cost, yields);
+        }
+
+        // The line itself, from data already read, so a caller that stores the
+        // data prints exactly what it stored. The unit is implied on the row;
+        // the info screen names it.
+        internal static string FormatCostAndYields(GeneratorDefinition generator, BigNumber cost,
+                                                  IReadOnlyList<(Definition target, BigNumber amount)> yields)
+        {
+            var line = new StringBuilder();
+            line.Append(NumberFormatter.Format(cost))
+                .Append(" ").Append(generator.costCurrency.displayName);
+            for (var i = 0; i < yields.Count; i++)
             {
-                if (amount == BigNumber.Zero)
-                    continue;
-                line.Append(yields++ == 0 ? " => " : ", ");
-                line.Append(NumberFormatter.Format(amount)).Append(" ").Append(target.displayName);
+                line.Append(i == 0 ? " => " : ", ");
+                line.Append(NumberFormatter.Format(yields[i].amount)).Append(" ").Append(yields[i].target.displayName);
             }
             return line.ToString();
         }

@@ -17,24 +17,24 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710450278563937
+    rid: 1688710475815583807
   actions:
-  - rid: 1688710450278563938
+  - rid: 1688710475815583808
   references:
     version: 2
     RefIds:
-    - rid: 1688710450278563937
+    - rid: 1688710475815583807
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 1688710450278563939
-        - rid: 1688710450278563940
-    - rid: 1688710450278563938
+        - rid: 1688710475815583809
+        - rid: 1688710475815583810
+    - rid: 1688710475815583808
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: album
-    - rid: 1688710450278563939
+    - rid: 1688710475815583809
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -43,7 +43,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 1
-    - rid: 1688710450278563940
+    - rid: 1688710475815583810
       type: {class: BarsCompleted, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

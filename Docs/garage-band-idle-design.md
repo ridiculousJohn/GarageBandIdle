@@ -1529,6 +1529,8 @@ class BarDefinition : Definition
     Condition    repeatWhen;      // null: fill once, stay full; true: pay, keep the residual, go again;
                                   // false: the manual team - pay once, zero, leave the active set
     ProducerDefinition tap;       // the producer the row fires when tapped (12.11); null: not a tap target
+    GeneratorDefinition level;    // the generator whose owned count is the bar's level (12.11); null: no level
+    UpgradeDefinition automation; // the upgrade whose purchase makes the bar go again; null: nothing automates it
     Condition    availableWhen;
     List<Action> onComplete;      // fires at each threshold crossing
     List<PerFillEntry> perFill;   // cascade: {effect, growth}, applied fillCount times on read
@@ -1543,6 +1545,27 @@ class GroupDefinition : Definition
 
 **A bar is declared on its scope** in `bars`, like a generator, and its progress and fill count are
 homed there.
+
+**A bar names its level and its automation**, both ordinary references resolved outward from the
+bar's scope like `tap`. `level` is the generator whose owned count is the bar's level: a row that
+shows the bar with its level reads the count, the cost and the buy buttons from it. `automation` is
+the upgrade whose purchase makes the bar go again by itself - the purchase is what flips
+`repeatWhen`. Neither is a second truth: what a completion pays is still its `onComplete` list's
+answer, and whether the bar IS automated is `repeatWhen` holding at its home, never whether the
+upgrade is bought. Validated as `tap` is, each on the bar's chain; `automation` on a bar with no
+`repeatWhen` is an error, since a bar that fills once has nothing to make go again.
+
+**What a completion is worth** is two reads beside the settlement, depositing nothing.
+`BarSystem.CompletionPayout` answers what the `onComplete` list would deposit to each currency if
+it ran now: a `FireGeneratorYield` entry through the resolution its firing commits
+(`Producer.ResolveGeneratorYield`: the owned count and every multiplier), an `AddCurrency` entry
+through its `AmountFor`, one line per (currency, home), summed, zeros kept. Only currency targets
+are income, so a yield entry naming a bar or a generator is left out. Every entry is sized against
+one state, so a list whose later action reads what an earlier one deposited is where the preview
+and the execution part; no authored completion list has that shape. `BarSystem.CompletionRate` is
+that payout times completions per REAL second - the bar's fill speed (`BarSystem.FillRate`, the
+single-bar form of the resolution the draw uses) times `game_speed`, over `fillAmount` - and it
+answers whether or not the bar is drawing, from its nominal speed even when it consumes.
 
 **A group is a set of members with an active set.** A group is declared on a scope in `groups` and
 lists members that scope declares - a bar, a generator, a producer, a currency, an upgrade - so a
@@ -1711,6 +1734,20 @@ order - whose `autobuy` switch reads on (§12.2) buys the largest count it can a
 same path the row's button takes, so every segment's bars have drunk before anything is spent and
 the sweep at the close sees the buys; a refusal is a no-op, every tick is the only rate, and the
 idle claim buys nothing. Then the sweep, commit, and refresh (§12.11).
+
+**The tick report** is what ONE tick moved, recorded at the mutation sites and never as a balance
+delta, keyed by the scope object plus an id, over the tick's real seconds. It holds three ledgers:
+the deposit net per (home, id) - the rate phase's deposits less the draw's spends; the fill per
+(bar scope, bar id); and the completion income per (currency home, currency id). Completion income
+is recorded at the draw: for every bar that actually filled in the segment, its one-completion
+payout times the fraction of a cycle it filled, the payout sized with the bar's rate in the
+start-of-segment snapshot, before the deposits and before its own completions. A bar that is not
+drawing records nothing, and a stalled bar records what its short fill is worth. Each ledger reads
+as a slope per real second, and for a running bar that does not stall the completion slope over a
+tick is its `CompletionRate`. The deposit slope never carries a completion's lump: the lump lands in
+bursts at the crossing, and the currency readout interpolates by the deposit slope between ticks.
+The idle offer builds no report, and its lines carry no completion income beyond the completions
+they pay.
 `lastActiveUtc` stamped when leaving a LIVE chapter — switch-away or backgrounding — and, for the
 foreground chapter only and only while Live, on save (a save under the dialog must leave the
 unpaid window); every write is monotonic (max), so a rolled-back clock can delay
@@ -1866,8 +1903,13 @@ band show it beneath the name or title when present, a generator's is read on it
 instead, and nothing else reads it.
 
 **Rates on screen.** A currency's header line is the name, the balance, and the tick report's
-realized rate beside it as "(X/s)" - the slope the readout already interpolates by, so it is the
-rate the balance is climbing at, zero before the first tick and for a currency nothing pays. A
+realized income beside it as "(X/s)": the deposit slope plus the completion slope
+(`TickReport.CompletionSlope`, what the fills of every drawing bar's completions are worth per real
+second), both read at the currency's home, which the readout resolves once and exposes. It is zero
+before the first tick and for a currency nothing pays. The balance itself interpolates on the
+deposit slope alone, because completion income lands in lumps at the crossing; the pinned headline
+copies the line's texts and so shows the same total. A levelled row prints its bar's earnings per
+second inside the fill (below). A
 generator row is the name, the owned count - the purchased count in parentheses with the granted
 count added inside them when there is one, `(3)` and `(3+8.89e11)`, the reference game's shape - a
 line beneath the name reading the next unit's cost
@@ -1919,8 +1961,25 @@ captures the pointer itself, and a captured pointer's events reach the capturing
 the manipulator hears a child taking the pointer and listens for the moves on that child - the
 arrangement the `ScrollView`'s own touch drag uses. The scroll bar is hidden.
 
+**A widget exposes what it shows as data, and no test reads a label.** Each widget that prints a
+number or a state keeps it in a public read-only member set on the line that writes the label, from
+the value that line formats: `ShownValue` and `ShownRate` on a currency line, `ShownPurchased`,
+`ShownGranted`, `ShownMax`, `ShownCost` and `ShownYields` on a generator row, `ShownBought` on an
+upgrade row, `Mark(member)` on a group (`MemberMark`, whose names are not the button's wording),
+`Row(bar)`, `BookTarget`, `ShownBookCost`, `BookEnabled`, `AutoTarget` and `AutoEnabled` on a
+levelled group with `ShownPurchased`, `ShownGranted`, `ShownProgress`, `ShownRates`, `ShownCost`,
+`ShownMax`, `Idle` and `Visible` on its rows, `IsOpen`, `ShownGroup` and `Rows` on the automation
+window with `Bar`, `State` and `ShownCost` on each row,
+`PreviewShown` with `ShownAmounts` and `ShownCurrencies` on a rung button, `ShowsClaim` on an
+event, `ShownSeconds` and `ShownPermanent` on the pill and the Encore window, and their like. The
+label and the member cannot differ, because one is formatted from the other. A test compares that
+member as a number, a bool or an enum; an authored name on screen is compared against the
+definition's own field; and wording the code owns is not asserted at all. No test compares an
+element's text against a literal string (John, 2026-11-10): that pins a sentence to prove a
+number, and breaks on a rewording that changed nothing.
+
 **Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
-Encore, the story log, the Discography or a generator's info screen is open, the host does not run the automatic story walk. The modal and any unsubmitted
+Encore, the story log, the Discography, a generator's info screen or the automation window is open, the host does not run the automatic story walk. The modal and any unsubmitted
 allocation draft remain intact. A waiting marked beat stays unseen and opens on the first refresh
 after the last overlay closes, if it is still available. The walk reads state, not a transition.
 
@@ -1971,6 +2030,59 @@ per-feature: any kind an author gates with explains itself for free.
 outside the select button submits `FireProducer` on that producer, the same command the Jam button
 issues, and the producer's yield entry naming the bar is how a tap adds time. Choosing stays the
 button's and paying is the row's, so the button's own click is never also a tap.
+
+**Two layouts for a group of bars.** The `group` module is the split layout: the bars in one list
+with a select control each, and their level generators, if any, as `generator_row` modules
+elsewhere. The `leveled_group` module (`LeveledGroupUI`, `LeveledGroup.uxml`) is the combined one,
+Ctrl C's card of levelled bars, for a group whose members are all bars naming a `level` (12.7); it
+binds a `GroupDefinition` by `contentId` exactly as `group` does, and a member that is not a bar or
+a bar with no `level` throws at bind as a content fault. A section picks a layout by the module it
+names. Each member is one row (`LeveledBarRowUI`), shown while the bar is available, as the group
+module shows its bars:
+- the title line is the bar's name and its level, the level generator's count printed by
+  `GeneratorRowUI.CountText`; holding it opens that generator's info screen, as a generator row's
+  hold does;
+- the fill rides the tick's bar slope between refreshes as a bar row's does, and prints inside it
+  the bar's earnings per second - each line of `BarSystem.CompletionRate` at the chapter's
+  `game_speed`, "27.60 Cash/s, 4.60 Fans/s", zero lines kept;
+- a tap on the fill starts a bar that is not running - `SetActiveMembers` with the bar added,
+  never removed - and works a running one through its `tap` producer; a bar that fills once and
+  stands full takes no tap. There is no select control. A row available and not running carries
+  `leveled-idle`, which the stylesheet draws as a bar waiting for its tap;
+- the buy control at the right is the generator row's "+1" and "+M" on the level, with its
+  enabling and arithmetic, over the next unit's cost; the row dims by `row-unaffordable`. The
+  control is its own element and its own class, so another buy control can replace it whole.
+The card ends in two buttons. **Book** names the first member in group order whose bar is not
+available and whose level is offered, as the bar's gate text (or its name when the gate has none)
+with the level's price; it buys one level and in the same press adds the bar to the active set, so
+the gig starts at once, and it is disarmed when unaffordable and hidden when no member qualifies.
+**Auto** reads "Auto" and nothing else. Where one member's automation stands is ONE answer,
+`LeveledGroupUI.Automation` (`AutomationState`): **Purchased** when the bar goes again by itself
+(`repeatWhen` holding at its home, never the purchase) or its upgrade is bought, **Buy** when
+`Purchasing.CanBuy` says the upgrade row's purchase would succeed, **Price** otherwise. A tap on Auto
+buys the automation of the first available member, in group order, that names an `automation` and
+does not read Purchased; the tap buys exactly when that member reads Buy, and the button is hidden
+when no member qualifies - so it leaves when every visible bar repeats and returns when another is
+booked. While that member reads Price the button is dimmed by a class (`leveled-auto-unaffordable`)
+and is never disabled: a disabled element receives no pointer events, and the hold is how a player
+who cannot afford the target reads its price.
+A hold on Auto (`GameConfig.longPressSeconds`, the row's hold) opens the **automation window**, a
+host-owned overlay (`AutomationWindowUI`) reached through `IAutomationOpener` with the group and the
+scope the card resolved, as the info screen is: the title "Auto", one line saying that a gig with
+Auto starts again by itself, then one row per member that is available and names an `automation`,
+in group order - the bar's name, taking the width it needs and wrapping at a word, and at the right
+its state from that same answer: grey "Purchased", an accent "Buy" that issues the upgrade row's
+purchase for THAT bar, or the upgrade's price in grey. Neither grey state is pressable. A purchase
+in the window leaves it open, and the host's refresh repaints it like every overlay, so a Buy, a gig
+booked or Cash arriving moves a row with no reopen; any gig is automated from here in any order
+while the tap keeps buying the first. "Dismiss" at the bottom right closes it. The hold and the tap
+share the button: the hold's manipulator listens on the way down, because a button's own click
+handler stops a press and a release where it handles them and a listener on the way up hears
+neither, and it lets go of the pointer the button's click captured when it
+fires, so the click is no longer pressed and the release lands on the window, and a drag that takes
+the pointer ends the hold before it fires. The rows' and the buttons' presses are public actions
+(`Tap`, `BuyOne`, `BuyMax`, `OpenInfo`, `Book`, `Auto`, `OpenAutomation`, and the window's `Buy` and
+`Dismiss`) so a headless test presses what the pointer presses.
 
 ### 12.12 Validation at content load
 
@@ -2074,7 +2186,9 @@ button's and paying is the row's, so the button's own click is never also a tap.
   twice (an empty list is legal: it fills from time). A group bound by a module needs no displayName:
   it renders its members, not itself. `perFill` on a bar with no `repeatWhen` is an error (12.6); a
 `repeatWhen` is validated as `availableWhen` is, its operands under the reach rules; a `tap` producer
-must be on the bar's own chain, and nothing checks that it pays this bar. A `LinearOnOwnedCount`
+must be on the bar's own chain, and nothing checks that it pays this bar; a `level` generator and an
+`automation` upgrade must be on it too, and `automation` on a bar with no `repeatWhen` is an error.
+A `LinearOnOwnedCount`
 names a generator on the chain and a nonnegative coefficient, as `LinearOnBalance`'s currency and
 coefficient are checked.
   `BarsCompleted` reaches like every other scope-attached read: the group's declaring scope is the
@@ -2186,11 +2300,13 @@ Assets/Scripts/
     GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
     IStoryOpener.cs         // the one method a story row asks of the host: open the card for a beat at its scope
     IGeneratorInfoOpener.cs // the one method a generator row asks of the host: open the info screen for a generator at its declaring scope
-    LongPressManipulator.cs // the hold gesture over an element's own scheduler; no capture, no propagation change
+    IAutomationOpener.cs    // the one method a levelled group's Auto asks of the host: open the automation window for a group at its declaring scope
+    LongPressManipulator.cs // the hold gesture over an element's own scheduler; never captures, lets go of a button's capture when it fires
     DragScrollManipulator.cs // a left-button mouse drag scrolls the page as a finger does; a click stays a click
     PinnedHeadlineUI.cs     // the headline currency line as an overlay: over its line at rest, shrunk beneath the pills once scrolled away
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
+              LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, Book and Auto; AutomationState
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
@@ -2202,7 +2318,9 @@ Assets/Scripts/
     RoadieAllocationUI.cs  // local allocation draft; Done submits the whole map
     EncoreWindowUI.cs      // remaining time and ad/Pass requests through the existing managers
     GeneratorInfoUI.cs     // a generator's info screen: description, the row's cost and yield line, owned count, production
-Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml,
+    AutomationWindowUI.cs  // a levelled group's automation window: one row per visible gig naming an automation, Purchased / Buy / price, Dismiss
+Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
+                          // (LeveledGroup.uxml among them),
                           // and Fonts/ (Roboto Regular, Medium and Bold with its Apache 2.0 licence)
 Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)

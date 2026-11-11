@@ -17,6 +17,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // exactly the rows that are on screen.
         public bool Visible { get; private set; }
 
+        // The progress figure the row prints before " / fillAmount".
+        public BigNumber ShownProgress { get; private set; } = BigNumber.Zero;
+
         private readonly GameSession session;
         private readonly ScopeState scope;
         private readonly GameClock clock;
@@ -107,7 +110,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void Show(BigNumber value)
         {
             var display = BigNumber.Min(bar.fillAmount, BigNumber.Max(BigNumber.Zero, value));
-            progressLabel.text = NumberFormatter.Format(display) + " / " + NumberFormatter.Format(bar.fillAmount);
+            ShownProgress = display;
+            progressLabel.text = NumberFormatter.Format(ShownProgress) + " / " + NumberFormatter.Format(bar.fillAmount);
             fill.value = (float)((display / bar.fillAmount).ToDouble() * 100);
         }
 

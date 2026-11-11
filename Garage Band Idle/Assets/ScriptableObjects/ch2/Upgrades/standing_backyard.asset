@@ -18,7 +18,7 @@ MonoBehaviour:
   description: The neighbors keep asking for another one, so the backyard show re-books
     itself and keeps paying while you are away.
   gate:
-    rid: 1688710450278564135
+    rid: 1688710475815583983
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
   cost:
     _value:
@@ -26,20 +26,15 @@ MonoBehaviour:
       exponent: 5
   effects: []
   actions:
-  - rid: 1688710450278564136
+  - rid: 1688710475815583984
   references:
     version: 2
     RefIds:
-    - rid: 1688710450278564135
-      type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+    - rid: 1688710475815583983
+      type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        generator: {fileID: 11400000, guid: d2306a9b3c4af8b4ea7da43322186594, type: 2}
-        count:
-          _value:
-            mantissa: 3
-            exponent: 0
-    - rid: 1688710450278564136
+    - rid: 1688710475815583984
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: booked_backyard

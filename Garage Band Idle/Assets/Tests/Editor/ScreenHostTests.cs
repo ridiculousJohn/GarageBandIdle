@@ -58,6 +58,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly EventDefinition GarageJam1;
             public readonly StoryBeatDefinition Opener;
             public readonly StoryBeatDefinition Capstone;
+            public readonly CurrencyDefinition Cash;
+            public readonly CurrencyDefinition Fans;
+            public readonly CurrencyDefinition Rehearsal;
+            public readonly CurrencyDefinition DemoTapes;
+            public readonly CurrencyDefinition Roadies;
 
             public readonly RootScopeState Root;
             public readonly ChapterScopeState Ch1;
@@ -108,6 +113,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 GarageJam1 = Find(Tier1Def.events, "garage_jam_1");
                 Opener = Find(Ch1Def.storyBeats, "story_ch1_open");
                 Capstone = Find(Ch1Def.storyBeats, "story_ch1_end");
+                // Each currency on the scope that declares it.
+                Cash = Find(Tier1Def.declaredCurrencies, "cash");
+                Fans = Find(Tier1Def.declaredCurrencies, "fans");
+                Rehearsal = Find(Tier1Def.declaredCurrencies, "rehearsal");
+                DemoTapes = Find(Ch1Def.declaredCurrencies, "demo_tapes");
+                Roadies = Find(rootDef.declaredCurrencies, "roadies");
 
                 Root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { Ch1Def }));
                 Ch1 = (ChapterScopeState)TestNavigation.Node(Root, Ch1Def);
@@ -162,11 +173,55 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // What a gate is actually explaining right now: the leg labels are
             // built once and toggled, so the visible ones are the unmet set.
-            public static string[] VisibleLegs(ScreenHost.ModuleView module) =>
+            public static VisualElement[] VisibleLegs(ScreenHost.ModuleView module) =>
                 module.Widget.Root.Q<VisualElement>("legs").Children()
                     .Where(leg => leg.style.display.value == DisplayStyle.Flex)
-                    .Select(leg => ((Label)leg).text)
                     .ToArray();
+
+            // The same set as the gate's own conditions: the row builds one
+            // label per top-level leg in authored order before anything else
+            // enters the container, so a label's index is its leg's.
+            public static Condition[] ShownLegs(ScreenHost.ModuleView module, Condition gate)
+            {
+                var legs = GateFeedback.Legs(gate);
+                var labels = module.Widget.Root.Q<VisualElement>("legs").Children().ToList();
+                return Enumerable.Range(0, legs.Count)
+                    .Where(i => Shown(labels[i]))
+                    .Select(i => legs[i])
+                    .ToArray();
+            }
+
+            // A threshold leg's progress, the pair its label prints beside its
+            // text.
+            public static void AssertProgress(Condition leg, GameContext ctx, double current, double target)
+            {
+                Assert.IsTrue(leg.Progress(ctx, out var shownCurrent, out var shownTarget), "a threshold leg");
+                AssertClose(current, shownCurrent, "the leg's current figure");
+                AssertClose(target, shownTarget, "the leg's target");
+            }
+
+            // Computed amounts within tolerance, never bit-exact: BigDouble's
+            // base-10 mantissa is binary-inexact.
+            public static void AssertClose(double expected, BigNumber actual, string what = null) =>
+                Assert.AreEqual(expected, actual.ToDouble(),
+                    Math.Max(1e-9, Math.Abs(expected) * 1e-12), what ?? string.Empty);
+
+            // The one balance change the idle dialog's single row stands for:
+            // the dialog builds its rows from the offer's own change list.
+            public void AssertSingleChange(CurrencyDefinition target, double amount, string what = null)
+            {
+                var change = Session.CurrentOffer.Changes().Single();
+                Assert.AreSame(target, change.target, "the row's currency");
+                AssertClose(amount, change.amount, what);
+            }
+
+            // The encore pill's countdown, read through the shared display
+            // answer with the root, timer and clock time the pill itself uses.
+            public string PillTimer => Screen.Q<TimerPill>("encore").Timer;
+
+            public bool PillPermanent => EncoreTime.Permanent(Root);
+
+            public long PillSeconds => EncoreTime.RemainingSeconds(Root, PillTimer, Clock.RealTimeUtc);
 
             // Which of the three screens is up: the host toggles a whole screen
             // by display, so the question has one answer per element.
@@ -192,7 +247,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var buttons = fx.Screen.Q<VisualElement>("chapters")
                 .Query<Button>(className: "select-chapter").ToList();
             Assert.AreEqual(1, buttons.Count, "one button per chapter in root's roster");
-            Assert.AreEqual("The Garage", buttons[0].text, "ch1's authored displayName");
+            Assert.AreEqual(fx.Ch1Def.displayName, buttons[0].text, "ch1's authored displayName");
         }
 
         // The pick is the switch the button makes, and the switch's own refresh
@@ -226,7 +281,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var top = fx.Screen.Q<VisualElement>("top-bar");
             Assert.IsTrue(Fixture.Shown(top));
-            Assert.AreEqual("\u23F1  00:00:00", top.Q<Button>("encore").text);
+            Assert.IsFalse(fx.PillPermanent, "no Pass is owned");
+            Assert.AreEqual(0, fx.PillSeconds, "and no boost is banked");
             Assert.IsTrue(top.Q<Button>("story-log").enabledSelf, "the story log opens from the right pill");
 
             fx.Host.OpenStory(fx.Opener, fx.Ch1);
@@ -252,16 +308,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Enter();
             fx.Host.OpenEncore();
 
-            var window = fx.Screen.Q<VisualElement>("encore-window");
-            Assert.AreEqual("Time remaining 01:01:01", window.Q<Label>("encore-remaining").text);
-            Assert.AreEqual("While active, game speed is 2.00x.", window.Q<Label>("encore-description").text);
-            Assert.AreEqual("Boost for 4 hours", window.Q<Button>("encore-ad").text,
-                "the promise is the authored grant");
+            var window = fx.Host.EncoreWindow;
+            Assert.IsFalse(window.ShownPermanent);
+            Assert.AreEqual(3661, window.ShownSeconds);
+            Fixture.AssertClose(2, window.ShownGameSpeed, "the speed the timer buys");
+            Assert.AreEqual(14400, window.ShownGrantSeconds, "the promise is the authored grant");
 
             fx.Clock.Frame(fx.Now.AddSeconds(2), 2);
             fx.Host.Interpolate();
-            Assert.AreEqual("Time remaining 01:00:59", window.Q<Label>("encore-remaining").text);
-            Assert.AreEqual("\u23F1  01:00:59", fx.Screen.Q<Button>("encore").text);
+            Assert.AreEqual(3659, window.ShownSeconds);
+            Assert.IsFalse(fx.PillPermanent);
+            Assert.AreEqual(3659, fx.PillSeconds, "the pill counts the same timer on the same clock");
         }
 
         // The chrome names its timer ONCE, in its own UXML: the pill is an
@@ -293,24 +350,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 tree.RootDef.modifiers.Add(tier);
                 tree.RootDef.permanentModifiers.Add(tier);
             });
-            var description = fx.Screen.Q<Label>("encore-description");
+            var window = fx.Host.EncoreWindow;
 
             fx.Host.OpenEncore();
-            Assert.AreEqual("While active, game speed is 2.00x.", description.text, "nothing banked: the promise");
+            Fixture.AssertClose(2, window.ShownGameSpeed, "nothing banked: the promise");
 
             var record = new TimedBuff { buffId = "encore_timer", expiresAtUtc = fx.Tree.Now.AddSeconds(14400) };
             fx.Tree.Root.timedBuffs.Add(record);
             fx.Host.OpenEncore();
-            Assert.AreEqual("While active, game speed is 2.00x.", description.text, "four hours: under the band");
+            Fixture.AssertClose(2, window.ShownGameSpeed, "four hours: under the band");
 
             record.expiresAtUtc = fx.Tree.Now.AddSeconds(90000);
             fx.Host.OpenEncore();
-            Assert.AreEqual("While active, game speed is 4.00x.", description.text, "twenty-five hours: both rungs");
+            Fixture.AssertClose(4, window.ShownGameSpeed, "twenty-five hours: both rungs");
 
             fx.Tree.Root.timedBuffs.Clear();
             fx.Tree.Root.entitlements.Add("backstage_pass");
             fx.Host.OpenEncore();
-            Assert.AreEqual("While active, game speed is 4.00x.", description.text,
+            Fixture.AssertClose(4, window.ShownGameSpeed,
                 "the Pass leg admits the tier with no timer, as the tick reads it");
         }
 
@@ -354,10 +411,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Host.OpenEncore();
 
             var window = fx.Screen.Q<VisualElement>("encore-window");
-            Assert.AreEqual("Time remaining \u221E", window.Q<Label>("encore-remaining").text);
+            Assert.IsTrue(fx.Host.EncoreWindow.ShownPermanent, "the window reads the Pass as permanent Encore");
             Assert.IsFalse(Fixture.Shown(window.Q<Button>("encore-ad")));
             Assert.IsFalse(Fixture.Shown(window.Q<Button>("encore-pass")));
-            Assert.AreEqual("\u23F1  \u221E", fx.Screen.Q<Button>("encore").text);
+            Assert.IsTrue(fx.PillPermanent, "and so does the pill");
         }
 
         [Test]
@@ -373,7 +430,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(Fixture.Shown(fx.Screen.Q<VisualElement>("settings")),
                 "the callback's refresh preserves the requested overlay");
             Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("encore-window")));
-            Assert.AreEqual("\u23F1  04:00:00", fx.Screen.Q<Button>("encore").text);
+            Assert.IsFalse(fx.PillPermanent);
+            Assert.AreEqual(14400, fx.PillSeconds, "the pill counts the four hours the reward banked");
             Assert.AreEqual(1, fx.Saves, "the delivered reward was saved");
         }
 
@@ -492,15 +550,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Host.OpenRoadies();
             var overlay = fx.Screen.Q<VisualElement>("roadie-allocation");
 
-            fx.Host.RoadieAllocation.Increase("ch1");
-            Assert.AreEqual("1", overlay.Q<Label>("roadie-count-ch1").text);
-            Assert.AreEqual("Unallocated  1.00", overlay.Q<Label>("roadie-unallocated").text);
+            var allocation = fx.Host.RoadieAllocation;
+            allocation.Increase("ch1");
+            Assert.AreEqual(1, allocation.ShownCount("ch1"));
+            Fixture.AssertClose(1, allocation.ShownUnallocated);
             Assert.IsTrue(overlay.Q<Button>("roadie-minus-ch1").enabledSelf);
 
             fx.Session.GrantRoadies(1, fx.Now);
-            Assert.AreEqual("1", overlay.Q<Label>("roadie-count-ch1").text,
-                "a state refresh keeps the local draft");
-            Assert.AreEqual("Unallocated  2.00", overlay.Q<Label>("roadie-unallocated").text);
+            Assert.AreEqual(1, allocation.ShownCount("ch1"), "a state refresh keeps the local draft");
+            Fixture.AssertClose(2, allocation.ShownUnallocated);
 
             fx.Host.RoadieAllocation.Done();
 
@@ -523,7 +581,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsEmpty(fx.Root.roadieAllocation, "leaving without Done submits no command");
             fx.Host.SelectChapter(fx.Ch1);
             fx.Host.OpenRoadies();
-            Assert.AreEqual("0", fx.Screen.Q<Label>("roadie-count-ch1").text,
+            Assert.AreEqual(0, fx.Host.RoadieAllocation.ShownCount("ch1"),
                 "the next overlay starts from simulation state, not the dead draft");
         }
 
@@ -552,10 +610,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // cash is the whole offer.
             Assert.AreEqual(1, lines.childCount, "the amp's cash is the only line");
 
-            var labels = lines.Children().Single().Query<Label>().ToList();
-            Assert.AreEqual("Cash", labels[0].text, "the currency's authored name");
-            Assert.AreEqual("+250.00", labels[1].text,
+            fx.AssertSingleChange(fx.Cash, 250,
                 "one amp pays 0.5 cash/s, root's authored idle base halves it, over 1000s");
+            Assert.AreEqual(fx.Cash.displayName, lines.Children().Single().Q<Label>().text,
+                "the row is named by the currency");
         }
 
         // The dialog prints one row per currency the window moved, and what it
@@ -577,9 +635,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // of it, filling to its threshold and stopping there.
             var lines = fx.Screen.Q<VisualElement>("lines");
             Assert.AreEqual(1, lines.childCount, "rehearsal is the only currency the window moved");
-            var labels = lines.Children().Single().Query<Label>().ToList();
-            Assert.AreEqual("Rehearsal", labels[0].text);
-            Assert.AreEqual("-350.00", labels[1].text, "250 in, 600 drawn");
+            fx.AssertSingleChange(fx.Rehearsal, -350, "250 in, 600 drawn");
+            Assert.AreEqual(fx.Rehearsal.displayName, lines.Children().Single().Q<Label>().text,
+                "the row is named by the currency");
         }
 
         // The dialog's three actions (12.11): OK settles, and the two request
@@ -599,8 +657,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(Fixture.Shown(collect.Q<Button>("pass")), "and so is the Pass");
             Assert.IsTrue(Fixture.Shown(collect.Q<Button>("ok")));
 
-            var labels = fx.Screen.Q<VisualElement>("lines").Children().Single().Query<Label>().ToList();
-            Assert.AreEqual("+100.00", labels[1].text,
+            Assert.AreEqual(1, fx.Screen.Q<VisualElement>("lines").childCount, "one row for the amp's cash");
+            fx.AssertSingleChange(fx.Cash, 100,
                 "one amp pays 0.5 cash/s, root's authored idle base halves it, over 400s");
         }
 
@@ -623,8 +681,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(Fixture.Shown(collect.Q<Button>("pass")), "and there is nothing left to buy");
             Assert.IsTrue(Fixture.Shown(collect.Q<Button>("ok")));
 
-            var labels = fx.Screen.Q<VisualElement>("lines").Children().Single().Query<Label>().ToList();
-            Assert.AreEqual("+400.00", labels[1].text, "the free player's 100 at 4x");
+            Assert.AreEqual(1, fx.Screen.Q<VisualElement>("lines").childCount, "one row for the amp's cash");
+            fx.AssertSingleChange(fx.Cash, 400, "the free player's 100 at 4x");
         }
 
         // The lines are a fact of the offer and the buttons a fact of the
@@ -671,7 +729,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(Fixture.Shown(fx.Screen.Q<VisualElement>("collect")),
                 "the offer is paid, so the dialog is down");
             Assert.AreEqual(7, fx.Host.Sections.Count, "the chapter came up in the claim's own refresh");
-            Assert.AreEqual("250.00", Fixture.Text(fx.Host.Sections[GarageFloor].Modules[CashLine], "value"),
+            Fixture.AssertClose(250, CashHeader(fx).ShownValue,
                 "what the dialog offered is what the balance holds");
         }
 
@@ -728,8 +786,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Enter();
 
             var cash = fx.Host.Sections[GarageFloor].Modules[CashLine];
-            Assert.AreEqual("Cash", Fixture.Text(cash, "name"));
-            Assert.AreEqual("0.00", Fixture.Text(cash, "value"));
+            Assert.AreEqual(fx.Cash.displayName, Fixture.Text(cash, "name"));
+            Fixture.AssertClose(0, CashHeader(fx).ShownValue);
         }
 
         // The reference game's rate line (12.11): the tick report's realized
@@ -741,9 +799,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fx = new Fixture();
             fx.Enter();
 
-            var cash = fx.Host.Sections[GarageFloor].Modules[CashLine];
-            var zero = "(" + NumberFormatter.Format(BigNumber.Zero) + "/s)";
-            Assert.AreEqual(zero, Fixture.Text(cash, "rate"),
+            var cash = CashHeader(fx);
+            Assert.AreEqual(BigNumber.Zero, cash.ShownRate,
                 "no tick has run, so there is no measured slope to show");
 
             // The amp's authored gate is 100 earned cash and its first unit
@@ -758,8 +815,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Cash is declared at tier1, so tier1 is the home the report keys
             // the net by (12.3).
             var slope = fx.Session.LastTick.DepositSlope(fx.Tier1, "cash");
-            Assert.AreEqual("(" + NumberFormatter.Format(slope) + "/s)", Fixture.Text(cash, "rate"));
-            Assert.AreNotEqual(zero, Fixture.Text(cash, "rate"), "the amp paid, so the slope is not zero");
+            Assert.AreEqual(slope, cash.ShownRate);
+            Assert.AreNotEqual(BigNumber.Zero, cash.ShownRate, "the amp paid, so the slope is not zero");
         }
 
         [Test]
@@ -770,7 +827,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
             // No Render call here: the transaction's refresh is what repaints.
-            Assert.AreEqual("1.00", Fixture.Text(fx.Host.Sections[GarageFloor].Modules[CashLine], "value"));
+            Fixture.AssertClose(1, CashHeader(fx).ShownValue);
         }
 
         [Test]
@@ -791,8 +848,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNotNull(fans.Widget, "the revealed module built its widget");
             // The regression: a widget created mid-pass is refreshed by the pass
             // that created it, so the label is never blank for one transaction.
-            Assert.AreEqual("Fans", Fixture.Text(fans, "name"));
-            Assert.AreEqual("0.00", Fixture.Text(fans, "value"));
+            Assert.AreEqual(fx.Fans.displayName, Fixture.Text(fans, "name"));
+            Fixture.AssertClose(0, ((CurrencyHeaderUI)fans.Widget).ShownValue);
         }
 
         [Test]
@@ -819,14 +876,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The yield line is the reference game's row: the first amp's
             // authored 60 cash, then what one amp pays per second. The button
             // beside it is the single-unit buy and carries nothing else.
-            var amp = section.Modules[0].Widget.Root;
-            Assert.AreEqual("60.00 Cash => 0.50 Cash", amp.Q<Label>("yield").text);
-            var buy = amp.Q<Button>("buy");
-            Assert.AreEqual("+1", buy.text);
+            var row = (GeneratorRowUI)section.Modules[0].Widget;
+            AssertCostAndYield(fx, row, 60, 0.5);
+            var buy = row.Root.Q<Button>("buy");
             Assert.IsTrue(buy.enabledSelf, "101 cash covers the 60");
-            var buyMax = amp.Q<Button>("buy_max");
-            Assert.AreEqual("+1", buyMax.text, "101 cash covers one amp and not the second's 69");
+            var buyMax = row.Root.Q<Button>("buy_max");
+            Assert.AreEqual(1, row.ShownMax, "101 cash covers one amp and not the second's 69");
             Assert.IsTrue(buyMax.enabledSelf);
+        }
+
+        // The row's "cost => yield" line as data: the next unit's cash cost,
+        // then the one thing a unit pays, in cash per second.
+        private static void AssertCostAndYield(Fixture fx, GeneratorRowUI row, double cost, double cashPerSecond,
+                                               string what = null)
+        {
+            Fixture.AssertClose(cost, row.ShownCost, what);
+            var yield = row.ShownYields.Single();
+            Assert.AreSame(fx.Cash, yield.target, "a unit pays cash");
+            Fixture.AssertClose(cashPerSecond, yield.amount, what);
         }
 
         // Exposed stays exposed, and the purchase gate is the button's business
@@ -849,15 +916,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(section.Modules[2].Visible, "the bassist's is not");
             Assert.IsFalse(section.Modules[3].Visible, "and neither is the guitarist's");
 
-            var drummer = section.Modules[1].Widget.Root;
-            var drummerBuy = drummer.Q<Button>("buy");
+            var drummer = (GeneratorRowUI)section.Modules[1].Widget;
+            var drummerBuy = drummer.Root.Q<Button>("buy");
             Assert.IsFalse(drummerBuy.enabledSelf,
                 "no amps are owned, so the purchase gate is closed and the button says so");
-            Assert.AreEqual("+1", drummerBuy.text, "the button is the single-unit buy");
-            var drummerBuyMax = drummer.Q<Button>("buy_max");
+            var drummerBuyMax = drummer.Root.Q<Button>("buy_max");
             Assert.IsFalse(drummerBuyMax.enabledSelf, "a closed gate affords zero of them");
-            Assert.AreEqual("+1", drummerBuyMax.text, "and at zero the max button reads the single unit");
-            Assert.AreEqual("250.00 Cash => 3.00 Cash", drummer.Q<Label>("yield").text,
+            Assert.AreEqual(1, drummer.ShownMax, "and at zero the max button reads the single unit");
+            AssertCostAndYield(fx, drummer, 250, 3,
                 "fans sits behind its own reveal, and an inactive currency takes nothing from any source");
             Assert.IsFalse(section.Modules[0].Widget.Root.Q<Button>("buy").enabledSelf,
                 "1 cash after one press does not cover the amp's 60");
@@ -886,19 +952,19 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(8, max);
             var buy = row.Root.Q<Button>("buy");
             var buyMax = row.Root.Q<Button>("buy_max");
-            Assert.AreEqual("+1", buy.text);
-            Assert.AreEqual("+8", buyMax.text);
+            Assert.AreEqual(8, row.ShownMax);
             Assert.IsTrue(buy.enabledSelf);
             Assert.IsTrue(buyMax.enabledSelf);
 
             // What the button's click submits: the count it printed.
             fx.Session.TryBuy(ctx, fx.PracticeAmp, max);
 
-            Assert.AreEqual("(8)", row.Root.Q<Label>("count").text);
+            Assert.AreEqual(8, row.ShownPurchased);
+            Fixture.AssertClose(0, row.ShownGranted, "no payment has landed, so the label prints no granted count");
             // 177.39 left against the ninth unit's 183.54, so nothing is
-            // affordable: both buttons read "+1" and neither presses.
-            Assert.AreEqual("+1", buy.text);
-            Assert.AreEqual("+1", buyMax.text);
+            // affordable: the max button reads the single unit and neither
+            // button presses.
+            Assert.AreEqual(1, row.ShownMax);
             Assert.IsFalse(buy.enabledSelf);
             Assert.IsFalse(buyMax.enabledSelf);
         }
@@ -918,19 +984,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The tap is a transaction, so its own refresh repaints the row over
             // the facts set beneath it.
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
-            Assert.AreEqual("(3)", row.Root.Q<Label>("count").text);
+            Assert.AreEqual(3, row.ShownPurchased);
+            Fixture.AssertClose(0, row.ShownGranted, "nothing granted, so none is printed");
 
             fx.Tier1.grantedCounts["practice_amp"] = 2.5;
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
-            Assert.AreEqual("(3+2.50)", row.Root.Q<Label>("count").text);
+            Assert.AreEqual(3, row.ShownPurchased);
+            Fixture.AssertClose(2.5, row.ShownGranted);
         }
 
         // Exactly one unit affordable is the state both buttons read "+1" for,
         // and both do the same thing - no hiding rule for a state that lasts
         // seconds (12.11).
         [Test]
-        public void BothButtonsReadPlusOneWhenExactlyOneUnitIsAffordable()
+        public void TheMaxButtonShowsOneUnitWhenExactlyOneIsAffordable()
         {
             var fx = new Fixture();
             fx.Enter();
@@ -942,8 +1010,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, Purchasing.MaxAffordable(fx.Ctx(fx.Tier1), fx.PracticeAmp));
             var buy = row.Root.Q<Button>("buy");
             var buyMax = row.Root.Q<Button>("buy_max");
-            Assert.AreEqual("+1", buy.text);
-            Assert.AreEqual("+1", buyMax.text);
+            Assert.AreEqual(1, row.ShownMax, "the max button prints the single unit its neighbor buys");
             Assert.IsTrue(buy.enabledSelf);
             Assert.IsTrue(buyMax.enabledSelf);
         }
@@ -974,9 +1041,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // A bought upgrade is a fact the row renders rather than a reason to
-        // drop it: the latch reads Bought and the row keeps its place (12.11).
+        // drop it: the latch shows itself bought and the row keeps its place
+        // (12.11).
         [Test]
-        public void ABoughtUpgradeRowReadsBoughtAndStaysListed()
+        public void ABoughtUpgradeRowShowsItsPurchaseAndStaysListed()
         {
             var fx = new Fixture();
             fx.Enter();
@@ -989,8 +1057,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(section.Visible, "the chapter's flag opened the gear");
             Assert.AreEqual(6, section.Modules.Count, "one module per authored upgrade");
             Assert.IsTrue(section.Modules[0].Visible, "the latch's row carries no gate of its own");
-            var buy = section.Modules[0].Widget.Root.Q<Button>("buy");
-            Assert.AreEqual("Bought", buy.text);
+            var latch = (UpgradeRowUI)section.Modules[0].Widget;
+            Assert.IsTrue(latch.ShownBought);
+            Assert.AreEqual(BigNumber.Zero, latch.ShownCost, "a bought row shows no price");
+            var buy = latch.Root.Q<Button>("buy");
             Assert.IsFalse(buy.enabledSelf, "a one-shot purchase is not pressable twice");
             for (var i = 1; i < section.Modules.Count; i++)
                 Assert.IsFalse(section.Modules[i].Visible, "the rest wait on their own flags");
@@ -1011,25 +1081,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // One readout per DISTINCT consumed currency: the three covers all
             // drink Rehearsal, and the name is the currency's authored one.
+            var group = (GroupUI)module.Widget;
             var readouts = module.Widget.Root.Query<VisualElement>(className: "consumed-readout").ToList();
-            CollectionAssert.AreEqual(new[] { "Rehearsal" }, readouts.Select(line => line.Q<Label>().text).ToArray());
+            CollectionAssert.AreEqual(new[] { fx.Rehearsal.displayName },
+                readouts.Select(line => line.Q<Label>().text).ToArray());
 
             var rows = Fixture.BarRows(module);
             Assert.AreEqual(3, rows.Count, "one row per authored bar");
             CollectionAssert.AreEqual(
-                new[] { "Three-Chord Anthem", "Parking-Lot Standard", "The Crowd-Pleaser" },
+                fx.LearnCovers.members.Select(member => member.displayName).ToArray(),
                 rows.Select(row => row.Q<Label>(className: "bar-name").text).ToArray(),
                 "the authored bar order and names");
-            CollectionAssert.AreEqual(
-                new[] { "0.00 / 100.00", "0.00 / 300.00", "0.00 / 600.00" },
-                rows.Select(row => row.Q<Label>(className: "bar-progress").text).ToArray(),
-                "the authored fill amounts, none of them started");
+            foreach (var row in rows)
+                Assert.AreEqual(0f, row.Q<ProgressBar>(className: "bar-fill").value, "none of them started");
+            foreach (var member in fx.LearnCovers.members)
+                Assert.AreEqual(MemberMark.Select, group.Mark(member), $"'{member.Id}' is offered for selection");
             foreach (var member in Fixture.MemberRows(module))
-            {
-                var select = member.Q<Button>(className: "member-select");
-                Assert.AreEqual("Select", select.text);
-                Assert.IsTrue(select.enabledSelf, "nothing is selected yet, so every cover is choosable");
-            }
+                Assert.IsTrue(member.Q<Button>(className: "member-select").enabledSelf,
+                    "nothing is selected yet, so every cover is choosable");
         }
 
         [Test]
@@ -1044,13 +1113,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(fx.Tier1.activeMembers[fx.LearnCovers.Id].Contains(fx.Cover1.Id), "cover_1 was selected");
 
             // No Render call: the command's own refresh is what repaints.
-            var buttons = Fixture.MemberRows(fx.Host.Sections[RehearsalSpace].Modules.Single())
+            var module = fx.Host.Sections[RehearsalSpace].Modules.Single();
+            var group = (GroupUI)module.Widget;
+            var buttons = Fixture.MemberRows(module)
                 .Select(member => member.Q<Button>(className: "member-select"))
                 .ToArray();
-            Assert.AreEqual("Selected", buttons[0].text);
+            var covers = fx.LearnCovers.members;
+            Assert.AreEqual(MemberMark.Selected, group.Mark(covers[0]));
             Assert.IsTrue(buttons[0].enabledSelf, "the control toggles, so the running cover is how it is stopped");
-            Assert.AreEqual("Select", buttons[1].text);
-            Assert.AreEqual("Select", buttons[2].text);
+            Assert.AreEqual(MemberMark.Select, group.Mark(covers[1]));
+            Assert.AreEqual(MemberMark.Select, group.Mark(covers[2]));
             Assert.IsTrue(buttons[1].enabledSelf, "a sibling stays pressable, and a full group refuses the press");
         }
 
@@ -1065,20 +1137,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var module = fx.Host.Sections[Release].Modules.Single();
             Assert.IsTrue(module.Visible, "the flag opened the release");
+            var rung = fx.Tier1Def.rung;
             var press = module.Widget.Root.Q<Button>("press");
-            Assert.AreEqual("Cut a Demo", press.text, "the rung's authored label");
+            Assert.AreEqual(rung.label, press.text, "the rung's authored label");
             Assert.IsFalse(press.enabledSelf, "a fresh run meets neither threshold");
 
             Assert.AreEqual(3, module.Widget.Root.Q<VisualElement>("legs").childCount,
                 "one label per authored leg, built once and toggled");
-            CollectionAssert.AreEqual(
-                new[] { "50 fans (0.00/50.00)", "Learn a cover (0.00/1.00)" }, Fixture.VisibleLegs(module),
+            var legs = GateFeedback.Legs(rung.offerCondition);
+            CollectionAssert.AreEqual(new[] { legs[0], legs[1] }, Fixture.ShownLegs(module, rung.offerCondition),
                 "the two unmet legs; nothing is pending, so the reward leg holds and stays hidden");
+            Fixture.AssertProgress(legs[0], fx.Ctx(fx.Tier1), 0, 50);
+            Fixture.AssertProgress(legs[1], fx.Ctx(fx.Tier1), 0, 1);
 
+            var widget = (RungButtonUI)module.Widget;
             var preview = module.Widget.Root.Q<Label>("preview");
             Assert.AreEqual(DisplayStyle.Flex, preview.style.display.value, "the rung opens with an AddCurrency");
-            Assert.AreEqual("Would bank: +0.00 Demo Tapes", preview.text,
-                "the payout at zero fans, over the paid currency's authored name");
+            Assert.IsTrue(widget.PreviewShown);
+            CollectionAssert.AreEqual(new[] { fx.DemoTapes }, widget.ShownCurrencies.ToArray(), "the paid currency");
+            Assert.AreEqual(1, widget.ShownAmounts.Count);
+            Fixture.AssertClose(0, widget.ShownAmounts[0], "the payout at zero fans");
         }
 
         [Test]
@@ -1091,17 +1169,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
 
             var module = fx.Host.Sections[BackyardParty].Modules.Single();
+            var rung = fx.Ch1Def.rung;
             var press = module.Widget.Root.Q<Button>("press");
-            Assert.AreEqual("Play the Backyard Party", press.text);
+            Assert.AreEqual(rung.label, press.text, "the rung's authored label");
             Assert.IsFalse(press.enabledSelf, "no demo tapes have been banked");
 
-            // The threshold leg carries its own uiText, so it renders as that
-            // text with the progress beside it - the capstone's whole readout.
-            CollectionAssert.AreEqual(new[] { "Hand out 30 Demo Tapes (0.00/30.00)" }, Fixture.VisibleLegs(module));
+            // The threshold leg is the whole gate and shows with its progress
+            // beside it - the capstone's whole readout.
+            CollectionAssert.AreEqual(new[] { rung.offerCondition }, Fixture.ShownLegs(module, rung.offerCondition));
+            Fixture.AssertProgress(rung.offerCondition, fx.Ctx(fx.Ch1), 0, 30);
+
+            var widget = (RungButtonUI)module.Widget;
             var preview = module.Widget.Root.Q<Label>("preview");
             Assert.AreEqual(DisplayStyle.Flex, preview.style.display.value, "the capstone opens with an AddCurrency");
-            Assert.AreEqual("Would bank: +1.00 Roadies", preview.text,
-                "the constant roadie, over the paid currency's authored name");
+            Assert.IsTrue(widget.PreviewShown);
+            CollectionAssert.AreEqual(new[] { fx.Roadies }, widget.ShownCurrencies.ToArray(), "the paid currency");
+            Assert.AreEqual(1, widget.ShownAmounts.Count);
+            Fixture.AssertClose(1, widget.ShownAmounts[0], "the constant roadie");
         }
 
         [Test]
@@ -1117,10 +1201,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var section = fx.Host.Sections[GarageJam];
             Assert.IsTrue(section.Visible, "the first demo tape opened the section");
-            CollectionAssert.AreEqual(
-                new[] { "Garage Jam I", "Garage Jam II", "Garage Jam III" },
-                section.Modules.Select(module => Fixture.Text(module, "name")).ToArray(),
-                "one row per authored event, named from content");
+            CollectionAssert.AreEqual(fx.Tier1Def.events, section.Modules.Select(module => module.Definition.content),
+                "one row per authored event, in authored order");
+            foreach (var module in section.Modules)
+                Assert.AreEqual(module.Definition.content.displayName, Fixture.Text(module, "name"),
+                    "each row is named from its event's content");
 
             var first = section.Modules[0];
             Assert.IsTrue(first.Widget.Root.Q<Button>("start").enabledSelf, "one demo tape is jam I's whole gate");
@@ -1128,9 +1213,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var second = section.Modules[1];
             Assert.IsFalse(second.Widget.Root.Q<Button>("start").enabledSelf);
-            CollectionAssert.AreEqual(
-                new[] { "Clear Garage Jam I first", "15 Demo Tapes (1.00/15.00)" }, Fixture.VisibleLegs(second),
+            var gate = ((EventDefinition)second.Definition.content).availableWhen;
+            var legs = GateFeedback.Legs(gate);
+            CollectionAssert.AreEqual(new[] { legs[0], legs[2] }, Fixture.ShownLegs(second, gate),
                 "the unmet legs in authored order; jam II is uncleared, so its own already-cleared leg holds");
+            Fixture.AssertProgress(legs[2], fx.Ctx(fx.Tier1), 1, 15);
         }
 
         [Test]
@@ -1150,11 +1237,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "a running attempt has nothing left to start");
             var dismiss = first.Widget.Root.Q<Button>("dismiss");
             Assert.AreEqual(DisplayStyle.Flex, dismiss.style.display.value);
-            Assert.AreEqual("Dismiss", dismiss.text, "the goal has not latched, so the ending banks nothing");
+            Assert.IsFalse(((EventUI)first.Widget).ShowsClaim, "the goal has not latched, so the ending banks nothing");
             Assert.IsEmpty(Fixture.VisibleLegs(first), "a running attempt has no gate to explain");
-            // The onEntry restarted tier1, so the cash the tap earned is gone
-            // and the goal reads from zero.
-            Assert.AreEqual("60s left - Goal 0.00/150.00", Fixture.Text(first, "status"));
+            // The status reads the attempt: the authored minute, all of it
+            // left, and a goal the onEntry's restart of tier1 put back at zero
+            // by taking the cash the tap earned.
+            Assert.IsNotEmpty(Fixture.Text(first, "status"), "a running attempt shows its status");
+            var record = fx.Tier1.activeEvent;
+            Assert.AreEqual(60, record.remainingSeconds, 1e-9, "the authored time limit, untouched");
+            Assert.IsFalse(record.goalReached);
+            Fixture.AssertProgress(fx.GarageJam1.goal, fx.Ctx(fx.Tier1), 0, 150);
 
             for (var i = 1; i < section.Modules.Count; i++)
                 Assert.IsFalse(section.Modules[i].Widget.Root.Q<Button>("start").enabledSelf,
@@ -1183,6 +1275,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return (GeneratorRowUI)fx.Host.Sections[Band].Modules[0].Widget;
         }
 
+        // The garage floor's cash line widget.
+        private static CurrencyHeaderUI CashHeader(Fixture fx) =>
+            (CurrencyHeaderUI)fx.Host.Sections[GarageFloor].Modules[CashLine].Widget;
+
         private static string InfoText(Fixture fx, string element) =>
             fx.Host.GeneratorInfo.Root.Q<Label>(element).text;
 
@@ -1208,9 +1304,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(fx.PracticeAmp.description, description.text);
             Assert.AreEqual(row.Root.Q<Label>("yield").text, InfoText(fx, "info-cost"),
                 "the row and the screen print one line, not two that agree until they do not");
-            Assert.AreEqual("Owned: (0)", InfoText(fx, "info-owned"));
-            Assert.AreEqual("Producing: nothing", InfoText(fx, "info-production"),
-                "no units are owned, so there is no product to name");
+            var info = fx.Host.GeneratorInfo;
+            Assert.AreEqual(0, info.ShownPurchased);
+            Fixture.AssertClose(0, info.ShownGranted, "nothing granted");
+            // No units are owned, so there is no product to name: the label is
+            // the screen's own formatter over an owned count of zero.
+            Assert.AreEqual(GeneratorInfoUI.ProductionText(fx.Ctx(fx.Tier1), fx.PracticeAmp, BigNumber.Zero),
+                InfoText(fx, "info-production"));
 
             // Bought beneath the standing screen: the gate is 100 earned cash
             // and the first unit costs 60.
@@ -1219,12 +1319,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, fx.Tier1.generatorCounts["practice_amp"], "the amp was bought");
 
             Assert.IsTrue(Fixture.Shown(fx.Host.GeneratorInfo.Root), "a purchase is not a close");
-            Assert.AreEqual("Owned: (1)", InfoText(fx, "info-owned"));
+            Assert.AreEqual(1, info.ShownPurchased);
             // One unit's rate at the declaring scope, which is what N units
             // produce: nothing in the effect vocabulary reads the owned count.
             var (target, amount) = Producer.UnitRate(fx.Ctx(fx.Tier1), fx.PracticeAmp).Single();
-            Assert.AreEqual("Producing: " + NumberFormatter.Format(amount) + " " + target.displayName + "/s",
-                InfoText(fx, "info-production"));
+            Assert.AreSame(fx.Cash, target, "an amp produces cash");
+            Fixture.AssertClose(0.5, amount, "one amp's authored rate");
+            Assert.AreEqual(GeneratorInfoUI.ProductionText(fx.Ctx(fx.Tier1), fx.PracticeAmp, BigNumber.One),
+                InfoText(fx, "info-production"), "the screen's own formatter over the one owned unit");
         }
 
         // A press that spans a refresh lands on the element it started on: the
@@ -1318,7 +1420,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var row = fx.Host.Sections[GarageFloor].Modules[OpenStoryRow];
             var open = StoryButton(row);
-            Assert.AreEqual("Make Some Noise", open.text, "the beat's authored displayName is the button");
+            Assert.AreEqual(fx.Opener.displayName, open.text, "the beat's authored displayName is the button");
             Assert.IsTrue(open.enabledSelf, "the opener's gate is Always, so it is live from the first press");
             Assert.IsEmpty(Fixture.VisibleLegs(row), "an available beat has nothing left to explain");
             Assert.IsFalse(open.ClassListContains("seen"), "and nothing has read it yet");
@@ -1339,8 +1441,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var card = StoryCard(fx.Screen);
             Assert.IsTrue(Fixture.Shown(card), "the card is up over the chapter");
-            Assert.AreEqual("Make Some Noise", card.Q<Label>("title").text);
-            StringAssert.StartsWith("It starts in the garage.", card.Q<Label>("text").text);
+            Assert.AreEqual(fx.Opener.displayName, card.Q<Label>("title").text, "the beat's authored name");
+            Assert.AreEqual(fx.Opener.text, card.Q<Label>("text").text, "the beat's authored prose");
             Assert.AreSame(fx.Opener, fx.Host.ShownStory);
             // The chapter is live and ticking, so the interpolation reason that
             // keeps the sections down under the idle dialog does not apply.
@@ -1384,7 +1486,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var row = fx.Host.Sections[GarageFloor].Modules[EndStoryRow];
             Assert.IsTrue(row.Visible, "the flag opened the row's own gate");
             var open = StoryButton(row);
-            Assert.AreEqual("Your First Roadie", open.text);
+            Assert.AreEqual(fx.Capstone.displayName, open.text, "the beat's authored displayName is the button");
             Assert.IsTrue(open.enabledSelf, "the same flag is the beat's gate");
             Assert.IsEmpty(Fixture.VisibleLegs(row));
             Assert.IsNull(fx.Host.ShownStory, "chapter 1 marks neither beat, so neither pops");
@@ -1449,9 +1551,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var entries = LogEntries(fx.Screen);
             Assert.AreEqual(1, entries.Count, "one entry per read beat");
-            Assert.AreEqual("Make Some Noise", entries[0].text, "the beat's authored displayName");
+            Assert.AreEqual(fx.Opener.displayName, entries[0].text, "the beat's authored displayName");
             Assert.IsFalse(Fixture.Shown(StoryLogWindow(fx.Screen).Q<Label>("story-log-empty")));
-            CollectionAssert.DoesNotContain(entries.Select(entry => entry.text).ToArray(), "Your First Roadie",
+            CollectionAssert.DoesNotContain(entries.Select(entry => entry.text).ToArray(), fx.Capstone.displayName,
                 "the capstone is unread, so no entry stands for it");
         }
 
@@ -1473,7 +1575,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsFalse(Fixture.Shown(StoryLogWindow(fx.Screen)), "the card takes the log's place");
             Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
-            Assert.AreEqual("Make Some Noise", StoryCard(fx.Screen).Q<Label>("title").text);
+            Assert.AreEqual(fx.Opener.displayName, StoryCard(fx.Screen).Q<Label>("title").text);
             Assert.AreSame(fx.Opener, fx.Host.ShownStory);
             Assert.AreEqual(flags, fx.Root.flags.Count, "a read beat's reopen writes nothing");
 
@@ -1591,13 +1693,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(DiscographyWindow(fx.Screen), fx.Host.Discography.Root);
             var rows = DiscographyRows(fx.Screen);
             Assert.AreEqual(2, rows.Count, "one row per song");
+            CollectionAssert.AreEqual(fx.Root.songs.Select(song => song.songId).ToArray(),
+                fx.Host.Discography.ShownSongIds.ToArray(), "the rows stand for the songs in the order written");
+            // The stored names, from the title the test's own AddSong authors.
             var expected = new[] { "Untitled #1", "Untitled #2" };
             for (var i = 0; i < rows.Count; i++)
             {
-                Assert.AreEqual(expected[i], NameField(rows[i]).value, $"row {i} shows its song's name");
-                Assert.AreEqual(fx.Root.songs[i].name, NameField(rows[i]).value);
+                Assert.AreEqual(expected[i], fx.Root.songs[i].name, $"song {i} is named from its title");
+                Assert.AreEqual(fx.Root.songs[i].name, NameField(rows[i]).value, $"row {i} shows its song's name");
                 Assert.AreEqual(40, NameField(rows[i]).maxLength, "the field holds MaxNameLength");
-                Assert.AreEqual("Rename", rows[i].Q<Button>(className: "discography-rename").text);
+                var rename = rows[i].Q<Button>(className: "discography-rename");
+                Assert.IsNotNull(rename, $"row {i} has a rename button");
+                Assert.IsTrue(rename.enabledSelf, "and it presses");
             }
             Assert.AreEqual(7, fx.Host.Sections.Count, "the sections stay up beneath the window");
         }
@@ -1620,13 +1727,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.AreEqual("Garage Anthem", fx.Root.songs[1].name);
             Assert.AreEqual("Untitled #1", fx.Root.songs[0].name, "the other song is untouched");
-            Assert.AreEqual("Garage Anthem", NameField(DiscographyRows(fx.Screen)[1]).value);
-            Assert.AreEqual("Untitled #1", NameField(DiscographyRows(fx.Screen)[0]).value);
+            Assert.AreEqual(fx.Root.songs[1].name, NameField(DiscographyRows(fx.Screen)[1]).value);
+            Assert.AreEqual(fx.Root.songs[0].name, NameField(DiscographyRows(fx.Screen)[0]).value);
 
             fx.Host.Discography.Rename("song_1", "   Backyard Party  ");
 
-            Assert.AreEqual("Backyard Party", fx.Root.songs[0].name);
-            Assert.AreEqual("Backyard Party", NameField(DiscographyRows(fx.Screen)[0]).value, "the trimmed name");
+            Assert.AreEqual("Backyard Party", fx.Root.songs[0].name, "the trimmed name");
+            Assert.AreEqual(fx.Root.songs[0].name, NameField(DiscographyRows(fx.Screen)[0]).value,
+                "the field shows the stored name");
             Assert.IsTrue(Fixture.Shown(DiscographyWindow(fx.Screen)), "the window stays up");
         }
 
@@ -1644,7 +1752,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Host.Discography.Rename("song_1", string.Empty);
 
             Assert.AreEqual("Untitled #1", fx.Root.songs[0].name, "an empty name is refused");
-            Assert.AreEqual("Untitled #1", NameField(DiscographyRows(fx.Screen)[0]).value);
+            Assert.AreEqual(fx.Root.songs[0].name, NameField(DiscographyRows(fx.Screen)[0]).value,
+                "the field goes back to the stored name");
         }
 
         // The host shows the window again on every refresh while it stands, a
@@ -1659,19 +1768,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             WriteSong(fx);
             fx.Host.OpenDiscography();
             var field = NameField(DiscographyRows(fx.Screen)[0]);
-            field.value = "Half a na";
+            var typed = "Half a na";
+            field.value = typed;
 
             WriteSong(fx);   // a transaction's refresh, with the window up
 
             Assert.AreSame(field, NameField(DiscographyRows(fx.Screen)[0]), "the row is kept, not built again");
-            Assert.AreEqual("Half a na", field.value, "a refresh leaves typed text alone");
+            Assert.AreEqual(typed, field.value, "a refresh leaves what the player typed alone");
             Assert.AreEqual(2, DiscographyRows(fx.Screen).Count, "the song written meanwhile gained a row");
             Assert.AreEqual("Untitled #1", fx.Root.songs[0].name, "nothing was stored");
 
             fx.Host.CloseOverlay();
             fx.Host.OpenDiscography();
 
-            Assert.AreEqual("Untitled #1", NameField(DiscographyRows(fx.Screen)[0]).value, "a reopen shows what is stored");
+            Assert.AreEqual(fx.Root.songs[0].name, NameField(DiscographyRows(fx.Screen)[0]).value,
+                "a reopen shows what is stored");
         }
 
         // A show builds a row for every song that has none, so a song written
@@ -1691,8 +1802,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var rows = DiscographyRows(fx.Screen);
             Assert.AreEqual(2, rows.Count);
-            Assert.AreEqual("Untitled #1", NameField(rows[0]).value);
-            Assert.AreEqual("Untitled #2", NameField(rows[1]).value);
+            CollectionAssert.AreEqual(fx.Root.songs.Select(song => song.songId).ToArray(),
+                fx.Host.Discography.ShownSongIds.ToArray(), "a row per song, in the order written");
+            Assert.AreEqual("Untitled #1", fx.Root.songs[0].name);
+            Assert.AreEqual("Untitled #2", fx.Root.songs[1].name);
+            Assert.AreEqual(fx.Root.songs[0].name, NameField(rows[0]).value);
+            Assert.AreEqual(fx.Root.songs[1].name, NameField(rows[1]).value);
         }
 
         [Test]
@@ -1737,7 +1852,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(fx.Host.Sections[GarageFloor].Root.ClassListContains("section-hero"));
             Assert.AreEqual(DisplayStyle.Flex, HeadlineElement(fx.Screen).style.display.value);
 
-            Assert.AreEqual("Cash", Fixture.Text(cash, "name"), "the currency's authored name");
+            Assert.AreEqual(fx.Cash.displayName, Fixture.Text(cash, "name"), "the currency's authored name");
             Assert.AreEqual(Fixture.Text(cash, "name"), HeadlineText(fx.Screen, "headline-name"));
             Assert.AreEqual(Fixture.Text(cash, "value"), HeadlineText(fx.Screen, "headline-value"));
             Assert.AreEqual(Fixture.Text(cash, "rate"), HeadlineText(fx.Screen, "headline-rate"));
@@ -1771,13 +1886,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Ten seconds of one amp at 0.5 cash/s: truth 5, slope 0.5/s, and
             // the tick's own refresh snaps the line at game time zero.
             fx.Session.Tick(10, fx.Now.AddSeconds(10));
-            Assert.AreEqual("5.00", Fixture.Text(cash, "value"));
+            Fixture.AssertClose(5, CashHeader(fx).ShownValue);
             Assert.AreEqual(Fixture.Text(cash, "value"), HeadlineText(fx.Screen, "headline-value"));
 
             fx.Clock.Frame(fx.Now.AddSeconds(14), 4);
             fx.Host.Interpolate();
 
-            Assert.AreEqual("7.00", Fixture.Text(cash, "value"), "four seconds of the slope on top of the snap");
+            Fixture.AssertClose(7, CashHeader(fx).ShownValue, "four seconds of the slope on top of the snap");
             Assert.AreEqual(Fixture.Text(cash, "value"), HeadlineText(fx.Screen, "headline-value"));
         }
 
@@ -1979,7 +2094,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var open = StoryButton(fx.Row(0));
             Assert.IsFalse(open.enabledSelf, "the gate does not hold and the beat is unread");
-            CollectionAssert.AreEqual(new[] { "Cut a demo" }, Fixture.VisibleLegs(fx.Row(0)));
+            CollectionAssert.AreEqual(new[] { fx.Marked.availableWhen }, Fixture.ShownLegs(fx.Row(0), fx.Marked.availableWhen),
+                "the gate's one leg, unmet");
             Assert.IsNull(fx.Host.ShownStory, "a marked beat that is not available yet has nothing to pop");
         }
 
@@ -1999,7 +2115,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
             Assert.AreSame(fx.Marked, fx.Host.ShownStory, "the first marked, available, unseen beat");
-            Assert.AreEqual("The First Cut", StoryCard(fx.Screen).Q<Label>("title").text);
+            Assert.AreEqual(fx.Marked.displayName, StoryCard(fx.Screen).Q<Label>("title").text);
             Assert.IsFalse(fx.Tree.Root.flags.Contains("story_marked_seen"),
                 "the open's mark waits behind the transaction it was issued from");
             Assert.IsTrue(StoryButton(fx.Row(1)).enabledSelf, "the unmarked beat's own gate holds too");
@@ -2050,7 +2166,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(fx.Host.ShownStory);
             Assert.IsFalse(fx.Tree.Root.flags.Contains("story_marked_seen"));
             if (overlayName == "roadie-allocation")
-                Assert.AreEqual("1", fx.Screen.Q<Label>("roadie-count-ch1").text,
+                Assert.AreEqual(1, fx.Host.RoadieAllocation.ShownCount("ch1"),
                     "the unsubmitted allocation draft survives while the story waits");
 
             fx.Host.CloseOverlay();
@@ -2107,13 +2223,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var entries = LogEntries(fx.Screen);
             Assert.AreEqual(1, entries.Count, "ch1's own two beats are unread");
-            Assert.AreEqual("Second Stage", entries[0].text, "the dormant chapter's beat");
+            Assert.AreEqual(fx.SecondStage.displayName, entries[0].text, "the dormant chapter's beat");
 
             // What the entry's button calls; a headless test has no pointer.
             fx.Host.StoryLog.Open(fx.SecondStage, fx.Ch2);
 
             Assert.IsTrue(Fixture.Shown(StoryCard(fx.Screen)));
-            Assert.AreEqual("Second Stage", StoryCard(fx.Screen).Q<Label>("title").text);
+            Assert.AreEqual(fx.SecondStage.displayName, StoryCard(fx.Screen).Q<Label>("title").text);
             Assert.AreSame(fx.Tree.Ch1, fx.Session.ForegroundChapter, "a rewatch is not a switch");
             Assert.AreEqual(flags, fx.Tree.Root.flags.Count, "the beat was already read");
 

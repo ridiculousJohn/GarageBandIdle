@@ -25,6 +25,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public BigNumber progressBefore = BigNumber.Zero;   // what the crossing test compares against
         public BigNumber filled = BigNumber.Zero;
 
+        // What one completion would pay each currency, sized in the same
+        // start-of-segment snapshot as the rate (12.9): read after the deposits
+        // or after the bar's own completions, it would be this segment's own
+        // production sizing the income the report attributes to it. Empty on a
+        // payment, which the report never reads.
+        public IReadOnlyList<(CurrencyDefinition currency, ScopeState home, BigNumber amount)> payout =
+            Array.Empty<(CurrencyDefinition, ScopeState, BigNumber)>();
+
         // A payment into the bar rather than a draw of what it consumes (12.7):
         // selection and availability govern DRINKING, and a payment is not a
         // drink, so the settlement's entry gate does not ask them of one.
@@ -89,6 +97,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     consumes = PerUnitCosts(ctx, entry),
                     rate = FillRate(subtreeCtx, entry),
                     progressBefore = progress,
+                    payout = CompletionPayout(ctx, entry.Bar),
                 });
             }
             return demand;
@@ -125,9 +134,107 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // the idle offer share this, so the number a window computes is the
         // number the tick would have moved (section 9).
         public static BigNumber FillRate(GameContext subtreeCtx, BarPlan plan) =>
+            FillRate(subtreeCtx, plan.Node, plan.Bar, plan.Rate);
+
+        // The same resolution for one bar a caller holds rather than a planned
+        // entry: the bar's home found outward from the acting scope, the plan
+        // its home compiled for it, and the subtree the tick draws it in - the
+        // chapter it resolves on, the foreground chapter whenever it draws at
+        // all. A bar declared at root draws in no chapter, so its own home is
+        // the subtree. Answers whether or not the bar is drawing.
+        public static BigNumber FillRate(GameContext ctx, BarDefinition bar)
+        {
+            var home = Producer.DeclaringScope<ScopeState>(ctx.Scope, bar);
+            var subtree = (ScopeState)home.Chapter() ?? home;
+            return FillRate(ctx.Rebase(subtree), home, bar, home.Link<StatPlans>(bar).Rate);
+        }
+
+        private static BigNumber FillRate(GameContext subtreeCtx, ScopeState home, BarDefinition bar,
+                                          CoordinatePlan ratePlan) =>
             BigNumber.Max(BigNumber.Zero,
-                plan.Bar.fillRate * Producer.GetMultiplier(subtreeCtx.Rebase(plan.Node), plan.Rate)
-                + Producer.GetRate(subtreeCtx, plan.Bar));
+                bar.fillRate * Producer.GetMultiplier(subtreeCtx.Rebase(home), ratePlan)
+                + Producer.GetRate(subtreeCtx, bar));
+
+        // What one completion of the bar would deposit to each currency if its
+        // onComplete ran now, depositing nothing (12.7): a FireGeneratorYield
+        // entry through the same resolution the firing commits
+        // (Producer.ResolveGeneratorYield - the owned count and every
+        // multiplier), an AddCurrency entry through the same AmountFor its
+        // Execute deposits. Only currency targets are income, so a yield entry
+        // naming a bar or a generator is left out; other kinds pay no currency.
+        // Amounts to one (currency, home) are summed, in first-seen order, and
+        // zeros are kept, so a level nobody bought still names what it pays.
+        //
+        // Every entry is sized against the one state the call sees. A list
+        // whose later action reads what an earlier one deposited - a formula on
+        // a balance the first entry paid - is where this and the execution
+        // part; none of the authored completion lists is that shape.
+        public static List<(CurrencyDefinition currency, ScopeState home, BigNumber amount)> CompletionPayout(
+            GameContext ctx, BarDefinition bar)
+        {
+            var home = Producer.DeclaringScope<ScopeState>(ctx.Scope, bar);
+            var homeCtx = ctx.Rebase(home);
+            var payout = new List<(CurrencyDefinition currency, ScopeState home, BigNumber amount)>();
+            foreach (var action in bar.onComplete)
+            {
+                switch (action)
+                {
+                    case FireGeneratorYield fire when fire.generator != null:
+                    {
+                        // The firing pays from the generator's declaring scope,
+                        // so each currency's home is found outward from there.
+                        var firing = Producer.DeclaringScope<ScopeState>(home, fire.generator);
+                        foreach (var (target, amount) in Producer.ResolveGeneratorYield(homeCtx, fire.generator))
+                            if (target is CurrencyDefinition currency)
+                                Accumulate(payout, currency, Producer.DeclaringScope<ScopeState>(firing, currency), amount);
+                        break;
+                    }
+                    case AddCurrency add:
+                        foreach (var currency in add.currencies)
+                            if (currency != null)
+                                Accumulate(payout, currency, Producer.DeclaringScope<ScopeState>(home, currency),
+                                           add.AmountFor(homeCtx, currency));
+                        break;
+                }
+            }
+            return payout;
+        }
+
+        // What the bar earns per REAL second while it runs: one completion's
+        // payout times completions per real second, which is the fill speed in
+        // units per game second, times game_speed, over fillAmount. Answers
+        // whether or not the bar is drawing - "what this earns while it runs" -
+        // and a bar that consumes answers from its nominal speed, since what
+        // its consumed currency covers is the draw's question, not this one.
+        // `gameSpeed` is TickSystem.GameSpeed over the chapter, the read the
+        // tick scales the same fill by.
+        public static List<(CurrencyDefinition currency, ScopeState home, BigNumber perSecond)> CompletionRate(
+            GameContext ctx, BarDefinition bar, double gameSpeed)
+        {
+            var payout = CompletionPayout(ctx, bar);
+            var rates = new List<(CurrencyDefinition currency, ScopeState home, BigNumber perSecond)>(payout.Count);
+            // A nonpositive threshold is refused at load and never draws; here
+            // it would be a division by it.
+            var perSecond = bar.fillAmount > BigNumber.Zero
+                ? FillRate(ctx, bar) * gameSpeed / bar.fillAmount
+                : BigNumber.Zero;
+            foreach (var (currency, home, amount) in payout)
+                rates.Add((currency, home, amount * perSecond));
+            return rates;
+        }
+
+        private static void Accumulate(List<(CurrencyDefinition currency, ScopeState home, BigNumber amount)> into,
+                                       CurrencyDefinition currency, ScopeState home, BigNumber amount)
+        {
+            for (var i = 0; i < into.Count; i++)
+            {
+                if (into[i].currency != currency || into[i].home != home)
+                    continue;
+                into[i] = (currency, home, into[i].amount + amount);
+                return;
+            }
+            into.Add((currency, home, amount));
+        }
 
         // The demand-side test, judged once in the snapshot: the bar is on, it
         // is available, and it has somewhere to fill to. The fillAmount leg is
@@ -220,6 +327,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                 // same number the crossing test compares against.
                 entry.scope.barProgress[entry.bar.Id] = entry.progressBefore + fill;
                 report.RecordFill(entry.scope, entry.bar.Id, fill);
+
+                // The completions this fill is worth, as the income it earns
+                // spread over the time it took (12.9): the snapshot's payout
+                // times the fraction of a cycle filled. Drawing admitted only a
+                // positive fillAmount, so the quotient is defined.
+                foreach (var (currency, home, amount) in entry.payout)
+                    if (amount != BigNumber.Zero)
+                        report.RecordCompletionIncome(home, currency.Id, amount * fill / entry.bar.fillAmount);
             }
         }
 

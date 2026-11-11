@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine.UIElements;
@@ -13,6 +14,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly Label yieldLabel;
 
         private ProducerDefinition producer;
+
+        private readonly List<(Definition target, BigNumber amount)> shownYields = new();
+
+        // What the line under the button says a press pays, in printed order,
+        // zeros left out as the line leaves them out.
+        public IReadOnlyList<(Definition target, BigNumber amount)> ShownYields => shownYields;
 
         public JamButtonUI(VisualElement root) : base(root)
         {
@@ -32,12 +39,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public override void Refresh()
         {
             var text = new StringBuilder();
+            shownYields.Clear();
             foreach (var (target, amount) in Producer.ResolveYield(Context(), producer))
             {
                 // Zeros are kept by the resolution and dropped by the reading:
                 // a target this firing pays nothing is not a line.
                 if (amount == BigNumber.Zero)
                     continue;
+                shownYields.Add((target, amount));
                 if (text.Length > 0)
                     text.Append(", ");
                 text.Append("+").Append(NumberFormatter.Format(amount)).Append(" ").Append(target.displayName);

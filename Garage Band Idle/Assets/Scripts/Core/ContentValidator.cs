@@ -1377,6 +1377,22 @@ namespace RidiculousGaming.GarageBandIdle
             if (bar.tap != null)
                 ctx.RequireOnChain(bar.tap, $"{site} tap");
 
+            // The level generator and the automating upgrade are ordinary
+            // references too, resolved outward from the bar's own scope (12.7).
+            // Nothing checks that the bar's onComplete fires the level or that
+            // the upgrade's actions flip repeatWhen: the pairing is authoring.
+            if (bar.level != null)
+                ctx.RequireOnChain(bar.level, $"{site} level");
+            if (bar.automation != null)
+            {
+                ctx.RequireOnChain(bar.automation, $"{site} automation");
+                // A bar with no repeatWhen fills once and stays full, so there
+                // is nothing for a purchase to make go again.
+                if (bar.repeatWhen == null)
+                    ctx.AddError(ValidationCheck.InertOperand,
+                        $"automation '{bar.automation.Id}' on a bar with no repeatWhen: a bar that fills once has nothing to automate (12.7).");
+            }
+
             // The cascade count is fillCounts, which only a repeating bar ever
             // acquires (12.6's row is titled "Repeating bars"). A non-repeating
             // bar's completion leaves no derivable effect-fact, which is why its

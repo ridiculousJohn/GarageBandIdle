@@ -79,13 +79,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ui.Open();
             ui.Increase("ch1");
             ui.Increase("ch2");
-            Assert.AreEqual("1", root.Q<Label>("roadie-count-ch1").text);
-            Assert.AreEqual("0", root.Q<Label>("roadie-count-ch2").text);
+            Assert.AreEqual(1, ui.ShownCount("ch1"));
+            Assert.AreEqual(0, ui.ShownCount("ch2"));
             Assert.IsFalse(root.Q<Button>("roadie-plus-ch2").enabledSelf);
 
             f.UnlockChapter2();
             ui.Refresh();
-            Assert.AreEqual("1", root.Q<Label>("roadie-count-ch1").text,
+            Assert.AreEqual(1, ui.ShownCount("ch1"),
                 "refresh preserves the eligible chapter's draft");
             Assert.IsTrue(root.Q<Button>("roadie-plus-ch2").enabledSelf);
 

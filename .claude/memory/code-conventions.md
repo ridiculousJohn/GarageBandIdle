@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-10T20:47:06.487Z
+  modified: 2026-11-11T02:55:44.773Z
 ---
 
 **Numbers**
@@ -42,3 +42,10 @@ metadata:
   Never curate inputs, loosen an assertion or delete a test to get green; a workaround that weakens
   a test is named as a workaround in the same sentence that reports it.
 - Tolerance for computed `BigNumber` chains; exactness only where the value is exact by construction.
+- NEVER compare an on-screen label against a literal string. John, 2026-11-10: "testing string
+  labels like that is fucking stupid and fragile, completely brain dead code." A test may prove a
+  value reaches the screen or that an element is shown, enabled or hidden; it does not pin wording.
+  As of that day about 90 such comparisons existed across six test files (61 in `ScreenHostTests`),
+  some added that same day under my briefs. Never brief an agent to write one.
+- Whether something is worth reworking is John's call, not mine: "don't fucking tell me what is
+  worth reworking". Report the finding and its size; do not rank it for him.

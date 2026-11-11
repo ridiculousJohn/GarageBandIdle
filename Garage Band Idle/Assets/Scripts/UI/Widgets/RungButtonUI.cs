@@ -31,6 +31,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // with nothing refused shows exactly its condition legs.
         private Label refusalLabel;
 
+        // Whether the preview line is displayed.
+        public bool PreviewShown { get; private set; }
+
+        // The amounts the preview prints, parallel to ShownCurrencies; empty when
+        // no preview shows.
+        public IReadOnlyList<BigNumber> ShownAmounts { get; private set; } = Array.Empty<BigNumber>();
+
+        // The currencies the preview prints, parallel to ShownAmounts.
+        public IReadOnlyList<Economy.CurrencyDefinition> ShownCurrencies { get; private set; } =
+            Array.Empty<Economy.CurrencyDefinition>();
+
         public RungButtonUI(VisualElement root) : base(root)
         {
             press = Require<Button>(root, "press", "RungButton.uxml");
@@ -103,16 +114,22 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             if (!RungFeedback.TryPreviewPayout(rung, ctx, out var amounts, out var currencies))
             {
+                PreviewShown = false;
+                ShownAmounts = Array.Empty<BigNumber>();
+                ShownCurrencies = Array.Empty<Economy.CurrencyDefinition>();
                 preview.style.display = DisplayStyle.None;
                 return;
             }
+            ShownAmounts = amounts;
+            ShownCurrencies = currencies;
             var paid = new StringBuilder();
-            for (var i = 0; i < currencies.Count; i++)
+            for (var i = 0; i < ShownCurrencies.Count; i++)
             {
                 if (paid.Length > 0)
                     paid.Append(", ");
-                paid.Append('+').Append(NumberFormatter.Format(amounts[i])).Append(' ').Append(currencies[i].displayName);
+                paid.Append('+').Append(NumberFormatter.Format(ShownAmounts[i])).Append(' ').Append(ShownCurrencies[i].displayName);
             }
+            PreviewShown = true;
             preview.style.display = DisplayStyle.Flex;
             preview.text = "Would bank: " + paid.ToString();
         }

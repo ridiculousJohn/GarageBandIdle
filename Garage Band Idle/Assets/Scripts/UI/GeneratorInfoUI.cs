@@ -27,6 +27,20 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // where the count, the cost and the rate are facts (12.3).
         private ScopeState scope;
 
+        private readonly List<(Definition target, BigNumber amount)> shownYields = new();
+
+        // The owned line's two halves, as GeneratorRowUI's count: the purchased
+        // count, and the granted count added beside it, zero when none prints.
+        public int ShownPurchased { get; private set; }
+
+        public BigNumber ShownGranted { get; private set; } = BigNumber.Zero;
+
+        // The cost line's data, through GeneratorRowUI.CostAndYields: the cost
+        // at its head, and the yields after the arrow in printed order.
+        public BigNumber ShownCost { get; private set; } = BigNumber.Zero;
+
+        public IReadOnlyList<(Definition target, BigNumber amount)> ShownYields => shownYields;
+
         public GeneratorInfoUI(VisualElement rootElement, GameClock clock, Action close)
         {
             Root = rootElement;
@@ -71,10 +85,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
             description.style.display = string.IsNullOrEmpty(generator.description)
                 ? DisplayStyle.None
                 : DisplayStyle.Flex;
-            cost.text = GeneratorRowUI.CostAndYieldText(ctx, generator);
+            var (unitCost, yields) = GeneratorRowUI.CostAndYields(ctx, generator);
+            ShownCost = unitCost;
+            shownYields.Clear();
+            shownYields.AddRange(yields);
+            cost.text = GeneratorRowUI.FormatCostAndYields(generator, ShownCost, shownYields);
             // The row's own formatter, so the screen and the row never print one
             // count two ways (12.11).
-            ownedLabel.text = "Owned: " + GeneratorRowUI.CountText(ctx, generator);
+            ShownPurchased = ctx.GetPurchasedCount(generator.Id);
+            ShownGranted = ctx.GetGrantedCount(generator.Id);
+            ownedLabel.text = "Owned: " + GeneratorRowUI.CountText(ShownPurchased, ShownGranted);
             production.text = ProductionText(ctx, generator, ctx.GetOwnedCount(generator.Id));
         }
 

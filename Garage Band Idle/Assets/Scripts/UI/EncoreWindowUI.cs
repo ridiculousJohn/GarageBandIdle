@@ -25,6 +25,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // the host, so this window names no timer of its own.
         private readonly string timerId;
 
+        // The remaining line shows infinity.
+        public bool ShownPermanent { get; private set; }
+
+        // The seconds the remaining line shows; zero when ShownPermanent.
+        public long ShownSeconds { get; private set; }
+
+        // The multiplier in the description line; zero when the line prints
+        // words instead of a factor.
+        public BigNumber ShownGameSpeed { get; private set; } = BigNumber.Zero;
+
+        // The seconds of boost the ad button offers; zero when it offers none.
+        public double ShownGrantSeconds { get; private set; }
+
         public EncoreWindowUI(VisualElement rootElement, RootScopeState root, string timerId, GameClock clock,
                               AdManager ads, IAPManager store, Action close)
         {
@@ -40,7 +53,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             ad = ScreenHost.Require<Button>(rootElement, "encore-ad");
             pass = ScreenHost.Require<Button>(rootElement, "encore-pass");
             var grant = GrantSeconds(root.DefinitionAs<RootDefinition>());
-            ad.text = grant > 0 ? "Boost for " + GrantDuration(grant) : "Boost";
+            ShownGrantSeconds = grant > 0 ? grant : 0;
+            ad.text = ShownGrantSeconds > 0 ? "Boost for " + GrantDuration(ShownGrantSeconds) : "Boost";
             ad.clicked += RequestAd;
             pass.clicked += RequestPass;
             ScreenHost.Require<Button>(rootElement, "encore-close").clicked += close;
@@ -68,7 +82,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Interpolate();
         }
 
-        public void Interpolate() => remaining.text = "Time remaining " + EncoreTime.Text(root, timerId, clock.RealTimeUtc);
+        public void Interpolate()
+        {
+            ShownPermanent = EncoreTime.Permanent(root);
+            ShownSeconds = ShownPermanent ? 0 : EncoreTime.RemainingSeconds(root, timerId, clock.RealTimeUtc);
+            remaining.text = "Time remaining " + EncoreTime.Format(ShownPermanent, ShownSeconds);
+        }
 
         public void Hide() => Root.style.display = DisplayStyle.None;
 
@@ -111,8 +130,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     found = true;
                 }
             }
+            ShownGameSpeed = found ? factor : BigNumber.Zero;
             description.text = found
-                ? "While active, game speed is " + NumberFormatter.Format(factor) + "x."
+                ? "While active, game speed is " + NumberFormatter.Format(ShownGameSpeed) + "x."
                 : "While active, Encore boosts your band.";
         }
 

@@ -11,17 +11,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
     public static class ModuleWidgetFactory
     {
         private static readonly Dictionary<string, Func<VisualElement, ModuleRegistry, IStoryOpener,
-                                                        IGeneratorInfoOpener, ModuleWidget>> Creators =
+                                                        IGeneratorInfoOpener, IAutomationOpener,
+                                                        ModuleWidget>> Creators =
             new()
             {
-                ["currency_line"] = (root, registry, stories, infos) => new CurrencyHeaderUI(root),
-                ["jam_button"] = (root, registry, stories, infos) => new JamButtonUI(root),
-                ["generator_row"] = (root, registry, stories, infos) => new GeneratorRowUI(root, infos),
-                ["upgrade_row"] = (root, registry, stories, infos) => new UpgradeRowUI(root),
-                ["group"] = (root, registry, stories, infos) => new GroupUI(root, registry, stories, infos),
-                ["rung_button"] = (root, registry, stories, infos) => new RungButtonUI(root),
-                ["event_row"] = (root, registry, stories, infos) => new EventUI(root),
-                ["story_row"] = (root, registry, stories, infos) => new StoryRowUI(root, stories),
+                ["currency_line"] = (root, registry, stories, infos, automations) => new CurrencyHeaderUI(root),
+                ["jam_button"] = (root, registry, stories, infos, automations) => new JamButtonUI(root),
+                ["generator_row"] = (root, registry, stories, infos, automations) => new GeneratorRowUI(root, infos),
+                ["upgrade_row"] = (root, registry, stories, infos, automations) => new UpgradeRowUI(root),
+                ["group"] = (root, registry, stories, infos, automations) => new GroupUI(root, registry, stories, infos, automations),
+                ["leveled_group"] = (root, registry, stories, infos, automations) => new LeveledGroupUI(root, infos, automations),
+                ["rung_button"] = (root, registry, stories, infos, automations) => new RungButtonUI(root),
+                ["event_row"] = (root, registry, stories, infos, automations) => new EventUI(root),
+                ["story_row"] = (root, registry, stories, infos, automations) => new StoryRowUI(root, stories),
             };
 
         // The registry cross-check enumerates the same closed set Create uses,
@@ -107,16 +109,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // authored content, and the import/boot cross-check catches a miss before a
         // first render ever does.
         //
-        // `stories` is the card's owner and `infos` the info screen's, each
-        // needed by one widget kind and ignored by the rest: the host is the one
-        // caller and hands itself in for both (12.11). The registry rides along
+        // `stories` is the card's owner, `infos` the info screen's and
+        // `automations` the automation window's, each needed by the widget
+        // kinds that open it and ignored by the rest: the host is the one
+        // caller and hands itself in for all three (12.11). The registry rides along
         // for the same reason - a group instantiates the layout each member's
         // own kind already has, so it renders them through this same factory.
         public static ModuleWidget Create(string prefabId, VisualElement root, ModuleRegistry registry,
-                                          IStoryOpener stories, IGeneratorInfoOpener infos)
+                                          IStoryOpener stories, IGeneratorInfoOpener infos,
+                                          IAutomationOpener automations)
         {
             if (prefabId != null && Creators.TryGetValue(prefabId, out var create))
-                return create(root, registry, stories, infos);
+                return create(root, registry, stories, infos, automations);
             throw new InvalidOperationException(
                 $"No widget controller answers prefabId '{prefabId}' (design doc 12.11).");
         }

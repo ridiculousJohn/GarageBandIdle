@@ -544,6 +544,12 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 bar.tap = string.IsNullOrEmpty(barDto.tap)
                     ? null
                     : Resolve<ProducerDefinition>(build, scope, barDto.tap, "tap");
+                bar.level = string.IsNullOrEmpty(barDto.level)
+                    ? null
+                    : Resolve<GeneratorDefinition>(build, scope, barDto.level, "level");
+                bar.automation = string.IsNullOrEmpty(barDto.automation)
+                    ? null
+                    : Resolve<UpgradeDefinition>(build, scope, barDto.automation, "automation");
                 bar.availableWhen = BuildCondition(build, scope, barDto.availableWhen);
                 bar.onComplete = barDto.onComplete.Select(a => BuildAction(build, scope, a)).ToList();
                 bar.perFill = barDto.perFill

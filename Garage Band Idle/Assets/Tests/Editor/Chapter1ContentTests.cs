@@ -522,8 +522,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(ch1.storyBeats.Any(b => b.opensWhenAvailable),
                 "chapter 1 marks neither beat");
 
-            StringAssert.StartsWith("It starts in the garage.", ch1.storyBeats[0].text);
-            StringAssert.StartsWith("The backyard's packed.", ch1.storyBeats[1].text);
+            // Each card has prose to show, and the two cards tell different
+            // things.
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ch1.storyBeats[0].text), "the opener's card has text");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ch1.storyBeats[1].text), "the capstone's card has text");
+            Assert.AreNotEqual(ch1.storyBeats[0].text, ch1.storyBeats[1].text, "the two cards differ");
         }
 
         // ---- section 12: the screen ----

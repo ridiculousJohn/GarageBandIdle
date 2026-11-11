@@ -20,13 +20,13 @@ MonoBehaviour:
     guy running sound who'd rather be anywhere else, and eleven other acts. You get
     three songs on Tuesday. Take them. Then take Friday.
   availableWhen:
-    rid: 1688710450278563936
+    rid: 1688710475815583806
   seenFlag: story_ch2_open_seen
   opensWhenAvailable: 0
   references:
     version: 2
     RefIds:
-    - rid: 1688710450278563936
+    - rid: 1688710475815583806
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

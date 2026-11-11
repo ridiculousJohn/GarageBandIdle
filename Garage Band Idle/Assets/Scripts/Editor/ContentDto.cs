@@ -351,6 +351,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public BigNumber fillRate;
         public ConditionDto repeatWhen;
         public string tap;
+        public string level;
+        public string automation;
         public ConditionDto availableWhen;
         public List<ActionDto> onComplete = new();
         public List<PerFillDto> perFill = new();

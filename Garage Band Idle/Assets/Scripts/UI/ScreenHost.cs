@@ -13,7 +13,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // an EditMode test builds it over imported content with no panel; UIRoot is
     // the MonoBehaviour shell around it. This is the ONE Refreshed subscriber -
     // widgets subscribe to nothing, so there is one dispatch order.
-    public sealed class ScreenHost : IDisposable, IStoryOpener, IGeneratorInfoOpener
+    public sealed class ScreenHost : IDisposable, IStoryOpener, IGeneratorInfoOpener, IAutomationOpener
     {
         // One module and the widget standing for it. The host owns these views,
         // so it writes them and anything holding the host reads them.
@@ -91,6 +91,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly StoryLogUI storyLog;
         private readonly DiscographyUI discography;
         private readonly GeneratorInfoUI generatorInfo;
+        private readonly AutomationWindowUI automation;
         private readonly PinnedHeadlineUI headline;
         private readonly List<SectionView> sections = new();
 
@@ -108,6 +109,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             StoryLog,
             Discography,
             GeneratorInfo,
+            Automation,
         }
 
         private LiveOverlay requestedOverlay;
@@ -135,6 +137,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public DiscographyUI Discography => discography;
 
         public GeneratorInfoUI GeneratorInfo => generatorInfo;
+
+        public AutomationWindowUI AutomationWindow => automation;
 
         public PinnedHeadlineUI Headline => headline;
 
@@ -165,6 +169,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 session.Root, session, clock, CloseOverlay);
             generatorInfo = new GeneratorInfoUI(Require<VisualElement>(screenRoot, "generator-info"),
                 clock, CloseOverlay);
+            automation = new AutomationWindowUI(Require<VisualElement>(screenRoot, "automation-window"),
+                session, clock, CloseOverlay);
             var scroll = Require<ScrollView>(screenRoot, "screen");
             scroll.AddManipulator(new DragScrollManipulator());
             headline = new PinnedHeadlineUI(Require<VisualElement>(screenRoot, "headline"),
@@ -304,6 +310,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
             OpenOverlay(LiveOverlay.GeneratorInfo);
         }
 
+        // The Auto button's hold, the one way the automation window opens: the
+        // group and its declaring scope live on the window, as the info
+        // screen's generator lives on its class.
+        public void OpenAutomation(GroupDefinition group, ScopeState scope)
+        {
+            automation.Hold(group, scope);
+            OpenOverlay(LiveOverlay.Automation);
+        }
+
         public void OpenEncore() => OpenOverlay(LiveOverlay.Encore);
 
         public void OpenStoryLog() => OpenOverlay(LiveOverlay.StoryLog);
@@ -322,6 +337,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             requestedOverlay = LiveOverlay.None;
             generatorInfo.Drop();
+            automation.Drop();
             HideRequestedOverlay();
         }
 
@@ -331,10 +347,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
             requestedBeat = null;
             story.Hide();
-            // Another overlay opening releases the held generator: the request
-            // it belongs to is the one being replaced.
+            // Another overlay opening releases the held generator and the held
+            // group: the request each belongs to is the one being replaced.
             if (overlay != LiveOverlay.GeneratorInfo)
                 generatorInfo.Drop();
+            if (overlay != LiveOverlay.Automation)
+                automation.Drop();
             HideRequestedOverlay();
             requestedOverlay = overlay;
             if (overlay == LiveOverlay.Roadies)
@@ -357,6 +375,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             story.Hide();
             requestedOverlay = LiveOverlay.None;
             generatorInfo.Drop();
+            automation.Drop();
             HideRequestedOverlay();
         }
 
@@ -369,6 +388,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             storyLog.Hide();
             discography.Hide();
             generatorInfo.Hide();
+            automation.Hide();
         }
 
         private void ShowRequestedOverlay()
@@ -397,6 +417,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 // production: a purchase beneath it, a tick, a Roadie change.
                 case LiveOverlay.GeneratorInfo:
                     generatorInfo.Show();
+                    break;
+                // Likewise each row's state: a purchase made in the window, a
+                // gig booked, Cash arriving.
+                case LiveOverlay.Automation:
+                    automation.Show();
                     break;
             }
         }
@@ -529,7 +554,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void CreateWidget(SectionView section, int index, ModuleView module)
         {
             var root = registry.Resolve(module.Definition.prefabId).Instantiate();
-            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this);
+            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this, this);
             module.Widget.Bind(session, module.Scope, module.Definition.content, clock);
             section.ModulesContainer.Insert(PlacedBefore(section, index), root);
         }

@@ -26,7 +26,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 1688710450278564035
+      rid: 1688710475815583897
   - target: income
     currencyId: 
     stat: yield
@@ -35,7 +35,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 1688710450278564036
+      rid: 1688710475815583898
   appliesWhen:
     rid: -2
   timer: 
@@ -45,14 +45,14 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710450278564035
+    - rid: 1688710475815583897
       type: {class: RoadieTotalBoost, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         perRoadie:
           _value:
             mantissa: 5
             exponent: -2
-    - rid: 1688710450278564036
+    - rid: 1688710475815583898
       type: {class: RoadieTotalBoost, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         perRoadie:

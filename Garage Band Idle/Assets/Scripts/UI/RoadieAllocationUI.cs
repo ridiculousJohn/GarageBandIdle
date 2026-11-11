@@ -23,6 +23,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly Dictionary<string, Button> minuses = new();
         private readonly Dictionary<string, Button> pluses = new();
         private readonly Dictionary<string, ChapterScopeState> chapters = new();
+        private readonly Dictionary<string, int> shownCounts = new();   // the value each count label prints
+
+        // The number after "Unallocated".
+        public BigNumber ShownUnallocated { get; private set; } = BigNumber.Zero;
+
+        // The count printed for that chapter.
+        public int ShownCount(string chapterId) =>
+            shownCounts.TryGetValue(chapterId, out var shown)
+                ? shown
+                : throw new InvalidOperationException($"The Roadie screen has no row for chapter '{chapterId}'.");
 
         public RoadieAllocationUI(VisualElement root, GameSession session, GameClock clock, Action close)
         {
@@ -80,7 +90,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 var minus = new Button { text = "-" };
                 minus.name = "roadie-minus-" + id;
                 minus.clicked += () => Decrease(id);
-                var count = new Label("0");
+                shownCounts[id] = 0;
+                var count = new Label(shownCounts[id].ToString());
                 count.name = "roadie-count-" + id;
                 count.AddToClassList("roadie-count");
                 var plus = new Button { text = "+" };
@@ -143,7 +154,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             foreach (var pair in draft)
             {
                 var unlocked = session.IsChapterUnlocked(chapters[pair.Key], clock.RealTimeUtc);
-                counts[pair.Key].text = pair.Value.ToString();
+                shownCounts[pair.Key] = pair.Value;
+                counts[pair.Key].text = shownCounts[pair.Key].ToString();
                 minuses[pair.Key].SetEnabled(unlocked && pair.Value > 0);
             }
             var remaining = Remaining();
@@ -152,7 +164,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 var unlocked = session.IsChapterUnlocked(chapters[pair.Key], clock.RealTimeUtc);
                 pluses[pair.Key].SetEnabled(unlocked && pair.Value < int.MaxValue && remaining >= BigNumber.One);
             }
-            unallocated.text = "Unallocated  " + NumberFormatter.Format(remaining);
+            ShownUnallocated = remaining;
+            unallocated.text = "Unallocated  " + NumberFormatter.Format(ShownUnallocated);
         }
 
         public void Done()
