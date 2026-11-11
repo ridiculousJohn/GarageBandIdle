@@ -1710,6 +1710,131 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(7, fx.Host.Sections.Count);
         }
 
+        // ---- the pinned headline (12.11) ----
+
+        // The headline's element and its three labels, as Screen.uxml names
+        // them.
+        private static VisualElement HeadlineElement(VisualElement screen) =>
+            screen.Q<VisualElement>("headline");
+
+        private static string HeadlineText(VisualElement screen, string element) =>
+            screen.Q<Label>(element).text;
+
+        // The headline follows the chapter's main currency line: the first
+        // header line showing in the first section that has one, which on the
+        // garage floor is Cash. The line is marked as the source, and the
+        // headline carries its three texts.
+        [Test]
+        public void TheHeadlineFollowsTheGarageFloorsCashLine()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            var cash = fx.Host.Sections[GarageFloor].Modules[CashLine];
+            Assert.AreSame(cash.Widget.Root, fx.Host.Headline.Source, "the first header line showing is followed");
+            Assert.IsTrue(cash.Widget.Root.ClassListContains("currency-pinned-source"));
+            Assert.IsTrue(cash.Widget.Root.ClassListContains("currency-primary"), "the line is still the headline number");
+            Assert.IsTrue(fx.Host.Sections[GarageFloor].Root.ClassListContains("section-hero"));
+            Assert.AreEqual(DisplayStyle.Flex, HeadlineElement(fx.Screen).style.display.value);
+
+            Assert.AreEqual("Cash", Fixture.Text(cash, "name"), "the currency's authored name");
+            Assert.AreEqual(Fixture.Text(cash, "name"), HeadlineText(fx.Screen, "headline-name"));
+            Assert.AreEqual(Fixture.Text(cash, "value"), HeadlineText(fx.Screen, "headline-value"));
+            Assert.AreEqual(Fixture.Text(cash, "rate"), HeadlineText(fx.Screen, "headline-rate"));
+        }
+
+        // A tap's own refresh repaints the line, and the headline with it.
+        [Test]
+        public void ATapsRefreshRepaintsTheHeadlineWithTheLine()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            var cash = fx.Host.Sections[GarageFloor].Modules[CashLine];
+            var before = HeadlineText(fx.Screen, "headline-value");
+
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+
+            Assert.AreEqual(Fixture.Text(cash, "value"), HeadlineText(fx.Screen, "headline-value"));
+            Assert.AreNotEqual(before, HeadlineText(fx.Screen, "headline-value"), "the tap paid cash");
+        }
+
+        // Between refreshes the line's balance rides the tick's slope, and the
+        // host's Interpolate carries the headline along with it.
+        [Test]
+        public void InterpolateCarriesTheHeadlineWithTheLine()
+        {
+            var fx = new Fixture();
+            fx.Tier1.generatorCounts["practice_amp"] = 1;
+            fx.Enter();
+            var cash = fx.Host.Sections[GarageFloor].Modules[CashLine];
+
+            // Ten seconds of one amp at 0.5 cash/s: truth 5, slope 0.5/s, and
+            // the tick's own refresh snaps the line at game time zero.
+            fx.Session.Tick(10, fx.Now.AddSeconds(10));
+            Assert.AreEqual("5.00", Fixture.Text(cash, "value"));
+            Assert.AreEqual(Fixture.Text(cash, "value"), HeadlineText(fx.Screen, "headline-value"));
+
+            fx.Clock.Frame(fx.Now.AddSeconds(14), 4);
+            fx.Host.Interpolate();
+
+            Assert.AreEqual("7.00", Fixture.Text(cash, "value"), "four seconds of the slope on top of the snap");
+            Assert.AreEqual(Fixture.Text(cash, "value"), HeadlineText(fx.Screen, "headline-value"));
+        }
+
+        // The headline belongs to a live chapter: a phase leaving Live takes
+        // it down and the line it followed loses the mark.
+        [Test]
+        public void LeavingLiveTakesTheHeadlineDown()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            var followed = fx.Host.Headline.Source;
+            Assert.IsNotNull(followed);
+
+            fx.Session.SwitchChapter(null, fx.Now);
+
+            Assert.AreEqual(SessionPhase.NoChapter, fx.Session.Phase);
+            Assert.IsNull(fx.Host.Headline.Source);
+            Assert.AreEqual(DisplayStyle.None, HeadlineElement(fx.Screen).style.display.value);
+            Assert.IsFalse(followed.ClassListContains("currency-pinned-source"));
+        }
+
+        // The headline draws over the page and never takes a press meant for
+        // the line beneath it.
+        [Test]
+        public void EveryElementOfTheHeadlineIgnoresPicking()
+        {
+            var fx = new Fixture();
+
+            foreach (var name in new[]
+                     {
+                         "headline", "headline-backdrop", "headline-line",
+                         "headline-name", "headline-value", "headline-rate"
+                     })
+            {
+                var element = fx.Screen.Q<VisualElement>(name);
+                Assert.IsNotNull(element, $"Screen.uxml has no element named '{name}'");
+                Assert.AreEqual(PickingMode.Ignore, element.pickingMode, $"'{name}' ignores picking");
+            }
+        }
+
+        // Draw order is child order: the headline comes after the page so it
+        // draws over it, and before every overlay so each of them covers it.
+        [Test]
+        public void TheHeadlineDrawsOverThePageAndUnderEveryOverlay()
+        {
+            var fx = new Fixture();
+            var headline = HeadlineElement(fx.Screen);
+
+            Assert.AreSame(headline, fx.Host.Headline.Root);
+            Assert.AreSame(fx.Screen, headline.parent, "the headline is a child of the screen root");
+            var at = fx.Screen.IndexOf(headline);
+            Assert.Greater(at, fx.Screen.IndexOf(fx.Screen.Q<ScrollView>("screen")), "after the page");
+            Assert.Less(at, fx.Screen.IndexOf(fx.Screen.Q<VisualElement>("select")), "before the select");
+            foreach (var overlay in fx.Screen.Children().Where(e => e.ClassListContains("overlay")))
+                Assert.Less(at, fx.Screen.IndexOf(overlay), $"before the '{overlay.name}' overlay");
+        }
+
         // ---- the marked beat pops by itself (decision 7) ----
 
         // A second host over the standing test tree: the pop rows need a MARKED

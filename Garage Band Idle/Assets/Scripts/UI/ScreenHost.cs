@@ -91,7 +91,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly StoryLogUI storyLog;
         private readonly DiscographyUI discography;
         private readonly GeneratorInfoUI generatorInfo;
+        private readonly PinnedHeadlineUI headline;
         private readonly List<SectionView> sections = new();
+
+        // The page's headline line this pass: the first visible section's
+        // currency-primary root, or null while no section shows one.
+        private VisualElement headlineSource;
 
         private enum LiveOverlay
         {
@@ -131,6 +136,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public GeneratorInfoUI GeneratorInfo => generatorInfo;
 
+        public PinnedHeadlineUI Headline => headline;
+
         // Over the screen's own root: the host owns every app-owned screen and
         // overlay, so it is the one place that knows which named elements
         // Screen.uxml promises.
@@ -158,6 +165,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 session.Root, session, clock, CloseOverlay);
             generatorInfo = new GeneratorInfoUI(Require<VisualElement>(screenRoot, "generator-info"),
                 clock, CloseOverlay);
+            var scroll = Require<ScrollView>(screenRoot, "screen");
+            scroll.AddManipulator(new DragScrollManipulator());
+            headline = new PinnedHeadlineUI(Require<VisualElement>(screenRoot, "headline"),
+                Require<VisualElement>(screenRoot, "top-bar"), scroll);
             session.Refreshed += Render;
         }
 
@@ -178,6 +189,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (phase != SessionPhase.Live || chapter == null)
             {
                 topBar.Root.style.display = DisplayStyle.None;
+                headline.Follow(null);
                 ClearLiveRequests();
                 if (phase == SessionPhase.NoChapter)
                     select.Show(false);
@@ -203,6 +215,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (chapter != builtFor)
                 Build(chapter);
 
+            headlineSource = null;
             foreach (var section in sections)
             {
                 var ctx = new GameContext(section.Scope, clock.RealTimeUtc);
@@ -214,6 +227,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 if (section.Visible)
                     RenderModules(section);
             }
+            headline.Follow(headlineSource);
+            headline.Interpolate();
 
             // After the rows, so the pass that reads a latch as set is the
             // pass that put the card up. The sections stay UP beneath it:
@@ -238,6 +253,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (session.Phase != SessionPhase.Live)
                 return;
             topBar.Interpolate();
+            headline.Interpolate();
             if (requestedOverlay == LiveOverlay.Encore)
                 encore.Interpolate();
         }
@@ -487,6 +503,24 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 if (module.Visible)
                     module.Widget.Refresh();
             }
+
+            // Two classes the stylesheet reads (12.11), set from what is built
+            // and showing so the look follows the content: the section carrying
+            // a currency header is the page's headline, and the first header
+            // line showing in it is the headline number. The page's first such
+            // line is the one the pinned headline follows.
+            var hero = false;
+            foreach (var module in section.Modules)
+            {
+                if (module.Widget is not CurrencyHeaderUI)
+                    continue;
+                var primary = module.Visible && !hero;
+                module.Widget.Root.EnableInClassList("currency-primary", primary);
+                if (primary && headlineSource == null)
+                    headlineSource = module.Widget.Root;
+                hero |= module.Visible;
+            }
+            section.Root.EnableInClassList("section-hero", hero);
         }
 
         // Instantiate, construct, bind - and the caller refreshes, in the same

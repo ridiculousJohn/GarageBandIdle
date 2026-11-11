@@ -1,98 +1,293 @@
-/* The screen's minimum legibility: a heading reads as a heading and a row
-   reads as a row. Nothing decorative - presentation tuning is content. */
+/* The screen's look (design doc 12.11), sized for the panel's 1080 x 1920
+   portrait reference: one typeface, one accent colour, sections as rounded
+   cards on a neutral page. Every length here is in reference pixels, so a
+   phone-sized 15px reads as roughly 46px.
 
-/* Every label reads light on the dark panels; buttons keep the theme's own text. */
+   page      rgb(48, 48, 48)      card     rgb(31, 31, 31)
+   divider   rgb(58, 58, 58)      text     rgb(242, 242, 242)
+   secondary rgb(168, 168, 168)   dimmed   rgb(111, 111, 111)
+   accent    rgb(226, 75, 74)     accent text rgb(240, 149, 149) */
+
+/* ---- base ---- */
+
+:root {
+    -unity-font-definition: url("Fonts/Roboto-Regular.ttf");
+    font-size: 46px;
+    color: rgb(242, 242, 242);
+    background-color: rgb(48, 48, 48);
+}
+
 Label {
-    color: rgb(232, 232, 232);
+    color: rgb(242, 242, 242);
+    margin: 0;
+    padding: 0;
+    white-space: normal;
+}
+
+/* A button is bare text until a rule below gives it a surface: the row
+   buttons and the dialog actions read as text, the way a link does. */
+.unity-button {
+    -unity-font-definition: url("Fonts/Roboto-Medium.ttf");
+    font-size: 44px;
+    color: rgb(242, 242, 242);
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 24px;
+    margin: 0;
+    padding: 18px 24px;
+}
+
+.unity-button:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.unity-button:active {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.unity-button:disabled {
+    color: rgb(111, 111, 111);
+    opacity: 1;
 }
 
 .screen {
     flex-grow: 1;
+    background-color: rgb(48, 48, 48);
 }
+
+
+/* ---- top bar ---- */
 
 .top-bar {
     flex-direction: row;
     justify-content: space-between;
-    padding-left: 12px;
-    padding-right: 12px;
-    padding-top: 8px;
+    align-items: center;
+    padding: 28px 36px 8px 36px;
+    background-color: rgb(48, 48, 48);
 }
 
 .top-pill {
     flex-direction: row;
-    background-color: rgb(45, 45, 45);
-    border-radius: 12px;
+    align-items: center;
+    background-color: rgb(31, 31, 31);
+    border-radius: 48px;
+    min-height: 96px;
 }
 
 .encore-pill {
-    min-width: 148px;
+    min-width: 320px;
+    font-size: 40px;
+    padding: 12px 36px;
+    border-radius: 48px;
+    background-color: rgb(31, 31, 31);
 }
 
 .top-actions {
-    padding-left: 4px;
-    padding-right: 4px;
+    padding-left: 12px;
+    padding-right: 12px;
 }
 
 .top-action {
-    margin-left: 2px;
-    margin-right: 2px;
+    font-size: 52px;
+    min-width: 96px;
+    padding: 12px 16px;
+    border-radius: 48px;
 }
+
+/* ---- sections ---- */
 
 .sections {
-    padding-left: 12px;
-    padding-right: 12px;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    padding: 28px 36px 96px 36px;
 }
 
+/* A section is a card. Revealing one fades it in (design doc 12.11): the
+   host raises section-revealing for the transition's length. */
 .section {
-    margin-bottom: 12px;
+    background-color: rgb(31, 31, 31);
+    border-radius: 38px;
+    padding: 28px 44px 16px 44px;
+    margin-bottom: 36px;
 }
 
 .section-title {
-    -unity-font-style: bold;
-    font-size: 18px;
+    -unity-font-definition: url("Fonts/Roboto-Medium.ttf");
+    font-size: 38px;
+    color: rgb(168, 168, 168);
     margin-bottom: 4px;
 }
+
+.section-description {
+    font-size: 34px;
+    color: rgb(168, 168, 168);
+    margin-bottom: 12px;
+}
+
+/* The section carrying the currency header is the page's headline, not a
+   card: large, centred, and on the page's own background. */
+.section-hero {
+    background-color: rgba(0, 0, 0, 0);
+    padding: 200px 0 24px 0;
+    margin-bottom: 24px;
+}
+
+.section-hero > .section-title, .section-hero > .section-description {
+    display: none;
+}
+
+/* A group sharing the headline's section (chapter 2's calendar) is still a
+   card of rows beneath it. */
+.section-hero .members {
+    background-color: rgb(31, 31, 31);
+    border-radius: 38px;
+    padding: 12px 44px;
+    margin-top: 36px;
+}
+
+/* ---- the currency header ---- */
 
 .currency-line {
     flex-direction: row;
     justify-content: space-between;
-    margin-bottom: 2px;
+    margin-bottom: 8px;
 }
 
 .currency-rate {
-    font-size: 12px;
-    opacity: 0.8;
-    margin-left: 6px;
+    font-size: 40px;
+    color: rgb(168, 168, 168);
+    margin-left: 16px;
 }
+
+.section-hero .currency-line {
+    justify-content: center;
+    align-items: flex-end;
+    margin-bottom: 12px;
+}
+
+.section-hero .currency-line Label {
+    font-size: 44px;
+    color: rgb(200, 200, 200);
+}
+
+.section-hero .currency-line #name {
+    margin-right: 16px;
+}
+
+.section-hero .currency-line .currency-rate {
+    color: rgb(150, 150, 150);
+}
+
+/* The first line of the header is the chapter's headline number. */
+.section-hero .currency-primary .currency-line {
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+}
+
+.section-hero .currency-primary Label {
+    font-size: 96px;
+    color: rgb(242, 242, 242);
+}
+
+.section-hero .currency-primary .currency-rate {
+    font-size: 46px;
+    color: rgb(208, 208, 208);
+    width: 100%;
+    margin-left: 0;
+    -unity-text-align: upper-center;
+}
+
+/* ---- the jam button: the one filled control ---- */
 
 .jam-button {
-    margin-top: 6px;
+    margin-top: 48px;
+    margin-left: 36px;
+    margin-right: 36px;
 }
 
+.jam-button .unity-button {
+    -unity-font-definition: url("Fonts/Roboto-Medium.ttf");
+    font-size: 84px;
+    color: rgb(255, 255, 255);
+    background-color: rgb(226, 75, 74);
+    border-radius: 30px;
+    padding: 36px 0;
+}
+
+.jam-button .unity-button:hover {
+    background-color: rgb(233, 96, 95);
+}
+
+.jam-button .unity-button:active {
+    background-color: rgb(196, 60, 59);
+}
+
+.jam-button Label {
+    font-size: 36px;
+    color: rgb(168, 168, 168);
+    margin-top: 16px;
+    -unity-text-align: upper-center;
+}
+
+/* ---- rows: generators and upgrades ---- */
+
+/* Rows are told apart by the space between them, not by a line. */
 .row {
     flex-direction: row;
     align-items: center;
-    margin-bottom: 4px;
+    padding: 38px 0;
 }
 
+/* Basis zero, so the text takes the width the buttons leave and wraps only
+   at that edge. */
 .row-text {
     flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+}
+
+.row-title {
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.row-name, .bar-name {
+    font-size: 46px;
 }
 
 .row-count {
-    min-width: 48px;
+    font-size: 46px;
+    margin-left: 14px;
+}
+
+.row-description, .row-yield, .bar-description {
+    font-size: 34px;
+    color: rgb(168, 168, 168);
+    white-space: normal;
 }
 
 .row-buy {
-    min-width: 120px;
+    min-width: 104px;
+    -unity-text-align: middle-right;
+    padding: 24px 8px;
 }
+
+/* A row the player cannot buy yet is dimmed whole; a bought upgrade reads
+   as settled. */
+.row-unaffordable Label, .row-bought Label {
+    color: rgb(111, 111, 111);
+}
+
+/* ---- bars and groups ---- */
 
 .consumed-readout {
     flex-direction: row;
     justify-content: space-between;
-    margin-bottom: 2px;
+    margin-bottom: 8px;
+    font-size: 38px;
+}
+
+.consumed-readout Label {
+    color: rgb(168, 168, 168);
+    font-size: 38px;
 }
 
 .member-row {
@@ -101,68 +296,111 @@ Label {
 }
 
 /* A bar row sits beside its group's select control, so it takes the width the
-   control leaves. */
+   control leaves; its text sits above its bar. */
 .bar-row {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     flex-grow: 1;
-    margin-bottom: 4px;
+    flex-shrink: 1;
+    flex-basis: 0;
+    padding: 38px 0;
+}
+
+.bar-tappable:active {
+    background-color: rgba(255, 255, 255, 0.06);
 }
 
 .bar-text {
-    min-width: 160px;
+    width: 100%;
+    margin-bottom: 14px;
 }
 
 .bar-fill {
     flex-grow: 1;
-    margin-left: 8px;
-    margin-right: 8px;
+    margin: 0 24px 0 0;
+}
+
+.bar-fill .unity-progress-bar__background {
+    height: 20px;
+    background-color: rgb(58, 58, 58);
+    border-width: 0;
+    border-radius: 10px;
+}
+
+.bar-fill .unity-progress-bar__progress {
+    background-color: rgb(226, 75, 74);
+    border-radius: 10px;
 }
 
 .bar-progress {
-    min-width: 96px;
+    font-size: 34px;
+    color: rgb(168, 168, 168);
+    min-width: 260px;
+    -unity-text-align: middle-right;
 }
 
 .member-select {
-    min-width: 96px;
+    min-width: 220px;
+    -unity-text-align: middle-right;
 }
 
-/* What a thing does, beneath its name: one voice for a row, a bar, and a
-   section band alike. */
-.row-description, .row-yield, .bar-description, .section-description {
-    font-size: 12px;
-    opacity: 0.8;
-    white-space: normal;
-}
-
-.section-description {
-    margin-bottom: 6px;
-}
+/* ---- gates, previews, the release ---- */
 
 .legs {
-    margin-top: 4px;
+    margin-top: 8px;
 }
 
 .leg {
-    font-size: 12px;
-    opacity: 0.8;
+    font-size: 36px;
+    color: rgb(168, 168, 168);
+    -unity-text-align: upper-center;
+}
+
+.rung {
+    align-items: center;
+    padding: 20px 0 16px 0;
+}
+
+.rung .unity-button {
+    color: rgb(240, 149, 149);
+    font-size: 46px;
+}
+
+.rung .unity-button:disabled {
+    color: rgb(111, 111, 111);
 }
 
 .preview {
-    font-size: 12px;
+    font-size: 40px;
+    color: rgb(208, 208, 208);
+    -unity-text-align: upper-center;
 }
 
 .event-row {
-    margin-bottom: 8px;
+    padding: 38px 0;
 }
 
 .event-status {
-    font-size: 12px;
+    font-size: 36px;
+    color: rgb(168, 168, 168);
 }
 
 .event-buttons {
     flex-direction: row;
+    justify-content: flex-end;
 }
+
+.event-buttons .unity-button, .story-row .unity-button {
+    color: rgb(240, 149, 149);
+}
+
+.story-row {
+    align-items: center;
+    padding: 16px 0;
+}
+
+/* ---- overlays ---- */
 
 /* The select and the collect dialog are whole screens: each covers the panel,
    so the ScrollView's layout beneath never matters. */
@@ -178,131 +416,111 @@ Label {
 .select {
     justify-content: center;
     align-items: center;
-    padding: 24px;
-    background-color: rgb(24, 24, 24);
+    padding: 72px;
+    background-color: rgb(48, 48, 48);
 }
 
 .select-title {
-    -unity-font-style: bold;
-    font-size: 24px;
-    margin-bottom: 16px;
+    -unity-font-definition: url("Fonts/Roboto-Medium.ttf");
+    font-size: 64px;
+    margin-bottom: 48px;
 }
 
 .select-chapters {
-    min-width: 320px;
+    width: 860px;
 }
 
 .select-chapter {
-    margin-bottom: 8px;
-    font-size: 18px;
+    font-size: 52px;
+    margin-bottom: 24px;
+    padding: 40px 44px;
+    background-color: rgb(31, 31, 31);
+    border-radius: 38px;
+    -unity-text-align: middle-left;
+}
+
+.select-chapter:hover {
+    background-color: rgb(40, 40, 40);
 }
 
 /* The scrim is what makes this read as a dialog and what absorbs input to
    anything beneath. */
-.collect {
+.collect, .story, .modal {
     justify-content: center;
     align-items: center;
     background-color: rgba(0, 0, 0, 0.6);
 }
 
-.collect-panel {
-    min-width: 480px;
-    padding: 24px;
-    background-color: rgb(32, 32, 32);
+.collect-panel, .story-panel, .modal-panel {
+    width: 820px;
+    padding: 56px 56px 32px 56px;
+    background-color: rgb(58, 58, 58);
+    border-radius: 24px;
 }
 
-.collect-title {
-    -unity-font-style: bold;
-    font-size: 20px;
-    margin-bottom: 12px;
+.collect-title, .story-title, .modal-title {
+    -unity-font-definition: url("Fonts/Roboto-Medium.ttf");
+    font-size: 56px;
+    margin-bottom: 36px;
 }
 
 .collect-lines {
-    margin-bottom: 12px;
+    margin-bottom: 36px;
 }
 
-.collect-double, .collect-pass {
-    margin-top: 8px;
+.collect-lines .currency-line {
+    justify-content: flex-start;
 }
 
-.collect-ok {
-    margin-top: 8px;
+.collect-lines .currency-line Label {
+    margin-right: 16px;
+}
+
+/* A dialog's actions are text at its right edge; the one that ends it is the
+   last. */
+.collect-double, .collect-pass, .collect-ok, .story-close, .overlay-close,
+#roadie-done, #encore-ad, #encore-pass {
+    align-self: flex-end;
+    margin-top: 12px;
+}
+
+.collect-double, .collect-pass, #encore-ad, #encore-pass, #roadie-done {
+    color: rgb(240, 149, 149);
 }
 
 /* The story card: a scrim over the still-rendered sections, which stay up and
    ticking beneath it - the chapter is live, so nothing here interpolates a
    stale report. */
-.story {
-    justify-content: center;
-    align-items: center;
-    background-color: rgba(0, 0, 0, 0.6);
-}
-
-.story-panel {
-    min-width: 480px;
-    max-width: 640px;
-    padding: 24px;
-    background-color: rgb(32, 32, 32);
-}
-
-.story-title {
-    -unity-font-style: bold;
-    font-size: 20px;
-    margin-bottom: 12px;
-}
-
 .story-text {
     white-space: normal;
-    margin-bottom: 16px;
+    margin-bottom: 36px;
 }
 
-.story-close {
-    margin-top: 8px;
-}
-
-.story-row {
-    margin-bottom: 8px;
-}
-
-.modal {
-    justify-content: center;
-    align-items: center;
-    background-color: rgba(0, 0, 0, 0.6);
-}
-
-.modal-panel {
-    min-width: 420px;
-    max-width: 640px;
-    padding: 24px;
-    background-color: rgb(32, 32, 32);
-}
-
-.modal-title {
-    -unity-font-style: bold;
-    font-size: 20px;
+.settings-row {
+    -unity-text-align: middle-left;
+    padding: 36px 24px;
     margin-bottom: 12px;
 }
 
-.settings-row, .encore-description, .encore-remaining,
-.roadie-unallocated, #roadie-done, #encore-ad, #encore-pass {
-    margin-bottom: 8px;
+.encore-description, .encore-remaining, .roadie-unallocated {
+    margin-bottom: 24px;
 }
 
 .info-description {
-    font-size: 12px;
-    opacity: 0.8;
+    font-size: 36px;
+    color: rgb(168, 168, 168);
     white-space: normal;
-    margin-bottom: 8px;
+    margin-bottom: 24px;
 }
 
 .info-line {
-    margin-bottom: 8px;
+    margin-bottom: 24px;
 }
 
 .roadie-row {
     flex-direction: row;
     align-items: center;
-    margin-bottom: 6px;
+    padding: 20px 0;
 }
 
 .roadie-name {
@@ -310,48 +528,99 @@ Label {
 }
 
 .roadie-count {
-    min-width: 52px;
+    min-width: 120px;
     -unity-text-align: middle-center;
 }
 
-.story-log-entries {
-    max-height: 400px;
-    margin-bottom: 8px;
+.story-log-entries, .discography-entries {
+    max-height: 1100px;
+    margin-bottom: 24px;
 }
 
 .story-log-entry {
-    margin-bottom: 8px;
-    font-size: 18px;
+    -unity-text-align: middle-left;
+    padding: 30px 12px;
 }
 
 .story-log-empty {
-    margin-bottom: 8px;
-    opacity: 0.8;
-}
-
-.discography-panel {
-    min-width: 480px;
-}
-
-.discography-entries {
-    max-height: 400px;
-    margin-bottom: 8px;
+    margin-bottom: 24px;
+    color: rgb(168, 168, 168);
 }
 
 .discography-row {
     flex-direction: row;
     align-items: center;
-    margin-bottom: 6px;
+    padding: 16px 0;
 }
 
 .discography-name {
     flex-grow: 1;
+    flex-shrink: 1;
+    font-size: 44px;
+}
+
+.discography-name .unity-text-field__input {
+    background-color: rgb(31, 31, 31);
+    color: rgb(242, 242, 242);
+    border-width: 0;
+    border-radius: 16px;
+    padding: 20px 24px;
 }
 
 .discography-rename {
-    min-width: 96px;
+    min-width: 220px;
+    color: rgb(240, 149, 149);
 }
 
-.overlay-close {
-    margin-top: 8px;
+/* ---- the pinned headline ---- */
+
+/* The page's own headline line keeps its space and is not drawn: the overlay
+   below is what shows, over it at rest and beneath the top bar once the page
+   has scrolled it away (design doc 12.11). */
+.currency-pinned-source {
+    visibility: hidden;
+}
+
+.headline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 0;
+}
+
+.headline-backdrop {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 118px;
+    background-color: rgb(48, 48, 48);
+}
+
+.headline-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    align-items: center;
+    transform-origin: top;
+}
+
+.headline-title {
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.headline-title Label {
+    font-size: 96px;
+    color: rgb(242, 242, 242);
+}
+
+#headline-name {
+    margin-right: 16px;
+}
+
+.headline-rate {
+    font-size: 46px;
+    color: rgb(208, 208, 208);
 }

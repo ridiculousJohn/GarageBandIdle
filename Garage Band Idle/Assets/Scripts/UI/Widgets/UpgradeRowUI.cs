@@ -39,7 +39,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 : DisplayStyle.Flex;
             // The purchased latch is the one-shot Purchasing itself reads, so a
             // tier reset that clears it leaves the row reading as buyable.
-            if (ctx.IsUpgradePurchased(upgrade.Id))
+            // The row dims whole while it cannot be bought, and reads as
+            // settled once it has been (12.11).
+            var purchased = ctx.IsUpgradePurchased(upgrade.Id);
+            Root.EnableInClassList("row-bought", purchased);
+            Root.EnableInClassList("row-unaffordable", !purchased && !Purchasing.CanBuy(ctx, upgrade));
+            if (purchased)
             {
                 buy.text = "Bought";
                 buy.SetEnabled(false);

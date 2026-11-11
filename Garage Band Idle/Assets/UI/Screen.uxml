@@ -9,9 +9,19 @@
             <ui:Button name="settings-button" text="&#x2699;" class="top-action" />
         </ui:VisualElement>
     </ui:VisualElement>
-    <ui:ScrollView name="screen" class="screen">
+    <ui:ScrollView name="screen" class="screen" vertical-scroller-visibility="Hidden" horizontal-scroller-visibility="Hidden">
         <ui:VisualElement name="sections" class="sections" />
     </ui:ScrollView>
+    <ui:VisualElement name="headline" class="headline" picking-mode="Ignore" style="display: none;">
+        <ui:VisualElement name="headline-backdrop" class="headline-backdrop" picking-mode="Ignore" />
+        <ui:VisualElement name="headline-line" class="headline-line" picking-mode="Ignore">
+            <ui:VisualElement class="headline-title" picking-mode="Ignore">
+                <ui:Label name="headline-name" picking-mode="Ignore" />
+                <ui:Label name="headline-value" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:Label name="headline-rate" class="headline-rate" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
     <ui:VisualElement name="select" class="overlay select" style="display: none;">
         <ui:Label text="Choose a chapter" class="select-title" />
         <ui:VisualElement name="chapters" class="select-chapters" />

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-10T20:46:57.938Z
+  modified: 2026-11-11T02:14:05.467Z
 ---
 
 The design descends from Ctrl C. Its Android reconstruction (version 1.12.2) is in `Docs/ctrl-c/`:
@@ -23,6 +23,47 @@ unresolved.
   live tick, the idle claim, the save and an event restart. Name the paths traced.
 - When John offers a shape and mine is chosen, record his shape too.
 - Record what he reports from play in this file.
+
+**The look, from the four Play Store screenshots** (seen 2026-11-10 at
+`play.google.com/store/apps/details?id=com.amorfatite.pretentious`; stills of an unknown version, so
+John's play wins where they differ - they show no top pills, only a "+" at the right)
+- Portrait phone. Light and dark themes with the same layout. One accent colour, orange, on the
+  big press buttons; everything else is neutral greys.
+- Header: "Lines: 1.91e12" large and centred, the rate beneath in parentheses, lots of space
+  around it. Scrolled, it collapses to a compact bar with the same two lines small.
+- Sections are rounded CARDS on the page background, a gap between cards.
+- Generator row: name and count on the first line; a smaller grey second line "cost = yield";
+  at the right two bare bold text buttons, "+1" and "+N", no button chrome; a thin divider between
+  rows; a row that cannot be bought yet is dimmed.
+- Prestige is its own card: "Rewrite (Gain 147580 Knowledge)" with an info icon, "Currently:
+  540.31 Knowledge" beneath, and a blue text button "Confirm".
+- Idle window: a small dark card, "While You Were Away", "You made:", one line per currency,
+  "Double This" with an ad icon, "Dismiss" at the bottom right.
+- The typeface looks like Roboto, which is Flutter's Android default (my inference; the reference
+  says the app is Flutter).
+- NOT visible in stills: how a section reveals itself the first time. John wants that behaviour
+  copied (2026-11-10: "how they reveal their new sections on first view"); it has to come from him.
+
+**The current version, from two phone screenshots John sent 2026-11-10** (these beat the store stills)
+- At rest, top to bottom: a tall empty band, then "Lines: 12.00" very large and centred with
+  "(0/s)" beneath; then the TWO PILLS, below the headline and above the press buttons - left a
+  stopwatch icon and "0:00:00", right three icons (story, chapters, settings); then the orange
+  Ctrl / C / V buttons; then the generator card.
+- Scrolled: a bar pinned at the top holds a bare stopwatch icon at the left, "Lines: 12.00" with
+  "(0/s)" small beneath in the centre, and a bare gear at the right. The pills are gone into those
+  two icons (no time text, no story or chapters icon). The press buttons and the cards scroll under
+  the bar; the buttons "just scroll off the top".
+- John: the banner "scrolls, but as it gets close to the top it gets smaller until it anchors to the
+  top and is always visible... it smoothly transitions in size and position".
+- Rows in this version have no divider lines, more space between them, and a light card with a
+  soft shadow. All text in an unaffordable row is grey, the "+1" buttons included.
+- "our 'jam' button is akin to their 'Ctrl' buttons".
+
+**Where Garage Band departs from it on purpose** (John, 2026-11-10)
+- The two pills stay fixed at the top. "the pills at the top are fine in my opinion, having those
+  options move around seems like bad UI design." They do not fold into icons.
+- The headline (the chapter's first currency) is big until it scrolls up, then gets smaller and
+  stays visible.
 
 **From John's play**
 - Numbers: fixed slots - two decimals below 1000, one below 10000, then a two-decimal mantissa and
@@ -49,5 +90,8 @@ unresolved.
 - Chapter 2 teams start tap-to-run; each gets its own automation upgrade; automated teams earn while
   away.
 - Untimed events accrue idle earnings.
+- Section reveal (2026-11-10): "when a section is first made visible, it fades in. If it becomes
+  visible in between two different sections, then the lower sections tween down to make room as
+  the revealed section fades in". He wants this copied.
 - Unknown to John: its font, whether idle accrual includes Overclock, and whether tokens moved while
   a chapter was dormant change that chapter's idle payout.

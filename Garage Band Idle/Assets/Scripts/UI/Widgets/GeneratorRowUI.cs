@@ -93,6 +93,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             buyMax.text = "+" + Math.Max(max, 1);
             buy.SetEnabled(max >= 1);
             buyMax.SetEnabled(max >= 1);
+            // The whole row dims while not one unit can be bought (12.11).
+            Root.EnableInClassList("row-unaffordable", max < 1);
         }
 
         // What the hold calls. Kept as a public UI action for the reason

@@ -1888,6 +1888,37 @@ owned sum times the per-unit figure because nothing in the effect vocabulary rea
 row reaches the host through `IGeneratorInfoOpener`, the shape `IStoryOpener` has, and the screen
 holds the generator and its declaring scope for as long as the request stands.
 
+**The look is modelled on Ctrl C** (2026-11-10), in `Screen.uss` alone: sized for the panel's
+1080 x 1920 portrait reference, one typeface (Roboto, whose digits are of equal width, so a counting
+number does not jitter), neutral greys, and ONE accent colour, used on the Jam button, a bar's fill
+and the text actions that commit something. A section is a rounded card on the page; a row is two
+lines, the name and count above and the cost and yield in smaller grey beneath, with bare text
+buttons at its right and no line between rows; a row that cannot be bought is dimmed whole
+(`row-unaffordable`, `row-bought`, set by the row from the same answer that disables its button).
+Windows are rounded panels over a scrim with their actions as text at the right. The widgets carry
+no colour or size of their own.
+
+**The headline and the pills.** The two pills are fixed at the top and never move - this is where
+the screen departs from Ctrl C, whose pills fold into icons as the page scrolls. The section
+carrying a currency header is the page's headline and not a card (`section-hero`), and the first header line
+showing in it is the headline number (`currency-primary`): both classes are set by the host from
+what is built and visible. That line is drawn by `PinnedHeadlineUI`, an overlay above the page and
+beneath every window: UI Toolkit draws in hierarchy order with no z-index, so a line inside the page
+could not stay above the cards scrolling over it. The page's own line keeps its space and is not
+drawn (`currency-pinned-source`). Each frame the overlay copies that line's three texts and takes
+its position from the line's own `worldBound`: over it while it is on screen, stopped beneath the
+pills once the page has scrolled it away, shrinking in between to `PinnedScale`, with a strip of
+page colour behind it as it arrives. It ignores picking, and it stays down for the frame in which
+the page has not been laid out.
+
+**The page scrolls by drag.** A `ScrollView` drag-scrolls for a touch pointer alone, so
+`DragScrollManipulator` gives the mouse the same gesture for the editor and a desktop build. A press
+is an ordinary click until it has travelled `StartDistance`; then the view captures the pointer,
+which takes the press away from a button that had it, so the release buys nothing. A pressed button
+captures the pointer itself, and a captured pointer's events reach the capturing element alone, so
+the manipulator hears a child taking the pointer and listens for the moves on that child - the
+arrangement the `ScrollView`'s own touch drag uses. The scroll bar is hidden.
+
 **Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
 Encore, the story log, the Discography or a generator's info screen is open, the host does not run the automatic story walk. The modal and any unsubmitted
 allocation draft remain intact. A waiting marked beat stays unseen and opens on the first refresh
@@ -2156,6 +2187,8 @@ Assets/Scripts/
     IStoryOpener.cs         // the one method a story row asks of the host: open the card for a beat at its scope
     IGeneratorInfoOpener.cs // the one method a generator row asks of the host: open the info screen for a generator at its declaring scope
     LongPressManipulator.cs // the hold gesture over an element's own scheduler; no capture, no propagation change
+    DragScrollManipulator.cs // a left-button mouse drag scrolls the page as a finger does; a click stays a click
+    PinnedHeadlineUI.cs     // the headline currency line as an overlay: over its line at rest, shrunk beneath the pills once scrolled away
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
@@ -2169,7 +2202,8 @@ Assets/Scripts/
     RoadieAllocationUI.cs  // local allocation draft; Done submits the whole map
     EncoreWindowUI.cs      // remaining time and ad/Pass requests through the existing managers
     GeneratorInfoUI.cs     // a generator's info screen: description, the row's cost and yield line, owned count, production
-Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
+Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml,
+                          // and Fonts/ (Roboto Regular, Medium and Bold with its Apache 2.0 licence)
 Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)
   root/                  // the document's own top scope id
