@@ -20,8 +20,8 @@ the shallower ones with it (§12.3).
 **The album loop (inner).** Within the current chapter the player grows the chapter's **base
 resource**, spends it on generators and upgrades, fills the chapter's **release meter**, and then
 releases an album (section 3 names the roles); in Chapter 1 that is tapping for Cash, buying gear and
-bandmates, and growing Fans. Releasing an album resets the run - the base resource, gear, the release
-meter, and the working Catalog - and pays a **prestige currency** (Chapter 1: Demo Tapes). The
+bandmates, and growing Fans. Releasing an album resets the run - the base resource, gear and the
+release meter - and pays a **prestige currency** (Chapter 1: Demo Tapes). The
 chapter's **income boost** reads a prestige currency's balance (Chapter 1's Demo Tapes), so the next
 run is faster. The player repeats this loop several times within a chapter.
 A chapter with more than one tier may bank a different prestige currency at each, and a shallow
@@ -36,6 +36,11 @@ reward curves read, §8.1) live at the **root** and survive everything; the caps
 the entire chapter, which is what makes the
 chapter immediately replayable (§8.1). Advancement to the next chapter is forward-only and reacts to
 the completion flag.
+
+**The song loop (chapters 5-8).** From the Studio on, the chapters are no longer independent of
+each other: the Studio makes songs, the Coast Tour and Radio raise their popularity, and Arenas pay
+by it, so replaying those four in turn is a loop of its own, whose reward is inducting a song into
+the Hall of Fame (section 7). The first pass through it is the weakest and is always completable.
 
 Prestige currencies are the link between the loops: the income boost reads one and the capstone
 gate reads one - the same currency or two, as the chapter authors it. Chapter advancement therefore
@@ -63,10 +68,10 @@ of its own prestige currencies.
 | 2 | Open Mic | Gigs as timed bars you book then automate; taps add time; Buzz multiplies payouts; Roadie allocation opens | Win the talent-show slot |
 | 3 | Local Venues | The circuit: rooms with genre taste and fan fatigue; booking agent automates | Headline the ballroom |
 | 4 | The Local Tour | The Van: routing across nearby cities; merch on the road | Complete the local circuit |
-| 5 | Record Deal / Studio | Songwriting & Catalog (§7) | Sign the deal & cut the record |
-| 6 | The Coast Tour | Sponsorships; long-haul routing, west to east | Festival main stage |
-| 7 | Radio / Streaming | Royalty catalog scaling; large idle income | First charting single / radio play |
-| 8 | Arenas / Stadiums | World tours, endgame scaling | Sell out a stadium (Hall of Fame) |
+| 5 | Record Deal / Studio | Songs: ideas become tracks, mixes and masters (§7) | Sign the deal & cut the record |
+| 6 | The Coast Tour | Sponsorships; long-haul routing, west to east; songs gain popularity on the road (§7) | Festival main stage |
+| 7 | Radio / Streaming | Airplay raises songs' popularity fast (§7); large idle income | First charting single / radio play |
+| 8 | Arenas / Stadiums | World tours whose pay reads the set list's songs (§7); endgame scaling | Sell out a stadium |
 
 Every chapter uses the same rhythm - grow the base resource, buy, fill the release meter, release an
 album - with new gear, a new mechanic, and a capstone gate on one of its own prestige currencies. The names
@@ -162,8 +167,6 @@ Chapter 1's are Cash, Fans and Demo Tapes; Chapter 2's are Cash, Fans and EPs.
 - **Fans** - the release meter: determines the album's Demo Tapes payout on release. Accrue
   passively once revealed; the fans rate composes a base contribution plus one from each bandmate,
   so it is a function of band size and time — never of Cash or income.
-- **Catalog (Ch. 6+)** - songs written during the run; a global income multiplier and the main input
-  to the chapter's release payout (section 7).
 
 **Chapter-scoped (Chapter 1):**
 - **Demo Tapes** - the prestige currency, paid by the album release (section 5). Each Demo Tape
@@ -172,14 +175,16 @@ Chapter 1's are Cash, Fans and Demo Tapes; Chapter 2's are Cash, Fans and EPs.
 **Permanent (root):**
 - **Roadies** - crew; a global multiplier allocated across unlocked chapters (section 8), and the only
   currency that crosses chapters.
-- **Discography** — a list of the player's best named songs (§7). Display only.
+- **Songs** - made in the Studio and kept in the catalog, then in the Hall of Fame (section 7). Not
+  a currency: a named thing with a popularity and a classification. With Roadies, songs are what
+  crosses chapters, and the Hall of Fame's boost is the second game-wide one. The Discography is the
+  screen that lists them.
 
 **Income.** Every produced number is computed on read as *the sum of its contributions times the
 product of the multipliers targeting it* (12.2). The effective multiplier stack on the base resource:
 
 ```
 income = Σ(generator base × owned × per-generator effects)
-         × catalogBoost      (run-scoped fact, §7)
          x prestigeMultiplier (chapter fact, 5)
          × roadieTotalBoost  (root fact, §8)
          × roadieChapterBoost (the played chapter's own stationing, §8.2)
@@ -244,13 +249,12 @@ precedes the `ResetScope`, so the formula reads the Fans the reset is about to d
 placed *after* a reset land in the fresh state, which is how a head-start reward ("start the next
 run with 500 Cash") is authored.
 
-- **Resets:** Cash, gear, learn-songs bars, Fans, working Catalog — everything the tier declares.
+- **Resets:** Cash, gear, learn-songs bars, Fans - everything the tier declares.
 - **Keeps:** the prestige currency it pays, declared outside the tier (Ch. 1: on the chapter), and
-  Roadies and Discography, declared at root - all unreachable by the tier's reset.
+  Roadies and songs, kept at root - all unreachable by the tier's reset.
 - **Awards the prestige currency** based on run performance:
   ```
-  early chapters:  earned = f(releaseMeterThisRun)        // Ch. 1: floor((fans/5)^0.5) Demo Tapes
-  Ch. 6+:          earned = f(releaseMeterThisRun, totalCatalogQuality)
+  earned = f(releaseMeterThisRun)        // Ch. 1: floor((fans/5)^0.5) Demo Tapes
   ```
 - **Each unit** raises the chapter's income where the chapter's income boost reads this currency,
   as Chapter 1's does: a permanent modifier the chapter declares and lists in
@@ -391,7 +395,7 @@ IS the host and the outward walk recovers it, exactly as for every other content
   bank. Nothing in an action list can observe the record's absence: handicaps are
   multipliers on production, and rewards read balances.
 - **Two ending lists, because failure has an ending too.** `rewards` runs only on success and holds
-  the payout - a chapter-durable buff (`AddModifier`), a Roadie, a Catalog song, local currency.
+  the payout - a chapter-durable buff (`AddModifier`), a Roadie, local currency.
   `onEnd` runs either way and is where the reset lives, so reward-before-reset is structural rather
   than a convention an author can get backwards. What a failed run costs is therefore authoring:
   `[RestartScope(tier)]` in `onEnd` banks whatever the tier's own gate allows and wipes the rest, a
@@ -414,43 +418,121 @@ IS the host and the outward walk recovers it, exactly as for every other content
 
 ---
 
-## 7. Songwriting: Catalog & Discography (Ch. 6+)
+## 7. Songs (Studio onward)
 
-Songwriting unlocks at the Studio chapter.
+Songs are things the player makes in the Studio and keeps after it. With Roadies they are what
+crosses chapters: a Roadie is a currency, a song is a named thing with a history. Decided
+2026-11-10; this section replaces the earlier sketch, in which a song rolled a quality tier and its
+quality multiplied all income (the "Catalog boost").
 
-> **State of this section (2026-11-10).** The Discography paragraph below is what the code does.
-> The quality roll and the Catalog boost are the earlier sketch: John dropped them on 2026-11-10
-> (the Studio's economy is ideas into tracks, build plan "Runtime work to do before chapters 3-8 are
-> implemented"), and nothing about songs crosses chapters but the Discography's display.
+> **What is built (2026-11-10).** A song is a title on root's list: `AddSong(title)` (12.5) writes
+> one from whatever list a chapter places it in, the title a pattern over the song's number
+> (`"Untitled #{0}"` writes "Untitled #1"), so a release nobody is watching still names its song.
+> The player renames any song from the Discography window - a session command, `RenameSong`, which
+> trims the name, holds it to 40 characters and refuses a blank one. The window opens from a top-bar
+> button that stands only while a song exists, and the save carries the list in order. Everything
+> else in this section is design and has no code yet; 7.5 gives the build order.
 
-- **Writing a song** rolls a quality tier — Common, Hit, or Classic — and the player names it. Song
-  quality feeds a run-scoped global multiplier:
-  ```
-  catalogBoost = 1 + Σ(quality weight per song this run)   // e.g. Common .01 / Hit .05 / Classic .20
-  ```
-  The songs written this run are facts in the tier's state; the boost is an effect derived from them
-  on read (§12.6) — it exists from Chapter 1 and contributes nothing until songs exist.
-- The multiplier is driven by song **quality**, not count, so songwriting is about improving songs.
-  It applies to all income and feeds royalty/idle income.
-- **On album release,** total catalog quality is the main input to that chapter's release payout
-  (section 5), and the working Catalog resets with the run.
-- **Discography** is the list of songs the root scope keeps forever, display only: nothing in the
-  economy reads a song. A song is written by an authored action, `AddSong(title)` (12.5), from
-  whatever list a chapter places it in; the title is a pattern over the song's number
-  (`"Untitled #{0}"` writes "Untitled #1"), so a release nobody is watching still names its song.
-  The player renames any song afterwards from the Discography window - a session command,
-  `RenameSong`, which trims the name, holds it to 40 characters and refuses a blank one. The window
-  opens from a top-bar button that stands only while a song exists, and the save carries the list
-  in order.
-- *Earlier sketch, dropped with the quality roll:* songs reaching the Discography by promotion from
-  the dying run's Catalog. The
-  selection rule is a Ch. 6 authoring decision, deferred (candidates we considered: auto-by-quality —
-  Classics always chart, Hits at a threshold; best-N-of-run; player picks a song to immortalize at
-  release).
+### 7.1 What a song is
 
-The three song systems are separate: learn-songs bars pace early chapters (run-scoped); Catalog is
-the studio-era multiplier (run-scoped, feeds the release payout); Discography is a persistent display
-list.
+- **A song is made from tracks.** The Studio is a pipeline of three bars, each consuming what the
+  one before it makes: lay down tracks (ideas become tracks), mix (tracks become mixes), master
+  (a mix becomes a song). A song is rare and earned - a few a run, not thousands.
+- **A song is born equal.** It has a title and no popularity. There is no quality roll: nobody
+  knows a classic in the studio, and nothing about how a song was recorded sets it apart.
+- **Popularity** is one number per song. It only goes up, and it goes up by the song being played
+  to an audience (7.2). It lives with the song, so no chapter's reset touches it.
+- **Classification** is read off popularity against steps authored once for the whole game, on
+  root: each step a name and a threshold, as many steps as the loop needs. The last step is the
+  highest classification.
+- **The catalog** is the songs the player holds, and it has a limit authored on root. When it is
+  full a newly mastered song is discarded; the only thing that frees a slot is induction (7.4).
+  Since every song is born equal there is no weak song to clear out, only an under-played one.
+
+### 7.2 The loop
+
+The Studio, the Coast Tour, Radio and Arenas form one repeatable loop: make songs, develop them,
+cash them in, and go round again with a better catalog. The first pass is the weakest, by design -
+repeat something and it gets better - and the one requirement is that the first pass can be
+completed. A long loop is acceptable; a chapter in it can be made shorter if a turn costs too much.
+
+| Chapter | What its set of songs does there | What it does to those songs |
+|---|---|---|
+| 5 Studio | - | Makes them. |
+| 6 Coast Tour | Unproven songs add little. | Raises their popularity, slowly: the road-tested path any song can take. |
+| 7 Radio | The songs are the singles being played. | Raises their popularity fast, once the set clears Radio's bar. |
+| 8 Arenas | What a show pays reads the classifications of the songs in the set. | Nothing. Arenas cash in. |
+
+- **Popularity rises in steps**, at the moments a chapter authors: a show finishing, a spin
+  completing, a release. It is not a continuous rate. Shows that finish while the player is away
+  pay their songs through the same completion the claim already settles (section 9).
+- **Radio's bar.** The set's TOTAL popularity against an authored number. At or above it the set
+  gets full airplay and gains fast; below it the songs are still played and gain slowly. The
+  chapter itself never locks, which is what keeps a first pass with unproven songs completable.
+  Because the bar is on the total, one big hit lifts the whole set over it: a hit carries a new
+  song onto the air, where touring it is the slow alternative.
+- **A song in several sets gains in each**, the away chapters at the away rate. On tour while the
+  song gets airplay is a natural bonus, not an exploit; the away cap bounds it.
+- **Arena pay reads the classification, not the raw popularity**: steps are bounded and legible on
+  a set list, where a number that grows without limit is what makes tuning run away. The effect
+  stays inside the chapter that uses it.
+
+### 7.3 Sets
+
+- **A set is the songs a chapter plays**, chosen by the player when the chapter starts and locked
+  until that chapter is completed or restarted.
+- **Its size is authored on the chapter.** Arenas may take more songs than the Tour.
+- **With fewer songs than slots, the songs the player has are the set.**
+- **A song may be in any number of chapters' sets at once.** One set list can serve the tour, the
+  radio and the arena. This is where a song differs from a Roadie, which is stationed in one
+  chapter.
+- **Hall of Fame songs** may sit in a set only where the chapter authors it, as a count: Arenas
+  one, every other chapter none. A band that still plays arenas plays its biggest song.
+- **A set belongs to its chapter's own state**, so the reset that completes or restarts the
+  chapter clears it and no rule has to (lifetime is placement, section 2).
+- **Every chapter can be restarted** from settings: the capstone's reset without its reward,
+  behind a confirmation. It is the way out of a set chosen badly.
+
+### 7.4 The Hall of Fame
+
+The Hall of Fame is what the loop is for. Without it, a better catalog only clears Arenas faster,
+and a faster clear buys nothing a Roadie replay does not already buy.
+
+- **Induction** takes a song out of the catalog for good, frees its slot, and gives a permanent
+  game-wide boost per inducted song. The boost's form is undecided; it will be an ordinary boost to
+  a stat or a currency. It is the second game-wide boost, beside Roadies (section 8).
+- **A song may be inducted when** it holds the highest classification AND has been credited a
+  number of completed chapter runs at that classification, the number authored on root. The runs
+  are what tell a lasting song from a one-hit wonder: popularity only rises, so "more popularity"
+  and "played for longer" are the same requirement, and staying power needs its own count. Runs are
+  earned by playing the loop, never by waiting, and neither game speed nor the device clock moves
+  them.
+- **A run is credited by an action a chapter places on its capstone**, to the songs in its set
+  that hold the highest classification. Which chapters count is therefore authoring: a chapter
+  whose capstone carries the action counts.
+- **A song in any set cannot be inducted.** A set never changes under the player, and the end of a
+  chapter is the moment a song is both free and possibly eligible. A chapter left unfinished pins
+  the songs in its set, so the Discography shows which sets a song is in.
+- **Induction is a trade**: the song leaves the Tour, Radio and Arena sets for a permanent boost.
+  The Hall of Fame slot in an Arena set softens it for the first inductee.
+
+### 7.5 Build order
+
+1. **Songs with standing.** Popularity on each song, the authored classifications, the catalog
+   limit, an action that adds popularity to every song in the acting chapter's set, a multiplier
+   formula over the classifications of the songs in the chapter's set - read the way the played
+   chapter's Roadie boost reads its own allocation (8.2) - and a condition on the set's total
+   popularity.
+2. **Sets.** Choosing, locking, clearing with the chapter, the size and the Hall of Fame count
+   authored on the chapter, and the screen that chooses a set when a chapter starts.
+3. **The Hall of Fame.** The run credit, induction, the boost, and the restart command with its
+   settings row.
+
+The Discography grows with each step: popularity, classification, runs and set membership per
+song, then the Hall of Fame and the induct button.
+
+Chapter 1's learn-songs bars (section 6) are unrelated to all of this: they are pacing bars that
+reset with the run.
 
 ---
 
@@ -694,8 +776,8 @@ chapter's top bar: one entry per beat whose latch is set, over every chapter in 
 reopens its card without writing anything, and closing that card returns to the log. There are no story
 interruptions during the loop itself.
 
-Named Catalog songs (§7) serve as story artifacts — the songs that chart appear in the Discography
-and persist.
+Named songs (§7) serve as story artifacts: the Discography keeps every song the player holds or
+has inducted, with the standing it earned.
 
 ---
 
@@ -714,7 +796,7 @@ Two structural properties keep pacing stable against players with strong income 
 
 Tuning must hold at both ends: an unbuffed player's pace is doable and never feels impossible, and
 a permanent-Encore player (2x game speed, with `maxGameSpeed` 4 as headroom above it, plus Roadie and
-Catalog multipliers) still takes
+Hall of Fame multipliers) still takes
 meaningful play time per chapter and breaks nothing. Timed events feel Encore fully — speed
 scales production but never timers (§9), so a 4× player meets a timed goal in a quarter of the
 clock; author timed goals with that end in mind.
@@ -734,7 +816,7 @@ completed gig pays (the generator yield its bar fires), and nothing multiplies a
 - 4-6 themed generators producing the base resource (exponential cost, growth ~1.15, Ch. 1's Cash in
   the thousands-millions).
 - A release meter target that makes an album cycle meaningful (seconds early, minutes later).
-- A prestige payout formula over the release meter (times catalog quality from Ch. 6).
+- A prestige payout formula over the release meter.
 - An income boost and a capstone gate, each reading a prestige currency - one currency or two.
 - One new mechanic.
 
@@ -1129,7 +1211,7 @@ currency once when the node is built, written beside the balance and the earned 
 deposit, read by the payout selector (§12.5), carried by the save beside the payload, and cleared by
 no reset. A reset installs a fresh payload of the same type and leaves both standing.
 
-The tree: **root** (Roadies, entitlements, completion flags, Discography, any counters a
+The tree: **root** (Roadies, entitlements, completion flags, songs, any counters a
 chapter's curves read (§8.1)) → **chapters** → **tiers**, and tiers may nest. **Ids are unique along a CHAIN** — a read walks
 outward and stops at the first scope that declares what it names, so two sibling chapters may each
 declare their own `cash`; what must not repeat is an id visible from one scope. Scope ids stay
@@ -2188,7 +2270,8 @@ Content/                 // the authored JSON the importer reads
   currency is paid by a release and declared outside that release's tier. The income boost (a chapter
   permanent modifier, +2% per unit in Ch. 1 and 2) and the capstone gate each read a prestige
   currency the chapter authors - the same one in Ch. 1 and 2, declared on the chapter and zeroed by
-  the capstone's own reset. Roadies are the only currency that crosses chapters.
+  the capstone's own reset. Roadies are the only currency that crosses chapters; songs cross too,
+  as named things and not a currency (section 7).
 - **Rungs:** the album release and the capstone are `{offerCondition, List<Action>}`; events are
   lifecycle commands executing authored lists (§6.1). Payout-before-clear is list order; `ResetScope` is a bare
   downward-closed clear; every invocation — `TryRung` from the UI, `ExecuteRung` from another

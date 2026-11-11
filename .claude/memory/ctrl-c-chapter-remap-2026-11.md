@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 9bcd0e53-5626-49e8-9aa2-6f02854d91fd
-  modified: 2026-11-10T23:42:59.979Z
+  modified: 2026-11-11T01:04:57.084Z
 ---
 
 On 2026-11-10 John approved a remap of Ctrl C chapters 3-8 onto Garage Band chapters 3-8 as the
@@ -35,6 +35,104 @@ JSON were not touched and still show the earlier sketch.
 - Section 7's Catalog: the Studio's economy is the ideas-to-tracks bar, the quality roll is
   dropped, song naming and the Discography stay display only; no catalog boost crosses chapters.
   ("yes those are fine")
+
+**REVERSED later on 2026-11-10: John keeps the song quality mechanic.** "I'd like to keep it, and
+resolve the open questions." He had not seen that cutting the Catalog left songs with no mechanical
+weight. Open and being resolved with him: which songs reach the Discography, whether the boost
+stays inside the Studio (my recommendation) or crosses chapters, what a song is in the
+ideas-to-tracks economy, how the tier is rolled, what quality feeds. Design section 7 carries a note
+I wrote that day calling the quality roll "dropped"; that note is now wrong and waits on an order to
+fix. The built `AddSong` / Discography has no quality field yet.
+
+**The song design below is WRITTEN INTO THE DOCS** (2026-11-10, his order "Write it into docs"):
+design section 7 rewritten as 7.1-7.5, the Catalog boost removed from sections 1, 2, 3, 5, 6.1, 10
+and 11, section 1 gains the song loop, and the build plan has the entry "Songs: standing, sets and
+the Hall of Fame" with three steps. Not built. Still stale and untouched: the backlog (its branch
+pair entry still talks about the Catalog and old chapter numbers) and the chapter 3 draft JSON.
+
+**Songs, as John shaped them late on 2026-11-10**
+- The Studio is a pipeline: lay down tracks, mix them, master the mix into a song ("Probably made
+  from tracks... laying down tracks, mixing the tracks, then recording the master to make a song").
+- No quality roll. A song's standing comes from popularity, which is not part of the Studio ("just
+  recording the song doesn't make it ... a 'classic'... That should be based on popularity").
+- Songs may cross chapters ("yes, we can add songs to be something that can cross chapters"). He
+  expects them to matter in Radio and in Arenas ("you play your hit song") and other later chapters.
+- He likes it as a "meta-prestige": replay the Studio for songs, raise their popularity on tour
+  and radio, so arena gigs pay more. His brainstorm (explicitly "just me brainstorming", NOT
+  decisions): Tour - assign up to N songs from the catalog at the chapter's start, those are the
+  ones that level; Radio - plays your top songs and needs a base popularity across the selection,
+  so one big hit can carry a new song onto the air instead of touring it; Arenas - pick a setlist
+  and the outcome scales with the songs' popularity.
+- John's rulings after my pros and cons (2026-11-10):
+  - The chapters stop being independent here: Studio -> Tour -> Radio -> Arena is a repeatable meta
+    loop, and a weaker first pass is the idle-game point. The one requirement is that the first
+    play is completable. A long loop is fine; chapters can be made shorter if needed.
+  - Songs are ASSIGNED to a chapter by the player, "sort of like Roadies can be allocated". Radio's
+    selection is chosen, not automatic.
+  - Arena pay reads the song's classification (Song / Hit / Classic), not raw popularity.
+  - How many songs a chapter takes is defined on the chapter and tunable; Arenas may take more
+    than the Tour.
+  - Tour slow, Radio fast: fine, tuning.
+  - With fewer songs than slots, the songs you have are the ones played.
+  - The catalog is limited; when full, a replay means retiring a song.
+  - Lock-in is answered by restarting the chapter; if no way exists, a "restart" / "start over"
+    button for the chapter in settings.
+- Ideas he floated, explicitly not to implement yet: a Hall of Fame for retired songs giving a
+  game-wide boost; making songs "a more abstract concept" and implementing songs in that system.
+  My advice given: model songs on the Roadie allocation precedent, no generic layer until a second
+  thing needs it.
+- Second round of rulings (2026-11-10), after he asked for my thoughts and not just a record:
+  - The Roadie comparison meant only "lives outside a chapter". A chapter's selected songs cannot
+    be changed until the chapter is restarted or completed.
+  - A song can be in ANY chapter's set at once - one set list can serve the tour, radio and arena.
+    He overruled my one-chapter-at-a-time recommendation.
+  - Forced obsolescence stays: he disagreed with making retirement optional. His candidate rule: a
+    new song replaces only a less popular one, otherwise it is discarded. I pointed out a new song
+    has zero popularity, so that rule as worded never replaces anything; unresolved.
+  - A restart button on every chapter is fine.
+  - Classifications are AUTHORED, with finer steps than three.
+  - The Hall of Fame is IN, as the loop's reward (my point 1): it is what the loop is for.
+- A song in both the Tour and Radio sets gaining popularity in both while away is intended: "if
+    Im on tour while my song is getting airtime, then that's a natural bonus".
+- Third round (2026-11-10): Hall of Fame induction is how catalog slots are freed ("I like
+    that"). Songs do NOT start with any popularity ("I don't like them starting with any
+    popularity"), so there is no bottom replacement: with a full catalog a new song is discarded
+    until an induction frees a slot. A song cannot be inducted while it is in a set list. Maybe
+    (his word "might"): an Arena set may include a Hall of Fame song, perhaps one - "if led
+    Zeppelin played an arena now, they would play Stairway to Heaven". I suggested making that an
+    authored per-chapter number like the slot count.
+- Superseded: the "replaces a less popular song" rule and my "born with popularity" fix.
+- Induction needs the highest classification, "and also maybe based on time as well": a one-hit
+    wonder should be harder to induct than a song that stayed on the charts. I recommended counting
+    completed chapter runs the song sat in a set as top classification (not clock time, not decay);
+    unresolved.
+- DECIDED ("ok go with your recommendation"): induction needs the highest classification AND a
+    number of completed chapter runs in which the song sat in a set at that classification. The
+    number is authored. Which chapters count toward it is not settled (Radio only, or any chapter
+    with a set); I proposed authoring it per chapter.
+- Which runs count for induction is AUTHORED, not limited: an action placed on a chapter's
+    capstone credits the run ("if we only wanted Radio to do it then we'd only put that action on
+    the radio's capstone").
+- The Hall of Fame boost "doesn't matter right now"; it will be some boost to yield, a currency or
+    other stat(s) per song.
+- The save holds songs wherever other persistent data is kept (root already saves the list).
+- Radio's bar DECIDED ("yes your suggestions are fine"): the set's TOTAL popularity gates the fast
+    airplay gain; below it songs still play and gain slowly; the chapter never locks.
+- The two engine pieces "we'd need to implement" (his words; a statement of need, not yet an order
+    to build). Shape I proposed, APPROVED 2026-11-10 ("that's all fine") as a design, with the
+    build order songs-with-standing, then sets, then the Hall of Fame; no order to write docs or
+    code was given: popularity is paid by an ACTION at
+    authored moments (a show or spin completing, a release) into every song in the acting chapter's
+    set - no continuous rate, so the tick and idle claim do not change and away completions pay
+    through the existing claim; arena pay is a multiplier formula reading the set's classifications
+    the way `RoadieActiveBoost` reads the played chapter's allocation; Radio's bar is a condition on
+    the set's total popularity. Sets live in the chapter's facts so a capstone or restart clears
+    them; songs, classifications and the catalog limit live on root.
+- Still open: what happens to a retired or inducted song that sits in a
+  locked set, where exactly popularity accrues, and the engine shape (songs are runtime things, not
+  authored definitions - a conversation before code).
+- Lesson: when John answers a design question he wants my assessment of the answer, not a
+  transcript of it ("thoughts on my answers instead of just recording them?").
 
 **Debt, as John settled it on 2026-11-10 (design only, not built, not in the docs)**
 - Debt is ONE shrinking multiplier formula, not a subtractive term. This replaces decision 11 of

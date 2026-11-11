@@ -169,7 +169,8 @@ lives somewhere other than a conversation.
     prestige; a room consumes its genre's material.
   - 4 Local Tour, from Ctrl C 4: tours as short runs paying a durable take; the Van is the
     hardware a tour's reset does not clear; merch is the take for draw beyond the target.
-  - 5 Studio, from Ctrl C 6: ideas become tracks through one session bar; two parallel prestiges.
+  - 5 Studio, from Ctrl C 6: ideas become tracks, tracks mixes and a mix a mastered song, three
+    bars where Ctrl C has one (design 7.1); two parallel prestiges.
   - 6 Coast Tour, from Ctrl C 5: road wear as debt; generators that make generators; three nested
     resets; sponsorships relieve the wear.
   - 7 Radio, from Ctrl C 7: three debts; the back catalog as a tier that carries none.
@@ -222,8 +223,9 @@ lives somewhere other than a conversation.
   7. **Song naming and the Discography** (chapter 5). DONE 2026-11-10 (design 7): `AddSong` writes
      a song under a default title and the player renames it afterwards. An action that writes a song (12.5 names
      `AddSong`; the code has none), a naming prompt, a Discography screen, and the save carrying
-     the `songs` list. Display only: no quality roll, and nothing about songs crosses chapters.
-     This one touches the UI and the save.
+     the `songs` list. As built a song is a title and nothing more. The song design decided after
+     it (design 7: popularity, classifications, sets, the Hall of Fame) is the next entry.
+     This one touched the UI and the save.
 
   Content on what exists, so nobody builds it again: chapter 3's sibling scene tiers and a
   root-curve payout in place of Ctrl C's softcap; chapter 4's fixed tour rewards paid as a
@@ -231,6 +233,30 @@ lives somewhere other than a conversation.
   its own rate, fired after the reset; chapter 5's two prestiges through a wrapper tier; chapter
   6's nested tiers and generators paying generator counts; chapter 8's exclusive pair, and the
   restart after the rival wins as flags and granted counts set after the reset.
+- **Songs: standing, sets and the Hall of Fame.** Decided 2026-11-10 (design 7), after the seven
+  items above were built, and not built. The quality roll and the Catalog boost of the earlier
+  sketch are gone: a song is mastered in the Studio with no popularity, gains it by being played
+  on the Coast Tour and on Radio, and is cashed in by Arenas, so chapters 5-8 are one repeatable
+  loop whose reward is inducting a song into the Hall of Fame. Songs and the Hall of Fame's boost
+  cross chapters, beside Roadies. What exists is item 7 above: a title on root's list, renamed from
+  the Discography. Three steps, each its own plan when picked up, in this order:
+  1. **Songs with standing.** Popularity and the completed-run count on each song; the
+     classifications and the catalog limit authored on root; an action that adds popularity to
+     every song in the acting chapter's set, placed where a song is heard (a show or a spin
+     completing, a release), so popularity rises in steps and neither the tick nor the idle claim
+     changes; a multiplier formula over the classifications of the songs in the chapter's set,
+     read as the played chapter's Roadie boost reads its allocation; a condition on the set's
+     total popularity (Radio's bar). The catalog limit discards a song mastered into a full
+     catalog.
+  2. **Sets.** A chapter's set in that chapter's own state, so the capstone's reset and a restart
+     clear it; chosen by a command when the chapter starts and locked after; its size and how
+     many Hall of Fame songs it may hold authored on the chapter; fewer songs than slots plays
+     them all; a song may be in any number of sets; the selection screen.
+  3. **The Hall of Fame.** An action on a capstone crediting a run to the set's songs at the
+     highest classification; induction as a command, refused for a song in any set or short of
+     the authored run count; the boost per inducted song, its form undecided; a restart command
+     for every chapter with its settings row and confirmation. The Discography shows each song's
+     popularity, classification, runs and sets, and the Hall of Fame.
 - **A higher speed tier** stays undecided (design 9). Timers landed 2026-09-14 (`timers-plan.md`),
   so if it is ever decided it is content alone: one more root modifier reading `encore_timer` with
   `activeAfterSeconds: 86400`, and removing it is deleting that modifier.

@@ -34,7 +34,7 @@ root
 **Root content** (declared once, game-wide; listed here because Ch. 1 is the first consumer):
 
 - Currencies: `roadies` ("Roadies") (accumulates, never spent in Ch. 1; the only currency that
-  crosses chapters), `discography` ("Discography"; list, Ch. 6+).
+  crosses chapters). Songs are not a currency: root keeps them as a list (design 7).
 - Permanent modifiers (§12.5/§12.6 — root-declared, root-applied via `permanentModifiers`;
   formula-shaped effects that exist from minute one):
   - `roadie_total`: `{target: income, stat: rate, × Π over chapters (1 + 0.05 × stationed there)}`
