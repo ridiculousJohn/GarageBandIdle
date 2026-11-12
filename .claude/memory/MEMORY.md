@@ -14,6 +14,7 @@
 
 ## Before saying the editor is open or closed
 - [Is the editor open](is-the-editor-open.md) - ONLY: Win32_Process with path under Hub\Editor AND command line naming this project. NEVER a process named "unity" (that is the CLI MCP server)
+- [Show, don't describe](show-dont-describe.md) - visual or animated change: record it from the running game (frames to MP4 via ffmpeg, never GIF) and send it
 - [Open the editor yourself](open-the-editor-yourself.md) - a check needs the editor and it is closed: launch it, never ask John to
 
 ## Before writing

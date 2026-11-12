@@ -28,6 +28,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // and the widget is toggled rather than rebuilt thereafter.
             public ModuleWidget Widget { get; internal set; }
 
+            // How the widget's root shows and hides; built with the widget.
+            public Reveal Reveal { get; internal set; }
+
             internal ModuleView(ModuleDefinition definition, ScopeState scope)
             {
                 Definition = definition;
@@ -46,6 +49,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
             public bool Visible { get; internal set; }
             public VisualElement Root { get; }
             public IReadOnlyList<ModuleView> Modules => modules;
+
+            // How Root shows and hides; Root starts hidden.
+            public Reveal Reveal { get; }
 
             // The sideways scroll view a Strip section lays its modules out in;
             // null for a List section.
@@ -66,6 +72,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
                 Root = new VisualElement();
                 Root.AddToClassList("section");
+                Reveal = new Reveal(Root, ScrollViewMode.Vertical);
                 // Authored text fixed for the process, so it is built once and
                 // no refresh owes it anything; each is drawn only when
                 // authored (12.11).
@@ -133,6 +140,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // The page's headline line this pass: the first visible section's
         // currency-primary root, or null while no section shows one.
         private VisualElement headlineSource;
+
+        // Whether the built chapter has had its first pass. That pass shows
+        // what it finds at once - a player loading a save does not watch the
+        // screen assemble - and a section or module turning visible on a
+        // later pass is revealed (12.11).
+        private bool settled;
 
         private enum LiveOverlay
         {
@@ -274,14 +287,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
             foreach (var section in sections)
             {
                 var ctx = new GameContext(section.Scope, clock.RealTimeUtc);
+                var wasVisible = section.Visible;
                 section.Visible = section.Definition.visibleWhen.Evaluate(ctx);
-                section.Root.style.display = section.Visible ? DisplayStyle.Flex : DisplayStyle.None;
+                section.Reveal.Show(section.Visible, settled);
                 // A hidden section's modules are neither evaluated nor
                 // refreshed: nothing on screen depends on them
-                // (requirement 3).
+                // (requirement 3). A module showing in the pass its section
+                // turns visible comes in with the section's own reveal.
                 if (section.Visible)
-                    RenderModules(section);
+                    RenderModules(section, settled && wasVisible);
             }
+            settled = true;
             headline.Follow(headlineSource);
             headline.Interpolate();
 
@@ -602,19 +618,22 @@ namespace RidiculousGaming.GarageBandIdle.UI
             container.Clear();
             sections.Clear();
             builtFor = chapter;
+            settled = false;
 
             foreach (var section in ((ChapterDefinition)chapter.Definition).sections)
             {
                 var view = new SectionView(section, chapter.Link(section));
                 foreach (var module in section.modules)
                     view.AddModule(new ModuleView(module, chapter.Link(module)));
-                view.Root.style.display = DisplayStyle.None;
                 container.Add(view.Root);
                 sections.Add(view);
             }
         }
 
-        private void RenderModules(SectionView section)
+        // `reveal`: whether a module turning visible this pass is revealed -
+        // false on the chapter's first pass and in the pass its section turns
+        // visible.
+        private void RenderModules(SectionView section, bool reveal)
         {
             for (var i = 0; i < section.Modules.Count; i++)
             {
@@ -627,7 +646,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     CreateWidget(section, i, module);
                 if (module.Widget == null)
                     continue;
-                module.Widget.Root.style.display = module.Visible ? DisplayStyle.Flex : DisplayStyle.None;
+                module.Reveal.Show(module.Visible, reveal);
                 if (module.Visible)
                     module.Widget.Refresh();
             }
@@ -659,6 +678,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
             var root = registry.Resolve(module.Definition.prefabId).Instantiate();
             module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this, this, this, this);
             module.Widget.Bind(session, module.Scope, module.Definition.content, clock);
+            // A strip's tiles stand side by side, so one grows in width there.
+            module.Reveal = new Reveal(root,
+                section.Strip != null ? ScrollViewMode.Horizontal : ScrollViewMode.Vertical);
             section.ModulesContainer.Insert(PlacedBefore(section, index), root);
         }
 

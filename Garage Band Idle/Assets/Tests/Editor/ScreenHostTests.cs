@@ -1956,6 +1956,143 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.Less(at, fx.Screen.IndexOf(overlay), $"before the '{overlay.name}' overlay");
         }
 
+        // ---- the reveal (12.11) ----
+
+        // A headless screen has no panel, so no layout pass measures a reveal
+        // and no scheduler grows it: a reveal stands at its start - shown and
+        // transparent - until CompleteReveal ends it as its last frame does.
+
+        // The authored route to the band: a deposit raises the earned total,
+        // and the command's sweep fires reveal_band.
+        private static ScreenHost.SectionView RevealBand(Fixture fx)
+        {
+            fx.Ctx(fx.Tier1).Deposit("cash", 100);
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+            var band = fx.Host.Sections[Band];
+            Assert.IsTrue(band.Visible, "the trigger set the flag the section reads");
+            return band;
+        }
+
+        private static void AssertAtRevealStart(Reveal reveal, string what)
+        {
+            Assert.IsTrue(reveal.Revealing, $"{what} is revealing");
+            Assert.IsTrue(reveal.Shown, $"{what} is shown");
+            Assert.IsTrue(Fixture.Shown(reveal.Element), $"{what} is displayed");
+            Assert.AreNotEqual(StyleKeyword.Null, reveal.Element.style.opacity.keyword, $"{what} has an inline opacity");
+            Assert.AreEqual(0f, reveal.Element.style.opacity.value, $"{what} starts transparent");
+        }
+
+        // Nothing a reveal writes is left inline.
+        private static void AssertNatural(VisualElement element, string what)
+        {
+            var style = element.style;
+            Assert.AreEqual(StyleKeyword.Null, style.opacity.keyword, $"{what}: opacity");
+            Assert.AreEqual(StyleKeyword.Null, style.position.keyword, $"{what}: position");
+            Assert.AreEqual(StyleKeyword.Null, style.left.keyword, $"{what}: left");
+            Assert.AreEqual(StyleKeyword.Null, style.right.keyword, $"{what}: right");
+            Assert.AreEqual(StyleKeyword.Null, style.overflow.keyword, $"{what}: overflow");
+            Assert.AreEqual(StyleKeyword.Null, style.height.keyword, $"{what}: height");
+            Assert.AreEqual(StyleKeyword.Null, style.width.keyword, $"{what}: width");
+            Assert.AreEqual(StyleKeyword.Null, style.paddingTop.keyword, $"{what}: padding-top");
+            Assert.AreEqual(StyleKeyword.Null, style.paddingBottom.keyword, $"{what}: padding-bottom");
+            Assert.AreEqual(StyleKeyword.Null, style.marginTop.keyword, $"{what}: margin-top");
+            Assert.AreEqual(StyleKeyword.Null, style.marginBottom.keyword, $"{what}: margin-bottom");
+            foreach (var child in element.hierarchy.Children())
+                Assert.AreEqual(StyleKeyword.Null, child.style.flexShrink.keyword, $"{what}: a child's flex-shrink");
+        }
+
+        // A player loading a save does not watch the screen assemble: the
+        // chapter's first pass shows what it finds at once.
+        [Test]
+        public void WhatTheFirstPassShowsIsNotRevealed()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            var floor = fx.Host.Sections[GarageFloor];
+            Assert.IsTrue(floor.Reveal.Shown);
+            Assert.IsFalse(floor.Reveal.Revealing, "the garage floor came up with the chapter");
+            AssertNatural(floor.Root, "the garage floor");
+            foreach (var module in floor.Modules.Where(m => m.Visible))
+            {
+                Assert.IsFalse(module.Reveal.Revealing, $"'{module.Definition.prefabId}' came up with the chapter");
+                AssertNatural(module.Widget.Root, module.Definition.prefabId);
+            }
+            Assert.IsFalse(fx.Host.Sections[Band].Reveal.Shown, "a hidden section is not shown");
+        }
+
+        // A section turning visible on a later pass reveals, and its rows come
+        // in with it rather than each on its own.
+        [Test]
+        public void ASectionTurningVisibleLaterRevealsAndEndsAtItsNaturalState()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            var band = RevealBand(fx);
+            AssertAtRevealStart(band.Reveal, "the band");
+            Assert.IsFalse(band.Modules[0].Reveal.Revealing, "the amp's row comes in with its section");
+
+            band.Reveal.CompleteReveal();
+            Assert.IsFalse(band.Reveal.Revealing);
+            Assert.IsTrue(Fixture.Shown(band.Root), "a completed reveal stays shown");
+            AssertNatural(band.Root, "the band");
+
+            fx.Session.Refresh();
+            Assert.IsFalse(band.Reveal.Revealing, "a section already shown does not reveal again");
+        }
+
+        // A row turning visible in a section already showing reveals the same
+        // way, with its section still.
+        [Test]
+        public void AModuleTurningVisibleInAShownSectionReveals()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            // play_for_crowd's gate is one drummer and its cost is 100 cash,
+            // and its own action sets the fans flag.
+            fx.Tier1.generatorCounts["drummer"] = 1;
+            fx.Ctx(fx.Tier1).Deposit("cash", 100);
+            fx.Session.TryBuy(fx.Ctx(fx.Tier1), fx.PlayForCrowd);
+
+            var floor = fx.Host.Sections[GarageFloor];
+            var fans = floor.Modules[FansLine];
+            Assert.IsTrue(fans.Visible, "the purchase revealed the fans line");
+            AssertAtRevealStart(fans.Reveal, "the fans line");
+            Assert.AreSame(fans.Widget.Root, fans.Reveal.Element);
+            Assert.IsFalse(floor.Reveal.Revealing, "the section holding it stays still");
+
+            fans.Reveal.CompleteReveal();
+            Assert.IsFalse(fans.Reveal.Revealing);
+            Assert.IsTrue(Fixture.Shown(fans.Widget.Root));
+            AssertNatural(fans.Widget.Root, "the fans line");
+        }
+
+        // A hide is at once and takes a reveal under way down with it; showing
+        // again is a reveal from the start.
+        [Test]
+        public void HidingMidRevealCancelsItAndShowingAgainRestartsIt()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+            var band = RevealBand(fx);
+            Assert.IsTrue(band.Reveal.Revealing);
+
+            fx.Ch1.flags.Remove("band_revealed");
+            fx.Session.Refresh();
+            Assert.IsFalse(band.Visible);
+            Assert.IsFalse(band.Reveal.Shown);
+            Assert.IsFalse(band.Reveal.Revealing, "the hide cancelled the reveal");
+            Assert.IsFalse(Fixture.Shown(band.Root), "hidden at once");
+            AssertNatural(band.Root, "the hidden band");
+
+            fx.Ch1.flags.Add("band_revealed");
+            fx.Session.Refresh();
+            Assert.IsTrue(band.Visible);
+            AssertAtRevealStart(band.Reveal, "the band shown again");
+        }
+
         // ---- the marked beat pops by itself (decision 7) ----
 
         // A second host over the standing test tree: the pop rows need a MARKED

@@ -1930,6 +1930,24 @@ both, and the axis that has travelled further owns the drag (`DragScrollManipula
 going to the page), so a sideways drag on a tile scrolls the strip and a vertical one the page. A
 nested view taking the pointer is its own drag starting, and the page stops tracking that press.
 
+**A section or a module turning visible during play is revealed** (Ctrl C's, 2026-11-12). The
+host shows and hides each section's root and each built module's root through one helper,
+`Reveal` (`SectionView.Reveal`, `ModuleView.Reveal`). A hide is at once. A show is at once on the
+first pass over a built chapter - after bind, a chapter switch, or a return to Live - so a player
+loading a save does not watch the screen assemble; on any later pass a hidden-to-visible flip
+reveals: the element fades in from transparent while its size along the axis its container stacks
+on grows from zero to what it lays out at, with the padding and margins on that axis, over
+`Reveal.Seconds` (0.3 s) on an ease-out curve, so whatever follows it slides along to make room.
+Down the page that is the height; a strip's tile grows in width. A length of auto cannot be
+tweened, so the reveal lays the element out of flow and transparent for one layout pass, reads the
+size it took, and grows it in flow from there on the element's own scheduler (panel time, never a
+game read), clipping its content and keeping its children at their own size. A module showing in
+the pass its section turns visible comes in with the section's reveal and has none of its own. A
+hide mid-reveal cancels it, and a later show starts over. When a reveal ends every inline value it
+wrote is cleared, so the element is exactly as it would be without one and a size its content took
+mid-reveal is the size it ends at. `Revealing` and `Shown` say where it stands, and
+`CompleteReveal` ends one at once - the last frame's state, for a headless test.
+
 **Upgrade tiles.** `upgrade_row` is the full-width upgrade, a row like a generator's. `upgrade_tile`
 (`UpgradeTileUI`, `UpgradeTile.uxml`) is the strip's widget: one upgrade bound by `contentId`,
 resolved as the row resolves it, drawn as a rounded, outlined tile of fixed width - a round
@@ -2383,6 +2401,7 @@ Assets/Scripts/
     LongPressManipulator.cs // the hold gesture over an element's own scheduler; never captures, lets go of a button's capture when it fires
     DragScrollManipulator.cs // a left-button mouse drag scrolls a view along its axis as a finger does - the page vertically, a strip sideways; a click stays a click
     PinnedHeadlineUI.cs     // the headline currency line as an overlay: over its line at rest, shrunk beneath the pills once scrolled away
+    Reveal.cs               // how a section or a module shows: at once, hidden at once, or revealed - a fade-in that grows it along its container's axis
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
               // RungButtonUI is the prestige card (RungButton.uxml): title with the gain and the (i), Currently, requirement lines, Confirm

@@ -100,8 +100,8 @@ Label {
     padding: 28px 36px 96px 36px;
 }
 
-/* A section is a card. Revealing one fades it in (design doc 12.11): the
-   host raises section-revealing for the transition's length. */
+/* A section is a card. Its reveal is driven from code (Reveal, design doc
+   12.11), so no rule here styles it. */
 .section {
     background-color: rgb(31, 31, 31);
     border-radius: 38px;
