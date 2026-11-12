@@ -18,9 +18,9 @@ MonoBehaviour:
   description: Everyone in town owes you one, so every gig level costs half for the
     rest of the chapter.
   gate:
-    rid: 1688710512883793941
+    rid: 1688710513577951295
   ownedWhen:
-    rid: 1688710512883793942
+    rid: 1688710513577951296
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
   cost:
     _value:
@@ -28,11 +28,11 @@ MonoBehaviour:
       exponent: 6
   effects: []
   actions:
-  - rid: 1688710512883793943
+  - rid: 1688710513577951297
   references:
     version: 2
     RefIds:
-    - rid: 1688710512883793941
+    - rid: 1688710513577951295
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -41,12 +41,12 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 1
-    - rid: 1688710512883793942
+    - rid: 1688710513577951296
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: favors_owed
-    - rid: 1688710512883793943
+    - rid: 1688710513577951297
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: favors_owed

@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710512883794133
+    rid: 1688710513577951487
   actions:
-  - rid: 1688710512883794134
+  - rid: 1688710513577951488
   references:
     version: 2
     RefIds:
-    - rid: 1688710512883794133
+    - rid: 1688710513577951487
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 0
-    - rid: 1688710512883794134
+    - rid: 1688710513577951488
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: photographer_friend_revealed

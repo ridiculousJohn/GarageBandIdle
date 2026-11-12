@@ -18,7 +18,7 @@ MonoBehaviour:
   description: Your name stays in the qualifier draw, so the night re-books itself
     and keeps paying while you are away.
   gate:
-    rid: 1688710512883794176
+    rid: 1688710513577951531
   ownedWhen:
     rid: -2
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
@@ -28,17 +28,17 @@ MonoBehaviour:
       exponent: 8
   effects: []
   actions:
-  - rid: 1688710512883794177
+  - rid: 1688710513577951532
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710512883794176
+    - rid: 1688710513577951531
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-    - rid: 1688710512883794177
+    - rid: 1688710513577951532
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: booked_botb_qualifier

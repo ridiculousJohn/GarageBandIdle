@@ -61,6 +61,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void OpenStory(Story.StoryBeatDefinition beat, ScopeState scope) { }
         }
 
+        private sealed class NoRungs : IRungOpener
+        {
+            public void OpenRungInfo(Rung rung) { }
+
+            public void OpenRungConfirm(Rung rung, ScopeState scope) { }
+        }
+
         private class Fixture
         {
             public static readonly DateTime Start = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
@@ -142,7 +149,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 var asset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Widgets/" + uxml);
                 Assert.IsNotNull(asset, "Assets/UI/Widgets/" + uxml + " is missing");
                 var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), Registry, new NoStories(),
-                    Infos, Automations, new NoDetails());
+                    Infos, Automations, new NoDetails(), new NoRungs());
                 widget.Bind(Session, Tier2, content, Clock);
                 return widget;
             }

@@ -606,6 +606,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     : new Rung
                     {
                         label = dto.rung.label,
+                        info = dto.rung.info,
+                        confirmText = dto.rung.confirmText,
                         offerCondition = BuildCondition(build, scope, dto.rung.offerCondition),
                         actions = dto.rung.actions.Select(a => BuildAction(build, scope, a)).ToList(),
                     };

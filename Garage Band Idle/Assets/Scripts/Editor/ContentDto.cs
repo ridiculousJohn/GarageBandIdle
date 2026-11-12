@@ -398,6 +398,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     internal class RungDto
     {
         public string label;
+        public string info;
+        public string confirmText;
         public ConditionDto offerCondition;
         public List<ActionDto> actions = new();
     }

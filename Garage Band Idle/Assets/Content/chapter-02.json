@@ -104,11 +104,13 @@
   ],
   "rung": {
     "label": "Win the Talent Show",
+    "info": "The night that ends the open mic circuit. Win it and you walk away with another Roadie who stays with the band for good.",
+    "confirmText": "The circuit starts over from nothing: every EP, the Cash, the fans, the Buzz, the calendar and every upgrade go, and only the Roadie comes with you.",
     "offerCondition": {
       "type": "CurrencyAtLeast",
       "currency": "eps",
       "threshold": 120,
-      "uiText": "Record 120 EPs"
+      "uiText": "Requires 120 EPs"
     },
     "actions": [
       {
@@ -1553,7 +1555,7 @@
               "type": "CurrencyAtLeast",
               "currency": "fans",
               "threshold": 300,
-              "uiText": "300 fans"
+              "uiText": "Requires 300 Fans"
             },
             {
               "type": "Not",

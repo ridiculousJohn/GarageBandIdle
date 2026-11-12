@@ -1138,25 +1138,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var module = fx.Host.Sections[Release].Modules.Single();
             Assert.IsTrue(module.Visible, "the flag opened the release");
             var rung = fx.Tier1Def.rung;
-            var press = module.Widget.Root.Q<Button>("press");
-            Assert.AreEqual(rung.label, press.text, "the rung's authored label");
-            Assert.IsFalse(press.enabledSelf, "a fresh run meets neither threshold");
+            var widget = (RungButtonUI)module.Widget;
+            Assert.IsFalse(widget.ConfirmEnabled, "a fresh run meets neither threshold");
+            Assert.IsFalse(module.Widget.Root.Q<Button>("confirm").enabledSelf);
+            Assert.IsTrue(module.Widget.Root.Q<Label>("title").ClassListContains("rung-title-locked"),
+                "the title is greyed while the rung is not offered");
 
             Assert.AreEqual(3, module.Widget.Root.Q<VisualElement>("legs").childCount,
                 "one label per authored leg, built once and toggled");
             var legs = GateFeedback.Legs(rung.offerCondition);
-            CollectionAssert.AreEqual(new[] { legs[0], legs[1] }, Fixture.ShownLegs(module, rung.offerCondition),
+            CollectionAssert.AreEqual(new[] { legs[0], legs[1] }, widget.ShownUnmetLegs.ToArray(),
                 "the two unmet legs; nothing is pending, so the reward leg holds and stays hidden");
+            CollectionAssert.AreEqual(widget.ShownUnmetLegs.ToArray(), Fixture.ShownLegs(module, rung.offerCondition),
+                "the labels shown are the legs the card names");
+            Assert.IsFalse(widget.ShownRefused);
             Fixture.AssertProgress(legs[0], fx.Ctx(fx.Tier1), 0, 50);
             Fixture.AssertProgress(legs[1], fx.Ctx(fx.Tier1), 0, 1);
 
-            var widget = (RungButtonUI)module.Widget;
-            var preview = module.Widget.Root.Q<Label>("preview");
-            Assert.AreEqual(DisplayStyle.Flex, preview.style.display.value, "the rung opens with an AddCurrency");
-            Assert.IsTrue(widget.PreviewShown);
+            Assert.IsTrue(widget.PreviewShown, "the rung opens with an AddCurrency");
+            Assert.IsTrue(Fixture.Shown(module.Widget.Root.Q<Label>("balance")));
             CollectionAssert.AreEqual(new[] { fx.DemoTapes }, widget.ShownCurrencies.ToArray(), "the paid currency");
             Assert.AreEqual(1, widget.ShownAmounts.Count);
-            Fixture.AssertClose(0, widget.ShownAmounts[0], "the payout at zero fans");
+            Fixture.AssertClose(0, widget.ShownAmounts[0], "the gain at zero fans, shown while locked");
+            Assert.AreEqual(1, widget.ShownBalances.Count);
+            Fixture.AssertClose(0, widget.ShownBalances[0], "no demo tapes are banked yet");
+            Assert.IsFalse(widget.InfoShown, "the release authors no info text");
         }
 
         [Test]
@@ -1170,22 +1176,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var module = fx.Host.Sections[BackyardParty].Modules.Single();
             var rung = fx.Ch1Def.rung;
-            var press = module.Widget.Root.Q<Button>("press");
-            Assert.AreEqual(rung.label, press.text, "the rung's authored label");
-            Assert.IsFalse(press.enabledSelf, "no demo tapes have been banked");
+            var widget = (RungButtonUI)module.Widget;
+            Assert.IsFalse(widget.ConfirmEnabled, "no demo tapes have been banked");
 
             // The threshold leg is the whole gate and shows with its progress
             // beside it - the capstone's whole readout.
+            CollectionAssert.AreEqual(new[] { rung.offerCondition }, widget.ShownUnmetLegs.ToArray());
             CollectionAssert.AreEqual(new[] { rung.offerCondition }, Fixture.ShownLegs(module, rung.offerCondition));
             Fixture.AssertProgress(rung.offerCondition, fx.Ctx(fx.Ch1), 0, 30);
 
-            var widget = (RungButtonUI)module.Widget;
-            var preview = module.Widget.Root.Q<Label>("preview");
-            Assert.AreEqual(DisplayStyle.Flex, preview.style.display.value, "the capstone opens with an AddCurrency");
-            Assert.IsTrue(widget.PreviewShown);
+            Assert.IsTrue(widget.PreviewShown, "the capstone opens with an AddCurrency");
             CollectionAssert.AreEqual(new[] { fx.Roadies }, widget.ShownCurrencies.ToArray(), "the paid currency");
             Assert.AreEqual(1, widget.ShownAmounts.Count);
             Fixture.AssertClose(1, widget.ShownAmounts[0], "the constant roadie");
+            Assert.AreEqual(1, widget.ShownBalances.Count);
+            Fixture.AssertClose(0, widget.ShownBalances[0], "no roadie is owned yet");
+            Assert.IsTrue(widget.InfoShown, "the capstone authors info text");
         }
 
         [Test]

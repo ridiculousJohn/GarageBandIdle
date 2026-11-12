@@ -109,4 +109,21 @@
             <ui:Button name="details-close" text="Close" class="overlay-close details-close" />
         </ui:VisualElement>
     </ui:VisualElement>
+    <ui:VisualElement name="rung-info" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel details-panel">
+            <ui:Label name="rung-info-title" class="modal-title" />
+            <ui:Label name="rung-info-text" class="details-effect" />
+            <ui:Button name="rung-info-close" text="Close" class="overlay-close details-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="rung-confirm" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel details-panel">
+            <ui:Label name="rung-confirm-title" class="modal-title" />
+            <ui:Label name="rung-confirm-text" class="details-effect" />
+            <ui:VisualElement class="window-actions">
+                <ui:Button name="rung-confirm-cancel" text="Cancel" class="window-secondary" />
+                <ui:Button name="rung-confirm-ok" text="Confirm" class="details-close" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
 </ui:UXML>

@@ -14,7 +14,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // the MonoBehaviour shell around it. This is the ONE Refreshed subscriber -
     // widgets subscribe to nothing, so there is one dispatch order.
     public sealed class ScreenHost : IDisposable, IStoryOpener, IGeneratorInfoOpener, IAutomationOpener,
-                                     IUpgradeDetailsOpener
+                                     IUpgradeDetailsOpener, IRungOpener
     {
         // One module and the widget standing for it. The host owns these views,
         // so it writes them and anything holding the host reads them.
@@ -125,6 +125,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly GeneratorInfoUI generatorInfo;
         private readonly AutomationWindowUI automation;
         private readonly UpgradeDetailsUI upgradeDetails;
+        private readonly RungInfoUI rungInfo;
+        private readonly RungConfirmUI rungConfirm;
         private readonly PinnedHeadlineUI headline;
         private readonly List<SectionView> sections = new();
 
@@ -144,6 +146,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             GeneratorInfo,
             Automation,
             UpgradeDetails,
+            RungInfo,
+            RungConfirm,
         }
 
         private LiveOverlay requestedOverlay;
@@ -175,6 +179,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public AutomationWindowUI AutomationWindow => automation;
 
         public UpgradeDetailsUI UpgradeDetails => upgradeDetails;
+
+        public RungInfoUI RungInfo => rungInfo;
+
+        public RungConfirmUI RungConfirm => rungConfirm;
 
         public PinnedHeadlineUI Headline => headline;
 
@@ -209,6 +217,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 session, clock, CloseOverlay);
             upgradeDetails = new UpgradeDetailsUI(Require<VisualElement>(screenRoot, "upgrade-details"),
                 clock, CloseOverlay);
+            rungInfo = new RungInfoUI(Require<VisualElement>(screenRoot, "rung-info"), CloseOverlay);
+            rungConfirm = new RungConfirmUI(Require<VisualElement>(screenRoot, "rung-confirm"),
+                session, clock, CloseOverlay);
             var scroll = Require<ScrollView>(screenRoot, "screen");
             scroll.AddManipulator(new DragScrollManipulator());
             headline = new PinnedHeadlineUI(Require<VisualElement>(screenRoot, "headline"),
@@ -366,6 +377,24 @@ namespace RidiculousGaming.GarageBandIdle.UI
             OpenOverlay(LiveOverlay.UpgradeDetails);
         }
 
+        // A prestige card's (i), the one way the info window opens: the rung
+        // lives on the window, as the details window's upgrade lives on its
+        // class.
+        public void OpenRungInfo(Rung rung)
+        {
+            rungInfo.Hold(rung);
+            OpenOverlay(LiveOverlay.RungInfo);
+        }
+
+        // A prestige card's Confirm on a rung that authors confirmText, the one
+        // way the confirmation window opens: the rung and the card's scope live
+        // on the window, which presses from that scope.
+        public void OpenRungConfirm(Rung rung, ScopeState scope)
+        {
+            rungConfirm.Hold(rung, scope);
+            OpenOverlay(LiveOverlay.RungConfirm);
+        }
+
         public void OpenEncore() => OpenOverlay(LiveOverlay.Encore);
 
         public void OpenStoryLog() => OpenOverlay(LiveOverlay.StoryLog);
@@ -386,6 +415,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             generatorInfo.Drop();
             automation.Drop();
             upgradeDetails.Drop();
+            rungInfo.Drop();
+            rungConfirm.Drop();
             HideRequestedOverlay();
         }
 
@@ -396,14 +427,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
             requestedBeat = null;
             story.Hide();
             // Another overlay opening releases the held generator, the held
-            // group and the held upgrade: the request each belongs to is the
-            // one being replaced.
+            // group, the held upgrade and the held rung: the request each
+            // belongs to is the one being replaced.
             if (overlay != LiveOverlay.GeneratorInfo)
                 generatorInfo.Drop();
             if (overlay != LiveOverlay.Automation)
                 automation.Drop();
             if (overlay != LiveOverlay.UpgradeDetails)
                 upgradeDetails.Drop();
+            if (overlay != LiveOverlay.RungInfo)
+                rungInfo.Drop();
+            if (overlay != LiveOverlay.RungConfirm)
+                rungConfirm.Drop();
             HideRequestedOverlay();
             requestedOverlay = overlay;
             if (overlay == LiveOverlay.Roadies)
@@ -428,6 +463,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             generatorInfo.Drop();
             automation.Drop();
             upgradeDetails.Drop();
+            rungInfo.Drop();
+            rungConfirm.Drop();
             HideRequestedOverlay();
         }
 
@@ -442,6 +479,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             generatorInfo.Hide();
             automation.Hide();
             upgradeDetails.Hide();
+            rungInfo.Hide();
+            rungConfirm.Hide();
         }
 
         private void ShowRequestedOverlay()
@@ -479,6 +518,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 // Likewise the owned state: a purchase made beneath it.
                 case LiveOverlay.UpgradeDetails:
                     upgradeDetails.Show();
+                    break;
+                // Authored text only, so a refresh beneath changes nothing.
+                case LiveOverlay.RungInfo:
+                    rungInfo.Show();
+                    break;
+                case LiveOverlay.RungConfirm:
+                    rungConfirm.Show();
                     break;
             }
         }
@@ -611,7 +657,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void CreateWidget(SectionView section, int index, ModuleView module)
         {
             var root = registry.Resolve(module.Definition.prefabId).Instantiate();
-            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this, this, this);
+            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this, this, this, this);
             module.Widget.Bind(session, module.Scope, module.Definition.content, clock);
             section.ModulesContainer.Insert(PlacedBefore(section, index), root);
         }

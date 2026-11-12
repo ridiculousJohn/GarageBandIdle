@@ -7,7 +7,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 {
     // The rung half of the feedback contract (design doc 12.11) over the
     // standing test tree: pressability is the rung's own IsOffered, the disarmed
-    // legs come from GateFeedback over offerCondition, and the "would bank"
+    // legs come from GateFeedback over offerCondition, and the payout
     // preview runs the same AmountFor the execution runs, one amount per paid
     // currency (design doc 5).
     public class RungFeedbackTests

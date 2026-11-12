@@ -17,6 +17,15 @@ namespace RidiculousGaming.GarageBandIdle
         // going to reach that button (12.11).
         public string label;
 
+        // Optional player-facing text the prestige card offers behind its (i)
+        // button: what pressing this rung does. Empty draws no (i) (12.11).
+        public string info;
+
+        // Optional sentence the confirmation window asks before the rung runs,
+        // naming what the press loses. Empty means Confirm runs the rung at once
+        // (12.11).
+        public string confirmText;
+
         [SerializeReference, SubclassPicker] public Condition offerCondition;
         [SerializeReference, SubclassPicker] public List<GameAction> actions = new();
 

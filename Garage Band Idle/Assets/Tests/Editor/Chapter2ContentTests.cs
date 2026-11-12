@@ -354,6 +354,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var legs = ((All)ep.offerCondition).conditions;
             Assert.AreEqual(new[] { "balance fans", "not reward pending" }, legs.Select(Describe).ToArray());
             Assert.AreEqual((BigNumber)300, Threshold(legs[0]));
+
+            // The EP resets one tier, so its card neither offers an (i) nor
+            // asks before it runs.
+            Assert.IsTrue(string.IsNullOrEmpty(ep.info));
+            Assert.IsTrue(string.IsNullOrEmpty(ep.confirmText));
         }
 
         [Test]
@@ -377,6 +382,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsNull(roadie.formula, "the chapter reward is the constant 1");
             Assert.AreEqual("ch2_complete", ((SetFlag)capstone.actions[1]).flagId);
             Assert.AreEqual(ch2, ((ResetScope)capstone.actions[2]).scope);
+
+            // It ends the chapter, so its card offers an (i) and asks before
+            // the reset runs.
+            Assert.IsFalse(string.IsNullOrEmpty(capstone.info));
+            Assert.IsFalse(string.IsNullOrEmpty(capstone.confirmText));
         }
 
         // ---- the Battle chain ----

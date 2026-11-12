@@ -567,7 +567,7 @@ Label {
     color: rgb(111, 111, 111);
 }
 
-/* ---- gates, previews, the release ---- */
+/* ---- gates, the prestige card ---- */
 
 .legs {
     margin-top: 8px;
@@ -579,24 +579,63 @@ Label {
     -unity-text-align: upper-center;
 }
 
+/* The prestige card: centred lines - the title with its gain and the (i)
+   beside it, the current balance, the requirements in the accent text while
+   locked, and Confirm, in the accent while the rung is offered and grey while
+   it is not. */
 .rung {
     align-items: center;
     padding: 20px 0 16px 0;
 }
 
-.rung .unity-button {
-    color: rgb(240, 149, 149);
-    font-size: 46px;
+.rung-title-line {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
 }
 
-.rung .unity-button:disabled {
+.rung-title {
+    flex-shrink: 1;
+    -unity-font-definition: url("Fonts/Roboto-Medium.ttf");
+    -unity-text-align: middle-center;
+}
+
+.rung-title-locked {
     color: rgb(111, 111, 111);
 }
 
-.preview {
+.unity-button.rung-info {
+    width: 60px;
+    height: 60px;
+    margin-left: 20px;
+    padding: 0;
+    font-size: 36px;
+    border-width: 3px;
+    border-radius: 30px;
+    border-color: rgb(168, 168, 168);
+    color: rgb(168, 168, 168);
+    -unity-text-align: middle-center;
+}
+
+.rung-balance {
+    margin-top: 8px;
     font-size: 40px;
     color: rgb(208, 208, 208);
     -unity-text-align: upper-center;
+}
+
+.rung .leg {
+    color: rgb(240, 149, 149);
+}
+
+.rung-confirm {
+    margin-top: 8px;
+    font-size: 46px;
+    color: rgb(240, 149, 149);
+}
+
+.rung-confirm:disabled {
+    color: rgb(111, 111, 111);
 }
 
 .event-row {
@@ -775,8 +814,9 @@ Label {
     color: rgb(240, 149, 149);
 }
 
-/* The upgrade details window: one paragraph, wrapping, and Close in the
-   accent text at the bottom right. */
+/* The text windows - an upgrade's details, a rung's info and a rung's
+   confirmation: one paragraph, wrapping, and the actions as text at the
+   bottom right, the committing one in the accent and Cancel in grey. */
 .details-effect {
     white-space: normal;
     margin-bottom: 24px;
@@ -784,6 +824,16 @@ Label {
 
 .details-close {
     color: rgb(240, 149, 149);
+}
+
+.window-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+.window-secondary {
+    color: rgb(168, 168, 168);
 }
 
 .roadie-row {

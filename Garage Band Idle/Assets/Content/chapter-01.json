@@ -52,7 +52,9 @@
 
   "rung": {
     "label": "Play the Backyard Party",
-    "offerCondition": { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 30, "uiText": "Hand out 30 Demo Tapes" },
+    "info": "The gig that ends the garage days. Play it and you walk away with a Roadie who stays with the band for good, and the Open Mic opens up.",
+    "confirmText": "The garage starts over from nothing: every Demo Tape, the Cash, the fans, the band and all the gear go, and only the Roadie comes with you.",
+    "offerCondition": { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 30, "uiText": "Requires 30 Demo Tapes" },
     "actions": [
       { "type": "AddCurrency", "currencies": ["roadies"], "amount": 1 },
       { "type": "SetFlag", "flagId": "ch1_complete" },
@@ -630,8 +632,8 @@
         "offerCondition": {
           "type": "All",
           "conditions": [
-            { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 50, "uiText": "50 fans" },
-            { "type": "BarsCompleted", "group": "learn_covers", "count": 1, "uiText": "Learn a cover" },
+            { "type": "CurrencyAtLeast", "currency": "fans", "threshold": 50, "uiText": "Requires 50 Fans" },
+            { "type": "BarsCompleted", "group": "learn_covers", "count": 1, "uiText": "Requires a cover learned" },
             {
               "type": "Not",
               "uiText": "Claim your Garage Jam reward first",

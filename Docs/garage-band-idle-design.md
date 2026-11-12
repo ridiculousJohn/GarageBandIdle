@@ -289,7 +289,7 @@ discarded by whatever reset follows — never banked.
 press time, a "bank at 1000, keep accruing for more at a lower rate" mechanic (Ctrl C's
 Lines → Knowledge) is entirely a formula shape: the offer condition sets the floor, a piecewise
 formula pays `10% × min(x, 1000) + slower(x − 1000)`, and the press-now-or-push-on decision emerges
-from the curve. The UI's "would bank: N" preview calls the same formula — one implementation, no
+from the curve. The prestige card's gain preview calls the same formula — one implementation, no
 drift.
 
 ---
@@ -1435,7 +1435,12 @@ modifiers, and each chapter's prestige modifier of 5, inside a modifier its chap
 this list's first content, as formula-shaped effects (12.6).
 
 **A rung** is `{offerCondition, List<Action>}` — the one shape behind the album release (declared
-on its tier) and the capstone (declared on the chapter): a rung of the prestige ladder. Event
+on its tier) and the capstone (declared on the chapter): a rung of the prestige ladder. Its
+presentation is its own content too: `label`, the prestige card's title, and two optional texts,
+`info` (what the card's (i) opens) and `confirmText` (the sentence the confirmation window asks
+before the rung runs, naming what it loses), JSON keys `label`, `info` and `confirmText` on the rung
+object (12.11). Neither optional text is validated: empty is how an author says the card has no (i)
+or asks nothing. Event
 lifecycle commands are **not**
 rungs - they execute authored `onEntry` / `rewards` / `onEnd` lists through the same action machinery
 (§6.1). Every invocation
@@ -1942,6 +1947,30 @@ the description once it is, and "Close" in the accent at the bottom right closes
 beneath it turns the paragraph on the host's refresh. An owned upgrade's tile stays on the strip:
 content gating a tile on a fact that can fall gives it `Any(UpgradePurchased <itself>, ...)`.
 
+**The prestige card.** `rung_button` (`RungButtonUI`, `RungButton.uxml`) binds nothing and presses
+its evaluation scope's own rung, as `TryRung` reads it; it is Ctrl C's prestige card, a stack of
+centred lines. The title is the rung's `label` with its gain, "Cut a Demo (Gain 3.00 Demo Tapes)",
+one amount and currency per target of the payout preview (`RungFeedback.TryPreviewPayout`) joined by
+commas, shown while locked too (it may read 0.00), and the label alone when the rung's first action
+is not an `AddCurrency`; the title is greyed (`rung-title-locked`) while the rung is not offered.
+Beside it a round (i) is drawn only when the rung authors `info`. Beneath it "Currently: " prints
+each previewed currency's balance, read at the home the payout deposits to, hidden with the preview.
+While locked the requirement lines follow in the accent text: one per unmet top-level leg
+(`GateFeedback.UnmetLegs` and `LegText`, below), then the refusal line when the rung's actions are
+refused (`ActionList.Refuses`, `RungFeedback.RefusalText`); each goes when it is met, so an offered
+card shows none. Last is "Confirm", a centred text button in the accent while the rung is offered and
+grey and disabled while it is not. Confirm on a rung authoring `confirmText` opens the **rung
+confirmation window**, and on any other runs `TryRung` at once; on a rung not offered it does
+nothing. A tap on the (i) opens the **rung info window**. Both are host-owned overlays reached
+through `IRungOpener`, as the upgrade details window is: the info window (`RungInfoUI`) titles itself
+with the label, shows the `info` text, and closes on "Close" in the accent at the bottom right; the
+confirmation window (`RungConfirmUI`) titles itself with the label and a question mark, shows the
+`confirmText`, and offers "Cancel" in grey and "Confirm" in the accent at the bottom right - Cancel
+closes it, and Confirm closes it and runs `TryRung` at the scope the card handed over, fail-closed
+as the card's own press is. Neither window reads state, so a refresh beneath them changes nothing.
+The upgrade details window stays its own class: its paragraph is judged from the owned state on
+every refresh, which a window of fixed texts does not do.
+
 **Rates on screen.** A currency's header line is the name, the balance, and the tick report's
 realized income beside it as "(X/s)": the deposit slope plus the completion slope
 (`TickReport.CompletionSlope`, what the fills of every drawing bar's completions are worth per real
@@ -2013,7 +2042,9 @@ levelled group with `ShownPurchased`, `ShownGranted`, `ShownProgress`, `ShownRat
 window with `Bar`, `State` and `ShownCost` on each row, `Upgrade`, `ShownCost`, `ShownOwned` and
 `ShownBuyable` on an upgrade tile, `IsOpen`, `ShownUpgrade` and `ShownOwned` on the upgrade details
 window,
-`PreviewShown` with `ShownAmounts` and `ShownCurrencies` on a rung button, `ShowsClaim` on an
+`PreviewShown`, `ShownAmounts`, `ShownCurrencies`, `ShownBalances`, `ShownUnmetLegs`, `ShownRefused`,
+`InfoShown` and `ConfirmEnabled` on a prestige card, `IsOpen` and `ShownRung` on the rung info
+window with `HeldScope` on the confirmation window, `ShowsClaim` on an
 event, `ShownSeconds` and `ShownPermanent` on the pill and the Encore window, and their like. The
 label and the member cannot differ, because one is formatted from the other. A test compares that
 member as a number, a bool or an enum; an authored name on screen is compared against the
@@ -2022,7 +2053,7 @@ element's text against a literal string (John, 2026-11-10): that pins a sentence
 number, and breaks on a rewording that changed nothing.
 
 **Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
-Encore, the story log, the Discography, a generator's info screen, the automation window or an upgrade's details window is open, the host does not run the automatic story walk. The modal and any unsubmitted
+Encore, the story log, the Discography, a generator's info screen, the automation window, an upgrade's details window or a rung's info or confirmation window is open, the host does not run the automatic story walk. The modal and any unsubmitted
 allocation draft remain intact. A waiting marked beat stays unseen and opens on the first refresh
 after the last overlay closes, if it is still available. The walk reads state, not a transition.
 
@@ -2057,7 +2088,7 @@ callbacks (AdManager / IAPManager) mutate through their own equally fail-closed 
 transaction), `DoubleAndClaimIdle()`, `GrantEntitlement(id)` and
 `PurchasePassFromDialog()`, `GrantRoadies(count)` - they are not UI paths.
 
-**A disarmed rung explains itself**: the rung-button widget evaluates its gate's top-level legs
+**A disarmed rung explains itself**: the prestige card evaluates its gate's top-level legs
 individually at the two refresh moments and lists the unmet legs' `Text` (§12.4) - a leg's own
 `uiText`, or for a compound leg the one composition rule, so an `Any` inside a gate explains itself
 without a hand-written line unless the author wants one; the gate's top-level `All` is rendered as
@@ -2126,7 +2157,8 @@ fires, so the click is no longer pressed and the release lands on the window, an
 the pointer ends the hold before it fires. The rows' and the buttons' presses are public actions
 (`Tap`, `BuyOne`, `BuyMax`, `OpenInfo`, `Book`, `Auto`, `OpenAutomation`, and the window's `Buy` and
 `Dismiss`) so a headless test presses what the pointer presses; an upgrade tile's are `Buy` and
-`OpenDetails`, and its window's `Close`.
+`OpenDetails`, and its window's `Close`; a prestige card's are `Press` (what Confirm does) and
+`OpenInfo`, the info window's `Close`, and the confirmation window's `Confirm` and `Cancel`.
 
 ### 12.12 Validation at content load
 
@@ -2347,11 +2379,13 @@ Assets/Scripts/
     IGeneratorInfoOpener.cs // the one method a generator row asks of the host: open the info screen for a generator at its declaring scope
     IAutomationOpener.cs    // the one method a levelled group's Auto asks of the host: open the automation window for a group at its declaring scope
     IUpgradeDetailsOpener.cs // the one method an upgrade tile asks of the host: open the details window for an upgrade at its declaring scope
+    IRungOpener.cs          // the two methods a prestige card asks of the host: open the rung's info window, and its confirmation window at the card's scope
     LongPressManipulator.cs // the hold gesture over an element's own scheduler; never captures, lets go of a button's capture when it fires
     DragScrollManipulator.cs // a left-button mouse drag scrolls a view along its axis as a finger does - the page vertically, a strip sideways; a click stays a click
     PinnedHeadlineUI.cs     // the headline currency line as an overlay: over its line at rest, shrunk beneath the pills once scrolled away
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
+              // RungButtonUI is the prestige card (RungButton.uxml): title with the gain and the (i), Currently, requirement lines, Confirm
               LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, Book and Auto; AutomationState
               UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): icon, name, price or Owned; a tap buys, a hold opens the details window
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
@@ -2367,6 +2401,8 @@ Assets/Scripts/
     GeneratorInfoUI.cs     // a generator's info screen: description, the row's cost and yield line, owned count, production
     AutomationWindowUI.cs  // a levelled group's automation window: one row per visible gig naming an automation, Purchased / Buy / price, Dismiss
     UpgradeDetailsUI.cs    // an upgrade's details window: the name, "On buy:" or "Current effect:" with the description, Close
+    RungInfoUI.cs          // a rung's info window: the label, the info text, Close
+    RungConfirmUI.cs       // a rung's confirmation window: the label with "?", the confirmText, Cancel and Confirm (TryRung at the card's scope)
 Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
                           // (LeveledGroup.uxml and UpgradeTile.uxml among them),
                           // and Fonts/ (Roboto Regular, Medium and Bold with its Apache 2.0 licence)

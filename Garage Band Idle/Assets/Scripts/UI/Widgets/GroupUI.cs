@@ -36,6 +36,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly IGeneratorInfoOpener infos;
         private readonly IAutomationOpener automations;
         private readonly IUpgradeDetailsOpener details;
+        private readonly IRungOpener rungs;
         private readonly VisualElement members;
         private readonly List<CurrencyReadout> readouts = new();
         private readonly List<CurrencyDefinition> readoutCurrencies = new();   // parallel to readouts
@@ -49,13 +50,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public GroupUI(VisualElement root, ModuleRegistry registry, IStoryOpener stories,
                        IGeneratorInfoOpener infos, IAutomationOpener automations,
-                       IUpgradeDetailsOpener details) : base(root)
+                       IUpgradeDetailsOpener details, IRungOpener rungs) : base(root)
         {
             this.registry = registry;
             this.stories = stories;
             this.infos = infos;
             this.automations = automations;
             this.details = details;
+            this.rungs = rungs;
             members = Require<VisualElement>(root, "members", "Group.uxml");
         }
 
@@ -191,7 +193,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             {
                 var prefabId = PrefabIdOf(member);
                 var root = registry.Resolve(prefabId).Instantiate();
-                view.Widget = ModuleWidgetFactory.Create(prefabId, root, registry, stories, infos, automations, details);
+                view.Widget = ModuleWidgetFactory.Create(prefabId, root, registry, stories, infos, automations, details, rungs);
                 view.Widget.Bind(Session, Scope, member, Clock);
                 view.Wrapper.Add(root);
             }

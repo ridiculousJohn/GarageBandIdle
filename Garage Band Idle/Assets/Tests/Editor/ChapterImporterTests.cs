@@ -463,6 +463,44 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         private static string WithoutRids(string text) =>
             Regex.Replace(text, @"rid: -?\d+", "rid: <regenerated>");
 
+        // ---- the rung ----
+
+        // The prestige card's two optional texts are the rung's own content,
+        // imported as label is; a rung authoring neither reads both as empty
+        // (12.11).
+        [Test]
+        public void A_rungs_info_and_confirm_text_import_and_absent_reads_as_empty()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", @"{
+                ""type"": ""ChapterDefinition"",
+                ""id"": ""ch1"",
+                ""displayName"": ""The Garage"",
+                ""rung"": {
+                    ""label"": ""Play the Party"",
+                    ""info"": ""The gig that ends the chapter."",
+                    ""confirmText"": ""Everything in the garage goes."",
+                    ""offerCondition"": { ""type"": ""Always"" }
+                },
+                ""children"": [
+                    {
+                        ""type"": ""TierDefinition"",
+                        ""id"": ""tier1"",
+                        ""rung"": { ""label"": ""Cut a Demo"", ""offerCondition"": { ""type"": ""Always"" } }
+                    }
+                ]
+            }");
+
+            Import();
+
+            var capstone = Load<ChapterDefinition>("ch1/ch1.asset").rung;
+            Assert.AreEqual("The gig that ends the chapter.", capstone.info);
+            Assert.AreEqual("Everything in the garage goes.", capstone.confirmText);
+            var release = Load<TierDefinition>("ch1/tier1.asset").rung;
+            Assert.IsTrue(string.IsNullOrEmpty(release.info), "an unauthored info draws no (i)");
+            Assert.IsTrue(string.IsNullOrEmpty(release.confirmText), "an unauthored confirmText asks nothing");
+        }
+
         // ---- the chapter's screen ----
 
         // Two tiers deep on purpose: a module's default scope is its CONTENT's

@@ -1,7 +1,11 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <ui:VisualElement name="rung" class="rung">
-        <ui:Button name="press" />
-        <ui:Label name="preview" class="preview" />
+        <ui:VisualElement class="rung-title-line">
+            <ui:Label name="title" class="rung-title" />
+            <ui:Button name="info" text="i" class="rung-info" />
+        </ui:VisualElement>
+        <ui:Label name="balance" class="rung-balance" />
         <ui:VisualElement name="legs" class="legs" />
+        <ui:Button name="confirm" text="Confirm" class="rung-confirm" />
     </ui:VisualElement>
 </ui:UXML>

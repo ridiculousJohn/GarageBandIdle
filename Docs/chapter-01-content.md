@@ -67,7 +67,7 @@ root
 | `cash` ("Cash") | tier1 | `income` | - | The base resource. The income tag is what the Demo Tapes and Roadie modifiers target (design 12.2). |
 | `fans` ("Fans") | tier1 | - | `FlagSet(fans_revealed)` | The release meter. **Never income-tagged, never roadie-buffable** - the farm throttle (design 8.2). |
 | `rehearsal` ("Rehearsal") | tier1 | - | `FlagSet(rehearsal_revealed)` | Fill pool for the cover bars. |
-| `demo_tapes` ("Demo Tapes") | ch1 | - | - | The prestige currency - what cutting a demo produces, and ch1's currency for both jobs: what `demo_tapes_income` reads (the income boost, section 8) and what earns the party gig (the capstone gate); fed by the release payout, zeroed by the capstone's own reset (design 5). The capstone leg reads "Hand out 30 Demo Tapes" over its progress. |
+| `demo_tapes` ("Demo Tapes") | ch1 | - | - | The prestige currency - what cutting a demo produces, and ch1's currency for both jobs: what `demo_tapes_income` reads (the income boost, section 8) and what earns the party gig (the capstone gate); fed by the release payout, zeroed by the capstone's own reset (design 5). The capstone leg reads "Requires 30 Demo Tapes" over its progress. |
 
 The two reveals are declared on the CURRENCY, not on the entries that pay it (§12.2). Fans is why:
 its sources are `band` plus every bandmate generator, so the per-entry form is a rule each new source
@@ -177,14 +177,15 @@ applies from minute one and is never granted; the others are granted by `AddModi
 
 ```
 tier1.release ("Cut a Demo"):
-  offerCondition: All[ CurrencyAtLeast(fans, 50),             # uiText "50 fans"
-                       BarsCompleted(learn_covers, 1),        # uiText "Learn a cover"
+  offerCondition: All[ CurrencyAtLeast(fans, 50),             # uiText "Requires 50 Fans"
+                       BarsCompleted(learn_covers, 1),        # uiText "Requires a cover learned"
                        Not(EventRewardPending) ]              # uiText "Claim your Garage Jam reward first"
   rungActions:    [ AddCurrency([demo_tapes], floor((fans/5)^0.5)),
                     ResetScope(tier1) ]
 
 ch1.capstone ("Play the Backyard Party"):
-  offerCondition: CurrencyAtLeast(demo_tapes, 30)         # same gate, first clear and every replay
+  info, confirmText: both authored                        # the card's (i) and its confirmation window (12.11)
+  offerCondition: CurrencyAtLeast(demo_tapes, 30)         # uiText "Requires 30 Demo Tapes"; same gate, first clear and every replay
   rungActions:    [ AddCurrency(roadies, 1),              # Ch. 1's reward formula: the constant 1
                     SetFlag(ch1_complete),                # root
                     ResetScope(ch1) ]
@@ -283,9 +284,9 @@ Opening a card sets its latch through `AcknowledgeStory` - `story_ch1_open_seen`
 | `the_band` | "The Band" | `FlagSet(band_revealed)` | tier1 | four `generator_row` modules, one per generator; the amp's shows with the section, each bandmate's gates on its own reveal flag (section 11) |
 | `the_gear` | "The Gear" | `FlagSet(gear_revealed)` | tier1 | six `upgrade_row` modules, one per upgrade; Stage Presence's shows with the section, the rest gate on their reveal flags; a bought upgrade's row reads Bought |
 | `rehearsal_space` | "The Rehearsal Space" | `FlagSet(rehearsal_revealed)` | tier1 | bar list + Rehearsal readout |
-| `the_release` | "The Release" | `FlagSet(album)` | ch1 | release rung button (+ "would bank: N" preview via the same formula) |
+| `the_release` | "The Release" | `FlagSet(album)` | ch1 | release prestige card (its gain previewed in the title via the same formula) |
 | `garage_jam` | "Garage Jam" | `CurrencyAtLeast(demo_tapes, 1)` | tier1 | three event rows, one per jam, all always-visible (below) |
-| `backyard_party` | "The Backyard Party" | `FlagSet(album)` | ch1 | capstone rung button; its one leg reads "Hand out 30 Demo Tapes" over `demo_tapes`/30 |
+| `backyard_party` | "The Backyard Party" | `FlagSet(album)` | ch1 | capstone prestige card; its one leg reads "Requires 30 Demo Tapes" over `demo_tapes`/30, with an (i) and a confirmation window |
 
 Every gate above is a flag or a monotonic fact — nothing strobes with spending (§2).
 

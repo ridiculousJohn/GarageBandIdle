@@ -550,8 +550,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual("Cut a Demo", tier1.rung.label);
             Assert.AreEqual("Play the Backyard Party", ch1.rung.label);
             // The capstone's one leg names what it asks, and the progress the
-            // button renders beside it is the same threshold (12.11).
-            Assert.AreEqual("Hand out 30 Demo Tapes", ch1.rung.offerCondition.uiText);
+            // card renders beside it is the same threshold (12.11).
+            Assert.AreEqual("Requires 30 Demo Tapes", ch1.rung.offerCondition.uiText);
+
+            // The capstone ends the chapter, so its card offers an (i) and asks
+            // before it runs; the release resets one tier and does neither.
+            Assert.IsFalse(string.IsNullOrEmpty(ch1.rung.info));
+            Assert.IsFalse(string.IsNullOrEmpty(ch1.rung.confirmText));
+            Assert.IsTrue(string.IsNullOrEmpty(tier1.rung.info));
+            Assert.IsTrue(string.IsNullOrEmpty(tier1.rung.confirmText));
         }
 
         // What a thing does is authored beside its name, and the row shows it

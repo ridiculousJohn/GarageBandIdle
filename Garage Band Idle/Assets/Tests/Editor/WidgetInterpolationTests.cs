@@ -53,6 +53,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void OpenUpgradeDetails(Economy.UpgradeDefinition upgrade, ScopeState scope) { }
         }
 
+        // The two things a prestige card asks of the host, answered by nothing
+        // for the same reason.
+        private sealed class NoRungs : IRungOpener
+        {
+            public static readonly NoRungs Instance = new();
+
+            public void OpenRungInfo(Rung rung) { }
+
+            public void OpenRungConfirm(Rung rung, ScopeState scope) { }
+        }
+
         // Computed amounts within tolerance, never bit-exact, for the reason
         // SessionPacingTests gives: BigDouble's base-10 mantissa is
         // binary-inexact. What a widget shows is read as the number it holds
@@ -111,7 +122,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
                 Assert.IsNotNull(registry, "Assets/Settings/ModuleRegistry.asset is missing.");
                 var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), registry,
-                    NoStories.Instance, NoInfos.Instance, NoAutomations.Instance, NoDetails.Instance);
+                    NoStories.Instance, NoInfos.Instance, NoAutomations.Instance, NoDetails.Instance,
+                    NoRungs.Instance);
                 widget.Bind(Session, Tree.Tier1, content, Clock);
                 return widget;
             }

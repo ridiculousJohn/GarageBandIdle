@@ -9,7 +9,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // only what a rung adds: the payout preview.
     public static class RungFeedback
     {
-        // "would bank: N" (design doc 5): the rung's FIRST action through the
+        // The prestige card's "Gain N" (design doc 5): the rung's FIRST action through the
         // same AmountFor the execution runs, one amount per target and parallel
         // to currencies, and only when it is an AddCurrency. First-only is what
         // makes parity hold by construction - nothing has mutated when the

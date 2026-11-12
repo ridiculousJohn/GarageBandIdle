@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-12T18:23:50.305Z
+  modified: 2026-11-12T22:25:05.917Z
 ---
 
 The design descends from Ctrl C. Its Android reconstruction (version 1.12.2) is in `Docs/ctrl-c/`:
@@ -60,6 +60,8 @@ John's play wins where they differ - they show no top pills, only a "+" at the r
 - "our 'jam' button is akin to their 'Ctrl' buttons".
 
 **Where Garage Band departs from it on purpose** (John, 2026-11-10)
+- A gated prestige card always shows what it still needs (2026-11-12: "if there's something
+  blocking the confirm then it should show the amount needed"), which Ctrl C's cards do not.
 - The two pills stay fixed at the top. "the pills at the top are fine in my opinion, having those
   options move around seems like bad UI design." They do not fold into icons.
 - The headline (the chapter's first currency) is big until it scrolls up, then gets smaller and
@@ -101,5 +103,17 @@ John's play wins where they differ - they show no top pills, only a "+" at the r
   "Next: ..." for a levelled one, "On buy: ..." for one not bought, only "Current effect" when maxed;
   a "Buy Upgrades On Tap" switch ("Long press to show details."); "Close". Upgrades can have
   levels. John prefers this to our titled Office card of full-width rows: "more compact".
+- Prestige confirmation (2026-11-12): some prestige buttons open a confirmation box and some do
+  not - a "major" reset that clears large swaths of progress asks, a small one that resets one tier
+  does not. John: "that's something that should be authored" (per rung, not a code rule).
+- Prestige cards (two screenshots, 2026-11-12, chapter with Money/Assets/Shares): each prestige is
+  its own card under the cards it resets. Line 1 "Liquidate (Gain 1.95e10 Money)", line 2
+  "Currently: 3927.8 Money", line 3 a centred text button "Confirm" - orange when it can be pressed,
+  grey when not; a locked card greys its title and still shows "(Gain 0.00 Shares)". No condition
+  lines on the card. Only SOME cards carry a black (i) beside the title (Buy Shares does, Liquidate
+  does not); Buy Shares' (i) opens a window: title "Buy Shares", "Requires 1.00e4 money", "Close".
+  Others may say more. Liquidate converts Assets to Money and resets only the tier above it; Buy
+  Shares converts Money to Shares and resets most of the chapter (Discipline and Metrics reset,
+  some later buffs do not - details in Docs/ctrl-c).
 - Unknown to John: its font, whether idle accrual includes Overclock, and whether tokens moved while
   a chapter was dormant change that chapter's idle payout.
