@@ -225,6 +225,29 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(0.5, Producer.GetRate(tree.Ctx(tree.Tier1), tree.Cash), "latch gone");
         }
 
+        // ownedWhen owns the upgrade without its latch: asked at the declaring
+        // scope, it refuses the buy and reads as owned through the one rule
+        // every reader asks.
+        [Test]
+        public void An_upgrade_whose_ownedWhen_holds_is_owned_and_refuses_the_buy()
+        {
+            var tree = Ready(t => t.AmpStrings.ownedWhen = new FlagSet { flagId = "album" });
+            var ctx = tree.Ctx(tree.Tier1);
+            Assert.IsTrue(Purchasing.CanBuy(ctx, tree.AmpStrings), "affordable, gate met, ownedWhen not yet holding");
+            Assert.IsFalse(Purchasing.IsOwned(ctx, tree.AmpStrings));
+
+            tree.Ch1.flags.Add("album");
+
+            Assert.IsTrue(Purchasing.IsOwned(ctx, tree.AmpStrings));
+            Assert.IsTrue(new UpgradePurchased { upgrade = tree.AmpStrings }.Evaluate(ctx), "the condition reads the rule");
+            Assert.IsFalse(tree.Tier1.purchasedUpgrades.Contains("amp_strings"), "owned with no latch");
+            Assert.IsFalse(Purchasing.CanBuy(ctx, tree.AmpStrings));
+            Assert.Throws<System.InvalidOperationException>(() => Purchasing.Buy(ctx, tree.AmpStrings));
+            Assert.IsFalse(Purchasing.TryBuy(ctx, tree.AmpStrings));
+            AssertClose(1000, tree.Tier1.balances["cash"], "nothing spent");
+            Assert.IsFalse(tree.Tier1.purchasedUpgrades.Contains("amp_strings"), "and no latch written");
+        }
+
         [Test]
         public void An_unmet_upgrade_gate_refuses_the_buy()
         {

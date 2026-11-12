@@ -317,6 +317,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     internal class UpgradeDto : DefinitionDto
     {
         public ConditionDto gate;
+        public ConditionDto ownedWhen;
         public string costCurrency;
         public BigNumber cost;
         public List<EffectDto> effects = new();
@@ -410,6 +411,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public string description;
         public ConditionDto visibleWhen;
         public string scopeId;
+        public UI.SectionLayout layout = UI.SectionLayout.List;
         public List<ModuleDto> modules = new();
     }
 

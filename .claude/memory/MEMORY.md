@@ -12,6 +12,9 @@
 - [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode compile, import and tests; the checks that make a run trustworthy; the script to copy
 - [Code conventions](code-conventions.md) - BigNumber everywhere, enums for closed sets, generic base for narrowing, ASCII, what a test may contain
 
+## Before saying the editor is open or closed
+- [Is the editor open](is-the-editor-open.md) - ONLY: Win32_Process with path under Hub\Editor AND command line naming this project. NEVER a process named "unity" (that is the CLI MCP server)
+
 ## Before writing
 - [Quote directive before editing](quote-directive-before-editing.md) - what is never an order; what a commit contains; AGENTS.md is not mine
 - [Ask before the work, not after](ask-before-the-work-not-after.md) - four tests for an open point; picks asked in one message before the first write; nothing after the report

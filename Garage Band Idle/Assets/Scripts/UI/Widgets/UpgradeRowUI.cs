@@ -5,8 +5,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
 {
     // One bound upgrade's row (design doc 12.11): the generator row's shape
     // without a count, since the fact behind an upgrade is a latch rather than
-    // a number. A bought upgrade reads Bought, the way a bar row reads Done -
-    // the latch is a fact this renders; visibility is the module's visibleWhen.
+    // a number. An owned upgrade (Purchasing.IsOwned: the latch, or its
+    // ownedWhen) reads Bought, the way a bar row reads Done - ownership is a
+    // fact this renders; visibility is the module's visibleWhen.
     public sealed class UpgradeRowUI : ModuleWidget
     {
         private readonly Label name;
@@ -43,11 +44,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
             description.style.display = string.IsNullOrEmpty(upgrade.description)
                 ? DisplayStyle.None
                 : DisplayStyle.Flex;
-            // The purchased latch is the one-shot Purchasing itself reads, so a
-            // tier reset that clears it leaves the row reading as buyable.
+            // Owned is the rule Purchasing itself refuses on (the latch, or the
+            // upgrade's ownedWhen), so a tier reset that clears the latch leaves
+            // the row buyable unless ownedWhen still holds.
             // The row dims whole while it cannot be bought, and reads as
             // settled once it has been (12.11).
-            var purchased = ctx.IsUpgradePurchased(upgrade.Id);
+            var purchased = Purchasing.IsOwned(ctx, upgrade);
             Root.EnableInClassList("row-bought", purchased);
             Root.EnableInClassList("row-unaffordable", !purchased && !Purchasing.CanBuy(ctx, upgrade));
             ShownBought = purchased;

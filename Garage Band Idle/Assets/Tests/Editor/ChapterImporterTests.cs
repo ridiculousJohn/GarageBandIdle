@@ -948,6 +948,35 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(Load<UpgradeDefinition>("ch1/Upgrades/standing.asset"), bar.automation);
         }
 
+        // An upgrade's ownedWhen is a condition built from the upgrade's own
+        // scope, as its gate is.
+        [Test]
+        public void An_upgrades_ownedWhen_imports_as_a_condition()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson.Replace(
+                @"""displayName"": ""Standing Booking"",",
+                @"""displayName"": ""Standing Booking"", ""ownedWhen"": { ""type"": ""FlagSet"", ""flagId"": ""auto_repeat"" },"));
+
+            Import();
+
+            var upgrade = Load<UpgradeDefinition>("ch1/Upgrades/standing.asset");
+            Assert.IsInstanceOf<FlagSet>(upgrade.ownedWhen);
+            Assert.AreEqual("auto_repeat", ((FlagSet)upgrade.ownedWhen).flagId);
+            Assert.IsInstanceOf<Always>(upgrade.gate, "the gate imports beside it");
+        }
+
+        [Test]
+        public void An_unauthored_ownedWhen_imports_as_absent()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson);
+
+            Import();
+
+            Assert.IsNull(Load<UpgradeDefinition>("ch1/Upgrades/standing.asset").ownedWhen);
+        }
+
         [Test]
         public void A_bars_level_naming_an_upgrade_aborts()
         {

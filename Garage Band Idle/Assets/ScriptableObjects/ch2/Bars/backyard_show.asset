@@ -28,24 +28,24 @@ MonoBehaviour:
       mantissa: 1
       exponent: 0
   repeatWhen:
-    rid: 1688710475815583767
+    rid: 1688710512698720280
   tap: {fileID: 11400000, guid: f6833b00ce91caa43b7d0395728c9b08, type: 2}
   level: {fileID: 11400000, guid: d2306a9b3c4af8b4ea7da43322186594, type: 2}
   automation: {fileID: 11400000, guid: e78f1db2afcd50b408f40212337fb6e0, type: 2}
   availableWhen:
-    rid: 1688710475815583768
+    rid: 1688710512698720281
   onComplete:
-  - rid: 1688710475815583769
+  - rid: 1688710512698720282
   perFill: []
   references:
     version: 2
     RefIds:
-    - rid: 1688710475815583767
+    - rid: 1688710512698720280
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: booked_backyard
-    - rid: 1688710475815583768
+    - rid: 1688710512698720281
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Book a Backyard Show
@@ -54,7 +54,7 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 1688710475815583769
+    - rid: 1688710512698720282
       type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         generator: {fileID: 11400000, guid: d2306a9b3c4af8b4ea7da43322186594, type: 2}

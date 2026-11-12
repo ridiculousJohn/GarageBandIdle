@@ -24,8 +24,6 @@
     "mailing_list_revealed",
     "photographer_friend_revealed",
     "zine_writeup_revealed",
-    "crowd_work_1_revealed",
-    "crowd_work_2_revealed",
     "street_team_revealed",
     "merch_table_revealed",
     "the_van_revealed"
@@ -251,25 +249,22 @@
         "flagId": "office_revealed"
       },
       "scopeId": "tier2",
+      "layout": "Strip",
       "modules": [
         {
-          "prefabId": "upgrade_row",
-          "contentId": "crowd_work_1",
-          "visibleWhen": {
-            "type": "FlagSet",
-            "flagId": "crowd_work_1_revealed"
-          }
+          "prefabId": "upgrade_tile",
+          "contentId": "crowd_work_1"
         },
         {
-          "prefabId": "upgrade_row",
+          "prefabId": "upgrade_tile",
           "contentId": "crowd_work_2",
           "visibleWhen": {
-            "type": "FlagSet",
-            "flagId": "crowd_work_2_revealed"
+            "type": "UpgradePurchased",
+            "upgrade": "crowd_work_1"
           }
         },
         {
-          "prefabId": "upgrade_row",
+          "prefabId": "upgrade_tile",
           "contentId": "street_team",
           "visibleWhen": {
             "type": "FlagSet",
@@ -277,7 +272,7 @@
           }
         },
         {
-          "prefabId": "upgrade_row",
+          "prefabId": "upgrade_tile",
           "contentId": "merch_table",
           "visibleWhen": {
             "type": "FlagSet",
@@ -285,7 +280,7 @@
           }
         },
         {
-          "prefabId": "upgrade_row",
+          "prefabId": "upgrade_tile",
           "contentId": "the_van",
           "visibleWhen": {
             "type": "FlagSet",
@@ -293,43 +288,37 @@
           }
         },
         {
-          "prefabId": "upgrade_row",
+          "prefabId": "upgrade_tile",
           "contentId": "bulk_booking",
           "visibleWhen": {
-            "type": "All",
+            "type": "Any",
             "conditions": [
+              {
+                "type": "UpgradePurchased",
+                "upgrade": "bulk_booking"
+              },
               {
                 "type": "CurrencyAtLeast",
                 "currency": "eps",
                 "threshold": 8
-              },
-              {
-                "type": "Not",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "bulk_booked"
-                }
               }
             ]
           }
         },
         {
-          "prefabId": "upgrade_row",
+          "prefabId": "upgrade_tile",
           "contentId": "favors",
           "visibleWhen": {
-            "type": "All",
+            "type": "Any",
             "conditions": [
+              {
+                "type": "UpgradePurchased",
+                "upgrade": "favors"
+              },
               {
                 "type": "CurrencyAtLeast",
                 "currency": "eps",
                 "threshold": 25
-              },
-              {
-                "type": "Not",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "favors_owed"
-                }
               }
             ]
           }
@@ -1094,6 +1083,10 @@
             "currency": "eps",
             "threshold": 8
           },
+          "ownedWhen": {
+            "type": "FlagSet",
+            "flagId": "bulk_booked"
+          },
           "costCurrency": "cash",
           "cost": 250000,
           "actions": [
@@ -1111,6 +1104,10 @@
             "type": "CurrencyAtLeast",
             "currency": "eps",
             "threshold": 25
+          },
+          "ownedWhen": {
+            "type": "FlagSet",
+            "flagId": "favors_owed"
           },
           "costCurrency": "cash",
           "cost": 2000000,
@@ -1302,34 +1299,6 @@
             {
               "type": "SetFlag",
               "flagId": "zine_writeup_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_crowd_work_1",
-          "condition": {
-            "type": "CurrencyAtLeast",
-            "currency": "cash",
-            "threshold": 300
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "crowd_work_1_revealed"
-            }
-          ]
-        },
-        {
-          "id": "reveal_crowd_work_2",
-          "condition": {
-            "type": "CurrencyAtLeast",
-            "currency": "cash",
-            "threshold": 25000
-          },
-          "actions": [
-            {
-              "type": "SetFlag",
-              "flagId": "crowd_work_2_revealed"
             }
           ]
         },

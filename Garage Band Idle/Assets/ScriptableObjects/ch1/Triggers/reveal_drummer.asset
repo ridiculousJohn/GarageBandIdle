@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710475815583747
+    rid: 1688710512698720259
   actions:
-  - rid: 1688710475815583748
+  - rid: 1688710512698720260
   references:
     version: 2
     RefIds:
-    - rid: 1688710475815583747
+    - rid: 1688710512698720259
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 0
-    - rid: 1688710475815583748
+    - rid: 1688710512698720260
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: drummer_revealed

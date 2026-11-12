@@ -93,9 +93,9 @@
     {
       "id": "the_office",
       "name": "The Office",
-      "modules": [ "module/upgrade-list" ],
+      "modules": [ "module/upgrade-strip" ],
       "visibleWhen": { "type": "currencyEarnedTotal", "currency": "cash", "value": 100 },
-      "note": "The run's upgrades and the two permanent switches. The standing bookings are not listed here: the calendar's Auto button sells them, one gig at a time."
+      "note": "The run's upgrades and the two permanent switches, as a strip of upgrade tiles (design 12.11): one sideways row, a tap buys, a hold opens the upgrade's details. Stage Banter shows with the section, Call and Response once Stage Banter is bought, and an owned upgrade keeps its tile. The standing bookings are not listed here: the calendar's Auto button sells them, one gig at a time."
     },
     {
       "id": "the_release",

@@ -102,4 +102,11 @@
             <ui:Button name="automation-close" text="Dismiss" class="overlay-close" />
         </ui:VisualElement>
     </ui:VisualElement>
+    <ui:VisualElement name="upgrade-details" class="overlay modal" style="display: none;">
+        <ui:VisualElement class="modal-panel details-panel">
+            <ui:Label name="details-name" class="modal-title" />
+            <ui:Label name="details-effect" class="details-effect" />
+            <ui:Button name="details-close" text="Close" class="overlay-close details-close" />
+        </ui:VisualElement>
+    </ui:VisualElement>
 </ui:UXML>

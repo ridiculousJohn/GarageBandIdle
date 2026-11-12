@@ -44,6 +44,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void OpenAutomation(Economy.GroupDefinition group, ScopeState scope) { }
         }
 
+        // The one thing an upgrade tile asks of the host, answered by nothing
+        // for the same reason.
+        private sealed class NoDetails : IUpgradeDetailsOpener
+        {
+            public static readonly NoDetails Instance = new();
+
+            public void OpenUpgradeDetails(Economy.UpgradeDefinition upgrade, ScopeState scope) { }
+        }
+
         // Computed amounts within tolerance, never bit-exact, for the reason
         // SessionPacingTests gives: BigDouble's base-10 mantissa is
         // binary-inexact. What a widget shows is read as the number it holds
@@ -102,7 +111,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 var registry = AssetDatabase.LoadAssetAtPath<ModuleRegistry>("Assets/Settings/ModuleRegistry.asset");
                 Assert.IsNotNull(registry, "Assets/Settings/ModuleRegistry.asset is missing.");
                 var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), registry,
-                    NoStories.Instance, NoInfos.Instance, NoAutomations.Instance);
+                    NoStories.Instance, NoInfos.Instance, NoAutomations.Instance, NoDetails.Instance);
                 widget.Bind(Session, Tree.Tier1, content, Clock);
                 return widget;
             }

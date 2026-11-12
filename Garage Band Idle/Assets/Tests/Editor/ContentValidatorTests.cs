@@ -1569,6 +1569,30 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach, "UpgradePurchased addresses 'merch_deal' declared at 'tier1b'");
         }
 
+        // An upgrade's ownedWhen is asked where its gate is, at the declaring
+        // scope, so an operand off that chain is refused the same way.
+        [Test]
+        public void Upgrade_OwnedWhenOperandOffTheDeclaringChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var sibling = TestTree.MakeDefinition<UpgradeDefinition>("merch_deal");
+            sibling.gate = new CurrencyAtLeast { currency = f.Ch1Records, threshold = 1 };
+            sibling.costCurrency = f.Ch1Records;
+            f.Tier1b.upgrades.Add(sibling);
+
+            f.AmpStrings.ownedWhen = new UpgradePurchased { upgrade = sibling };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "upgrade 'amp_strings' ownedWhen: UpgradePurchased addresses 'merch_deal' declared at 'tier1b'");
+        }
+
+        [Test]
+        public void Upgrade_OwnedWhenOnTheChain_NoChainReachFinding()
+        {
+            var f = new ValidatorFixture();
+            f.AmpStrings.ownedWhen = new UpgradePurchased { upgrade = f.StagePresence };
+            AssertNoFinding(f.Run(), ValidationCheck.ChainReach);
+        }
+
         // ---- the balance comparison ----
 
         // Composed onto the trigger's own gate, so the fixture's flag keeps
@@ -2390,13 +2414,37 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "sections[0]: visibleWhen is unauthored");
         }
 
+        // The title is optional: a section without one draws no header (12.11).
         [Test]
-        public void Section_EmptyTitle_Error()
+        public void Section_EmptyTitle_NoFindings()
         {
             var f = new ValidatorFixture();
-            f.Ch1.sections.Add(Section("", f.Tier1));
-            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
-                "title is empty - the section's header is authored text");
+            f.Ch1.sections.Add(Section("", f.Tier1, Module("currency_line", f.Tier1, f.Cash)));
+            AssertClean(f.Run());
+        }
+
+        // A strip of upgrade tiles validates as a list of rows does: each tile's
+        // upgrade is read outward from its module's scope.
+        [Test]
+        public void Section_StripOfUpgradeTiles_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            var section = Section("The Office", f.Tier1,
+                Module("upgrade_tile", f.Tier1, f.StagePresence), Module("upgrade_tile", f.Tier1, f.AmpStrings));
+            section.layout = UI.SectionLayout.Strip;
+            f.Ch1.sections.Add(section);
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void Section_UpgradeTileOffItsModulesChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var section = Section("The Office", f.Tier1b, Module("upgrade_tile", f.Tier1b, f.StagePresence));
+            section.layout = UI.SectionLayout.Strip;
+            f.Ch1.sections.Add(section);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "a module's bound content addresses 'stage_presence' declared at 'tier1'");
         }
 
         [Test]

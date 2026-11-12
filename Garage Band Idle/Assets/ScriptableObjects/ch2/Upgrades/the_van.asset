@@ -18,7 +18,9 @@ MonoBehaviour:
   description: Dave's van gets the gear and a carload of friends to the show, so
     every gig brings more Fans.
   gate:
-    rid: 1688710475815583871
+    rid: 1688710512698720368
+  ownedWhen:
+    rid: -2
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
   cost:
     _value:
@@ -40,7 +42,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710475815583871
+    - rid: 1688710512698720368
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

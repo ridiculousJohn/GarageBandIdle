@@ -276,6 +276,126 @@ Label {
     color: rgb(111, 111, 111);
 }
 
+/* ---- the strip: a section of tiles in one sideways row ---- */
+
+/* The modules sit in one row that scrolls sideways; each keeps its own width
+   rather than shrinking to fit. The scroll bar beneath is a thin track with a
+   rounded thumb and no arrow buttons. */
+.section-strip {
+    margin: 12px 0 16px 0;
+}
+
+.section-strip .unity-scroll-view__content-container {
+    flex-direction: row;
+}
+
+.section-strip .unity-scroll-view__content-container > * {
+    flex-shrink: 0;
+}
+
+.section-strip .unity-scroller--horizontal {
+    height: 10px;
+    min-height: 10px;
+    margin-top: 20px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.section-strip .unity-scroller--horizontal .unity-scroller__low-button,
+.section-strip .unity-scroller--horizontal .unity-scroller__high-button {
+    display: none;
+}
+
+.section-strip .unity-scroller--horizontal .unity-scroller__slider {
+    margin: 0;
+    height: 10px;
+    min-height: 10px;
+}
+
+.section-strip .unity-scroller--horizontal .unity-base-slider__tracker {
+    background-color: rgb(58, 58, 58);
+    border-width: 0;
+    border-radius: 5px;
+    height: 10px;
+    top: 0;
+    margin: 0;
+}
+
+.section-strip .unity-scroller--horizontal .unity-base-slider__dragger {
+    background-color: rgb(111, 111, 111);
+    border-width: 0;
+    border-radius: 5px;
+    height: 10px;
+    top: 0;
+    margin: 0;
+}
+
+.section-strip .unity-scroller--horizontal .unity-base-slider__dragger-border {
+    display: none;
+}
+
+/* ---- upgrade tiles ---- */
+
+/* An outlined, rounded tile of fixed width, so three sit across a phone: a
+   round placeholder icon, the name on one line cut with an ellipsis, and the
+   price or "Owned" beneath. A tile that cannot be bought now is dimmed by a
+   class and stays pressable, so its hold still opens the details window. */
+.unity-button.tile {
+    width: 280px;
+    min-height: 260px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 20px 0 0;
+    padding: 28px 20px 24px 20px;
+    border-width: 3px;
+    border-color: rgb(111, 111, 111);
+    border-radius: 24px;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.tile-icon {
+    width: 88px;
+    height: 88px;
+    border-radius: 44px;
+    margin-bottom: 20px;
+    background-color: rgb(111, 111, 111);
+}
+
+.tile-owned .tile-icon {
+    background-color: rgb(226, 75, 74);
+}
+
+.tile-name {
+    width: 100%;
+    font-size: 34px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-overflow-position: end;
+    -unity-text-align: middle-center;
+}
+
+.tile-price {
+    width: 100%;
+    margin-top: 8px;
+    font-size: 30px;
+    color: rgb(242, 242, 242);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-overflow-position: end;
+    -unity-text-align: middle-center;
+}
+
+.tile-unbuyable .tile-name, .tile-unbuyable .tile-price {
+    color: rgb(111, 111, 111);
+}
+
+.tile-owned .tile-price {
+    color: rgb(240, 149, 149);
+}
+
 /* ---- bars and groups ---- */
 
 .consumed-readout {
@@ -652,6 +772,17 @@ Label {
 }
 
 .automation-buy {
+    color: rgb(240, 149, 149);
+}
+
+/* The upgrade details window: one paragraph, wrapping, and Close in the
+   accent text at the bottom right. */
+.details-effect {
+    white-space: normal;
+    margin-bottom: 24px;
+}
+
+.details-close {
     color: rgb(240, 149, 149);
 }
 

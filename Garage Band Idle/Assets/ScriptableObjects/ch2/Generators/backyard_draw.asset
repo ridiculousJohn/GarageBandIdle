@@ -20,7 +20,7 @@ MonoBehaviour:
   description: How much of the neighborhood walks over for the backyard show, and
     every level pays a bigger lump of Cash and Fans at the end of the night.
   availableWhen:
-    rid: 1688710475815583966
+    rid: 1688710512698720473
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
   baseCost:
     _value:
@@ -56,7 +56,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710475815583966
+    - rid: 1688710512698720473
       type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

@@ -205,9 +205,17 @@ currencies as they become affordable.
 - **Gating.** An upgrade's gate is a single `Condition` (§12.4), so it can gate on any currency, an
   earned total, an owned count, a flag, or completed bars. Which currency unlocks which upgrade
   defines the order the player develops each currency and gives each chapter its shape.
-- **Effects & payloads.** An upgrade carries a `List<Effect>` (ongoing buffs, applied while the
-  purchase latch exists) and a `List<Action>` (one-shot payloads executed at purchase: grant a
-  currency, set a flag, add a modifier). No per-kind upgrade classes.
+- **Effects & payloads.** An upgrade carries its gate, a cost, an optional `ownedWhen` (below), a
+  `List<Effect>` (ongoing buffs, applied while the purchase latch exists) and a `List<Action>`
+  (one-shot payloads executed at purchase: grant a currency, set a flag, add a modifier). No
+  per-kind upgrade classes.
+- **Ownership.** An upgrade is owned while its purchase latch is set at its declaring scope OR its
+  optional `ownedWhen` condition holds there - the context its gate is asked in. One rule
+  (`UpgradeDefinition.IsOwned`, asked from any scope through `Purchasing.IsOwned`) answers every
+  reader: `CanBuy` / `Buy` refuse an owned upgrade, `UpgradePurchased` holds while it is owned, and
+  the tile, the row, the details window and the calendar's Auto button render it owned. The effects
+  alone read the latch: they apply while the latch exists, so what must outlive the latch is carried
+  by a flag, never by the upgrade's effects.
 - **Reveal.** A content-unlock upgrade reveals its content by a `SetFlag` action; the revealed
   content gates on that flag. One reveal mechanism for every content type.
 - **Lifetime is placement.** *Buff upgrades* are declared in a tier: their purchase latch clears when
@@ -220,8 +228,8 @@ currencies as they become affordable.
 - **Run-priced content that outlives the run.** A purchase priced in the run's currency is declared
   in the tier, where its price is, and its payload sets a flag declared on the chapter; whatever must
   survive reads the flag - a bar's `repeatWhen` (a standing booking), a chapter permanent modifier's
-  `appliesWhen` (an automation switch, a discount). The purchase latch resets with the tier as every
-  tier purchase does, and the row hides on the flag.
+  `appliesWhen` (an automation switch, a discount). The upgrade declares `ownedWhen` on that flag, so
+  after the tier resets its latch it still reads as owned: shown owned, and never bought again.
 
 ---
 
@@ -1284,6 +1292,9 @@ another, 12.5), `OwnedCountAtLeast`, `FlagSet`, `UpgradePurchased`,
 a scaling goal or reward curve reading a per-clear counter, 8.1). A prestige currency needs no
 special kind: it is a currency.
 
+`UpgradePurchased` holds while a latch for the upgrade stands on the chain from the acting scope,
+read outward as every fact is, or while its `ownedWhen` holds at its declaring scope (section 4).
+
 `BuffActive` names a modifier as `UpgradePurchased` names an upgrade and reads the TIMER that
 modifier declares (`ModifierDefinition.timer`) outward from the acting scope, true while the
 record's `expiresAtUtc` is later than the context's own time plus the modifier's
@@ -1875,8 +1886,8 @@ delta (device clock moved backwards) clamps elapsed time to zero — rollback ca
 
 ### 12.11 UI
 
-**Authored layout**: a chapter's screen is an ordered list of `SectionDefinition {title,
-visibleWhen, scope, modules}`; a `ModuleDefinition {prefabId, content?, visibleWhen?, scope}` binds
+**Authored layout**: a chapter's screen is an ordered list of `SectionDefinition {title?,
+description?, visibleWhen, scope, layout, modules}`; a `ModuleDefinition {prefabId, content?, visibleWhen?, scope}` binds
 a widget to content. Both are inline serialized data on the `ChapterDefinition`, and both reference
 by direct object field (12.14.5): `scope` is a `ScopeDefinition`, `content` a base-typed
 `Definition` (a producer, a currency, an event, a group - whose `group` module renders each member
@@ -1901,6 +1912,35 @@ line, and a registry entry. Every `Definition` and every section may carry an op
 `description`, player-facing text saying what the thing does; the widgets that render a row or a
 band show it beneath the name or title when present, a generator's is read on its info screen
 instead, and nothing else reads it.
+
+**A section's title is optional, and its layout is one of two.** The section view draws the title
+and the description each only when authored, so a section with neither is a bare card of modules.
+`layout` (`SectionLayout`, JSON key `layout`, `List` when absent) arranges the modules container:
+**List** stacks the visible modules down the card; **Strip** puts them in one row inside a sideways
+`ScrollView` (`SectionView.Strip`) with a thin scroll bar always drawn beneath and no vertical
+scroll, each module keeping its own width. A module's `visibleWhen` works the same in both, and a
+module that turns visible late lands in its authored place. The strip carries its own
+`DragScrollManipulator` on the horizontal axis beside the page's vertical one; one press is heard by
+both, and the axis that has travelled further owns the drag (`DragScrollManipulator.Starts`, a tie
+going to the page), so a sideways drag on a tile scrolls the strip and a vertical one the page. A
+nested view taking the pointer is its own drag starting, and the page stops tracking that press.
+
+**Upgrade tiles.** `upgrade_row` is the full-width upgrade, a row like a generator's. `upgrade_tile`
+(`UpgradeTileUI`, `UpgradeTile.uxml`) is the strip's widget: one upgrade bound by `contentId`,
+resolved as the row resolves it, drawn as a rounded, outlined tile of fixed width - a round
+placeholder icon, grey and in the accent once owned; the display name on one line, cut with an
+ellipsis; and beneath it the price with its currency's name, through `NumberFormatter`, or "Owned"
+in the accent once owned (section 4: the latch, or the upgrade's `ownedWhen`). A tap issues the upgrade row's purchase and does nothing on an owned or
+unbuyable tile. A tile that cannot be bought now is dimmed by a class (`tile-unbuyable`) and never
+disabled, since a disabled element receives no pointer events and the hold is how a player reads
+what the upgrade does before affording it. A hold (`GameConfig.longPressSeconds`, the same
+`LongPressManipulator` Auto uses, so a hold is never also a tap) opens the **upgrade details
+window**, a host-owned overlay (`UpgradeDetailsUI`) reached through `IUpgradeDetailsOpener` with the
+upgrade and its declaring scope, as the automation window is: the title is the upgrade's name, one
+paragraph reads "On buy: " and the description while it is not bought and "Current effect: " and
+the description once it is, and "Close" in the accent at the bottom right closes it. A purchase made
+beneath it turns the paragraph on the host's refresh. An owned upgrade's tile stays on the strip:
+content gating a tile on a fact that can fall gives it `Any(UpgradePurchased <itself>, ...)`.
 
 **Rates on screen.** A currency's header line is the name, the balance, and the tick report's
 realized income beside it as "(X/s)": the deposit slope plus the completion slope
@@ -1959,7 +1999,8 @@ is an ordinary click until it has travelled `StartDistance`; then the view captu
 which takes the press away from a button that had it, so the release buys nothing. A pressed button
 captures the pointer itself, and a captured pointer's events reach the capturing element alone, so
 the manipulator hears a child taking the pointer and listens for the moves on that child - the
-arrangement the `ScrollView`'s own touch drag uses. The scroll bar is hidden.
+arrangement the `ScrollView`'s own touch drag uses. The page's scroll bar is hidden; a strip's
+drag is the same manipulator on the horizontal axis (above).
 
 **A widget exposes what it shows as data, and no test reads a label.** Each widget that prints a
 number or a state keeps it in a public read-only member set on the line that writes the label, from
@@ -1969,7 +2010,9 @@ upgrade row, `Mark(member)` on a group (`MemberMark`, whose names are not the bu
 `Row(bar)`, `BookTarget`, `ShownBookCost`, `BookEnabled`, `AutoTarget` and `AutoEnabled` on a
 levelled group with `ShownPurchased`, `ShownGranted`, `ShownProgress`, `ShownRates`, `ShownCost`,
 `ShownMax`, `Idle` and `Visible` on its rows, `IsOpen`, `ShownGroup` and `Rows` on the automation
-window with `Bar`, `State` and `ShownCost` on each row,
+window with `Bar`, `State` and `ShownCost` on each row, `Upgrade`, `ShownCost`, `ShownOwned` and
+`ShownBuyable` on an upgrade tile, `IsOpen`, `ShownUpgrade` and `ShownOwned` on the upgrade details
+window,
 `PreviewShown` with `ShownAmounts` and `ShownCurrencies` on a rung button, `ShowsClaim` on an
 event, `ShownSeconds` and `ShownPermanent` on the pill and the Encore window, and their like. The
 label and the member cannot differ, because one is formatted from the other. A test compares that
@@ -1979,7 +2022,7 @@ element's text against a literal string (John, 2026-11-10): that pins a sentence
 number, and breaks on a rewording that changed nothing.
 
 **Modal dialogs block automatic story cards.** While settings, chapter select, Roadie allocation,
-Encore, the story log, the Discography, a generator's info screen or the automation window is open, the host does not run the automatic story walk. The modal and any unsubmitted
+Encore, the story log, the Discography, a generator's info screen, the automation window or an upgrade's details window is open, the host does not run the automatic story walk. The modal and any unsubmitted
 allocation draft remain intact. A waiting marked beat stays unseen and opens on the first refresh
 after the last overlay closes, if it is still available. The walk reads state, not a transition.
 
@@ -2058,7 +2101,7 @@ with the level's price; it buys one level and in the same press adds the bar to 
 the gig starts at once, and it is disarmed when unaffordable and hidden when no member qualifies.
 **Auto** reads "Auto" and nothing else. Where one member's automation stands is ONE answer,
 `LeveledGroupUI.Automation` (`AutomationState`): **Purchased** when the bar goes again by itself
-(`repeatWhen` holding at its home, never the purchase) or its upgrade is bought, **Buy** when
+(`repeatWhen` holding at its home, never the purchase) or its upgrade is owned (section 4), **Buy** when
 `Purchasing.CanBuy` says the upgrade row's purchase would succeed, **Price** otherwise. A tap on Auto
 buys the automation of the first available member, in group order, that names an `automation` and
 does not read Purchased; the tap buys exactly when that member reads Buy, and the button is hidden
@@ -2082,7 +2125,8 @@ neither, and it lets go of the pointer the button's click captured when it
 fires, so the click is no longer pressed and the release lands on the window, and a drag that takes
 the pointer ends the hold before it fires. The rows' and the buttons' presses are public actions
 (`Tap`, `BuyOne`, `BuyMax`, `OpenInfo`, `Book`, `Auto`, `OpenAutomation`, and the window's `Buy` and
-`Dismiss`) so a headless test presses what the pointer presses.
+`Dismiss`) so a headless test presses what the pointer presses; an upgrade tile's are `Buy` and
+`OpenDetails`, and its window's `Close`.
 
 ### 12.12 Validation at content load
 
@@ -2204,7 +2248,8 @@ coefficient are checked.
 - A gate may not be null: a generator's or event's `availableWhen`, an upgrade's gate, a rung's
   `offerCondition`, a trigger's condition. An unauthored gate is dead content, and `Always` is how
   an author says the gate is open. Filters keep their optional conditions - a bar's `availableWhen`
-  and a `ProducesEntry.condition` both default to active, because neither is a gate.
+  and a `ProducesEntry.condition` both default to active, because neither is a gate. An upgrade's
+  `ownedWhen` is optional too, and validated as its gate is, from the declaring scope.
 - A rendered gate's text is computed at load: the legs of a rung's `offerCondition` and an event's
   `availableWhen` are formatted through `Text` (12.4). A pattern `string.Format` refuses is an
   error; a default join over a child with no text is an error, a hole in the sentence; `uiText` on
@@ -2265,7 +2310,7 @@ Assets/Scripts/
     CurrencyDefinition.cs  ProducerDefinition.cs
     Producer.cs             // stateless resolution: a source's entries summed, times the product of its coordinate plan's links; GetRate and RatePairs read the contributor plan of the node they are asked at
     GeneratorDefinition.cs  UpgradeDefinition.cs
-    Purchasing.cs           // CostOf(generator, n) the series, MaxAffordable, TryBuy(generator, count | upgrade): fail-closed gate, one spend, count or latch, payload
+    Purchasing.cs           // CostOf(generator, n) the series, MaxAffordable, TryBuy(generator, count | upgrade): fail-closed gate, one spend, count or latch, payload; IsOwned(upgrade): the latch or ownedWhen
     MultiplierFormula.cs    // the formula family an Effect's factor can compute from
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply) + optional appliesWhen
     BarDefinition.cs  GroupDefinition.cs  BarSystem.cs   // a bar's consumes list; a group of members with an active set; the draw, the settlement, SetActiveMembers
@@ -2301,12 +2346,14 @@ Assets/Scripts/
     IStoryOpener.cs         // the one method a story row asks of the host: open the card for a beat at its scope
     IGeneratorInfoOpener.cs // the one method a generator row asks of the host: open the info screen for a generator at its declaring scope
     IAutomationOpener.cs    // the one method a levelled group's Auto asks of the host: open the automation window for a group at its declaring scope
+    IUpgradeDetailsOpener.cs // the one method an upgrade tile asks of the host: open the details window for an upgrade at its declaring scope
     LongPressManipulator.cs // the hold gesture over an element's own scheduler; never captures, lets go of a button's capture when it fires
-    DragScrollManipulator.cs // a left-button mouse drag scrolls the page as a finger does; a click stays a click
+    DragScrollManipulator.cs // a left-button mouse drag scrolls a view along its axis as a finger does - the page vertically, a strip sideways; a click stays a click
     PinnedHeadlineUI.cs     // the headline currency line as an overlay: over its line at rest, shrunk beneath the pills once scrolled away
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
               LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, Book and Auto; AutomationState
+              UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): icon, name, price or Owned; a tap buys, a hold opens the details window
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
@@ -2319,8 +2366,9 @@ Assets/Scripts/
     EncoreWindowUI.cs      // remaining time and ad/Pass requests through the existing managers
     GeneratorInfoUI.cs     // a generator's info screen: description, the row's cost and yield line, owned count, production
     AutomationWindowUI.cs  // a levelled group's automation window: one row per visible gig naming an automation, Purchased / Buy / price, Dismiss
+    UpgradeDetailsUI.cs    // an upgrade's details window: the name, "On buy:" or "Current effect:" with the description, Close
 Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
-                          // (LeveledGroup.uxml among them),
+                          // (LeveledGroup.uxml and UpgradeTile.uxml among them),
                           // and Fonts/ (Roboto Regular, Medium and Bold with its Apache 2.0 licence)
 Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)

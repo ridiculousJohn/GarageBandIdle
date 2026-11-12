@@ -11,19 +11,20 @@ namespace RidiculousGaming.GarageBandIdle.UI
     public static class ModuleWidgetFactory
     {
         private static readonly Dictionary<string, Func<VisualElement, ModuleRegistry, IStoryOpener,
-                                                        IGeneratorInfoOpener, IAutomationOpener,
+                                                        IGeneratorInfoOpener, IAutomationOpener, IUpgradeDetailsOpener,
                                                         ModuleWidget>> Creators =
             new()
             {
-                ["currency_line"] = (root, registry, stories, infos, automations) => new CurrencyHeaderUI(root),
-                ["jam_button"] = (root, registry, stories, infos, automations) => new JamButtonUI(root),
-                ["generator_row"] = (root, registry, stories, infos, automations) => new GeneratorRowUI(root, infos),
-                ["upgrade_row"] = (root, registry, stories, infos, automations) => new UpgradeRowUI(root),
-                ["group"] = (root, registry, stories, infos, automations) => new GroupUI(root, registry, stories, infos, automations),
-                ["leveled_group"] = (root, registry, stories, infos, automations) => new LeveledGroupUI(root, infos, automations),
-                ["rung_button"] = (root, registry, stories, infos, automations) => new RungButtonUI(root),
-                ["event_row"] = (root, registry, stories, infos, automations) => new EventUI(root),
-                ["story_row"] = (root, registry, stories, infos, automations) => new StoryRowUI(root, stories),
+                ["currency_line"] = (root, registry, stories, infos, automations, details) => new CurrencyHeaderUI(root),
+                ["jam_button"] = (root, registry, stories, infos, automations, details) => new JamButtonUI(root),
+                ["generator_row"] = (root, registry, stories, infos, automations, details) => new GeneratorRowUI(root, infos),
+                ["upgrade_row"] = (root, registry, stories, infos, automations, details) => new UpgradeRowUI(root),
+                ["upgrade_tile"] = (root, registry, stories, infos, automations, details) => new UpgradeTileUI(root, details),
+                ["group"] = (root, registry, stories, infos, automations, details) => new GroupUI(root, registry, stories, infos, automations, details),
+                ["leveled_group"] = (root, registry, stories, infos, automations, details) => new LeveledGroupUI(root, infos, automations),
+                ["rung_button"] = (root, registry, stories, infos, automations, details) => new RungButtonUI(root),
+                ["event_row"] = (root, registry, stories, infos, automations, details) => new EventUI(root),
+                ["story_row"] = (root, registry, stories, infos, automations, details) => new StoryRowUI(root, stories),
             };
 
         // The registry cross-check enumerates the same closed set Create uses,
@@ -109,18 +110,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // authored content, and the import/boot cross-check catches a miss before a
         // first render ever does.
         //
-        // `stories` is the card's owner, `infos` the info screen's and
-        // `automations` the automation window's, each needed by the widget
-        // kinds that open it and ignored by the rest: the host is the one
-        // caller and hands itself in for all three (12.11). The registry rides along
+        // `stories` is the card's owner, `infos` the info screen's,
+        // `automations` the automation window's and `details` the upgrade
+        // details window's, each needed by the widget kinds that open it and
+        // ignored by the rest: the host is the one caller and hands itself in
+        // for all four (12.11). The registry rides along
         // for the same reason - a group instantiates the layout each member's
         // own kind already has, so it renders them through this same factory.
         public static ModuleWidget Create(string prefabId, VisualElement root, ModuleRegistry registry,
                                           IStoryOpener stories, IGeneratorInfoOpener infos,
-                                          IAutomationOpener automations)
+                                          IAutomationOpener automations, IUpgradeDetailsOpener details)
         {
             if (prefabId != null && Creators.TryGetValue(prefabId, out var create))
-                return create(root, registry, stories, infos, automations);
+                return create(root, registry, stories, infos, automations, details);
             throw new InvalidOperationException(
                 $"No widget controller answers prefabId '{prefabId}' (design doc 12.11).");
         }

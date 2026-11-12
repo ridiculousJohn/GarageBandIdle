@@ -169,14 +169,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // the group's declaring scope, which is the bar's home (12.7), and the
         // bar names an automation. Whether a bar goes again by itself is its
         // repeatWhen holding there (12.7), never whether the upgrade is
-        // bought; a bought automation reads Purchased too, since buying it
-        // again is refused. Otherwise it is Buy exactly when the purchase the
+        // bought; an owned automation (Purchasing.IsOwned) reads Purchased
+        // too, since buying it again is refused. Otherwise it is Buy exactly when the purchase the
         // upgrade row issues would succeed, and Price when it would not.
         public static AutomationState Automation(GameContext ctx, BarDefinition bar)
         {
             if (bar.repeatWhen != null && bar.repeatWhen.Evaluate(ctx))
                 return AutomationState.Purchased;
-            if (AutomationContext(ctx, bar).IsUpgradePurchased(bar.automation.Id))
+            if (Purchasing.IsOwned(ctx, bar.automation))
                 return AutomationState.Purchased;
             return Purchasing.CanBuy(ctx, bar.automation) ? AutomationState.Buy : AutomationState.Price;
         }

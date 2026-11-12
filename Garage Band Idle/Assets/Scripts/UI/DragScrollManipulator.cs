@@ -5,8 +5,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
 {
     // The page's mouse drag (design doc 12.11): a ScrollView drag-scrolls for a
     // touch pointer alone, and the editor and a desktop build drive the page
-    // with a mouse, so a left-button drag here moves the view vertically the
-    // way a finger does. A touch or pen pointer is left to the view's own
+    // with a mouse, so a left-button drag here moves the view along its axis
+    // the way a finger does - vertically for the page, sideways for a
+    // section's strip. A touch or pen pointer is left to the view's own
     // handling.
     //
     // The down trickles, so the view sees a press that lands on a child - a
@@ -23,16 +24,40 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // on the child itself. That is the arrangement the ScrollView's own touch
     // drag uses for the same reason.
     //
-    // The two statics hold the arithmetic, so a headless test reaches it with
-    // no panel and no pointer.
+    // A strip sits inside the page, so one press is heard by both views. The
+    // axis that has travelled further owns the drag (Starts): the two answers
+    // never hold together, a tie going to the page, so one press moves one
+    // view. A nested view taking the pointer is that view's drag starting,
+    // and the outer view stops tracking the press.
+    //
+    // The statics hold the arithmetic, so a headless test reaches it with no
+    // panel and no pointer.
     public sealed class DragScrollManipulator : PointerManipulator
     {
         public const float StartDistance = 24f;
 
         public static bool Starts(float dragDeltaY) => Mathf.Abs(dragDeltaY) >= StartDistance;
 
+        // Whether a drag of `delta` starts on a view scrolling along `axis`:
+        // the travel along the axis reaches the start distance and is the
+        // larger of the two, strictly so for a sideways view.
+        public static bool Starts(Vector2 delta, ScrollViewMode axis)
+        {
+            var along = axis == ScrollViewMode.Horizontal ? delta.x : delta.y;
+            var across = axis == ScrollViewMode.Horizontal ? delta.y : delta.x;
+            if (!Starts(along))
+                return false;
+            return axis == ScrollViewMode.Horizontal
+                ? Mathf.Abs(along) > Mathf.Abs(across)
+                : Mathf.Abs(along) >= Mathf.Abs(across);
+        }
+
         public static float Offset(float startOffset, float dragDeltaY, float maxOffset) =>
             Mathf.Clamp(startOffset - dragDeltaY, 0f, Mathf.Max(0f, maxOffset));
+
+        // The axis this view scrolls along: Vertical for the page, Horizontal
+        // for a strip.
+        private readonly ScrollViewMode axis;
 
         // The tracked press, alive from a down to whichever ending comes first;
         // -1 while none is tracked.
@@ -44,6 +69,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // The child holding the tracked pointer, whose moves and endings are
         // heard on it directly; null while no child holds it.
         private VisualElement holder;
+
+        public DragScrollManipulator(ScrollViewMode axis = ScrollViewMode.Vertical) => this.axis = axis;
 
         private ScrollView View => (ScrollView)target;
 
@@ -80,7 +107,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         }
 
         // A child taking the tracked pointer: from here its events reach that
-        // child alone, so the view hears them there.
+        // child alone, so the view hears them there. A nested scroll view
+        // taking it is that view's own drag starting, so this view lets the
+        // press go.
         private void OnPointerCapture(PointerCaptureEvent evt)
         {
             if (evt.pointerId != pointerId || evt.target == target)
@@ -88,6 +117,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
             if (evt.target is not VisualElement child)
                 return;
             Unhook();
+            if (child is ScrollView)
+            {
+                pointerId = -1;
+                dragging = false;
+                return;
+            }
             holder = child;
             holder.RegisterCallback<PointerMoveEvent>(OnPointerMove);
             holder.RegisterCallback<PointerUpEvent>(OnPointerUp);
@@ -108,17 +143,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             if (evt.pointerId != pointerId)
                 return;
-            var deltaY = evt.position.y - downPosition.y;
+            var delta = (Vector2)evt.position - downPosition;
             if (!dragging)
             {
-                if (!Starts(deltaY))
+                if (!Starts(delta, axis))
                     return;
                 dragging = true;
                 target.CapturePointer(pointerId);
             }
             var view = View;
-            view.scrollOffset = new Vector2(startOffset.x,
-                Offset(startOffset.y, deltaY, view.verticalScroller.highValue));
+            view.scrollOffset = axis == ScrollViewMode.Horizontal
+                ? new Vector2(Offset(startOffset.x, delta.x, view.horizontalScroller.highValue), startOffset.y)
+                : new Vector2(startOffset.x, Offset(startOffset.y, delta.y, view.verticalScroller.highValue));
             evt.StopPropagation();
         }
 

@@ -959,10 +959,9 @@ namespace RidiculousGaming.GarageBandIdle
                             continue;
                         }
 
+                        // The title is optional: a section without one draws
+                        // no header (12.11), so nothing here reads it.
                         ctx.SetSite(siteBase);
-                        if (string.IsNullOrEmpty(section.title))
-                            ctx.AddError(ValidationCheck.NullEntry,
-                                "title is empty - the section's header is authored text (12.11).");
 
                         // The evaluation scope is the chapter or one of its
                         // descendants: the runtime reads it downward from the
@@ -1258,6 +1257,14 @@ namespace RidiculousGaming.GarageBandIdle
             {
                 ctx.SetSite($"{site} gate");
                 upgrade.gate.Validate(ctx);
+            }
+
+            // Optional, and asked where the gate is asked: at the declaring
+            // scope, so its operands take the same reach rules.
+            if (upgrade.ownedWhen != null)
+            {
+                ctx.SetSite($"{site} ownedWhen");
+                upgrade.ownedWhen.Validate(ctx);
             }
 
             ctx.SetSite(site);

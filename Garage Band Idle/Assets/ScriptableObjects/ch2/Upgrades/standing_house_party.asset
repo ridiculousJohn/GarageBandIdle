@@ -18,7 +18,9 @@ MonoBehaviour:
   description: Gets your name on every party going around, so the house party re-books
     itself and keeps paying while you are away.
   gate:
-    rid: 1688710475815584008
+    rid: 1688710512698720515
+  ownedWhen:
+    rid: -2
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
   cost:
     _value:
@@ -26,15 +28,17 @@ MonoBehaviour:
       exponent: 3
   effects: []
   actions:
-  - rid: 1688710475815584009
+  - rid: 1688710512698720516
   references:
     version: 2
     RefIds:
-    - rid: 1688710475815584008
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 1688710512698720515
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-    - rid: 1688710475815584009
+    - rid: 1688710512698720516
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: booked_house_party

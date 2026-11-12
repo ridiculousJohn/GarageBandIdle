@@ -51,6 +51,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
+        private sealed class NoDetails : IUpgradeDetailsOpener
+        {
+            public void OpenUpgradeDetails(UpgradeDefinition upgrade, ScopeState scope) { }
+        }
+
         private sealed class NoStories : IStoryOpener
         {
             public void OpenStory(Story.StoryBeatDefinition beat, ScopeState scope) { }
@@ -137,7 +142,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 var asset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Widgets/" + uxml);
                 Assert.IsNotNull(asset, "Assets/UI/Widgets/" + uxml + " is missing");
                 var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), Registry, new NoStories(),
-                    Infos, Automations);
+                    Infos, Automations, new NoDetails());
                 widget.Bind(Session, Tier2, content, Clock);
                 return widget;
             }

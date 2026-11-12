@@ -28,24 +28,24 @@ MonoBehaviour:
       mantissa: 1
       exponent: 0
   repeatWhen:
-    rid: 1688710475815583888
+    rid: 1688710512698720388
   tap: {fileID: 11400000, guid: 2675b161346a69a40bd0ebb4cb1caff1, type: 2}
   level: {fileID: 11400000, guid: a00a688a672517d4c8b5efe0a103308c, type: 2}
   automation: {fileID: 11400000, guid: 38242f434c18ddd478a088c8b4d01a96, type: 2}
   availableWhen:
-    rid: 1688710475815583889
+    rid: 1688710512698720389
   onComplete:
-  - rid: 1688710475815583890
+  - rid: 1688710512698720390
   perFill: []
   references:
     version: 2
     RefIds:
-    - rid: 1688710475815583888
+    - rid: 1688710512698720388
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: booked_house_party
-    - rid: 1688710475815583889
+    - rid: 1688710512698720389
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Book a House Party
@@ -54,7 +54,7 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 1688710475815583890
+    - rid: 1688710512698720390
       type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         generator: {fileID: 11400000, guid: a00a688a672517d4c8b5efe0a103308c, type: 2}

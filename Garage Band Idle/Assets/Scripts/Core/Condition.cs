@@ -173,12 +173,17 @@ namespace RidiculousGaming.GarageBandIdle
         }
     }
 
+    // Holds while a latch for the upgrade stands on the chain from the acting
+    // scope, read outward as every fact is, or while the upgrade is owned
+    // under the ownership rule (12.6): its ownedWhen, asked at its declaring
+    // scope.
     [Serializable]
     public class UpgradePurchased : Condition
     {
         public Economy.UpgradeDefinition upgrade;
 
-        public override bool Evaluate(GameContext ctx) => ctx.IsUpgradePurchased(upgrade.Id);
+        public override bool Evaluate(GameContext ctx) =>
+            ctx.IsUpgradePurchased(upgrade.Id) || Economy.Purchasing.IsOwned(ctx, upgrade);
 
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(upgrade, "UpgradePurchased");
     }

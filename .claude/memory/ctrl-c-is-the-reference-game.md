@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-11T02:14:05.467Z
+  modified: 2026-11-12T18:23:50.305Z
 ---
 
 The design descends from Ctrl C. Its Android reconstruction (version 1.12.2) is in `Docs/ctrl-c/`:
@@ -93,5 +93,13 @@ John's play wins where they differ - they show no top pills, only a "+" at the r
 - Section reveal (2026-11-10): "when a section is first made visible, it fades in. If it becomes
   visible in between two different sections, then the lower sections tween down to make room as
   the revealed section fades in". He wants this copied.
+- Upgrade strip (four screenshots, 2026-11-12): chapter-wide buffs sit in their own UNTITLED card
+  below the bar card, as square-ish outlined tiles in a row that scrolls sideways, with a thin
+  scroll bar under them. A tile: a round icon, the name (ellipsised) with its level "(3)", and
+  beneath it the cost "1.62e30 Money" in grey when unaffordable, or "Owned" in orange when maxed.
+  Tap buys; long press opens a details window: title (with level), "Current effect: ..." and
+  "Next: ..." for a levelled one, "On buy: ..." for one not bought, only "Current effect" when maxed;
+  a "Buy Upgrades On Tap" switch ("Long press to show details."); "Close". Upgrades can have
+  levels. John prefers this to our titled Office card of full-width rows: "more compact".
 - Unknown to John: its font, whether idle accrual includes Overclock, and whether tokens moved while
   a chapter was dormant change that chapter's idle payout.

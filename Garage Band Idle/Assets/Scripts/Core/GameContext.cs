@@ -118,6 +118,9 @@ namespace RidiculousGaming.GarageBandIdle
             return null;
         }
 
+        // The bare purchase latch, read outward. Ownership is a wider question -
+        // the latch or the upgrade's ownedWhen - and is Purchasing.IsOwned; this
+        // answers only whether a purchase wrote the latch in this scope-life.
         public bool IsUpgradePurchased(string upgradeId)
         {
             for (var node = Scope; node != null; node = node.Parent)

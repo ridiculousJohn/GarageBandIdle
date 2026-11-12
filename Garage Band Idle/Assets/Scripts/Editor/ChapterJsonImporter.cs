@@ -498,6 +498,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             {
                 var upgrade = (UpgradeDefinition)build.Built[upgradeDto];
                 upgrade.gate = BuildCondition(build, scope, upgradeDto.gate);
+                upgrade.ownedWhen = BuildCondition(build, scope, upgradeDto.ownedWhen);
                 upgrade.costCurrency = Resolve<CurrencyDefinition>(build, scope, upgradeDto.costCurrency, "costCurrency");
                 upgrade.cost = upgradeDto.cost;
                 // The currency is ALWAYS required - Purchasing dereferences it -
@@ -654,6 +655,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                         // chapter's section read a tier-declared flag (12.11).
                         visibleWhen = BuildCondition(build, sectionScope, sectionDto.visibleWhen),
                         scope = sectionScope,
+                        layout = sectionDto.layout,
                     };
                     foreach (var moduleDto in sectionDto.modules)
                         section.modules.Add(BuildModule(build, chapter, sectionScope, moduleDto));

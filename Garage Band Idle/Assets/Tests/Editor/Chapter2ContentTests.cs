@@ -104,7 +104,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 "bulk_booked", "favors_owed",
                 "office_revealed",
                 "mailing_list_revealed", "photographer_friend_revealed", "zine_writeup_revealed",
-                "crowd_work_1_revealed", "crowd_work_2_revealed", "street_team_revealed",
+                "street_team_revealed",
                 "merch_table_revealed", "the_van_revealed",
             }, ch2.declaredFlags.ToArray());
 
@@ -141,17 +141,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Ids(tier2.upgrades));
             Assert.AreEqual(new[] { "battle_1", "battle_2", "battle_3" }, Ids(tier2.events));
 
-            // The opening grant plus eleven reveals, hosted at tier2 where the
+            // The opening grant plus nine reveals, hosted at tier2 where the
             // gates they copy read; the chapter hosts none. The gigs, their
             // draws and their automations need no reveal: the calendar's own
             // Book and Auto buttons show the next one (12.11).
             Assert.AreEqual(0, ch2.triggers.Count);
-            Assert.AreEqual(12, tier2.triggers.Count);
+            Assert.AreEqual(10, tier2.triggers.Count);
             CollectionAssert.AreEquivalent(new[]
             {
                 "opening_cash", "reveal_promo", "reveal_office",
                 "reveal_mailing_list", "reveal_photographer_friend", "reveal_zine_writeup",
-                "reveal_crowd_work_1", "reveal_crowd_work_2", "reveal_street_team",
+                "reveal_street_team",
                 "reveal_merch_table", "reveal_the_van", "reveal_release",
             }, Ids(tier2.triggers));
         }
@@ -255,6 +255,22 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var discount = favors.effects.Single();
             Assert.AreEqual(("gig_draw", Stat.Cost), (discount.target, discount.stat));
             Assert.AreEqual((BigNumber)0.5, discount.multiplier);
+        }
+
+        // The two switches are bought with the run's Cash, so they are declared
+        // on the tier and their latch clears on an EP; each declares ownedWhen
+        // on the chapter flag its payload sets, so it reads owned for the rest
+        // of the chapter.
+        [Test]
+        public void The_two_switches_are_owned_while_their_chapter_flag_is_set()
+        {
+            foreach (var (id, flag) in new[] { ("bulk_booking", "bulk_booked"), ("favors", "favors_owed") })
+            {
+                var upgrade = Find(tier2.upgrades, id);
+                Assert.AreEqual(flag, ((FlagSet)upgrade.ownedWhen).flagId, id);
+                Assert.AreEqual(flag, ((SetFlag)upgrade.actions.Single()).flagId, $"{id}'s payload sets it");
+                Assert.Contains(flag, ch2.declaredFlags, $"{flag} is a chapter fact");
+            }
         }
 
         // The chapter's permanent lift: +2% income per EP at both stats, so the
@@ -429,6 +445,43 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsFalse(automations.Contains(module.content as UpgradeDefinition),
                     $"{module.prefabId} {module.content?.Id} shows a booking the Auto button already sells");
             }
+        }
+
+        // The Office is a strip of upgrade tiles (12.11). Stage Banter shows
+        // with the section, Call and Response once Stage Banter is bought, and
+        // the two switches keep their tile once bought.
+        [Test]
+        public void The_office_is_a_strip_of_upgrade_tiles_whose_owned_tiles_stay()
+        {
+            var office = ch2.sections[2];
+
+            Assert.AreEqual(UI.SectionLayout.Strip, office.layout);
+            Assert.AreEqual(new[]
+            {
+                "upgrade_tile crowd_work_1 @tier2", "upgrade_tile crowd_work_2 @tier2",
+                "upgrade_tile street_team @tier2", "upgrade_tile merch_table @tier2",
+                "upgrade_tile the_van @tier2", "upgrade_tile bulk_booking @tier2",
+                "upgrade_tile favors @tier2",
+            }, Modules(2));
+
+            Assert.IsNull(office.modules[0].visibleWhen, "Stage Banter shows when the Office does");
+            Assert.AreSame(Find(tier2.upgrades, "crowd_work_1"),
+                ((UpgradePurchased)office.modules[1].visibleWhen).upgrade);
+
+            foreach (var (index, eps) in new[] { (5, 8), (6, 25) })
+            {
+                var gate = (Any)office.modules[index].visibleWhen;
+                Assert.AreEqual(2, gate.conditions.Count, office.modules[index].content.Id);
+                Assert.AreSame(office.modules[index].content, ((UpgradePurchased)gate.conditions[0]).upgrade,
+                    $"{office.modules[index].content.Id} stays while it is owned");
+                var threshold = (CurrencyAtLeast)gate.conditions[1];
+                Assert.AreEqual("eps", threshold.currency.Id);
+                Assert.AreEqual((BigNumber)eps, threshold.threshold, $"{office.modules[index].content.Id} shows at {eps} EPs");
+            }
+
+            // The other sections keep the list layout.
+            foreach (var section in ch2.sections.Where(s => s != office))
+                Assert.AreEqual(UI.SectionLayout.List, section.layout, section.title);
         }
 
         // ---- helpers ----

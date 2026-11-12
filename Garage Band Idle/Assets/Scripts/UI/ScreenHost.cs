@@ -13,7 +13,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // an EditMode test builds it over imported content with no panel; UIRoot is
     // the MonoBehaviour shell around it. This is the ONE Refreshed subscriber -
     // widgets subscribe to nothing, so there is one dispatch order.
-    public sealed class ScreenHost : IDisposable, IStoryOpener, IGeneratorInfoOpener, IAutomationOpener
+    public sealed class ScreenHost : IDisposable, IStoryOpener, IGeneratorInfoOpener, IAutomationOpener,
+                                     IUpgradeDetailsOpener
     {
         // One module and the widget standing for it. The host owns these views,
         // so it writes them and anything holding the host reads them.
@@ -35,8 +36,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         }
 
         // One authored band of the screen. Its elements are built in code
-        // rather than from a UXML: a section is a title and a container, and
-        // nothing about that shape is authored per chapter.
+        // rather than from a UXML: a section is an optional title and
+        // description and a container, and nothing about that shape is
+        // authored per chapter beyond the texts and the layout.
         public sealed class SectionView
         {
             public SectionDefinition Definition { get; }
@@ -45,10 +47,16 @@ namespace RidiculousGaming.GarageBandIdle.UI
             public VisualElement Root { get; }
             public IReadOnlyList<ModuleView> Modules => modules;
 
+            // The sideways scroll view a Strip section lays its modules out in;
+            // null for a List section.
+            public ScrollView Strip { get; }
+
             private readonly List<ModuleView> modules = new();
 
             // Where module roots land, kept apart from the title so a widget's
-            // index among the section's modules is its index here.
+            // index among the section's modules is its index here: the
+            // container itself for a List section, the strip's content for a
+            // Strip one.
             internal VisualElement ModulesContainer { get; }
 
             internal SectionView(SectionDefinition definition, ScopeState scope)
@@ -58,20 +66,44 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
                 Root = new VisualElement();
                 Root.AddToClassList("section");
-                var title = new Label(definition.title);
-                title.AddToClassList("section-title");
-                Root.Add(title);
                 // Authored text fixed for the process, so it is built once and
-                // no refresh owes it anything (12.11).
+                // no refresh owes it anything; each is drawn only when
+                // authored (12.11).
+                if (!string.IsNullOrEmpty(definition.title))
+                {
+                    var title = new Label(definition.title);
+                    title.AddToClassList("section-title");
+                    Root.Add(title);
+                }
                 if (!string.IsNullOrEmpty(definition.description))
                 {
                     var description = new Label(definition.description);
                     description.AddToClassList("section-description");
                     Root.Add(description);
                 }
-                ModulesContainer = new VisualElement();
-                ModulesContainer.AddToClassList("section-modules");
-                Root.Add(ModulesContainer);
+                if (definition.layout == SectionLayout.Strip)
+                {
+                    // One row that scrolls sideways with a thin bar beneath and
+                    // never vertically. The page's drag owns a vertical drag
+                    // and this one a sideways drag (DragScrollManipulator), so
+                    // a press on a tile scrolls whichever way it travels.
+                    Strip = new ScrollView(ScrollViewMode.Horizontal)
+                    {
+                        horizontalScrollerVisibility = ScrollerVisibility.AlwaysVisible,
+                        verticalScrollerVisibility = ScrollerVisibility.Hidden,
+                    };
+                    Strip.AddToClassList("section-strip");
+                    Strip.AddManipulator(new DragScrollManipulator(ScrollViewMode.Horizontal));
+                    ModulesContainer = Strip.contentContainer;
+                    ModulesContainer.AddToClassList("section-modules");
+                    Root.Add(Strip);
+                }
+                else
+                {
+                    ModulesContainer = new VisualElement();
+                    ModulesContainer.AddToClassList("section-modules");
+                    Root.Add(ModulesContainer);
+                }
             }
 
             internal void AddModule(ModuleView module) => modules.Add(module);
@@ -92,6 +124,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly DiscographyUI discography;
         private readonly GeneratorInfoUI generatorInfo;
         private readonly AutomationWindowUI automation;
+        private readonly UpgradeDetailsUI upgradeDetails;
         private readonly PinnedHeadlineUI headline;
         private readonly List<SectionView> sections = new();
 
@@ -110,6 +143,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Discography,
             GeneratorInfo,
             Automation,
+            UpgradeDetails,
         }
 
         private LiveOverlay requestedOverlay;
@@ -139,6 +173,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public GeneratorInfoUI GeneratorInfo => generatorInfo;
 
         public AutomationWindowUI AutomationWindow => automation;
+
+        public UpgradeDetailsUI UpgradeDetails => upgradeDetails;
 
         public PinnedHeadlineUI Headline => headline;
 
@@ -171,6 +207,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 clock, CloseOverlay);
             automation = new AutomationWindowUI(Require<VisualElement>(screenRoot, "automation-window"),
                 session, clock, CloseOverlay);
+            upgradeDetails = new UpgradeDetailsUI(Require<VisualElement>(screenRoot, "upgrade-details"),
+                clock, CloseOverlay);
             var scroll = Require<ScrollView>(screenRoot, "screen");
             scroll.AddManipulator(new DragScrollManipulator());
             headline = new PinnedHeadlineUI(Require<VisualElement>(screenRoot, "headline"),
@@ -319,6 +357,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
             OpenOverlay(LiveOverlay.Automation);
         }
 
+        // An upgrade tile's hold, the one way the details window opens: the
+        // upgrade and its declaring scope live on the window, as the
+        // automation window's group lives on its class.
+        public void OpenUpgradeDetails(UpgradeDefinition upgrade, ScopeState scope)
+        {
+            upgradeDetails.Hold(upgrade, scope);
+            OpenOverlay(LiveOverlay.UpgradeDetails);
+        }
+
         public void OpenEncore() => OpenOverlay(LiveOverlay.Encore);
 
         public void OpenStoryLog() => OpenOverlay(LiveOverlay.StoryLog);
@@ -338,6 +385,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             requestedOverlay = LiveOverlay.None;
             generatorInfo.Drop();
             automation.Drop();
+            upgradeDetails.Drop();
             HideRequestedOverlay();
         }
 
@@ -347,12 +395,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
             requestedBeat = null;
             story.Hide();
-            // Another overlay opening releases the held generator and the held
-            // group: the request each belongs to is the one being replaced.
+            // Another overlay opening releases the held generator, the held
+            // group and the held upgrade: the request each belongs to is the
+            // one being replaced.
             if (overlay != LiveOverlay.GeneratorInfo)
                 generatorInfo.Drop();
             if (overlay != LiveOverlay.Automation)
                 automation.Drop();
+            if (overlay != LiveOverlay.UpgradeDetails)
+                upgradeDetails.Drop();
             HideRequestedOverlay();
             requestedOverlay = overlay;
             if (overlay == LiveOverlay.Roadies)
@@ -376,6 +427,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             requestedOverlay = LiveOverlay.None;
             generatorInfo.Drop();
             automation.Drop();
+            upgradeDetails.Drop();
             HideRequestedOverlay();
         }
 
@@ -389,6 +441,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             discography.Hide();
             generatorInfo.Hide();
             automation.Hide();
+            upgradeDetails.Hide();
         }
 
         private void ShowRequestedOverlay()
@@ -422,6 +475,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 // gig booked, Cash arriving.
                 case LiveOverlay.Automation:
                     automation.Show();
+                    break;
+                // Likewise the owned state: a purchase made beneath it.
+                case LiveOverlay.UpgradeDetails:
+                    upgradeDetails.Show();
                     break;
             }
         }
@@ -554,7 +611,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void CreateWidget(SectionView section, int index, ModuleView module)
         {
             var root = registry.Resolve(module.Definition.prefabId).Instantiate();
-            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this, this);
+            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this, this, this);
             module.Widget.Bind(session, module.Scope, module.Definition.content, clock);
             section.ModulesContainer.Insert(PlacedBefore(section, index), root);
         }

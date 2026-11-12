@@ -17,19 +17,19 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710475815583991
+    rid: 1688710512698720498
   actions:
-  - rid: 1688710475815583992
+  - rid: 1688710512698720499
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710475815583991
+    - rid: 1688710512698720498
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-    - rid: 1688710475815583992
+    - rid: 1688710512698720499
       type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currencies:

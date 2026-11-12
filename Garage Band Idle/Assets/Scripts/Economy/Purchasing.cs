@@ -35,7 +35,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             var declaringCtx = ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade));
             return upgrade.IsOffered(declaringCtx)
-                && !declaringCtx.Scope.purchasedUpgrades.Contains(upgrade.Id)   // the latch IS the one-shot; a reset re-arms it
+                && !upgrade.IsOwned(declaringCtx)   // the latch IS the one-shot, and a reset re-arms it unless ownedWhen holds
                 && declaringCtx.CanSpend(upgrade.costCurrency.Id, CostOf(upgrade, declaringCtx))
                 && ActionList.Refuses(upgrade.actions, declaringCtx) == null;
         }
@@ -64,7 +64,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade);
             var declaringCtx = ctx.Rebase(declaring);
             var cost = CostOf(upgrade, declaringCtx);
-            if (!upgrade.IsOffered(declaringCtx) || declaring.purchasedUpgrades.Contains(upgrade.Id)
+            if (!upgrade.IsOffered(declaringCtx) || upgrade.IsOwned(declaringCtx)
                 || !declaringCtx.CanSpend(upgrade.costCurrency.Id, cost)
                 || ActionList.Refuses(upgrade.actions, declaringCtx) != null)
                 throw new InvalidOperationException($"Buy: upgrade '{upgrade.Id}' is not currently buyable - ask CanBuy first.");
@@ -78,6 +78,13 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             declaring.purchasedUpgrades.Add(upgrade.Id);
             ActionList.Run(upgrade.actions, declaringCtx);
         }
+
+        // Whether the upgrade is owned, asked from any scope on its chain: the
+        // rule (UpgradeDefinition.IsOwned) at the declaring scope, so every
+        // reader - the UpgradePurchased condition, the tile, the row, the
+        // details window, the Auto button - answers what CanBuy refuses on.
+        public static bool IsOwned(GameContext ctx, UpgradeDefinition upgrade) =>
+            upgrade.IsOwned(ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade)));
 
         public static bool TryBuy(GameContext ctx, GeneratorDefinition generator, int count)
         {
