@@ -449,25 +449,23 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- the draw row ----
 
-        // A draw has yield entries only, so the row's line and the info screen
-        // read UnitYield beside UnitRate: the price, then what one completion
-        // pays, and the screen names the unit the row implies (12.11).
+        // A draw has yield entries only: its first unit's price, and what the
+        // gig it feeds pays per completion, one lump per owned draw.
         [Test]
-        public void The_draw_row_prints_the_lump_one_unit_pays_and_the_screen_names_the_unit()
+        public void The_draw_costs_its_price_and_each_owned_draw_adds_a_lump_to_the_gig()
         {
             var f = new Chapter2();
             f.Enter();
+            var ctx = f.Ctx(f.Tier2);
 
-            Assert.AreEqual("5.00 Cash => 3.00 Cash, 0.50 Fans",
-                UI.GeneratorRowUI.CostAndYieldText(f.Ctx(f.Tier2), f.OpenMicDraw));
-            Assert.AreEqual("Producing: nothing",
-                UI.GeneratorInfoUI.ProductionText(f.Ctx(f.Tier2), f.OpenMicDraw, 0));
+            Assert.AreEqual((BigNumber)5, Purchasing.CostOf(f.OpenMicDraw, ctx, 1), "the first draw's price");
 
-            f.Ctx(f.Tier2).Deposit(f.Cash.Id, 100);
-            f.Session.TryBuy(f.Ctx(f.Tier2), f.OpenMicDraw, 3);
-            Assert.AreEqual("Pays: 9.00 Cash, 1.50 Fans per gig",
-                UI.GeneratorInfoUI.ProductionText(f.Ctx(f.Tier2), f.OpenMicDraw, 3),
-                "three draws, one completion");
+            ctx.Deposit(f.Cash.Id, 100);
+            f.Session.TryBuy(ctx, f.OpenMicDraw, 3);
+            var payout = BarSystem.CompletionPayout(f.Ctx(f.Tier2), f.OpenMic)
+                .ToDictionary(line => line.currency.Id, line => line.amount);
+            Assert.AreEqual((BigNumber)9, payout["cash"], "three draws, 3 Cash each, per gig");
+            Assert.AreEqual((BigNumber)1.5, payout["fans"], "three draws, 0.5 Fans each, per gig");
         }
 
         private static IdleOfferLine Line(Chapter2 f, CurrencyDefinition currency) =>

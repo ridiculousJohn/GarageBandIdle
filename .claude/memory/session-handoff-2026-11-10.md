@@ -5,13 +5,17 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 419a5cc1-800f-4018-923c-04aa2418a7ad
-  modified: 2026-11-11T05:21:34.642Z
+  modified: 2026-11-12T19:49:56.041Z
 ---
 
 A snapshot, not a rule. Check `git status` and `git log` before trusting any line of it, and
 delete this file once its contents are stale.
 
 **Committed, none pushed** (all on `master`)
+- `3ad0c10` (2026-11-12) the Office as a strip of upgrade tiles, section layout Strip, optional
+  section title, upgrade `ownedWhen` (1183/1183). John played it: "runs fine". Fourteen orphan ch2
+  trigger assets now (adds `reveal_crowd_work_1`, `reveal_crowd_work_2`). Levelled upgrades are
+  deferred in the build plan.
 - `6804f4c` chapter 2's calendar as a card of levelled gigs, the Auto window, and the "no test
   reads a label" rework (1161/1161). Earlier that day: `b8b0d3c`, `aa42043`, `e1c849c`, `05721c4`,
   `04f3797`.

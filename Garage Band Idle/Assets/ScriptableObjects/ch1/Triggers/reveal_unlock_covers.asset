@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710512698720463
+    rid: 1688710512883794127
   actions:
-  - rid: 1688710512698720464
+  - rid: 1688710512883794128
   references:
     version: 2
     RefIds:
-    - rid: 1688710512698720463
+    - rid: 1688710512883794127
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 1
-    - rid: 1688710512698720464
+    - rid: 1688710512883794128
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: unlock_covers_revealed

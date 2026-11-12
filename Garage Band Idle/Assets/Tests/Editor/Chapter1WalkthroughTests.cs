@@ -500,7 +500,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var refusal = ActionList.Refuses(f.Ch1Def.rung.actions, f.Ctx(f.Ch1));
             Assert.IsNotNull(refusal);
             Assert.AreSame(f.Tier1, refusal.Host, "the tier holding the record, not the chapter");
-            Assert.AreEqual("Claim your Garage Jam I reward first", RungFeedback.RefusalText(refusal));
 
             // A refused list runs nothing at all - not even the roadie it
             // opens with.

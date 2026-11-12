@@ -262,7 +262,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var refusal = ActionList.Refuses(tree.Tier1Def.rung.actions, ctx);
             Assert.IsNotNull(refusal);
-            Assert.AreEqual("Claim your open_mic reward first", RungFeedback.RefusalText(refusal));
+            Assert.AreSame(tree.OpenMic, refusal.Event, "the refusal names the armed event");
 
             tree.Tier1.activeEvent = null;
             Assert.IsTrue(tree.Tier1Def.rung.IsOffered(ctx));

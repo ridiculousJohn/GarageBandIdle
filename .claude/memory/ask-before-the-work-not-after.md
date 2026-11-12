@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-10T22:44:04.152Z
+  modified: 2026-11-12T20:05:09.684Z
 ---
 
 **Why:** John's standing complaint is "one more thing" after every delivery. Each one costs him a
@@ -33,6 +33,15 @@ looked for. John: "none of your 'decisions' were really decisions".)
 - When an option carries a consequence, look for the shape that removes the consequence before
   presenting it as a trade-off. Only what is left after that search is a pick.
 - When the reference game answers it, follow the reference and say so.
+
+**Cleanup is part of the change, never a question** (2026-11-12: I left 14 orphaned trigger assets
+from removed content across two commits and then asked whether to delete them. John: "in who's
+fucking world would those be kept around?" and "things that should have OBVIOUSLY been done with the
+first run".)
+- Whatever a change makes dead goes in the same run: orphaned generated assets (the importer never
+  deletes; its "no longer authored ... left on disk" lines are a to-do, not a report), unused flags,
+  triggers, tests and doc lines. Verify nothing references it, delete it, say so in one line.
+- Never list leftover cleanup as "for you to decide". If the answer is obvious, it is not a pick.
 
 **During and after**
 - A pick that surfaces mid-work pauses the work for one question. Never finish and append it.

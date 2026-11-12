@@ -26,7 +26,7 @@ MonoBehaviour:
         mantissa: 1
         exponent: 0
     formula:
-      rid: 1688710512698720315
+      rid: 1688710512883793978
   appliesWhen:
     rid: -2
   timer: 
@@ -36,7 +36,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710512698720315
+    - rid: 1688710512883793978
       type: {class: LinearOnBalance, ns: RidiculousGaming.GarageBandIdle.Economy, asm: Assembly-CSharp}
       data:
         currency: {fileID: 11400000, guid: df8d154a476df3d4b8f6eb1f40268b0f, type: 2}

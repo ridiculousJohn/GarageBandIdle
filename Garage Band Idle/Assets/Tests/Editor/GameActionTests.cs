@@ -582,7 +582,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreSame(tree.Tier1, refusal.Host, "the refusing scope is the one holding the record");
             Assert.AreSame(tree.Tier1.activeEvent, refusal.Record);
             Assert.AreSame(tree.OpenMic, refusal.Event, "read from that host's own events list");
-            Assert.AreEqual("Claim your open_mic reward first", RungFeedback.RefusalText(refusal));
 
             Assert.IsFalse(ActionList.TryRun(Only(reset), ctx));
             Assert.AreEqual((BigNumber)300, tree.Tier1.balances["cash"], "a refused list moves nothing");

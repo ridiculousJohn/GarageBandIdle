@@ -18,7 +18,7 @@ MonoBehaviour:
   description: Start working up other people's songs. Opens the Rehearsal Space and
     the Rehearsal that fills it.
   gate:
-    rid: 1688710512698720401
+    rid: 1688710512883794065
   ownedWhen:
     rid: -2
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
@@ -28,13 +28,13 @@ MonoBehaviour:
       exponent: 2
   effects: []
   actions:
-  - rid: 1688710512698720402
+  - rid: 1688710512883794066
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710512698720401
+    - rid: 1688710512883794065
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -43,7 +43,7 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 1
-    - rid: 1688710512698720402
+    - rid: 1688710512883794066
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: rehearsal_revealed

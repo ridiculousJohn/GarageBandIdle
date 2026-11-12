@@ -16,14 +16,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
     // place the authoring boundary is exercised end to end.
     public class ChapterImporterTests
     {
-        private const string SandboxRoot = "Assets/ImporterTestSandbox";
         private const string GroupName = "ImporterTestContent";
 
-        // One folder per TEST rather than one folder deleted and recreated:
+        // One folder per TEST, under a root unique to the RUN, so no path is
+        // ever deleted and recreated within one editor session:
         // AssetDatabase.DeleteAsset does not settle before a CreateAsset at the
         // same path moments later, and the file that results reads back empty.
+        // A second run in the same session reuses every test's name, so the
+        // run token is what keeps it off the paths the first run deleted.
         // Nothing about the importer needs this - a repeat import into a live
         // folder is exactly what the idempotence test covers.
+        private static string SandboxRoot;
         private static string sandbox;
         private static string ContentDirectory => sandbox + "/Content";
         private static string ObjectRoot => sandbox + "/Objects";
@@ -82,6 +85,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             ""children"": [{ ""type"": ""TierDefinition"", ""id"": ""tier1"" }]
         }";
 
+        [OneTimeSetUp]
+        public void OneTimeSetUp() =>
+            SandboxRoot = "Assets/ImporterTestSandbox_" + System.Guid.NewGuid().ToString("N");
+
         [SetUp]
         public void SetUp()
         {
@@ -95,7 +102,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The group goes per test: an entry left from a deleted asset would sit
-        // in it still claiming the 'root' address.
+        // in it still claiming the 'root' address. The import saved the
+        // settings WITH the group, so the removal is saved too - otherwise the
+        // file on disk keeps a reference to the group asset RemoveGroup deleted.
         [TearDown]
         public void TearDown()
         {
@@ -103,6 +112,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var group = settings.FindGroup(GroupName);
             if (group != null)
                 settings.RemoveGroup(group);
+            AssetDatabase.SaveAssetIfDirty(settings);
         }
 
         [OneTimeTearDown]

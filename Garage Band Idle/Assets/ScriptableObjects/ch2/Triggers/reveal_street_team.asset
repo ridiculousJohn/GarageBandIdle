@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710512698720445
+    rid: 1688710512883794109
   actions:
-  - rid: 1688710512698720446
+  - rid: 1688710512883794110
   references:
     version: 2
     RefIds:
-    - rid: 1688710512698720445
+    - rid: 1688710512883794109
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 4
             exponent: 1
-    - rid: 1688710512698720446
+    - rid: 1688710512883794110
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: street_team_revealed

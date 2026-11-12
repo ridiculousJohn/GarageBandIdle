@@ -270,7 +270,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var refusal = ActionList.Refuses(outer.actions, ctx);
             Assert.IsNotNull(refusal, "the named rung's reset is refused, and the outer list hears it");
             Assert.AreSame(tree.Tier1, refusal.Host);
-            Assert.AreEqual("Claim your open_mic reward first", RungFeedback.RefusalText(refusal));
             Assert.IsFalse(ActionList.TryRun(outer.actions, ctx));
             Assert.AreEqual(BigNumber.Zero, tree.Ch1.balances["ch1_records"], "the outer payout never happened");
             Assert.AreEqual((BigNumber)42, tree.Tier1.balances["cash"], "and nothing was cleared");
