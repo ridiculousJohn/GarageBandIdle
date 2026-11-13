@@ -74,12 +74,19 @@ Label {
     min-height: 96px;
 }
 
+/* The stopwatch glyph sits at the pill's left, in the padding the time
+   text leaves it. */
 .encore-pill {
     min-width: 320px;
     font-size: 40px;
-    padding: 12px 36px;
+    padding: 12px 36px 12px 96px;
     border-radius: 48px;
     background-color: rgb(31, 31, 31);
+    background-image: url("Icons/stopwatch.png");
+    background-size: 48px 48px;
+    background-repeat: no-repeat;
+    background-position-x: left 32px;
+    background-position-y: center;
 }
 
 .top-actions {
@@ -87,12 +94,21 @@ Label {
     padding-right: 12px;
 }
 
+/* Each action is its glyph alone, centred in a round touch target. */
 .top-action {
-    font-size: 52px;
     min-width: 96px;
-    padding: 12px 16px;
+    min-height: 96px;
     border-radius: 48px;
+    background-size: 52px 52px;
+    background-repeat: no-repeat;
+    background-position-x: center;
+    background-position-y: center;
 }
+
+.icon-story { background-image: url("Icons/story.png"); }
+.icon-discography { background-image: url("Icons/discography.png"); }
+.icon-chapters { background-image: url("Icons/chapters.png"); }
+.icon-settings { background-image: url("Icons/settings.png"); }
 
 /* ---- sections ---- */
 
@@ -336,9 +352,9 @@ Label {
 
 /* ---- upgrade tiles ---- */
 
-/* An outlined, rounded tile of fixed width, so three sit across a phone: a
-   round placeholder icon, the name on one line cut with an ellipsis, and the
-   price or "Owned" beneath. A tile that cannot be bought now is dimmed by a
+/* An outlined, rounded tile of fixed width, so three sit across a phone: an
+   icon, the name on one line cut with an ellipsis, and the price or "Owned"
+   beneath. A tile that cannot be bought now is dimmed by a
    class and stays pressable, so its hold still opens the details window. */
 .unity-button.tile {
     width: 280px;
@@ -354,16 +370,20 @@ Label {
     background-color: rgba(0, 0, 0, 0);
 }
 
+/* The shared guitar-pick glyph, which an upgrade naming its own icon replaces
+   by an inline image; either is grey until the upgrade is owned, then the
+   accent. */
 .tile-icon {
     width: 88px;
     height: 88px;
-    border-radius: 44px;
     margin-bottom: 20px;
-    background-color: rgb(111, 111, 111);
+    background-image: url("Icons/upgrade.png");
+    background-size: 88px 88px;
+    -unity-background-image-tint-color: rgb(111, 111, 111);
 }
 
 .tile-owned .tile-icon {
-    background-color: rgb(226, 75, 74);
+    -unity-background-image-tint-color: rgb(226, 75, 74);
 }
 
 /* The name and the level sit on one line; on a narrow tile the name is

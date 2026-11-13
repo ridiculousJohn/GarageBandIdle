@@ -207,8 +207,8 @@ currencies as they become affordable.
   defines the order the player develops each currency and gives each chapter its shape.
 - **Effects & payloads.** An upgrade carries its gate, a cost, an optional `ownedWhen` (below), a
   `List<Effect>` (ongoing buffs, applied while the purchase latch exists) and a `List<Action>`
-  (one-shot payloads executed at purchase: grant a currency, set a flag, add a modifier). No
-  per-kind upgrade classes.
+  (one-shot payloads executed at purchase: grant a currency, set a flag, add a modifier), and an
+  optional `icon`, the glyph its tile draws (section 12.11). No per-kind upgrade classes.
 - **Ownership.** An upgrade is owned while its purchase latch is set at its declaring scope OR its
   optional `ownedWhen` condition holds there - the context its gate is asked in; a levelled upgrade
   (below) is owned at its last level. One rule
@@ -1994,8 +1994,12 @@ mid-reveal is the size it ends at. `Revealing` and `Shown` say where it stands, 
 
 **Upgrade tiles.** `upgrade_row` is the full-width upgrade, a row like a generator's. `upgrade_tile`
 (`UpgradeTileUI`, `UpgradeTile.uxml`) is the strip's widget: one upgrade bound by `contentId`,
-resolved as the row resolves it, drawn as a rounded, outlined tile of fixed width - a round
-placeholder icon, grey and in the accent once owned; the display name on one line, cut with an
+resolved as the row resolves it, drawn as a rounded, outlined tile of fixed width - the upgrade's
+own glyph when it names one (`UpgradeDefinition.icon`, JSON `icon`: the file name stem of a PNG
+under `UI/Icons`, which the importer resolves to the texture and aborts on when no such file
+exists), else the shared guitar pick (`UI/Icons/upgrade.png`, the stylesheet's default), either
+grey and in the accent once owned (`ShownIcon` is the upgrade's own, null while the pick shows);
+the display name on one line, cut with an
 ellipsis; and beneath it the price with its currency's name, through `NumberFormatter`, or "Owned"
 in the accent once owned (section 4: the latch, or the upgrade's `ownedWhen`, or a levelled
 upgrade's last level). A levelled upgrade's name carries the owned level in parentheses once one is
@@ -2106,7 +2110,7 @@ the value that line formats: `ShownValue` and `ShownRate` on a currency line, `S
 upgrade row, `Mark(member)` on a group (`MemberMark`, whose names are not the button's wording),
 `Row(bar)`, `BookTarget`, `ShownBookCost`, `BookEnabled`, `AutoTarget`, `AutoEnabled`, `BuyControl`,
 `Mode` and `Figures` on a levelled group with `ShownPurchased`, `ShownGranted`, `ShownProgress`,
-`ShownRates`, `ShownPayouts`, `ShownCost`, `ShownMax`, `ShownCount`, `ControlKind`, `Idle` and `Visible` on its rows, `Shown` and
+`ShownRates`, `ShownPayouts`, `ShownCost`, `ShownMax`, `ShownCount`, `ControlKind`, `Idle`, `ShownLevelZero` and `Visible` on its rows, `Shown` and
 `Queued` on the threshold toast, `IsOpen`, `ShownGroup` and `Rows` on the automation
 window with `Bar`, `State` and `ShownCost` on each row, `Upgrade`, `ShownCost`, `ShownOwned` and
 `ShownBuyable`, `ShownLevel` and `ShownMaxLevel` on an upgrade tile (`ShownLevel` and `ShownMaxLevel`
@@ -2182,7 +2186,16 @@ Ctrl C's card of levelled bars, for a group whose members are all bars naming a 
 binds a `GroupDefinition` by `contentId` exactly as `group` does, and a member that is not a bar or
 a bar with no `level` throws at bind as a content fault. A section picks a layout by the module it
 names. Each member is one row (`LeveledBarRowUI`), shown while the bar is available, as the group
-module shows its bars:
+module shows its bars. **The card is never a Book button alone**: while no member's bar is
+available - the first entry into a chapter, and every run after a reset - the FIRST member in group
+order shows as a row at level 0 (`ShownLevelZero`) when its level is offered, as Ctrl C's card
+opens with its first bar on it: the name with its count of 0, an empty fill whose figures are the
+ordinary reads and so zero, every line kept, and the buy control on its level, dimmed as any row's.
+A press of that control is the Book button's pair - the purchase, then the bar added to the active
+set - so the first hire starts the gig; the row reads whether it stands at level 0 before the
+purchase, whose own refresh moves it off, and the add is fail-closed, so a refused purchase starts
+nothing. Its fill takes no tap, since its bar is not available, and it is never Auto's target, its
+gig not being hired. From level 1 it is an ordinary row. Each row:
 - the title line is the bar's name and its level, the level generator's count printed by
   `GeneratorRowUI.CountText`; holding it opens that generator's info screen, as a generator row's
   hold does;
@@ -2216,7 +2229,7 @@ and back round to Buy One and repainting the card; a Pair card draws none, so it
 alone. Both modes belong to the card, in memory for as long as the card is built - a chapter switch
 or a return from the idle dialog builds it afresh at Per Second and Buy One - and are never saved.
 The card ends in two buttons. **Book** names the first member in group order whose bar is not
-available and whose level is offered, as the bar's gate text (or its name when the gate has none)
+available, is not the row shown at level 0, and whose level is offered, as the bar's gate text (or its name when the gate has none)
 with the level's price; it buys one level and in the same press adds the bar to the active set, so
 the gig starts at once, and it is disarmed when unaffordable and hidden when no member qualifies.
 **Auto** reads "Auto" and nothing else. Where one member's automation stands is ONE answer,
@@ -2224,7 +2237,7 @@ the gig starts at once, and it is disarmed when unaffordable and hidden when no 
 (`repeatWhen` holding at its home, never the purchase) or its upgrade is owned (section 4), **Buy** when
 `Purchasing.CanBuy` says the upgrade row's purchase would succeed, **Price** otherwise. A tap on Auto
 buys the automation of the first available member, in group order, that names an `automation` and
-does not read Purchased; the tap buys exactly when that member reads Buy, and the button is hidden
+does not read Purchased (a row at level 0 shows a member that is not available); the tap buys exactly when that member reads Buy, and the button is hidden
 when no member qualifies - so it leaves when every visible bar repeats and returns when another is
 booked. While that member reads Price the button is dimmed by a class (`leveled-auto-unaffordable`)
 and is never disabled: a disabled element receives no pointer events, and the hold is how a player
@@ -2461,7 +2474,7 @@ Assets/Scripts/
   Economy/
     CurrencyDefinition.cs  ProducerDefinition.cs
     Producer.cs             // stateless resolution: a source's entries summed, times the product of its coordinate plan's links; GetRate and RatePairs read the contributor plan of the node they are asked at
-    GeneratorDefinition.cs  UpgradeDefinition.cs   // the generator with its count thresholds (CountThreshold, ThresholdEffect, NextThreshold, ThresholdsCrossed); the upgrade with its levels (UpgradeLevel, LevelAt, NextLevel)
+    GeneratorDefinition.cs  UpgradeDefinition.cs   // the generator with its count thresholds (CountThreshold, ThresholdEffect, NextThreshold, ThresholdsCrossed); the upgrade with its levels (UpgradeLevel, LevelAt, NextLevel) and its optional tile icon
     Purchasing.cs           // CostOf(generator, n) the series, MaxAffordable, TryBuy(generator, count | upgrade): fail-closed gate, one spend, count or latch (and next level), payload; IsOwned(upgrade): the latch or ownedWhen, or the last level
     MultiplierFormula.cs    // the formula family an Effect's factor can compute from
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply) + optional appliesWhen
@@ -2510,7 +2523,7 @@ Assets/Scripts/
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
               // RungButtonUI is the prestige card (RungButton.uxml): title with the gain and the (i), Currently, requirement lines, Confirm
               LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, the Pair or Cycle buy control, the Per Second / Raw toggle, Book and Auto; AutomationState, BuyMode, FigureMode
-              UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): icon, name (with the owned level), price or Owned; a tap buys, a hold opens the details window
+              UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): its own icon or the shared pick, name (with the owned level), price or Owned; a tap buys, a hold opens the details window
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
@@ -2527,7 +2540,8 @@ Assets/Scripts/
     RungInfoUI.cs          // a rung's info window: the label, the info text, Close
     RungConfirmUI.cs       // a rung's confirmation window: the label with "?", the confirmText, Cancel and Confirm (TryRung at the card's scope)
 Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml
-                          // (LeveledGroup.uxml and UpgradeTile.uxml among them),
+                          // (LeveledGroup.uxml and UpgradeTile.uxml among them), Icons/ (the white glyphs the
+                          // stylesheet tints: the top bar's, the shared upgrade pick, and each upgrade's own),
                           // and Fonts/ (Roboto Regular, Medium and Bold with its Apache 2.0 licence)
 Assets/Settings/          // hand-made settings, never imported: GameConfig, ModuleRegistry, PanelSettings
 ScriptableObjects/       // the importer's managed root: DOCUMENT then FAMILY (12.14.5)

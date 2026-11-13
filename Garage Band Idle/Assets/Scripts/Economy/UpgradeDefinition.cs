@@ -52,6 +52,11 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // effects, description, actions and ownedWhen are not (12.12).
         public List<UpgradeLevel> levels = new();
 
+        // Optional; null is absent. The glyph the upgrade's tile draws in
+        // place of the shared guitar pick (12.11); the importer resolves the
+        // authored file name stem under UI/Icons to this reference.
+        public Texture2D icon;
+
         public bool IsLevelled => levels.Count > 0;
 
         public bool IsOffered(GameContext declaringCtx) =>

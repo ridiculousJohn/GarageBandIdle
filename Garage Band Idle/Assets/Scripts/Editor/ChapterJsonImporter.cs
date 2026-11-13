@@ -34,6 +34,9 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public const string AssetRootPath = "Assets/ScriptableObjects";
         public const string GroupName = "Content";
 
+        // Where an upgrade's authored `icon` stem names its PNG (12.11).
+        public const string IconPath = "Assets/UI/Icons";
+
         // Ids become path segments, so the grammar is what keeps separators,
         // "..", and case-games out of the filesystem. \z, not $: $ also matches
         // before a final newline, and "cash\n" is a legal JSON string.
@@ -519,6 +522,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 if (upgradeDto.levels != null && upgradeDto.levels.Count == 0)
                     throw new ContentImportException(
                         $"upgrade '{upgrade.Id}': `levels` is authored empty - a levelled upgrade has at least one level, and an upgrade with none omits the key.");
+                upgrade.icon = Icon(upgrade, upgradeDto.icon);
                 scope.upgrades.Add(upgrade);
             }
 
@@ -777,6 +781,22 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 });
             }
             return threshold;
+        }
+
+        // An upgrade's tile glyph (12.11): the PNG its authored stem names under
+        // IconPath, or null when none is authored. A stem naming no such file
+        // aborts, since the tile would otherwise fall back to the shared pick
+        // without anyone having asked for it.
+        private static Texture2D Icon(UpgradeDefinition upgrade, string stem)
+        {
+            if (stem == null)
+                return null;
+            var path = IconPath + "/" + stem + ".png";
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (texture == null)
+                throw new ContentImportException(
+                    $"upgrade '{upgrade.Id}': `icon` names '{path}', and no texture is there.");
+            return texture;
         }
 
         // One level of a levelled upgrade (design doc 4), built from the

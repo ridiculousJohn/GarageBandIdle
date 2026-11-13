@@ -3,10 +3,10 @@
     <ui:VisualElement name="top-bar" class="top-bar" style="display: none;">
         <RidiculousGaming.GarageBandIdle.UI.TimerPill name="encore" timer="encore_timer" class="top-pill encore-pill" />
         <ui:VisualElement class="top-pill top-actions">
-            <ui:Button name="story-log" text="&#x2709;" class="top-action" />
-            <ui:Button name="discography" text="&#x266B;" class="top-action" />
-            <ui:Button name="chapter-select" text="&#x2630;" class="top-action" />
-            <ui:Button name="settings-button" text="&#x2699;" class="top-action" />
+            <ui:Button name="story-log" class="top-action icon-story" />
+            <ui:Button name="discography" class="top-action icon-discography" />
+            <ui:Button name="chapter-select" class="top-action icon-chapters" />
+            <ui:Button name="settings-button" class="top-action icon-settings" />
         </ui:VisualElement>
     </ui:VisualElement>
     <ui:ScrollView name="screen" class="screen" vertical-scroller-visibility="Hidden" horizontal-scroller-visibility="Hidden">

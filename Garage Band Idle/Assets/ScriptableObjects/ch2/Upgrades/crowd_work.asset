@@ -17,7 +17,7 @@ MonoBehaviour:
   displayName: Crowd Work
   description: 
   gate:
-    rid: 1688710518450421906
+    rid: 1688710519480123538
   ownedWhen:
     rid: -2
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
@@ -62,12 +62,13 @@ MonoBehaviour:
     description: Get the crowd singing back at you, and every tap pushes a gig's
       bar five times as far.
     actions: []
+  icon: {fileID: 2800000, guid: b9f9f612203821a4e8cfa349ca8036fd, type: 3}
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710518450421906
+    - rid: 1688710519480123538
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

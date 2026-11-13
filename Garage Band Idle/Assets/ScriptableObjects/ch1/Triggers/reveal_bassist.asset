@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710518450421952
+    rid: 1688710519480123584
   actions:
-  - rid: 1688710518450421953
+  - rid: 1688710519480123585
   references:
     version: 2
     RefIds:
-    - rid: 1688710518450421952
+    - rid: 1688710519480123584
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 0
-    - rid: 1688710518450421953
+    - rid: 1688710519480123585
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: bassist_revealed

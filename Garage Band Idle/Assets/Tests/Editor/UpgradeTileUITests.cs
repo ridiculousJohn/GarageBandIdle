@@ -32,9 +32,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // Section one carries no title and lists the Cash line and a row for
             // a levelled upgrade; section two is a strip of the two tier1
-            // upgrades. Both always show.
-            public TreeFixture()
+            // upgrades. Both always show. Stage Presence draws the icon given,
+            // and none leaves it the shared pick.
+            public TreeFixture(Texture2D stagePresenceIcon = null)
             {
+                Tree.StagePresence.icon = stagePresenceIcon;
                 Tuning = TestTree.MakeLevelled("amp_tuning", Tree.Cash, "practice_amp", Stat.Rate, (100, 2), (400, 5));
                 Tree.Tier1Def.upgrades.Add(Tuning);
                 // The chrome the host binds: Screen.uxml's pill names timer
@@ -225,6 +227,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(BigNumber.Zero, tile.ShownCost);
             Assert.IsTrue(tile.Root.ClassListContains("tile-owned"));
             Assert.IsFalse(tile.Root.ClassListContains("tile-unbuyable"), "owned is not dimmed");
+        }
+
+        // An upgrade naming an icon draws it inline over the stylesheet's pick;
+        // one naming none leaves the pick.
+        [Test]
+        public void A_tile_shows_its_upgrades_own_icon_and_the_pick_without_one()
+        {
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(ChapterJsonImporter.IconPath + "/upgrade.png");
+            Assert.IsNotNull(texture);
+            var fx = new TreeFixture(texture);
+
+            var own = fx.Tile(fx.Tree.StagePresence);
+            Assert.AreSame(texture, own.ShownIcon);
+            Assert.AreSame(texture, own.Root.Q("icon").style.backgroundImage.value.texture);
+
+            var shared = fx.Tile(fx.Tree.AmpStrings);
+            Assert.IsNull(shared.ShownIcon);
+            Assert.AreEqual(StyleKeyword.Null, shared.Root.Q("icon").style.backgroundImage.keyword,
+                "no inline image, so the stylesheet's pick shows");
         }
 
         [Test]

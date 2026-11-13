@@ -338,6 +338,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         // list INSTEAD of cost, effects, description and actions, and an empty
         // list is refused at import, since an asset cannot tell it from absent.
         public List<UpgradeLevelDto> levels;
+
+        // Null when unauthored: the file name stem of a PNG under the
+        // importer's icon folder, the tile's own glyph (12.11).
+        public string icon;
     }
 
     // One level of a levelled upgrade: its cost in the upgrade's

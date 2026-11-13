@@ -39,8 +39,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // The levelled group (design doc 12.11): the module over ONE group whose
     // members are all bars naming a level, bound by contentId exactly as the
     // group module is. Each available bar is one combined row - its name and
-    // level, its fill with its earnings inside, the level's buy control - and
-    // the card ends in two buttons: Book, which buys the first level of the
+    // level, its fill with its earnings inside, the level's buy control. While
+    // no bar is available the first member shows as a row at level 0, whose
+    // buy control hires its first level and starts it as Book does. The
+    // card ends in two buttons: Book, which buys the first level of the
     // next gig not yet on the calendar and starts it, and Auto, which buys the
     // automation of the first visible gig that does not yet go again by
     // itself; holding Auto opens the automation window over the group, where
@@ -75,7 +77,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private ScopeState declaring;
 
         // The bar the Book button books: the first member in group order that
-        // is not available and whose level is offered. Null hides the button.
+        // is not available, is not shown at level 0, and whose level is
+        // offered. Null hides the button.
         public BarDefinition BookTarget { get; private set; }
 
         // The price printed on Book: one unit of the target's level.
@@ -168,9 +171,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 BuyMode.Next => "Buy Next",
                 _ => "Buy One",
             };
-            foreach (var view in views)
-                view.Refresh();
             var ctx = Context().Rebase(declaring);
+            var first = LevelZero(ctx);
+            foreach (var view in views)
+                view.Refresh(view == first);
             RefreshBook(ctx);
             RefreshAuto(ctx);
         }
@@ -272,8 +276,23 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private static GameContext AutomationContext(GameContext ctx, BarDefinition bar) =>
             ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, bar.automation));
 
+        // The row shown at level 0: the first member in group order, while no
+        // member's bar is available and that member's level is offered - the
+        // card is never a Book button alone. Null once any bar is available.
+        private LeveledBarRowUI LevelZero(GameContext ctx)
+        {
+            foreach (var view in views)
+                if (view.Available(ctx))
+                    return null;
+            if (views.Count == 0)
+                return null;
+            var first = views[0];
+            return first.Bar.level.IsAvailable(ctx.Rebase(first.LevelHome)) ? first : null;
+        }
+
         // Book: the next gig not on the calendar whose level can be bought at
-        // all, priced at one unit of that level. Its text is the bar's own gate
+        // all, priced at one unit of that level. A row at level 0 is visible,
+        // so Book never offers the bar it shows. Its text is the bar's own gate
         // text when it has one - the gate is what booking satisfies - else the
         // bar's name.
         private void RefreshBook(GameContext ctx)
@@ -302,9 +321,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             book.SetEnabled(BookEnabled);
         }
 
-        // Auto: the first visible gig whose automation is not Purchased. So
-        // the button leaves when every visible gig repeats and comes back when
-        // another is booked. Its face is the word alone, from the UXML; the
+        // Auto: the first visible gig whose automation is not Purchased, a
+        // row at level 0 aside since its gig is not hired yet. So the button
+        // leaves when every visible gig repeats and comes back when another
+        // is booked. Its face is the word alone, from the UXML; the
         // prices are the window's.
         private void RefreshAuto(GameContext ctx)
         {
@@ -313,7 +333,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             foreach (var view in views)
             {
                 var bar = view.Bar;
-                if (!view.Visible || bar.automation == null)
+                if (!view.Visible || view.ShownLevelZero || bar.automation == null)
                     continue;
                 var state = Automation(ctx, bar);
                 if (state == AutomationState.Purchased)

@@ -1,13 +1,14 @@
 using System;
+using UnityEngine;
 using RidiculousGaming.GarageBandIdle.Economy;
 using UnityEngine.UIElements;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
-    // One bound upgrade as a tile (design doc 12.11), the strip's widget: a
-    // placeholder icon, the name, and beneath it the price or "Owned". A
-    // levelled upgrade's name carries its owned level in parentheses once one
-    // is owned, and its price is the next level's until the last. A tap
+    // One bound upgrade as a tile (design doc 12.11), the strip's widget: the
+    // upgrade's own icon or the shared guitar pick, the name, and beneath it
+    // the price or "Owned". A levelled upgrade's name carries its owned level
+    // in parentheses once one is owned, and its price is the next level's until the last. A tap
     // buys through the purchase the upgrade row issues; a hold opens the
     // upgrade's details window through the host. A tile that cannot be bought
     // now is dimmed by a class and never disabled: a disabled element receives
@@ -17,6 +18,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
     {
         private readonly IUpgradeDetailsOpener details;
         private readonly Button tile;
+        private readonly VisualElement icon;
         private readonly Label name;
         private readonly Label level;
         private readonly Label price;
@@ -28,6 +30,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private ScopeState declaring;
 
         public UpgradeDefinition Upgrade => upgrade;
+
+        // The upgrade's own glyph the icon draws, or null while the
+        // stylesheet's shared guitar pick shows. Either is tinted by the
+        // stylesheet: grey, and the accent once owned.
+        public Texture2D ShownIcon { get; private set; }
 
         // True when the second line reads as owned.
         public bool ShownOwned { get; private set; }
@@ -50,6 +57,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public UpgradeTileUI(VisualElement root, IUpgradeDetailsOpener details) : base(root)
         {
             tile = Require<Button>(root, "tile", "UpgradeTile.uxml");
+            icon = Require<VisualElement>(root, "icon", "UpgradeTile.uxml");
             name = Require<Label>(root, "name", "UpgradeTile.uxml");
             level = Require<Label>(root, "level", "UpgradeTile.uxml");
             price = Require<Label>(root, "price", "UpgradeTile.uxml");
@@ -65,6 +73,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 ?? throw new InvalidOperationException(
                     $"The upgrade_tile module binds '{Content?.Id}', which is not an UpgradeDefinition (12.11).");
             declaring = Producer.DeclaringScope<ScopeState>(Scope, upgrade);
+            // An authored icon is an inline image over the stylesheet's pick;
+            // none leaves the pick, so the stylesheet stays its one source.
+            ShownIcon = upgrade.icon;
+            icon.style.backgroundImage = upgrade.icon != null
+                ? new StyleBackground(upgrade.icon)
+                : new StyleBackground(StyleKeyword.Null);
             // A tap buys and a hold opens the window. The hold's manipulator
             // lets go of the button's pointer when it fires, so the release
             // that ends a hold is never also a tap (LongPressManipulator).

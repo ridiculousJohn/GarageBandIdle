@@ -227,13 +227,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var fx = new Fixture();
             var calendar = fx.Calendar();
-            foreach (var bar in fx.Tier2Def.bars)
+            Assert.IsTrue(calendar.Row(fx.OpenMic).ShownLevelZero, "no draw bought: the first gig stands at level 0");
+            foreach (var bar in fx.Tier2Def.bars.Where(b => b != fx.OpenMic))
                 Assert.IsFalse(calendar.Row(bar).Visible, $"{bar.Id}: no draw bought, so no gig is booked");
 
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
             calendar.Refresh();
 
             Assert.IsTrue(calendar.Row(fx.OpenMic).Visible, "one draw opens the open mic");
+            Assert.IsFalse(calendar.Row(fx.OpenMic).ShownLevelZero, "and it is an ordinary row");
             foreach (var bar in fx.Tier2Def.bars.Where(b => b != fx.OpenMic))
                 Assert.IsFalse(calendar.Row(bar).Visible, $"{bar.Id} still wants its own draw");
         }
@@ -349,15 +351,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Book_offers_the_first_unbooked_gig_whose_draw_is_offered()
         {
             var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Give(200);
             var calendar = fx.Calendar();
 
-            Assert.AreSame(fx.OpenMic, calendar.BookTarget, "open_mic_draw is offered from the start");
-            AssertClose(Purchasing.CostOf(fx.OpenMicDraw, fx.Ctx, 1).ToDouble(), calendar.ShownBookCost);
-            Assert.IsTrue(calendar.BookEnabled, "the opening 5 Cash buys the first draw");
+            Assert.AreSame(fx.HouseParty, calendar.BookTarget, "the open mic is booked and house_party_draw is offered");
+            AssertClose(Purchasing.CostOf(fx.HousePartyDraw, fx.Ctx, 1).ToDouble(), calendar.ShownBookCost);
+            Assert.IsTrue(calendar.BookEnabled, "200 Cash buys the first house party draw");
 
             fx.Tier2.balances[fx.Cash.Id] = BigNumber.Zero;
             calendar.Refresh();
-            Assert.AreSame(fx.OpenMic, calendar.BookTarget, "an unaffordable booking is still offered");
+            Assert.AreSame(fx.HouseParty, calendar.BookTarget, "an unaffordable booking is still offered");
             Assert.IsFalse(calendar.BookEnabled, "and disarmed");
         }
 
@@ -365,14 +369,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Book_buys_the_draw_and_starts_the_gig_then_waits_for_the_next_draw()
         {
             var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Session.SetActiveMembers(fx.Ctx, fx.TheCalendar, new Definition[] { fx.OpenMic });
             var calendar = fx.Calendar();
 
-            calendar.Book();
-            calendar.Refresh();
-
-            Assert.AreEqual(1, fx.Owned(fx.OpenMicDraw), "one level bought");
-            Assert.IsTrue(fx.Active(fx.OpenMic), "and the gig started in the same press");
-            Assert.IsTrue(calendar.Row(fx.OpenMic).Visible);
             Assert.IsNull(calendar.BookTarget, "house_party_draw is not offered before 150 Cash earned");
 
             fx.Give(200);
@@ -386,6 +386,156 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, fx.Owned(fx.HousePartyDraw));
             Assert.IsTrue(fx.Active(fx.HouseParty));
             Assert.IsTrue(fx.Active(fx.OpenMic), "booking adds to the calendar and takes nothing off it");
+        }
+
+        // ---- the first bar at level 0 ----
+
+        // The hire press of whichever control the row draws.
+        private static void Hire(LeveledBarRowUI row)
+        {
+            if (row.ControlKind == BuyControlKind.Cycle)
+                row.Buy();
+            else
+                row.BuyOne();
+        }
+
+        [TestCase(BuyControlKind.Pair)]
+        [TestCase(BuyControlKind.Cycle)]
+        public void A_card_with_no_started_gig_shows_the_first_gig_alone_at_level_0(BuyControlKind control)
+        {
+            var fx = new Fixture();
+            var calendar = fx.Calendar(control);
+            var row = calendar.Row(fx.OpenMic);
+
+            var shown = fx.TheCalendar.members.Cast<BarDefinition>().Where(bar => calendar.Row(bar).Visible).ToArray();
+            CollectionAssert.AreEqual(new[] { fx.OpenMic }, shown, "one row, the first gig in group order");
+            Assert.IsTrue(row.ShownLevelZero);
+            Assert.AreEqual(control, row.ControlKind);
+            Assert.AreEqual(0, row.ShownPurchased, "level 0");
+            Assert.AreEqual(BigNumber.Zero, row.ShownGranted);
+            Assert.AreEqual(BigNumber.Zero, row.ShownProgress, "an empty bar");
+            Assert.IsFalse(row.Idle, "a row at level 0 waits for a hire, not a tap");
+            Assert.IsNotEmpty(row.ShownRates, "every line the gig pays is kept");
+            foreach (var (currency, perSecond) in row.ShownRates)
+                Assert.AreEqual(BigNumber.Zero, perSecond, $"{currency.Id}: no level earns nothing");
+
+            AssertClose(Purchasing.CostOf(fx.OpenMicDraw, fx.Ctx, 1).ToDouble(), row.ShownCost, "one level's price");
+            if (control == BuyControlKind.Cycle)
+                Assert.AreEqual(1, row.ShownCount);
+            Assert.IsFalse(row.Root.ClassListContains("row-unaffordable"), "the opening 5 Cash hires the first level");
+
+            Assert.AreNotSame(fx.OpenMic, calendar.BookTarget, "Book never offers the gig the row shows");
+            Assert.IsNull(calendar.BookTarget, "and house_party_draw is not offered before 150 Cash earned");
+        }
+
+        [TestCase(BuyControlKind.Pair)]
+        [TestCase(BuyControlKind.Cycle)]
+        public void Hiring_from_the_level_0_row_starts_the_gig_and_makes_it_an_ordinary_row(BuyControlKind control)
+        {
+            var fx = new Fixture();
+            var calendar = fx.Calendar(control);
+            var row = calendar.Row(fx.OpenMic);
+
+            Hire(row);
+            calendar.Refresh();
+
+            Assert.AreEqual(1, fx.Owned(fx.OpenMicDraw), "one level hired");
+            Assert.IsTrue(fx.Active(fx.OpenMic), "and the gig started in the same press, as Book starts it");
+            Assert.IsTrue(row.Visible);
+            Assert.IsFalse(row.ShownLevelZero, "an ordinary row from here");
+            Assert.AreEqual(1, row.ShownPurchased);
+            Assert.IsFalse(row.Idle, "running");
+
+            fx.Give(1000);
+            calendar.Refresh();
+            Hire(row);
+            calendar.Refresh();
+            Assert.AreEqual(2, fx.Owned(fx.OpenMicDraw), "the next hire buys a level and nothing more");
+            Assert.IsTrue(fx.Active(fx.OpenMic));
+        }
+
+        [TestCase(BuyControlKind.Pair)]
+        [TestCase(BuyControlKind.Cycle)]
+        public void An_unaffordable_hire_at_level_0_buys_nothing_and_starts_nothing(BuyControlKind control)
+        {
+            var fx = new Fixture();
+            fx.Tier2.balances[fx.Cash.Id] = BigNumber.Zero;
+            var calendar = fx.Calendar(control);
+            var row = calendar.Row(fx.OpenMic);
+            Assert.IsTrue(row.ShownLevelZero);
+            Assert.IsTrue(row.Root.ClassListContains("row-unaffordable"), "dimmed as every row is");
+
+            Hire(row);
+            calendar.Refresh();
+
+            Assert.AreEqual(0, fx.Owned(fx.OpenMicDraw));
+            Assert.IsFalse(fx.Active(fx.OpenMic), "the add is refused with the purchase");
+            Assert.IsTrue(row.ShownLevelZero);
+        }
+
+        [Test]
+        public void The_level_0_row_takes_no_tap()
+        {
+            var fx = new Fixture();
+            var calendar = fx.Calendar();
+            var row = calendar.Row(fx.OpenMic);
+
+            row.Tap();
+            calendar.Refresh();
+
+            Assert.IsFalse(fx.Active(fx.OpenMic), "a gig not hired is not started");
+            Assert.AreEqual(BigNumber.Zero, fx.Progress(fx.OpenMic));
+            Assert.AreEqual(0, fx.Owned(fx.OpenMicDraw), "and nothing is bought");
+            Assert.IsTrue(row.ShownLevelZero);
+        }
+
+        [Test]
+        public void Auto_ignores_the_level_0_row()
+        {
+            var fx = new Fixture();
+            fx.Give(1000000);
+            var calendar = fx.Calendar();
+            Assert.IsTrue(calendar.Row(fx.OpenMic).ShownLevelZero);
+
+            Assert.IsNull(calendar.AutoTarget, "a gig not hired yet is nothing to automate");
+            Assert.IsFalse(calendar.AutoEnabled);
+        }
+
+        // A started gig takes the level-0 row away, and a reset that leaves
+        // none started brings it back - the run after an EP release.
+        [Test]
+        public void A_card_with_a_started_gig_shows_no_level_0_row()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = fx.Calendar();
+            foreach (var bar in fx.Tier2Def.bars)
+                Assert.IsFalse(calendar.Row(bar).ShownLevelZero, $"{bar.Id}: the open mic is available");
+
+            fx.Tier2.generatorCounts[fx.OpenMicDraw.Id] = 0;
+            calendar.Refresh();
+            Assert.IsTrue(calendar.Row(fx.OpenMic).ShownLevelZero, "none started again");
+        }
+
+        // Chapter 2 on entry, through the host: the calendar's one row is the
+        // Tuesday Open Mic at level 0, and its Hire starts it while the host's
+        // own refresh runs between the purchase and the add.
+        [Test]
+        public void Chapter_2_opens_with_the_open_mic_at_level_0()
+        {
+            var fx = new Fixture();
+            var calendar = Fixture.Calendar(fx.Host());
+            var row = calendar.Row(fx.OpenMic);
+
+            Assert.IsTrue(row.ShownLevelZero);
+            Assert.AreEqual(BuyControlKind.Cycle, row.ControlKind);
+            Assert.IsNull(calendar.BookTarget);
+
+            row.Buy();
+
+            Assert.AreEqual(1, fx.Owned(fx.OpenMicDraw));
+            Assert.IsTrue(fx.Active(fx.OpenMic), "the first hire started the gig");
+            Assert.IsFalse(row.ShownLevelZero);
         }
 
         // ---- Auto ----

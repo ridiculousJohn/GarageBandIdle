@@ -13,7 +13,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // figures toggle reads; at the right the level's buy control and the price
     // of what it buys. Tapping the fill starts the bar when it is not running
     // and works it when it is; holding the title opens the level generator's
-    // info screen. Every fact is read where it lives: the bar's at its home,
+    // info screen. A row at level 0 - the card's first bar while no bar on the
+    // card is available - takes no tap, and its buy control's press hires the
+    // first level and starts the gig, as the card's Book button does. Every fact is read where it lives: the bar's at its home,
     // the level's at the generator's declaring scope (12.3), and the earnings
     // through BarSystem.CompletionRate or BarSystem.CompletionPayout, the reads
     // the tick's own completion income is sized by (12.7). The row also watches
@@ -26,9 +28,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public BarDefinition Bar { get; }
 
-        // What the row decided last refresh: shown while the bar is available,
-        // so the interpolation moves exactly the rows that are on screen.
+        // What the row decided last refresh: shown while the bar is available
+        // or stands at level 0, so the interpolation moves exactly the rows
+        // that are on screen.
         public bool Visible { get; private set; }
+
+        // True while the row stands at level 0: the card's first bar, shown
+        // while no bar on the card is available (LeveledGroupUI). Its fill
+        // takes no tap, since the bar is not available, and its buy control
+        // hires the first level and starts the gig in the same press, as
+        // the Book button does.
+        public bool ShownLevelZero { get; private set; }
 
         // True while the bar is available and not running, which is the state
         // a tap answers by starting it; the row carries `leveled-idle` for it.
@@ -148,8 +158,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Root.Add(text);
 
             buy = buyControl == BuyControlKind.Cycle
-                ? new HireControl(session, clock, bar.level, LevelHome, mode)
-                : new PairControl(session, clock, bar.level, LevelHome);
+                ? new HireControl(bar.level, Hire, mode)
+                : new PairControl(bar.level, Hire);
             Root.Add(buy.Root);
 
             // The fill is the tap target and the title the hold's: the buy
@@ -167,12 +177,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public static bool Available(BarDefinition bar, GameContext homeCtx) =>
             bar.availableWhen == null || bar.availableWhen.Evaluate(homeCtx);
 
-        public void Refresh()
+        // `levelZero` is the card's answer for this row: true when no bar on
+        // the card is available and this is its first bar (LeveledGroupUI).
+        public void Refresh(bool levelZero)
         {
             var ctx = Context();
             var levelCtx = ctx.Rebase(LevelHome);
             Watch(levelCtx);
-            Visible = Available(ctx);
+            ShownLevelZero = levelZero;
+            Visible = levelZero || Available(ctx);
             Root.style.display = Visible ? DisplayStyle.Flex : DisplayStyle.None;
             if (!Visible)
             {
@@ -181,7 +194,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 return;
             }
 
-            Idle = !IsActive() && !Complete(ctx);
+            Idle = !levelZero && !IsActive() && !Complete(ctx);
             Root.EnableInClassList("leveled-idle", Idle);
 
             nameLabel.text = Bar.displayName;
@@ -224,7 +237,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // presses. A bar not running is started - added to the group's set,
         // never removed from it; a running bar that names a producer is
         // worked, the command the Jam button issues; a bar that fills once and
-        // stands full has nothing left to run, so the press does nothing.
+        // stands full has nothing left to run, and a row at level 0 shows a
+        // bar that is not available, so either press does nothing.
         public void Tap()
         {
             var ctx = Context();
@@ -275,6 +289,21 @@ namespace RidiculousGaming.GarageBandIdle.UI
             watching = true;
         }
 
+        // What every buy control's press submits: `count` levels at the
+        // level's declaring scope. On a row at level 0 the press is the Book
+        // button's pair - the purchase, then the bar added to the active set
+        // by the card's `activate` - so the first hire starts the gig. The
+        // row's state is read before the purchase, whose own refresh moves the
+        // row off level 0; the add is fail-closed, so a refused purchase
+        // leaves the bar unavailable and nothing changes.
+        private void Hire(int count)
+        {
+            var starts = ShownLevelZero;
+            session.TryBuy(new GameContext(LevelHome, clock.RealTimeUtc), Bar.level, count);
+            if (starts)
+                activate(Bar);
+        }
+
         private PairControl Pair() =>
             buy as PairControl ?? throw new InvalidOperationException(
                 $"The row for '{Bar.Id}' draws the {ControlKind} control, which has no +1 or +M (12.11).");
@@ -319,26 +348,23 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // The level's buy control, kept in its own element and its own class so
         // the row's other parts never reach into it and one control replaces
         // the other whole: the price beneath whatever buttons it draws, and the
-        // answer the row dims by (12.11).
+        // answer the row dims by (12.11). `hire` is the row's purchase of N
+        // levels, the one way a control's press buys.
         private abstract class BuyControl
         {
             public VisualElement Root { get; }
 
             public BigNumber ShownCost { get; private set; } = BigNumber.Zero;
 
-            protected readonly GameSession session;
-            protected readonly GameClock clock;
             protected readonly GeneratorDefinition level;
+            protected readonly Action<int> hire;
             protected readonly VisualElement buttons;
-            private readonly ScopeState levelHome;
             private readonly Label cost;
 
-            protected BuyControl(GameSession session, GameClock clock, GeneratorDefinition level, ScopeState levelHome)
+            protected BuyControl(GeneratorDefinition level, Action<int> hire)
             {
-                this.session = session;
-                this.clock = clock;
                 this.level = level;
-                this.levelHome = levelHome;
+                this.hire = hire;
 
                 Root = new VisualElement();
                 Root.AddToClassList("leveled-buy");
@@ -360,8 +386,6 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 ShownCost = price;
                 cost.text = NumberFormatter.Format(price) + " " + level.costCurrency.displayName;
             }
-
-            protected GameContext Context() => new GameContext(levelHome, clock.RealTimeUtc);
         }
 
         // The generator row's "+1" and "+M" over the next unit's cost, with its
@@ -379,8 +403,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
             // an int beside the label: the tap buys the count the player saw.
             private int maxCount;
 
-            public PairControl(GameSession session, GameClock clock, GeneratorDefinition level, ScopeState levelHome)
-                : base(session, clock, level, levelHome)
+            public PairControl(GeneratorDefinition level, Action<int> hire)
+                : base(level, hire)
             {
                 one = new Button();
                 one.AddToClassList("row-buy");
@@ -393,9 +417,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 max.clicked += BuyMax;
             }
 
-            public void BuyOne() => session.TryBuy(Context(), level, 1);
+            public void BuyOne() => hire(1);
 
-            public void BuyMax() => session.TryBuy(Context(), level, maxCount);
+            public void BuyMax() => hire(maxCount);
 
             public override bool Refresh(GameContext levelCtx)
             {
@@ -424,29 +448,28 @@ namespace RidiculousGaming.GarageBandIdle.UI
             public int ShownCount { get; private set; } = 1;
 
             private readonly Func<BuyMode> mode;
-            private readonly Button hire;
+            private readonly Button button;
 
-            public HireControl(GameSession session, GameClock clock, GeneratorDefinition level, ScopeState levelHome,
-                               Func<BuyMode> mode)
-                : base(session, clock, level, levelHome)
+            public HireControl(GeneratorDefinition level, Action<int> hire, Func<BuyMode> mode)
+                : base(level, hire)
             {
                 this.mode = mode;
-                hire = new Button();
-                hire.AddToClassList("row-buy");
-                hire.AddToClassList("leveled-hire");
-                buttons.Add(hire);
-                hire.clicked += Buy;
+                button = new Button();
+                button.AddToClassList("row-buy");
+                button.AddToClassList("leveled-hire");
+                buttons.Add(button);
+                button.clicked += Buy;
             }
 
-            public void Buy() => session.TryBuy(Context(), level, ShownCount);
+            public void Buy() => hire(ShownCount);
 
             public override bool Refresh(GameContext levelCtx)
             {
                 ShownCount = Count(levelCtx);
                 ShowCost(Purchasing.CostOf(level, levelCtx, ShownCount));
-                hire.text = "Hire: x" + ShownCount;
+                button.text = "Hire: x" + ShownCount;
                 var affordable = Purchasing.CanBuy(levelCtx, level, ShownCount);
-                hire.EnableInClassList("leveled-hire-unaffordable", !affordable);
+                button.EnableInClassList("leveled-hire-unaffordable", !affordable);
                 return affordable;
             }
 

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: edbbbf61-8b4e-4ea3-b5a3-e83d43fa518d
-  modified: 2026-11-12T23:56:56.147Z
+  modified: 2026-11-13T02:50:03.295Z
 ---
 
 John described these from his own play of Ctrl C on 2026-11-10, with two phone screenshots. They
@@ -64,6 +64,11 @@ widget it names.
   naming it ("Components x50 speed"). Chapter 8's Components/Switches/RAM/Motherboards bars are his
   example (some effects target the row itself, some another row); the reference docs do not hold
   the threshold numbers.
+- **First bar and later runs (John, 2026-11-12).** Ctrl C never shows a "Book the first bar" line:
+  the first bar is on the card from the start as a level-0 row with "Hire: x1" (you start able to
+  afford one). On later prestige runs every bar is shown, with all but the first bar's buy button
+  ghosted. John is fine without the later-runs part for now; he suggested a flag set on the first
+  EP release could drive it. Deferred, not ordered.
 - **The "Hire: xN" button and the Buy One/Max/Next cycle button.**
 
 **Why:** John reported these as he remembered them mid-session and asked that they be recorded

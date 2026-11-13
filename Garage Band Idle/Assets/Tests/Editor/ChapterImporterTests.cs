@@ -1102,6 +1102,50 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(0, standing.levels.Count);
         }
 
+        // ---- upgrade icons ----
+
+        // An upgrade's `icon` is a file name stem under the icon folder, and
+        // the asset holds the texture itself (12.11).
+        [Test]
+        public void An_upgrades_icon_stem_imports_as_the_texture_at_that_path()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson.Replace(
+                @"""displayName"": ""Standing Booking"",",
+                @"""displayName"": ""Standing Booking"", ""icon"": ""upgrade"","));
+
+            Import();
+
+            var icon = Load<UpgradeDefinition>("ch1/Upgrades/standing.asset").icon;
+            Assert.IsNotNull(icon);
+            Assert.AreSame(AssetDatabase.LoadAssetAtPath<Texture2D>(ChapterJsonImporter.IconPath + "/upgrade.png"), icon);
+        }
+
+        [Test]
+        public void An_unauthored_icon_imports_as_absent()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson);
+
+            Import();
+
+            Assert.IsNull(Load<UpgradeDefinition>("ch1/Upgrades/standing.asset").icon);
+        }
+
+        [Test]
+        public void An_icon_naming_no_file_aborts_naming_the_path()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson.Replace(
+                @"""displayName"": ""Standing Booking"",",
+                @"""displayName"": ""Standing Booking"", ""icon"": ""no_such_icon"","));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains(ChapterJsonImporter.IconPath + "/no_such_icon.png", thrown.Message);
+            StringAssert.Contains("standing", thrown.Message);
+            Assert.IsNull(Load<UpgradeDefinition>("ch1/Upgrades/standing.asset"), "nothing was written");
+        }
+
         // An asset cannot tell an empty list from an absent one, so an authored
         // empty list is refused at the import rather than read as no levels.
         [Test]

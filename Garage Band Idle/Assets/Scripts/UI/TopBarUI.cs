@@ -67,7 +67,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         {
             ShownPermanent = EncoreTime.Permanent(root);
             ShownSeconds = ShownPermanent ? 0 : EncoreTime.RemainingSeconds(root, encore.Timer, clock.RealTimeUtc);
-            encore.text = "\u23F1  " + EncoreTime.Format(ShownPermanent, ShownSeconds);
+            // The stopwatch is the pill's background glyph (Screen.uss); the
+            // text is the time alone.
+            encore.text = EncoreTime.Format(ShownPermanent, ShownSeconds);
         }
 
         // The discography button stands only while root keeps a song, so a

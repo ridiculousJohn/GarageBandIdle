@@ -1294,6 +1294,7 @@
         {
           "id": "bulk_booking",
           "displayName": "Bulk Booking",
+          "icon": "upgrade-bulk_booking",
           "description": "Hand the calendar over: every gig buys as many levels as you can afford on its own, for the rest of the chapter.",
           "gate": {
             "type": "CurrencyAtLeast",
@@ -1316,6 +1317,7 @@
         {
           "id": "favors",
           "displayName": "Favors Owed",
+          "icon": "upgrade-favors",
           "description": "Everyone in town owes you one, so every gig level costs half for the rest of the chapter.",
           "gate": {
             "type": "CurrencyAtLeast",
@@ -1338,6 +1340,7 @@
         {
           "id": "crowd_work",
           "displayName": "Crowd Work",
+          "icon": "upgrade-crowd_work",
           "gate": {
             "type": "Always"
           },
@@ -1370,6 +1373,7 @@
         {
           "id": "street_team",
           "displayName": "Street Team",
+          "icon": "upgrade-street_team",
           "description": "Kids who hand out your flyers for you, so everything in Promotion builds Buzz twice as fast.",
           "gate": {
             "type": "CurrencyAtLeast",
@@ -1389,6 +1393,7 @@
         {
           "id": "merch_table",
           "displayName": "A Merch Table",
+          "icon": "upgrade-merch_table",
           "description": "Shirts and tapes by the door, so every gig pays more Cash when it ends.",
           "gate": {
             "type": "CurrencyAtLeast",
@@ -1409,6 +1414,7 @@
         {
           "id": "the_van",
           "displayName": "Borrow the Van",
+          "icon": "upgrade-the_van",
           "description": "Dave's van gets the gear and a carload of friends to the show, so every gig brings more Fans.",
           "gate": {
             "type": "CurrencyAtLeast",

@@ -533,6 +533,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.AreEqual(UI.SectionLayout.List, section.layout, section.title);
         }
 
+        // Each Office upgrade names its own tile glyph (12.11), the PNG under
+        // the importer's icon folder that carries its id.
+        [Test]
+        public void Each_office_upgrade_names_its_own_icon()
+        {
+            foreach (var id in new[] { "crowd_work", "street_team", "merch_table", "the_van", "bulk_booking", "favors" })
+            {
+                var icon = Find(tier2.upgrades, id).icon;
+                Assert.IsNotNull(icon, id);
+                Assert.AreEqual(ChapterJsonImporter.IconPath + "/upgrade-" + id + ".png",
+                    AssetDatabase.GetAssetPath(icon), id);
+            }
+        }
+
         // Crowd Work is one levelled upgrade (design doc 4): two levels priced
         // in the run's Cash, each a factor on the work_the_crowd tag, the
         // second replacing the first rather than stacking on it. Its gate is
