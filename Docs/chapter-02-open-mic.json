@@ -6,11 +6,12 @@
     "theChapterInOneLine": "Chapter 1 was a number going up. Chapter 2 is a calendar: you book gigs, they run, they pay out, and you decide whether to level them, automate them, or reach for the next one.",
     "shape": "Ctrl C's Chapter 2 (timed teams, a balance-multiplier layer, one prestige, timed challenges) as a band. Chapter 1's continuous economy is GONE: there is no Cash per second, no Jam button paying Cash, no rehearsal, no covers. Income arrives only in lumps when a gig finishes.",
     "newInThisChapter": [
-      "GIGS are timed bars (`fillCurrency: null`, fill from time). A gig runs its cycle and on completion fires its DRAW generator's yield — the lump of Cash and Fans. Bigger gigs have longer cycles and bigger lumps.",
+      "GIGS are timed bars (`fillCurrency: null`, fill from time). A gig runs its cycle and on completion fires its DRAW generator's yield — the lump of Cash and Rep. Bigger gigs have longer cycles and bigger lumps.",
       "GIG LEVELS: each gig's payout is a generator (`*_draw`) you buy copies of. Owned count scales the lump (decision 2 / B). Buying the first copy is what unlocks the gig at all — Ctrl C's base level cost.",
       "STANDING BOOKING: a manual gig pays once, returns to zero and drops out of the active set; you book it again by tapping it. A permanent-in-chapter upgrade per gig sets a flag its `repeatWhen` reads, and from then on it re-books itself (E). Auto-booked gigs are the only thing that earns while you are away.",
       "WORK THE CROWD: tapping a gig row fires a producer whose yield pays the BAR — seconds of progress (C, H). Tap never pays Cash. Upgrades make each tap worth more time.",
-      "BUZZ is the multiplier layer. Promo generators produce it as a rate; Buzz multiplies gig CASH payouts by (1 + log10(1 + buzz)) (LogOnBalance), so more Buzz always pays more and each point adds less than the last. Buzz does not touch Fans - see fans.couplingNote.",
+      "BUZZ is the multiplier layer. Promo generators produce it as a rate; Buzz multiplies gig CASH payouts by (1 + log10(1 + buzz)) (LogOnBalance), so more Buzz always pays more and each point adds less than the last. Buzz does not touch Rep - see rep.couplingNote.",
+      "REP is the release meter and the chapter's second Cash layer: each gig pays a lump of Rep, and the Rep balance multiplies gig CASH payouts by (1 + log10(1 + rep)) (rep_cash, LogOnBalance). EPS SOLD, the prestige currency, multiply every gig's Rep lump, so the currency a release banks multiplies the very number the next release pays from.",
       "BULK BOOKING is autobuy on the draw generators (F). FAVORS is a cost multiplier on them (A).",
       "BATTLE OF THE BANDS: a five-minute timed challenge, staged, reward doubles gig payouts.",
       "Roadie allocation UI unlocks here (Ch1's capstone deliberately left it locked)."
@@ -19,18 +20,18 @@
     "modelNotes": {
       "conditions": "Discriminated Condition objects with a `type` field, threshold always `value`. Types used: `currency`, `currencyEarnedTotal`, `ownedCount`, `flagSet`, `compound`, `always`.",
       "gigAsBarPlusGenerator": "Every gig is a PAIR: a bar (the booking, fills from time) and a generator (the draw, whose owned count is the gig's level and whose yield entries are the payout). The bar's `onComplete` is `fireGeneratorYield` naming the draw. Multipliers reach the payout by naming the yield lines (ids) or their tag `gig_payout`; a buff on the BAR (`stat: rate`) would speed the cycle, which nothing in this chapter does — see §11 on prestige never raising a fill rate.",
-      "manualVsStanding": "`repeatWhen: { type: flagSet, flag: booked_<gig> }`. False = the manual team (decision 5): pays, zeros, leaves the active set; the player taps it again to run it again, no new command. True = repeats, keeping the residual. The standing-booking upgrade sets the flag; because the upgrade and flag are permanent-in-chapter, every gig you have automated stays automated across EPs — Ctrl C needed a separate Micromanagement purchase for that, this game gets it from scope.",
+      "manualVsStanding": "`repeatWhen: { type: flagSet, flag: booked_<gig> }`. False = the manual team (decision 5): pays, zeros, leaves the active set; the player taps it again to run it again, no new command. True = repeats, keeping the residual. The standing-booking upgrade sets the flag; because the upgrade and flag are permanent-in-chapter, every gig you have automated stays automated across releases — Ctrl C needed a separate Micromanagement purchase for that, this game gets it from scope.",
       "tap": "`bar.tap` names a producer (decision 20). The producer's single contribution names the BAR as its target with `feeds: yield`, amount in seconds of progress (C). One producer per gig so the tap lands on the row you tapped; they share the `work_the_crowd` tag so one buff reaches all of them.",
       "buzz": "`constants.buzzBuff` is the friendly shape Ch1 uses for `demoTapesBuff`: a balance multiplier the importer builds as a permanent chapter modifier carrying `LogOnBalance` on the `buzz` currency, targeting the tag named in `affects`. Buzz is run-scoped and resets with the EP.",
       "maxActive": "The calendar group's `maxActive` equals its bar count — there is no cap on concurrent bookings, exactly as Ctrl C runs every hired team at once. The chapter's decisions are level vs automate vs next tier, not which gigs to hold. Raising a cap by upgrade would need a payload that does not exist; it is not wanted here.",
-      "payoutSelector": "The EP's payout formula reads Fans EARNED THIS ROUND (G's default), not the balance. Fans are never spent in this chapter so the two agree, but the default is the right one to lean on.",
+      "payoutSelector": "The EP's payout formula reads Rep EARNED THIS ROUND (G's default), not the balance. Rep is never spent in this chapter so the two agree, but the default is the right one to lean on. rep_cash reads the Rep balance, which is the same number.",
       "flags": "One reveal registry, as Ch1. A contentUnlock upgrade's payload is `setFlag`; anything gated on a system existing uses `flagSet`."
     },
     "currencies": {
       "cash": "run-scoped; the base resource; paid in lumps by gig completions; buys draw levels, standing bookings, promo, upgrades",
-      "fans": "run-scoped; paid in lumps by gig completions; scales with draw level and gig count only; the release meter; sets the EPs payout",
+      "rep": "displayed as Rep, the band's reputation: an abstract standing, so the large late-chapter numbers read as reach rather than a head count. Run-scoped; paid in lumps by gig completions; scales with draw level, gig count and EPs Sold (eps_sold_rep); the release meter; sets the EPs Sold payout; its balance multiplies gig Cash payouts by (1 + log10(1 + rep)) (rep_cash)",
       "buzz": "run-scoped; produced by promo generators as a rate; multiplies gig Cash payouts by (1 + log10(1 + buzz))",
-      "eps": "chapter-scoped; the prestige currency; each EP buffs Cash (eps_income, a permanent modifier declared on the chapter); EPs gate the capstone, whose reset of the chapter zeroes them"
+      "eps_sold": "displayed as EPs Sold, the copies of the band's EPs sold. Chapter-scoped; the prestige currency; each EP sold adds 0.05% to every gig's Rep payout (eps_sold_rep, a permanent modifier declared on the chapter) and nothing to Cash; EPs Sold gate the capstone, whose reset of the chapter zeroes them"
     }
   },
 
@@ -43,22 +44,31 @@
   },
 
   "constants": {
-    "generatorCostGrowth": 1.3,
-    "generatorCostGrowthNote": "Chapter default, applied to every draw and promo generator that authors no growth of its own. Ctrl C's team levels grow geometrically and its early chapters use 1.6; 1.3 keeps a gig's levels chunky enough that each one is a decision without making the ladder a wall. Tune per generator by adding `growth` to its cost block.",
+    "generatorCostGrowth": 1.6,
+    "generatorCostGrowthNote": "Applied to every draw and promo generator. 1.6 is Ctrl C's rate for its chapters 1-3, chosen so a run stalls: each level costs 60% more than the last, which outruns what a level pays, so within a run the ladder flattens near the target release time and the release becomes the better move. Tune per generator by adding `growth` to its cost block.",
     "epsBuff": {
-      "perEp": 0.02,
+      "perEp": 0.0005,
       "mode": "additive",
-      "affects": [ "cash" ],
-      "note": "Ch1's shape on the chapter's own currency: the EPs modifier, declared on the chapter, multiplies Cash, and a gig's Cash yield is Cash. This is the chapter's prestige lever - each EP raises what every gig pays, never how fast one runs (section 11). Fans are deliberately outside it."
+      "formula": "LinearOnBalance",
+      "currency": "eps_sold",
+      "affects": [ "gig_rep" ],
+      "note": "The chapter's prestige lever, built as the permanent chapter modifier eps_sold_rep: every gig's Rep yield times (1 + 0.0005 x epsSold), so each EP sold adds 0.05% to every gig's Rep payout. It multiplies Rep, the number the release payout reads, so each release raises the next one's payout - Ctrl C's chapter 2 shape, where Experience is paid from Lines and multiplies Lines. Cash is deliberately outside it; Cash reaches the loop through repBuff. It raises what every gig pays, never how fast one runs (section 11)."
+    },
+    "repBuff": {
+      "coefficient": 1,
+      "affects": [ "gig_cash" ],
+      "formula": "LogOnBalance",
+      "currency": "rep",
+      "note": "Built as the permanent tier modifier rep_cash, declared on the tier beside buzz_buff: gig Cash times (1 + log10(1 + rep)), x2 at 9 Rep, x3 at 99, x4 at 999. Rep is run-scoped, so the factor is rebuilt every run. The log is what keeps the Rep -> Cash -> draw levels -> Rep loop from running away within a run."
     },
     "buzzBuff": {
       "coefficient": 1,
       "affects": [ "gig_cash" ],
       "formula": "LogOnBalance",
       "currency": "buzz",
-      "note": "The Data layer. Gig Cash times (1 + log10(1 + buzz)): x2 at 9 Buzz, x3 at 99, x4 at 999, each point adding less than the last, targeting the `gig_cash` tag carried by every draw generator's Cash line. Built as a permanent chapter modifier carrying LogOnBalance(buzz, 1). Run-scoped through its currency: Buzz resets with the EP, so the layer is rebuilt every run and promo is the run's second spend."
+      "note": "The Data layer. Gig Cash times (1 + log10(1 + buzz)): x2 at 9 Buzz, x3 at 99, x4 at 999, each point adding less than the last, targeting the `gig_cash` tag carried by every draw generator's Cash line. Built as tier2's permanent modifier `buzz_buff` carrying LogOnBalance(buzz, 1). Run-scoped through its currency: Buzz resets with the release, so the layer is rebuilt every run and promo is the run's second spend."
     },
-    "incomeFormulaNote": "Every composed number is still the sum of its contributions times the product of the multipliers reaching it. A gig's Cash lump = draw.cash_line x ownedCount x (1 + 0.02 x eps) x (1 + log10(1 + buzz)) x buffs. A gig's Fans lump = draw.fans_line x ownedCount x buffs, with NO EPs or Buzz term."
+    "incomeFormulaNote": "Every composed number is still the sum of its contributions times the product of the multipliers reaching it. A gig's Cash lump = draw.cash_line x ownedCount x (1 + log10(1 + buzz)) x (1 + log10(1 + rep)) x buffs, with NO EPs Sold term. A gig's Rep lump = draw.rep_line x ownedCount x (1 + 0.0005 x epsSold) x buffs, with NO Buzz term."
   },
 
   "flags": [
@@ -112,14 +122,14 @@
       "id": "the_talent_show_section",
       "name": "The Talent Show",
       "modules": [ "module/capstone" ],
-      "visibleWhen": { "type": "currency", "currency": "eps", "value": 1 },
+      "visibleWhen": { "type": "currency", "currency": "eps_sold", "value": 1 },
       "note": "Region coarse, action precise — Ch1's the_backyard arrangement. Appears with the prestige loop; the button arms at `capstone.unlock`, the sole home of the pacing number."
     }
   ],
 
   "currencies": [
     { "id": "cash", "group": "run" },
-    { "id": "fans", "group": "run" },
+    { "id": "rep", "group": "run" },
     { "id": "buzz", "group": "run", "note": "Pure state (a balance, a group, formatting). How it is earned lives on the promo generators; how it is spent is that it is not - it is read by buzzBuff's LogOnBalance." }
   ],
 
@@ -131,7 +141,7 @@
       "cost": { "currency": "cash", "amount": 5 },
       "contributions": [
         { "id": "open_mic_cash", "currency": "cash", "amount": 3,   "feeds": "yield", "tags": [ "gig_payout", "gig_cash" ] },
-        { "id": "open_mic_fans", "currency": "fans", "amount": 0.5, "feeds": "yield", "tags": [ "gig_payout", "gig_fans" ] }
+        { "id": "open_mic_rep", "currency": "rep", "amount": 0.5, "feeds": "yield", "tags": [ "gig_payout", "gig_rep" ] }
       ],
       "unlock": { "type": "always" },
       "note": "The first gig's draw. The chapter opens with 5 Cash so the first level is affordable at once; buying it is what makes the open_mic bar available. YIELD lines, count-scaled, fired by the bar (B) — nothing fires them otherwise, and the validator's InertOperand check is satisfied by the bar's onComplete naming this generator."
@@ -143,7 +153,7 @@
       "cost": { "currency": "cash", "amount": 60 },
       "contributions": [
         { "id": "house_party_cash", "currency": "cash", "amount": 25, "feeds": "yield", "tags": [ "gig_payout", "gig_cash" ] },
-        { "id": "house_party_fans", "currency": "fans", "amount": 4,  "feeds": "yield", "tags": [ "gig_payout", "gig_fans" ] }
+        { "id": "house_party_rep", "currency": "rep", "amount": 4,  "feeds": "yield", "tags": [ "gig_payout", "gig_rep" ] }
       ],
       "unlock": { "type": "currencyEarnedTotal", "currency": "cash", "value": 150 }
     },
@@ -154,7 +164,7 @@
       "cost": { "currency": "cash", "amount": 700 },
       "contributions": [
         { "id": "coffeehouse_cash", "currency": "cash", "amount": 180, "feeds": "yield", "tags": [ "gig_payout", "gig_cash" ] },
-        { "id": "coffeehouse_fans", "currency": "fans", "amount": 22,  "feeds": "yield", "tags": [ "gig_payout", "gig_fans" ] }
+        { "id": "coffeehouse_rep", "currency": "rep", "amount": 22,  "feeds": "yield", "tags": [ "gig_payout", "gig_rep" ] }
       ],
       "unlock": { "type": "currencyEarnedTotal", "currency": "cash", "value": 2500 }
     },
@@ -165,7 +175,7 @@
       "cost": { "currency": "cash", "amount": 9000 },
       "contributions": [
         { "id": "backyard_cash", "currency": "cash", "amount": 1500, "feeds": "yield", "tags": [ "gig_payout", "gig_cash" ] },
-        { "id": "backyard_fans", "currency": "fans", "amount": 140,  "feeds": "yield", "tags": [ "gig_payout", "gig_fans" ] }
+        { "id": "backyard_rep", "currency": "rep", "amount": 140,  "feeds": "yield", "tags": [ "gig_payout", "gig_rep" ] }
       ],
       "unlock": { "type": "currencyEarnedTotal", "currency": "cash", "value": 40000 }
     },
@@ -176,7 +186,7 @@
       "cost": { "currency": "cash", "amount": 150000 },
       "contributions": [
         { "id": "bar_opener_cash", "currency": "cash", "amount": 14000, "feeds": "yield", "tags": [ "gig_payout", "gig_cash" ] },
-        { "id": "bar_opener_fans", "currency": "fans", "amount": 900,   "feeds": "yield", "tags": [ "gig_payout", "gig_fans" ] }
+        { "id": "bar_opener_rep", "currency": "rep", "amount": 900,   "feeds": "yield", "tags": [ "gig_payout", "gig_rep" ] }
       ],
       "unlock": { "type": "currencyEarnedTotal", "currency": "cash", "value": 700000 }
     },
@@ -187,7 +197,7 @@
       "cost": { "currency": "cash", "amount": 3000000 },
       "contributions": [
         { "id": "botb_qualifier_cash", "currency": "cash", "amount": 160000, "feeds": "yield", "tags": [ "gig_payout", "gig_cash" ] },
-        { "id": "botb_qualifier_fans", "currency": "fans", "amount": 7000,   "feeds": "yield", "tags": [ "gig_payout", "gig_fans" ] }
+        { "id": "botb_qualifier_rep", "currency": "rep", "amount": 7000,   "feeds": "yield", "tags": [ "gig_payout", "gig_rep" ] }
       ],
       "unlock": { "type": "currencyEarnedTotal", "currency": "cash", "value": 15000000 }
     },
@@ -226,7 +236,7 @@
       "unlock": { "type": "ownedCount", "generator": "photographer_friend", "value": 5 }
     }
   ],
-  "generatorsNote": "Two families by tag. `gig_draw`: a gig's level, count-scaled yield fired by its bar. `promo`: ordinary rate generators feeding Buzz. No generator in this chapter produces Cash or Fans as a RATE — that is the whole point.",
+  "generatorsNote": "Two families by tag. `gig_draw`: a gig's level, count-scaled yield fired by its bar. `promo`: ordinary rate generators feeding Buzz. No generator in this chapter produces Cash or Rep as a RATE — that is the whole point.",
 
   "producers": [
     { "id": "crowd_open_mic",       "tags": [ "work_the_crowd" ], "contributions": [ { "id": "crowd_open_mic_time",       "bar": "open_mic",       "amount": 1.0, "feeds": "yield" } ] },
@@ -236,7 +246,7 @@
     { "id": "crowd_bar_opener",     "tags": [ "work_the_crowd" ], "contributions": [ { "id": "crowd_bar_opener_time",     "bar": "bar_opener",     "amount": 1.0, "feeds": "yield" } ] },
     { "id": "crowd_botb_qualifier", "tags": [ "work_the_crowd" ], "contributions": [ { "id": "crowd_botb_qualifier_time", "bar": "botb_qualifier", "amount": 1.0, "feeds": "yield" } ] }
   ],
-  "producersNote": "Work the Crowd. Each is fired by ONE bar's `tap` (H) and pays that bar's progress (C): one second per tap at base. A contribution names a BAR as its target where Ch1's name a currency — exactly one of currency / generator / bar per entry (C). No module presents these; the bar row is the surface. There is no `jam`, no `band`, no `practice`: nothing in this chapter is a press that pays Cash or a rate that pays Fans.",
+  "producersNote": "Work the Crowd. Each is fired by ONE bar's `tap` (H) and pays that bar's progress (C): one second per tap at base. A contribution names a BAR as its target where Ch1's name a currency — exactly one of currency / generator / bar per entry (C). No module presents these; the bar row is the surface. There is no `jam`, no `band`, no `practice`: nothing in this chapter is a press that pays Cash or a rate that pays Rep.",
 
   "bars": {
     "scope": "run",
@@ -331,7 +341,7 @@
   "rewards": [
     { "id": "gig_payout_x2", "name": "Gig Payouts ×2", "type": "multiplier", "value": 2.0, "targets": [ "gig_payout" ] }
   ],
-  "rewardsNote": "One entry, used by every Battle of the Bands stage. Same vocabulary as Ch1: `multiplier` with `targets` naming ids or tags, any term matching. `gig_payout` is carried by every draw yield line, Cash and Fans alike, so the event reward multiplies the Fans line as well as the Cash - earned by a timed challenge, permanent-in-chapter, which is the §6.1 lateral-reward shape.",
+  "rewardsNote": "One entry, used by every Battle of the Bands stage. Same vocabulary as Ch1: `multiplier` with `targets` naming ids or tags, any term matching. `gig_payout` is carried by every draw yield line, Cash and Rep alike, so the event reward multiplies the Rep line as well as the Cash - earned by a timed challenge, permanent-in-chapter, which is the §6.1 lateral-reward shape.",
 
   "upgrades": [
     {
@@ -407,9 +417,9 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 0 },
-      "gate": { "type": "currency", "currency": "fans", "value": 300 },
+      "gate": { "type": "currency", "currency": "rep", "value": 300 },
       "payload": { "effect": "setFlag", "flag": "album" },
-      "note": "Reveals the prestige button. 300 Fans is a few dozen open mics or a handful of house parties — reached in the first ten minutes, as Ch1's first demo is."
+      "note": "Reveals the prestige button. 300 Rep is a few dozen open mics or a handful of house parties - reached in the first ten minutes, as Ch1's first demo is."
     },
     {
       "id": "hire_the_crew",
@@ -417,7 +427,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 0 },
-      "gate": { "type": "currency", "currency": "eps", "value": 1 },
+      "gate": { "type": "currency", "currency": "eps_sold", "value": 1 },
       "payload": { "effect": "setFlag", "flag": "crew" },
       "note": "Reveals Roadie allocation, which Ch1's capstone deliberately left locked. After the first EP so the inner loop is understood first."
     },
@@ -427,7 +437,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 250000 },
-      "gate": { "type": "currency", "currency": "eps", "value": 8 },
+      "gate": { "type": "currency", "currency": "eps_sold", "value": 8 },
       "payload": { "effect": "autobuy", "targets": [ "gig_draw" ] },
       "note": "Ctrl C's HR / Delegation. Autobuy (F) on every draw generator by tag: the tick buys as many levels as it can afford at its end, after the bars have drunk. Permanent-in-chapter, so it is the second thing that makes each run's rebuild faster. Fights with saving for the next standing booking — which is the decision."
     },
@@ -437,7 +447,7 @@
       "type": "contentUnlock",
       "scope": "permanentInChapter",
       "cost": { "currency": "cash", "amount": 2000000 },
-      "gate": { "type": "currency", "currency": "eps", "value": 25 },
+      "gate": { "type": "currency", "currency": "eps_sold", "value": 25 },
       "payload": { "effect": "multiplier", "value": 0.5, "targets": [ "gig_draw" ], "stat": "cost" },
       "note": "Cost as a multiplier target (A): every draw level half price. `stat: cost` on the payload is the address; the gather multiplies it onto the unit cost before the series. Ctrl C's Syntax Highlighting is 0.01 — 0.5 here because the ladder is short."
     },
@@ -472,9 +482,9 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 120000 },
-      "gate": { "type": "currency", "currency": "fans", "value": 200 },
+      "gate": { "type": "currency", "currency": "rep", "value": 200 },
       "payload": { "effect": "multiplier", "value": 1.5, "targets": [ "gig_cash" ] },
-      "note": "Fans-gated: a crowd is what makes a merch table pay. Cash lines only, never Fans."
+      "note": "Rep-gated: a name people know is what makes a merch table pay. Cash lines only, never Rep."
     },
     {
       "id": "the_van",
@@ -482,41 +492,41 @@
       "type": "buff",
       "scope": "run",
       "cost": { "currency": "cash", "amount": 3000000 },
-      "gate": { "type": "currency", "currency": "fans", "value": 5000 },
-      "payload": { "effect": "multiplier", "value": 1.5, "targets": [ "gig_fans" ] },
-      "note": "The one run-scoped buff on Fans, late and Fans-gated. More people get to the show. Small on purpose — see fans.couplingNote."
+      "gate": { "type": "currency", "currency": "rep", "value": 5000 },
+      "payload": { "effect": "multiplier", "value": 1.5, "targets": [ "gig_rep" ] },
+      "note": "The one run-scoped buff on Rep, late and Rep-gated. More people get to the show. Small on purpose - see rep.couplingNote."
     }
   ],
 
-  "fans": {
-    "currency": "fans",
-    "couplingNote": "Fans arrive only as gig lumps, scaled by draw level (a Cash purchase) and by how many gigs complete (time). EPs and Buzz do NOT reach them: `epsBuff.affects` is Cash and `buzzBuff.affects` is `gig_cash`, so a Fans line carries neither. The only Fans multipliers are the_van (run-scoped, Fans-gated), the Battle of the Bands reward (earned), and each draw's one count threshold: at 25 owned it doubles the next gig's draw yield (the qualifier's own), and since that effect names no currency it doubles the Fans line with the Cash. That keeps the wall-clock floor section 8.1 depends on: a late replay buys its levels instantly, then still waits out the cycles."
+  "rep": {
+    "currency": "rep",
+    "couplingNote": "Rep arrives only as gig lumps, scaled by draw level (a Cash purchase), by how many gigs complete (time), and by EPs Sold: `epsBuff` (eps_sold_rep) multiplies every gig's Rep line by (1 + 0.0005 x epsSold). That is the prestige loop: the release pays EPs Sold from Rep earned, and EPs Sold multiply Rep, so what a release banks raises the next release's payout. Rep in turn drives Cash: `repBuff` (rep_cash) multiplies every gig's Cash line by (1 + log10(1 + rep)), so Rep buys more draw levels, which pay more Rep. The log is what keeps that loop from running away within a run - Rep grows the Cash lump only by its order of magnitude, while growth 1.6 makes every level 60% dearer than the last - so a run still stalls. Buzz never touches Rep: `buzzBuff.affects` is `gig_cash`, so a Rep line carries no Buzz term. The other Rep multipliers are the_van (run-scoped, Rep-gated), the Battle of the Bands reward (earned), and each draw's one count threshold: at 25 owned it doubles the next gig's draw yield (the qualifier's own), and since that effect names no currency it doubles the Rep line with the Cash. Every one of them multiplies what a completed gig pays, never how fast a gig fills, which keeps the wall-clock floor section 8.1 depends on: a late replay buys its levels instantly, then still waits out the cycles."
   },
 
   "album": {
     "id": "record_an_ep",
     "displayName": "Record an EP",
-    "unlock": { "type": "currency", "currency": "fans", "value": 300 },
-    "resets": [ "cash", "fans", "buzz", "generators.owned", "upgrades.buff", "upgrades.contentUnlock (scope: run)", "flags (scope: run)", "bars (progress + active set)" ],
-    "keeps": [ "eps", "roadies", "upgrades.contentUnlock (scope: permanentInChapter)", "flags (scope: permanentInChapter) - every standing booking", "bulk_booking", "favors" ],
-    "epsFormula": "floor( (fansEarnedThisRound / 10) ^ 0.5 )",
+    "unlock": { "type": "currency", "currency": "rep", "value": 300 },
+    "resets": [ "cash", "rep", "buzz", "generators.owned", "upgrades.buff", "upgrades.contentUnlock (scope: run)", "flags (scope: run)", "bars (progress + active set)" ],
+    "keeps": [ "eps_sold", "roadies", "upgrades.contentUnlock (scope: permanentInChapter)", "flags (scope: permanentInChapter) - every standing booking", "bulk_booking", "favors" ],
+    "epsFormula": "floor( repEarnedThisRound / 100 )",
     "epsFormulaReads": "earnedThisRound",
-    "epsFormulaExamples": { "300fans": 5, "1000fans": 10, "4000fans": 20, "10000fans": 31 },
-    "note": "Reads Fans EARNED this round (payout selector G, the default). Reset is driven by currency group and declared scope, not a name list. What makes the second run faster: EPs raise every Cash lump; every standing booking you bought is still set, so each gig re-books itself the moment its draw is repurchased; Bulk Booking, if owned, buys the levels for you. Ctrl C needed Stand Up and Micromanagement for the last two - here they fall out of scope."
+    "epsFormulaExamples": { "300rep": 3, "1000rep": 10, "10000rep": 100, "1000000rep": 10000 },
+    "note": "Reads Rep EARNED this round (payout selector G, the default), as RootCurveFormula(rep, divisor 100, exponent 1): linear in Rep, so a run that earns twice the Rep sells twice the copies. Reset is driven by currency group and declared scope, not a name list. What makes the second run faster: EPs Sold raise every Rep lump, and through rep_cash that Rep raises every Cash lump; every standing booking you bought is still set, so each gig re-books itself the moment its draw is repurchased; Bulk Booking, if owned, buys the levels for you. Ctrl C needed Stand Up and Micromanagement for the last two - here they fall out of scope."
   },
 
   "events": [
     {
       "id": "battle_of_the_bands",
       "name": "Battle of the Bands",
-      "availableWhen": { "type": "currency", "currency": "eps", "value": 5 },
-      "availableNote": "After a few EPs, so the calendar is understood and the player has at least the house party automated.",
+      "availableWhen": { "type": "currency", "currency": "eps_sold", "value": 5 },
+      "availableNote": "At 5 EPs Sold, after the first releases, so the calendar is understood and the player has at least the house party automated.",
       "baselineReset": true,
-      "baselineResetNote": "On entry the chapter economy resets to a fixed baseline for the event's duration, so stages scale independently of the player's EPs.",
+      "baselineResetNote": "On entry the chapter economy resets to a fixed baseline for the event's duration, so stages scale independently of the player's EPs Sold.",
       "tiers": [
-        { "tier": 1, "debuff": { "effect": "multiplier", "value": 1.0, "targets": [ "gig" ], "note": "No handicap at stage 1 — the timer is the challenge, as in Ctrl C's Sprints." }, "goal": { "type": "currency", "currency": "fans", "value": 250 },   "timerSeconds": 300, "failable": true, "reward": "gig_payout_x2", "scope": "permanentInChapter" },
-        { "tier": 2, "debuff": { "effect": "multiplier", "value": 0.5, "targets": [ "work_the_crowd" ], "note": "Half-speed taps." }, "goal": { "type": "currency", "currency": "fans", "value": 2500 },  "timerSeconds": 300, "failable": true, "reward": "gig_payout_x2", "scope": "permanentInChapter" },
-        { "tier": 3, "debuff": { "effect": "handicap", "targets": [ "gig_draw" ], "stat": "autobuy", "note": "Bulk Booking off for the run — an event handicap on the autobuy coordinate is the design doc's own 'automation disabled' example (decision 12)." }, "goal": { "type": "currency", "currency": "fans", "value": 25000 }, "timerSeconds": 300, "failable": true, "reward": "gig_payout_x2", "scope": "permanentInChapter" }
+        { "tier": 1, "debuff": { "effect": "multiplier", "value": 1.0, "targets": [ "gig" ], "note": "No handicap at stage 1 — the timer is the challenge, as in Ctrl C's Sprints." }, "goal": { "type": "currency", "currency": "rep", "value": 250 },   "timerSeconds": 300, "failable": true, "reward": "gig_payout_x2", "scope": "permanentInChapter" },
+        { "tier": 2, "debuff": { "effect": "multiplier", "value": 0.5, "targets": [ "work_the_crowd" ], "note": "Half-speed taps." }, "goal": { "type": "currency", "currency": "rep", "value": 2500 },  "timerSeconds": 300, "failable": true, "reward": "gig_payout_x2", "scope": "permanentInChapter" },
+        { "tier": 3, "debuff": { "effect": "handicap", "targets": [ "gig_draw" ], "stat": "autobuy", "note": "Bulk Booking off for the run — an event handicap on the autobuy coordinate is the design doc's own 'automation disabled' example (decision 12)." }, "goal": { "type": "currency", "currency": "rep", "value": 25000 }, "timerSeconds": 300, "failable": true, "reward": "gig_payout_x2", "scope": "permanentInChapter" }
       ],
       "failNote": "Timed, so failable: the timer running out cancels the stage. The player can quit anytime. Cost is time only, never permanent progress.",
       "tuningNote": "Each stage doubles gig payouts permanently, Ctrl C's Sprint reward. Tuned SOFT-REQUIRED (§6.1): three stages is 8x, which a reasonable player will not skip, and the chapter is still completable without it. Timers feel Encore fully (§11) — a 4x player has effectively 20 minutes; author the goals for the unbuffed player and let Encore make it comfortable."
@@ -532,7 +542,7 @@
   "capstone": {
     "id": "the_talent_show",
     "name": "Win the Talent Show",
-    "unlock": { "type": "currency", "currency": "eps", "value": 120 },
+    "unlock": { "type": "currency", "currency": "eps_sold", "value": 100000 },
     "unlockNote": "The SOLE authored source of the chapter gate and the primary pacing knob, as Ch1.",
     "onComplete": {
       "grantRoadies": 1,
@@ -546,39 +556,43 @@
     { "stage": 2, "name": "Friday",             "unlocks": "house_party_draw",                                 "gate": "150 Cash earned" },
     { "stage": 3, "name": "Standing Booking",   "unlocks": "the open mic re-books itself; first idle income",  "gate": "120 Cash",              "target": "~3 min" },
     { "stage": 4, "name": "Flyers",             "unlocks": "Buzz layer (flag: promo)",                         "gate": "200 Cash held" },
-    { "stage": 5, "name": "Record an EP",       "unlocks": "prestige",                                         "gate": "300 Fans",              "target": "~8-10 min from chapter open" },
-    { "stage": 6, "name": "Hire the Crew",      "unlocks": "Roadie allocation",                                "gate": "1 EP" },
-    { "stage": 7, "name": "Battle of the Bands","unlocks": "the timed event",                                  "gate": "5 EPs" },
-    { "stage": 8, "name": "Bulk Booking",       "unlocks": "autobuy on draw levels",                           "gate": "8 EPs" },
-    { "stage": 9, "name": "Favors",             "unlocks": "half-price levels",                                "gate": "25 EPs" },
-    { "stage": 10,"name": "The Talent Show",    "unlocks": "capstone -> Chapter 3 + a Roadie",                 "gate": "120 EPs" }
+    { "stage": 5, "name": "Record an EP",       "unlocks": "prestige",                                         "gate": "300 Rep",          "target": "~8-10 min from chapter open" },
+    { "stage": 6, "name": "Hire the Crew",      "unlocks": "Roadie allocation",                                "gate": "1 EP Sold" },
+    { "stage": 7, "name": "Battle of the Bands","unlocks": "the timed event",                                  "gate": "5 EPs Sold" },
+    { "stage": 8, "name": "Bulk Booking",       "unlocks": "autobuy on draw levels",                           "gate": "8 EPs Sold" },
+    { "stage": 9, "name": "Favors",             "unlocks": "half-price levels",                                "gate": "25 EPs Sold" },
+    { "stage": 10,"name": "The Talent Show",    "unlocks": "capstone -> Chapter 3 + a Roadie",                 "gate": "100,000 EPs Sold" }
   ],
 
   "balanceTargets": {
     "timeToFirstEpSeconds": 540,
+    "timeToFirstEpNote": "The first release about 9 minutes from chapter open: growth 1.6 stalls the run's ladder near there, and the release at 300 Rep is the way past it.",
     "estEpCyclesToCapstone": "10-14",
-    "targetCycleLengthMinutes": "2-6",
+    "releaseDoublingTarget": "Each release roughly doubles the banked EPs Sold when the player releases once the pending payout matches what is banked. Because EPs Sold multiply the Rep the payout reads, each run reaches that point in about the same time, so the 10-14 releases to 100,000 EPs Sold are loops of similar length rather than a shrinking or growing series.",
+    "targetCycleLengthMinutes": "about 9, the first release's length",
     "primaryPacingKnob": "capstone.unlock.value — raise/lower before touching any curve",
     "secondaryKnobs": [
-      "generatorCostGrowth (1.3) — how many levels a gig is worth buying before the next tier is the better spend.",
+      "generatorCostGrowth (1.6) - where a run stalls: how many levels a gig is worth buying before the next tier, or the release, is the better move.",
+      "epsBuff.perEp (0.0005) and the payout divisor (100) - how hard each release pushes the next; together they set whether a release roughly doubles EPs Sold.",
       "the standing bookings' prices — set how long each gig stays manual. Too cheap and the chapter is idle by minute two; too dear and the tap grind outstays its welcome.",
       "fillAmount per gig — the cycle ladder; payouts are tuned against it, so move them together.",
-      "buzzBuff.coefficient (1) - how much the second spend matters."
+      "buzzBuff.coefficient (1) - how much the second spend matters.",
+      "repBuff.coefficient (1) - how much Rep feeds back into Cash; a log keeps the feedback bounded, so raise it before reaching for a steeper shape."
     ],
     "watchList": [
       "If the manual phase of each new gig feels like a chore rather than a hook, lower its standing booking's price: the booking has no gate of its own, so the price is the whole knob.",
-      "If Fans per run flatten because nothing multiplies them, that is by design - raise draw Fans lines or the_van, never add an EPs or Buzz term to Fans.",
+      "If releases stop roughly doubling EPs Sold, tune epsBuff.perEp or the payout divisor before touching growth. Never add a Buzz term to Rep, and never let anything raise how fast a gig fills: EPs Sold multiply what a gig pays in Rep, which is the only place the prestige currency reaches.",
       "If players park on the open mic and never buy up, the higher draws' unlock thresholds (currencyEarnedTotal) are too far apart.",
       "The chapter must not overstay: if estEpCyclesToCapstone drifts above ~14, lower the gate rather than adding content."
     ],
-    "tuneAgainst": "a player with the full multiplier stack active (Encore up to 4x, EPs, and Roadies stationed from Ch1); confirm the chapter still takes meaningful play time and that Battle of the Bands is beatable unbuffed"
+    "tuneAgainst": "a player with the full multiplier stack active (Encore up to 4x, EPs Sold, and Roadies stationed from Ch1); confirm the chapter still takes meaningful play time and that Battle of the Bands is beatable unbuffed"
   },
 
   "importerNotes": {
     "actions": "`onComplete` entries use `{ action: fireGeneratorYield, generator }` for `FireGeneratorYield` (B). Same friendly-key convention Ch1 uses for payload effects.",
     "contributionsTargetingABar": "A contribution names exactly one of `currency` / `generator` / `bar` (C). The crowd producers name a `bar`.",
     "payloadStat": "`stat: cost` and `effect: autobuy` on a payload address the cost and autobuy coordinates (A, F). `effect: handicap` with a `stat` on an event debuff is the handicap side of the same coordinate.",
-    "buzzBuff": "Like `epsBuff`, with `coefficient` where `epsBuff` has `perEp` and no `mode`, plus `formula: LogOnBalance` and `currency` naming the balance the permanent chapter modifier reads. `affects` names a TAG here, not a currency.",
+    "buzzBuff": "Like `epsBuff`, with `coefficient` where `epsBuff` has `perEp` and no `mode`; `formula` and `currency` name the formula and the balance the permanent modifier reads (LogOnBalance on buzz here, LinearOnBalance on eps_sold in `epsBuff`). `repBuff` has buzzBuff's shape, LogOnBalance on rep. `affects` names a TAG in all three, not a currency.",
     "fillFromTime": "`fillCurrency: null` with `fillAmount` in seconds and `fillRate: 1` — a time-fed bar per §12.7. Author `fillRate` explicitly so the cycle is legible in the data.",
     "noJam": "This chapter authors no `module/tap` and no `jam` producer. The validator's 'yield-holding producer nobody presents' check is satisfied for the crowd producers by the bars' `tap` naming them."
   }

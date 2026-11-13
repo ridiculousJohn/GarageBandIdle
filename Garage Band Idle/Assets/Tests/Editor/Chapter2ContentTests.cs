@@ -90,8 +90,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void Each_scope_declares_the_families_the_chapter_files_on_it()
         {
             // The chapter's own counter, the one currency the EP pays.
-            Assert.AreEqual(new[] { "eps" }, Ids(ch2.declaredCurrencies));
-            Assert.AreEqual(new[] { "EPs" }, ch2.declaredCurrencies.Select(c => c.displayName).ToArray());
+            Assert.AreEqual(new[] { "eps_sold" }, Ids(ch2.declaredCurrencies));
+            Assert.AreEqual(new[] { "EPs Sold" }, ch2.declaredCurrencies.Select(c => c.displayName).ToArray());
 
             // Everything that survives an EP: the booked bookings, the two
             // permanent switches, the Battle records, and every row reveal.
@@ -109,9 +109,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }, ch2.declaredFlags.ToArray());
 
             Assert.AreEqual(
-                new[] { "gig_payout_x2", "bulk_booking_switch", "favors_discount", "eps_income" }, Ids(ch2.modifiers));
+                new[] { "gig_payout_x2", "bulk_booking_switch", "favors_discount", "eps_sold_rep" }, Ids(ch2.modifiers));
             Assert.AreEqual(
-                new[] { "bulk_booking_switch", "favors_discount", "eps_income" }, Ids(ch2.permanentModifiers));
+                new[] { "bulk_booking_switch", "favors_discount", "eps_sold_rep" }, Ids(ch2.permanentModifiers));
             Assert.AreEqual(new[] { "story_ch2_open", "story_ch2_end" }, Ids(ch2.storyBeats));
             Assert.AreEqual(6, ch2.sections.Count, "only a chapter has a screen, and this is all of it");
             Assert.AreEqual(0, ch2.events.Count, "the Battle chain hosts at tier2, where its resets reach");
@@ -120,9 +120,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // vocabularies its own effects address.
             Assert.AreEqual(new[] { "gig", "gig_draw", "promo", "work_the_crowd" }, tier2.declaredTags.ToArray());
             Assert.AreEqual(new[] { "promo_revealed" }, tier2.declaredFlags.ToArray());
-            Assert.AreEqual(new[] { "cash", "fans", "buzz" }, Ids(tier2.declaredCurrencies));
-            Assert.AreEqual(new[] { "buzz_buff" }, Ids(tier2.modifiers));
-            Assert.AreEqual(new[] { "buzz_buff" }, Ids(tier2.permanentModifiers));
+            Assert.AreEqual(new[] { "cash", "rep", "buzz" }, Ids(tier2.declaredCurrencies));
+            Assert.AreEqual(new[] { "Cash", "Rep", "Buzz" }, tier2.declaredCurrencies.Select(c => c.displayName).ToArray());
+            Assert.AreEqual(new[] { "buzz_buff", "rep_cash" }, Ids(tier2.modifiers));
+            Assert.AreEqual(new[] { "buzz_buff", "rep_cash" }, Ids(tier2.permanentModifiers));
             Assert.AreEqual(new[] { "crowd_open_mic", "crowd_house_party", "crowd_coffeehouse",
                                     "crowd_backyard", "crowd_bar_opener", "crowd_botb_qualifier" },
                 Ids(tier2.producers));
@@ -199,8 +200,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var draw = Find(tier2.generators, "open_mic_draw");
 
             Assert.AreEqual("cash", draw.costCurrency.Id);
-            Assert.AreEqual((BigNumber)1.3, draw.growth);
-            Assert.AreEqual(new[] { "cash", "fans" }, draw.produces.Select(e => e.currency.Id).ToArray());
+            Assert.AreEqual(new[] { "cash", "rep" }, draw.produces.Select(e => e.currency.Id).ToArray());
             Assert.AreEqual(new[] { Stat.Yield, Stat.Yield }, draw.produces.Select(e => e.stat).ToArray());
             Assert.AreEqual((BigNumber)3, draw.produces[0].value);
             Assert.AreEqual((BigNumber)0.5, draw.produces[1].value);
@@ -213,21 +213,36 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual((BigNumber)0.05, buzz.value);
         }
 
+        // One price curve across the chapter: every level of every draw and
+        // every promo generator costs 1.6 times the one before it.
+        [Test]
+        public void Every_generator_grows_its_price_by_1_6()
+        {
+            Assert.AreEqual(10, tier2.generators.Count, "six draws and four promos");
+            foreach (var generator in tier2.generators)
+                Assert.AreEqual((BigNumber)1.6, generator.growth, generator.Id);
+        }
+
         // ---- the modifiers ----
 
-        // Every Cash in this chapter is a fired yield, so the Buzz factor sits
-        // at the yield stat on the draw tag narrowed to cash: a log curve on
-        // the Buzz balance, so it keeps climbing at a falling rate. Roadies
-        // need nothing here: root's pair carries yield as well as rate, and
-        // the draws carry the production tag its active factor names (8.2).
+        // Every Cash in this chapter is a fired yield, so the Buzz and Rep
+        // factors sit at the yield stat on the draw tag narrowed to cash: each
+        // a log curve on its balance, so it keeps climbing at a falling rate.
+        // Roadies need nothing here: root's pair carries yield as well as
+        // rate, and the draws carry the production tag its active factor
+        // names (8.2).
         [Test]
-        public void The_run_modifier_lifts_the_gig_cash_yield_by_buzz()
+        public void The_run_modifiers_lift_the_gig_cash_yield_by_buzz_and_by_rep()
         {
-            var buzz = Find(tier2.modifiers, "buzz_buff").effects.Single();
-            Assert.AreEqual(("gig_draw", "cash", Stat.Yield), (buzz.target, buzz.currencyId, buzz.stat));
-            var curve = (LogOnBalance)buzz.formula;
-            Assert.AreEqual("buzz", curve.currency.Id);
-            Assert.AreEqual((BigNumber)1, curve.coefficient);
+            foreach (var (id, balance) in new[] { ("buzz_buff", "buzz"), ("rep_cash", "rep") })
+            {
+                var effect = Find(tier2.modifiers, id).effects.Single();
+                Assert.AreEqual(("gig_draw", "cash", Stat.Yield), (effect.target, effect.currencyId, effect.stat), id);
+                var curve = (LogOnBalance)effect.formula;
+                Assert.AreEqual(balance, curve.currency.Id, id);
+                Assert.AreEqual((BigNumber)1, curve.coefficient, id);
+                Assert.IsTrue(tier2.permanentModifiers.Contains(Find(tier2.modifiers, id)), id);
+            }
 
             Assert.IsTrue(tier2.generators.Where(g => g.Id.EndsWith("_draw"))
                 .All(g => g.Tags.SequenceEqual(new[] { "gig_draw", "production" })),
@@ -274,22 +289,20 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
-        // The chapter's permanent lift: +2% income per EP at both stats, so the
-        // fired gig yields ride it. It reads the chapter's own counter, which
-        // the capstone's reset clears with the chapter.
+        // The chapter's permanent lift: +0.05% of a gig's Rep per EP Sold, at
+        // the yield stat on the draw tag narrowed to rep, so it never touches
+        // the Cash line. It reads the chapter's own counter, which the
+        // capstone's reset clears with the chapter.
         [Test]
-        public void EPs_lift_income_through_a_permanent_chapter_modifier()
+        public void EPs_Sold_lift_the_gig_rep_yield_through_a_permanent_chapter_modifier()
         {
-            var lift = Find(ch2.modifiers, "eps_income");
+            var lift = Find(ch2.modifiers, "eps_sold_rep");
 
-            Assert.AreEqual(new[] { ("income", Stat.Rate), ("income", Stat.Yield) },
-                lift.effects.Select(e => (e.target, e.stat)).ToArray());
-            foreach (var effect in lift.effects)
-            {
-                var curve = (LinearOnBalance)effect.formula;
-                Assert.AreEqual("eps", curve.currency.Id, effect.stat.ToString());
-                Assert.AreEqual((BigNumber)0.02, curve.coefficient, effect.stat.ToString());
-            }
+            var effect = lift.effects.Single();
+            Assert.AreEqual(("gig_draw", "rep", Stat.Yield), (effect.target, effect.currencyId, effect.stat));
+            var curve = (LinearOnBalance)effect.formula;
+            Assert.AreEqual("eps_sold", curve.currency.Id);
+            Assert.AreEqual((BigNumber)0.0005, curve.coefficient);
             Assert.IsTrue(ch2.permanentModifiers.Contains(lift));
         }
 
@@ -332,28 +345,29 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- the rungs ----
 
         // The EP pays the chapter's own counter, the one currency both the
-        // capstone gate and the income lift read.
+        // capstone gate and the Rep lift read: one EP Sold per 100 Rep the
+        // round earned, a straight line rather than a root.
         [Test]
-        public void The_EP_pays_eps_from_one_root_curve()
+        public void The_EP_pays_eps_sold_from_one_root_curve()
         {
             var ep = tier2.rung;
             var pay = (AddCurrency)ep.actions[0];
 
             Assert.AreEqual("Record an EP", ep.label);
-            Assert.AreEqual(new[] { "eps" }, Ids(pay.currencies));
+            Assert.AreEqual(new[] { "eps_sold" }, Ids(pay.currencies));
             var curve = (RootCurveFormula)pay.formula;
-            Assert.AreEqual("fans", curve.currency.Id);
-            // Fans are never spent and clear with the tier, so what the round
+            Assert.AreEqual("rep", curve.currency.Id);
+            // Rep is never spent and clears with the tier, so what the round
             // earned and what stands are the same number here (12.5).
             Assert.AreEqual(PayoutTotal.EarnedThisRound, curve.reads);
-            Assert.AreEqual((BigNumber)10, curve.divisor);
-            Assert.AreEqual(0.5, curve.exponent);
+            Assert.AreEqual((BigNumber)100, curve.divisor);
+            Assert.AreEqual(1.0, curve.exponent);
             Assert.AreEqual(tier2, ((ResetScope)ep.actions[1]).scope, "the payout banks before the clear");
 
             // The second leg is the armed-reward guard: a Battle stage's
             // modifier has to be collected before the run it was won in ends.
             var legs = ((All)ep.offerCondition).conditions;
-            Assert.AreEqual(new[] { "balance fans", "not reward pending" }, legs.Select(Describe).ToArray());
+            Assert.AreEqual(new[] { "balance rep", "not reward pending" }, legs.Select(Describe).ToArray());
             Assert.AreEqual((BigNumber)300, Threshold(legs[0]));
 
             // The EP resets one tier, so its card neither offers an (i) nor
@@ -370,8 +384,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // One leg, so the gate is that leg and not an All wrapping it: the
             // chapter counter is the whole pacing knob.
             Assert.AreEqual("Win the Talent Show", capstone.label);
-            Assert.AreEqual("balance eps", Describe(capstone.offerCondition));
-            Assert.AreEqual((BigNumber)120, Threshold(capstone.offerCondition));
+            Assert.AreEqual("balance eps_sold", Describe(capstone.offerCondition));
+            Assert.AreEqual((BigNumber)100000, Threshold(capstone.offerCondition));
+            Assert.AreEqual("Requires 100,000 EPs Sold", capstone.offerCondition.uiText);
 
             // The roadie, the completion flag, the chapter reset - and nothing
             // else: the reset clears the chapter counter, so an EP recorded
@@ -516,15 +531,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             Assert.IsNull(office.modules[0].visibleWhen, "Crowd Work shows when the Office does");
 
-            foreach (var (index, eps) in new[] { (4, 8), (5, 25) })
+            foreach (var (index, epsSold) in new[] { (4, 8), (5, 25) })
             {
                 var gate = (Any)office.modules[index].visibleWhen;
                 Assert.AreEqual(2, gate.conditions.Count, office.modules[index].content.Id);
                 Assert.AreSame(office.modules[index].content, ((UpgradePurchased)gate.conditions[0]).upgrade,
                     $"{office.modules[index].content.Id} stays while it is owned");
                 var threshold = (CurrencyAtLeast)gate.conditions[1];
-                Assert.AreEqual("eps", threshold.currency.Id);
-                Assert.AreEqual((BigNumber)eps, threshold.threshold, $"{office.modules[index].content.Id} shows at {eps} EPs");
+                Assert.AreEqual("eps_sold", threshold.currency.Id);
+                Assert.AreEqual((BigNumber)epsSold, threshold.threshold,
+                    $"{office.modules[index].content.Id} shows at {epsSold} EPs Sold");
             }
 
             // The other sections keep the list layout.

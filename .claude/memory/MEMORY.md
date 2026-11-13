@@ -1,7 +1,7 @@
 # Memory index
 
 ## Read first, then delete when stale
-- [Session handoff](session-handoff-2026-11-10.md) - state at end of 2026-11-12: chapter 2 rebalance and stable ids committed, EP buff retune next, items waiting on John, chapter 3 after
+- [Session handoff](session-handoff-2026-11-10.md) - state at end of 2026-11-12: chapter 2 loop restructure (Rep, EPs Sold) committed, play-test next, items waiting on John, chapter 3 after
 
 ## The project
 - [Project layout and workflow](project-layout-and-workflow.md) - where things live, which docs are authority, editing mechanics that bite

@@ -42,7 +42,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly ChapterDefinition Ch2Def;
             public readonly TierDefinition Tier2Def;
 
-            public readonly CurrencyDefinition Roadies, Eps, Cash, Fans;
+            public readonly CurrencyDefinition Roadies, EpsSold, Cash, Rep;
             public readonly ProducerDefinition CrowdOpenMic;
             public readonly GeneratorDefinition OpenMicDraw;
             public readonly UpgradeDefinition StandingOpenMic, CrowdWork, BulkBooking;
@@ -86,10 +86,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Tier2Def = (TierDefinition)Ch2Def.children.Single();
 
                 Roadies = Find(RootDef.declaredCurrencies, "roadies");
-                Eps = Find(Ch2Def.declaredCurrencies, "eps");
+                EpsSold = Find(Ch2Def.declaredCurrencies, "eps_sold");
                 StoryCh2End = Find(Ch2Def.storyBeats, "story_ch2_end");
                 Cash = Find(Tier2Def.declaredCurrencies, "cash");
-                Fans = Find(Tier2Def.declaredCurrencies, "fans");
+                Rep = Find(Tier2Def.declaredCurrencies, "rep");
                 CrowdOpenMic = Find(Tier2Def.producers, "crowd_open_mic");
                 OpenMicDraw = Find(Tier2Def.generators, "open_mic_draw");
                 StandingOpenMic = Find(Tier2Def.upgrades, "standing_open_mic");
@@ -221,7 +221,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // opening_cash is the only trigger the switch-in sweep collects.
             AssertClose(5, f.Balance(f.Tier2, f.Cash), "the chapter opens with 5 Cash");
-            Assert.AreEqual((BigNumber)0, f.Balance(f.Tier2, f.Fans), "fans");
+            Assert.AreEqual((BigNumber)0, f.Balance(f.Tier2, f.Rep), "rep");
             Assert.IsEmpty(f.Tier2.generatorCounts, "nothing is hired yet");
             Assert.IsFalse(f.OpenMic.availableWhen.Evaluate(f.Ctx(f.Tier2)),
                 "the gig wants a draw before it can be booked");
@@ -247,11 +247,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Selected(f.OpenMic), "the gig is the one the calendar is running");
             f.Tick(5);
 
-            // One draw owned, no EPs and no Buzz banked and no Roadies
-            // stationed, so every factor on the lump is 1: the completion pays
-            // the authored 3 Cash and 0.5 Fans times the owned count of 1.
+            // One draw owned, no EPs Sold, no Rep and no Buzz banked and no
+            // Roadies stationed, so every factor on the lump is 1: the
+            // completion pays the authored 3 Cash and 0.5 Rep times the owned
+            // count of 1.
             AssertClose(3, f.Balance(f.Tier2, f.Cash), "the gig's cash lump");
-            AssertClose(0.5, f.Balance(f.Tier2, f.Fans), "and its fans");
+            AssertClose(0.5, f.Balance(f.Tier2, f.Rep), "and its rep");
             Assert.AreEqual((BigNumber)0, f.Progress(f.OpenMic), "the manual team returns to zero");
             Assert.IsFalse(f.Selected(f.OpenMic), "and leaves the set until the player books it again");
         }
@@ -294,16 +295,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(3, f.Owned(f.OpenMicDraw), "the three draws the fixture bought");
             Assert.IsTrue(f.Ch2.flags.Contains("booked_open_mic"), "the payload flag is a ch2 fact");
 
-            var cash = f.Balance(f.Tier2, f.Cash);
-            var fans = f.Balance(f.Tier2, f.Fans);
-            f.Tick(10);
+            // 1 unit per second over 5 seconds is one crossing of the gig's 5,
+            // and each completion fires the draw at its owned count of 3: 3 x 3
+            // Cash under the Rep the run holds when it lands, so each lump is
+            // the one the runtime prices just before it, and 3 x 0.5 Rep, which
+            // no EP Sold lifts yet. The second crossing needs no selection.
+            for (var crossing = 1; crossing <= 2; crossing++)
+            {
+                var cash = f.Balance(f.Tier2, f.Cash);
+                var rep = f.Balance(f.Tier2, f.Rep);
+                var lump = BarSystem.CompletionPayout(f.Ctx(f.Tier2), f.OpenMic)
+                    .ToDictionary(line => line.currency.Id, line => line.amount);
+                Assert.Greater(lump["cash"].ToDouble(), 9, $"completion {crossing}: the Rep banked lifts the 3 x 3 Cash");
+                f.Tick(5);
 
-            // 1 unit per second over 10 seconds is two crossings of the gig's 5,
-            // and each completion fires the draw at its owned count of 3: 2 x 3
-            // x 3 Cash and 2 x 0.5 x 3 Fans.
-            AssertClose(18, f.Balance(f.Tier2, f.Cash) - cash, "two completions of the three-draw lump");
-            AssertClose(3, f.Balance(f.Tier2, f.Fans) - fans, "and their fans");
-            Assert.IsTrue(f.Selected(f.OpenMic), "a booked gig stays on the calendar");
+                AssertClose(lump["cash"].ToDouble(), f.Balance(f.Tier2, f.Cash) - cash,
+                    $"completion {crossing}: the three-draw cash lump");
+                AssertClose(1.5, f.Balance(f.Tier2, f.Rep) - rep, $"completion {crossing}: and its rep");
+                Assert.IsTrue(f.Selected(f.OpenMic), "a booked gig stays on the calendar");
+            }
             Assert.AreEqual((BigNumber)0, f.Progress(f.OpenMic), "10 seconds less the two 5s it paid out");
 
             // The residual is retained rather than discarded, which is what
@@ -324,57 +334,66 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(f.Selected(f.OpenMic), "and on a gig left running");
 
             var cash = f.Balance(f.Tier2, f.Cash);
-            var fans = f.Balance(f.Tier2, f.Fans);
+            var rep = f.Balance(f.Tier2, f.Rep);
+
+            // The window prices every completion once, at the state the player
+            // left, under the idle circumstance: the 3 x 3 Cash lifted by the
+            // Rep banked at the stamp, which the window's own Rep does not move.
+            var lump = BarSystem.CompletionPayout(new GameContext(f.Tier2, f.Now, idleAccumulation: true), f.OpenMic)
+                .Single(line => line.currency == f.Cash).amount;
+            Assert.Greater(lump.ToDouble(), 9, "the Rep banked lifts the 3 x 3 Cash");
+
             f.GoAway(3600);
             Assert.AreEqual(SessionPhase.AwaitingIdleClaim, f.Session.Phase);
 
             // The fill is a rate, so idle_base's wildcard x0.5 halves it: 0.5
             // units per second over 3600 seconds is 1800, and the gig's 5 makes
             // that 360 completions. Each fires the draw at its owned count of 3,
-            // with no EPs, Buzz or Roadies on the lump.
+            // with no EPs Sold, Buzz or Roadies on the lump.
             var bar = f.Session.CurrentOffer.bars.Single();
             Assert.AreSame(f.OpenMic, bar.bar);
             Assert.AreEqual(360, bar.completions, "3600 s at 0.5/s over a 5 unit gig");
-            AssertClose(360 * 3 * 3, Line(f, f.Cash).amount, "cash");
-            AssertClose(360 * 0.5 * 3, Line(f, f.Fans).amount, "fans");
+            AssertClose(360 * lump.ToDouble(), Line(f, f.Cash).amount, "cash");
+            AssertClose(360 * 0.5 * 3, Line(f, f.Rep).amount, "rep");
             Assert.IsEmpty(f.Session.CurrentOffer.draws, "a time-fed gig drinks nothing");
             Assert.AreEqual(cash, f.Balance(f.Tier2, f.Cash), "an offer deposits nothing until it settles");
 
             f.Session.ClaimIdle(f.Now);
             Assert.AreEqual(SessionPhase.Live, f.Session.Phase);
-            AssertClose(3240, f.Balance(f.Tier2, f.Cash) - cash, "the claim deposits the cash line");
-            AssertClose(540, f.Balance(f.Tier2, f.Fans) - fans, "and the fans line");
+            AssertClose(360 * lump.ToDouble(), f.Balance(f.Tier2, f.Cash) - cash, "the claim deposits the cash line");
+            AssertClose(540, f.Balance(f.Tier2, f.Rep) - rep, "and the rep line");
             Assert.AreEqual((BigNumber)0, f.Progress(f.OpenMic), "1800 of fill is a whole number of gigs");
         }
 
         // ---- 6. the EP ----
 
         [Test]
-        public void The_ep_pays_five_eps_and_resets_the_run_leaving_the_booking()
+        public void The_ep_pays_three_eps_sold_and_resets_the_run_leaving_the_booking()
         {
             var f = new Chapter2();
             f.BookTheOpenMic();
 
-            // The run's own fans plus the remainder, so the release reads
-            // exactly 300 earned this round and pays floor(sqrt(300 / 10)) = 5.
-            f.Ctx(f.Tier2).Deposit(f.Fans.Id, 300 - f.Earned(f.Tier2, f.Fans));
-            AssertClose(300, f.Earned(f.Tier2, f.Fans), "300 fans earned this round");
+            // The run's own Rep plus the remainder, so the release reads 350
+            // earned this round and pays floor(350 / 100) = 3 - halfway between
+            // two EPs Sold, so the sum's last digit cannot move the floor.
+            f.Ctx(f.Tier2).Deposit(f.Rep.Id, 350 - f.Earned(f.Tier2, f.Rep));
+            AssertClose(350, f.Earned(f.Tier2, f.Rep), "350 rep earned this round");
 
             // A direct deposit is not a transaction, so the reveal that reads it
             // fires on the next tick's sweep.
             f.Tick(1);
-            Assert.IsTrue(f.Ch2.flags.Contains("album"), "reveal_release opened The Release at 300 fans");
+            Assert.IsTrue(f.Ch2.flags.Contains("album"), "reveal_release opened The Release past 300 rep");
 
             Assert.IsTrue(f.Tier2Def.rung.IsOffered(f.Ctx(f.Tier2)));
             f.Session.TryRung(f.Ctx(f.Tier2));
 
             // The EP banks the chapter's own counter.
-            AssertClose(5, f.Balance(f.Ch2, f.Eps), "eps");
+            AssertClose(3, f.Balance(f.Ch2, f.EpsSold), "eps sold");
 
             // The reset re-arms opening_cash, and the transaction's own closing
             // sweep is what re-fires it - so the new run opens funded.
             AssertClose(5, f.Balance(f.Tier2, f.Cash), "the next run's opening lump");
-            Assert.AreEqual((BigNumber)0, f.Balance(f.Tier2, f.Fans), "fans go with the run");
+            Assert.AreEqual((BigNumber)0, f.Balance(f.Tier2, f.Rep), "rep goes with the run");
             Assert.IsEmpty(f.Tier2.generatorCounts, "the draws are hired again from scratch");
             Assert.IsEmpty(f.Tier2.barProgress, "and the calendar is clear");
             Assert.IsTrue(f.Ch2.flags.Contains("booked_open_mic"),
@@ -388,7 +407,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new Chapter2();
             f.Enter();
-            f.Ctx(f.Ch2).Deposit(f.Eps.Id, 8);
+            f.Ctx(f.Ch2).Deposit(f.EpsSold.Id, 8);
             f.Ctx(f.Tier2).Deposit(f.Cash.Id, 250000);
             f.Session.TryBuy(f.Ctx(f.Tier2), f.BulkBooking);
             Assert.IsTrue(f.Ch2.flags.Contains("bulk_booked"), "the payload wrote the chapter-lifetime flag");
@@ -398,13 +417,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // count the bank allows - the same number the row's button would.
             f.Ctx(f.Tier2).Deposit(f.Cash.Id, 1000);
             var affordable = Purchasing.MaxAffordable(f.Ctx(f.Tier2), f.OpenMicDraw);
-            Assert.Greater(affordable, 1, "1000 cash covers several draws at base 5 and growth 1.3");
+            Assert.Greater(affordable, 1, "1000 cash covers several draws at base 5 and growth 1.6");
             f.Tick(1);
             Assert.AreEqual(affordable, f.Owned(f.OpenMicDraw), "the tick bought the whole affordable count");
             Assert.IsFalse(Purchasing.CanBuy(f.Ctx(f.Tier2), f.OpenMicDraw, 1),
                 "and stopped at the first count the bank could not cover");
 
-            f.Ctx(f.Tier2).Deposit(f.Fans.Id, 300);
+            f.Ctx(f.Tier2).Deposit(f.Rep.Id, 300);
             Assert.IsTrue(f.Tier2Def.rung.IsOffered(f.Ctx(f.Tier2)));
             f.Session.TryRung(f.Ctx(f.Tier2));
             Assert.IsTrue(f.Ch2.flags.Contains("bulk_booked"), "the flag outlives the run that bought it");
@@ -423,12 +442,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var f = new Chapter2();
             f.BookTheOpenMic();
-            f.Ctx(f.Ch2).Deposit(f.Eps.Id, 120);
+            f.Ctx(f.Ch2).Deposit(f.EpsSold.Id, 100000);
 
             // A live run that meets the EP's own gate: the capstone pays no EP
             // for it, and the chapter reset clears it with everything else.
-            f.Ctx(f.Tier2).Deposit(f.Fans.Id, 300 - f.Earned(f.Tier2, f.Fans));
-            Assert.IsTrue(f.Ch2Def.rung.IsOffered(f.Ctx(f.Ch2)), "120 EPs clears the capstone's gate");
+            f.Ctx(f.Tier2).Deposit(f.Rep.Id, 300 - f.Earned(f.Tier2, f.Rep));
+            Assert.IsTrue(f.Ch2Def.rung.IsOffered(f.Ctx(f.Ch2)), "100,000 EPs Sold clears the capstone's gate");
             f.Session.TryRung(f.Ctx(f.Ch2));
 
             AssertClose(1, f.Balance(f.Root, f.Roadies), "chapter 2 pays one Roadie");
@@ -436,12 +455,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // ResetScope(ch2) is downward closed: the chapter's own facts go
             // with the tier's, and the chapter sits immediately replayable.
-            AssertClose(0, f.Balance(f.Ch2, f.Eps), "the gate counter zeroes");
+            AssertClose(0, f.Balance(f.Ch2, f.EpsSold), "the gate counter zeroes");
             Assert.IsFalse(f.Ch2.flags.Contains("booked_open_mic"), "the booking goes with the chapter");
             Assert.IsEmpty(f.Ch2.flags, "every ch2 flag with it - the reveals and the battle latches");
             Assert.IsEmpty(f.Tier2.generatorCounts);
             Assert.IsEmpty(f.Tier2.barProgress);
-            AssertClose(0, f.Balance(f.Tier2, f.Fans), "the run's fans go with the tier");
+            AssertClose(0, f.Balance(f.Tier2, f.Rep), "the run's rep goes with the tier");
 
             // The closing beat reads the root flag the capstone set, which is
             // why it is homed where no chapter reset can reach it.
@@ -466,7 +485,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var payout = BarSystem.CompletionPayout(f.Ctx(f.Tier2), f.OpenMic)
                 .ToDictionary(line => line.currency.Id, line => line.amount);
             Assert.AreEqual((BigNumber)9, payout["cash"], "three draws, 3 Cash each, per gig");
-            Assert.AreEqual((BigNumber)1.5, payout["fans"], "three draws, 0.5 Fans each, per gig");
+            Assert.AreEqual((BigNumber)1.5, payout["rep"], "three draws, 0.5 Rep each, per gig");
+        }
+
+        // The two balances that lift a gig's lump, each on its own line: Rep
+        // on the Cash, at 1 + log10(1 + Rep), and EPs Sold on the Rep, at
+        // 1 + 0.0005 per EP Sold. 99 Rep is a x3 and 2000 EPs Sold a x2, and
+        // neither touches the other line.
+        [Test]
+        public void Rep_lifts_the_gigs_cash_and_eps_sold_lift_its_rep()
+        {
+            var f = new Chapter2();
+            f.Enter();
+            var ctx = f.Ctx(f.Tier2);
+            ctx.Deposit(f.Cash.Id, 100);
+            f.Session.TryBuy(ctx, f.OpenMicDraw, 3);
+
+            f.Ctx(f.Tier2).Deposit(f.Rep.Id, 99);
+            var payout = BarSystem.CompletionPayout(f.Ctx(f.Tier2), f.OpenMic)
+                .ToDictionary(line => line.currency.Id, line => line.amount);
+            AssertClose(27, payout["cash"], "99 Rep triples the three-draw 9 Cash");
+            AssertClose(1.5, payout["rep"], "and leaves the Rep line alone");
+
+            f.Ctx(f.Ch2).Deposit(f.EpsSold.Id, 2000);
+            payout = BarSystem.CompletionPayout(f.Ctx(f.Tier2), f.OpenMic)
+                .ToDictionary(line => line.currency.Id, line => line.amount);
+            AssertClose(3, payout["rep"], "2000 EPs Sold double the three-draw 1.5 Rep");
+            AssertClose(27, payout["cash"], "and leave the Cash line alone");
         }
 
         private static IdleOfferLine Line(Chapter2 f, CurrencyDefinition currency) =>

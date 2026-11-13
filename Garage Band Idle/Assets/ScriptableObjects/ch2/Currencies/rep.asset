@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5efc841d80f6eed4d911603873651c33, type: 3}
-  m_Name: fans
+  m_Name: rep
   m_EditorClassIdentifier: Assembly-CSharp::RidiculousGaming.GarageBandIdle.Economy.CurrencyDefinition
-  id: fans
+  id: rep
   tags: []
-  displayName: Fans
+  displayName: Rep
   description: 
   activeWhen:
     rid: -2

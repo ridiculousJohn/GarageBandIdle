@@ -19,7 +19,7 @@ MonoBehaviour:
   children: []
   declaredCurrencies:
   - {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
-  - {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+  - {fileID: 11400000, guid: 5c30c46b619d3f449ad84360ba7a78c6, type: 2}
   - {fileID: 11400000, guid: df8d154a476df3d4b8f6eb1f40268b0f, type: 2}
   declaredFlags:
   - promo_revealed
@@ -49,8 +49,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: c59db6327d263bf41b910126a4c66bd1, type: 2}
   modifiers:
   - {fileID: 11400000, guid: 08a0b147f49d24c4a87a963eda9a3f3b, type: 2}
+  - {fileID: 11400000, guid: 243d74318068ca34e8dc42fa25472f39, type: 2}
   permanentModifiers:
   - {fileID: 11400000, guid: 08a0b147f49d24c4a87a963eda9a3f3b, type: 2}
+  - {fileID: 11400000, guid: 243d74318068ca34e8dc42fa25472f39, type: 2}
   generators:
   - {fileID: 11400000, guid: edf09e3dfa9244647bc2776a145bd91f, type: 2}
   - {fileID: 11400000, guid: a00a688a672517d4c8b5efe0a103308c, type: 2}
@@ -96,13 +98,13 @@ MonoBehaviour:
     - rid: 3484238820291346284
       type: {class: RootCurveFormula, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+        currency: {fileID: 11400000, guid: 5c30c46b619d3f449ad84360ba7a78c6, type: 2}
         reads: 0
         divisor:
           _value:
             mantissa: 1
-            exponent: 1
-        exponent: 0.5
+            exponent: 2
+        exponent: 1
     - rid: 4606566827300502135
       type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
@@ -123,8 +125,8 @@ MonoBehaviour:
     - rid: 4765143147052330422
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        uiText: Requires 300 Fans
-        currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+        uiText: Requires 300 Rep
+        currency: {fileID: 11400000, guid: 5c30c46b619d3f449ad84360ba7a78c6, type: 2}
         threshold:
           _value:
             mantissa: 3
@@ -144,7 +146,7 @@ MonoBehaviour:
       type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currencies:
-        - {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        - {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
         amount:
           _value:
             mantissa: 0

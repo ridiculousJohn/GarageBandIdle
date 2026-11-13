@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-13T03:32:35.773Z
+  modified: 2026-11-13T04:54:43.018Z
 ---
 
 The design descends from Ctrl C. Its Android reconstruction (version 1.12.2) is in `Docs/ctrl-c/`:
@@ -117,5 +117,9 @@ John's play wins where they differ - they show no top pills, only a "+" at the r
   some later buffs do not - details in Docs/ctrl-c).
 - Chapter 2's Data (+1% Lines per point): John does not recall it ballooning within one promotion
   (2026-11-12, asked after the sim showed our Buzz, the same shape, reaching x5000 Cash in a 30-minute run).
+- Chapter 2's Promotion (2026-11-12): available any time, but worth it only once the pending
+  Experience is about what is already banked (e.g. 1e10 banked, wait for 1e10 more), so each loop
+  roughly doubled Experience; the next run's costs climbed too, so loops felt the same length. He
+  does not recall how long a loop was.
 - Unknown to John: its font, whether idle accrual includes Overclock, and whether tokens moved while
   a chapter was dormant change that chapter's idle payout.

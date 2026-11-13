@@ -82,7 +82,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public static readonly DateTime Start = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
 
             public readonly TierDefinition Tier2Def;
-            public readonly CurrencyDefinition Cash, Fans, Buzz;
+            public readonly CurrencyDefinition Cash, Rep, Buzz;
             public readonly GroupDefinition TheCalendar;
             public readonly BarDefinition OpenMic, HouseParty;
             public readonly GeneratorDefinition OpenMicDraw, HousePartyDraw;
@@ -128,7 +128,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Tier2Def = (TierDefinition)ch2Def.children.Single();
 
                 Cash = Find(Tier2Def.declaredCurrencies, "cash");
-                Fans = Find(Tier2Def.declaredCurrencies, "fans");
+                Rep = Find(Tier2Def.declaredCurrencies, "rep");
                 Buzz = Find(Tier2Def.declaredCurrencies, "buzz");
                 TheCalendar = Find(Tier2Def.groups, "the_calendar");
                 OpenMic = Find(Tier2Def.bars, "open_mic");
@@ -1191,7 +1191,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_rows_first_refresh_raises_nothing()
         {
             var fx = new Fixture();
-            fx.Give(1000000);
+            fx.Give(10000000);
             var first = fx.OpenMicDraw.thresholds[0];
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, first.count);
             Assert.AreEqual(first.count, fx.Owned(fx.OpenMicDraw), "the first threshold is reached before the row is built");
@@ -1207,7 +1207,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_purchase_across_thresholds_raises_each_effect_in_order()
         {
             var fx = AuthoredThresholds((5, 1), (10, 2), (40, 1));
-            fx.Give(1000000);
+            fx.Give(10000000);
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
             var calendar = fx.Calendar();
 
@@ -1244,7 +1244,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_lowered_count_raises_nothing_and_is_measured_from()
         {
             var fx = new Fixture();
-            fx.Give(1000000);
+            fx.Give(10000000);
             var first = fx.OpenMicDraw.thresholds[0];
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, first.count);
             var calendar = fx.Calendar();
@@ -1268,7 +1268,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void The_host_shows_the_first_crossed_effect_and_queues_the_rest()
         {
             var fx = AuthoredThresholds((5, 1), (10, 2));
-            fx.Give(1000000);
+            fx.Give(10000000);
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
             var host = fx.Host();
             var toast = host.Toast;

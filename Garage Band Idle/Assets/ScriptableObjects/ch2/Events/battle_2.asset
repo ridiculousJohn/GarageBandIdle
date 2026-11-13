@@ -15,7 +15,7 @@ MonoBehaviour:
   id: battle_2
   tags: []
   displayName: Battle of the Bands II
-  description: Five minutes to pull 2500 fans while working the crowd counts half.
+  description: Five minutes to build 2500 Rep while working the crowd counts half.
   availableWhen:
     rid: 7998337719617684240
   goal:
@@ -47,7 +47,7 @@ MonoBehaviour:
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+        currency: {fileID: 11400000, guid: 5c30c46b619d3f449ad84360ba7a78c6, type: 2}
         threshold:
           _value:
             mantissa: 2.5
@@ -96,8 +96,8 @@ MonoBehaviour:
     - rid: 9123397279235730336
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        uiText: 5 EPs
-        currency: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        uiText: 5 EPs Sold
+        currency: {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
         threshold:
           _value:
             mantissa: 5

@@ -537,7 +537,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var fx = new OfficeFixture();
             fx.Reveal();
             var chapter = new GameContext(fx.Ch2, fx.Now);
-            chapter.Deposit("eps", 8);
+            chapter.Deposit("eps_sold", 8);
             fx.Ctx.Deposit(fx.Cash.Id, Purchasing.CostOf(fx.BulkBooking, fx.Ctx));
             fx.Session.Refresh();
             var module = fx.Module(fx.BulkBooking);
@@ -550,9 +550,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(tile.ShownOwned);
             Assert.IsTrue(module.Visible, "bought, and still on the strip");
 
-            // The purchase alone carries it: with the EP clause false the
-            // owned tile still shows.
-            chapter.SetBalance("eps", BigNumber.Zero);
+            // The purchase alone carries it: with the EPs Sold clause false
+            // the owned tile still shows.
+            chapter.SetBalance("eps_sold", BigNumber.Zero);
             fx.Session.Refresh();
             Assert.IsTrue(module.Visible);
             Assert.IsTrue(tile.ShownOwned);
@@ -570,9 +570,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Reveal();
             var favors = fx.Tier2Def.upgrades.Single(u => u.Id == "favors");
             var draw = fx.Tier2Def.generators.Single(g => g.Id == "open_mic_draw");
-            var fans = fx.Tier2Def.declaredCurrencies.Single(c => c.Id == "fans");
+            var rep = fx.Tier2Def.declaredCurrencies.Single(c => c.Id == "rep");
             var chapter = new GameContext(fx.Ch2, fx.Now);
-            chapter.Deposit("eps", 25);
+            chapter.Deposit("eps_sold", 25);
             var undiscounted = Purchasing.CostOf(draw, fx.Ctx, 1);
             fx.Ctx.Deposit(fx.Cash.Id,
                 Purchasing.CostOf(fx.BulkBooking, fx.Ctx) + Purchasing.CostOf(favors, fx.Ctx));
@@ -587,13 +587,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(fx.Tier2.purchasedUpgrades.Contains(fx.BulkBooking.Id));
             Assert.IsTrue(fx.Tier2.purchasedUpgrades.Contains(favors.Id));
 
-            // The release: 300 fans earned this run, and the EP resets the tier.
-            fx.Ctx.Deposit(fans.Id, 300);
+            // The release: 300 Rep earned this run, and the EP resets the tier.
+            fx.Ctx.Deposit(rep.Id, 300);
             Assert.IsTrue(fx.Tier2Def.rung.IsOffered(fx.Ctx));
             fx.Session.TryRung(fx.Ctx);
             Assert.IsFalse(fx.Tier2.purchasedUpgrades.Contains(fx.BulkBooking.Id), "the latch went with the run");
             Assert.IsFalse(fx.Tier2.purchasedUpgrades.Contains(favors.Id));
-            Assert.IsTrue(chapter.GetBalance("eps") >= (BigNumber)25, "both gates are met again");
+            Assert.IsTrue(chapter.GetBalance("eps_sold") >= (BigNumber)25, "both gates are met again");
             fx.Session.Refresh();
 
             foreach (var (module, upgrade) in new[] { (bulkModule, fx.BulkBooking), (favorsModule, favors) })
@@ -612,8 +612,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsFalse(fx.Tier2.purchasedUpgrades.Contains(upgrade.Id), $"{upgrade.Id}: and writes no latch");
             }
 
-            // Visible on ownership alone: with the EP clause false both tiles stay.
-            chapter.SetBalance("eps", BigNumber.Zero);
+            // Visible on ownership alone: with the EPs Sold clause false both tiles stay.
+            chapter.SetBalance("eps_sold", BigNumber.Zero);
             fx.Session.Refresh();
             Assert.IsTrue(bulkModule.Visible, "Bulk Booking stays on the strip");
             Assert.IsTrue(favorsModule.Visible, "Favors Owed stays on the strip");

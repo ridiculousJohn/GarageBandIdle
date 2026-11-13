@@ -19,7 +19,7 @@ MonoBehaviour:
   children:
   - {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
   declaredCurrencies:
-  - {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+  - {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
   declaredFlags:
   - album
   - botb1_done
@@ -48,11 +48,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 542294a6db7f755418d58b2901c49ad7, type: 2}
   - {fileID: 11400000, guid: 0de7ff8003a089e488a95e7936687edf, type: 2}
   - {fileID: 11400000, guid: a0189b2f9f8349841a0a7618505976b7, type: 2}
-  - {fileID: 11400000, guid: 4e9c465b7be67654481efb3bae98cc1c, type: 2}
+  - {fileID: 11400000, guid: dad34656ad52e2842a6f1f97788ab230, type: 2}
   permanentModifiers:
   - {fileID: 11400000, guid: 0de7ff8003a089e488a95e7936687edf, type: 2}
   - {fileID: 11400000, guid: a0189b2f9f8349841a0a7618505976b7, type: 2}
-  - {fileID: 11400000, guid: 4e9c465b7be67654481efb3bae98cc1c, type: 2}
+  - {fileID: 11400000, guid: dad34656ad52e2842a6f1f97788ab230, type: 2}
   generators: []
   bars: []
   groups: []
@@ -79,7 +79,7 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
       buyControl: 0
     - prefabId: currency_line
-      content: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+      content: {fileID: 11400000, guid: 5c30c46b619d3f449ad84360ba7a78c6, type: 2}
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
@@ -91,7 +91,7 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
       buyControl: 0
     - prefabId: currency_line
-      content: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+      content: {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
       visibleWhen:
         rid: 1760015643212062123
       scope: {fileID: 11400000}
@@ -192,8 +192,9 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
       buyControl: 0
   - title: The Release
-    description: Record an EP once you have 300 fans. It banks EPs and starts the
-      run over with the calendar empty.
+    description: Record an EP once you have 300 Rep. The more Rep you built this
+      run, the more copies it sells, banked as EPs Sold, and the run starts over
+      with the calendar empty.
     visibleWhen:
       rid: 7334139343768002094
     scope: {fileID: 11400000}
@@ -232,8 +233,8 @@ MonoBehaviour:
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
       buyControl: 0
   - title: The Talent Show
-    description: The night that ends the chapter. Record 120 EPs to get on the bill,
-      and you walk away with another Roadie.
+    description: The night that ends the chapter. Sell 100,000 EPs to get on the
+      bill, and you walk away with another Roadie.
     visibleWhen:
       rid: 693579672051615364
     scope: {fileID: 11400000}
@@ -257,7 +258,7 @@ MonoBehaviour:
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        currency: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        currency: {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
         threshold:
           _value:
             mantissa: 1
@@ -276,7 +277,7 @@ MonoBehaviour:
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        currency: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        currency: {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
         threshold:
           _value:
             mantissa: 1
@@ -310,7 +311,7 @@ MonoBehaviour:
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        currency: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        currency: {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
         threshold:
           _value:
             mantissa: 2.5
@@ -335,8 +336,8 @@ MonoBehaviour:
         label: Win the Talent Show
         info: The night that ends the open mic circuit. Win it and you walk away
           with another Roadie who stays with the band for good.
-        confirmText: 'The circuit starts over from nothing: every EP, the Cash, the
-          fans, the Buzz, the calendar and every upgrade go, and only the Roadie
+        confirmText: 'The circuit starts over from nothing: every EP Sold, the Cash,
+          the Rep, the Buzz, the calendar and every upgrade go, and only the Roadie
           comes with you.'
         offerCondition:
           rid: 6406400294486419320
@@ -365,7 +366,7 @@ MonoBehaviour:
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        currency: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        currency: {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
         threshold:
           _value:
             mantissa: 5
@@ -373,17 +374,17 @@ MonoBehaviour:
     - rid: 6406400294486419320
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        uiText: Requires 120 EPs
-        currency: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        uiText: Requires 100,000 EPs Sold
+        currency: {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
         threshold:
           _value:
-            mantissa: 1.2
-            exponent: 2
+            mantissa: 1
+            exponent: 5
     - rid: 6662144370090621913
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        currency: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        currency: {fileID: 11400000, guid: 0805afe6ef8440943b636618469b27a9, type: 2}
         threshold:
           _value:
             mantissa: 8

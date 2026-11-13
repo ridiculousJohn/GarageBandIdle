@@ -31,7 +31,7 @@ MonoBehaviour:
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-        currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+        currency: {fileID: 11400000, guid: 5c30c46b619d3f449ad84360ba7a78c6, type: 2}
         threshold:
           _value:
             mantissa: 2

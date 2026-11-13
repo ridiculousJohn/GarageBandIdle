@@ -65,7 +65,7 @@ of its own prestige currencies.
 | # | Chapter | New mechanic | Capstone gig |
 |---|---|---|---|
 | 1 | Garage / Basement | Tap, gear/bandmate buffs, "learn covers" bars | First backyard / house party |
-| 2 | Open Mic | Gigs as timed bars you book then automate; taps add time; Buzz multiplies payouts; Roadie allocation opens | Win the talent-show slot |
+| 2 | Open Mic | Gigs as timed bars you book then automate; taps add time; Buzz and Rep multiply Cash payouts, EPs Sold multiply Rep payouts; Roadie allocation opens | Win the talent-show slot |
 | 3 | Local Venues | The circuit: rooms with genre taste and fan fatigue; booking agent automates | Headline the ballroom |
 | 4 | The Local Tour | The Van: routing across nearby cities; merch on the road | Complete the local circuit |
 | 5 | Record Deal / Studio | Songs: ideas become tracks, mixes and masters (§7) | Sign the deal & cut the record |
@@ -75,8 +75,8 @@ of its own prestige currencies.
 
 Every chapter uses the same rhythm - grow the base resource, buy, fill the release meter, release an
 album - with new gear, a new mechanic, and a capstone gate on one of its own prestige currencies. The names
-are the chapter's own (section 3): Chapter 1's are Cash, Fans and Demo Tapes, Chapter 2's Cash, Fans
-and EPs.
+are the chapter's own (section 3): Chapter 1's are Cash, Fans and Demo Tapes, Chapter 2's Cash, Rep
+and EPs Sold.
 
 **Chapter anatomy.** A chapter is a **scope** (§12.3): a state container holding the currencies,
 flags, producers, generators, upgrades, bars, and triggers declared to it, plus its tier scopes. The chapter level owns
@@ -149,11 +149,13 @@ section 1), never fewer:
 Two jobs are done by prestige currencies, and which currency does each is the chapter's authoring:
 the **income boost** (a permanent modifier the chapter declares reads a currency's balance to
 multiply the chapter's income, section 5) and the **capstone gate** (the capstone's offer condition
-reads a currency, section 6). One currency may do both - Chapter 1's Demo Tapes and Chapter 2's EPs
-do - or two different currencies may. Nothing in the engine ties the two: each is an ordinary
-authored reference (a formula's currency, a condition's currency).
+reads a currency, section 6). One currency may do both - Chapter 1's Demo Tapes do - or two
+different currencies may. The boost may also reach income through the release meter: Chapter 2's
+EPs Sold gate its capstone and multiply what a gig pays in Rep, the release meter, and the Rep
+balance multiplies what a gig pays in Cash. Nothing in the engine ties the two jobs: each is an
+ordinary authored reference (a formula's currency, a condition's currency).
 
-Chapter 1's are Cash, Fans and Demo Tapes; Chapter 2's are Cash, Fans and EPs.
+Chapter 1's are Cash, Fans and Demo Tapes; Chapter 2's are Cash, Rep and EPs Sold.
 
 **Run-scoped (Chapter 1 tier):**
 - **Cash** - the base resource: earned by tapping and generators; spent on gear and upgrades.
@@ -624,7 +626,7 @@ product everywhere, so the currency is where it belongs. `roadie_active` targets
 SOURCES (`{target: production, currencyId: income, stat: rate}`), because which chapter a number is
 produced in is a property of its source; a currency total has already summed across sources and can
 no longer name one chapter. **The release meter must never carry a roadie-targeted tag**: the
-wall-clock throttle of 8.1 stands on the release meter (Ch. 1 and 2: Fans) being unbuffable by
+wall-clock throttle of 8.1 stands on the release meter (Ch. 1: Fans, Ch. 2: Rep) being unbuffable by
 Roadies, and the `currencyId: income` narrowing is what enforces it even on a bandmate that pays
 Cash and Fans from one definition. **Reallocation is present state** (decided 2026-09-10): a dormant chapter's idle claim is computed at
 switch-in over the allocation standing then, the same stance Encore takes - what was
@@ -827,8 +829,9 @@ fast a pacing bar or a fan meter fills. The wall-clock floor §8.1 relies on is 
 not the size of what it pays, so buffing a payout keeps the floor while buffing a rate removes it and
 lets a late replay collapse to seconds. A per-chapter payout buff is also the safer shape than a
 global one: it is chapter-local, so nothing leaks across chapters and no narrowing rule is needed to
-keep it out of the fan rate. Chapter 2's gigs are the first instance: EPs and Buzz multiply what a
-completed gig pays (the generator yield its bar fires), and nothing multiplies a gig's cycle.
+keep it out of the fan rate. Chapter 2's gigs are the first instance, and the rule holds there:
+EPs Sold multiply what a completed gig pays in Rep, Buzz and Rep multiply what it pays in Cash
+(the generator yield its bar fires), and nothing multiplies a gig's cycle.
 
 **Per-chapter economy template (to fill in):**
 - A base resource, a release meter and a prestige currency, named for the chapter (section 3).
@@ -2058,7 +2061,7 @@ generator row is the name, the owned count - the purchased count in parentheses 
 count added inside them when there is one, `(3)` and `(3+8.89e11)`, the reference game's shape - a
 line beneath the name reading the next unit's cost
 and what that one unit pays - per second for its rate entries, per firing for the yield entries a
-bar fires ("250.00 Cash => 3.00 Cash"; a draw's "5.00 Cash => 3.00 Cash, 0.50 Fans"), through
+bar fires ("250.00 Cash => 3.00 Cash"; a draw's "5.00 Cash => 3.00 Cash, 0.50 Rep"), through
 `Producer.UnitRate` and `Producer.UnitYield` at the declaring scope, and two buy buttons: "+1", and "+M" printing `Purchasing.MaxAffordable` at
 the declaring scope, both disabled and both reading "+1" when M is zero, and both reading "+1"
 when one unit is affordable. A button buys the count printed on it: the tap submits `TryBuy` with that count, the
@@ -2069,7 +2072,7 @@ repaints both labels. A long press on the row's text - a hold of
 `GameConfig.longPressSeconds`, judged by the element's own scheduler since it is presentation and
 never a game read - opens the generator's info screen, a host-owned overlay: the description, the
 same cost and yield line, the owned count in the row's form, and what the owned units pay - per second for rates
-("Producing: 3.00 Cash/s") and per firing for yields ("Pays: 9.00 Cash, 1.50 Fans per gig"), each the
+("Producing: 3.00 Cash/s") and per firing for yields ("Pays: 9.00 Cash, 1.50 Rep per gig"), each the
 owned sum times the per-unit figure because nothing in the effect vocabulary reads the count. The
 row reaches the host through `IGeneratorInfoOpener`, the shape `IStoryOpener` has, and the screen
 holds the generator and its declaring scope for as long as the request stands.
@@ -2204,9 +2207,9 @@ gig not being hired. From level 1 it is an ordinary row. Each row:
   hold does;
 - the fill rides the tick's bar slope between refreshes as a bar row's does, and prints inside it
   the bar's earnings in the card's figure mode (`FigureMode`): **Per Second**, each line of
-  `BarSystem.CompletionRate` at the chapter's `game_speed`, "27.60 Cash/s, 4.60 Fans/s"
+  `BarSystem.CompletionRate` at the chapter's `game_speed`, "27.60 Cash/s, 4.60 Rep/s"
   (`ShownRates`), or **Raw**, each line of `BarSystem.CompletionPayout`, what one completion pays,
-  "30.87 Cash, 4.11 Fans" (`ShownPayouts`); zero lines kept, and the mode not printed leaves its
+  "30.87 Cash, 4.11 Rep" (`ShownPayouts`); zero lines kept, and the mode not printed leaves its
   member empty. The figures are set at each refresh and only the fill moves between refreshes;
 - a tap on the fill starts a bar that is not running - `SetActiveMembers` with the bar added,
   never removed - and works a running one through its `tap` producer; a bar that fills once and

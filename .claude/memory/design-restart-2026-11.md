@@ -15,7 +15,7 @@ design doc, content and tests (build-plan row "Chapter prestige is local (2026-1
   generators can accumulate may be the chapter's subject (fans, chart ratings, any band thing). The
   design doc states roles only: base resource, release meter, prestige currency.
 - **No universal Records.** Roadies are the only currency that crosses chapters. Chapter 1's prestige
-  currency is `demo_tapes`, chapter 2's is `eps`. Records may return as ONE later chapter's own
+  currency is `demo_tapes`, chapter 2's is `eps_sold` ("EPs Sold"). Records may return as ONE later chapter's own
   resource (a platinum-record chapter was floated, not decided; it is in the backlog).
 - **The income boost and the capstone gate are separate authored references.** One currency may do
   both (chapters 1 and 2) or two may. "There is absolutely zero reason to limit it."

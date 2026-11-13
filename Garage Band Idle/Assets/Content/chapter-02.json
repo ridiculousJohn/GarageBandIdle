@@ -30,8 +30,8 @@
   ],
   "currencies": [
     {
-      "id": "eps",
-      "displayName": "EPs"
+      "id": "eps_sold",
+      "displayName": "EPs Sold"
     }
   ],
   "modifiers": [
@@ -74,24 +74,16 @@
       ]
     },
     {
-      "id": "eps_income",
+      "id": "eps_sold_rep",
       "effects": [
         {
-          "target": "income",
-          "stat": "rate",
-          "formula": {
-            "type": "LinearOnBalance",
-            "currency": "eps",
-            "coefficient": 0.02
-          }
-        },
-        {
-          "target": "income",
+          "target": "gig_draw",
+          "currencyId": "rep",
           "stat": "yield",
           "formula": {
             "type": "LinearOnBalance",
-            "currency": "eps",
-            "coefficient": 0.02
+            "currency": "eps_sold",
+            "coefficient": 0.0005
           }
         }
       ]
@@ -100,17 +92,17 @@
   "permanentModifiers": [
     "bulk_booking_switch",
     "favors_discount",
-    "eps_income"
+    "eps_sold_rep"
   ],
   "rung": {
     "label": "Win the Talent Show",
     "info": "The night that ends the open mic circuit. Win it and you walk away with another Roadie who stays with the band for good.",
-    "confirmText": "The circuit starts over from nothing: every EP, the Cash, the fans, the Buzz, the calendar and every upgrade go, and only the Roadie comes with you.",
+    "confirmText": "The circuit starts over from nothing: every EP Sold, the Cash, the Rep, the Buzz, the calendar and every upgrade go, and only the Roadie comes with you.",
     "offerCondition": {
       "type": "CurrencyAtLeast",
-      "currency": "eps",
-      "threshold": 120,
-      "uiText": "Requires 120 EPs"
+      "currency": "eps_sold",
+      "threshold": 100000,
+      "uiText": "Requires 100,000 EPs Sold"
     },
     "actions": [
       {
@@ -167,7 +159,7 @@
         },
         {
           "prefabId": "currency_line",
-          "contentId": "fans"
+          "contentId": "rep"
         },
         {
           "prefabId": "currency_line",
@@ -179,10 +171,10 @@
         },
         {
           "prefabId": "currency_line",
-          "contentId": "eps",
+          "contentId": "eps_sold",
           "visibleWhen": {
             "type": "CurrencyAtLeast",
-            "currency": "eps",
+            "currency": "eps_sold",
             "threshold": 1
           }
         },
@@ -294,7 +286,7 @@
               },
               {
                 "type": "CurrencyAtLeast",
-                "currency": "eps",
+                "currency": "eps_sold",
                 "threshold": 8
               }
             ]
@@ -312,7 +304,7 @@
               },
               {
                 "type": "CurrencyAtLeast",
-                "currency": "eps",
+                "currency": "eps_sold",
                 "threshold": 25
               }
             ]
@@ -322,7 +314,7 @@
     },
     {
       "title": "The Release",
-      "description": "Record an EP once you have 300 fans. It banks EPs and starts the run over with the calendar empty.",
+      "description": "Record an EP once you have 300 Rep. The more Rep you built this run, the more copies it sells, banked as EPs Sold, and the run starts over with the calendar empty.",
       "visibleWhen": {
         "type": "FlagSet",
         "flagId": "album"
@@ -340,7 +332,7 @@
       "description": "Three timed rounds, one at a time. The run starts over for each one, and clearing a round doubles what every gig pays for the rest of the chapter.",
       "visibleWhen": {
         "type": "CurrencyAtLeast",
-        "currency": "eps",
+        "currency": "eps_sold",
         "threshold": 5
       },
       "scopeId": "tier2",
@@ -361,10 +353,10 @@
     },
     {
       "title": "The Talent Show",
-      "description": "The night that ends the chapter. Record 120 EPs to get on the bill, and you walk away with another Roadie.",
+      "description": "The night that ends the chapter. Sell 100,000 EPs to get on the bill, and you walk away with another Roadie.",
       "visibleWhen": {
         "type": "CurrencyAtLeast",
-        "currency": "eps",
+        "currency": "eps_sold",
         "threshold": 1
       },
       "scopeId": "ch2",
@@ -397,8 +389,8 @@
           ]
         },
         {
-          "id": "fans",
-          "displayName": "Fans"
+          "id": "rep",
+          "displayName": "Rep"
         },
         {
           "id": "buzz",
@@ -406,7 +398,8 @@
         }
       ],
       "permanentModifiers": [
-        "buzz_buff"
+        "buzz_buff",
+        "rep_cash"
       ],
       "modifiers": [
         {
@@ -419,6 +412,21 @@
               "formula": {
                 "type": "LogOnBalance",
                 "currency": "buzz",
+                "coefficient": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "rep_cash",
+          "effects": [
+            {
+              "target": "gig_draw",
+              "currencyId": "cash",
+              "stat": "yield",
+              "formula": {
+                "type": "LogOnBalance",
+                "currency": "rep",
                 "coefficient": 1
               }
             }
@@ -711,7 +719,7 @@
         {
           "id": "open_mic_draw",
           "displayName": "Open Mic Draw",
-          "description": "How many people turn up for you on a Tuesday, and every level pays a bigger lump of Cash and Fans when the set ends.",
+          "description": "How many people turn up for you on a Tuesday, and every level pays a bigger lump of Cash and Rep when the set ends.",
           "tags": [
             "gig_draw",
             "production"
@@ -721,7 +729,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 5,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "cash",
@@ -729,7 +737,7 @@
               "value": 3
             },
             {
-              "currency": "fans",
+              "currency": "rep",
               "stat": "yield",
               "value": 0.5
             }
@@ -750,7 +758,7 @@
         {
           "id": "house_party_draw",
           "displayName": "House Party Draw",
-          "description": "How many people you pack into a house party, and every level pays a bigger lump of Cash and Fans when the party wraps.",
+          "description": "How many people you pack into a house party, and every level pays a bigger lump of Cash and Rep when the party wraps.",
           "tags": [
             "gig_draw",
             "production"
@@ -762,7 +770,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 60,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "cash",
@@ -770,7 +778,7 @@
               "value": 25
             },
             {
-              "currency": "fans",
+              "currency": "rep",
               "stat": "yield",
               "value": 4
             }
@@ -791,7 +799,7 @@
         {
           "id": "coffeehouse_draw",
           "displayName": "Coffeehouse Draw",
-          "description": "How many tables fill up for the coffeehouse set, and every level pays a bigger lump of Cash and Fans when the set finishes.",
+          "description": "How many tables fill up for the coffeehouse set, and every level pays a bigger lump of Cash and Rep when the set finishes.",
           "tags": [
             "gig_draw",
             "production"
@@ -803,7 +811,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 700,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "cash",
@@ -811,7 +819,7 @@
               "value": 180
             },
             {
-              "currency": "fans",
+              "currency": "rep",
               "stat": "yield",
               "value": 22
             }
@@ -832,7 +840,7 @@
         {
           "id": "backyard_draw",
           "displayName": "Backyard Show Draw",
-          "description": "How much of the neighborhood walks over for the backyard show, and every level pays a bigger lump of Cash and Fans at the end of the night.",
+          "description": "How much of the neighborhood walks over for the backyard show, and every level pays a bigger lump of Cash and Rep at the end of the night.",
           "tags": [
             "gig_draw",
             "production"
@@ -844,7 +852,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 9000,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "cash",
@@ -852,7 +860,7 @@
               "value": 1500
             },
             {
-              "currency": "fans",
+              "currency": "rep",
               "stat": "yield",
               "value": 140
             }
@@ -873,7 +881,7 @@
         {
           "id": "bar_opener_draw",
           "displayName": "Bar Opening Slot Draw",
-          "description": "How much of the bar's crowd sticks around for your opening slot, and every level pays a bigger lump of Cash and Fans when you come off.",
+          "description": "How much of the bar's crowd sticks around for your opening slot, and every level pays a bigger lump of Cash and Rep when you come off.",
           "tags": [
             "gig_draw",
             "production"
@@ -885,7 +893,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 150000,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "cash",
@@ -893,7 +901,7 @@
               "value": 14000
             },
             {
-              "currency": "fans",
+              "currency": "rep",
               "stat": "yield",
               "value": 900
             }
@@ -914,7 +922,7 @@
         {
           "id": "botb_qualifier_draw",
           "displayName": "Battle of the Bands Qualifier Draw",
-          "description": "How many of your own people show up to the qualifier, and every level pays a bigger lump of Cash and Fans when the night ends.",
+          "description": "How many of your own people show up to the qualifier, and every level pays a bigger lump of Cash and Rep when the night ends.",
           "tags": [
             "gig_draw",
             "production"
@@ -926,7 +934,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 3000000,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "cash",
@@ -934,7 +942,7 @@
               "value": 160000
             },
             {
-              "currency": "fans",
+              "currency": "rep",
               "stat": "yield",
               "value": 7000
             }
@@ -965,7 +973,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 80,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "buzz",
@@ -988,7 +996,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 1200,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "buzz",
@@ -1011,7 +1019,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 20000,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "buzz",
@@ -1034,7 +1042,7 @@
           },
           "costCurrency": "cash",
           "baseCost": 400000,
-          "growth": 1.3,
+          "growth": 1.6,
           "produces": [
             {
               "currency": "buzz",
@@ -1148,7 +1156,7 @@
           "description": "Hand the calendar over: every gig buys as many levels as you can afford on its own, for the rest of the chapter.",
           "gate": {
             "type": "CurrencyAtLeast",
-            "currency": "eps",
+            "currency": "eps_sold",
             "threshold": 8
           },
           "ownedWhen": {
@@ -1171,7 +1179,7 @@
           "description": "Everyone in town owes you one, so every gig level costs half for the rest of the chapter.",
           "gate": {
             "type": "CurrencyAtLeast",
-            "currency": "eps",
+            "currency": "eps_sold",
             "threshold": 25
           },
           "ownedWhen": {
@@ -1247,7 +1255,7 @@
           "description": "Shirts and tapes by the door, so every gig pays more Cash when it ends.",
           "gate": {
             "type": "CurrencyAtLeast",
-            "currency": "fans",
+            "currency": "rep",
             "threshold": 200
           },
           "costCurrency": "cash",
@@ -1265,10 +1273,10 @@
           "id": "the_van",
           "displayName": "Borrow the Van",
           "icon": "upgrade-the_van",
-          "description": "Dave's van gets the gear and a carload of friends to the show, so every gig brings more Fans.",
+          "description": "Dave's van gets the gear and a carload of friends to the show, so every gig builds more Rep.",
           "gate": {
             "type": "CurrencyAtLeast",
-            "currency": "fans",
+            "currency": "rep",
             "threshold": 5000
           },
           "costCurrency": "cash",
@@ -1276,7 +1284,7 @@
           "effects": [
             {
               "target": "gig_draw",
-              "currencyId": "fans",
+              "currencyId": "rep",
               "stat": "yield",
               "multiplier": 1.5
             }
@@ -1387,7 +1395,7 @@
           "id": "reveal_merch_table",
           "condition": {
             "type": "CurrencyAtLeast",
-            "currency": "fans",
+            "currency": "rep",
             "threshold": 200
           },
           "actions": [
@@ -1401,7 +1409,7 @@
           "id": "reveal_the_van",
           "condition": {
             "type": "CurrencyAtLeast",
-            "currency": "fans",
+            "currency": "rep",
             "threshold": 5000
           },
           "actions": [
@@ -1415,7 +1423,7 @@
           "id": "reveal_release",
           "condition": {
             "type": "CurrencyAtLeast",
-            "currency": "fans",
+            "currency": "rep",
             "threshold": 300
           },
           "actions": [
@@ -1430,15 +1438,15 @@
         {
           "id": "battle_1",
           "displayName": "Battle of the Bands I",
-          "description": "Five minutes to pull 250 fans with no handicap at all - the clock is the whole contest.",
+          "description": "Five minutes to build 250 Rep with no handicap at all - the clock is the whole contest.",
           "availableWhen": {
             "type": "All",
             "conditions": [
               {
                 "type": "CurrencyAtLeast",
-                "currency": "eps",
+                "currency": "eps_sold",
                 "threshold": 5,
-                "uiText": "5 EPs"
+                "uiText": "5 EPs Sold"
               },
               {
                 "type": "Not",
@@ -1452,7 +1460,7 @@
           },
           "goal": {
             "type": "CurrencyAtLeast",
-            "currency": "fans",
+            "currency": "rep",
             "threshold": 250
           },
           "timeLimitSeconds": 300,
@@ -1484,7 +1492,7 @@
         {
           "id": "battle_2",
           "displayName": "Battle of the Bands II",
-          "description": "Five minutes to pull 2500 fans while working the crowd counts half.",
+          "description": "Five minutes to build 2500 Rep while working the crowd counts half.",
           "availableWhen": {
             "type": "All",
             "conditions": [
@@ -1503,15 +1511,15 @@
               },
               {
                 "type": "CurrencyAtLeast",
-                "currency": "eps",
+                "currency": "eps_sold",
                 "threshold": 5,
-                "uiText": "5 EPs"
+                "uiText": "5 EPs Sold"
               }
             ]
           },
           "goal": {
             "type": "CurrencyAtLeast",
-            "currency": "fans",
+            "currency": "rep",
             "threshold": 2500
           },
           "timeLimitSeconds": 300,
@@ -1549,7 +1557,7 @@
         {
           "id": "battle_3",
           "displayName": "Battle of the Bands III",
-          "description": "Five minutes to pull 25000 fans with Bulk Booking off for the run.",
+          "description": "Five minutes to build 25000 Rep with Bulk Booking off for the run.",
           "availableWhen": {
             "type": "All",
             "conditions": [
@@ -1568,15 +1576,15 @@
               },
               {
                 "type": "CurrencyAtLeast",
-                "currency": "eps",
+                "currency": "eps_sold",
                 "threshold": 5,
-                "uiText": "5 EPs"
+                "uiText": "5 EPs Sold"
               }
             ]
           },
           "goal": {
             "type": "CurrencyAtLeast",
-            "currency": "fans",
+            "currency": "rep",
             "threshold": 25000
           },
           "timeLimitSeconds": 300,
@@ -1618,9 +1626,9 @@
           "conditions": [
             {
               "type": "CurrencyAtLeast",
-              "currency": "fans",
+              "currency": "rep",
               "threshold": 300,
-              "uiText": "Requires 300 Fans"
+              "uiText": "Requires 300 Rep"
             },
             {
               "type": "Not",
@@ -1635,13 +1643,13 @@
           {
             "type": "AddCurrency",
             "currencies": [
-              "eps"
+              "eps_sold"
             ],
             "formula": {
               "type": "RootCurveFormula",
-              "currency": "fans",
-              "divisor": 10,
-              "exponent": 0.5
+              "currency": "rep",
+              "divisor": 100,
+              "exponent": 1
             }
           },
           {
