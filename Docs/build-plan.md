@@ -287,6 +287,9 @@ lives somewhere other than a conversation.
   Second / Raw toggle (the row "The Per Second / Raw toggle" above), and levelled upgrades (the row
   "Levelled upgrades" above).
 - **Tuning.** Every `GameConfig` number is a placeholder and the content doc's pacing targets have
-  only been checked in tests.
+  only been checked in tests. Chapter 2 is out of balance in play (John, 2026-11-12): one long first
+  run levelled gigs to 26-71, the gig thresholds (x2 speed at 10, 25, 50) and Crowd Work x5 grew
+  Fans enormously, and the first EP release paid 2504 EPs where Win the Talent Show needs 120 - and
+  each EP adds 2% to gig Cash. The threshold numbers were a draft for review.
 - **Platform work** the plan never covered: a device build, the save's location and migration on
   device, and store submission.

@@ -1,14 +1,14 @@
 # Memory index
 
 ## Read first, then delete when stale
-- [Session handoff 2026-11-10](session-handoff-2026-11-10.md) - uncommitted work, the ruling John was about to give, UI work still open
+- [Session handoff](session-handoff-2026-11-10.md) - state at end of 2026-11-12 (cf76be6): chapter 2 balance problem, items waiting on John, chapter 3 next
 
 ## The project
 - [Project layout and workflow](project-layout-and-workflow.md) - where things live, which docs are authority, editing mechanics that bite
 - [Design restart 2026-11](design-restart-2026-11.md) - decisions from the 2026-11-09 restart; chapters 3-8 are still old sketches
 - [Ctrl C chapter remap 2026-11](ctrl-c-chapter-remap-2026-11.md) - the approved Ctrl C to Garage Band map for chapters 3-8 and John's three rulings; not yet in the docs
 - [Ctrl C is the reference game](ctrl-c-is-the-reference-game.md) - read Docs/ctrl-c and ask John before reasoning from scratch; what he reported from play
-- [Ctrl C bar card controls](ctrl-c-bar-card-controls.md) - combined bar row, Auto, Hire xN, Buy One/Max/Next, Per Second/Raw, count thresholds; what is ordered and what is deferred
+- [Ctrl C bar card controls](ctrl-c-bar-card-controls.md) - levelled card features built through 2026-11-12, and the ones still deferred (later-runs ghosted bars, pill buttons, toast/cycle tidy-ups)
 - [Unity headless verify loop](unity-headless-verify-loop.md) - batchmode compile, import and tests; the checks that make a run trustworthy; the script to copy
 - [Code conventions](code-conventions.md) - BigNumber everywhere, enums for closed sets, generic base for narrowing, ASCII, what a test may contain
 
