@@ -1977,8 +1977,10 @@ scroll, each module keeping its own width. A module's `visibleWhen` works the sa
 module that turns visible late lands in its authored place. The strip carries its own
 `DragScrollManipulator` on the horizontal axis beside the page's vertical one; one press is heard by
 both, and the axis that has travelled further owns the drag (`DragScrollManipulator.Starts`, a tie
-going to the page), so a sideways drag on a tile scrolls the strip and a vertical one the page. A
-nested view taking the pointer is its own drag starting, and the page stops tracking that press.
+going to the page), so a sideways drag on a tile scrolls the strip and a vertical one the page. The
+view whose drag starts captures the pointer, and each view hears every capture of a press it is
+tracking on its panel's root: the strip taking the pointer ends the page's tracking of that press,
+and the page taking it ends the strip's, so one press moves one view.
 
 **A section or a module turning visible during play is revealed** (Ctrl C's, 2026-11-12). The
 host shows and hides each section's root and each built module's root through one helper,
@@ -2014,7 +2016,8 @@ the level it stands at (the first before any is owned). A tap issues the upgrade
 unbuyable tile. A tile that cannot be bought now is dimmed by a class (`tile-unbuyable`) and never
 disabled, since a disabled element receives no pointer events and the hold is how a player reads
 what the upgrade does before affording it. A hold (`GameConfig.longPressSeconds`, the same
-`LongPressManipulator` Auto uses, so a hold is never also a tap) opens the **upgrade details
+`LongPressManipulator` Auto uses under the hold's rule, so a hold is never also a tap and a drag
+that starts on a tile is never a hold) opens the **upgrade details
 window**, a host-owned overlay (`UpgradeDetailsUI`) reached through `IUpgradeDetailsOpener` with the
 upgrade and its declaring scope, as the automation window is: the title is the upgrade's name, one
 paragraph reads "On buy: " and the description while it is not bought and "Current effect: " and
@@ -2070,7 +2073,9 @@ refuses whole - never a count the player did not see. The flushed frames may hav
 balance either way (production up, a bar's draw down), and the refresh at the transaction's close
 repaints both labels. A long press on the row's text - a hold of
 `GameConfig.longPressSeconds`, judged by the element's own scheduler since it is presentation and
-never a game read - opens the generator's info screen, a host-owned overlay: the description, the
+never a game read, under the hold's rule (**The hold** below) - opens the generator's info screen,
+so a drag that starts on the text scrolls the page and opens nothing, and the pointer crossing
+between the text's labels is still a hold. The screen is a host-owned overlay: the description, the
 same cost and yield line, the owned count in the row's form, and what the owned units pay - per second for rates
 ("Producing: 3.00 Cash/s") and per firing for yields ("Pays: 9.00 Cash, 1.50 Rep per gig"), each the
 owned sum times the per-unit figure because nothing in the effect vocabulary reads the count. The
@@ -2100,14 +2105,44 @@ pills once the page has scrolled it away, shrinking in between to `PinnedScale`,
 page colour behind it as it arrives. It ignores picking, and it stays down for the frame in which
 the page has not been laid out.
 
-**The page scrolls by drag.** A `ScrollView` drag-scrolls for a touch pointer alone, so
-`DragScrollManipulator` gives the mouse the same gesture for the editor and a desktop build. A press
-is an ordinary click until it has travelled `StartDistance`; then the view captures the pointer,
-which takes the press away from a button that had it, so the release buys nothing. A pressed button
-captures the pointer itself, and a captured pointer's events reach the capturing element alone, so
-the manipulator hears a child taking the pointer and listens for the moves on that child - the
-arrangement the `ScrollView`'s own touch drag uses. The page's scroll bar is hidden; a strip's
-drag is the same manipulator on the horizontal axis (above).
+**The page scrolls by drag.** A `ScrollView` drag-scrolls for a touch or pen pointer alone, so
+`DragScrollManipulator` gives the left mouse button the same gesture for the editor and a desktop
+build, modelled on the `ScrollView`'s own touch drag. The page carries it, a strip carries it on the
+horizontal axis (above), and so do the story log's and the Discography's lists, so every list that
+scrolls drags. The down trickles to the view before the element under the pointer and is neither
+captured nor stopped: a press is an ordinary click until it has travelled `StartDistance`. Once it
+has, along the view's axis and further than across it (`Starts`), the view captures the pointer,
+which takes the press away from a button that had it, so the release clicks nothing; the content
+follows the pointer (`Offset`, clamped to the scroll range), and the drag's moves and its up are
+stopped at the view. A pressed button captures the pointer itself, and a captured pointer's events
+reach the capturing element alone, so while a press is tracked the view hears every capture of that
+pointer on its panel's root: a child of the view taking it is hooked and its moves and endings are
+heard on that child until it lets go; a nested scroll view or anything outside the view taking it
+ends the view's tracking. The up, a cancel, the view losing the pointer and the view leaving its
+panel end the press, and every ending lets go of the view's capture, dragging or not. A release can
+be lost (Unity's UUM-138133), so a move of the tracked pointer with the left button no longer
+pressed is an ending too, and a down that finds the view still holding the pointer lets it go first:
+the page never keeps the pointer. The page's scroll bar is hidden.
+
+**The hold.** `LongPressManipulator` is a press held still on an element: it fires once,
+`GameConfig.longPressSeconds` after the down on the element's own scheduler, if and only if that
+press is still down, the pointer has not travelled `DragScrollManipulator.StartDistance` from the
+down, it is still over the element, and no element other than the element itself has taken the
+pointer since the down. A press that travelled the drag distance is a drag, never a hold. The left
+button arms it (a touch's primary press counts as one); the up, a cancel, a move heard on the
+element that has travelled, the pointer leaving the element itself (a child's leave is not one), any
+other element taking the pointer - heard on the panel's root for as long as the hold is armed, since
+a dragging view's capture sends every later event to that view alone and the content moving with
+the pointer keeps the element under it - the element losing the pointer, and the element leaving its
+panel each end it. At the fire the rule is asked again of the panel: the pointer's capture is
+nobody's or the element's, and the element under the last position heard is the element or inside
+it. Firing ends the hold first, then lets go of a capture the element holds - a button's click -
+and then runs the action. A hold is never also a tap, whatever the action opens: the panel tells a
+button's click that it lost the pointer only after the next pointer event, and with nothing over
+the button that event is the release, landing on the button while its click is still pressed, so
+the hold stops the next up or cancel of the fired press heard on the element on the way down,
+before the click hears it, and the click lets go on the loss of the pointer alone. The hold never
+captures and stops nothing while it is armed, so a drag that starts on it still scrolls.
 
 **A widget exposes what it shows as data, and no test reads a label.** Each widget that prints a
 number or a state keeps it in a public read-only member set on the line that writes the label, from
@@ -2258,11 +2293,13 @@ purchase for THAT bar, or the upgrade's price in grey. Neither grey state is pre
 in the window leaves it open, and the host's refresh repaints it like every overlay, so a Buy, a gig
 booked or Cash arriving moves a row with no reopen; any gig is automated from here in any order
 while the tap keeps buying the first. "Dismiss" at the bottom right closes it. The hold and the tap
-share the button: the hold's manipulator listens on the way down, because a button's own click
-handler stops a press and a release where it handles them and a listener on the way up hears
-neither, and it lets go of the pointer the button's click captured when it
-fires, so the click is no longer pressed and the release lands on the window, and a drag that takes
-the pointer ends the hold before it fires. The rows' and the buttons' presses are public actions
+share the button under the hold's rule (**The hold**): the hold's manipulator listens on the way
+down, because a button's own click handler stops a press and a release where it handles them and a
+listener on the way up hears neither, and it lets go of the pointer the button's click captured when
+it fires and stops the release that follows, so the click is no longer pressed and the release
+clicks nothing. A drag that takes
+the pointer from the button ends the hold before it fires and its release clicks nothing, so a press
+on Auto is a tap, a hold or a drag and never two of them. The rows' and the buttons' presses are public actions
 (`Tap`, `BuyOne`, `BuyMax`, the cycle row's `Buy`, `OpenInfo`, the card's `ToggleFigures`, `Cycle`,
 `Book`, `Auto`,
 `OpenAutomation`, and the window's `Buy` and `Dismiss`) so a headless test presses what the pointer
@@ -2521,8 +2558,8 @@ Assets/Scripts/
     IRungOpener.cs          // the two methods a prestige card asks of the host: open the rung's info window, and its confirmation window at the card's scope
     IToastOpener.cs         // the one method a levelled row asks of the host: show the toast for one effect a crossed threshold switched on
     ToastUI.cs              // the threshold toast: a pill near the bottom, one effect at a time for 2 s with a fade, crossings queued
-    LongPressManipulator.cs // the hold gesture over an element's own scheduler; never captures, lets go of a button's capture when it fires
-    DragScrollManipulator.cs // a left-button mouse drag scrolls a view along its axis as a finger does - the page vertically, a strip sideways; a click stays a click
+    LongPressManipulator.cs // the hold gesture over an element's own scheduler: fires once if the press stays down, still, over the element and untaken; never captures, lets go of a button's capture when it fires
+    DragScrollManipulator.cs // a left-button mouse drag scrolls a view along its axis as a finger does - the page and the overlay lists vertically, a strip sideways; a click stays a click, and every ending lets go of the pointer
     PinnedHeadlineUI.cs     // the headline currency line as an overlay: over its line at rest, shrunk beneath the pills once scrolled away
     Reveal.cs               // how a section or a module shows: at once, hidden at once, or revealed - a fade-in that grows it along its container's axis
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
@@ -2532,8 +2569,8 @@ Assets/Scripts/
               UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): its own icon or the shared pick, name (with the owned level), price or Owned; a tap buys, a hold opens the details window
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
-    StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
-    DiscographyUI.cs        // the Discography overlay: one row per song root keeps, a name field and a button that renames through the session
+    StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host; the list drags
+    DiscographyUI.cs        // the Discography overlay: one row per song root keeps, a name field and a button that renames through the session; the list drags
     NumberFormatter.cs
     TopBarUI.cs             // the two pills; the countdown pill's timer, authored in Screen.uxml, is read by the window too
     TimerPill.cs            // the countdown pill element: a Button with a `timer` UXML attribute, so the chrome names its timer once

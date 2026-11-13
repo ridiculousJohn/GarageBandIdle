@@ -15,7 +15,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly RootScopeState root;
         private readonly GameSession session;
         private readonly GameClock clock;
-        private readonly VisualElement entries;
+        private readonly ScrollView entries;
 
         // The name field standing for each song's row, by song id, so a
         // rename's answer reaches the row it came from and a show can tell
@@ -34,7 +34,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             this.root = root;
             this.session = session;
             this.clock = clock;
-            entries = ScreenHost.Require<VisualElement>(rootElement, "discography-entries");
+            // The list is a ScrollView, and a mouse drags it as the page is
+            // dragged (DragScrollManipulator).
+            entries = ScreenHost.Require<ScrollView>(rootElement, "discography-entries");
+            entries.AddManipulator(new DragScrollManipulator());
             ScreenHost.Require<Button>(rootElement, "discography-close").clicked += close;
         }
 

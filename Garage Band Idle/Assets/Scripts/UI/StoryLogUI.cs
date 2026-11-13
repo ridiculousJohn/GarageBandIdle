@@ -28,7 +28,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Root = rootElement;
             this.clock = clock;
             this.stories = stories;
-            var entries = ScreenHost.Require<VisualElement>(rootElement, "story-log-entries");
+            // The list is a ScrollView, and a mouse drags it as the page is
+            // dragged (DragScrollManipulator).
+            var entries = ScreenHost.Require<ScrollView>(rootElement, "story-log-entries");
+            entries.AddManipulator(new DragScrollManipulator());
             empty = ScreenHost.Require<Label>(rootElement, "story-log-empty");
             ScreenHost.Require<Button>(rootElement, "story-log-close").clicked += close;
             foreach (var child in root.Children)
