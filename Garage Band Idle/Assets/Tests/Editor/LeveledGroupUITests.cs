@@ -111,7 +111,10 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The roster boot composes, entered as a live player enters it:
             // the root flag a finished chapter 1 leaves, the stamp at now so
             // no idle window is owed. opening_cash pays its 5 Cash on entry.
-            public Fixture()
+            // `author` runs once the definitions are found and before the
+            // state is built from them, so what a test authors there is what
+            // the gather compiles.
+            public Fixture(Action<Fixture> author = null)
             {
                 var rootDef = AssetDatabase.LoadAssetAtPath<RootDefinition>(
                     ChapterJsonImporter.AssetRootPath + "/root/root.asset");
@@ -132,6 +135,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 HouseParty = Find(Tier2Def.bars, "house_party");
                 OpenMicDraw = Find(Tier2Def.generators, "open_mic_draw");
                 HousePartyDraw = Find(Tier2Def.generators, "house_party_draw");
+                author?.Invoke(this);
 
                 Root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { ch1Def, ch2Def }));
                 Ch2 = (ChapterScopeState)TestNavigation.Node(Root, ch2Def);
@@ -219,6 +223,44 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             public double GameSpeed => TickSystem.GameSpeed(new GameContext(Ch2, Now), Ch2, Session.Config);
         }
+
+        // ---- thresholds a test authors ----
+
+        // The loaded draw a test gave thresholds of its own, and the list
+        // chapter 2 authored on it. The asset changes in memory only and is
+        // never saved; TearDown hands the content's list back after every
+        // test, passed or failed, so no other test - in this class or any
+        // other - sees the test's list.
+        private GeneratorDefinition authoredOn;
+        private List<CountThreshold> contentThresholds;
+
+        [TearDown]
+        public void RestoreTheContentThresholds()
+        {
+            if (authoredOn != null)
+                authoredOn.thresholds = contentThresholds;
+            authoredOn = null;
+            contentThresholds = null;
+        }
+
+        // A fixture whose open mic draw carries the thresholds given - a count
+        // and how many effects it switches on, each doubling the open mic's
+        // speed - in place of chapter 2's, so a test of several thresholds or
+        // several effects does not lean on the chapter's tuning. Each effect
+        // is its own object, so an order assertion tells them apart.
+        private Fixture AuthoredThresholds(params (int count, int effects)[] thresholds) =>
+            new Fixture(fx =>
+            {
+                authoredOn = fx.OpenMicDraw;
+                contentThresholds = fx.OpenMicDraw.thresholds;
+                fx.OpenMicDraw.thresholds = thresholds.Select(authored =>
+                {
+                    var threshold = new CountThreshold { count = authored.count };
+                    for (var i = 0; i < authored.effects; i++)
+                        threshold.effects.Add(new ThresholdEffect { target = fx.OpenMic, stat = Stat.Rate, multiplier = 2 });
+                    return threshold;
+                }).ToList();
+            });
 
         // ---- the rows ----
 
@@ -989,10 +1031,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(Purchasing.CostOf(fx.OpenMicDraw, fx.Ctx, row.ShownCount).ToDouble(), row.ShownCost);
         }
 
+        // Two thresholds of the test's own above the count it starts from.
         [Test]
         public void Buy_Next_buys_exactly_to_the_threshold()
         {
-            var fx = new Fixture();
+            var fx = AuthoredThresholds((5, 1), (10, 1));
             fx.Give(1000000);
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 3);
             var calendar = fx.Calendar(BuyControlKind.Cycle);
@@ -1149,17 +1192,21 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var fx = new Fixture();
             fx.Give(1000000);
-            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 12);
+            var first = fx.OpenMicDraw.thresholds[0];
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, first.count);
+            Assert.AreEqual(first.count, fx.Owned(fx.OpenMicDraw), "the first threshold is reached before the row is built");
 
             fx.Calendar();
 
             Assert.IsEmpty(fx.Toasts.Raised);
         }
 
+        // Two thresholds crossed in one purchase, the second switching on two
+        // effects, and a third above the purchase that stays unraised.
         [Test]
         public void A_purchase_across_thresholds_raises_each_effect_in_order()
         {
-            var fx = new Fixture();
+            var fx = AuthoredThresholds((5, 1), (10, 2), (40, 1));
             fx.Give(1000000);
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
             var calendar = fx.Calendar();
@@ -1167,9 +1214,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 24);
             calendar.Refresh();
 
-            var expected = fx.OpenMicDraw.ThresholdsCrossed(1, 25).SelectMany(t => t.effects).ToArray();
-            Assert.Greater(expected.Length, 1, "chapter 2 authors more than one effect up to 25");
-            CollectionAssert.AreEqual(expected, fx.Toasts.Raised);
+            Assert.AreEqual(25, fx.Owned(fx.OpenMicDraw));
+            var thresholds = fx.OpenMicDraw.thresholds;
+            CollectionAssert.AreEqual(
+                new[] { thresholds[0].effects[0], thresholds[1].effects[0], thresholds[1].effects[1] },
+                fx.Toasts.Raised, "5's effect, then 10's two in their order, and nothing of 40's");
         }
 
         // Any cause moves the count, so any cause raises it: a grant here.
@@ -1188,15 +1237,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // A reset lowering the count raises nothing, and the lowered count is
-        // what the next crossing is measured from.
+        // what the next crossing is measured from. The row is built past the
+        // first threshold, so climbing back to it raises only if the watch
+        // measures from the lowered count.
         [Test]
         public void A_lowered_count_raises_nothing_and_is_measured_from()
         {
             var fx = new Fixture();
             fx.Give(1000000);
-            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 12);
-            var calendar = fx.Calendar();
             var first = fx.OpenMicDraw.thresholds[0];
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, first.count);
+            var calendar = fx.Calendar();
+            Assert.AreEqual(first.count, fx.Owned(fx.OpenMicDraw), "the row is built past the first threshold");
 
             fx.Tier2.generatorCounts[fx.OpenMicDraw.Id] = 1;
             calendar.Refresh();
@@ -1210,11 +1262,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- the toast ----
 
         // The host's toast: nothing on the first render, then the first
-        // crossing's effect shown and the rest queued behind it in order.
+        // crossing's effect shown and the rest queued behind it in order -
+        // three effects over two thresholds of the test's own.
         [Test]
         public void The_host_shows_the_first_crossed_effect_and_queues_the_rest()
         {
-            var fx = new Fixture();
+            var fx = AuthoredThresholds((5, 1), (10, 2));
             fx.Give(1000000);
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
             var host = fx.Host();
@@ -1224,7 +1277,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 24);
 
-            var raised = fx.OpenMicDraw.ThresholdsCrossed(1, 25).SelectMany(t => t.effects).ToList();
+            var raised = fx.OpenMicDraw.thresholds.SelectMany(t => t.effects).ToList();
+            Assert.AreEqual(3, raised.Count);
             Assert.AreSame(raised[0], toast.Shown);
             CollectionAssert.AreEqual(raised.Skip(1).ToArray(), toast.Queued);
 

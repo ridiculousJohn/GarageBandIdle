@@ -2,7 +2,7 @@
   "_meta": {
     "file": "Chapter 2 — Open Mic. Buildable content data.",
     "usage": "Follows chapter-01-garage.json's shape and the design doc's §12 vocabulary. Content is reached by DIRECT REFERENCE from the root scope; the importer materializes assets AND wires them into the declaring scope's lists. All numbers are starter values and every one is authored here on the chapter, never in code.",
-    "runtime": "Authored entirely on the primitives landed 2026-09-16 (`chapter-primitives-plan.md`, A-H). Nothing in this file needs new runtime: bars firing a generator's yield (B), payments into a bar's progress (C), the owned-count formula (D), repeatWhen as a condition (E), autobuy (F), the payout selector (G), the bar row's tap (H), cost as a multiplier target (A), and LinearOnBalance for a per-point balance multiplier.",
+    "runtime": "Authored entirely on the primitives landed 2026-09-16 (`chapter-primitives-plan.md`, A-H). Nothing in this file needs new runtime: bars firing a generator's yield (B), payments into a bar's progress (C), the owned-count formula (D), repeatWhen as a condition (E), autobuy (F), the payout selector (G), the bar row's tap (H), cost as a multiplier target (A), and LogOnBalance for a balance multiplier that grows at a falling rate.",
     "theChapterInOneLine": "Chapter 1 was a number going up. Chapter 2 is a calendar: you book gigs, they run, they pay out, and you decide whether to level them, automate them, or reach for the next one.",
     "shape": "Ctrl C's Chapter 2 (timed teams, a balance-multiplier layer, one prestige, timed challenges) as a band. Chapter 1's continuous economy is GONE: there is no Cash per second, no Jam button paying Cash, no rehearsal, no covers. Income arrives only in lumps when a gig finishes.",
     "newInThisChapter": [
@@ -10,7 +10,7 @@
       "GIG LEVELS: each gig's payout is a generator (`*_draw`) you buy copies of. Owned count scales the lump (decision 2 / B). Buying the first copy is what unlocks the gig at all — Ctrl C's base level cost.",
       "STANDING BOOKING: a manual gig pays once, returns to zero and drops out of the active set; you book it again by tapping it. A permanent-in-chapter upgrade per gig sets a flag its `repeatWhen` reads, and from then on it re-books itself (E). Auto-booked gigs are the only thing that earns while you are away.",
       "WORK THE CROWD: tapping a gig row fires a producer whose yield pays the BAR — seconds of progress (C, H). Tap never pays Cash. Upgrades make each tap worth more time.",
-      "BUZZ is the multiplier layer. Promo generators produce it as a rate; every point of Buzz is +1% on gig CASH payouts (LinearOnBalance). Buzz does not touch Fans — see fans.couplingNote.",
+      "BUZZ is the multiplier layer. Promo generators produce it as a rate; Buzz multiplies gig CASH payouts by (1 + log10(1 + buzz)) (LogOnBalance), so more Buzz always pays more and each point adds less than the last. Buzz does not touch Fans - see fans.couplingNote.",
       "BULK BOOKING is autobuy on the draw generators (F). FAVORS is a cost multiplier on them (A).",
       "BATTLE OF THE BANDS: a five-minute timed challenge, staged, reward doubles gig payouts.",
       "Roadie allocation UI unlocks here (Ch1's capstone deliberately left it locked)."
@@ -21,7 +21,7 @@
       "gigAsBarPlusGenerator": "Every gig is a PAIR: a bar (the booking, fills from time) and a generator (the draw, whose owned count is the gig's level and whose yield entries are the payout). The bar's `onComplete` is `fireGeneratorYield` naming the draw. Multipliers reach the payout by naming the yield lines (ids) or their tag `gig_payout`; a buff on the BAR (`stat: rate`) would speed the cycle, which nothing in this chapter does — see §11 on prestige never raising a fill rate.",
       "manualVsStanding": "`repeatWhen: { type: flagSet, flag: booked_<gig> }`. False = the manual team (decision 5): pays, zeros, leaves the active set; the player taps it again to run it again, no new command. True = repeats, keeping the residual. The standing-booking upgrade sets the flag; because the upgrade and flag are permanent-in-chapter, every gig you have automated stays automated across EPs — Ctrl C needed a separate Micromanagement purchase for that, this game gets it from scope.",
       "tap": "`bar.tap` names a producer (decision 20). The producer's single contribution names the BAR as its target with `feeds: yield`, amount in seconds of progress (C). One producer per gig so the tap lands on the row you tapped; they share the `work_the_crowd` tag so one buff reaches all of them.",
-      "buzz": "`constants.buzzBuff` is the friendly shape Ch1 uses for `demoTapesBuff`: a per-point additive multiplier the importer builds as a permanent chapter modifier carrying `LinearOnBalance` on the `buzz` currency, targeting the tag named in `affects`. Buzz is run-scoped and resets with the EP.",
+      "buzz": "`constants.buzzBuff` is the friendly shape Ch1 uses for `demoTapesBuff`: a balance multiplier the importer builds as a permanent chapter modifier carrying `LogOnBalance` on the `buzz` currency, targeting the tag named in `affects`. Buzz is run-scoped and resets with the EP.",
       "maxActive": "The calendar group's `maxActive` equals its bar count — there is no cap on concurrent bookings, exactly as Ctrl C runs every hired team at once. The chapter's decisions are level vs automate vs next tier, not which gigs to hold. Raising a cap by upgrade would need a payload that does not exist; it is not wanted here.",
       "payoutSelector": "The EP's payout formula reads Fans EARNED THIS ROUND (G's default), not the balance. Fans are never spent in this chapter so the two agree, but the default is the right one to lean on.",
       "flags": "One reveal registry, as Ch1. A contentUnlock upgrade's payload is `setFlag`; anything gated on a system existing uses `flagSet`."
@@ -29,7 +29,7 @@
     "currencies": {
       "cash": "run-scoped; the base resource; paid in lumps by gig completions; buys draw levels, standing bookings, promo, upgrades",
       "fans": "run-scoped; paid in lumps by gig completions; scales with draw level and gig count only; the release meter; sets the EPs payout",
-      "buzz": "run-scoped; produced by promo generators as a rate; each point is +1% on gig Cash payouts",
+      "buzz": "run-scoped; produced by promo generators as a rate; multiplies gig Cash payouts by (1 + log10(1 + buzz))",
       "eps": "chapter-scoped; the prestige currency; each EP buffs Cash (eps_income, a permanent modifier declared on the chapter); EPs gate the capstone, whose reset of the chapter zeroes them"
     }
   },
@@ -52,14 +52,13 @@
       "note": "Ch1's shape on the chapter's own currency: the EPs modifier, declared on the chapter, multiplies Cash, and a gig's Cash yield is Cash. This is the chapter's prestige lever - each EP raises what every gig pays, never how fast one runs (section 11). Fans are deliberately outside it."
     },
     "buzzBuff": {
-      "perUnit": 0.01,
-      "mode": "additive",
+      "coefficient": 1,
       "affects": [ "gig_cash" ],
-      "formula": "LinearOnBalance",
+      "formula": "LogOnBalance",
       "currency": "buzz",
-      "note": "The Data layer. +1% gig Cash per point of Buzz, targeting the `gig_cash` tag carried by every draw generator's Cash line. Built as a permanent chapter modifier carrying LinearOnBalance(buzz, 0.01). Run-scoped through its currency: Buzz resets with the EP, so the layer is rebuilt every run and promo is the run's second spend."
+      "note": "The Data layer. Gig Cash times (1 + log10(1 + buzz)): x2 at 9 Buzz, x3 at 99, x4 at 999, each point adding less than the last, targeting the `gig_cash` tag carried by every draw generator's Cash line. Built as a permanent chapter modifier carrying LogOnBalance(buzz, 1). Run-scoped through its currency: Buzz resets with the EP, so the layer is rebuilt every run and promo is the run's second spend."
     },
-    "incomeFormulaNote": "Every composed number is still the sum of its contributions times the product of the multipliers reaching it. A gig's Cash lump = draw.cash_line x ownedCount x (1 + 0.02 x eps) x (1 + 0.01 x buzz) x buffs. A gig's Fans lump = draw.fans_line x ownedCount x buffs, with NO EPs or Buzz term."
+    "incomeFormulaNote": "Every composed number is still the sum of its contributions times the product of the multipliers reaching it. A gig's Cash lump = draw.cash_line x ownedCount x (1 + 0.02 x eps) x (1 + log10(1 + buzz)) x buffs. A gig's Fans lump = draw.fans_line x ownedCount x buffs, with NO EPs or Buzz term."
   },
 
   "flags": [
@@ -121,7 +120,7 @@
   "currencies": [
     { "id": "cash", "group": "run" },
     { "id": "fans", "group": "run" },
-    { "id": "buzz", "group": "run", "note": "Pure state (a balance, a group, formatting). How it is earned lives on the promo generators; how it is spent is that it is not — it is read by buzzBuff's LinearOnBalance." }
+    { "id": "buzz", "group": "run", "note": "Pure state (a balance, a group, formatting). How it is earned lives on the promo generators; how it is spent is that it is not - it is read by buzzBuff's LogOnBalance." }
   ],
 
   "generators": [
@@ -332,7 +331,7 @@
   "rewards": [
     { "id": "gig_payout_x2", "name": "Gig Payouts ×2", "type": "multiplier", "value": 2.0, "targets": [ "gig_payout" ] }
   ],
-  "rewardsNote": "One entry, used by every Battle of the Bands stage. Same vocabulary as Ch1: `multiplier` with `targets` naming ids or tags, any term matching. `gig_payout` is carried by every draw yield line, Cash and Fans alike, so the event reward is the one thing in the chapter that scales Fans by a multiplier — earned by a timed challenge, permanent-in-chapter, which is the §6.1 lateral-reward shape.",
+  "rewardsNote": "One entry, used by every Battle of the Bands stage. Same vocabulary as Ch1: `multiplier` with `targets` naming ids or tags, any term matching. `gig_payout` is carried by every draw yield line, Cash and Fans alike, so the event reward multiplies the Fans line as well as the Cash - earned by a timed challenge, permanent-in-chapter, which is the §6.1 lateral-reward shape.",
 
   "upgrades": [
     {
@@ -491,7 +490,7 @@
 
   "fans": {
     "currency": "fans",
-    "couplingNote": "Fans arrive only as gig lumps, scaled by draw level (a Cash purchase) and by how many gigs complete (time). EPs and Buzz do NOT reach them: `epsBuff.affects` is Cash and `buzzBuff.affects` is `gig_cash`, so a Fans line carries neither. The only Fans multipliers are the_van (run-scoped, Fans-gated) and the Battle of the Bands reward (earned). That keeps the wall-clock floor section 8.1 depends on: a late replay buys its levels instantly, then still waits out the cycles."
+    "couplingNote": "Fans arrive only as gig lumps, scaled by draw level (a Cash purchase) and by how many gigs complete (time). EPs and Buzz do NOT reach them: `epsBuff.affects` is Cash and `buzzBuff.affects` is `gig_cash`, so a Fans line carries neither. The only Fans multipliers are the_van (run-scoped, Fans-gated), the Battle of the Bands reward (earned), and each draw's one count threshold: at 25 owned it doubles the next gig's draw yield (the qualifier's own), and since that effect names no currency it doubles the Fans line with the Cash. That keeps the wall-clock floor section 8.1 depends on: a late replay buys its levels instantly, then still waits out the cycles."
   },
 
   "album": {
@@ -564,7 +563,7 @@
       "generatorCostGrowth (1.3) — how many levels a gig is worth buying before the next tier is the better spend.",
       "the standing bookings' prices — set how long each gig stays manual. Too cheap and the chapter is idle by minute two; too dear and the tap grind outstays its welcome.",
       "fillAmount per gig — the cycle ladder; payouts are tuned against it, so move them together.",
-      "buzzBuff.perUnit (0.01) — how much the second spend matters."
+      "buzzBuff.coefficient (1) - how much the second spend matters."
     ],
     "watchList": [
       "If the manual phase of each new gig feels like a chore rather than a hook, lower its standing booking's price: the booking has no gate of its own, so the price is the whole knob.",
@@ -579,7 +578,7 @@
     "actions": "`onComplete` entries use `{ action: fireGeneratorYield, generator }` for `FireGeneratorYield` (B). Same friendly-key convention Ch1 uses for payload effects.",
     "contributionsTargetingABar": "A contribution names exactly one of `currency` / `generator` / `bar` (C). The crowd producers name a `bar`.",
     "payloadStat": "`stat: cost` and `effect: autobuy` on a payload address the cost and autobuy coordinates (A, F). `effect: handicap` with a `stat` on an event debuff is the handicap side of the same coordinate.",
-    "buzzBuff": "Same shape as `epsBuff`, plus `formula: LinearOnBalance` and `currency` naming the balance the permanent chapter modifier reads. `affects` names a TAG here, not a currency.",
+    "buzzBuff": "Like `epsBuff`, with `coefficient` where `epsBuff` has `perEp` and no `mode`, plus `formula: LogOnBalance` and `currency` naming the balance the permanent chapter modifier reads. `affects` names a TAG here, not a currency.",
     "fillFromTime": "`fillCurrency: null` with `fillAmount` in seconds and `fillRate: 1` — a time-fed bar per §12.7. Author `fillRate` explicitly so the cycle is legible in the data.",
     "noJam": "This chapter authors no `module/tap` and no `jam` producer. The validator's 'yield-holding producer nobody presents' check is satisfied for the crowd producers by the bars' `tap` naming them."
   }

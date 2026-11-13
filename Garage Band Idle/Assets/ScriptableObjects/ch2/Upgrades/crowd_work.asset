@@ -17,7 +17,7 @@ MonoBehaviour:
   displayName: Crowd Work
   description: 
   gate:
-    rid: 1688710519480123538
+    rid: 790796740185524978
   ownedWhen:
     rid: -2
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
@@ -68,7 +68,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710519480123538
+    - rid: 790796740185524978
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

@@ -216,17 +216,18 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // ---- the modifiers ----
 
         // Every Cash in this chapter is a fired yield, so the Buzz factor sits
-        // at the yield stat on the draw tag narrowed to cash. Roadies need
-        // nothing here: root's pair carries yield as well as rate, and the
-        // draws carry the production tag its active factor names (8.2).
+        // at the yield stat on the draw tag narrowed to cash: a log curve on
+        // the Buzz balance, so it keeps climbing at a falling rate. Roadies
+        // need nothing here: root's pair carries yield as well as rate, and
+        // the draws carry the production tag its active factor names (8.2).
         [Test]
         public void The_run_modifier_lifts_the_gig_cash_yield_by_buzz()
         {
             var buzz = Find(tier2.modifiers, "buzz_buff").effects.Single();
             Assert.AreEqual(("gig_draw", "cash", Stat.Yield), (buzz.target, buzz.currencyId, buzz.stat));
-            var curve = (LinearOnBalance)buzz.formula;
+            var curve = (LogOnBalance)buzz.formula;
             Assert.AreEqual("buzz", curve.currency.Id);
-            Assert.AreEqual((BigNumber)0.01, curve.coefficient);
+            Assert.AreEqual((BigNumber)1, curve.coefficient);
 
             Assert.IsTrue(tier2.generators.Where(g => g.Id.EndsWith("_draw"))
                 .All(g => g.Tags.SequenceEqual(new[] { "gig_draw", "production" })),
@@ -469,35 +470,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The gig ladder's count thresholds (12.7), draft numbers: every draw
-        // doubles its own gig's speed - the bar's fill rate - at 10, 25 and 50,
-        // and at 25 doubles the next gig's draw payout; the qualifier, with no
-        // gig above it, doubles its own.
+        // has one, at 25, doubling the next gig's draw payout - every currency
+        // it pays; the qualifier, with no gig above it, doubles its own.
+        // Nothing in the chapter speeds a gig, so no threshold names a bar.
         [Test]
-        public void Each_draw_doubles_its_gigs_speed_at_10_25_and_50_and_the_next_gigs_payout_at_25()
+        public void Each_draw_doubles_the_next_gigs_draw_payout_at_25_and_no_threshold_speeds_a_gig()
         {
             var gigs = tier2.bars;
             Assert.AreEqual(6, gigs.Count, "the six gigs, in ladder order");
             for (var i = 0; i < gigs.Count; i++)
             {
-                var gig = gigs[i];
-                var draw = gig.level;
+                var draw = gigs[i].level;
                 var payoutTarget = i + 1 < gigs.Count ? gigs[i + 1].level : draw;
-                Assert.AreEqual(new[] { 10, 25, 50 }, draw.thresholds.Select(t => t.count).ToArray(), draw.Id);
-                Assert.AreEqual(new[] { 1, 2, 1 }, draw.thresholds.Select(t => t.effects.Count).ToArray(), draw.Id);
+                var threshold = draw.thresholds.Single();
+                Assert.AreEqual(25, threshold.count, draw.Id);
 
-                foreach (var threshold in draw.thresholds)
-                {
-                    var speed = threshold.effects[0];
-                    Assert.AreSame(gig, speed.target, $"{draw.Id} at {threshold.count} speeds its own gig");
-                    Assert.AreEqual(Stat.Rate, speed.stat);
-                    Assert.AreEqual((BigNumber)2, speed.multiplier);
-                }
-
-                var payout = draw.thresholds[1].effects[1];
+                var payout = threshold.effects.Single();
                 Assert.AreSame(payoutTarget, payout.target, $"{draw.Id} at 25 pays into {payoutTarget.Id}");
+                Assert.IsTrue(string.IsNullOrEmpty(payout.currencyId), $"{draw.Id}: every currency the draw pays");
                 Assert.AreEqual(Stat.Yield, payout.stat);
                 Assert.AreEqual((BigNumber)2, payout.multiplier);
             }
+
+            foreach (var generator in tier2.generators)
+                foreach (var threshold in generator.thresholds)
+                    foreach (var effect in threshold.effects)
+                        Assert.IsNotInstanceOf<BarDefinition>(effect.target,
+                            $"{generator.Id} at {threshold.count} names a gig");
         }
 
         // The Office is a strip of upgrade tiles (12.11). Crowd Work shows

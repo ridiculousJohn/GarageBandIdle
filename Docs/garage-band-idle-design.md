@@ -1111,11 +1111,13 @@ is the owner: a threshold names one row, so `target` is a REFERENCE, resolved ou
 generator's scope like `level` - the generator itself when unauthored - and the gather's selector
 is that row's id. The factor is a constant (a formula is an import error), because the toast prints
 it (12.11). The gather meets an effect applied at a scope only from an owner declared there or
-below, so the target must be declared at the generator's own scope (12.12). Chapter 2's gig draws
-are the first content: a bar's speed is its fill `rate`, named by the bar's id; a gig's payout is its
-draw's `yield`, named by the draw's id. `GeneratorDefinition.NextThreshold` answers the first count
-not yet reached (at an owned count, or at the declaring scope's own count), and `ThresholdsCrossed`
-the thresholds a move between two counts reaches - none for a move down.
+below, so the target must be declared at the generator's own scope (12.12). A bar's speed is its
+fill `rate`, named by the bar's id; a gig's payout is its draw's `yield`, named by the draw's id.
+Chapter 2's gig draws are the first content: each authors one threshold, at 25, that doubles the
+next gig's payout - that gig's draw at `yield` - and the qualifier, with no gig above it, doubles its
+own; nothing in the chapter addresses a gig's `rate` (section 11). `GeneratorDefinition.NextThreshold`
+answers the first count not yet reached (at an owned count, or at the declaring scope's own count),
+and `ThresholdsCrossed` the thresholds a move between two counts reaches - none for a move down.
 
 **Debt is a factor that shrinks, not a term that subtracts.** `DebtFactor` is
 `max(0, 1 - coefficient x debt)`, where debt is a list of currencies' balances combined by sum or by
@@ -1606,10 +1608,11 @@ upgrade is bought. Validated as `tap` is, each on the bar's chain; `automation` 
 `repeatWhen` is an error, since a bar that fills once has nothing to make go again.
 
 **A level carries the bar's thresholds.** A levelled bar's milestones are its `level` generator's
-count thresholds (12.2): "at level 10, this gig x2 speed" is a threshold on the draw whose effect
-names the bar at `rate`, and "at level 25, the next gig's payout x2" one naming that gig's draw at
-`yield`. The bar declares nothing for them; the row that shows the level reads the next one for its
-Buy Next count and watches the count for crossings to toast (12.11).
+count thresholds (12.2): "at level 25, the next gig's payout x2" is a threshold on the draw whose
+effect names that gig's draw at `yield`, and a speed milestone, "at level 10, this gig x2 speed",
+would be one naming the bar at `rate`, which chapter 2 does not author. The bar declares nothing
+for them; the row that shows the level reads the next one for its Buy Next count and watches the
+count for crossings to toast (12.11).
 
 **What a completion is worth** is two reads beside the settlement, depositing nothing.
 `BarSystem.CompletionPayout` answers what the `onComplete` list would deposit to each currency if
@@ -2266,7 +2269,7 @@ presses, and the toast's `Advance` ends the shown toast as its last frame would;
 
 **The threshold toast.** When a levelled row's level crosses a count threshold during play - a
 purchase, an autobuy, a grant, whatever moved the count - a toast names each effect the threshold
-switched on: "<target displayName> x<multiplier> <stat word>", "Tuesday Open Mic x2 speed", the stat
+switched on: "<target displayName> x<multiplier> <stat word>", "House Party Draw x2 payout", the stat
 word from one mapping (`ToastUI.StatWord`: `rate` is "speed", `yield` "payout", `cost` "cost", any
 other stat its own name). The row detects it: every refresh reads the level's owned count, and a
 count above the last one it read raises the effects of `ThresholdsCrossed` between them, in order,
@@ -2604,10 +2607,14 @@ Content/                 // the authored JSON the importer reads
    something that does not exist, so only flags, tags, stat names, and the `Effect` selectors
    (`target`, `currencyId` — id-or-tag matchers, §12.2) stay strings.
    **Re-import overwrites**: the JSON is the source of truth for a chapter it authored; content
-   born in the editor is simply never re-imported over. (If round-tripping ever matters, a
-   chapter/game exporter back to JSON is a later addition — deliberately not built now.) A
-   polymorphic kind in data with no class behind it is an import error (§12.12); regular
-   per-chapter gear curves can be generated at import.
+   born in the editor is simply never re-imported over. A write resets an existing asset to a
+   blank instance's state before filling it, so nothing a previous import wrote survives it, and
+   every `[SerializeReference]` object it lands takes as its managed reference id a hash of its
+   field path on its asset, set before the asset first serializes (Unity fixes an id then), so the
+   same content writes the same bytes and a re-import changes only what the content changed.
+   (If round-tripping ever matters, a chapter/game exporter back to JSON is a later addition —
+   deliberately not built now.) A polymorphic kind in data with no class behind it is an import
+   error (§12.12); regular per-chapter gear curves can be generated at import.
 6. Run the §12.12 validation pass at boot in development builds; fail loudly.
 7. **A content fault throws, in every build.** Content is static and validated, so an unresolvable
    reference, a fact naming something no scope on its chain declares, or a number outside its legal

@@ -28,7 +28,7 @@ MonoBehaviour:
     formula:
       rid: -2
   appliesWhen:
-    rid: 1688710519480123539
+    rid: 1042937454250432615
   timer: encore_timer
   activeAfterSeconds: 0
   references:
@@ -36,19 +36,19 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710519480123539
+    - rid: 1042937454250432615
       type: {class: Any, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 1688710519480123540
-        - rid: 1688710519480123541
-    - rid: 1688710519480123540
+        - rid: 6207144187278492033
+        - rid: 6207913845418050508
+    - rid: 6207144187278492033
       type: {class: HasEntitlement, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         entitlementId: backstage_pass
-    - rid: 1688710519480123541
+    - rid: 6207913845418050508
       type: {class: BuffActive, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

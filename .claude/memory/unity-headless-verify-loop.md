@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-11T03:19:59.549Z
+  modified: 2026-11-13T04:17:48.875Z
 ---
 
 Unity batchmode is the ONLY compiler allowed here. No Roslyn, csc or dotnet. If batchmode cannot run,
@@ -41,7 +41,9 @@ compilation is unverified: say so and ask John to close the editor.
 - The expected count is the latest row of `Docs/build-plan.md`, never recall.
 
 **What a reimport does to the tree (not content changes, not findings)**
-- `rid` values regenerate, so every asset holding a condition, action or formula shows modified.
+- `rid` values are stable (2026-11-12: a hash of each reference's field path, set by the importer), so
+  a reimport of unchanged content changes no file. An asset that shows modified after an import
+  changed for real; check it.
 - An empty serialized string is written `uiText: ` with a trailing space.
 - The importer never deletes. An asset no document authors any more is left on disk and logged as
   "no longer authored by any document - left on disk".

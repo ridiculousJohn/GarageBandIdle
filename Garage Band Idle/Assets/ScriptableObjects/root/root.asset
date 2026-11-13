@@ -50,11 +50,11 @@ MonoBehaviour:
   entitlements:
   - backstage_pass
   encoreAdReward:
-  - rid: 1688710519480123397
+  - rid: 7730364293298916499
   references:
     version: 2
     RefIds:
-    - rid: 1688710519480123397
+    - rid: 7730364293298916499
       type: {class: ExtendTimer, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         timer: encore_timer

@@ -17,13 +17,17 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710519480123419
+    rid: 6072966049061434462
   actions:
-  - rid: 1688710519480123420
+  - rid: 527410319920142766
   references:
     version: 2
     RefIds:
-    - rid: 1688710519480123419
+    - rid: 527410319920142766
+      type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        flagId: album
+    - rid: 6072966049061434462
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +36,3 @@ MonoBehaviour:
           _value:
             mantissa: 3
             exponent: 2
-    - rid: 1688710519480123420
-      type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        flagId: album

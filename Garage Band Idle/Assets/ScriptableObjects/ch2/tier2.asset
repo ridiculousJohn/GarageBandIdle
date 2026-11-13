@@ -85,7 +85,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e335570ec3271244989e7b7e829e4d28, type: 2}
   - {fileID: 11400000, guid: 41c13b81cfaa8924a98ff17cdce96258, type: 2}
   rung:
-    rid: 1688710519480123634
+    rid: 4606566827300502135
   events:
   - {fileID: 11400000, guid: e2265816330582e40becab1596191495, type: 2}
   - {fileID: 11400000, guid: 8920797fc0b077147b1af67d369b5ccf, type: 2}
@@ -93,55 +93,7 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 1688710519480123634
-      type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        label: Record an EP
-        info: 
-        confirmText: 
-        offerCondition:
-          rid: 1688710519480123635
-        actions:
-        - rid: 1688710519480123636
-        - rid: 1688710519480123637
-    - rid: 1688710519480123635
-      type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: 
-        conditions:
-        - rid: 1688710519480123638
-        - rid: 1688710519480123639
-    - rid: 1688710519480123636
-      type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        currencies:
-        - {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
-        amount:
-          _value:
-            mantissa: 0
-            exponent: 0
-        formula:
-          rid: 1688710519480123640
-    - rid: 1688710519480123637
-      type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        scope: {fileID: 11400000}
-    - rid: 1688710519480123638
-      type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: Requires 300 Fans
-        currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
-        threshold:
-          _value:
-            mantissa: 3
-            exponent: 2
-    - rid: 1688710519480123639
-      type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: Claim your Battle of the Bands reward first
-        condition:
-          rid: 1688710519480123641
-    - rid: 1688710519480123640
+    - rid: 3484238820291346284
       type: {class: RootCurveFormula, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
@@ -151,7 +103,55 @@ MonoBehaviour:
             mantissa: 1
             exponent: 1
         exponent: 0.5
-    - rid: 1688710519480123641
+    - rid: 4606566827300502135
+      type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        label: Record an EP
+        info: 
+        confirmText: 
+        offerCondition:
+          rid: 6406400294486419320
+        actions:
+        - rid: 6752657644374341920
+        - rid: 6751747248746372437
+    - rid: 4764012849098718739
+      type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Claim your Battle of the Bands reward first
+        condition:
+          rid: 8613994455815512640
+    - rid: 4765143147052330422
+      type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Requires 300 Fans
+        currency: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
+        threshold:
+          _value:
+            mantissa: 3
+            exponent: 2
+    - rid: 6406400294486419320
+      type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        conditions:
+        - rid: 4765143147052330422
+        - rid: 4764012849098718739
+    - rid: 6751747248746372437
+      type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        scope: {fileID: 11400000}
+    - rid: 6752657644374341920
+      type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        currencies:
+        - {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
+        amount:
+          _value:
+            mantissa: 0
+            exponent: 0
+        formula:
+          rid: 3484238820291346284
+    - rid: 8613994455815512640
       type: {class: EventRewardPending, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

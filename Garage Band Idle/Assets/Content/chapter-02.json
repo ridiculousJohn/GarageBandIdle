@@ -207,7 +207,7 @@
     },
     {
       "title": "Promotion",
-      "description": "Handbills, mailing lists and anyone who will write about you. They build Buzz on their own, and every point of Buzz adds a little to the cash a gig pays.",
+      "description": "Handbills, mailing lists and anyone who will write about you. They build Buzz on their own, and the more Buzz you have, the more cash a gig pays, each point adding a little less than the last.",
       "visibleWhen": {
         "type": "FlagSet",
         "flagId": "promo_revealed"
@@ -417,9 +417,9 @@
               "currencyId": "cash",
               "stat": "yield",
               "formula": {
-                "type": "LinearOnBalance",
+                "type": "LogOnBalance",
                 "currency": "buzz",
-                "coefficient": 0.01
+                "coefficient": 1
               }
             }
           ]
@@ -736,36 +736,11 @@
           ],
           "thresholds": [
             {
-              "count": 10,
-              "effects": [
-                {
-                  "target": "open_mic",
-                  "stat": "rate",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
               "count": 25,
               "effects": [
                 {
-                  "target": "open_mic",
-                  "stat": "rate",
-                  "multiplier": 2
-                },
-                {
                   "target": "house_party_draw",
                   "stat": "yield",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
-              "count": 50,
-              "effects": [
-                {
-                  "target": "open_mic",
-                  "stat": "rate",
                   "multiplier": 2
                 }
               ]
@@ -802,36 +777,11 @@
           ],
           "thresholds": [
             {
-              "count": 10,
-              "effects": [
-                {
-                  "target": "house_party",
-                  "stat": "rate",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
               "count": 25,
               "effects": [
                 {
-                  "target": "house_party",
-                  "stat": "rate",
-                  "multiplier": 2
-                },
-                {
                   "target": "coffeehouse_draw",
                   "stat": "yield",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
-              "count": 50,
-              "effects": [
-                {
-                  "target": "house_party",
-                  "stat": "rate",
                   "multiplier": 2
                 }
               ]
@@ -868,36 +818,11 @@
           ],
           "thresholds": [
             {
-              "count": 10,
-              "effects": [
-                {
-                  "target": "coffeehouse_set",
-                  "stat": "rate",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
               "count": 25,
               "effects": [
                 {
-                  "target": "coffeehouse_set",
-                  "stat": "rate",
-                  "multiplier": 2
-                },
-                {
                   "target": "backyard_draw",
                   "stat": "yield",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
-              "count": 50,
-              "effects": [
-                {
-                  "target": "coffeehouse_set",
-                  "stat": "rate",
                   "multiplier": 2
                 }
               ]
@@ -934,36 +859,11 @@
           ],
           "thresholds": [
             {
-              "count": 10,
-              "effects": [
-                {
-                  "target": "backyard_show",
-                  "stat": "rate",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
               "count": 25,
               "effects": [
                 {
-                  "target": "backyard_show",
-                  "stat": "rate",
-                  "multiplier": 2
-                },
-                {
                   "target": "bar_opener_draw",
                   "stat": "yield",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
-              "count": 50,
-              "effects": [
-                {
-                  "target": "backyard_show",
-                  "stat": "rate",
                   "multiplier": 2
                 }
               ]
@@ -1000,36 +900,11 @@
           ],
           "thresholds": [
             {
-              "count": 10,
-              "effects": [
-                {
-                  "target": "bar_opener",
-                  "stat": "rate",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
               "count": 25,
               "effects": [
                 {
-                  "target": "bar_opener",
-                  "stat": "rate",
-                  "multiplier": 2
-                },
-                {
                   "target": "botb_qualifier_draw",
                   "stat": "yield",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
-              "count": 50,
-              "effects": [
-                {
-                  "target": "bar_opener",
-                  "stat": "rate",
                   "multiplier": 2
                 }
               ]
@@ -1066,36 +941,11 @@
           ],
           "thresholds": [
             {
-              "count": 10,
-              "effects": [
-                {
-                  "target": "botb_qualifier",
-                  "stat": "rate",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
               "count": 25,
               "effects": [
                 {
-                  "target": "botb_qualifier",
-                  "stat": "rate",
-                  "multiplier": 2
-                },
-                {
                   "target": "botb_qualifier_draw",
                   "stat": "yield",
-                  "multiplier": 2
-                }
-              ]
-            },
-            {
-              "count": 50,
-              "effects": [
-                {
-                  "target": "botb_qualifier",
-                  "stat": "rate",
                   "multiplier": 2
                 }
               ]

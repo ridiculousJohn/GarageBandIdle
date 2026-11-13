@@ -28,24 +28,28 @@ MonoBehaviour:
       mantissa: 1
       exponent: 0
   repeatWhen:
-    rid: 1688710519480123392
+    rid: 3977718579302348594
   tap: {fileID: 11400000, guid: 321b5cbac38b1934ab7a4c18692a061a, type: 2}
   level: {fileID: 11400000, guid: 061e3a40d4c09a04584f0d2b2c0d609b, type: 2}
   automation: {fileID: 11400000, guid: d79d2d0d04ab85e4caa37ab0c541f71d, type: 2}
   availableWhen:
-    rid: 1688710519480123393
+    rid: 7998337719617684240
   onComplete:
-  - rid: 1688710519480123394
+  - rid: 7825020698106105859
   perFill: []
   references:
     version: 2
     RefIds:
-    - rid: 1688710519480123392
+    - rid: 3977718579302348594
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: booked_bar_opener
-    - rid: 1688710519480123393
+    - rid: 7825020698106105859
+      type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        generator: {fileID: 11400000, guid: 061e3a40d4c09a04584f0d2b2c0d609b, type: 2}
+    - rid: 7998337719617684240
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Book a Bar Opening Slot
@@ -54,7 +58,3 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 1688710519480123394
-      type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        generator: {fileID: 11400000, guid: 061e3a40d4c09a04584f0d2b2c0d609b, type: 2}

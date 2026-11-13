@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-12T22:25:05.917Z
+  modified: 2026-11-13T03:32:35.773Z
 ---
 
 The design descends from Ctrl C. Its Android reconstruction (version 1.12.2) is in `Docs/ctrl-c/`:
@@ -115,5 +115,7 @@ John's play wins where they differ - they show no top pills, only a "+" at the r
   Others may say more. Liquidate converts Assets to Money and resets only the tier above it; Buy
   Shares converts Money to Shares and resets most of the chapter (Discipline and Metrics reset,
   some later buffs do not - details in Docs/ctrl-c).
+- Chapter 2's Data (+1% Lines per point): John does not recall it ballooning within one promotion
+  (2026-11-12, asked after the sim showed our Buzz, the same shape, reaching x5000 Cash in a 30-minute run).
 - Unknown to John: its font, whether idle accrual includes Overclock, and whether tokens moved while
   a chapter was dormant change that chapter's idle payout.

@@ -167,7 +167,10 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             // is dirty - without this the wiring lives in memory until the
             // domain reloads over it, and the files on disk stay empty.
             foreach (var definition in written.Created)
+            {
+                AssignStableReferenceIds(definition, written.Paths[definition]);
                 EditorUtility.SetDirty(definition);
+            }
             AssetDatabase.SaveAssets();
 
             AssignAddressables(written, options);
@@ -1116,7 +1119,21 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             // load can hand back a subasset of a file that is not ours.
             var existing = AssetDatabase.LoadMainAssetAtPath(path);
             if (existing != null && existing.GetType() == type)
+            {
+                // Reset to a blank instance's state before the build fills it:
+                // the JSON is the whole of the asset, and the previous import's
+                // [SerializeReference] objects go with their managed reference
+                // ids, which AssignStableReferenceIds hands to this import's.
+                var name = existing.name;
+                var blank = ScriptableObject.CreateInstance(type);
+                EditorUtility.CopySerialized(blank, existing);
+                UnityEngine.Object.DestroyImmediate(blank);
+                existing.name = name;
+                // The copy replaces the data, not the host's id registry; one
+                // serialization of the blank state is what releases the ids.
+                using (new SerializedObject(existing)) { }
                 return (Definition)existing;
+            }
             // Preflight refuses an occupied path, so arriving here with one
             // occupied means the two passes disagree - never a licence to
             // overwrite, which is what CreateAsset would do next.
@@ -1127,6 +1144,153 @@ namespace RidiculousGaming.GarageBandIdle.Editor
             var created = (Definition)ScriptableObject.CreateInstance(type);
             AssetDatabase.CreateAsset(created, path);
             return created;
+        }
+
+        // Every [SerializeReference] object on a written asset takes as its id
+        // a hash of its field path on that asset ("rung.actions[2]",
+        // "effects[0].formula"), so the same content serializes to the same
+        // bytes on every import and a reimport's diff shows only real changes.
+        // The build makes each of these objects fresh, and an object the
+        // serializer ids itself gets a random id, so left alone every asset
+        // holding one would be rewritten with nothing but its rid lines
+        // changed. An edit moves only the ids of references whose position
+        // moved.
+        //
+        // The walk reads the host's LIVE object graph by reflection, picking
+        // fields the way Unity's serializer does, and never serializes the
+        // host: Unity gives an object its id the first time the host
+        // serializes with it, and SetManagedReferenceIdForObject refuses to
+        // change an id once given. Serializing afterwards is the audit - an
+        // id on the host that is neither null nor one assigned here is a
+        // reference the walk missed, and that fails the import rather than
+        // writing a random id.
+        private static void AssignStableReferenceIds(Definition host, string assetPath)
+        {
+            var found = new List<(string Path, object Value)>();
+            var entered = new List<object>();
+            Walk(host, host.GetType(), "");
+
+            var claimed = new Dictionary<long, string>();
+            foreach (var (path, value) in found)
+            {
+                var id = Fnv1a64(path) & long.MaxValue;
+                if (claimed.TryGetValue(id, out var other))
+                    throw new ContentImportException(
+                        $"'{assetPath}': the managed references at '{other}' and '{path}' hash to the same id {id}.", true);
+                claimed.Add(id, path);
+                if (!UnityEngine.Serialization.ManagedReferenceUtility.SetManagedReferenceIdForObject(host, value, id))
+                    throw new ContentImportException(
+                        $"'{assetPath}': Unity refused managed reference id {id} for '{path}' - the object holds id " +
+                        $"{UnityEngine.Serialization.ManagedReferenceUtility.GetManagedReferenceIdForObject(host, value)}, and id {id} is held by " +
+                        $"{UnityEngine.Serialization.ManagedReferenceUtility.GetManagedReference(host, id)?.GetType().Name ?? "nothing"}.", true);
+            }
+
+            using (new SerializedObject(host)) { }
+            foreach (var id in UnityEngine.Serialization.ManagedReferenceUtility.GetManagedReferenceIds(host))
+                if (id != UnityEngine.Serialization.ManagedReferenceUtility.RefIdNull && !claimed.ContainsKey(id))
+                    throw new ContentImportException(
+                        $"'{assetPath}': managed reference id {id} is on the asset but the field walk never reached its object.", true);
+
+            // A node's serialized fields. A plain field is walked as its
+            // declared type, the way Unity stores it; a reference is walked as
+            // the object's own type, which is what Unity records for it.
+            void Walk(object node, Type type, string prefix)
+            {
+                if (!type.IsValueType)
+                {
+                    if (entered.Any(e => ReferenceEquals(e, node)))
+                        return;
+                    entered.Add(node);
+                }
+                foreach (var field in SerializedFields(type))
+                {
+                    var isReference = field.IsDefined(typeof(SerializeReference), false);
+                    var isList = IsList(field.FieldType);
+                    var declared = isList ? ElementType(field.FieldType) : field.FieldType;
+                    if (!isReference && !IsComposite(declared))
+                        continue;
+                    var value = field.GetValue(node);
+                    if (value == null)
+                        continue;
+                    var path = prefix + field.Name;
+                    if (!isList)
+                    {
+                        Enter(value, declared, path, isReference);
+                        continue;
+                    }
+                    var items = (System.Collections.IList)value;
+                    for (var i = 0; i < items.Count; i++)
+                        Enter(items[i], declared, $"{path}[{i}]", isReference);
+                }
+            }
+
+            // Null stays RefIdNull. A reference reached twice keeps its first
+            // path: one object, one id.
+            void Enter(object value, Type declared, string path, bool isReference)
+            {
+                if (value == null)
+                    return;
+                if (!isReference)
+                {
+                    Walk(value, declared, path + ".");
+                    return;
+                }
+                if (found.Any(f => ReferenceEquals(f.Value, value)))
+                    return;
+                found.Add((path, value));
+                Walk(value, value.GetType(), path + ".");
+            }
+
+            // Unity's rule: instance fields, base class first, that are public
+            // or [SerializeField] or [SerializeReference], and not readonly,
+            // const, or [NonSerialized]. The engine's own base classes hold
+            // nothing of the content's.
+            static IEnumerable<System.Reflection.FieldInfo> SerializedFields(Type type)
+            {
+                var chain = new List<Type>();
+                for (var t = type; t != null && t != typeof(object) && t != typeof(ScriptableObject)
+                                   && t != typeof(UnityEngine.Object); t = t.BaseType)
+                    chain.Add(t);
+                chain.Reverse();
+                const System.Reflection.BindingFlags Declared = System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic
+                    | System.Reflection.BindingFlags.DeclaredOnly;
+                foreach (var t in chain)
+                foreach (var field in t.GetFields(Declared))
+                {
+                    if (field.IsInitOnly || field.IsLiteral || field.IsNotSerialized)
+                        continue;
+                    if (field.IsPublic || field.IsDefined(typeof(SerializeField), false)
+                                       || field.IsDefined(typeof(SerializeReference), false))
+                        yield return field;
+                }
+            }
+
+            static bool IsList(Type type) =>
+                type.IsArray || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>));
+
+            static Type ElementType(Type list) =>
+                list.IsArray ? list.GetElementType() : list.GetGenericArguments()[0];
+
+            // A [Serializable] class or struct Unity stores inline. Another
+            // asset is a UnityEngine.Object reference and is never entered.
+            static bool IsComposite(Type type) =>
+                !type.IsPrimitive && !type.IsEnum && type != typeof(string) && !IsList(type)
+                && !typeof(UnityEngine.Object).IsAssignableFrom(type) && type.IsSerializable;
+
+            static long Fnv1a64(string text)
+            {
+                unchecked
+                {
+                    var hash = 14695981039346656037UL;
+                    foreach (var b in System.Text.Encoding.UTF8.GetBytes(text))
+                    {
+                        hash ^= b;
+                        hash *= 1099511628211UL;
+                    }
+                    return (long)hash;
+                }
+            }
         }
 
         private static void EnsureFolder(string folder)

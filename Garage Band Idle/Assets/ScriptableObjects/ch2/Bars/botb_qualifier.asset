@@ -28,24 +28,28 @@ MonoBehaviour:
       mantissa: 1
       exponent: 0
   repeatWhen:
-    rid: 1688710519480123409
+    rid: 3977718579302348594
   tap: {fileID: 11400000, guid: c59db6327d263bf41b910126a4c66bd1, type: 2}
   level: {fileID: 11400000, guid: 049eeb882fc155e49b9a04441fd62303, type: 2}
   automation: {fileID: 11400000, guid: 76449147113c4464c87cdf6676385827, type: 2}
   availableWhen:
-    rid: 1688710519480123410
+    rid: 7998337719617684240
   onComplete:
-  - rid: 1688710519480123411
+  - rid: 7825020698106105859
   perFill: []
   references:
     version: 2
     RefIds:
-    - rid: 1688710519480123409
+    - rid: 3977718579302348594
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: booked_botb_qualifier
-    - rid: 1688710519480123410
+    - rid: 7825020698106105859
+      type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        generator: {fileID: 11400000, guid: 049eeb882fc155e49b9a04441fd62303, type: 2}
+    - rid: 7998337719617684240
       type: {class: OwnedCountAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Book a Battle of the Bands Qualifier
@@ -54,7 +58,3 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 1688710519480123411
-      type: {class: FireGeneratorYield, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        generator: {fileID: 11400000, guid: 049eeb882fc155e49b9a04441fd62303, type: 2}
