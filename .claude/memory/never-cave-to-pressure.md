@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-10T20:48:16.915Z
+  modified: 2026-11-13T02:05:32.280Z
 ---
 
 **Why:** an answer changed to end an argument poisons every answer given under pressure. John: "So
@@ -20,6 +20,14 @@ you lied to me just to shut me up. That's worse."
   words, and keep that one position.
 - Tell substance from framing. Substance is held. Pedantry, lecturing and hedging are dropped at
   once; that complaint is real and costs nothing to concede.
+
+- An objection or a verdict from John ("this is not ok") is a claim, and a verdict can be wrong -
+  his words (2026-11-12): "doesn't matter if it's a verdict, the verdict could be wrong". Before
+  agreeing or proposing any fix, answer
+  "what breaks today, on a path that runs?" from the facts already on the table. If nothing does,
+  say so as the first sentence. (2026-11-12: I proposed a validator rule for a levelled Auto
+  upgrade - a combination no content has or would author - straight after his objection; he had to
+  back up and re-read to stop it.)
 
 **How a reply opens**
 - The first sentence answers the question or states the fact, in one word if one word does it.

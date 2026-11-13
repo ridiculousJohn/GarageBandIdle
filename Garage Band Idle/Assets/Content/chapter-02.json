@@ -256,15 +256,7 @@
       "modules": [
         {
           "prefabId": "upgrade_tile",
-          "contentId": "crowd_work_1"
-        },
-        {
-          "prefabId": "upgrade_tile",
-          "contentId": "crowd_work_2",
-          "visibleWhen": {
-            "type": "UpgradePurchased",
-            "upgrade": "crowd_work_1"
-          }
+          "contentId": "crowd_work"
         },
         {
           "prefabId": "upgrade_tile",
@@ -1344,40 +1336,34 @@
           ]
         },
         {
-          "id": "crowd_work_1",
-          "displayName": "Stage Banter",
-          "description": "Talk to the room between songs, and every tap on a gig pushes its bar twice as far.",
+          "id": "crowd_work",
+          "displayName": "Crowd Work",
           "gate": {
-            "type": "CurrencyAtLeast",
-            "currency": "cash",
-            "threshold": 300
+            "type": "Always"
           },
           "costCurrency": "cash",
-          "cost": 300,
-          "effects": [
+          "levels": [
             {
-              "target": "work_the_crowd",
-              "stat": "yield",
-              "multiplier": 2
-            }
-          ]
-        },
-        {
-          "id": "crowd_work_2",
-          "displayName": "Call and Response",
-          "description": "Get the crowd singing back at you, and every tap pushes a gig's bar further still.",
-          "gate": {
-            "type": "CurrencyAtLeast",
-            "currency": "cash",
-            "threshold": 25000
-          },
-          "costCurrency": "cash",
-          "cost": 25000,
-          "effects": [
+              "cost": 300,
+              "description": "Talk to the room between songs, and every tap on a gig pushes its bar twice as far.",
+              "effects": [
+                {
+                  "target": "work_the_crowd",
+                  "stat": "yield",
+                  "multiplier": 2
+                }
+              ]
+            },
             {
-              "target": "work_the_crowd",
-              "stat": "yield",
-              "multiplier": 2.5
+              "cost": 25000,
+              "description": "Get the crowd singing back at you, and every tap pushes a gig's bar five times as far.",
+              "effects": [
+                {
+                  "target": "work_the_crowd",
+                  "stat": "yield",
+                  "multiplier": 5
+                }
+              ]
             }
           ]
         },

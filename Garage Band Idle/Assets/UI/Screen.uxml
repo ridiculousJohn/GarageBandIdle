@@ -109,6 +109,7 @@
         <ui:VisualElement class="modal-panel details-panel">
             <ui:Label name="details-name" class="modal-title" />
             <ui:Label name="details-effect" class="details-effect" />
+            <ui:Label name="details-next" class="details-effect" />
             <ui:Button name="details-close" text="Close" class="overlay-close details-close" />
         </ui:VisualElement>
     </ui:VisualElement>

@@ -366,8 +366,24 @@ Label {
     background-color: rgb(226, 75, 74);
 }
 
-.tile-name {
+/* The name and the level sit on one line; on a narrow tile the name is
+   cut short and the level always stays whole, "Economies Of Sc... (3)". */
+.tile-title {
     width: 100%;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.tile-title .tile-level {
+    flex-shrink: 0;
+    min-width: auto;
+    overflow: visible;
+    margin-left: 8px;
+}
+
+.tile-name {
+    flex-shrink: 1;
+    min-width: 0;
     font-size: 34px;
     white-space: nowrap;
     overflow: hidden;
@@ -850,7 +866,8 @@ Label {
 }
 
 /* The text windows - an upgrade's details, a rung's info and a rung's
-   confirmation: one paragraph, wrapping, and the actions as text at the
+   confirmation: wrapping paragraphs (an upgrade's current effect and its
+   next level's are two), and the actions as text at the
    bottom right, the committing one in the accent and Cancel in grey. */
 .details-effect {
     white-space: normal;

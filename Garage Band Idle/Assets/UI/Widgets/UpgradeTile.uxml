@@ -1,7 +1,10 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <ui:Button name="tile" class="tile">
         <ui:VisualElement name="icon" class="tile-icon" picking-mode="Ignore" />
-        <ui:Label name="name" class="tile-name" picking-mode="Ignore" />
+        <ui:VisualElement name="title" class="tile-title" picking-mode="Ignore">
+            <ui:Label name="name" class="tile-name" picking-mode="Ignore" />
+            <ui:Label name="level" class="tile-name tile-level" picking-mode="Ignore" />
+        </ui:VisualElement>
         <ui:Label name="price" class="tile-price" picking-mode="Ignore" />
     </ui:Button>
 </ui:UXML>

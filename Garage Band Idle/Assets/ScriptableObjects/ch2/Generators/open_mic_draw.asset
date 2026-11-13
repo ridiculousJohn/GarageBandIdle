@@ -20,7 +20,7 @@ MonoBehaviour:
   description: How many people turn up for you on a Tuesday, and every level pays
     a bigger lump of Cash and Fans when the set ends.
   availableWhen:
-    rid: 1688710516000424361
+    rid: 1688710518450421878
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
   baseCost:
     _value:
@@ -91,7 +91,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710516000424361
+    - rid: 1688710518450421878
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

@@ -1035,6 +1035,106 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.Throws<ContentImportException>(Import);
         }
 
+        // ---- levelled upgrades ----
+
+        // A levelled upgrade beside the bar's automation (design doc 4): two
+        // levels in the upgrade's costCurrency, each with its effects in the
+        // Effect JSON shape and its own text, the second with an action.
+        private static string LevelledUpgradeJson => LevelledBarJson.Replace(
+            @"""upgrades"": [",
+            @"""upgrades"": [
+                {
+                    ""id"": ""tuning"",
+                    ""displayName"": ""Tuning"",
+                    ""gate"": { ""type"": ""Always"" },
+                    ""costCurrency"": ""cash"",
+                    ""levels"": [
+                        {
+                            ""cost"": 10,
+                            ""description"": ""Level one."",
+                            ""effects"": [{ ""target"": ""draw"", ""stat"": ""rate"", ""multiplier"": 2 }]
+                        },
+                        {
+                            ""cost"": 50,
+                            ""description"": ""Level two."",
+                            ""effects"": [{ ""target"": ""draw"", ""stat"": ""rate"", ""multiplier"": 5 }],
+                            ""actions"": [{ ""type"": ""SetFlag"", ""flagId"": ""auto_repeat"" }]
+                        }
+                    ]
+                },");
+
+        [Test]
+        public void An_upgrades_levels_import_with_their_costs_effects_text_and_actions()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledUpgradeJson);
+
+            Import();
+
+            var tuning = Load<UpgradeDefinition>("ch1/Upgrades/tuning.asset");
+            Assert.IsTrue(tuning.IsLevelled);
+            Assert.AreEqual(2, tuning.levels.Count);
+            Assert.AreEqual((BigNumber)10, tuning.levels[0].cost);
+            Assert.AreEqual((BigNumber)50, tuning.levels[1].cost);
+            Assert.AreEqual((BigNumber)2, tuning.levels[0].effects.Single().multiplier);
+            Assert.AreEqual((BigNumber)5, tuning.levels[1].effects.Single().multiplier);
+            Assert.AreEqual("draw", tuning.levels[1].effects.Single().target);
+            Assert.AreEqual(Stat.Rate, tuning.levels[1].effects.Single().stat);
+            Assert.IsFalse(string.IsNullOrEmpty(tuning.levels[0].description));
+            Assert.AreNotEqual(tuning.levels[0].description, tuning.levels[1].description, "each level its own text");
+            Assert.IsEmpty(tuning.levels[0].actions);
+            Assert.AreEqual("auto_repeat", ((SetFlag)tuning.levels[1].actions.Single()).flagId);
+            Assert.AreSame(Load<CurrencyDefinition>("ch1/Currencies/cash.asset"), tuning.costCurrency);
+            Assert.IsEmpty(tuning.effects, "nothing of its own beside its levels");
+            Assert.IsEmpty(tuning.actions);
+        }
+
+        [Test]
+        public void An_upgrade_without_levels_imports_an_empty_list()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson);
+
+            Import();
+
+            var standing = Load<UpgradeDefinition>("ch1/Upgrades/standing.asset");
+            Assert.IsFalse(standing.IsLevelled);
+            Assert.AreEqual(0, standing.levels.Count);
+        }
+
+        // An asset cannot tell an empty list from an absent one, so an authored
+        // empty list is refused at the import rather than read as no levels.
+        [Test]
+        public void An_empty_levels_list_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson.Replace(
+                @"""upgrades"": [",
+                @"""upgrades"": [
+                    {
+                        ""id"": ""tuning"",
+                        ""displayName"": ""Tuning"",
+                        ""gate"": { ""type"": ""Always"" },
+                        ""costCurrency"": ""cash"",
+                        ""levels"": []
+                    },"));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("levels", thrown.Message);
+        }
+
+        // Mixing the one-purchase fields into a levelled upgrade is refused by
+        // the validation pass the import runs (12.12).
+        [Test]
+        public void A_levelled_upgrade_with_a_top_level_cost_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledUpgradeJson.Replace(
+                @"""id"": ""tuning"",", @"""id"": ""tuning"", ""cost"": 10,"));
+
+            Assert.Throws<ContentImportException>(Import);
+        }
+
         // ---- a generator's count thresholds ----
 
         // Two thresholds on the level generator: the first names no target, so

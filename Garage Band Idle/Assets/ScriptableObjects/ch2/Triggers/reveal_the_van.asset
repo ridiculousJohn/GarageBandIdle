@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710516000424469
+    rid: 1688710518450421990
   actions:
-  - rid: 1688710516000424470
+  - rid: 1688710518450421991
   references:
     version: 2
     RefIds:
-    - rid: 1688710516000424469
+    - rid: 1688710518450421990
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 3
-    - rid: 1688710516000424470
+    - rid: 1688710518450421991
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: the_van_revealed

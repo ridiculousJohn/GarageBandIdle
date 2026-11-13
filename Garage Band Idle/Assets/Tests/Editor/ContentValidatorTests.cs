@@ -1329,6 +1329,100 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertNoFinding(f.Run(), ValidationCheck.NumericRange);
         }
 
+        // ---- levelled upgrades (design doc 4) ----
+
+        // Two levels on the amp's rate, filed beside the fixture's upgrades.
+        private static UpgradeDefinition AddTuning(ValidatorFixture f)
+        {
+            var tuning = TestTree.MakeLevelled("amp_tuning", f.Cash, "practice_amp", Stat.Rate, (100, 2), (400, 5));
+            f.Tier1.upgrades.Add(tuning);
+            return tuning;
+        }
+
+        [Test]
+        public void LevelledUpgrade_Valid_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            AddTuning(f);
+            AssertClean(f.Run());
+        }
+
+        // The one-purchase fields are a second answer the purchase never reads,
+        // and ownedWhen a second ownership rule: each is refused beside levels.
+        [Test]
+        public void LevelledUpgrade_TopLevelFieldsBesideLevels_Error()
+        {
+            var f = new ValidatorFixture();
+            var tuning = AddTuning(f);
+            tuning.cost = 10;
+            tuning.effects.Add(new Effect { target = "practice_amp", stat = Stat.Rate, multiplier = 2 });
+            tuning.actions.Add(new SetFlag { flagId = "album" });
+            tuning.description = "a second answer";
+            tuning.ownedWhen = new FlagSet { flagId = "album" };
+            var report = f.Run();
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.InertOperand, "upgrade 'amp_tuning': authors a top-level cost");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.InertOperand, "authors top-level effects");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.InertOperand, "authors top-level actions");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.InertOperand, "authors a top-level description");
+            AssertFinding(report, ValidationSeverity.Error, ValidationCheck.InertOperand, "authors ownedWhen");
+        }
+
+        [Test]
+        public void LevelledUpgrade_NegativeLevelCost_Error()
+        {
+            var f = new ValidatorFixture();
+            AddTuning(f).levels[1].cost = -1;
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange,
+                "upgrade 'amp_tuning' levels[1]: cost is");
+        }
+
+        [Test]
+        public void LevelledUpgrade_LevelThatDoesNothing_Error()
+        {
+            var f = new ValidatorFixture();
+            AddTuning(f).levels[0].effects.Clear();
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "upgrade 'amp_tuning' levels[0]: has no effects and no actions");
+        }
+
+        // A level with actions and no effects does something, so it is legal.
+        [Test]
+        public void LevelledUpgrade_LevelWithOnlyActions_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            var level = AddTuning(f).levels[0];
+            level.effects.Clear();
+            level.actions.Add(new SetFlag { flagId = "album" });
+            AssertClean(f.Run());
+        }
+
+        [Test]
+        public void LevelledUpgrade_NullLevel_Error()
+        {
+            var f = new ValidatorFixture();
+            AddTuning(f).levels.Add(null);
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry,
+                "upgrade 'amp_tuning' levels[2]: a null level");
+        }
+
+        // A level's effects are validated as the upgrade's own are.
+        [Test]
+        public void LevelledUpgrade_LevelEffectsAreValidated_Error()
+        {
+            var f = new ValidatorFixture();
+            AddTuning(f).levels[1].effects.Add(new Effect { target = "practice_amp", stat = Stat.Rate, multiplier = -1 });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never flips a number's sign");
+        }
+
+        // A level's actions join every other action list in the shared ledgers.
+        [Test]
+        public void LevelledUpgrade_LevelActionsAreValidated_Error()
+        {
+            var f = new ValidatorFixture();
+            AddTuning(f).levels[1].actions.Add(new SetFlag { flagId = "ghost_flag" });
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference, "SetFlag names flag 'ghost_flag'");
+        }
+
         [Test]
         public void Upgrade_ActionListParticipatesInTheSharedLedgers_Error()
         {

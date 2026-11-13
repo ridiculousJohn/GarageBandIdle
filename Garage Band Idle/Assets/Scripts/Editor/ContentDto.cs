@@ -333,6 +333,22 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public BigNumber cost;
         public List<EffectDto> effects = new();
         public List<ActionDto> actions = new();
+
+        // Null when unauthored: a levelled upgrade (design doc 4) authors this
+        // list INSTEAD of cost, effects, description and actions, and an empty
+        // list is refused at import, since an asset cannot tell it from absent.
+        public List<UpgradeLevelDto> levels;
+    }
+
+    // One level of a levelled upgrade: its cost in the upgrade's
+    // costCurrency, its effects in the Effect JSON shape, what it does, and the
+    // actions its purchase runs.
+    internal class UpgradeLevelDto
+    {
+        public BigNumber cost;
+        public List<EffectDto> effects = new();
+        public string description;
+        public List<ActionDto> actions = new();
     }
 
     internal class ModifierDto : DefinitionDto

@@ -95,7 +95,7 @@
       "name": "The Office",
       "modules": [ "module/upgrade-strip" ],
       "visibleWhen": { "type": "currencyEarnedTotal", "currency": "cash", "value": 100 },
-      "note": "The run's upgrades and the two permanent switches, as a strip of upgrade tiles (design 12.11): one sideways row, a tap buys, a hold opens the upgrade's details. Stage Banter shows with the section, Call and Response once Stage Banter is bought, and an owned upgrade keeps its tile. The standing bookings are not listed here: the calendar's Auto button sells them, one gig at a time."
+      "note": "The run's upgrades and the two permanent switches, as a strip of upgrade tiles (design 12.11): one sideways row, a tap buys, a hold opens the upgrade's details. Crowd Work shows with the section and buys one level per tap, and an owned upgrade keeps its tile. The standing bookings are not listed here: the calendar's Auto button sells them, one gig at a time."
     },
     {
       "id": "the_release",
@@ -444,23 +444,18 @@
     },
 
     {
-      "id": "crowd_work_1",
-      "name": "Stage Banter",
+      "id": "crowd_work",
+      "name": "Crowd Work",
       "type": "buff",
       "scope": "run",
-      "cost": { "currency": "cash", "amount": 300 },
-      "gate": { "type": "currency", "currency": "cash", "value": 300 },
-      "payload": { "effect": "multiplier", "value": 2.0, "targets": [ "work_the_crowd" ] },
-      "note": "Each tap adds two seconds. Reaches every crowd producer through the tag."
-    },
-    {
-      "id": "crowd_work_2",
-      "name": "Call and Response",
-      "type": "buff",
-      "scope": "run",
-      "cost": { "currency": "cash", "amount": 25000 },
-      "gate": { "type": "currency", "currency": "cash", "value": 25000 },
-      "payload": { "effect": "multiplier", "value": 2.5, "targets": [ "work_the_crowd" ] }
+      "gate": { "type": "always" },
+      "levels": [
+        { "cost": { "currency": "cash", "amount": 300 },
+          "payload": { "effect": "multiplier", "value": 2.0, "targets": [ "work_the_crowd" ] } },
+        { "cost": { "currency": "cash", "amount": 25000 },
+          "payload": { "effect": "multiplier", "value": 5.0, "targets": [ "work_the_crowd" ] } }
+      ],
+      "note": "A levelled upgrade (design 4): each buy buys the next level, and the owned level's factor replaces the one below it - x2 at level 1, x5 at level 2, never x10. Reaches every crowd producer through the tag."
     },
     {
       "id": "street_team",

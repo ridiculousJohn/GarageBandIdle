@@ -380,6 +380,27 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return encore;
         }
 
+        // A levelled upgrade (design doc 4) with an open gate: one level per
+        // (cost, multiplier) pair, each level's one effect naming the same
+        // target and stat, so the levels differ only in price and factor. Each
+        // level carries a description, as authored content does. The caller
+        // files it on a scope.
+        public static UpgradeDefinition MakeLevelled(string id, CurrencyDefinition currency, string target,
+                                                     string stat, params (double cost, double multiplier)[] levels)
+        {
+            var upgrade = MakeDefinition<UpgradeDefinition>(id);
+            upgrade.gate = new Always();
+            upgrade.costCurrency = currency;
+            for (var i = 0; i < levels.Length; i++)
+                upgrade.levels.Add(new UpgradeLevel
+                {
+                    cost = levels[i].cost,
+                    description = $"{id} level {i + 1}",
+                    effects = { new Effect { target = target, stat = stat, multiplier = levels[i].multiplier } },
+                });
+            return upgrade;
+        }
+
         public static T MakeDefinition<T>(string id, params string[] tags) where T : Definition
         {
             var def = ScriptableObject.CreateInstance<T>();

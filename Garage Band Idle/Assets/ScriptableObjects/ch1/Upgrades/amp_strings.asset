@@ -17,7 +17,7 @@ MonoBehaviour:
   displayName: New Strings
   description: Doubles the cash every practice amp brings in.
   gate:
-    rid: 1688710516000424458
+    rid: 1688710518450421979
   ownedWhen:
     rid: -2
   costCurrency: {fileID: 11400000, guid: 4b7dc9a7f2ade9f439f2f1b01ca45486, type: 2}
@@ -36,12 +36,13 @@ MonoBehaviour:
     formula:
       rid: -2
   actions: []
+  levels: []
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710516000424458
+    - rid: 1688710518450421979
       type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

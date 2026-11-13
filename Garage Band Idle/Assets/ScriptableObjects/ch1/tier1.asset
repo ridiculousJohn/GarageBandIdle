@@ -67,7 +67,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d61f1735260c6a54e9835ac4d5c6e821, type: 2}
   - {fileID: 11400000, guid: 497e5407cef7927409a0eb0395992db3, type: 2}
   rung:
-    rid: 1688710516000424390
+    rid: 1688710518450421911
   events:
   - {fileID: 11400000, guid: a501c742e6b699144bfd4569a3fc5f04, type: 2}
   - {fileID: 11400000, guid: 5c74e8f75564aa943882ae98f1a41f71, type: 2}
@@ -75,26 +75,26 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 1688710516000424390
+    - rid: 1688710518450421911
       type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         label: Cut a Demo
         info: 
         confirmText: 
         offerCondition:
-          rid: 1688710516000424391
+          rid: 1688710518450421912
         actions:
-        - rid: 1688710516000424392
-        - rid: 1688710516000424393
-    - rid: 1688710516000424391
+        - rid: 1688710518450421913
+        - rid: 1688710518450421914
+    - rid: 1688710518450421912
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 1688710516000424394
-        - rid: 1688710516000424395
-        - rid: 1688710516000424396
-    - rid: 1688710516000424392
+        - rid: 1688710518450421915
+        - rid: 1688710518450421916
+        - rid: 1688710518450421917
+    - rid: 1688710518450421913
       type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currencies:
@@ -104,12 +104,12 @@ MonoBehaviour:
             mantissa: 0
             exponent: 0
         formula:
-          rid: 1688710516000424397
-    - rid: 1688710516000424393
+          rid: 1688710518450421918
+    - rid: 1688710518450421914
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000}
-    - rid: 1688710516000424394
+    - rid: 1688710518450421915
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Requires 50 Fans
@@ -118,19 +118,19 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 1
-    - rid: 1688710516000424395
+    - rid: 1688710518450421916
       type: {class: BarsCompleted, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Requires a cover learned
         group: {fileID: 11400000, guid: 83eeaad8455aa4343bc732ea8ed03e53, type: 2}
         count: 1
-    - rid: 1688710516000424396
+    - rid: 1688710518450421917
       type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Claim your Garage Jam reward first
         condition:
-          rid: 1688710516000424398
-    - rid: 1688710516000424397
+          rid: 1688710518450421919
+    - rid: 1688710518450421918
       type: {class: RootCurveFormula, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currency: {fileID: 11400000, guid: 8fcd19c799d152b4b95054ec949a12ff, type: 2}
@@ -140,7 +140,7 @@ MonoBehaviour:
             mantissa: 5
             exponent: 0
         exponent: 0.5
-    - rid: 1688710516000424398
+    - rid: 1688710518450421919
       type: {class: EventRewardPending, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

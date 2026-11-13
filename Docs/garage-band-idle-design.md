@@ -210,12 +210,23 @@ currencies as they become affordable.
   (one-shot payloads executed at purchase: grant a currency, set a flag, add a modifier). No
   per-kind upgrade classes.
 - **Ownership.** An upgrade is owned while its purchase latch is set at its declaring scope OR its
-  optional `ownedWhen` condition holds there - the context its gate is asked in. One rule
+  optional `ownedWhen` condition holds there - the context its gate is asked in; a levelled upgrade
+  (below) is owned at its last level. One rule
   (`UpgradeDefinition.IsOwned`, asked from any scope through `Purchasing.IsOwned`) answers every
   reader: `CanBuy` / `Buy` refuse an owned upgrade, `UpgradePurchased` holds while it is owned, and
   the tile, the row, the details window and the calendar's Auto button render it owned. The effects
   alone read the latch: they apply while the latch exists, so what must outlive the latch is carried
   by a flag, never by the upgrade's effects.
+- **Levelled upgrades.** An upgrade may author `levels` instead of its own cost, effects,
+  description and actions: each level is `{cost, effects, description?, actions?}`, the cost in the
+  upgrade's `costCurrency` under the upgrade's cost factor. A buy buys the NEXT level - its price, its
+  actions - and the owned level is a fact beside the latch (`upgradeLevels`, section 12.3). Levels REPLACE,
+  never stack: while the upgrade stands at level N exactly level N's effects apply, so a x2 level
+  followed by a x5 one is x5, not x10. The latch stands from the first level, so `UpgradePurchased`
+  holds at level 1 and above; the upgrade is owned, and refuses the buy, at its last level. A
+  levelled upgrade authors no `ownedWhen`: its ownership is its last level. A tier reset clears the
+  level with the latch, so a buff ladder is re-climbed each run like any buff upgrade. Chapter 2's
+  Crowd Work is the first: x2 on the crowd producers at 300 Cash, then x5 at 25,000.
 - **Reveal.** A content-unlock upgrade reveals its content by a `SetFlag` action; the revealed
   content gates on that flag. One reveal mechanism for every content type.
 - **Lifetime is placement.** *Buff upgrades* are declared in a tier: their purchase latch clears when
@@ -1191,6 +1202,7 @@ class ScopeFacts   // the mutable state a reset DESTROYS; what a reset keeps sit
     Dictionary<string, BigDouble> grantedCounts;    // paid in by other sources' entries, fraction kept
     HashSet<string>               flags;
     HashSet<string>               purchasedUpgrades;
+    Dictionary<string, int>       upgradeLevels;    // a levelled upgrade's owned level, 1..levels; the latch stands beside it (section 4)
     HashSet<string>               firedTriggers;    // one-shot trigger latches — a reset re-arms (§12.5)
     Dictionary<string, BigDouble> barProgress;      // uncapped — overfill is allowed
     Dictionary<string, int>       fillCounts;       // bars with a repeatWhen, the ones that complete more than once
@@ -1312,7 +1324,8 @@ a scaling goal or reward curve reading a per-clear counter, 8.1). A prestige cur
 special kind: it is a currency.
 
 `UpgradePurchased` holds while a latch for the upgrade stands on the chain from the acting scope,
-read outward as every fact is, or while its `ownedWhen` holds at its declaring scope (section 4).
+read outward as every fact is, or while its `ownedWhen` holds at its declaring scope (section 4). A
+levelled upgrade's latch stands from its first level, so the condition holds at level 1 and above.
 
 `BuffActive` names a modifier as `UpgradePurchased` names an upgrade and reads the TIMER that
 modifier declares (`ModifierDefinition.timer`) outward from the acting scope, true while the
@@ -1512,7 +1525,8 @@ the half a plan does not fix.
 
 A scope names its own carriers in ONE enumeration, and that order IS the multiplication order at a
 node: upgrades, permanent modifiers, granted modifiers, bar cascades, generator thresholds, then
-handicaps, each kind in declaration order and effects in declaration order within a carrier. The enumeration names no source
+handicaps, each kind in declaration order and effects in declaration order within a carrier (a
+levelled upgrade's level effects follow its own, level by level). The enumeration names no source
 from outside, so a kind of scope with a source the others lack adds it in one override rather than as
 another read inside a walk. That is what lets `events` live on `InteriorDefinition` (§12.3) with
 nothing on the base naming them - the interior scope folds its handicaps in, and root, having no
@@ -1523,7 +1537,7 @@ named list off it. Across the tree the sources are:
 
 | Source | The fact (stored) | The effects (derived on read) |
 |---|---|---|
-| Purchased upgrades | `purchasedUpgrades` set | the upgrade definition's `List<Effect>` |
+| Purchased upgrades | `purchasedUpgrades` set; `upgradeLevels` for a levelled upgrade | the upgrade definition's `List<Effect>`; a levelled upgrade's are each level's, live while the owned level is exactly that level (section 4) |
 | Owned generators | `generatorCounts` | `produces` entries scaled by count (contributions, not effects) |
 | Timed records (Encore) | `{buffId, expiresAt}` list, the id a declared TIMER's | none directly - a record is a timer's value, a FACT the `BuffActive` condition reads through the modifier that names the timer and its band, and the modifier is a permanent membership with that condition in its `appliesWhen` (§9), the idle fraction's shape |
 | Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
@@ -1903,7 +1917,11 @@ Serialize the ScopeState tree, nested as the scopes are — **and nothing else**
 a field of the root
 scope's state (§12.3), so principle 2 is literally the save format. JSON + checksum, validated on
 load (ids resolve; unknown ids from removed content are dropped with a warning). No grants, no
-derived values, no replay of actions. Idle payouts are capped client-side.
+derived values, no replay of actions. Idle payouts are capped client-side. A levelled upgrade's
+level takes the same filter plus its range: one naming an undeclared upgrade or one with no levels,
+or below 1, is dropped; one past the last level is clamped to the last, since the purchases it
+records were made. The latch then follows the level - a latch with no level is dropped, a level
+with no latch has it restored - each with a warning.
 
 A schema version becomes a compatibility contract the moment a build that can write it reaches a
 player. Before that, format changes revise the current version in place and dev saves are deleted
@@ -1979,7 +1997,10 @@ mid-reveal is the size it ends at. `Revealing` and `Shown` say where it stands, 
 resolved as the row resolves it, drawn as a rounded, outlined tile of fixed width - a round
 placeholder icon, grey and in the accent once owned; the display name on one line, cut with an
 ellipsis; and beneath it the price with its currency's name, through `NumberFormatter`, or "Owned"
-in the accent once owned (section 4: the latch, or the upgrade's `ownedWhen`). A tap issues the upgrade row's purchase and does nothing on an owned or
+in the accent once owned (section 4: the latch, or the upgrade's `ownedWhen`, or a levelled
+upgrade's last level). A levelled upgrade's name carries the owned level in parentheses once one is
+owned, "Crowd Work (1)", and its price is the next level's; the row does the same, its description
+the level it stands at (the first before any is owned). A tap issues the upgrade row's purchase and does nothing on an owned or
 unbuyable tile. A tile that cannot be bought now is dimmed by a class (`tile-unbuyable`) and never
 disabled, since a disabled element receives no pointer events and the hold is how a player reads
 what the upgrade does before affording it. A hold (`GameConfig.longPressSeconds`, the same
@@ -1987,8 +2008,11 @@ what the upgrade does before affording it. A hold (`GameConfig.longPressSeconds`
 window**, a host-owned overlay (`UpgradeDetailsUI`) reached through `IUpgradeDetailsOpener` with the
 upgrade and its declaring scope, as the automation window is: the title is the upgrade's name, one
 paragraph reads "On buy: " and the description while it is not bought and "Current effect: " and
-the description once it is, and "Close" in the accent at the bottom right closes it. A purchase made
-beneath it turns the paragraph on the host's refresh. An owned upgrade's tile stays on the strip:
+the description once it is, and "Close" in the accent at the bottom right closes it. A levelled
+upgrade's title carries the owned level as its tile's name does; before any level it reads "On buy: "
+and the first level's description, partly bought "Current effect: " with the owned level's and
+"Next: " with the next level's, and at the last level only the current effect. A purchase made
+beneath it turns the paragraphs on the host's refresh. An owned upgrade's tile stays on the strip:
 content gating a tile on a fact that can fall gives it `Any(UpgradePurchased <itself>, ...)`.
 
 **The prestige card.** `rung_button` (`RungButtonUI`, `RungButton.uxml`) binds nothing and presses
@@ -2012,7 +2036,7 @@ confirmation window (`RungConfirmUI`) titles itself with the label and a questio
 `confirmText`, and offers "Cancel" in grey and "Confirm" in the accent at the bottom right - Cancel
 closes it, and Confirm closes it and runs `TryRung` at the scope the card handed over, fail-closed
 as the card's own press is. Neither window reads state, so a refresh beneath them changes nothing.
-The upgrade details window stays its own class: its paragraph is judged from the owned state on
+The upgrade details window stays its own class: its paragraphs are judged from the owned state on
 every refresh, which a window of fixed texts does not do.
 
 **Rates on screen.** A currency's header line is the name, the balance, and the tick report's
@@ -2085,8 +2109,9 @@ upgrade row, `Mark(member)` on a group (`MemberMark`, whose names are not the bu
 `ShownRates`, `ShownPayouts`, `ShownCost`, `ShownMax`, `ShownCount`, `ControlKind`, `Idle` and `Visible` on its rows, `Shown` and
 `Queued` on the threshold toast, `IsOpen`, `ShownGroup` and `Rows` on the automation
 window with `Bar`, `State` and `ShownCost` on each row, `Upgrade`, `ShownCost`, `ShownOwned` and
-`ShownBuyable` on an upgrade tile, `IsOpen`, `ShownUpgrade` and `ShownOwned` on the upgrade details
-window,
+`ShownBuyable`, `ShownLevel` and `ShownMaxLevel` on an upgrade tile (`ShownLevel` and `ShownMaxLevel`
+on an upgrade row too), `IsOpen`, `ShownUpgrade`, `ShownOwned`, `ShownLevel`, `ShownCurrent`,
+`ShownNext`, `ShownCurrentLevel` and `ShownNextLevel` on the upgrade details window,
 `PreviewShown`, `ShownAmounts`, `ShownCurrencies`, `ShownBalances`, `ShownUnmetLegs`, `ShownRefused`,
 `InfoShown` and `ConfirmEnabled` on a prestige card, `IsOpen` and `ShownRung` on the rung info
 window with `HeldScope` on the confirmation window, `ShowsClaim` on an
@@ -2371,6 +2396,12 @@ coefficient are checked.
   an author says the gate is open. Filters keep their optional conditions - a bar's `availableWhen`
   and a `ProducesEntry.condition` both default to active, because neither is a gate. An upgrade's
   `ownedWhen` is optional too, and validated as its gate is, from the declaring scope.
+- A levelled upgrade (section 4) authors no top-level `cost`, `effects`, `description`, `actions` or
+  `ownedWhen` beside its `levels`: each would be a second answer the purchase never reads, so each is
+  an error. Each level has a nonnegative cost and at least one effect or action; its effects are
+  validated as the upgrade's own are and its actions with every other list
+  (`ScopeDefinition.ActionLists`). An authored empty `levels` is an import error, since an asset cannot
+  tell it from an absent one.
 - A rendered gate's text is computed at load: the legs of a rung's `offerCondition` and an event's
   `availableWhen` are formatted through `Text` (12.4). A pattern `string.Format` refuses is an
   error; a default join over a child with no text is an error, a hole in the sentence; `uiText` on
@@ -2430,8 +2461,8 @@ Assets/Scripts/
   Economy/
     CurrencyDefinition.cs  ProducerDefinition.cs
     Producer.cs             // stateless resolution: a source's entries summed, times the product of its coordinate plan's links; GetRate and RatePairs read the contributor plan of the node they are asked at
-    GeneratorDefinition.cs  UpgradeDefinition.cs   // the generator with its count thresholds (CountThreshold, ThresholdEffect, NextThreshold, ThresholdsCrossed)
-    Purchasing.cs           // CostOf(generator, n) the series, MaxAffordable, TryBuy(generator, count | upgrade): fail-closed gate, one spend, count or latch, payload; IsOwned(upgrade): the latch or ownedWhen
+    GeneratorDefinition.cs  UpgradeDefinition.cs   // the generator with its count thresholds (CountThreshold, ThresholdEffect, NextThreshold, ThresholdsCrossed); the upgrade with its levels (UpgradeLevel, LevelAt, NextLevel)
+    Purchasing.cs           // CostOf(generator, n) the series, MaxAffordable, TryBuy(generator, count | upgrade): fail-closed gate, one spend, count or latch (and next level), payload; IsOwned(upgrade): the latch or ownedWhen, or the last level
     MultiplierFormula.cs    // the formula family an Effect's factor can compute from
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply) + optional appliesWhen
     BarDefinition.cs  GroupDefinition.cs  BarSystem.cs   // a bar's consumes list; a group of members with an active set; the draw, the settlement, SetActiveMembers
@@ -2479,7 +2510,7 @@ Assets/Scripts/
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
               // RungButtonUI is the prestige card (RungButton.uxml): title with the gain and the (i), Currently, requirement lines, Confirm
               LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, the Pair or Cycle buy control, the Per Second / Raw toggle, Book and Auto; AutomationState, BuyMode, FigureMode
-              UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): icon, name, price or Owned; a tap buys, a hold opens the details window
+              UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): icon, name (with the owned level), price or Owned; a tap buys, a hold opens the details window
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button
     StoryLogUI.cs           // the story log overlay: one button per read beat over root's roster, reopening the card through the host
@@ -2492,7 +2523,7 @@ Assets/Scripts/
     EncoreWindowUI.cs      // remaining time and ad/Pass requests through the existing managers
     GeneratorInfoUI.cs     // a generator's info screen: description, the row's cost and yield line, owned count, production
     AutomationWindowUI.cs  // a levelled group's automation window: one row per visible gig naming an automation, Purchased / Buy / price, Dismiss
-    UpgradeDetailsUI.cs    // an upgrade's details window: the name, "On buy:" or "Current effect:" with the description, Close
+    UpgradeDetailsUI.cs    // an upgrade's details window: the name (with the owned level), "On buy:" or "Current effect:" with the description - a levelled upgrade's "Current effect:" and "Next:" by level - Close
     RungInfoUI.cs          // a rung's info window: the label, the info text, Close
     RungConfirmUI.cs       // a rung's confirmation window: the label with "?", the confirmText, Cancel and Confirm (TryRung at the card's scope)
 Assets/UI/                // the UI Toolkit text assets: Screen.uxml + Screen.uss, the runtime theme, Widgets/*.uxml

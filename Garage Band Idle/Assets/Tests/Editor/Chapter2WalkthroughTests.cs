@@ -45,7 +45,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly CurrencyDefinition Roadies, Eps, Cash, Fans;
             public readonly ProducerDefinition CrowdOpenMic;
             public readonly GeneratorDefinition OpenMicDraw;
-            public readonly UpgradeDefinition StandingOpenMic, CrowdWork1, BulkBooking;
+            public readonly UpgradeDefinition StandingOpenMic, CrowdWork, BulkBooking;
             public readonly GroupDefinition TheCalendar;
             public readonly BarDefinition OpenMic;
             public readonly StoryBeatDefinition StoryCh2End;
@@ -93,7 +93,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 CrowdOpenMic = Find(Tier2Def.producers, "crowd_open_mic");
                 OpenMicDraw = Find(Tier2Def.generators, "open_mic_draw");
                 StandingOpenMic = Find(Tier2Def.upgrades, "standing_open_mic");
-                CrowdWork1 = Find(Tier2Def.upgrades, "crowd_work_1");
+                CrowdWork = Find(Tier2Def.upgrades, "crowd_work");
                 BulkBooking = Find(Tier2Def.upgrades, "bulk_booking");
                 TheCalendar = Find(Tier2Def.groups, "the_calendar");
                 OpenMic = Find(Tier2Def.bars, "open_mic");
@@ -272,14 +272,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1, f.Progress(f.OpenMic), "one press, one second of the gig");
             AssertClose(5, f.OpenMic.fillAmount.ToDouble(), "of five");
 
-            // Stage Banter is a x2 on the work_the_crowd tag the producer
-            // carries, so the same press moves the bar twice as far.
-            f.PlayUntil(() => f.Balance(f.Tier2, f.Cash) >= 300, "300 cash for Stage Banter");
-            f.Buy(f.CrowdWork1);
+            // Crowd Work's first level is a x2 on the work_the_crowd tag the
+            // producer carries, so the same press moves the bar twice as far.
+            f.PlayUntil(() => f.Balance(f.Tier2, f.Cash) >= 300, "300 cash for Crowd Work's first level");
+            f.Buy(f.CrowdWork);
+            Assert.AreEqual(1, f.CrowdWork.LevelAt(f.Tier2), "one buy, one level");
             f.Select(f.OpenMic);
             Assert.AreEqual((BigNumber)0, f.Progress(f.OpenMic), "the last cycle settled and zeroed the bar");
             f.Tap();
-            AssertClose(2, f.Progress(f.OpenMic), "the press pays 2 after crowd_work_1");
+            AssertClose(2, f.Progress(f.OpenMic), "the press pays 2 at Crowd Work's first level");
         }
 
         // ---- 4. the standing booking ----

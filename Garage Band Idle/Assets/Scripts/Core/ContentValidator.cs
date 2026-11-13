@@ -1359,6 +1359,59 @@ namespace RidiculousGaming.GarageBandIdle
             // grant site.
             for (var i = 0; i < upgrade.effects.Count; i++)
                 ValidateEffect(ctx, upgrade.effects[i], $"{site} effects[{i}]", scope);
+
+            if (upgrade.IsLevelled)
+                ValidateUpgradeLevels(ctx, upgrade, scope, site);
+        }
+
+        // A levelled upgrade (design doc 4) says what it costs, does and runs
+        // per level, so the one-purchase fields would be a second answer the
+        // purchase never reads: each is refused rather than ignored. ownedWhen
+        // is refused too - a levelled upgrade is owned at its last level, and a
+        // second ownership rule would leave levels unbought behind it. Each
+        // level costs nothing negative and does something; its effects are
+        // validated as the upgrade's own are, and its actions with every other
+        // list (ScopeDefinition.ActionLists).
+        private static void ValidateUpgradeLevels(ValidationContext ctx, Economy.UpgradeDefinition upgrade,
+                                                  ScopeDefinition scope, string site)
+        {
+            ctx.SetSite(site);
+            if (upgrade.cost != BigNumber.Zero)
+                ctx.AddError(ValidationCheck.InertOperand,
+                    $"authors a top-level cost of {upgrade.cost} beside levels - a levelled upgrade is priced per level (design doc 4).");
+            if (upgrade.effects.Count > 0)
+                ctx.AddError(ValidationCheck.InertOperand,
+                    "authors top-level effects beside levels - a levelled upgrade's effects are its levels' (design doc 4).");
+            if (upgrade.actions.Count > 0)
+                ctx.AddError(ValidationCheck.InertOperand,
+                    "authors top-level actions beside levels - a levelled upgrade's actions are its levels' (design doc 4).");
+            if (!string.IsNullOrEmpty(upgrade.description))
+                ctx.AddError(ValidationCheck.InertOperand,
+                    "authors a top-level description beside levels - a levelled upgrade is described per level (design doc 4).");
+            if (upgrade.ownedWhen != null)
+                ctx.AddError(ValidationCheck.InertOperand,
+                    "authors ownedWhen beside levels - a levelled upgrade is owned at its last level (design doc 4).");
+
+            for (var i = 0; i < upgrade.levels.Count; i++)
+            {
+                var level = upgrade.levels[i];
+                var levelSite = $"{site} levels[{i}]";
+                ctx.SetSite(levelSite);
+                if (level == null)
+                {
+                    ctx.AddError(ValidationCheck.NullEntry, "a null level.");
+                    continue;
+                }
+                if (level.cost < BigNumber.Zero)
+                    ctx.AddError(ValidationCheck.NumericRange,
+                        $"cost is {level.cost} - a purchase never pays out.");
+                if (level.effects.Count == 0 && level.actions.Count == 0)
+                    ctx.AddError(ValidationCheck.NullEntry,
+                        "has no effects and no actions - a level that does nothing is not a level (design doc 4).");
+                for (var j = 0; j < level.effects.Count; j++)
+                    ValidateEffect(ctx, level.effects[j], $"{levelSite} effects[{j}]", scope);
+            }
+            ctx.SetSite(site);
         }
 
         // A group lists members and caps how many are active at once. That is

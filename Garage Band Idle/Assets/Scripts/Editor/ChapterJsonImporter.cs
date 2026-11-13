@@ -510,6 +510,15 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                         $"upgrade '{upgrade.Id}': a cost block needs a currency and a nonnegative amount.");
                 upgrade.effects = upgradeDto.effects.Select(e => BuildEffect(build, scope, e)).ToList();
                 upgrade.actions = upgradeDto.actions.Select(a => BuildAction(build, scope, a)).ToList();
+                upgrade.levels = upgradeDto.levels == null
+                    ? new List<UpgradeLevel>()
+                    : upgradeDto.levels.Select(l => Level(build, scope, upgrade, l)).ToList();
+                // An asset cannot tell an empty list from an absent one, so an
+                // authored empty `levels` is refused here rather than importing
+                // as a one-purchase upgrade (12.12).
+                if (upgradeDto.levels != null && upgradeDto.levels.Count == 0)
+                    throw new ContentImportException(
+                        $"upgrade '{upgrade.Id}': `levels` is authored empty - a levelled upgrade has at least one level, and an upgrade with none omits the key.");
                 scope.upgrades.Add(upgrade);
             }
 
@@ -768,6 +777,23 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 });
             }
             return threshold;
+        }
+
+        // One level of a levelled upgrade (design doc 4), built from the
+        // upgrade's own scope like the upgrade's own effects and actions. The
+        // price's sign and the level's content are the validation pass's.
+        private static UpgradeLevel Level(Build build, ScopeDefinition scope, UpgradeDefinition upgrade,
+                                          UpgradeLevelDto dto)
+        {
+            if (dto == null)
+                throw new ContentImportException($"upgrade '{upgrade.Id}': a null level.");
+            return new UpgradeLevel
+            {
+                cost = dto.cost,
+                effects = dto.effects.Select(e => BuildEffect(build, scope, e)).ToList(),
+                description = dto.description,
+                actions = dto.actions.Select(a => BuildAction(build, scope, a)).ToList(),
+            };
         }
 
         private static Effect BuildEffect(Build build, ScopeDefinition scope, EffectDto dto)

@@ -67,6 +67,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, BigNumber> grantedCounts = new();    // per generator, beside generatorCounts; BigNumber and never floored (12.2)
         public HashSet<string> flags = new();
         public HashSet<string> purchasedUpgrades = new();
+        public Dictionary<string, int> upgradeLevels = new();          // levelled upgrades: the owned level, 1..levels; the latch stands beside it (design doc 4)
         public HashSet<string> firedTriggers = new();                  // one-shot trigger latches - a reset re-arms
         public Dictionary<string, BigNumber> barProgress = new();      // uncapped - overfill is allowed
         public Dictionary<string, int> fillCounts = new();             // repeating bars
@@ -151,6 +152,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, BigNumber> grantedCounts => facts.grantedCounts;
         public HashSet<string> flags => facts.flags;
         public HashSet<string> purchasedUpgrades => facts.purchasedUpgrades;
+        public Dictionary<string, int> upgradeLevels => facts.upgradeLevels;
         public HashSet<string> firedTriggers => facts.firedTriggers;
         public Dictionary<string, BigNumber> barProgress => facts.barProgress;
         public Dictionary<string, int> fillCounts => facts.fillCounts;

@@ -31,8 +31,9 @@ namespace RidiculousGaming.GarageBandIdle
         // kind, read off the carrier.
         public GrowthKind Growth { get; }
 
-        // Threshold entries only - the owned count of the carrying generator
-        // at which the effect switches on (12.7).
+        // Threshold entries - the owned count of the carrying generator at
+        // which the effect switches on (12.7). UpgradeLevel entries - the
+        // level whose effect this is (design doc 4).
         public int AtCount { get; }
 
         internal EffectLink(in CarrierEffect carrier, ScopeState node)
@@ -87,9 +88,9 @@ namespace RidiculousGaming.GarageBandIdle
                     return Producer.Grown(Producer.FactorOf(Effect, origin), fills, Growth);
 
                 default:
-                    // An upgrade's latch, a reached threshold and an event's
-                    // record scale nothing: there is one of each, so the live
-                    // fact IS the factor (12.6/12.7/12.8). A kind with no
+                    // An upgrade's latch or level, a reached threshold and an
+                    // event's record scale nothing: there is one of each, so
+                    // the live fact IS the factor (12.6/12.7/12.8). A kind with no
                     // liveness never reaches here - Live throws on one.
                     return Producer.FactorOf(Effect, origin);
             }
@@ -109,6 +110,14 @@ namespace RidiculousGaming.GarageBandIdle
                     // gathers nothing, which is the membership seam for this
                     // kind (12.7).
                     return Node.purchasedUpgrades.Contains(Carrier.Id)
+                        && origin.Rebase(Node).IsOn(Carrier);
+
+                case LivenessKind.UpgradeLevel:
+                    // A level's effects apply while the upgrade stands at
+                    // exactly that level - the owned level, the highest bought -
+                    // so a level replaces the one below it rather than stacking
+                    // on it (design doc 4). The group seam is the upgrade's own.
+                    return Node.upgradeLevels.TryGetValue(Carrier.Id, out var level) && level == AtCount
                         && origin.Rebase(Node).IsOn(Carrier);
 
                 case LivenessKind.Permanent:

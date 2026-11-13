@@ -26,13 +26,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly TestTree Tree = new();
             public readonly SectionDefinition Untitled;
             public readonly SectionDefinition Office;
+            public readonly UpgradeDefinition Tuning;
             public readonly GameSession Session;
             public readonly ScreenHost Host;
 
-            // Section one carries no title and lists the Cash line; section two
-            // is a strip of the two tier1 upgrades. Both always show.
+            // Section one carries no title and lists the Cash line and a row for
+            // a levelled upgrade; section two is a strip of the two tier1
+            // upgrades. Both always show.
             public TreeFixture()
             {
+                Tuning = TestTree.MakeLevelled("amp_tuning", Tree.Cash, "practice_amp", Stat.Rate, (100, 2), (400, 5));
+                Tree.Tier1Def.upgrades.Add(Tuning);
                 // The chrome the host binds: Screen.uxml's pill names timer
                 // 'encore_timer', and the host requires root to declare it.
                 TestTree.DeclareEncore(Tree.RootDef);
@@ -43,6 +47,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                     modules =
                     {
                         new ModuleDefinition { prefabId = "currency_line", content = Tree.Cash, scope = Tree.Tier1Def },
+                        new ModuleDefinition { prefabId = "upgrade_row", content = Tuning, scope = Tree.Tier1Def },
                     },
                 };
                 Office = new SectionDefinition
@@ -89,6 +94,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             public UpgradeTileUI Tile(UpgradeDefinition upgrade) =>
                 (UpgradeTileUI)View(Office).Modules.Single(module => module.Definition.content == upgrade).Widget;
+
+            public UpgradeRowUI Row(UpgradeDefinition upgrade) =>
+                (UpgradeRowUI)View(Untitled).Modules.Single(module => module.Definition.content == upgrade).Widget;
 
             // Earned and held: the upgrades' gates read the earned total.
             public void Earn(BigNumber cash)
@@ -293,6 +301,35 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(window.IsOpen, "a refresh does not bring a closed window back");
         }
 
+        // A levelled upgrade's row (12.11): the owned level beside the name,
+        // the next level's price until the last, then Bought.
+        [Test]
+        public void A_levelled_rows_level_and_price_follow_each_level_and_read_Bought_at_the_last()
+        {
+            var fx = new TreeFixture();
+            var row = fx.Row(fx.Tuning);
+            fx.Earn(1000);
+
+            Assert.AreEqual(0, row.ShownLevel, "nothing owned, no level shown");
+            Assert.AreEqual(2, row.ShownMaxLevel);
+            Assert.IsFalse(row.ShownBought);
+            Assert.AreEqual(Purchasing.CostOf(fx.Tuning, fx.Ctx), row.ShownCost);
+            Assert.AreEqual((BigNumber)100, row.ShownCost, "the first level's price");
+
+            fx.Session.TryBuy(fx.Ctx, fx.Tuning);
+
+            Assert.AreEqual(1, row.ShownLevel);
+            Assert.IsFalse(row.ShownBought, "a level is left to buy");
+            Assert.AreEqual((BigNumber)400, row.ShownCost, "the next level's price");
+
+            fx.Session.TryBuy(fx.Ctx, fx.Tuning);
+
+            Assert.AreEqual(2, row.ShownLevel);
+            Assert.IsTrue(row.ShownBought, "the last level owns it");
+            Assert.AreEqual(BigNumber.Zero, row.ShownCost);
+            Assert.IsTrue(row.Root.ClassListContains("row-bought"));
+        }
+
         // One press moves one view: the axis that travelled further owns the
         // drag, a tie going to the page.
         [Test]
@@ -328,7 +365,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             public readonly TierDefinition Tier2Def;
             public readonly CurrencyDefinition Cash;
-            public readonly UpgradeDefinition StageBanter, CallAndResponse, BulkBooking;
+            public readonly UpgradeDefinition CrowdWork, BulkBooking;
             public readonly ChapterScopeState Ch2;
             public readonly TierScopeState Tier2;
             public readonly GameSession Session;
@@ -350,8 +387,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsNotNull(ch2Def, "chapter-02.json has not been imported - run Garage Band Idle/Import Content.");
                 Tier2Def = (TierDefinition)ch2Def.children.Single();
                 Cash = Tier2Def.declaredCurrencies.Single(c => c.Id == "cash");
-                StageBanter = Tier2Def.upgrades.Single(u => u.Id == "crowd_work_1");
-                CallAndResponse = Tier2Def.upgrades.Single(u => u.Id == "crowd_work_2");
+                CrowdWork = Tier2Def.upgrades.Single(u => u.Id == "crowd_work");
                 BulkBooking = Tier2Def.upgrades.Single(u => u.Id == "bulk_booking");
 
                 var root = ScopeState.Build(ComposedContent.Compose(rootDef, new[] { ch1Def, ch2Def }));
@@ -392,7 +428,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
-        public void Stage_Banter_shows_whenever_the_Office_does()
+        public void Crowd_Work_shows_first_whenever_the_Office_does()
         {
             var fx = new OfficeFixture();
             Assert.IsFalse(fx.Office.Visible, "the Office waits for its reveal");
@@ -400,26 +436,78 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             fx.Reveal();
 
             Assert.IsTrue(fx.Office.Visible);
-            Assert.IsTrue(fx.Module(fx.StageBanter).Visible);
-            Assert.IsInstanceOf<UpgradeTileUI>(fx.Module(fx.StageBanter).Widget);
+            Assert.IsTrue(fx.Module(fx.CrowdWork).Visible);
+            Assert.AreSame(fx.Module(fx.CrowdWork), fx.Office.Modules[0], "the strip's first tile");
+            Assert.IsInstanceOf<UpgradeTileUI>(fx.Module(fx.CrowdWork).Widget);
         }
 
+        // One tap buys one level at that level's price: the tile shows the
+        // owned level beside the name and the next level's price, then Owned at
+        // the last; the details window says what buying does, then the current
+        // level beside the next, then the current level alone.
         [Test]
-        public void Call_and_Response_waits_for_Stage_Banter_to_be_bought()
+        public void Crowd_Work_buys_one_level_per_tap_and_its_tile_and_window_follow_the_level()
         {
             var fx = new OfficeFixture();
             fx.Reveal();
-            Assert.IsFalse(fx.Module(fx.CallAndResponse).Visible);
+            var tile = (UpgradeTileUI)fx.Module(fx.CrowdWork).Widget;
+            var window = fx.Host.UpgradeDetails;
+            tile.OpenDetails();
 
-            fx.Ctx.Deposit(fx.Cash.Id, Purchasing.CostOf(fx.StageBanter, fx.Ctx));
+            Assert.AreEqual(0, tile.ShownLevel, "nothing owned, no level shown");
+            Assert.AreEqual(2, tile.ShownMaxLevel);
+            Assert.IsFalse(tile.ShownOwned);
+            Assert.IsFalse(tile.ShownBuyable, "no cash yet");
+            Assert.AreEqual(Purchasing.CostOf(fx.CrowdWork, fx.Ctx), tile.ShownCost);
+            Assert.AreEqual((BigNumber)300, tile.ShownCost, "the first level's price");
+            Assert.AreEqual(0, window.ShownLevel);
+            Assert.IsFalse(window.ShownCurrent, "nothing is doing anything yet");
+            Assert.IsTrue(window.ShownNext, "what buying does");
+            Assert.AreEqual(1, window.ShownNextLevel);
+
+            fx.Ctx.Deposit(fx.Cash.Id, tile.ShownCost);
             fx.Session.Refresh();
-            Assert.IsFalse(fx.Module(fx.CallAndResponse).Visible, "affording Stage Banter is not enough");
+            Assert.IsTrue(tile.ShownBuyable);
+            tile.Buy();
 
-            ((UpgradeTileUI)fx.Module(fx.StageBanter).Widget).Buy();
+            Assert.AreEqual(1, fx.CrowdWork.LevelAt(fx.Tier2));
+            Assert.IsTrue(fx.Ctx.IsUpgradePurchased(fx.CrowdWork.Id), "the latch stands from the first level");
+            Assert.AreEqual(1, tile.ShownLevel);
+            Assert.IsFalse(tile.ShownOwned, "a level is left to buy");
+            Assert.AreEqual(Purchasing.CostOf(fx.CrowdWork, fx.Ctx), tile.ShownCost);
+            Assert.AreEqual((BigNumber)25000, tile.ShownCost, "the second level's price");
+            Assert.IsTrue(window.IsOpen, "a purchase beneath leaves the window up");
+            Assert.AreEqual(1, window.ShownLevel);
+            Assert.IsTrue(window.ShownCurrent);
+            Assert.AreEqual(1, window.ShownCurrentLevel);
+            Assert.IsTrue(window.ShownNext);
+            Assert.AreEqual(2, window.ShownNextLevel);
+            Assert.IsFalse(window.ShownOwned);
 
-            Assert.IsTrue(fx.Ctx.IsUpgradePurchased(fx.StageBanter.Id));
-            Assert.IsTrue(fx.Module(fx.CallAndResponse).Visible);
-            Assert.IsTrue(fx.Module(fx.StageBanter).Visible, "the owned tile stays");
+            fx.Ctx.Deposit(fx.Cash.Id, tile.ShownCost);
+            fx.Session.Refresh();
+            tile.Buy();
+
+            Assert.AreEqual(2, fx.CrowdWork.LevelAt(fx.Tier2));
+            Assert.AreEqual(2, tile.ShownLevel);
+            Assert.IsTrue(tile.ShownOwned, "the last level owns it");
+            Assert.IsFalse(tile.ShownBuyable);
+            Assert.AreEqual(BigNumber.Zero, tile.ShownCost);
+            Assert.IsTrue(tile.Root.ClassListContains("tile-owned"));
+            Assert.AreEqual(2, window.ShownLevel);
+            Assert.IsTrue(window.ShownOwned);
+            Assert.IsTrue(window.ShownCurrent);
+            Assert.AreEqual(2, window.ShownCurrentLevel);
+            Assert.IsFalse(window.ShownNext, "nothing left to buy");
+            Assert.AreEqual(0, window.ShownNextLevel);
+
+            // Funded, a tap at the last level buys nothing.
+            fx.Ctx.Deposit(fx.Cash.Id, 100000);
+            var cash = fx.Ctx.GetBalance(fx.Cash.Id);
+            tile.Buy();
+            Assert.AreEqual(cash, fx.Ctx.GetBalance(fx.Cash.Id), "a tap spends nothing");
+            Assert.AreEqual(2, fx.CrowdWork.LevelAt(fx.Tier2));
+            Assert.IsTrue(fx.Module(fx.CrowdWork).Visible, "the owned tile stays");
         }
 
         [Test]

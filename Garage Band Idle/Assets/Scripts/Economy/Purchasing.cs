@@ -30,14 +30,17 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // The payload takes the action-list runner's question like every other
         // list (12.5): an upgrade whose actions would clear a scope holding an
-        // armed reward is unbuyable rather than half-applied.
+        // armed reward is unbuyable rather than half-applied. For a levelled
+        // upgrade the purchase is the NEXT level - its price, its actions - and
+        // there is none once the last level is owned (design doc 4).
         public static bool CanBuy(GameContext ctx, UpgradeDefinition upgrade)
         {
-            var declaringCtx = ctx.Rebase(Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade));
+            var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade);
+            var declaringCtx = ctx.Rebase(declaring);
             return upgrade.IsOffered(declaringCtx)
-                && !upgrade.IsOwned(declaringCtx)   // the latch IS the one-shot, and a reset re-arms it unless ownedWhen holds
+                && !upgrade.IsOwned(declaringCtx)   // the latch IS the one-shot, and a reset re-arms it unless ownedWhen holds; a levelled upgrade is owned at its last level
                 && declaringCtx.CanSpend(upgrade.costCurrency.Id, CostOf(upgrade, declaringCtx))
-                && ActionList.Refuses(upgrade.actions, declaringCtx) == null;
+                && ActionList.Refuses(upgrade.NextActions(declaring), declaringCtx) == null;
         }
 
         // Performs the purchase. Calling either when Can answers false is a
@@ -63,20 +66,25 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         {
             var declaring = Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade);
             var declaringCtx = ctx.Rebase(declaring);
-            var cost = CostOf(upgrade, declaringCtx);
-            if (!upgrade.IsOffered(declaringCtx) || upgrade.IsOwned(declaringCtx)
-                || !declaringCtx.CanSpend(upgrade.costCurrency.Id, cost)
-                || ActionList.Refuses(upgrade.actions, declaringCtx) != null)
+            if (!CanBuy(ctx, upgrade))
                 throw new InvalidOperationException($"Buy: upgrade '{upgrade.Id}' is not currently buyable - ask CanBuy first.");
 
+            // Read before the level moves: the price and the payload are the
+            // level being bought.
+            var cost = CostOf(upgrade, declaringCtx);
+            var payload = upgrade.NextActions(declaring);
             declaringCtx.Spend(upgrade.costCurrency.Id, cost);
 
-            // Latch before payload: the effects are live for anything the actions
-            // read. A payload that clears the latch's own scope re-arms the
-            // upgrade for another purchase; no load-time check refuses that
-            // shape, so the content's walkthrough is what would show it.
+            // Latch (and level) before payload: the effects are live for
+            // anything the actions read. A payload that clears the latch's own
+            // scope re-arms the upgrade for another purchase; no load-time check
+            // refuses that shape, so the content's walkthrough is what would
+            // show it. A levelled upgrade's latch stands from its first level,
+            // and the level fact is what moves on every later buy.
             declaring.purchasedUpgrades.Add(upgrade.Id);
-            ActionList.Run(upgrade.actions, declaringCtx);
+            if (upgrade.IsLevelled)
+                declaring.upgradeLevels[upgrade.Id] = upgrade.LevelAt(declaring) + 1;
+            ActionList.Run(payload, declaringCtx);
         }
 
         // Whether the upgrade is owned, asked from any scope on its chain: the
@@ -138,9 +146,12 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // An upgrade's price takes the same stage-1 factor at its own (upgrade,
         // cost currency, cost) coordinate (12.2). No positive backstop: a free
-        // upgrade is legal content, because the latch makes it one-shot.
+        // upgrade is legal content, because the latch makes it one-shot - and a
+        // levelled one is bounded by its level count. A levelled upgrade's price
+        // is its next level's cost, so asking at the last level throws: there
+        // is no next purchase to price.
         public static BigNumber CostOf(UpgradeDefinition upgrade, GameContext declaringCtx) =>
-            upgrade.cost * Producer.GetMultiplier(declaringCtx,
+            upgrade.NextBaseCost(declaringCtx.Scope) * Producer.GetMultiplier(declaringCtx,
                 declaringCtx.Scope.Link<StatPlans>(upgrade).For(Stat.Cost));
 
         // M, the largest count the gate and the balance allow at the declaring

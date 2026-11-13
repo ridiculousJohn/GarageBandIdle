@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle;
+using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Save;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -414,6 +415,99 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var ch1 = TestNavigation.Node(root, loaded.Ch1Def);
             Assert.AreEqual(1, ch1.modifierStacks.Count);
             Assert.IsTrue(ch1.modifierStacks.ContainsKey("gj_tap_1"));
+        }
+
+        // ---- levelled upgrades ----
+
+        // Two levelled upgrades on tier1, declared on the tree a save loads
+        // into: the load filter judges against what that tree declares.
+        private static TestTree LevelledTree()
+        {
+            var tree = new TestTree();
+            tree.Tier1Def.upgrades.Add(TestTree.MakeLevelled(
+                "amp_tuning", tree.Cash, "practice_amp", Stat.Rate, (100, 2), (400, 5)));
+            tree.Tier1Def.upgrades.Add(TestTree.MakeLevelled(
+                "amp_polish", tree.Cash, "practice_amp", Stat.Rate, (100, 2), (400, 5)));
+            return tree;
+        }
+
+        private static ScopeState LoadLevels(Action<TestTree> author)
+        {
+            var saved = new TestTree();
+            author(saved);
+            var loaded = LevelledTree();
+            Assert.IsTrue(SaveSystem.TryDeserialize(SaveSystem.Serialize(saved.Root), loaded.Content, out var root));
+            return TestNavigation.Node(root, loaded.Tier1Def);
+        }
+
+        [Test]
+        public void A_levelled_upgrades_level_round_trips_beside_its_latch()
+        {
+            var tier1 = LoadLevels(saved =>
+            {
+                saved.Tier1.purchasedUpgrades.Add("amp_tuning");
+                saved.Tier1.upgradeLevels["amp_tuning"] = 2;
+            });
+
+            Assert.AreEqual(2, tier1.upgradeLevels["amp_tuning"]);
+            Assert.IsTrue(tier1.purchasedUpgrades.Contains("amp_tuning"));
+            Assert.IsFalse(tier1.upgradeLevels.ContainsKey("amp_polish"), "an unbought upgrade carries no level");
+        }
+
+        // The purchases a level records were made; only the content shrank
+        // under them, so the level is clamped to the last one rather than lost.
+        [Test]
+        public void A_level_past_the_last_is_clamped_to_the_last()
+        {
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("amp_tuning.*clamped to 2"));
+            var tier1 = LoadLevels(saved =>
+            {
+                saved.Tier1.purchasedUpgrades.Add("amp_tuning");
+                saved.Tier1.upgradeLevels["amp_tuning"] = 5;
+            });
+
+            Assert.AreEqual(2, tier1.upgradeLevels["amp_tuning"]);
+            Assert.IsTrue(tier1.purchasedUpgrades.Contains("amp_tuning"));
+        }
+
+        // A level naming an upgrade the scope does not declare, one with no
+        // levels, or a level below one is dropped - in the order the save holds
+        // them.
+        [Test]
+        public void Undeclared_unlevelled_and_nonpositive_levels_are_dropped()
+        {
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("ghost_upgrade"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("amp_strings.*no levels"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("amp_tuning.*is 0"));
+            var tier1 = LoadLevels(saved =>
+            {
+                saved.Tier1.upgradeLevels["ghost_upgrade"] = 1;
+                saved.Tier1.upgradeLevels["amp_strings"] = 1;
+                saved.Tier1.upgradeLevels["amp_tuning"] = 0;
+            });
+
+            Assert.IsEmpty(tier1.upgradeLevels);
+            Assert.IsEmpty(tier1.purchasedUpgrades, "no latch was saved and none is made from a dropped level");
+        }
+
+        // For a levelled upgrade the latch means level 1 or above, so the latch
+        // follows the level: a latch with no level goes, and a level with no
+        // latch has it restored.
+        [Test]
+        public void A_levelled_upgrades_latch_follows_its_level()
+        {
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("amp_tuning.*no level"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("amp_polish.*no latch"));
+            var tier1 = LoadLevels(saved =>
+            {
+                saved.Tier1.purchasedUpgrades.Add("amp_tuning");
+                saved.Tier1.upgradeLevels["amp_polish"] = 1;
+            });
+
+            Assert.IsFalse(tier1.purchasedUpgrades.Contains("amp_tuning"));
+            Assert.IsFalse(tier1.upgradeLevels.ContainsKey("amp_tuning"));
+            Assert.IsTrue(tier1.purchasedUpgrades.Contains("amp_polish"));
+            Assert.AreEqual(1, tier1.upgradeLevels["amp_polish"]);
         }
 
         // The granted half of an owned count takes the same filter the purchased

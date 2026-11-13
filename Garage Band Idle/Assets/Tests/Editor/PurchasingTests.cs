@@ -259,6 +259,128 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1000, tree.Tier1.balances["cash"], "balance");
         }
 
+        // ---- levelled upgrades ----
+
+        // Two levels on the amp's rate, x2 then x5, priced 100 and 400 in Cash.
+        private static UpgradeDefinition AmpTuning(TestTree t) =>
+            TestTree.MakeLevelled("amp_tuning", t.Cash, "practice_amp", Stat.Rate, (100, 2), (400, 5));
+
+        // A buy buys the next level at that level's price; the latch stands
+        // from the first, and the upgrade is owned - so refused - at its last.
+        [Test]
+        public void A_levelled_upgrade_buys_one_level_at_that_levels_cost_and_refuses_at_the_last()
+        {
+            UpgradeDefinition tuning = null;
+            var tree = Ready(t => t.Tier1Def.upgrades.Add(tuning = AmpTuning(t)));
+            var ctx = tree.Ctx(tree.Tier1);
+            var purchased = new UpgradePurchased { upgrade = tuning };
+
+            Assert.AreEqual(0, tuning.LevelAt(tree.Tier1));
+            AssertClose(100, Purchasing.CostOf(tuning, ctx), "the first level's price");
+            Assert.IsFalse(purchased.Evaluate(ctx), "nothing bought");
+
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+
+            AssertClose(900, tree.Tier1.balances["cash"], "the first level spent its own cost");
+            Assert.AreEqual(1, tuning.LevelAt(tree.Tier1));
+            Assert.IsTrue(tree.Tier1.purchasedUpgrades.Contains(tuning.Id), "the latch stands from the first level");
+            Assert.IsTrue(purchased.Evaluate(ctx), "UpgradePurchased holds at level 1");
+            Assert.IsFalse(Purchasing.IsOwned(ctx, tuning), "a level is left to buy");
+            AssertClose(400, Purchasing.CostOf(tuning, ctx), "the second level's price");
+
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+
+            AssertClose(500, tree.Tier1.balances["cash"], "the second level spent its own cost");
+            Assert.AreEqual(2, tuning.LevelAt(tree.Tier1));
+            Assert.IsTrue(Purchasing.IsOwned(ctx, tuning), "owned at the last level");
+            Assert.IsFalse(Purchasing.CanBuy(ctx, tuning));
+            Assert.IsFalse(Purchasing.TryBuy(ctx, tuning));
+            Assert.Throws<System.InvalidOperationException>(() => Purchasing.Buy(ctx, tuning));
+            Assert.Throws<System.InvalidOperationException>(() => Purchasing.CostOf(tuning, ctx),
+                "there is no next level to price");
+            AssertClose(500, tree.Tier1.balances["cash"], "nothing more spent");
+            Assert.AreEqual(2, tuning.LevelAt(tree.Tier1));
+        }
+
+        // A level the balance cannot cover refuses whole, the level unmoved.
+        [Test]
+        public void An_unaffordable_level_refuses_and_leaves_the_level_alone()
+        {
+            UpgradeDefinition tuning = null;
+            var tree = Ready(t => t.Tier1Def.upgrades.Add(tuning = AmpTuning(t)));
+            var ctx = tree.Ctx(tree.Tier1);
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+            tree.Tier1.balances["cash"] = 399;
+
+            Assert.IsFalse(Purchasing.TryBuy(ctx, tuning));
+
+            Assert.AreEqual(1, tuning.LevelAt(tree.Tier1));
+            AssertClose(399, tree.Tier1.balances["cash"]);
+        }
+
+        // Only the owned level's effects apply: level 2's x5 REPLACES level 1's
+        // x2, never multiplying onto it, in the live gather the tick reads.
+        [Test]
+        public void Only_the_owned_levels_effects_apply_and_a_level_replaces_the_one_below()
+        {
+            UpgradeDefinition tuning = null;
+            var tree = Ready(t => t.Tier1Def.upgrades.Add(tuning = AmpTuning(t)));
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+            var ctx = tree.Ctx(tree.Tier1);
+            AssertClose(0.5, Producer.GetRate(ctx, tree.Cash), "no level");
+
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+            AssertClose(1, Producer.GetRate(ctx, tree.Cash), "level 1: x2");
+
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+            AssertClose(2.5, Producer.GetRate(ctx, tree.Cash), "level 2: x5 alone, not x2 x5");
+        }
+
+        // Each level runs its own actions at the moment it is bought, and only
+        // that level's.
+        [Test]
+        public void A_levels_actions_run_when_that_level_is_bought()
+        {
+            UpgradeDefinition tuning = null;
+            var tree = Ready(t =>
+            {
+                tuning = AmpTuning(t);
+                tuning.levels[1].actions.Add(new SetFlag { flagId = "fans_revealed" });
+                t.Tier1Def.upgrades.Add(tuning);
+            });
+            var ctx = tree.Ctx(tree.Tier1);
+
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+            Assert.IsFalse(tree.Tier1.flags.Contains("fans_revealed"), "level 1 runs nothing");
+
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+            Assert.IsTrue(tree.Tier1.flags.Contains("fans_revealed"), "level 2 ran its own action");
+        }
+
+        // A tier reset clears the level exactly as it clears the latch, so the
+        // run starts again from the first level and no level's effect applies.
+        [Test]
+        public void A_tier_reset_clears_the_level_with_the_latch()
+        {
+            UpgradeDefinition tuning = null;
+            var tree = Ready(t => t.Tier1Def.upgrades.Add(tuning = AmpTuning(t)));
+            var ctx = tree.Ctx(tree.Tier1);
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+
+            tree.Tier1.Clear(tree.Now);
+
+            Assert.AreEqual(0, tuning.LevelAt(tree.Tier1));
+            Assert.IsFalse(tree.Tier1.purchasedUpgrades.Contains(tuning.Id));
+            Assert.IsFalse(Purchasing.IsOwned(ctx, tuning));
+            tree.Tier1.generatorCounts["practice_amp"] = 1;
+            AssertClose(0.5, Producer.GetRate(ctx, tree.Cash), "no level's effect survives the reset");
+            tree.Tier1.balances["cash"] = 1000;
+            AssertClose(100, Purchasing.CostOf(tuning, ctx), "the first level's price again");
+            Assert.IsTrue(Purchasing.TryBuy(ctx, tuning));
+            Assert.AreEqual(1, tuning.LevelAt(tree.Tier1));
+        }
+
         // ---- dispatch ----
 
         [Test]

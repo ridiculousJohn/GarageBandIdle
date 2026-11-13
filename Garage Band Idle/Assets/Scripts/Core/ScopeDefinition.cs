@@ -60,6 +60,7 @@ namespace RidiculousGaming.GarageBandIdle
     public enum LivenessKind
     {
         Upgrade,    // purchasedUpgrades holds the upgrade's id at the node
+        UpgradeLevel, // upgradeLevels holds exactly this level for the levelled upgrade at the node
         Permanent,  // always, subject to appliesWhen; merged with the node's stack for the same modifier
         Granted,    // modifierStacks holds a count at the node, subject to appliesWhen
         Cascade,    // fillCounts holds a count for the repeating bar at the node
@@ -84,8 +85,10 @@ namespace RidiculousGaming.GarageBandIdle
         // stacking kind instead, read off the carrier.
         public readonly Economy.GrowthKind Growth;
 
-        // Threshold entries only: the owned count of the carrying generator at
-        // which the effect switches on (design doc 12.7).
+        // Threshold entries: the owned count of the carrying generator at
+        // which the effect switches on (design doc 12.7). UpgradeLevel
+        // entries: the level whose effect this is, live at exactly that level
+        // (design doc 4).
         public readonly int AtCount;
 
         internal CarrierEffect(LivenessKind liveness, Definition carrier, in Effect effect,
@@ -189,7 +192,7 @@ namespace RidiculousGaming.GarageBandIdle
         // the sites out by hand, so a new kind of list is added here and
         // nowhere else - which is what leaves no second site to forget. The
         // order is the kinds in declaration order: triggers, bar completions,
-        // then upgrade payloads.
+        // then upgrade payloads - a levelled upgrade's one per level.
         public virtual IEnumerable<ActionListSite> ActionLists()
         {
             foreach (var trigger in triggers)
@@ -201,8 +204,15 @@ namespace RidiculousGaming.GarageBandIdle
                     yield return new ActionListSite(bar.onComplete, $"bar '{bar.Id}'");
 
             foreach (var upgrade in upgrades)
-                if (upgrade != null)
-                    yield return new ActionListSite(upgrade.actions, $"upgrade '{upgrade.Id}'");
+            {
+                if (upgrade == null)
+                    continue;
+                yield return new ActionListSite(upgrade.actions, $"upgrade '{upgrade.Id}'");
+                for (var i = 0; i < upgrade.levels.Count; i++)
+                    if (upgrade.levels[i] != null)
+                        yield return new ActionListSite(upgrade.levels[i].actions,
+                                                        $"upgrade '{upgrade.Id}' levels[{i}]");
+            }
         }
 
         // Every source of base contributions this scope declares, ONCE, in one
@@ -238,12 +248,24 @@ namespace RidiculousGaming.GarageBandIdle
         public virtual IEnumerable<CarrierEffect> EffectCarriers(
             IReadOnlyList<Economy.ModifierDefinition> grantable)
         {
+            // An upgrade's own effects ride its latch; a levelled upgrade's are
+            // each level's, live at exactly that level, so a level replaces
+            // the one below it rather than stacking (design doc 4). A null
+            // level is a load error and is never compiled.
             foreach (var upgrade in upgrades)
             {
                 if (upgrade == null)
                     continue;
                 foreach (var effect in upgrade.effects)
                     yield return new CarrierEffect(LivenessKind.Upgrade, upgrade, effect);
+                for (var i = 0; i < upgrade.levels.Count; i++)
+                {
+                    var level = upgrade.levels[i];
+                    if (level == null)
+                        continue;
+                    foreach (var effect in level.effects)
+                        yield return new CarrierEffect(LivenessKind.UpgradeLevel, upgrade, effect, atCount: i + 1);
+                }
             }
 
             foreach (var modifier in permanentModifiers)

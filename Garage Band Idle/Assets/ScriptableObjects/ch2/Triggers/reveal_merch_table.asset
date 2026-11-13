@@ -17,13 +17,13 @@ MonoBehaviour:
   displayName: 
   description: 
   condition:
-    rid: 1688710516000424477
+    rid: 1688710518450421998
   actions:
-  - rid: 1688710516000424478
+  - rid: 1688710518450421999
   references:
     version: 2
     RefIds:
-    - rid: 1688710516000424477
+    - rid: 1688710518450421998
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -32,7 +32,7 @@ MonoBehaviour:
           _value:
             mantissa: 2
             exponent: 2
-    - rid: 1688710516000424478
+    - rid: 1688710518450421999
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: merch_table_revealed

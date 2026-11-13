@@ -363,6 +363,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                 Debug.LogWarning($"SaveSystem: upgrade latch '{upgradeId}' is not declared by scope '{definition.Id}' - dropped.");
                 return true;
             });
+            FilterUpgradeLevels(facts, definition);
 
             // An owned count is positive or absent: zero already reads as absent,
             // and a negative one would buy the next unit at a discount.
@@ -596,6 +597,80 @@ namespace RidiculousGaming.GarageBandIdle.Save
             {
                 if (bar != null && bar.Id == barId)
                     return bar;
+            }
+            return null;
+        }
+
+        // A levelled upgrade's owned level (design doc 4) takes the rule every
+        // declared-id family takes, plus its own range: a level naming an
+        // upgrade this scope does not declare, or one with no levels, goes; a
+        // level below one goes, since zero already reads as absent; a level past
+        // the last is clamped to the last, since the purchases it records were
+        // made and only the content shrank under them. The latch then follows
+        // the level, which is what it means for a levelled upgrade (level 1 and
+        // above): a latch with no level is dropped, a level with no latch has
+        // its latch restored.
+        private static void FilterUpgradeLevels(ScopeFacts facts, ScopeDefinition definition)
+        {
+            List<string> staleLevels = null;
+            List<KeyValuePair<string, int>> clamped = null;
+            foreach (var pair in facts.upgradeLevels)
+            {
+                var upgrade = FindUpgrade(definition, pair.Key);
+                if (upgrade == null)
+                    Debug.LogWarning($"SaveSystem: upgrade level '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
+                else if (!upgrade.IsLevelled)
+                    Debug.LogWarning($"SaveSystem: upgrade level '{pair.Key}' names an upgrade with no levels - dropped.");
+                else if (pair.Value < 1)
+                    Debug.LogWarning($"SaveSystem: upgrade level '{pair.Key}' is {pair.Value} - dropped.");
+                else
+                {
+                    if (pair.Value > upgrade.levels.Count)
+                    {
+                        Debug.LogWarning($"SaveSystem: upgrade level '{pair.Key}' is {pair.Value} of {upgrade.levels.Count} - clamped to {upgrade.levels.Count}.");
+                        (clamped ??= new List<KeyValuePair<string, int>>())
+                            .Add(new KeyValuePair<string, int>(pair.Key, upgrade.levels.Count));
+                    }
+                    continue;
+                }
+                (staleLevels ??= new List<string>()).Add(pair.Key);
+            }
+            if (staleLevels != null)
+            {
+                foreach (var key in staleLevels)
+                    facts.upgradeLevels.Remove(key);
+            }
+            if (clamped != null)
+            {
+                foreach (var pair in clamped)
+                    facts.upgradeLevels[pair.Key] = pair.Value;
+            }
+
+            foreach (var upgrade in definition.upgrades)
+            {
+                if (upgrade == null || !upgrade.IsLevelled)
+                    continue;
+                var levelled = facts.upgradeLevels.ContainsKey(upgrade.Id);
+                var latched = facts.purchasedUpgrades.Contains(upgrade.Id);
+                if (latched && !levelled)
+                {
+                    Debug.LogWarning($"SaveSystem: upgrade latch '{upgrade.Id}' stands with no level - dropped.");
+                    facts.purchasedUpgrades.Remove(upgrade.Id);
+                }
+                else if (levelled && !latched)
+                {
+                    Debug.LogWarning($"SaveSystem: upgrade level '{upgrade.Id}' stands with no latch - latch restored.");
+                    facts.purchasedUpgrades.Add(upgrade.Id);
+                }
+            }
+        }
+
+        private static Economy.UpgradeDefinition FindUpgrade(ScopeDefinition definition, string upgradeId)
+        {
+            foreach (var upgrade in definition.upgrades)
+            {
+                if (upgrade != null && upgrade.Id == upgradeId)
+                    return upgrade;
             }
             return null;
         }

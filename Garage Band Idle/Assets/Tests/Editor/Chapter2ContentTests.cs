@@ -137,7 +137,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(new[] { "standing_open_mic", "standing_house_party", "standing_coffeehouse",
                                     "standing_backyard", "standing_bar_opener", "standing_botb_qualifier",
                                     "bulk_booking", "favors",
-                                    "crowd_work_1", "crowd_work_2", "street_team", "merch_table", "the_van" },
+                                    "crowd_work", "street_team", "merch_table", "the_van" },
                 Ids(tier2.upgrades));
             Assert.AreEqual(new[] { "battle_1", "battle_2", "battle_3" }, Ids(tier2.events));
 
@@ -500,9 +500,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
-        // The Office is a strip of upgrade tiles (12.11). Stage Banter shows
-        // with the section, Call and Response once Stage Banter is bought, and
-        // the two switches keep their tile once bought.
+        // The Office is a strip of upgrade tiles (12.11). Crowd Work shows
+        // with the section, and the two switches keep their tile once bought.
         [Test]
         public void The_office_is_a_strip_of_upgrade_tiles_whose_owned_tiles_stay()
         {
@@ -511,17 +510,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(UI.SectionLayout.Strip, office.layout);
             Assert.AreEqual(new[]
             {
-                "upgrade_tile crowd_work_1 @tier2", "upgrade_tile crowd_work_2 @tier2",
-                "upgrade_tile street_team @tier2", "upgrade_tile merch_table @tier2",
+                "upgrade_tile crowd_work @tier2", "upgrade_tile street_team @tier2", "upgrade_tile merch_table @tier2",
                 "upgrade_tile the_van @tier2", "upgrade_tile bulk_booking @tier2",
                 "upgrade_tile favors @tier2",
             }, Modules(2));
 
-            Assert.IsNull(office.modules[0].visibleWhen, "Stage Banter shows when the Office does");
-            Assert.AreSame(Find(tier2.upgrades, "crowd_work_1"),
-                ((UpgradePurchased)office.modules[1].visibleWhen).upgrade);
+            Assert.IsNull(office.modules[0].visibleWhen, "Crowd Work shows when the Office does");
 
-            foreach (var (index, eps) in new[] { (5, 8), (6, 25) })
+            foreach (var (index, eps) in new[] { (4, 8), (5, 25) })
             {
                 var gate = (Any)office.modules[index].visibleWhen;
                 Assert.AreEqual(2, gate.conditions.Count, office.modules[index].content.Id);
@@ -535,6 +531,37 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // The other sections keep the list layout.
             foreach (var section in ch2.sections.Where(s => s != office))
                 Assert.AreEqual(UI.SectionLayout.List, section.layout, section.title);
+        }
+
+        // Crowd Work is one levelled upgrade (design doc 4): two levels priced
+        // in the run's Cash, each a factor on the work_the_crowd tag, the
+        // second replacing the first rather than stacking on it. Its gate is
+        // open, since the levels' prices are the whole of what holds it back,
+        // and it authors nothing of its own beside its levels.
+        [Test]
+        public void Crowd_Work_is_one_levelled_upgrade_of_two_replacing_levels()
+        {
+            var crowdWork = Find(tier2.upgrades, "crowd_work");
+
+            Assert.IsInstanceOf<Always>(crowdWork.gate);
+            Assert.IsNull(crowdWork.ownedWhen);
+            Assert.AreEqual("cash", crowdWork.costCurrency.Id);
+            Assert.IsEmpty(crowdWork.effects);
+            Assert.IsEmpty(crowdWork.actions);
+            Assert.IsTrue(string.IsNullOrEmpty(crowdWork.description));
+            Assert.AreEqual(2, crowdWork.levels.Count);
+
+            foreach (var (index, cost, multiplier) in new[] { (0, 300d, 2d), (1, 25000d, 5d) })
+            {
+                var level = crowdWork.levels[index];
+                Assert.AreEqual((BigNumber)cost, level.cost, $"level {index + 1}");
+                Assert.IsFalse(string.IsNullOrEmpty(level.description), $"level {index + 1} says what it does");
+                Assert.IsEmpty(level.actions);
+                var effect = level.effects.Single();
+                Assert.AreEqual("work_the_crowd", effect.target);
+                Assert.AreEqual(Stat.Yield, effect.stat);
+                Assert.AreEqual((BigNumber)multiplier, effect.multiplier, $"level {index + 1}");
+            }
         }
 
         // ---- helpers ----
