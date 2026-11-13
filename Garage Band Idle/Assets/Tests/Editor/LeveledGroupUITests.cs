@@ -872,6 +872,125 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(1, calendar.Row(fx.OpenMic).ShownCount);
         }
 
+        // ---- the figures toggle ----
+
+        // Every row's shown payouts are BarSystem.CompletionPayout's lines and
+        // its rates are empty.
+        private static void AssertPayouts(Fixture fx, LeveledBarRowUI row, BarDefinition bar)
+        {
+            var expected = BarSystem.CompletionPayout(fx.Ctx, bar);
+            Assert.IsEmpty(row.ShownRates, $"{bar.Id}: Raw prints no rates");
+            Assert.AreEqual(expected.Count, row.ShownPayouts.Count, $"{bar.Id}: one line per currency the gig pays");
+            for (var i = 0; i < expected.Count; i++)
+            {
+                Assert.AreSame(expected[i].currency, row.ShownPayouts[i].currency);
+                Assert.AreEqual(expected[i].amount, row.ShownPayouts[i].amount, expected[i].currency.Id);
+            }
+        }
+
+        // Every row's shown rates are BarSystem.CompletionRate's lines and its
+        // payouts are empty.
+        private static void AssertRates(Fixture fx, LeveledBarRowUI row, BarDefinition bar)
+        {
+            var expected = BarSystem.CompletionRate(fx.Ctx, bar, fx.GameSpeed);
+            Assert.IsEmpty(row.ShownPayouts, $"{bar.Id}: Per Second prints no payouts");
+            Assert.AreEqual(expected.Count, row.ShownRates.Count, $"{bar.Id}: one line per currency the gig pays");
+            for (var i = 0; i < expected.Count; i++)
+            {
+                Assert.AreSame(expected[i].currency, row.ShownRates[i].currency);
+                Assert.AreEqual(expected[i].perSecond, row.ShownRates[i].perSecond, expected[i].currency.Id);
+            }
+        }
+
+        // Two gigs booked and levelled, so every assertion covers more than
+        // one row.
+        private static Fixture TwoGigs()
+        {
+            var fx = new Fixture();
+            fx.Give(1000);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 3);
+            fx.Session.TryBuy(fx.Ctx, fx.HousePartyDraw, 2);
+            return fx;
+        }
+
+        [Test]
+        public void A_card_is_built_at_Per_Second_and_its_rows_show_rates()
+        {
+            var fx = TwoGigs();
+            var calendar = fx.Calendar();
+
+            Assert.AreEqual(FigureMode.PerSecond, calendar.Figures);
+            foreach (var bar in new[] { fx.OpenMic, fx.HouseParty })
+            {
+                Assert.IsTrue(calendar.Row(bar).Visible, $"{bar.Id} is booked");
+                AssertRates(fx, calendar.Row(bar), bar);
+            }
+        }
+
+        [Test]
+        public void The_toggle_switches_every_row_to_payouts_and_back_to_rates()
+        {
+            var fx = TwoGigs();
+            var calendar = fx.Calendar();
+
+            calendar.ToggleFigures();
+            Assert.AreEqual(FigureMode.Raw, calendar.Figures);
+            foreach (var bar in new[] { fx.OpenMic, fx.HouseParty })
+                AssertPayouts(fx, calendar.Row(bar), bar);
+            Assert.Greater(calendar.Row(fx.OpenMic).ShownPayouts[0].amount.ToDouble(), 0,
+                "three draws pay something per completion");
+
+            calendar.ToggleFigures();
+            Assert.AreEqual(FigureMode.PerSecond, calendar.Figures);
+            foreach (var bar in new[] { fx.OpenMic, fx.HouseParty })
+                AssertRates(fx, calendar.Row(bar), bar);
+        }
+
+        [Test]
+        public void The_figures_survive_a_refresh()
+        {
+            var fx = TwoGigs();
+            var calendar = fx.Calendar();
+            calendar.ToggleFigures();
+
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            calendar.Refresh();
+
+            Assert.AreEqual(FigureMode.Raw, calendar.Figures);
+            foreach (var bar in new[] { fx.OpenMic, fx.HouseParty })
+                AssertPayouts(fx, calendar.Row(bar), bar);
+        }
+
+        // The toggle is the first of the top line's two buttons, shown on a
+        // Pair card and a Cycle card alike; only a Cycle card shows the
+        // cycle beside it. The toggle and the cycle hold separate modes.
+        [TestCase(BuyControlKind.Pair)]
+        [TestCase(BuyControlKind.Cycle)]
+        public void The_toggle_stands_at_the_top_left_of_every_card(BuyControlKind control)
+        {
+            var fx = TwoGigs();
+            var calendar = fx.Calendar(control);
+            var top = calendar.Root.Q<VisualElement>("top");
+            var toggle = calendar.Root.Q<Button>("figures");
+            var cycle = calendar.Root.Q<Button>("cycle");
+
+            Assert.IsNotNull(toggle);
+            Assert.AreSame(top, toggle.parent);
+            Assert.AreEqual(0, top.IndexOf(toggle), "the toggle is the top line's first button");
+            Assert.AreEqual(1, top.IndexOf(cycle), "the cycle follows it");
+            Assert.AreNotEqual(DisplayStyle.None, toggle.style.display.value, "every card shows the toggle");
+            Assert.AreEqual(control == BuyControlKind.Cycle ? DisplayStyle.Flex : DisplayStyle.None,
+                cycle.style.display.value, "only a Cycle card shows the cycle");
+
+            calendar.ToggleFigures();
+            Assert.AreEqual(FigureMode.Raw, calendar.Figures);
+            Assert.AreEqual(BuyMode.One, calendar.Mode, "the toggle leaves the buy mode alone");
+            AssertPayouts(fx, calendar.Row(fx.OpenMic), fx.OpenMic);
+
+            calendar.Cycle();
+            Assert.AreEqual(FigureMode.Raw, calendar.Figures, "and the cycle leaves the figures alone");
+        }
+
         // ---- threshold crossings ----
 
         // What was already reached when the row is built is not news.

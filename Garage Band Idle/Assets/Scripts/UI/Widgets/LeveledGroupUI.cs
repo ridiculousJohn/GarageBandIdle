@@ -27,6 +27,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
         Next,
     }
 
+    // What every row of a levelled card prints inside its fill
+    // (LeveledGroupUI.Figures): each currency's earnings per second, or what
+    // one completion pays. The names are not the toggle's wording.
+    public enum FigureMode
+    {
+        PerSecond,
+        Raw,
+    }
+
     // The levelled group (design doc 12.11): the module over ONE group whose
     // members are all bars naming a level, bound by contentId exactly as the
     // group module is. Each available bar is one combined row - its name and
@@ -36,10 +45,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // automation of the first visible gig that does not yet go again by
     // itself; holding Auto opens the automation window over the group, where
     // any visible gig's automation is bought. There is no select control:
-    // tapping a bar is how it starts. A card whose module authors the Cycle
-    // buy control opens with one more button, the cycle, which steps every
-    // row's Hire button through Buy One, Buy Max and Buy Next; the mode lives
-    // on the card for as long as the card is built and is never saved. The
+    // tapping a bar is how it starts. Every card opens with the figures
+    // toggle at its top left, which switches what every row prints inside its
+    // fill between Per Second and Raw. A card whose module authors the Cycle
+    // buy control opens with one more button at its top right, the cycle,
+    // which steps every row's Hire button through Buy One, Buy Max and Buy
+    // Next. Both modes live on the card for as long as the card is built and
+    // are never saved. The
     // group module stays the layout for a group that is not levelled (the
     // split one, bars in one list and their generators in another).
     // The rows are built once and toggled, because a group's members are a
@@ -50,6 +62,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly IAutomationOpener automations;
         private readonly IToastOpener toasts;
         private readonly VisualElement rows;
+        private readonly Button figures;
         private readonly Button cycle;
         private readonly Button book;
         private readonly Button auto;
@@ -88,11 +101,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // draws no cycle button.
         public BuyMode Mode { get; private set; } = BuyMode.One;
 
+        // What the figures toggle reads and every row prints inside its fill.
+        // Starts at PerSecond whenever the card is built, on a Pair card and a
+        // Cycle card alike.
+        public FigureMode Figures { get; private set; } = FigureMode.PerSecond;
+
         public LeveledGroupUI(VisualElement root, IGeneratorInfoOpener infos, IAutomationOpener automations,
                               IToastOpener toasts)
             : base(root)
         {
             rows = Require<VisualElement>(root, "rows", "LeveledGroup.uxml");
+            figures = Require<Button>(root, "figures", "LeveledGroup.uxml");
             cycle = Require<Button>(root, "cycle", "LeveledGroup.uxml");
             book = Require<Button>(root, "book", "LeveledGroup.uxml");
             auto = Require<Button>(root, "auto", "LeveledGroup.uxml");
@@ -101,6 +120,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             this.infos = infos ?? throw new ArgumentNullException(nameof(infos));
             this.automations = automations ?? throw new ArgumentNullException(nameof(automations));
             this.toasts = toasts ?? throw new ArgumentNullException(nameof(toasts));
+            figures.clicked += ToggleFigures;
             cycle.clicked += Cycle;
             book.clicked += Book;
             auto.clicked += Auto;
@@ -127,7 +147,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             foreach (var member in group.members)
             {
                 var row = new LeveledBarRowUI(Session, declaring, Clock, group, (BarDefinition)member, infos, toasts,
-                    Activate, BuyControl, () => Mode);
+                    Activate, BuyControl, () => Mode, () => Figures);
                 rows.Add(row.Root);
                 views.Add(row);
             }
@@ -141,6 +161,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public override void Refresh()
         {
+            figures.text = Figures == FigureMode.Raw ? "Raw" : "Per Second";
             cycle.text = Mode switch
             {
                 BuyMode.Max => "Buy Max",
@@ -183,6 +204,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 BuyMode.Max => BuyMode.Next,
                 _ => BuyMode.One,
             };
+            Refresh();
+        }
+
+        // What the figures toggle presses, public for the reason Cycle is: Per
+        // Second, then Raw, then Per Second again. Like the cycle, a press
+        // changes no state the session holds, so the card repaints itself.
+        public void ToggleFigures()
+        {
+            Figures = Figures == FigureMode.PerSecond ? FigureMode.Raw : FigureMode.PerSecond;
             Refresh();
         }
 

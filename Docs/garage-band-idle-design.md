@@ -2022,7 +2022,7 @@ second), both read at the currency's home, which the readout resolves once and e
 before the first tick and for a currency nothing pays. The balance itself interpolates on the
 deposit slope alone, because completion income lands in lumps at the crossing; the pinned headline
 copies the line's texts and so shows the same total. A levelled row prints its bar's earnings per
-second inside the fill (below). A
+second, or per completion, inside the fill (below); the header stays per second either way. A
 generator row is the name, the owned count - the purchased count in parentheses with the granted
 count added inside them when there is one, `(3)` and `(3+8.89e11)`, the reference game's shape - a
 line beneath the name reading the next unit's cost
@@ -2080,9 +2080,9 @@ number or a state keeps it in a public read-only member set on the line that wri
 the value that line formats: `ShownValue` and `ShownRate` on a currency line, `ShownPurchased`,
 `ShownGranted`, `ShownMax`, `ShownCost` and `ShownYields` on a generator row, `ShownBought` on an
 upgrade row, `Mark(member)` on a group (`MemberMark`, whose names are not the button's wording),
-`Row(bar)`, `BookTarget`, `ShownBookCost`, `BookEnabled`, `AutoTarget`, `AutoEnabled`, `BuyControl`
-and `Mode` on a levelled group with `ShownPurchased`, `ShownGranted`, `ShownProgress`, `ShownRates`,
-`ShownCost`, `ShownMax`, `ShownCount`, `ControlKind`, `Idle` and `Visible` on its rows, `Shown` and
+`Row(bar)`, `BookTarget`, `ShownBookCost`, `BookEnabled`, `AutoTarget`, `AutoEnabled`, `BuyControl`,
+`Mode` and `Figures` on a levelled group with `ShownPurchased`, `ShownGranted`, `ShownProgress`,
+`ShownRates`, `ShownPayouts`, `ShownCost`, `ShownMax`, `ShownCount`, `ControlKind`, `Idle` and `Visible` on its rows, `Shown` and
 `Queued` on the threshold toast, `IsOpen`, `ShownGroup` and `Rows` on the automation
 window with `Bar`, `State` and `ShownCost` on each row, `Upgrade`, `ShownCost`, `ShownOwned` and
 `ShownBuyable` on an upgrade tile, `IsOpen`, `ShownUpgrade` and `ShownOwned` on the upgrade details
@@ -2162,8 +2162,11 @@ module shows its bars:
   `GeneratorRowUI.CountText`; holding it opens that generator's info screen, as a generator row's
   hold does;
 - the fill rides the tick's bar slope between refreshes as a bar row's does, and prints inside it
-  the bar's earnings per second - each line of `BarSystem.CompletionRate` at the chapter's
-  `game_speed`, "27.60 Cash/s, 4.60 Fans/s", zero lines kept;
+  the bar's earnings in the card's figure mode (`FigureMode`): **Per Second**, each line of
+  `BarSystem.CompletionRate` at the chapter's `game_speed`, "27.60 Cash/s, 4.60 Fans/s"
+  (`ShownRates`), or **Raw**, each line of `BarSystem.CompletionPayout`, what one completion pays,
+  "30.87 Cash, 4.11 Fans" (`ShownPayouts`); zero lines kept, and the mode not printed leaves its
+  member empty. The figures are set at each refresh and only the fill moves between refreshes;
 - a tap on the fill starts a bar that is not running - `SetActiveMembers` with the bar added,
   never removed - and works a running one through its `tap` producer; a bar that fills once and
   stands full takes no tap. There is no select control. A row available and not running carries
@@ -2180,11 +2183,13 @@ module shows its bars:
   button is dimmed by a class (`leveled-hire-unaffordable`) and never disabled while N is not
   affordable. Either way the row dims by `row-unaffordable` while what the control buys is not
   affordable. Each control is its own class behind one base, so the row never reaches into it.
-A Cycle card opens with its **cycle button** at the top right, an accent text action reading "Buy
-One", "Buy Max" or "Buy Next" (`BuyMode`), each press stepping to the next and back round to Buy One
-and repainting the card; a Pair card draws none. The mode belongs to the card, in memory for as long
-as the card is built - a chapter switch or a return from the idle dialog builds it afresh at Buy One -
-and is never saved.
+Every card opens with its **figures toggle** at the top left, an accent text action reading "Per
+Second" or "Raw" (`Figures`), each press flipping it and repainting every row's figures; the header
+totals stay per second. A Cycle card adds its **cycle button** at the top right, the same accent
+text action reading "Buy One", "Buy Max" or "Buy Next" (`BuyMode`), each press stepping to the next
+and back round to Buy One and repainting the card; a Pair card draws none, so its toggle stands
+alone. Both modes belong to the card, in memory for as long as the card is built - a chapter switch
+or a return from the idle dialog builds it afresh at Per Second and Buy One - and are never saved.
 The card ends in two buttons. **Book** names the first member in group order whose bar is not
 available and whose level is offered, as the bar's gate text (or its name when the gate has none)
 with the level's price; it buys one level and in the same press adds the bar to the active set, so
@@ -2214,7 +2219,8 @@ handler stops a press and a release where it handles them and a listener on the 
 neither, and it lets go of the pointer the button's click captured when it
 fires, so the click is no longer pressed and the release lands on the window, and a drag that takes
 the pointer ends the hold before it fires. The rows' and the buttons' presses are public actions
-(`Tap`, `BuyOne`, `BuyMax`, the cycle row's `Buy`, `OpenInfo`, the card's `Cycle`, `Book`, `Auto`,
+(`Tap`, `BuyOne`, `BuyMax`, the cycle row's `Buy`, `OpenInfo`, the card's `ToggleFigures`, `Cycle`,
+`Book`, `Auto`,
 `OpenAutomation`, and the window's `Buy` and `Dismiss`) so a headless test presses what the pointer
 presses, and the toast's `Advance` ends the shown toast as its last frame would; an upgrade tile's are `Buy` and
 `OpenDetails`, and its window's `Close`; a prestige card's are `Press` (what Confirm does) and
@@ -2472,7 +2478,7 @@ Assets/Scripts/
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
               // RungButtonUI is the prestige card (RungButton.uxml): title with the gain and the (i), Currently, requirement lines, Confirm
-              LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, the Pair or Cycle buy control, Book and Auto; AutomationState, BuyMode
+              LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, the Pair or Cycle buy control, the Per Second / Raw toggle, Book and Auto; AutomationState, BuyMode, FigureMode
               UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): icon, name, price or Owned; a tap buys, a hold opens the details window
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button

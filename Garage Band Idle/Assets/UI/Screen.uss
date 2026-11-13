@@ -567,11 +567,27 @@ Label {
     color: rgb(111, 111, 111);
 }
 
-/* The cycle button of a Cycle card, at its top right: a text action in the
-   accent colour naming what every row's Hire button buys. */
-.leveled-cycle {
-    align-self: flex-end;
+/* The card's top line: the figures toggle at the left on every card, and the
+   cycle button of a Cycle card at the right. On a Pair card the toggle stands
+   alone at the left. */
+.leveled-top {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Both top buttons: text actions in the accent colour, the figures toggle
+   naming what every row prints inside its fill and the cycle what every row's
+   Hire button buys. */
+.leveled-top-action {
     color: rgb(240, 149, 149);
+}
+
+.leveled-figures {
+    -unity-text-align: middle-left;
+}
+
+.leveled-cycle {
     -unity-text-align: middle-right;
 }
 

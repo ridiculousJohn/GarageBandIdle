@@ -9,13 +9,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // One row of a levelled group (design doc 12.11): a bar shown with its
     // level, the reference game's combined row. The title line is the bar's
     // name and the level's owned count; beneath it the fill, with what the bar
-    // earns per second printed inside it; at the right the level's buy control
-    // and the price of what it buys. Tapping the fill starts the bar when it
-    // is not running and works it when it is; holding the title opens the
-    // level generator's info screen. Every fact is read where it lives: the
-    // bar's at its home, the level's at the generator's declaring scope
-    // (12.3), and the earnings through BarSystem.CompletionRate, the read the
-    // tick's own completion income is sized by (12.7). The row also watches
+    // earns printed inside it - per second, or per completion, as the card's
+    // figures toggle reads; at the right the level's buy control and the price
+    // of what it buys. Tapping the fill starts the bar when it is not running
+    // and works it when it is; holding the title opens the level generator's
+    // info screen. Every fact is read where it lives: the bar's at its home,
+    // the level's at the generator's declaring scope (12.3), and the earnings
+    // through BarSystem.CompletionRate or BarSystem.CompletionPayout, the reads
+    // the tick's own completion income is sized by (12.7). The row also watches
     // its level for count thresholds: a refresh that finds the owned count
     // risen past one raises a toast per effect it switched on, and the first
     // refresh after the row is built only takes the count as it stands.
@@ -45,9 +46,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // when the label prints none.
         public BigNumber ShownGranted { get; private set; } = BigNumber.Zero;
 
-        // The per-second earnings printed inside the fill, one line per
-        // currency in BarSystem.CompletionRate's order, zero lines kept.
+        // The per-second earnings printed inside the fill while the card reads
+        // Per Second, one line per currency in BarSystem.CompletionRate's
+        // order, zero lines kept; empty while it reads Raw.
         public IReadOnlyList<(CurrencyDefinition currency, BigNumber perSecond)> ShownRates => shownRates;
+
+        // What one completion pays, printed inside the fill while the card
+        // reads Raw, one line per currency in BarSystem.CompletionPayout's
+        // order, zero lines kept; empty while it reads Per Second.
+        public IReadOnlyList<(CurrencyDefinition currency, BigNumber amount)> ShownPayouts => shownPayouts;
 
         // The price printed under the buy control: one level under the pair,
         // the N levels the Hire button buys under the cycle.
@@ -78,7 +85,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly Label countLabel;
         private readonly ProgressBar fill;
         private readonly BuyControl buy;
+        private readonly Func<FigureMode> figures;
         private readonly List<(CurrencyDefinition currency, BigNumber perSecond)> shownRates = new();
+        private readonly List<(CurrencyDefinition currency, BigNumber amount)> shownPayouts = new();
 
         // The fill's snap: truth at the refresh and the bar slope the last
         // tick realized, for the frames between (12.11).
@@ -97,11 +106,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // lists members its own scope declares (12.7). `activate` is the
         // module's add-to-the-active-set, the one way a row or the Book button
         // starts a bar. `mode` is the card's cycle button, read by a Cycle
-        // control on every refresh.
+        // control on every refresh; `figures` is the card's figures toggle,
+        // read on every refresh.
         public LeveledBarRowUI(GameSession session, ScopeState home, GameClock clock, GroupDefinition group,
                                BarDefinition bar, IGeneratorInfoOpener infos, IToastOpener toasts,
-                               Action<BarDefinition> activate, BuyControlKind buyControl, Func<BuyMode> mode)
+                               Action<BarDefinition> activate, BuyControlKind buyControl, Func<BuyMode> mode,
+                               Func<FigureMode> figures)
         {
+            this.figures = figures;
             this.session = session;
             this.home = home;
             this.clock = clock;
@@ -182,10 +194,22 @@ namespace RidiculousGaming.GarageBandIdle.UI
             slope = report == null ? BigNumber.Zero : report.BarSlope(home, Bar.Id);
             stamp = clock.GameTimeSeconds;
 
+            // The figures are set here and nowhere else: what a level or a
+            // modifier changes moves them, and the fill alone interpolates.
             shownRates.Clear();
-            foreach (var (currency, _, perSecond) in BarSystem.CompletionRate(ctx, Bar, GameSpeed(ctx)))
-                shownRates.Add((currency, perSecond));
-            fill.title = EarningsText(shownRates);
+            shownPayouts.Clear();
+            if (figures() == FigureMode.Raw)
+            {
+                foreach (var (currency, _, amount) in BarSystem.CompletionPayout(ctx, Bar))
+                    shownPayouts.Add((currency, amount));
+                fill.title = EarningsText(shownPayouts, "");
+            }
+            else
+            {
+                foreach (var (currency, _, perSecond) in BarSystem.CompletionRate(ctx, Bar, GameSpeed(ctx)))
+                    shownRates.Add((currency, perSecond));
+                fill.title = EarningsText(shownRates, "/s");
+            }
             Show(truth);
 
             // The whole row dims while not one level can be bought (12.11).
@@ -273,17 +297,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
             return chapter == null ? 1 : TickSystem.GameSpeed(ctx.Rebase(chapter), chapter, session.Config);
         }
 
-        // "27.60 Cash/s, 4.60 Fans/s": every line, zeros included, so a level
-        // nobody bought still names what the gig pays.
-        private static string EarningsText(IReadOnlyList<(CurrencyDefinition currency, BigNumber perSecond)> rates)
+        // "27.60 Cash/s, 4.60 Fans/s" with the unit "/s", "30.87 Cash, 4.11
+        // Fans" with none: every line, zeros included, so a level nobody
+        // bought still names what the gig pays.
+        private static string EarningsText(IReadOnlyList<(CurrencyDefinition currency, BigNumber amount)> lines,
+                                           string unit)
         {
             var line = new StringBuilder();
-            for (var i = 0; i < rates.Count; i++)
+            for (var i = 0; i < lines.Count; i++)
             {
                 if (i > 0)
                     line.Append(", ");
-                line.Append(NumberFormatter.Format(rates[i].perSecond))
-                    .Append(" ").Append(rates[i].currency.displayName).Append("/s");
+                line.Append(NumberFormatter.Format(lines[i].amount))
+                    .Append(" ").Append(lines[i].currency.displayName).Append(unit);
             }
             return line.ToString();
         }
