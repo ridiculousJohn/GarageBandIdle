@@ -612,6 +612,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                     var evt = (EventDefinition)build.Built[eventDto];
                     evt.availableWhen = BuildCondition(build, scope, eventDto.availableWhen);
                     evt.goal = BuildCondition(build, scope, eventDto.goal);
+                    evt.completedWhen = BuildCondition(build, scope, eventDto.completedWhen);
                     evt.timeLimitSeconds = eventDto.timeLimitSeconds;
                     evt.handicaps = eventDto.handicaps.Select(e => BuildEffect(build, scope, e)).ToList();
                     evt.onEntry = eventDto.onEntry.Select(a => BuildAction(build, scope, a)).ToList();

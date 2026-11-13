@@ -1440,23 +1440,14 @@
           "displayName": "Battle of the Bands I",
           "description": "Five minutes to build 250 Rep with no handicap at all - the clock is the whole contest.",
           "availableWhen": {
-            "type": "All",
-            "conditions": [
-              {
-                "type": "CurrencyAtLeast",
-                "currency": "eps_sold",
-                "threshold": 5,
-                "uiText": "5 EPs Sold"
-              },
-              {
-                "type": "Not",
-                "uiText": "Already cleared",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "botb1_done"
-                }
-              }
-            ]
+            "type": "CurrencyAtLeast",
+            "currency": "eps_sold",
+            "threshold": 5,
+            "uiText": "5 EPs Sold"
+          },
+          "completedWhen": {
+            "type": "FlagSet",
+            "flagId": "botb1_done"
           },
           "goal": {
             "type": "CurrencyAtLeast",
@@ -1502,20 +1493,16 @@
                 "uiText": "Clear Battle of the Bands I first"
               },
               {
-                "type": "Not",
-                "uiText": "Already cleared",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "botb2_done"
-                }
-              },
-              {
                 "type": "CurrencyAtLeast",
                 "currency": "eps_sold",
                 "threshold": 5,
                 "uiText": "5 EPs Sold"
               }
             ]
+          },
+          "completedWhen": {
+            "type": "FlagSet",
+            "flagId": "botb2_done"
           },
           "goal": {
             "type": "CurrencyAtLeast",
@@ -1567,20 +1554,16 @@
                 "uiText": "Clear Battle of the Bands II first"
               },
               {
-                "type": "Not",
-                "uiText": "Already cleared",
-                "condition": {
-                  "type": "FlagSet",
-                  "flagId": "botb3_done"
-                }
-              },
-              {
                 "type": "CurrencyAtLeast",
                 "currency": "eps_sold",
                 "threshold": 5,
                 "uiText": "5 EPs Sold"
               }
             ]
+          },
+          "completedWhen": {
+            "type": "FlagSet",
+            "flagId": "botb3_done"
           },
           "goal": {
             "type": "CurrencyAtLeast",

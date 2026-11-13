@@ -409,6 +409,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
     {
         public ConditionDto availableWhen;
         public ConditionDto goal;
+        public ConditionDto completedWhen;
         public double timeLimitSeconds;
         public List<EffectDto> handicaps = new();
         public List<ActionDto> onEntry = new();

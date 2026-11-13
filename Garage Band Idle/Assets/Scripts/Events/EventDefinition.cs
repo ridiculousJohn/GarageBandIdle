@@ -17,6 +17,11 @@ namespace RidiculousGaming.GarageBandIdle.Events
         // validation warns, because the event can never reward.
         [SerializeReference, SubclassPicker] public Condition goal;
 
+        // The event is done for good while this holds: Start refuses it and the
+        // row reads "Completed" in place of the button. Null means the event
+        // never completes and stays re-enterable.
+        [SerializeReference, SubclassPicker] public Condition completedWhen;
+
         // Real seconds; zero means untimed. Expiry ends nothing but the chance
         // to latch the goal (12.8).
         public double timeLimitSeconds;
@@ -36,6 +41,10 @@ namespace RidiculousGaming.GarageBandIdle.Events
         // (the same ruling as a generator's). ctx must be rebased to the host.
         public bool IsAvailable(GameContext hostCtx) =>
             availableWhen != null && availableWhen.Evaluate(hostCtx);
+
+        // ctx must be rebased to the host, as for IsAvailable.
+        public bool IsCompleted(GameContext hostCtx) =>
+            completedWhen != null && completedWhen.Evaluate(hostCtx);
 
         public bool GoalHolds(GameContext hostCtx) =>
             goal != null && goal.Evaluate(hostCtx);

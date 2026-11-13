@@ -1216,14 +1216,68 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var first = section.Modules[0];
             Assert.IsTrue(first.Widget.Root.Q<Button>("start").enabledSelf, "one demo tape is jam I's whole gate");
             Assert.IsEmpty(Fixture.VisibleLegs(first), "a startable event has nothing left to explain");
+            Assert.AreEqual(DisplayStyle.None, first.Widget.Root.Q<Label>("completed").style.display.value,
+                "jam I is not cleared, so its row offers Start");
 
             var second = section.Modules[1];
             Assert.IsFalse(second.Widget.Root.Q<Button>("start").enabledSelf);
             var gate = ((EventDefinition)second.Definition.content).availableWhen;
             var legs = GateFeedback.Legs(gate);
-            CollectionAssert.AreEqual(new[] { legs[0], legs[2] }, Fixture.ShownLegs(second, gate),
-                "the unmet legs in authored order; jam II is uncleared, so its own already-cleared leg holds");
-            Fixture.AssertProgress(legs[2], fx.Ctx(fx.Tier1), 1, 15);
+            CollectionAssert.AreEqual(new[] { legs[0], legs[1] }, Fixture.ShownLegs(second, gate),
+                "the unmet legs in authored order: jam I is uncleared and the tapes are short");
+            Fixture.AssertProgress(legs[1], fx.Ctx(fx.Tier1), 1, 15);
+        }
+
+        // A cleared jam reads "Completed" where its button sits: nothing to
+        // start, nothing to dismiss, and no gate left to explain.
+        [Test]
+        public void AClearedJamRowReadsCompletedWithNoButtonAndNoLegs()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            fx.Ctx(fx.Tier1).Deposit("demo_tapes", 1);
+            fx.Ch1.flags.Add("gj1_done");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+
+            var first = fx.Host.Sections[GarageJam].Modules[0];
+            var completed = first.Widget.Root.Q<Label>("completed");
+            Assert.AreEqual(DisplayStyle.Flex, completed.style.display.value);
+            Assert.AreEqual("Completed", completed.text);
+            Assert.AreEqual(DisplayStyle.None, first.Widget.Root.Q<Button>("start").style.display.value);
+            Assert.AreEqual(DisplayStyle.None, first.Widget.Root.Q<Button>("dismiss").style.display.value);
+            Assert.IsEmpty(Fixture.VisibleLegs(first), "a completed event has no gate to explain");
+            Assert.IsEmpty(Fixture.Text(first, "status"));
+            Assert.IsFalse(((EventUI)first.Widget).ShowsClaim);
+
+            // The next level is not completed: it offers Start, and with its
+            // predecessor cleared only the tapes leg is left unmet.
+            var second = fx.Host.Sections[GarageJam].Modules[1];
+            Assert.AreEqual(DisplayStyle.None, second.Widget.Root.Q<Label>("completed").style.display.value);
+            Assert.AreEqual(DisplayStyle.Flex, second.Widget.Root.Q<Button>("start").style.display.value);
+            var gate = ((EventDefinition)second.Definition.content).availableWhen;
+            CollectionAssert.AreEqual(new[] { GateFeedback.Legs(gate)[1] }, Fixture.ShownLegs(second, gate));
+        }
+
+        // A running attempt keeps its ending button even when the completion
+        // already holds: the record is ended only by that button.
+        [Test]
+        public void ARunningAttemptOutranksCompletion()
+        {
+            var fx = new Fixture();
+            fx.Enter();
+
+            fx.Ctx(fx.Tier1).Deposit("demo_tapes", 1);
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+            fx.Session.TryStartEvent(fx.Ctx(fx.Tier1), fx.GarageJam1);
+            Assert.IsNotNull(fx.Tier1.activeEvent, "the jam started");
+            fx.Ch1.flags.Add("gj1_done");
+            fx.Session.FireProducer(fx.Ctx(fx.Tier1), fx.TapProducer);
+
+            var first = fx.Host.Sections[GarageJam].Modules[0];
+            Assert.AreEqual(DisplayStyle.Flex, first.Widget.Root.Q<Button>("dismiss").style.display.value);
+            Assert.AreEqual(DisplayStyle.None, first.Widget.Root.Q<Button>("start").style.display.value);
+            Assert.AreEqual(DisplayStyle.None, first.Widget.Root.Q<Label>("completed").style.display.value);
         }
 
         [Test]

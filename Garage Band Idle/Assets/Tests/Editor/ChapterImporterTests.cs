@@ -564,6 +564,55 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(string.IsNullOrEmpty(release.confirmText), "an unauthored confirmText asks nothing");
         }
 
+        // ---- an event's conditions ----
+
+        // The gate, the goal and the completion are three condition slots on
+        // one event, each built from its own key; an unauthored completion
+        // stays null, which is an event that never completes.
+        [Test]
+        public void An_events_gate_goal_and_completion_import()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", @"{
+                ""type"": ""ChapterDefinition"",
+                ""id"": ""ch1"",
+                ""displayName"": ""The Garage"",
+                ""flags"": [""album"", ""jam_done""],
+                ""children"": [
+                    {
+                        ""type"": ""TierDefinition"",
+                        ""id"": ""tier1"",
+                        ""events"": [
+                            {
+                                ""id"": ""jam"",
+                                ""displayName"": ""Jam"",
+                                ""availableWhen"": { ""type"": ""FlagSet"", ""flagId"": ""album"", ""uiText"": ""Cut a demo"" },
+                                ""goal"": { ""type"": ""FlagSet"", ""flagId"": ""album"" },
+                                ""completedWhen"": { ""type"": ""FlagSet"", ""flagId"": ""jam_done"" },
+                                ""rewards"": [{ ""type"": ""SetFlag"", ""flagId"": ""jam_done"" }]
+                            },
+                            {
+                                ""id"": ""open_jam"",
+                                ""displayName"": ""Open Jam"",
+                                ""availableWhen"": { ""type"": ""Always"" },
+                                ""goal"": { ""type"": ""FlagSet"", ""flagId"": ""album"" }
+                            }
+                        ]
+                    }
+                ]
+            }");
+
+            Import();
+
+            var events = Load<TierDefinition>("ch1/tier1.asset").events;
+            Assert.AreEqual(new[] { "jam", "open_jam" }, events.Select(e => e.Id).ToArray());
+            var jam = events[0];
+            Assert.AreEqual("album", ((FlagSet)jam.availableWhen).flagId);
+            Assert.AreEqual("album", ((FlagSet)jam.goal).flagId);
+            Assert.AreEqual("jam_done", ((FlagSet)jam.completedWhen).flagId);
+            Assert.IsNull(events[1].completedWhen, "an unauthored completion is null");
+        }
+
         // ---- the chapter's screen ----
 
         // Two tiers deep on purpose: a module's default scope is its CONTENT's

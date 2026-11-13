@@ -407,6 +407,33 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // ---- the Battle chain ----
 
+        // Each stage after the first gates on its predecessor's flag, and each
+        // is completed by the flag its own reward sets, which Start refuses -
+        // so at most one stage is startable at any moment.
+        [Test]
+        public void Each_battle_ladders_on_the_previous_flag_and_completes_on_its_own()
+        {
+            // One leg, so the gate is that leg and not an All wrapping it.
+            var first = Find(tier2.events, "battle_1").availableWhen;
+            Assert.AreEqual("balance eps_sold", Describe(first));
+            Assert.AreEqual("5 EPs Sold", first.uiText);
+
+            var later = new (string id, string previousLeg, string previousText)[]
+            {
+                ("battle_2", "flag botb1_done", "Clear Battle of the Bands I first"),
+                ("battle_3", "flag botb2_done", "Clear Battle of the Bands II first"),
+            };
+            foreach (var (id, previousLeg, previousText) in later)
+            {
+                var legs = ((All)Find(tier2.events, id).availableWhen).conditions;
+                Assert.AreEqual(new[] { previousLeg, "balance eps_sold" }, legs.Select(Describe).ToArray(), id);
+                Assert.AreEqual(new[] { previousText, "5 EPs Sold" }, legs.Select(c => c.uiText).ToArray(), id);
+            }
+
+            Assert.AreEqual(new[] { "flag botb1_done", "flag botb2_done", "flag botb3_done" },
+                tier2.events.Select(e => Describe(e.completedWhen)).ToArray());
+        }
+
         // The third stage takes away the automation instead of a multiplier: the
         // switch is off for the run, so five minutes of the ladder is bought by
         // hand (chapter-primitives F).
@@ -621,7 +648,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             FlagSet c => $"flag {c.flagId}",
             BarsCompleted c => $"bars {c.group.Id} {c.count}",
             Not { condition: EventRewardPending } => "not reward pending",
-            Not { condition: FlagSet exclusion } => $"not flag {exclusion.flagId}",
             _ => condition.GetType().Name,
         };
 

@@ -1003,6 +1003,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
+        public void Event_CompletedWhen_IsValidatedAtItsSite()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent().completedWhen = new FlagSet { flagId = "missing_flag" };
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.UnresolvedReference,
+                "event 'garage_jam' completedWhen: FlagSet references flag 'missing_flag'");
+        }
+
+        // A completion renders no legs, so it carries no uiText; a null one
+        // (the authored shape above) is an event that stays re-enterable.
+        [Test]
+        public void Event_CompletedWhen_WithoutUiText_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.AddGuardedEvent().completedWhen = new FlagSet { flagId = "album" };
+            AssertClean(f.Run());
+        }
+
+        [Test]
         public void Event_NegativeTimeLimit_Error()
         {
             var f = new ValidatorFixture();

@@ -1109,10 +1109,10 @@ namespace RidiculousGaming.GarageBandIdle
             }
         }
 
-        // An event's own shape: its gate, goal, timer, and handicaps, judged in
-        // the HOST's scope (12.4), which the acting scope already is. The three
-        // action lists are walked with every other list, from the definition's
-        // own enumeration.
+        // An event's own shape: its gate, goal, completion condition, timer, and
+        // handicaps, judged in the HOST's scope (12.4), which the acting scope
+        // already is. The three action lists are walked with every other list,
+        // from the definition's own enumeration.
         private static void ValidateEvent(ValidationContext ctx, Events.EventDefinition evt, ScopeDefinition scope)
         {
             var site = $"event '{evt.Id}'";
@@ -1134,6 +1134,14 @@ namespace RidiculousGaming.GarageBandIdle
                     "goal is unauthored - the event is dismiss-only and can never reward.");
             else
                 evt.goal.Validate(ctx);
+
+            // Optional: a null completedWhen is an event that stays re-enterable.
+            // It renders no legs, so it has no gate text to check.
+            if (evt.completedWhen != null)
+            {
+                ctx.SetSite($"{site} completedWhen");
+                evt.completedWhen.Validate(ctx);
+            }
 
             ctx.SetSite(site);
             if (ctx.RequireFiniteDouble(evt.timeLimitSeconds, $"{site} timeLimitSeconds") && evt.timeLimitSeconds < 0)

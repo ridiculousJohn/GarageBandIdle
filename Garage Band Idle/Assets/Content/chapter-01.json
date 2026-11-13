@@ -534,17 +534,8 @@
         {
           "id": "garage_jam_1",
           "displayName": "Garage Jam I",
-          "availableWhen": {
-            "type": "All",
-            "conditions": [
-              { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 1, "uiText": "1 Demo Tape" },
-              {
-                "type": "Not",
-                "uiText": "Already cleared",
-                "condition": { "type": "FlagSet", "flagId": "gj1_done" }
-              }
-            ]
-          },
+          "availableWhen": { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 1, "uiText": "1 Demo Tape" },
+          "completedWhen": { "type": "FlagSet", "flagId": "gj1_done" },
           "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 150 },
           "timeLimitSeconds": 60,
           "handicaps": [
@@ -568,14 +559,10 @@
             "type": "All",
             "conditions": [
               { "type": "FlagSet", "flagId": "gj1_done", "uiText": "Clear Garage Jam I first" },
-              {
-                "type": "Not",
-                "uiText": "Already cleared",
-                "condition": { "type": "FlagSet", "flagId": "gj2_done" }
-              },
               { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 15, "uiText": "15 Demo Tapes" }
             ]
           },
+          "completedWhen": { "type": "FlagSet", "flagId": "gj2_done" },
           "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 300 },
           "timeLimitSeconds": 90,
           "handicaps": [
@@ -600,14 +587,10 @@
             "type": "All",
             "conditions": [
               { "type": "FlagSet", "flagId": "gj2_done", "uiText": "Clear Garage Jam II first" },
-              {
-                "type": "Not",
-                "uiText": "Already cleared",
-                "condition": { "type": "FlagSet", "flagId": "gj3_done" }
-              },
               { "type": "CurrencyAtLeast", "currency": "demo_tapes", "threshold": 30, "uiText": "30 Demo Tapes" }
             ]
           },
+          "completedWhen": { "type": "FlagSet", "flagId": "gj3_done" },
           "goal": { "type": "CurrencyAtLeast", "currency": "cash", "threshold": 600 },
           "timeLimitSeconds": 90,
           "handicaps": [

@@ -376,34 +376,41 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         // Each level gates on the previous one's completion flag AND a banked
         // Demo Tapes threshold, which is what makes "come back later" the
-        // experience rather than a wall. The exclusion leg is what keeps at
-        // most one jam startable at any moment - no selection rule anywhere.
+        // experience rather than a wall. Each level is completed by its own
+        // flag, which Start refuses - so with the predecessor leg, at most one
+        // jam is startable at any moment, with no selection rule anywhere.
         [Test]
         public void The_garage_jam_chain_ladders_on_the_previous_flag_and_demo_tapes()
         {
             // Level one has no predecessor, so banked Demo Tapes is the whole
-            // of its entry requirement.
-            var first = ((All)Event("garage_jam_1").availableWhen).conditions;
-            Assert.AreEqual(new[] { "balance demo_tapes", "not flag gj1_done" }, first.Select(Describe).ToArray());
-            Assert.AreEqual((BigNumber)1, Threshold(first[0]));
+            // of its entry requirement - one leg, so the gate is that leg and
+            // not an All wrapping it.
+            var first = Event("garage_jam_1").availableWhen;
+            Assert.AreEqual("balance demo_tapes", Describe(first));
+            Assert.AreEqual((BigNumber)1, Threshold(first));
             // The uiText sits on the leg itself, which is what a disabled row
             // lists (12.11).
-            Assert.AreEqual(new[] { "1 Demo Tape", "Already cleared" }, first.Select(c => c.uiText).ToArray());
+            Assert.AreEqual("1 Demo Tape", first.uiText);
 
-            var later = new (string id, string previousLeg, string ownLeg, double tapes, string previousText)[]
+            var later = new (string id, string previousLeg, double tapes, string previousText)[]
             {
-                ("garage_jam_2", "flag gj1_done", "not flag gj2_done", 15, "Clear Garage Jam I first"),
-                ("garage_jam_3", "flag gj2_done", "not flag gj3_done", 30, "Clear Garage Jam II first"),
+                ("garage_jam_2", "flag gj1_done", 15, "Clear Garage Jam I first"),
+                ("garage_jam_3", "flag gj2_done", 30, "Clear Garage Jam II first"),
             };
-            foreach (var (id, previousLeg, ownLeg, tapes, previousText) in later)
+            foreach (var (id, previousLeg, tapes, previousText) in later)
             {
                 var legs = ((All)Event(id).availableWhen).conditions;
-                Assert.AreEqual(new[] { previousLeg, ownLeg, "balance demo_tapes" },
+                Assert.AreEqual(new[] { previousLeg, "balance demo_tapes" },
                     legs.Select(Describe).ToArray(), id);
-                Assert.AreEqual((BigNumber)tapes, Threshold(legs[2]), id);
-                Assert.AreEqual(new[] { previousText, "Already cleared", $"{tapes} Demo Tapes" },
+                Assert.AreEqual((BigNumber)tapes, Threshold(legs[1]), id);
+                Assert.AreEqual(new[] { previousText, $"{tapes} Demo Tapes" },
                     legs.Select(c => c.uiText).ToArray(), id);
             }
+
+            // Each level is completed by the flag its own reward sets.
+            var completions = new[] { "flag gj1_done", "flag gj2_done", "flag gj3_done" };
+            for (var i = 0; i < tier1.events.Count; i++)
+                Assert.AreEqual(completions[i], Describe(tier1.events[i].completedWhen), tier1.events[i].Id);
 
             var goals = new[] { 150, 300, 600 };
             var timers = new[] { 60d, 90d, 90d };
@@ -757,7 +764,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             FlagSet c => $"flag {c.flagId}",
             BarsCompleted c => $"bars {c.group.Id} {c.count}",
             Not { condition: EventRewardPending } => "not reward pending",
-            Not { condition: FlagSet exclusion } => $"not flag {exclusion.flagId}",
             _ => condition.GetType().Name,
         };
 

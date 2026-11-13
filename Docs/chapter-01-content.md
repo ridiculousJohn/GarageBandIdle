@@ -209,27 +209,28 @@ Three separate `EventDefinition`s (levels are separate events, §6.1). Shared sh
 continues), `onEntry: [RestartScope(tier1)]` - a gate-met run banks exactly as a
 release would, an unfinished one is discarded.
 
-| Event | availableWhen | Goal | Timer | rewards |
-|---|---|---|---|---|
-| `garage_jam_1` ("Garage Jam I") | `All[CurrencyAtLeast(demo_tapes, 1), Not(FlagSet(gj1_done))]` | `CurrencyAtLeast(cash, 150)` | 60s | `[AddModifier(ch1, gj_tap_1), SetFlag(gj1_done)]` |
-| `garage_jam_2` ("Garage Jam II") | `All[FlagSet(gj1_done), Not(FlagSet(gj2_done)), CurrencyAtLeast(demo_tapes, 15)]` | `CurrencyAtLeast(cash, 300)` | 90s | `[RemoveModifier(ch1, gj_tap_1), AddModifier(ch1, gj_tap_2), SetFlag(gj2_done)]` |
-| `garage_jam_3` ("Garage Jam III") | `All[FlagSet(gj2_done), Not(FlagSet(gj3_done)), CurrencyAtLeast(demo_tapes, 30)]` | `CurrencyAtLeast(cash, 600)` | 90s | `[RemoveModifier(ch1, gj_tap_2), AddModifier(ch1, gj_tap_3), SetFlag(gj3_done)]` |
+| Event | availableWhen | completedWhen | Goal | Timer | rewards |
+|---|---|---|---|---|---|
+| `garage_jam_1` ("Garage Jam I") | `CurrencyAtLeast(demo_tapes, 1)` | `FlagSet(gj1_done)` | `CurrencyAtLeast(cash, 150)` | 60s | `[AddModifier(ch1, gj_tap_1), SetFlag(gj1_done)]` |
+| `garage_jam_2` ("Garage Jam II") | `All[FlagSet(gj1_done), CurrencyAtLeast(demo_tapes, 15)]` | `FlagSet(gj2_done)` | `CurrencyAtLeast(cash, 300)` | 90s | `[RemoveModifier(ch1, gj_tap_1), AddModifier(ch1, gj_tap_2), SetFlag(gj2_done)]` |
+| `garage_jam_3` ("Garage Jam III") | `All[FlagSet(gj2_done), CurrencyAtLeast(demo_tapes, 30)]` | `FlagSet(gj3_done)` | `CurrencyAtLeast(cash, 600)` | 90s | `[RemoveModifier(ch1, gj_tap_2), AddModifier(ch1, gj_tap_3), SetFlag(gj3_done)]` |
 
 All three share `onEnd: [ResetScope(tier1)]`, which runs whether or not the goal was reached -
 dismissal pays the bonus if it was, then clears the sprint either way, and the next run starts fresh
 with whatever bonus was earned. Nothing pre-event is at stake: entry already banked the run through
 the release's own gate before wiping tier1, so a failed attempt only loses what the attempt itself
 built.
-The `Not(FlagSet(gjN_done))` legs make the three gates mutually exclusive: at most one jam is
-startable at any moment - no selection rule anywhere, §12's rows merely render the facts. A
-cleared jam stops being startable for the rest of the chapter cycle, which the reward lists
-already assume (each removes its predecessor's modifier; a re-clear would pay nothing under
-`Replace` stacking); the capstone's `ResetScope(ch1)` clears the flags and the Demo Tapes and
-re-arms the whole ladder for the replay, which re-gates from zero.
+Each jam's `completedWhen` is its own `FlagSet(gjN_done)`, and `StartEvent` refuses a completed
+event; with each later gate requiring its predecessor's flag, at most one jam is startable at any
+moment - no selection rule anywhere, section 12's rows merely render the facts. A cleared jam is
+completed for the rest of the chapter cycle, which the reward lists already assume (each removes
+its predecessor's modifier; a re-clear would pay nothing under `Replace` stacking), and its row
+reads "Completed" in place of the button; the capstone's `ResetScope(ch1)` clears the flags and
+the Demo Tapes and re-arms the whole ladder for the replay, which re-gates from zero.
 Gate leg `uiText` (§12.11's unmet-legs contract, rendered on a disabled row):
 `CurrencyAtLeast(demo_tapes, N)` reads "1 Demo Tape" / "15 Demo Tapes" / "30 Demo Tapes"; `FlagSet(gj1_done)` "Clear Garage
-Jam I first"; `FlagSet(gj2_done)` "Clear Garage Jam II first"; each `Not(FlagSet(gjN_done))`
-"Already cleared".
+Jam I first"; `FlagSet(gj2_done)` "Clear Garage Jam II first". `completedWhen` renders no legs and
+carries no `uiText`. Jam I's gate is its single leg rather than an `All` wrapping it.
 `gj*_done` flags and the reward modifiers live at **ch1** — they survive tier resets, die at the
 capstone (nothing in these lists resets ch1, so a jam's flags and modifiers outlive the run that
 paid them). Neither rung's
@@ -314,11 +315,14 @@ gated on `album` would vanish at the moment its beat became available.
 **An event module binds one event** - the header-line shape again. Whether a locked jam shows as
 a disabled row or not at all is that module's authored `visibleWhen`: Ch. 1 authors all three
 rows always-visible, so once the section reveals it is never an empty box - locked jams sit
-disabled showing their unmet gate legs' `uiText` (§10). Whether a row is ACTIVE (tier1's record
-names its event) or STARTABLE (its `availableWhen` passes - the same gate `StartEvent` enforces)
-is runtime fact, never a widget decision; the `Not(FlagSet(gjN_done))` legs (§10) keep at most
-one Start live at a time. A design that wants within-cycle re-clears later is reward lists
-authored for re-entry - content, no system change.
+disabled showing their unmet gate legs' `uiText` (section 10). The row's name and its one control share
+the header line. Its state is runtime fact, never a widget decision, in this precedence: ACTIVE
+(tier1's record names its event: Dismiss or Claim reward), COMPLETED (its `completedWhen` holds:
+a "Completed" label where the button sits, no legs), else Start, enabled when `CanStart` passes -
+the same check `StartEvent` enforces - and otherwise disabled with its unmet legs. The
+`completedWhen` flags and the predecessor legs (section 10) keep at most one Start live at a time. A
+design that wants within-cycle re-clears later is reward lists authored for re-entry and a null
+`completedWhen` - content, no system change.
 
 ---
 

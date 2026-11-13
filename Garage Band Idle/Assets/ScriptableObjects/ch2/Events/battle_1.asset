@@ -21,6 +21,8 @@ MonoBehaviour:
     rid: 7998337719617684240
   goal:
     rid: 2087966473949486262
+  completedWhen:
+    rid: 8536381457994908570
   timeLimitSeconds: 300
   handicaps: []
   onEntry:
@@ -42,11 +44,6 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 2
-    - rid: 4223514207500820600
-      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: 
-        flagId: botb1_done
     - rid: 5370096032203340167
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
@@ -65,19 +62,6 @@ MonoBehaviour:
       data:
         scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
     - rid: 7998337719617684240
-      type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: 
-        conditions:
-        - rid: 9121360983700662014
-        - rid: 9120582529468077851
-    - rid: 9120582529468077851
-      type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: Already cleared
-        condition:
-          rid: 4223514207500820600
-    - rid: 9121360983700662014
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 5 EPs Sold
@@ -86,3 +70,8 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 0
+    - rid: 8536381457994908570
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: 
+        flagId: botb1_done

@@ -9,21 +9,22 @@ namespace RidiculousGaming.GarageBandIdle.Events
     // answers the mutable-state question, the command mutates and throws when
     // its guard says no, Try* wraps the two. Each resolves the host by the
     // outward walk - declaration is ownership, asked for an InteriorScopeState
-    // so root is not a candidate - and rebases to it, so the gate, the goal and
-    // all three action lists evaluate in the HOST's scope (12.4).
+    // so root is not a candidate - and rebases to it, so the gate, the goal,
+    // the completion condition and all three action lists evaluate in the
+    // HOST's scope (12.4).
     public static class EventSystem
     {
         // Start refuses an occupied host - ANY record, running or expired-but-
-        // undismissed, blocks entry (12.8) - and a closed gate; a null gate
-        // refuses, the fail-closed backstop behind the load-time check. The
-        // entry list takes the runner's question like every other list (12.5):
-        // an onEntry that would clear a scope holding an armed reward closes
-        // the Start button rather than half-running.
+        // undismissed, blocks entry (12.8) - a completed event, and a closed
+        // gate; a null gate refuses, the fail-closed backstop behind the
+        // load-time check. The entry list takes the runner's question like
+        // every other list (12.5): an onEntry that would clear a scope holding
+        // an armed reward closes the Start button rather than half-running.
         public static bool CanStart(GameContext ctx, EventDefinition evt)
         {
             var host = Producer.DeclaringScope<InteriorScopeState>(ctx.Scope, evt);
             var hostCtx = ctx.Rebase(host);
-            return host.activeEvent == null && evt.IsAvailable(hostCtx)
+            return host.activeEvent == null && !evt.IsCompleted(hostCtx) && evt.IsAvailable(hostCtx)
                 && ActionList.Refuses(evt.onEntry, hostCtx) == null;
         }
 
@@ -31,7 +32,7 @@ namespace RidiculousGaming.GarageBandIdle.Events
         {
             var host = Producer.DeclaringScope<InteriorScopeState>(ctx.Scope, evt);
             var hostCtx = ctx.Rebase(host);
-            if (host.activeEvent != null || !evt.IsAvailable(hostCtx)
+            if (host.activeEvent != null || evt.IsCompleted(hostCtx) || !evt.IsAvailable(hostCtx)
                 || ActionList.Refuses(evt.onEntry, hostCtx) != null)
                 throw new InvalidOperationException(
                     $"Start: event '{evt.Id}' is not currently startable - ask CanStart first.");

@@ -8,9 +8,12 @@ using UnityEngine.UIElements;
 namespace RidiculousGaming.GarageBandIdle.UI
 {
     // One bound event's row (design doc 12.11). Its state is runtime fact,
-    // never a widget decision: ACTIVE when the host's record names this event,
-    // STARTABLE when EventSystem.CanStart says so - the same gate StartEvent
-    // enforces - else disabled, rendering its unmet legs. Nothing here
+    // never a widget decision, in this precedence: ACTIVE when the host's
+    // record names this event, with the ending button; else COMPLETED when the
+    // event's completedWhen holds, reading "Completed" where the button sits,
+    // with no legs and no refusal; else the Start button, enabled when
+    // EventSystem.CanStart says so - the same gate StartEvent enforces - and
+    // otherwise disabled, rendering its unmet legs. Nothing here
     // interpolates: the timer snaps per tick, four times a second at the
     // authored cadence, and the interpolated slopes are measured deltas, which
     // a wall clock is not.
@@ -21,6 +24,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly VisualElement legs;
         private readonly Button start;
         private readonly Button dismiss;
+        private readonly Label completed;
 
         // The legs paired with the conditions they render, as the rung button
         // pairs them: the gate's top-level list is fixed, so the labels are
@@ -49,6 +53,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             legs = Require<VisualElement>(root, "legs", "EventRow.uxml");
             start = Require<Button>(root, "start", "EventRow.uxml");
             dismiss = Require<Button>(root, "dismiss", "EventRow.uxml");
+            completed = Require<Label>(root, "completed", "EventRow.uxml");
         }
 
         protected override void OnBound()
@@ -57,6 +62,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             host = Producer.DeclaringScope<InteriorScopeState>(Scope, evt);
             nameLabel.text = evt.displayName;
             start.text = "Start";
+            completed.text = "Completed";
             start.clicked += () => Session.TryStartEvent(Context(), evt);
             dismiss.clicked += () => Session.TryDismissEvent(Context(), evt);
             foreach (var leg in GateFeedback.Legs(evt.availableWhen))
@@ -76,9 +82,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
             var hostCtx = ctx.Rebase(host);
             var record = host.activeEvent;
             var active = record != null && record.eventId == evt.Id;
+            // A running attempt outranks completion: its record is ended only
+            // by its own button, so that button shows whatever else holds.
+            var done = !active && evt.IsCompleted(hostCtx);
 
-            start.style.display = active ? DisplayStyle.None : DisplayStyle.Flex;
+            start.style.display = active || done ? DisplayStyle.None : DisplayStyle.Flex;
             dismiss.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
+            completed.style.display = done ? DisplayStyle.Flex : DisplayStyle.None;
             if (active)
             {
                 // A running attempt has no gate left to explain, and its one
@@ -94,8 +104,18 @@ namespace RidiculousGaming.GarageBandIdle.UI
             }
 
             ShowsClaim = false;
-            start.SetEnabled(EventSystem.CanStart(ctx, evt));
             statusLabel.text = "";
+            if (done)
+            {
+                // A completed event has nothing left to explain: no gate legs,
+                // and Start refuses it before any refusal could be asked.
+                foreach (var (_, label) in legViews)
+                    label.style.display = DisplayStyle.None;
+                ShowRefusal(null);
+                return;
+            }
+
+            start.SetEnabled(EventSystem.CanStart(ctx, evt));
             var unmet = GateFeedback.UnmetLegs(evt.availableWhen, hostCtx);
             foreach (var (condition, label) in legViews)
             {

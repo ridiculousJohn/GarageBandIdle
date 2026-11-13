@@ -28,6 +28,42 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         [Test]
+        public void Start_refuses_a_completed_event()
+        {
+            var tree = new TestTree();
+            var ctx = tree.Ctx(tree.Tier1);
+            tree.TimedGig.completedWhen = new FlagSet { flagId = "fans_revealed" };
+            tree.Tier1.flags.Add("fans_revealed");
+
+            // The gate is open, so completion alone refuses.
+            Assert.IsTrue(tree.TimedGig.IsAvailable(ctx));
+            Assert.IsTrue(tree.TimedGig.IsCompleted(ctx));
+            Assert.IsFalse(EventSystem.CanStart(ctx, tree.TimedGig));
+            Assert.IsFalse(EventSystem.TryStart(ctx, tree.TimedGig));
+            Assert.Throws<System.InvalidOperationException>(() => EventSystem.Start(ctx, tree.TimedGig));
+            Assert.IsNull(tree.Tier1.activeEvent);
+        }
+
+        [Test]
+        public void Start_admits_an_event_whose_completion_is_null_or_unmet()
+        {
+            var tree = new TestTree();
+            var ctx = tree.Ctx(tree.Tier1);
+
+            // Null: the event never completes and stays re-enterable.
+            Assert.IsNull(tree.TimedGig.completedWhen);
+            Assert.IsFalse(tree.TimedGig.IsCompleted(ctx));
+            Assert.IsTrue(EventSystem.CanStart(ctx, tree.TimedGig));
+
+            // Authored but not holding.
+            tree.TimedGig.completedWhen = new FlagSet { flagId = "fans_revealed" };
+            Assert.IsFalse(tree.TimedGig.IsCompleted(ctx));
+            Assert.IsTrue(EventSystem.CanStart(ctx, tree.TimedGig));
+            EventSystem.Start(ctx, tree.TimedGig);
+            Assert.AreEqual("timed_gig", tree.Tier1.activeEvent.eventId);
+        }
+
+        [Test]
         public void Start_refuses_an_occupied_host_running_expired_or_a_siblings()
         {
             var tree = new TestTree();

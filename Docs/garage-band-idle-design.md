@@ -352,8 +352,9 @@ always completable without any given event, but only quickly with the events its
 An event is **content plus one state record** (§12.8):
 
 ```
-EventDefinition: availableWhen (Condition), goal (Condition), timeLimit (0 = untimed),
-                 handicaps (List<Effect>), onEntry / rewards / onEnd (List<Action>)
+EventDefinition: availableWhen (Condition), goal (Condition), completedWhen (Condition, optional),
+                 timeLimit (0 = untimed), handicaps (List<Effect>),
+                 onEntry / rewards / onEnd (List<Action>)
 ActiveEvent:     { eventId, remainingSeconds, goalReached }   - in host scope state
 ```
 
@@ -363,8 +364,9 @@ IS the host and the outward walk recovers it, exactly as for every other content
 - **Lifecycle: two self-guarding operations.** `StartEvent(event)` and `DismissEvent(event)` are
   **commands, not Action kinds** (12.11) - a player enters an event by choice, so no authored list
   can start or end one, and the whole class of one event spawning another has nowhere to live. Each
-  is fail-closed against its own gate: start checks `availableWhen` **and that the host holds no
-  event record - one event per scope, and an expired-but-undismissed record still counts**, dismiss
+  is fail-closed against its own gate: start checks `availableWhen`, **that the host holds no
+  event record - one event per scope, and an expired-but-undismissed record still counts** - and
+  that the event is not completed (`completedWhen` holds; null never completes), dismiss
   checks that the host holds a record **for that event**. There is no separate claim and abort:
   dismissal is the single ending, and it pays the reward if the goal was reached - so a successful
   attempt cannot be thrown away by pressing the wrong button.
@@ -431,7 +433,9 @@ IS the host and the outward walk recovers it, exactly as for every other content
   own gate.
 - **Levels:** a harder rerun of an event is simply **another event** — `silent_stage_2` is its own
   definition whose `availableWhen` gates on `silent_stage_1_done`; there is no level machinery, no
-  selection contract, and `StartEvent(event)` is always fully specified. The rising requirement
+  selection contract, and `StartEvent(event)` is always fully specified. A cleared level is
+  retired by its own `completedWhen` (`FlagSet(silent_stage_1_done)`): Start refuses it and its row
+  reads "Completed" in place of the button. The rising requirement
   plus the player's power curve throttles level stacks as a repeatable Roadie source. Reward
   composition is per-chain authoring: each level's modifier is an *increment* that stacks with the
   previous level's, or the next level's `rewards` swaps them explicitly
@@ -1742,7 +1746,8 @@ Defined in §6.1. The definition is declared on its host scope like every other 
 `StartEvent` holds the reference and the stored record's id resolves by walking outward (§12.3).
 Runtime is one record per host scope - **at most one**, and the state schema holds a single record
 rather than a list, so a second is unrepresentable rather than filtered at load. `StartEvent`
-rejects a host that already holds a record, running or expired-but-undismissed.
+rejects a host that already holds a record, running or expired-but-undismissed, and an event whose
+`completedWhen` holds.
 
 `goalReached` latches the moment the goal holds while the attempt has not expired, and one rule
 covers timed and untimed alike. Two callers take that latch, because neither covers the other. The
@@ -1754,8 +1759,10 @@ catches a goal reached by a command outside any tick. Both callers walk the same
 the foreground chapter's subtree: root never resets and is on every chain, while a dormant chapter
 waits, so a threshold crossed while away fires on the first sweep after switch-in.
 
-`StartEvent` / `DismissEvent` are the two self-guarding commands. Start checks `availableWhen` and
-the empty host, runs `onEntry`, then creates the record - after the list, so an `onEntry` that
+`StartEvent` / `DismissEvent` are the two self-guarding commands. Start checks the empty host, that
+the event is not completed (`completedWhen`, evaluated at the host like the gate; null never
+completes, so the event stays re-enterable), `availableWhen`, and that `onEntry` would not be
+refused, then runs `onEntry`, then creates the record - after the list, so an `onEntry` that
 resets the host puts the record in the fresh payload. Dismiss checks that the host holds a record
 **for the named event** - a sibling's record is an ordinary refusal, not a licence to pay this
 event's reward - then **removes it first**, then runs `rewards` if `goalReached` was set, then runs `onEnd` either way.
@@ -2442,6 +2449,9 @@ coefficient are checked.
   selector for naming one:
   that would mean interpreting the word, which is the search this pass does not do.
 - A balance goal on an event whose `onEntry` never resets the host scope warns.
+- An event's `completedWhen` is optional - null is an event that never completes - and when
+  authored it is validated as its goal is, from the host. It renders no legs, so the rendered-gate
+  text check below does not apply to it.
 - An event on the root scope needs no check. `events` is declared on `InteriorDefinition` (§12.3),
   so root has no field to hold one: handicaps gathering into every chapter's outward walk and a
   globally occupied host are unrepresentable rather than refused, and the state agrees - the record
@@ -2565,6 +2575,7 @@ Assets/Scripts/
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
               // RungButtonUI is the prestige card (RungButton.uxml): title with the gain and the (i), Currently, requirement lines, Confirm
+              // EventUI (EventRow.uxml): name and button on one header line, then status and legs; three states in precedence - ACTIVE (the host's record names it: Dismiss or Claim reward), COMPLETED (completedWhen holds: a "Completed" label where the button sits, no legs), else Start, enabled per CanStart, with the unmet legs
               LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, the Pair or Cycle buy control, the Per Second / Raw toggle, Book and Auto; AutomationState, BuyMode, FigureMode
               UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): its own icon or the shared pick, name (with the owned level), price or Owned; a tap buys, a hold opens the details window
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen

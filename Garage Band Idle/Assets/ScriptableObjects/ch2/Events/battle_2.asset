@@ -20,6 +20,8 @@ MonoBehaviour:
     rid: 7998337719617684240
   goal:
     rid: 2087966473949486262
+  completedWhen:
+    rid: 8536381457994908570
   timeLimitSeconds: 300
   handicaps:
   - target: work_the_crowd
@@ -52,11 +54,6 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 3
-    - rid: 4223514207500820600
-      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: 
-        flagId: botb2_done
     - rid: 5370096032203340167
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
@@ -81,19 +78,12 @@ MonoBehaviour:
         conditions:
         - rid: 9121360983700662014
         - rid: 9120582529468077851
-        - rid: 9123397279235730336
-    - rid: 9120582529468077851
-      type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
-      data:
-        uiText: Already cleared
-        condition:
-          rid: 4223514207500820600
-    - rid: 9121360983700662014
+    - rid: 8536381457994908570
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
-        uiText: Clear Battle of the Bands I first
-        flagId: botb1_done
-    - rid: 9123397279235730336
+        uiText: 
+        flagId: botb2_done
+    - rid: 9120582529468077851
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 5 EPs Sold
@@ -102,3 +92,8 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 0
+    - rid: 9121360983700662014
+      type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
+      data:
+        uiText: Clear Battle of the Bands I first
+        flagId: botb1_done

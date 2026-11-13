@@ -702,15 +702,28 @@ Label {
 .rung-confirm {
     margin-top: 8px;
     font-size: 46px;
-    color: rgb(240, 149, 149);
 }
 
-.rung-confirm:disabled {
-    color: rgb(111, 111, 111);
+.rung-confirm:enabled {
+    color: rgb(240, 149, 149);
 }
 
 .event-row {
     padding: 38px 0;
+}
+
+/* The name and the row's one control share the header line: the name takes
+   the room and wraps, the control keeps its width at the right. */
+.event-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.event-header .row-name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    white-space: normal;
 }
 
 .event-status {
@@ -720,10 +733,20 @@ Label {
 
 .event-buttons {
     flex-direction: row;
+    flex-shrink: 0;
+    align-items: center;
     justify-content: flex-end;
 }
 
-.event-buttons .unity-button, .story-row .unity-button {
+/* Sits where the button would: the button's text size and padding. */
+.event-completed {
+    font-size: 44px;
+    color: rgb(168, 168, 168);
+    padding: 18px 24px;
+    -unity-text-align: middle-right;
+}
+
+.event-buttons .unity-button:enabled, .story-row .unity-button:enabled {
     color: rgb(240, 149, 149);
 }
 
@@ -816,7 +839,7 @@ Label {
     margin-top: 12px;
 }
 
-.collect-double, .collect-pass, #encore-ad, #encore-pass, #roadie-done {
+.collect-double, .collect-pass, #encore-ad, #encore-pass, #roadie-done:enabled {
     color: rgb(240, 149, 149);
 }
 
