@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 6de30a77-b186-4a60-a5f3-377cf4424b41
-  modified: 2026-11-13T05:50:08.972Z
+  modified: 2026-11-13T05:55:13.934Z
 ---
 
 A snapshot, not a rule. Check `git status` and `git log` before trusting any line of it.
@@ -17,6 +17,11 @@ gate 100,000. Build-plan row "Chapter 2's release loop" records it.
 
 **Next on balance:** John plays it on a fresh chapter 2 (his save's old `fans`/`eps` drop on load).
 The numbers came from a scratchpad simulator (no taps, Encore or Roadies), so play decides them.
+
+**Open, John's ruling (2026-11-12):** cutting an EP must clear chapter 2's automation like Ctrl C's
+Promotion ("make it like Ctrl C"). Today the `booked_*` flags are ch2-scoped, so automation survives
+the release and Auto never reappears. Ctrl C clears automation unless Micromanagement is owned
+(Docs/ctrl-c chapter 2, "Promotion and persistence"). John will pick this up himself later.
 
 **Waiting on John:** see [[ctrl-c-bar-card-controls]] (later-runs ghosted bars, pill-style buttons,
 three toast/cycle tidy-ups).
