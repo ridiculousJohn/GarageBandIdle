@@ -16,6 +16,17 @@ namespace RidiculousGaming.GarageBandIdle.UI
         Price,
     }
 
+    // What the cycle button at the top of a Cycle card says each row's Hire
+    // button buys (LeveledGroupUI.Mode): one level, the most the balance
+    // affords, or the levels still needed to reach the next count threshold.
+    // The names are not the button's wording.
+    public enum BuyMode
+    {
+        One,
+        Max,
+        Next,
+    }
+
     // The levelled group (design doc 12.11): the module over ONE group whose
     // members are all bars naming a level, bound by contentId exactly as the
     // group module is. Each available bar is one combined row - its name and
@@ -25,7 +36,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // automation of the first visible gig that does not yet go again by
     // itself; holding Auto opens the automation window over the group, where
     // any visible gig's automation is bought. There is no select control:
-    // tapping a bar is how it starts. The
+    // tapping a bar is how it starts. A card whose module authors the Cycle
+    // buy control opens with one more button, the cycle, which steps every
+    // row's Hire button through Buy One, Buy Max and Buy Next; the mode lives
+    // on the card for as long as the card is built and is never saved. The
     // group module stays the layout for a group that is not levelled (the
     // split one, bars in one list and their generators in another).
     // The rows are built once and toggled, because a group's members are a
@@ -34,7 +48,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
     {
         private readonly IGeneratorInfoOpener infos;
         private readonly IAutomationOpener automations;
+        private readonly IToastOpener toasts;
         private readonly VisualElement rows;
+        private readonly Button cycle;
         private readonly Button book;
         private readonly Button auto;
         private readonly List<LeveledBarRowUI> views = new();
@@ -62,16 +78,30 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // True when the target's automation reads Buy.
         public bool AutoEnabled { get; private set; }
 
-        public LeveledGroupUI(VisualElement root, IGeneratorInfoOpener infos, IAutomationOpener automations)
+        // Which buy control every row draws: the module's authored choice,
+        // which the host hands over before the bind that builds the rows
+        // (12.11). Pair when nothing sets it.
+        public BuyControlKind BuyControl { get; set; } = BuyControlKind.Pair;
+
+        // What the cycle button reads and every Hire button buys by. Starts at
+        // One whenever the card is built; meaningless on a Pair card, which
+        // draws no cycle button.
+        public BuyMode Mode { get; private set; } = BuyMode.One;
+
+        public LeveledGroupUI(VisualElement root, IGeneratorInfoOpener infos, IAutomationOpener automations,
+                              IToastOpener toasts)
             : base(root)
         {
             rows = Require<VisualElement>(root, "rows", "LeveledGroup.uxml");
+            cycle = Require<Button>(root, "cycle", "LeveledGroup.uxml");
             book = Require<Button>(root, "book", "LeveledGroup.uxml");
             auto = Require<Button>(root, "auto", "LeveledGroup.uxml");
-            // A row with nowhere to send the hold would render a dead gesture,
-            // and the host is the only caller (requirement 7).
+            // A row with nowhere to send the hold or the crossing would render
+            // a dead gesture, and the host is the only caller (requirement 7).
             this.infos = infos ?? throw new ArgumentNullException(nameof(infos));
             this.automations = automations ?? throw new ArgumentNullException(nameof(automations));
+            this.toasts = toasts ?? throw new ArgumentNullException(nameof(toasts));
+            cycle.clicked += Cycle;
             book.clicked += Book;
             auto.clicked += Auto;
         }
@@ -96,10 +126,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             foreach (var member in group.members)
             {
-                var row = new LeveledBarRowUI(Session, declaring, Clock, group, (BarDefinition)member, infos, Activate);
+                var row = new LeveledBarRowUI(Session, declaring, Clock, group, (BarDefinition)member, infos, toasts,
+                    Activate, BuyControl, () => Mode);
                 rows.Add(row.Root);
                 views.Add(row);
             }
+            cycle.style.display = BuyControl == BuyControlKind.Cycle ? DisplayStyle.Flex : DisplayStyle.None;
 
             // A tap on Auto buys and a hold opens the window. The hold's
             // manipulator lets go of the button's pointer when it fires, so the
@@ -109,6 +141,12 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public override void Refresh()
         {
+            cycle.text = Mode switch
+            {
+                BuyMode.Max => "Buy Max",
+                BuyMode.Next => "Buy Next",
+                _ => "Buy One",
+            };
             foreach (var view in views)
                 view.Refresh();
             var ctx = Context().Rebase(declaring);
@@ -131,6 +169,21 @@ namespace RidiculousGaming.GarageBandIdle.UI
                     return view;
             throw new InvalidOperationException(
                 $"The leveled group '{group?.Id}' does not list '{bar?.Id}'.");
+        }
+
+        // What the cycle button presses, public so a headless test presses what
+        // the pointer presses: Buy One, then Buy Max, then Buy Next, then Buy
+        // One again. A press changes no state the session holds, so no command
+        // runs and no refresh follows; the card repaints itself.
+        public void Cycle()
+        {
+            Mode = Mode switch
+            {
+                BuyMode.One => BuyMode.Max,
+                BuyMode.Max => BuyMode.Next,
+                _ => BuyMode.One,
+            };
+            Refresh();
         }
 
         // What the Book button presses, public so a headless test presses what

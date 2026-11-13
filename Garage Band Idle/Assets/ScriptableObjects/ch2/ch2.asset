@@ -58,17 +58,17 @@ MonoBehaviour:
   groups: []
   upgrades: []
   rung:
-    rid: 1688710513577951306
+    rid: 1688710516000424269
   events: []
   unlock:
-    rid: 1688710513577951307
+    rid: 1688710516000424270
   sections:
   - title: The Calendar
     description: The nights you have booked. Tap a gig to play it, tap a playing
       gig to work the crowd, and use the buttons at the right to raise its draw.
       Book adds the next gig, and Auto makes the next gig re-book itself.
     visibleWhen:
-      rid: 1688710513577951308
+      rid: 1688710516000424271
     scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
     layout: 0
     modules:
@@ -77,42 +77,49 @@ MonoBehaviour:
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: currency_line
       content: {fileID: 11400000, guid: 315c16cc77c3a9a4198d48b6f4a9980b, type: 2}
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: currency_line
       content: {fileID: 11400000, guid: df8d154a476df3d4b8f6eb1f40268b0f, type: 2}
       visibleWhen:
-        rid: 1688710513577951309
+        rid: 1688710516000424272
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: currency_line
       content: {fileID: 11400000, guid: 341b9d8aa778ef94fa58cc96d23f140c, type: 2}
       visibleWhen:
-        rid: 1688710513577951310
+        rid: 1688710516000424273
       scope: {fileID: 11400000}
+      buyControl: 0
     - prefabId: leveled_group
       content: {fileID: 11400000, guid: b8e8d2340df4c1d498c25306d708e2c8, type: 2}
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 1
     - prefabId: story_row
       content: {fileID: 11400000, guid: 69bfc81d05b9bb343803bbc5f35c4225, type: 2}
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000}
+      buyControl: 0
     - prefabId: story_row
       content: {fileID: 11400000, guid: 57a874ab79193fd499ebe0cba8aab8fe, type: 2}
       visibleWhen:
-        rid: 1688710513577951311
+        rid: 1688710516000424274
       scope: {fileID: 11400000}
+      buyControl: 0
   - title: Promotion
     description: Handbills, mailing lists and anyone who will write about you. They
       build Buzz on their own, and every point of Buzz adds a little to the cash
       a gig pays.
     visibleWhen:
-      rid: 1688710513577951312
+      rid: 1688710516000424275
     scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
     layout: 0
     modules:
@@ -121,26 +128,30 @@ MonoBehaviour:
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: generator_row
       content: {fileID: 11400000, guid: c0e13c501547f704e8454a858786bc36, type: 2}
       visibleWhen:
-        rid: 1688710513577951313
+        rid: 1688710516000424276
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: generator_row
       content: {fileID: 11400000, guid: 4a1a3728b5e04f946a2f9e66e4c10409, type: 2}
       visibleWhen:
-        rid: 1688710513577951314
+        rid: 1688710516000424277
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: generator_row
       content: {fileID: 11400000, guid: b7ba86c6dbae44e40ac1bc4f47e5277d, type: 2}
       visibleWhen:
-        rid: 1688710513577951315
+        rid: 1688710516000424278
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
   - title: The Office
     description: 'Where the band''s business gets done: everything here buys you
       more out of every night you play.'
     visibleWhen:
-      rid: 1688710513577951316
+      rid: 1688710516000424279
     scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
     layout: 1
     modules:
@@ -149,41 +160,48 @@ MonoBehaviour:
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: upgrade_tile
       content: {fileID: 11400000, guid: 66c10a2973d349f4cafa95b6b0c12af7, type: 2}
       visibleWhen:
-        rid: 1688710513577951317
+        rid: 1688710516000424280
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: upgrade_tile
       content: {fileID: 11400000, guid: f07ebed0242cba946b38bade2bc3c84f, type: 2}
       visibleWhen:
-        rid: 1688710513577951318
+        rid: 1688710516000424281
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: upgrade_tile
       content: {fileID: 11400000, guid: e335570ec3271244989e7b7e829e4d28, type: 2}
       visibleWhen:
-        rid: 1688710513577951319
+        rid: 1688710516000424282
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: upgrade_tile
       content: {fileID: 11400000, guid: 41c13b81cfaa8924a98ff17cdce96258, type: 2}
       visibleWhen:
-        rid: 1688710513577951320
+        rid: 1688710516000424283
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: upgrade_tile
       content: {fileID: 11400000, guid: d142acf5f2ed21d46af505aa3c5d85df, type: 2}
       visibleWhen:
-        rid: 1688710513577951321
+        rid: 1688710516000424284
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: upgrade_tile
       content: {fileID: 11400000, guid: 96fcab3ac7d4d44478fe23ef61235636, type: 2}
       visibleWhen:
-        rid: 1688710513577951322
+        rid: 1688710516000424285
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
   - title: The Release
     description: Record an EP once you have 300 fans. It banks EPs and starts the
       run over with the calendar empty.
     visibleWhen:
-      rid: 1688710513577951323
+      rid: 1688710516000424286
     scope: {fileID: 11400000}
     layout: 0
     modules:
@@ -192,11 +210,12 @@ MonoBehaviour:
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
   - title: Battle of the Bands
     description: Three timed rounds, one at a time. The run starts over for each
       one, and clearing a round doubles what every gig pays for the rest of the chapter.
     visibleWhen:
-      rid: 1688710513577951324
+      rid: 1688710516000424287
     scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
     layout: 0
     modules:
@@ -205,21 +224,24 @@ MonoBehaviour:
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: event_row
       content: {fileID: 11400000, guid: 8920797fc0b077147b1af67d369b5ccf, type: 2}
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
     - prefabId: event_row
       content: {fileID: 11400000, guid: d5b72bdb7a9823a438fa05cf97fae37e, type: 2}
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
+      buyControl: 0
   - title: The Talent Show
     description: The night that ends the chapter. Record 120 EPs to get on the bill,
       and you walk away with another Roadie.
     visibleWhen:
-      rid: 1688710513577951325
+      rid: 1688710516000424288
     scope: {fileID: 11400000}
     layout: 0
     modules:
@@ -228,6 +250,7 @@ MonoBehaviour:
       visibleWhen:
         rid: -2
       scope: {fileID: 11400000}
+      buyControl: 0
   storyBeats:
   - {fileID: 11400000, guid: 69bfc81d05b9bb343803bbc5f35c4225, type: 2}
   - {fileID: 11400000, guid: 57a874ab79193fd499ebe0cba8aab8fe, type: 2}
@@ -236,7 +259,7 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710513577951306
+    - rid: 1688710516000424269
       type: {class: Rung, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         label: Win the Talent Show
@@ -246,26 +269,26 @@ MonoBehaviour:
           fans, the Buzz, the calendar and every upgrade go, and only the Roadie
           comes with you.'
         offerCondition:
-          rid: 1688710513577951326
+          rid: 1688710516000424289
         actions:
-        - rid: 1688710513577951327
-        - rid: 1688710513577951328
-        - rid: 1688710513577951329
-    - rid: 1688710513577951307
+        - rid: 1688710516000424290
+        - rid: 1688710516000424291
+        - rid: 1688710516000424292
+    - rid: 1688710516000424270
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Play the Backyard Party
         flagId: ch1_complete
-    - rid: 1688710513577951308
+    - rid: 1688710516000424271
       type: {class: Always, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
-    - rid: 1688710513577951309
+    - rid: 1688710516000424272
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: promo_revealed
-    - rid: 1688710513577951310
+    - rid: 1688710516000424273
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -274,76 +297,76 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 1688710513577951311
+    - rid: 1688710516000424274
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: ch2_complete
-    - rid: 1688710513577951312
+    - rid: 1688710516000424275
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: promo_revealed
-    - rid: 1688710513577951313
+    - rid: 1688710516000424276
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: mailing_list_revealed
-    - rid: 1688710513577951314
+    - rid: 1688710516000424277
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: photographer_friend_revealed
-    - rid: 1688710513577951315
+    - rid: 1688710516000424278
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: zine_writeup_revealed
-    - rid: 1688710513577951316
+    - rid: 1688710516000424279
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: office_revealed
-    - rid: 1688710513577951317
+    - rid: 1688710516000424280
       type: {class: UpgradePurchased, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         upgrade: {fileID: 11400000, guid: c1eafd604418c9b43b44eaea2cd87239, type: 2}
-    - rid: 1688710513577951318
+    - rid: 1688710516000424281
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: street_team_revealed
-    - rid: 1688710513577951319
+    - rid: 1688710516000424282
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: merch_table_revealed
-    - rid: 1688710513577951320
+    - rid: 1688710516000424283
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: the_van_revealed
-    - rid: 1688710513577951321
+    - rid: 1688710516000424284
       type: {class: Any, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 1688710513577951330
-        - rid: 1688710513577951331
-    - rid: 1688710513577951322
+        - rid: 1688710516000424293
+        - rid: 1688710516000424294
+    - rid: 1688710516000424285
       type: {class: Any, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 1688710513577951332
-        - rid: 1688710513577951333
-    - rid: 1688710513577951323
+        - rid: 1688710516000424295
+        - rid: 1688710516000424296
+    - rid: 1688710516000424286
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         flagId: album
-    - rid: 1688710513577951324
+    - rid: 1688710516000424287
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -352,7 +375,7 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 0
-    - rid: 1688710513577951325
+    - rid: 1688710516000424288
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -361,7 +384,7 @@ MonoBehaviour:
           _value:
             mantissa: 1
             exponent: 0
-    - rid: 1688710513577951326
+    - rid: 1688710516000424289
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Requires 120 EPs
@@ -370,7 +393,7 @@ MonoBehaviour:
           _value:
             mantissa: 1.2
             exponent: 2
-    - rid: 1688710513577951327
+    - rid: 1688710516000424290
       type: {class: AddCurrency, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         currencies:
@@ -381,20 +404,20 @@ MonoBehaviour:
             exponent: 0
         formula:
           rid: -2
-    - rid: 1688710513577951328
+    - rid: 1688710516000424291
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: ch2_complete
-    - rid: 1688710513577951329
+    - rid: 1688710516000424292
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000}
-    - rid: 1688710513577951330
+    - rid: 1688710516000424293
       type: {class: UpgradePurchased, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         upgrade: {fileID: 11400000, guid: d142acf5f2ed21d46af505aa3c5d85df, type: 2}
-    - rid: 1688710513577951331
+    - rid: 1688710516000424294
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -403,12 +426,12 @@ MonoBehaviour:
           _value:
             mantissa: 8
             exponent: 0
-    - rid: 1688710513577951332
+    - rid: 1688710516000424295
       type: {class: UpgradePurchased, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         upgrade: {fileID: 11400000, guid: 96fcab3ac7d4d44478fe23ef61235636, type: 2}
-    - rid: 1688710513577951333
+    - rid: 1688710516000424296
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

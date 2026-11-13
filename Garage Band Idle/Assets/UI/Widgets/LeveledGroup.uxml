@@ -1,5 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <ui:VisualElement name="leveled_group" class="members leveled-group">
+        <ui:Button name="cycle" class="leveled-cycle" style="display: none;" />
         <ui:VisualElement name="rows" class="leveled-rows" />
         <ui:VisualElement name="footer" class="leveled-footer">
             <ui:Button name="book" class="leveled-book" />

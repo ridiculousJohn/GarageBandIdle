@@ -12,19 +12,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
     {
         private static readonly Dictionary<string, Func<VisualElement, ModuleRegistry, IStoryOpener,
                                                         IGeneratorInfoOpener, IAutomationOpener, IUpgradeDetailsOpener,
-                                                        IRungOpener, ModuleWidget>> Creators =
+                                                        IRungOpener, IToastOpener, ModuleWidget>> Creators =
             new()
             {
-                ["currency_line"] = (root, registry, stories, infos, automations, details, rungs) => new CurrencyHeaderUI(root),
-                ["jam_button"] = (root, registry, stories, infos, automations, details, rungs) => new JamButtonUI(root),
-                ["generator_row"] = (root, registry, stories, infos, automations, details, rungs) => new GeneratorRowUI(root, infos),
-                ["upgrade_row"] = (root, registry, stories, infos, automations, details, rungs) => new UpgradeRowUI(root),
-                ["upgrade_tile"] = (root, registry, stories, infos, automations, details, rungs) => new UpgradeTileUI(root, details),
-                ["group"] = (root, registry, stories, infos, automations, details, rungs) => new GroupUI(root, registry, stories, infos, automations, details, rungs),
-                ["leveled_group"] = (root, registry, stories, infos, automations, details, rungs) => new LeveledGroupUI(root, infos, automations),
-                ["rung_button"] = (root, registry, stories, infos, automations, details, rungs) => new RungButtonUI(root, rungs),
-                ["event_row"] = (root, registry, stories, infos, automations, details, rungs) => new EventUI(root),
-                ["story_row"] = (root, registry, stories, infos, automations, details, rungs) => new StoryRowUI(root, stories),
+                ["currency_line"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new CurrencyHeaderUI(root),
+                ["jam_button"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new JamButtonUI(root),
+                ["generator_row"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new GeneratorRowUI(root, infos),
+                ["upgrade_row"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new UpgradeRowUI(root),
+                ["upgrade_tile"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new UpgradeTileUI(root, details),
+                ["group"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new GroupUI(root, registry, stories, infos, automations, details, rungs, toasts),
+                ["leveled_group"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new LeveledGroupUI(root, infos, automations, toasts),
+                ["rung_button"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new RungButtonUI(root, rungs),
+                ["event_row"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new EventUI(root),
+                ["story_row"] = (root, registry, stories, infos, automations, details, rungs, toasts) => new StoryRowUI(root, stories),
             };
 
         // The registry cross-check enumerates the same closed set Create uses,
@@ -112,19 +112,20 @@ namespace RidiculousGaming.GarageBandIdle.UI
         //
         // `stories` is the card's owner, `infos` the info screen's,
         // `automations` the automation window's, `details` the upgrade details
-        // window's and `rungs` the rung info and confirmation windows', each
-        // needed by the widget kinds that open it and ignored by the rest: the
-        // host is the one caller and hands itself in for all five (12.11). The
+        // window's, `rungs` the rung info and confirmation windows' and
+        // `toasts` the threshold toast's, each needed by the widget kinds that
+        // open it and ignored by the rest: the host is the one caller and hands
+        // itself in for all six (12.11). The
         // registry rides along for the same reason - a group instantiates the
         // layout each member's own kind already has, so it renders them through
         // this same factory.
         public static ModuleWidget Create(string prefabId, VisualElement root, ModuleRegistry registry,
                                           IStoryOpener stories, IGeneratorInfoOpener infos,
                                           IAutomationOpener automations, IUpgradeDetailsOpener details,
-                                          IRungOpener rungs)
+                                          IRungOpener rungs, IToastOpener toasts)
         {
             if (prefabId != null && Creators.TryGetValue(prefabId, out var create))
-                return create(root, registry, stories, infos, automations, details, rungs);
+                return create(root, registry, stories, infos, automations, details, rungs, toasts);
             throw new InvalidOperationException(
                 $"No widget controller answers prefabId '{prefabId}' (design doc 12.11).");
         }

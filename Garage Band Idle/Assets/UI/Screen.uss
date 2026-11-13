@@ -567,6 +567,25 @@ Label {
     color: rgb(111, 111, 111);
 }
 
+/* The cycle button of a Cycle card, at its top right: a text action in the
+   accent colour naming what every row's Hire button buys. */
+.leveled-cycle {
+    align-self: flex-end;
+    color: rgb(240, 149, 149);
+    -unity-text-align: middle-right;
+}
+
+/* A row's one Hire button under the cycle: as wide as its longest count reads,
+   and dimmed like Auto while the count it names cannot be afforded, still
+   pressable since a press is fail-closed. */
+.leveled-hire {
+    min-width: 260px;
+}
+
+.leveled-hire-unaffordable {
+    color: rgb(111, 111, 111);
+}
+
 /* ---- gates, the prestige card ---- */
 
 .legs {
@@ -942,4 +961,26 @@ Label {
 .headline-rate {
     font-size: 46px;
     color: rgb(208, 208, 208);
+}
+
+/* ---- the threshold toast ---- */
+
+/* A dark rounded pill near the bottom of the screen, centred, over the page
+   and beneath every window; its opacity is driven by ToastUI as it fades in
+   and out, and it never takes a press (design doc 12.11). */
+.toast {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 160px;
+    align-items: center;
+}
+
+.toast-text {
+    background-color: rgba(18, 18, 18, 0.92);
+    border-radius: 48px;
+    padding: 26px 56px;
+    font-size: 40px;
+    color: rgb(242, 242, 242);
+    -unity-text-align: middle-center;
 }

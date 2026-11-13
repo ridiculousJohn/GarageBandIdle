@@ -50,10 +50,11 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The order of EffectCarriers IS the multiplication order at a node:
-        // upgrades, permanent modifiers, granted modifiers, bar cascades, then
-        // handicaps - each kind in declaration order, effects in declaration
-        // order within a carrier. A sixth carrier kind is an entry here and
-        // nowhere else, which is what leaves no second site to forget.
+        // upgrades, permanent modifiers, granted modifiers, bar cascades,
+        // generator thresholds, then handicaps - each kind in declaration
+        // order, effects in declaration order within a carrier. A seventh
+        // carrier kind is an entry here and nowhere else, which is what leaves
+        // no second site to forget.
         [Test]
         public void EffectCarriers_names_every_kind_in_the_multiplication_order()
         {
@@ -88,6 +89,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             });
             tier.bars.Add(bar);
 
+            var amp = TestTree.MakeDefinition<GeneratorDefinition>("amp");
+            amp.availableWhen = new Always();
+            amp.costCurrency = coin;
+            amp.baseCost = 1;
+            var milestone = new CountThreshold { count = 10 };
+            milestone.effects.Add(new ThresholdEffect { target = amp, stat = Stat.Rate, multiplier = 13 });
+            amp.thresholds.Add(milestone);
+            tier.generators.Add(amp);
+
             var evt = TestTree.MakeDefinition<EventDefinition>("gig");
             evt.handicaps.Add(new Effect { target = "amp", stat = Stat.Rate, multiplier = 0 });
             tier.events.Add(evt);
@@ -98,12 +108,12 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 new[]
                 {
                     LivenessKind.Upgrade, LivenessKind.Upgrade, LivenessKind.Permanent,
-                    LivenessKind.Granted, LivenessKind.Cascade, LivenessKind.Handicap
+                    LivenessKind.Granted, LivenessKind.Cascade, LivenessKind.Threshold, LivenessKind.Handicap
                 },
                 carriers.Select(carrier => carrier.Liveness).ToArray(),
-                "upgrades, permanent, granted, cascades, then handicaps");
+                "upgrades, permanent, granted, cascades, thresholds, then handicaps");
             CollectionAssert.AreEqual(
-                new Definition[] { upgrade, upgrade, permanent, granted, bar, evt },
+                new Definition[] { upgrade, upgrade, permanent, granted, bar, amp, evt },
                 carriers.Select(carrier => carrier.Carrier).ToArray(),
                 "each effect names the carrier whose fact decides it");
 
@@ -111,6 +121,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.AreEqual(Stat.Yield, carriers[1].Effect.stat);
             Assert.AreEqual(GrowthKind.Linear, carriers[4].Growth,
                 "growth rides the carrying entry, never the Effect atom");
+            Assert.AreEqual(10, carriers[5].AtCount, "the count rides the carrying threshold");
+            Assert.AreEqual("amp", carriers[5].Effect.target, "and the selector is the owner's own id");
         }
 
         // Root has no events field at all (12.3): the kind it cannot host is

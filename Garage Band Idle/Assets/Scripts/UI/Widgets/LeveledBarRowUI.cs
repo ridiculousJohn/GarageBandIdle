@@ -10,12 +10,15 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // level, the reference game's combined row. The title line is the bar's
     // name and the level's owned count; beneath it the fill, with what the bar
     // earns per second printed inside it; at the right the level's buy control
-    // and the next unit's cost. Tapping the fill starts the bar when it is not
-    // running and works it when it is; holding the title opens the level
-    // generator's info screen. Every fact is read where it lives: the bar's at
-    // its home, the level's at the generator's declaring scope (12.3), and the
-    // earnings through BarSystem.CompletionRate, the read the tick's own
-    // completion income is sized by (12.7).
+    // and the price of what it buys. Tapping the fill starts the bar when it
+    // is not running and works it when it is; holding the title opens the
+    // level generator's info screen. Every fact is read where it lives: the
+    // bar's at its home, the level's at the generator's declaring scope
+    // (12.3), and the earnings through BarSystem.CompletionRate, the read the
+    // tick's own completion income is sized by (12.7). The row also watches
+    // its level for count thresholds: a refresh that finds the owned count
+    // risen past one raises a toast per effect it switched on, and the first
+    // refresh after the row is built only takes the count as it stands.
     public sealed class LeveledBarRowUI
     {
         public VisualElement Root { get; }
@@ -46,11 +49,19 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // currency in BarSystem.CompletionRate's order, zero lines kept.
         public IReadOnlyList<(CurrencyDefinition currency, BigNumber perSecond)> ShownRates => shownRates;
 
-        // The next level's cost printed under the buy buttons.
+        // The price printed under the buy control: one level under the pair,
+        // the N levels the Hire button buys under the cycle.
         public BigNumber ShownCost => buy.ShownCost;
 
-        // The N on the max button's "+N", as printed.
-        public int ShownMax => buy.ShownMax;
+        // The N on the pair's max button's "+N", as printed; zero under the
+        // cycle, which draws no max button.
+        public int ShownMax => buy is PairControl pair ? pair.ShownMax : 0;
+
+        // The N on the cycle's "Hire: xN", as printed; zero under the pair.
+        public int ShownCount => buy is HireControl hire ? hire.ShownCount : 0;
+
+        // Which buy control the row draws, the card's choice (12.11).
+        public BuyControlKind ControlKind { get; }
 
         // The level generator's declaring scope, resolved once: the count, the
         // price and the purchase are its facts (12.3/12.4).
@@ -61,6 +72,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly GameClock clock;
         private readonly GroupDefinition group;
         private readonly IGeneratorInfoOpener infos;
+        private readonly IToastOpener toasts;
         private readonly Action<BarDefinition> activate;
         private readonly Label nameLabel;
         private readonly Label countLabel;
@@ -74,20 +86,31 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private BigNumber slope = BigNumber.Zero;
         private double stamp;
 
+        // The level's owned count the last refresh read, and whether there has
+        // been one: the count a crossing is measured from. A row's first
+        // refresh is after a bind, a chapter switch or a return to Live, and
+        // what was already reached then is not news.
+        private BigNumber seenCount = BigNumber.Zero;
+        private bool watching;
+
         // `home` is the group's declaring scope, which is the bar's: a group
         // lists members its own scope declares (12.7). `activate` is the
         // module's add-to-the-active-set, the one way a row or the Book button
-        // starts a bar.
+        // starts a bar. `mode` is the card's cycle button, read by a Cycle
+        // control on every refresh.
         public LeveledBarRowUI(GameSession session, ScopeState home, GameClock clock, GroupDefinition group,
-                               BarDefinition bar, IGeneratorInfoOpener infos, Action<BarDefinition> activate)
+                               BarDefinition bar, IGeneratorInfoOpener infos, IToastOpener toasts,
+                               Action<BarDefinition> activate, BuyControlKind buyControl, Func<BuyMode> mode)
         {
             this.session = session;
             this.home = home;
             this.clock = clock;
             this.group = group;
             this.infos = infos;
+            this.toasts = toasts;
             this.activate = activate;
             Bar = bar;
+            ControlKind = buyControl;
             LevelHome = Producer.DeclaringScope<ScopeState>(home, bar.level);
 
             Root = new VisualElement();
@@ -112,7 +135,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
             text.Add(fill);
             Root.Add(text);
 
-            buy = new BuyControl(session, clock, bar.level, LevelHome);
+            buy = buyControl == BuyControlKind.Cycle
+                ? new HireControl(session, clock, bar.level, LevelHome, mode)
+                : new PairControl(session, clock, bar.level, LevelHome);
             Root.Add(buy.Root);
 
             // The fill is the tap target and the title the hold's: the buy
@@ -133,6 +158,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
         public void Refresh()
         {
             var ctx = Context();
+            var levelCtx = ctx.Rebase(LevelHome);
+            Watch(levelCtx);
             Visible = Available(ctx);
             Root.style.display = Visible ? DisplayStyle.Flex : DisplayStyle.None;
             if (!Visible)
@@ -146,7 +173,6 @@ namespace RidiculousGaming.GarageBandIdle.UI
             Root.EnableInClassList("leveled-idle", Idle);
 
             nameLabel.text = Bar.displayName;
-            var levelCtx = ctx.Rebase(LevelHome);
             ShownPurchased = levelCtx.GetPurchasedCount(Bar.level.Id);
             ShownGranted = levelCtx.GetGrantedCount(Bar.level.Id);
             countLabel.text = GeneratorRowUI.CountText(ShownPurchased, ShownGranted);
@@ -186,10 +212,14 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 session.FireProducer(ctx, Bar.tap);
         }
 
-        // The two buy buttons' presses, public for the same reason as Tap.
-        public void BuyOne() => buy.BuyOne();
+        // The pair's two presses, public for the same reason as Tap. Pressing a
+        // button the row does not draw is a caller bug.
+        public void BuyOne() => Pair().BuyOne();
 
-        public void BuyMax() => buy.BuyMax();
+        public void BuyMax() => Pair().BuyMax();
+
+        // The cycle's one press: the N levels the Hire button printed.
+        public void Buy() => Hire().Buy();
 
         // What the hold calls: the level generator's info screen, at the
         // declaring scope the row resolved at construction.
@@ -203,6 +233,31 @@ namespace RidiculousGaming.GarageBandIdle.UI
             ShownProgress = display;
             fill.value = (float)((display / Bar.fillAmount).ToDouble() * 100);
         }
+
+        // The crossing watch, ahead of the visibility test so a level bought
+        // while the gig is not yet on the calendar is still measured from. A
+        // count that rose past thresholds raises each one's effects in order;
+        // a count that fell (a reset) raises nothing and is simply the new
+        // count to measure from.
+        private void Watch(GameContext levelCtx)
+        {
+            var owned = levelCtx.GetOwnedCount(Bar.level.Id);
+            if (watching && owned > seenCount)
+                foreach (var threshold in Bar.level.ThresholdsCrossed(seenCount, owned))
+                    foreach (var effect in threshold.effects)
+                        if (effect != null)
+                            toasts.OpenToast(effect);
+            seenCount = owned;
+            watching = true;
+        }
+
+        private PairControl Pair() =>
+            buy as PairControl ?? throw new InvalidOperationException(
+                $"The row for '{Bar.Id}' draws the {ControlKind} control, which has no +1 or +M (12.11).");
+
+        private HireControl Hire() =>
+            buy as HireControl ?? throw new InvalidOperationException(
+                $"The row for '{Bar.Id}' draws the {ControlKind} control, which has no Hire button (12.11).");
 
         private bool IsActive() =>
             home.activeMembers.TryGetValue(group.Id, out var active) && active.Contains(Bar.Id);
@@ -236,32 +291,23 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private GameContext Context() => new GameContext(home, clock.RealTimeUtc);
 
         // The level's buy control, kept in its own element and its own class so
-        // the row's other parts never reach into it: "+1" and "+M" over the
-        // next unit's cost, with the generator row's arithmetic and enabling -
-        // M is Purchasing.MaxAffordable at the declaring scope, both buttons
-        // read "+1" and disable when it is zero, and each submits the count
-        // printed on it (12.11).
-        private sealed class BuyControl
+        // the row's other parts never reach into it and one control replaces
+        // the other whole: the price beneath whatever buttons it draws, and the
+        // answer the row dims by (12.11).
+        private abstract class BuyControl
         {
             public VisualElement Root { get; }
 
-            public int ShownMax { get; private set; }
-
             public BigNumber ShownCost { get; private set; } = BigNumber.Zero;
 
-            private readonly GameSession session;
-            private readonly GameClock clock;
-            private readonly GeneratorDefinition level;
+            protected readonly GameSession session;
+            protected readonly GameClock clock;
+            protected readonly GeneratorDefinition level;
+            protected readonly VisualElement buttons;
             private readonly ScopeState levelHome;
-            private readonly Button one;
-            private readonly Button max;
             private readonly Label cost;
 
-            // The count the last refresh printed into the max button, kept as
-            // an int beside the label: the tap buys the count the player saw.
-            private int maxCount;
-
-            public BuyControl(GameSession session, GameClock clock, GeneratorDefinition level, ScopeState levelHome)
+            protected BuyControl(GameSession session, GameClock clock, GeneratorDefinition level, ScopeState levelHome)
             {
                 this.session = session;
                 this.clock = clock;
@@ -270,19 +316,52 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
                 Root = new VisualElement();
                 Root.AddToClassList("leveled-buy");
-                var buttons = new VisualElement();
+                buttons = new VisualElement();
                 buttons.AddToClassList("leveled-buttons");
+                cost = new Label();
+                cost.AddToClassList("row-yield");
+                cost.AddToClassList("leveled-cost");
+                Root.Add(buttons);
+                Root.Add(cost);
+            }
+
+            // True when what the control buys is affordable now, the answer
+            // the row dims by.
+            public abstract bool Refresh(GameContext levelCtx);
+
+            protected void ShowCost(BigNumber price)
+            {
+                ShownCost = price;
+                cost.text = NumberFormatter.Format(price) + " " + level.costCurrency.displayName;
+            }
+
+            protected GameContext Context() => new GameContext(levelHome, clock.RealTimeUtc);
+        }
+
+        // The generator row's "+1" and "+M" over the next unit's cost, with its
+        // arithmetic and enabling - M is Purchasing.MaxAffordable at the
+        // declaring scope, both buttons read "+1" and disable when it is zero,
+        // and each submits the count printed on it (12.11).
+        private sealed class PairControl : BuyControl
+        {
+            public int ShownMax { get; private set; }
+
+            private readonly Button one;
+            private readonly Button max;
+
+            // The count the last refresh printed into the max button, kept as
+            // an int beside the label: the tap buys the count the player saw.
+            private int maxCount;
+
+            public PairControl(GameSession session, GameClock clock, GeneratorDefinition level, ScopeState levelHome)
+                : base(session, clock, level, levelHome)
+            {
                 one = new Button();
                 one.AddToClassList("row-buy");
                 max = new Button();
                 max.AddToClassList("row-buy");
                 buttons.Add(one);
                 buttons.Add(max);
-                cost = new Label();
-                cost.AddToClassList("row-yield");
-                cost.AddToClassList("leveled-cost");
-                Root.Add(buttons);
-                Root.Add(cost);
 
                 one.clicked += BuyOne;
                 max.clicked += BuyMax;
@@ -292,11 +371,9 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
             public void BuyMax() => session.TryBuy(Context(), level, maxCount);
 
-            // True when one level is affordable, the answer the row dims by.
-            public bool Refresh(GameContext levelCtx)
+            public override bool Refresh(GameContext levelCtx)
             {
-                ShownCost = Purchasing.CostOf(level, levelCtx, 1);
-                cost.text = NumberFormatter.Format(ShownCost) + " " + level.costCurrency.displayName;
+                ShowCost(Purchasing.CostOf(level, levelCtx, 1));
 
                 var affordable = Purchasing.MaxAffordable(levelCtx, level);
                 maxCount = affordable;
@@ -307,8 +384,64 @@ namespace RidiculousGaming.GarageBandIdle.UI
                 max.SetEnabled(affordable >= 1);
                 return affordable >= 1;
             }
+        }
 
-            private GameContext Context() => new GameContext(levelHome, clock.RealTimeUtc);
+        // Ctrl C's "Hire: xN" over the price of those N, N from the card's
+        // cycle button: Buy One is 1; Buy Max the most the balance affords
+        // now, Purchasing.MaxAffordable, and 1 while that is zero; Buy Next the
+        // levels still needed to reach the level's next count threshold, and 1
+        // when no threshold is left. The press submits the N printed, which
+        // the command buys whole or refuses. Dimmed by a class and never
+        // disabled while N is not affordable, as the Auto button is.
+        private sealed class HireControl : BuyControl
+        {
+            public int ShownCount { get; private set; } = 1;
+
+            private readonly Func<BuyMode> mode;
+            private readonly Button hire;
+
+            public HireControl(GameSession session, GameClock clock, GeneratorDefinition level, ScopeState levelHome,
+                               Func<BuyMode> mode)
+                : base(session, clock, level, levelHome)
+            {
+                this.mode = mode;
+                hire = new Button();
+                hire.AddToClassList("row-buy");
+                hire.AddToClassList("leveled-hire");
+                buttons.Add(hire);
+                hire.clicked += Buy;
+            }
+
+            public void Buy() => session.TryBuy(Context(), level, ShownCount);
+
+            public override bool Refresh(GameContext levelCtx)
+            {
+                ShownCount = Count(levelCtx);
+                ShowCost(Purchasing.CostOf(level, levelCtx, ShownCount));
+                hire.text = "Hire: x" + ShownCount;
+                var affordable = Purchasing.CanBuy(levelCtx, level, ShownCount);
+                hire.EnableInClassList("leveled-hire-unaffordable", !affordable);
+                return affordable;
+            }
+
+            private int Count(GameContext levelCtx)
+            {
+                switch (mode())
+                {
+                    case BuyMode.Max:
+                        return Math.Max(Purchasing.MaxAffordable(levelCtx, level), 1);
+                    case BuyMode.Next:
+                    {
+                        var next = level.NextThreshold(levelCtx);
+                        if (next == null)
+                            return 1;
+                        var needed = (next.count - levelCtx.GetOwnedCount(level.Id)).ToDouble();
+                        return Math.Max((int)Math.Ceiling(needed), 1);
+                    }
+                    default:
+                        return 1;
+                }
+            }
         }
     }
 }

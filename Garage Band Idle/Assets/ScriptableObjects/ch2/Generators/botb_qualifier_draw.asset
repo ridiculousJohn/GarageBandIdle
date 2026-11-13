@@ -20,7 +20,7 @@ MonoBehaviour:
   description: How many of your own people show up to the qualifier, and every level
     pays a bigger lump of Cash and Fans when the night ends.
   availableWhen:
-    rid: 1688710513577951446
+    rid: 1688710516000424409
   costCurrency: {fileID: 11400000, guid: ed9b91b9c3908b84ca2d32aea1ae2e26, type: 2}
   baseCost:
     _value:
@@ -51,12 +51,47 @@ MonoBehaviour:
         exponent: 3
     condition:
       rid: -2
+  thresholds:
+  - count: 10
+    effects:
+    - target: {fileID: 11400000, guid: fca102f2b99198b459c1a1c19d8373d4, type: 2}
+      currencyId: 
+      stat: rate
+      multiplier:
+        _value:
+          mantissa: 2
+          exponent: 0
+  - count: 25
+    effects:
+    - target: {fileID: 11400000, guid: fca102f2b99198b459c1a1c19d8373d4, type: 2}
+      currencyId: 
+      stat: rate
+      multiplier:
+        _value:
+          mantissa: 2
+          exponent: 0
+    - target: {fileID: 11400000}
+      currencyId: 
+      stat: yield
+      multiplier:
+        _value:
+          mantissa: 2
+          exponent: 0
+  - count: 50
+    effects:
+    - target: {fileID: 11400000, guid: fca102f2b99198b459c1a1c19d8373d4, type: 2}
+      currencyId: 
+      stat: rate
+      multiplier:
+        _value:
+          mantissa: 2
+          exponent: 0
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 1688710513577951446
+    - rid: 1688710516000424409
       type: {class: EarnedTotalAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

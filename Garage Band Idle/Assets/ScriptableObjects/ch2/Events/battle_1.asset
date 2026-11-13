@@ -18,29 +18,29 @@ MonoBehaviour:
   description: Five minutes to pull 250 fans with no handicap at all - the clock
     is the whole contest.
   availableWhen:
-    rid: 1688710513577951472
+    rid: 1688710516000424435
   goal:
-    rid: 1688710513577951473
+    rid: 1688710516000424436
   timeLimitSeconds: 300
   handicaps: []
   onEntry:
-  - rid: 1688710513577951474
+  - rid: 1688710516000424437
   rewards:
-  - rid: 1688710513577951475
-  - rid: 1688710513577951476
+  - rid: 1688710516000424438
+  - rid: 1688710516000424439
   onEnd:
-  - rid: 1688710513577951477
+  - rid: 1688710516000424440
   references:
     version: 2
     RefIds:
-    - rid: 1688710513577951472
+    - rid: 1688710516000424435
       type: {class: All, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
         conditions:
-        - rid: 1688710513577951478
-        - rid: 1688710513577951479
-    - rid: 1688710513577951473
+        - rid: 1688710516000424441
+        - rid: 1688710516000424442
+    - rid: 1688710516000424436
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 
@@ -49,24 +49,24 @@ MonoBehaviour:
           _value:
             mantissa: 2.5
             exponent: 2
-    - rid: 1688710513577951474
+    - rid: 1688710516000424437
       type: {class: RestartScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
-    - rid: 1688710513577951475
+    - rid: 1688710516000424438
       type: {class: AddModifier, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: 8129ef8281c5df34d9c003a7bf19531b, type: 2}
         modifier: {fileID: 11400000, guid: 542294a6db7f755418d58b2901c49ad7, type: 2}
-    - rid: 1688710513577951476
+    - rid: 1688710516000424439
       type: {class: SetFlag, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         flagId: botb1_done
-    - rid: 1688710513577951477
+    - rid: 1688710516000424440
       type: {class: ResetScope, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         scope: {fileID: 11400000, guid: ce3b09f5934e5544e97d6ff43cabd5a5, type: 2}
-    - rid: 1688710513577951478
+    - rid: 1688710516000424441
       type: {class: CurrencyAtLeast, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 5 EPs
@@ -75,13 +75,13 @@ MonoBehaviour:
           _value:
             mantissa: 5
             exponent: 0
-    - rid: 1688710513577951479
+    - rid: 1688710516000424442
       type: {class: Not, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: Already cleared
         condition:
-          rid: 1688710513577951480
-    - rid: 1688710513577951480
+          rid: 1688710516000424443
+    - rid: 1688710516000424443
       type: {class: FlagSet, ns: RidiculousGaming.GarageBandIdle, asm: Assembly-CSharp}
       data:
         uiText: 

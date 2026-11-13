@@ -14,7 +14,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
     // the MonoBehaviour shell around it. This is the ONE Refreshed subscriber -
     // widgets subscribe to nothing, so there is one dispatch order.
     public sealed class ScreenHost : IDisposable, IStoryOpener, IGeneratorInfoOpener, IAutomationOpener,
-                                     IUpgradeDetailsOpener, IRungOpener
+                                     IUpgradeDetailsOpener, IRungOpener, IToastOpener
     {
         // One module and the widget standing for it. The host owns these views,
         // so it writes them and anything holding the host reads them.
@@ -135,6 +135,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private readonly RungInfoUI rungInfo;
         private readonly RungConfirmUI rungConfirm;
         private readonly PinnedHeadlineUI headline;
+        private readonly ToastUI toast;
         private readonly List<SectionView> sections = new();
 
         // The page's headline line this pass: the first visible section's
@@ -199,6 +200,8 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         public PinnedHeadlineUI Headline => headline;
 
+        public ToastUI Toast => toast;
+
         // Over the screen's own root: the host owns every app-owned screen and
         // overlay, so it is the one place that knows which named elements
         // Screen.uxml promises.
@@ -237,6 +240,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             scroll.AddManipulator(new DragScrollManipulator());
             headline = new PinnedHeadlineUI(Require<VisualElement>(screenRoot, "headline"),
                 Require<VisualElement>(screenRoot, "top-bar"), scroll);
+            toast = new ToastUI(Require<VisualElement>(screenRoot, "toast"));
             session.Refreshed += Render;
         }
 
@@ -411,6 +415,11 @@ namespace RidiculousGaming.GarageBandIdle.UI
             OpenOverlay(LiveOverlay.RungConfirm);
         }
 
+        // A levelled row's crossing, the one way a toast is raised: queued
+        // behind whatever is showing (12.11). Only a live chapter's rows are
+        // refreshed, so nothing arrives outside Live.
+        public void OpenToast(ThresholdEffect effect) => toast.Enqueue(effect);
+
         public void OpenEncore() => OpenOverlay(LiveOverlay.Encore);
 
         public void OpenStoryLog() => OpenOverlay(LiveOverlay.StoryLog);
@@ -473,6 +482,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
 
         private void ClearLiveRequests()
         {
+            toast.Clear();
             requestedBeat = null;
             story.Hide();
             requestedOverlay = LiveOverlay.None;
@@ -619,6 +629,7 @@ namespace RidiculousGaming.GarageBandIdle.UI
             sections.Clear();
             builtFor = chapter;
             settled = false;
+            toast.Clear();
 
             foreach (var section in ((ChapterDefinition)chapter.Definition).sections)
             {
@@ -676,7 +687,13 @@ namespace RidiculousGaming.GarageBandIdle.UI
         private void CreateWidget(SectionView section, int index, ModuleView module)
         {
             var root = registry.Resolve(module.Definition.prefabId).Instantiate();
-            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry, this, this, this, this, this);
+            module.Widget = ModuleWidgetFactory.Create(module.Definition.prefabId, root, registry,
+                this, this, this, this, this, this);
+            // The one module field a widget reads beyond its content: which buy
+            // control a levelled card draws, handed over before the bind that
+            // builds its rows (12.11).
+            if (module.Widget is LeveledGroupUI card)
+                card.BuyControl = module.Definition.buyControl;
             module.Widget.Bind(session, module.Scope, module.Definition.content, clock);
             // A strip's tiles stand side by side, so one grows in width there.
             module.Reveal = new Reveal(root,

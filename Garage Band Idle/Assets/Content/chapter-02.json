@@ -188,7 +188,8 @@
         },
         {
           "prefabId": "leveled_group",
-          "contentId": "the_calendar"
+          "contentId": "the_calendar",
+          "buyControl": "Cycle"
         },
         {
           "prefabId": "story_row",
@@ -740,6 +741,43 @@
               "stat": "yield",
               "value": 0.5
             }
+          ],
+          "thresholds": [
+            {
+              "count": 10,
+              "effects": [
+                {
+                  "target": "open_mic",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 25,
+              "effects": [
+                {
+                  "target": "open_mic",
+                  "stat": "rate",
+                  "multiplier": 2
+                },
+                {
+                  "target": "house_party_draw",
+                  "stat": "yield",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 50,
+              "effects": [
+                {
+                  "target": "open_mic",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            }
           ]
         },
         {
@@ -768,6 +806,43 @@
               "currency": "fans",
               "stat": "yield",
               "value": 4
+            }
+          ],
+          "thresholds": [
+            {
+              "count": 10,
+              "effects": [
+                {
+                  "target": "house_party",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 25,
+              "effects": [
+                {
+                  "target": "house_party",
+                  "stat": "rate",
+                  "multiplier": 2
+                },
+                {
+                  "target": "coffeehouse_draw",
+                  "stat": "yield",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 50,
+              "effects": [
+                {
+                  "target": "house_party",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
             }
           ]
         },
@@ -798,6 +873,43 @@
               "stat": "yield",
               "value": 22
             }
+          ],
+          "thresholds": [
+            {
+              "count": 10,
+              "effects": [
+                {
+                  "target": "coffeehouse_set",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 25,
+              "effects": [
+                {
+                  "target": "coffeehouse_set",
+                  "stat": "rate",
+                  "multiplier": 2
+                },
+                {
+                  "target": "backyard_draw",
+                  "stat": "yield",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 50,
+              "effects": [
+                {
+                  "target": "coffeehouse_set",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            }
           ]
         },
         {
@@ -826,6 +938,43 @@
               "currency": "fans",
               "stat": "yield",
               "value": 140
+            }
+          ],
+          "thresholds": [
+            {
+              "count": 10,
+              "effects": [
+                {
+                  "target": "backyard_show",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 25,
+              "effects": [
+                {
+                  "target": "backyard_show",
+                  "stat": "rate",
+                  "multiplier": 2
+                },
+                {
+                  "target": "bar_opener_draw",
+                  "stat": "yield",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 50,
+              "effects": [
+                {
+                  "target": "backyard_show",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
             }
           ]
         },
@@ -856,6 +1005,43 @@
               "stat": "yield",
               "value": 900
             }
+          ],
+          "thresholds": [
+            {
+              "count": 10,
+              "effects": [
+                {
+                  "target": "bar_opener",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 25,
+              "effects": [
+                {
+                  "target": "bar_opener",
+                  "stat": "rate",
+                  "multiplier": 2
+                },
+                {
+                  "target": "botb_qualifier_draw",
+                  "stat": "yield",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 50,
+              "effects": [
+                {
+                  "target": "bar_opener",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            }
           ]
         },
         {
@@ -884,6 +1070,43 @@
               "currency": "fans",
               "stat": "yield",
               "value": 7000
+            }
+          ],
+          "thresholds": [
+            {
+              "count": 10,
+              "effects": [
+                {
+                  "target": "botb_qualifier",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 25,
+              "effects": [
+                {
+                  "target": "botb_qualifier",
+                  "stat": "rate",
+                  "multiplier": 2
+                },
+                {
+                  "target": "botb_qualifier_draw",
+                  "stat": "yield",
+                  "multiplier": 2
+                }
+              ]
+            },
+            {
+              "count": 50,
+              "effects": [
+                {
+                  "target": "botb_qualifier",
+                  "stat": "rate",
+                  "multiplier": 2
+                }
+              ]
             }
           ]
         },

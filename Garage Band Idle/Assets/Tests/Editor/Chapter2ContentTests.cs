@@ -457,6 +457,49 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             }
         }
 
+        // The calendar draws Ctrl C's buy control: one Hire button per row
+        // under the card's cycle button (12.11).
+        [Test]
+        public void The_calendar_module_authors_the_cycle_buy_control()
+        {
+            var module = ch2.sections[0].modules.Single(m => m.prefabId == "leveled_group");
+            Assert.AreEqual(UI.BuyControlKind.Cycle, module.buyControl);
+            foreach (var other in ch2.sections.SelectMany(s => s.modules).Where(m => m != module))
+                Assert.AreEqual(UI.BuyControlKind.Pair, other.buyControl, $"{other.prefabId} authors none");
+        }
+
+        // The gig ladder's count thresholds (12.7), draft numbers: every draw
+        // doubles its own gig's speed - the bar's fill rate - at 10, 25 and 50,
+        // and at 25 doubles the next gig's draw payout; the qualifier, with no
+        // gig above it, doubles its own.
+        [Test]
+        public void Each_draw_doubles_its_gigs_speed_at_10_25_and_50_and_the_next_gigs_payout_at_25()
+        {
+            var gigs = tier2.bars;
+            Assert.AreEqual(6, gigs.Count, "the six gigs, in ladder order");
+            for (var i = 0; i < gigs.Count; i++)
+            {
+                var gig = gigs[i];
+                var draw = gig.level;
+                var payoutTarget = i + 1 < gigs.Count ? gigs[i + 1].level : draw;
+                Assert.AreEqual(new[] { 10, 25, 50 }, draw.thresholds.Select(t => t.count).ToArray(), draw.Id);
+                Assert.AreEqual(new[] { 1, 2, 1 }, draw.thresholds.Select(t => t.effects.Count).ToArray(), draw.Id);
+
+                foreach (var threshold in draw.thresholds)
+                {
+                    var speed = threshold.effects[0];
+                    Assert.AreSame(gig, speed.target, $"{draw.Id} at {threshold.count} speeds its own gig");
+                    Assert.AreEqual(Stat.Rate, speed.stat);
+                    Assert.AreEqual((BigNumber)2, speed.multiplier);
+                }
+
+                var payout = draw.thresholds[1].effects[1];
+                Assert.AreSame(payoutTarget, payout.target, $"{draw.Id} at 25 pays into {payoutTarget.Id}");
+                Assert.AreEqual(Stat.Yield, payout.stat);
+                Assert.AreEqual((BigNumber)2, payout.multiplier);
+            }
+        }
+
         // The Office is a strip of upgrade tiles (12.11). Stage Banter shows
         // with the section, Call and Response once Stage Banter is bought, and
         // the two switches keep their tile once bought.

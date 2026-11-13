@@ -68,6 +68,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void OpenRungConfirm(Rung rung, ScopeState scope) { }
         }
 
+        // The one thing a row asks of the host on a crossing, recorded in the
+        // order the row raised them.
+        private sealed class RecordingToasts : IToastOpener
+        {
+            public readonly List<ThresholdEffect> Raised = new();
+
+            public void OpenToast(ThresholdEffect effect) => Raised.Add(effect);
+        }
+
         private class Fixture
         {
             public static readonly DateTime Start = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
@@ -86,6 +95,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public readonly ModuleRegistry Registry;
             public readonly RecordingInfos Infos = new();
             public readonly RecordingAutomations Automations = new();
+            public readonly RecordingToasts Toasts = new();
 
             public DateTime Now = Start;
 
@@ -144,19 +154,24 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // A widget as the host builds one: the shipping UXML instantiated,
             // the factory's controller over it, bound at tier2.
-            public ModuleWidget Widget(string prefabId, string uxml, Definition content)
+            // `configure` runs between construction and the bind, where the
+            // host hands a levelled card its module's buy control.
+            public ModuleWidget Widget(string prefabId, string uxml, Definition content,
+                                       Action<ModuleWidget> configure = null)
             {
                 var asset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Widgets/" + uxml);
                 Assert.IsNotNull(asset, "Assets/UI/Widgets/" + uxml + " is missing");
                 var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), Registry, new NoStories(),
-                    Infos, Automations, new NoDetails(), new NoRungs());
+                    Infos, Automations, new NoDetails(), new NoRungs(), Toasts);
+                configure?.Invoke(widget);
                 widget.Bind(Session, Tier2, content, Clock);
                 return widget;
             }
 
-            public LeveledGroupUI Calendar()
+            public LeveledGroupUI Calendar(BuyControlKind control = BuyControlKind.Pair)
             {
-                var widget = (LeveledGroupUI)Widget("leveled_group", "LeveledGroup.uxml", TheCalendar);
+                var widget = (LeveledGroupUI)Widget("leveled_group", "LeveledGroup.uxml", TheCalendar,
+                    w => ((LeveledGroupUI)w).BuyControl = control);
                 widget.Refresh();
                 return widget;
             }
@@ -707,6 +722,262 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             header.Refresh();
 
             Assert.AreEqual(report.DepositSlope(fx.Tier2, fx.Buzz.Id), header.ShownRate);
+        }
+
+        // ---- the cycle buy control ----
+
+        [Test]
+        public void A_pair_card_draws_the_pair_on_every_row()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = fx.Calendar();
+            var row = calendar.Row(fx.OpenMic);
+
+            Assert.AreEqual(BuyControlKind.Pair, calendar.BuyControl);
+            Assert.AreEqual(BuyControlKind.Pair, row.ControlKind);
+            Assert.AreEqual(0, row.ShownCount, "the pair draws no Hire button");
+            Assert.Throws<InvalidOperationException>(row.Buy, "and there is no Hire press to make");
+        }
+
+        [Test]
+        public void The_cycle_button_steps_one_max_next_and_back_to_one()
+        {
+            var calendar = new Fixture().Calendar(BuyControlKind.Cycle);
+            Assert.AreEqual(BuyMode.One, calendar.Mode, "a card is built at Buy One");
+
+            calendar.Cycle();
+            Assert.AreEqual(BuyMode.Max, calendar.Mode);
+            calendar.Cycle();
+            Assert.AreEqual(BuyMode.Next, calendar.Mode);
+            calendar.Cycle();
+            Assert.AreEqual(BuyMode.One, calendar.Mode);
+        }
+
+        [Test]
+        public void A_cycle_row_draws_one_hire_button_and_no_pair()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var row = fx.Calendar(BuyControlKind.Cycle).Row(fx.OpenMic);
+
+            Assert.AreEqual(BuyControlKind.Cycle, row.ControlKind);
+            Assert.AreEqual(0, row.ShownMax, "the cycle draws no max button");
+            Assert.Throws<InvalidOperationException>(row.BuyOne);
+            Assert.Throws<InvalidOperationException>(row.BuyMax);
+        }
+
+        [Test]
+        public void Buy_One_hires_one_level_at_one_levels_price()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Give(1000);
+            var calendar = fx.Calendar(BuyControlKind.Cycle);
+            var row = calendar.Row(fx.OpenMic);
+
+            Assert.AreEqual(1, row.ShownCount);
+            AssertClose(Purchasing.CostOf(fx.OpenMicDraw, fx.Ctx, 1).ToDouble(), row.ShownCost);
+
+            row.Buy();
+            Assert.AreEqual(2, fx.Owned(fx.OpenMicDraw), "the press hired the one it printed");
+        }
+
+        [Test]
+        public void Buy_Max_hires_the_most_the_balance_affords_at_their_price()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            fx.Give(100);
+            var calendar = fx.Calendar(BuyControlKind.Cycle);
+            calendar.Cycle();
+            var row = calendar.Row(fx.OpenMic);
+
+            var max = Purchasing.MaxAffordable(fx.Ctx, fx.OpenMicDraw);
+            Assert.Greater(max, 1, "100 Cash covers several draws");
+            Assert.AreEqual(max, row.ShownCount);
+            AssertClose(Purchasing.CostOf(fx.OpenMicDraw, fx.Ctx, max).ToDouble(), row.ShownCost,
+                "the price of all N, not of one");
+
+            row.Buy();
+            Assert.AreEqual(1 + max, fx.Owned(fx.OpenMicDraw));
+        }
+
+        // Nothing affordable: the button still names one, the row dims, and the
+        // press is refused whole like every buy.
+        [Test]
+        public void Buy_Max_with_nothing_affordable_names_one_and_buys_nothing()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = fx.Calendar(BuyControlKind.Cycle);
+            calendar.Cycle();
+            var row = calendar.Row(fx.OpenMic);
+            Assert.AreEqual(0, Purchasing.MaxAffordable(fx.Ctx, fx.OpenMicDraw), "the opening 5 Cash bought the first");
+
+            Assert.AreEqual(1, row.ShownCount);
+            Assert.IsTrue(row.Root.ClassListContains("row-unaffordable"));
+
+            row.Buy();
+            Assert.AreEqual(1, fx.Owned(fx.OpenMicDraw), "a press it cannot pay for buys nothing");
+        }
+
+        [Test]
+        public void Buy_Next_names_the_levels_still_needed_to_the_next_threshold()
+        {
+            var fx = new Fixture();
+            fx.Give(1000000);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 3);
+            var calendar = fx.Calendar(BuyControlKind.Cycle);
+            calendar.Cycle();
+            calendar.Cycle();
+            var row = calendar.Row(fx.OpenMic);
+
+            var next = fx.OpenMicDraw.NextThreshold(fx.Ctx);
+            Assert.IsNotNull(next);
+            Assert.AreEqual(next.count - 3, row.ShownCount);
+            AssertClose(Purchasing.CostOf(fx.OpenMicDraw, fx.Ctx, row.ShownCount).ToDouble(), row.ShownCost);
+        }
+
+        [Test]
+        public void Buy_Next_buys_exactly_to_the_threshold()
+        {
+            var fx = new Fixture();
+            fx.Give(1000000);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 3);
+            var calendar = fx.Calendar(BuyControlKind.Cycle);
+            calendar.Cycle();
+            calendar.Cycle();
+            var row = calendar.Row(fx.OpenMic);
+            var first = fx.OpenMicDraw.NextThreshold(fx.Ctx);
+
+            row.Buy();
+            Assert.AreEqual(first.count, fx.Owned(fx.OpenMicDraw), "to the threshold and not one past it");
+
+            calendar.Refresh();
+            var second = fx.OpenMicDraw.NextThreshold(fx.Ctx);
+            Assert.AreEqual(second.count - first.count, row.ShownCount, "and the next press aims at the one after");
+        }
+
+        [Test]
+        public void Buy_Next_with_no_threshold_left_names_one()
+        {
+            var fx = new Fixture();
+            fx.Tier2.generatorCounts[fx.OpenMicDraw.Id] = 100;
+            var calendar = fx.Calendar(BuyControlKind.Cycle);
+            calendar.Cycle();
+            calendar.Cycle();
+
+            Assert.IsNull(fx.OpenMicDraw.NextThreshold(fx.Ctx), "past every threshold");
+            Assert.AreEqual(1, calendar.Row(fx.OpenMic).ShownCount);
+        }
+
+        // ---- threshold crossings ----
+
+        // What was already reached when the row is built is not news.
+        [Test]
+        public void A_rows_first_refresh_raises_nothing()
+        {
+            var fx = new Fixture();
+            fx.Give(1000000);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 12);
+
+            fx.Calendar();
+
+            Assert.IsEmpty(fx.Toasts.Raised);
+        }
+
+        [Test]
+        public void A_purchase_across_thresholds_raises_each_effect_in_order()
+        {
+            var fx = new Fixture();
+            fx.Give(1000000);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = fx.Calendar();
+
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 24);
+            calendar.Refresh();
+
+            var expected = fx.OpenMicDraw.ThresholdsCrossed(1, 25).SelectMany(t => t.effects).ToArray();
+            Assert.Greater(expected.Length, 1, "chapter 2 authors more than one effect up to 25");
+            CollectionAssert.AreEqual(expected, fx.Toasts.Raised);
+        }
+
+        // Any cause moves the count, so any cause raises it: a grant here.
+        [Test]
+        public void A_granted_count_crossing_a_threshold_raises_it()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = fx.Calendar();
+            var first = fx.OpenMicDraw.thresholds[0];
+
+            fx.Tier2.grantedCounts[fx.OpenMicDraw.Id] = first.count - 1;
+            calendar.Refresh();
+
+            CollectionAssert.AreEqual(first.effects, fx.Toasts.Raised);
+        }
+
+        // A reset lowering the count raises nothing, and the lowered count is
+        // what the next crossing is measured from.
+        [Test]
+        public void A_lowered_count_raises_nothing_and_is_measured_from()
+        {
+            var fx = new Fixture();
+            fx.Give(1000000);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 12);
+            var calendar = fx.Calendar();
+            var first = fx.OpenMicDraw.thresholds[0];
+
+            fx.Tier2.generatorCounts[fx.OpenMicDraw.Id] = 1;
+            calendar.Refresh();
+            Assert.IsEmpty(fx.Toasts.Raised, "a fall is not a crossing");
+
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, first.count - 1);
+            calendar.Refresh();
+            CollectionAssert.AreEqual(first.effects, fx.Toasts.Raised, "climbing back is");
+        }
+
+        // ---- the toast ----
+
+        // The host's toast: nothing on the first render, then the first
+        // crossing's effect shown and the rest queued behind it in order.
+        [Test]
+        public void The_host_shows_the_first_crossed_effect_and_queues_the_rest()
+        {
+            var fx = new Fixture();
+            fx.Give(1000000);
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var host = fx.Host();
+            var toast = host.Toast;
+            Assert.IsNull(toast.Shown, "the first render raises nothing");
+            Assert.IsEmpty(toast.Queued);
+
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 24);
+
+            var raised = fx.OpenMicDraw.ThresholdsCrossed(1, 25).SelectMany(t => t.effects).ToList();
+            Assert.AreSame(raised[0], toast.Shown);
+            CollectionAssert.AreEqual(raised.Skip(1).ToArray(), toast.Queued);
+
+            toast.Advance();
+            Assert.AreSame(raised[1], toast.Shown, "one after another");
+            for (var i = 2; i < raised.Count; i++)
+                toast.Advance();
+            toast.Advance();
+            Assert.IsNull(toast.Shown, "the queue runs dry");
+            Assert.IsEmpty(toast.Queued);
+        }
+
+        [Test]
+        public void The_chapter_2_calendar_is_built_with_the_cycle()
+        {
+            var fx = new Fixture();
+            fx.Session.TryBuy(fx.Ctx, fx.OpenMicDraw, 1);
+            var calendar = Fixture.Calendar(fx.Host());
+
+            Assert.AreEqual(BuyControlKind.Cycle, calendar.BuyControl, "the module's authored control");
+            Assert.AreEqual(BuyControlKind.Cycle, calendar.Row(fx.OpenMic).ControlKind);
+            Assert.AreEqual(BuyMode.One, calendar.Mode);
         }
     }
 }

@@ -4,6 +4,16 @@ using UnityEngine;
 
 namespace RidiculousGaming.GarageBandIdle.UI
 {
+    // Which buy control a levelled card draws on each row (design doc 12.11):
+    // Pair is the generator row's "+1" and "+M"; Cycle is Ctrl C's one
+    // "Hire: xN" button per row under a card-level button cycling Buy One,
+    // Buy Max and Buy Next.
+    public enum BuyControlKind
+    {
+        Pair,
+        Cycle,
+    }
+
     // One widget on a section: what renders it, what it binds, and where it
     // evaluates (design doc 12.11). Inline serialized data on the section, the
     // same plain shape the section itself is.
@@ -27,6 +37,10 @@ namespace RidiculousGaming.GarageBandIdle.UI
         // normalizes every module to a concrete scope, so nothing computes a
         // default at runtime (12.11).
         public ScopeDefinition scope;
+
+        // Read by the levelled group alone, which the host hands it to before
+        // binding; Pair when unauthored (12.11).
+        public BuyControlKind buyControl = BuyControlKind.Pair;
 
         // prefabId becomes a registry key, and the same grammar ids use keeps
         // it a key. \z, not $: $ also matches before a final newline, which the

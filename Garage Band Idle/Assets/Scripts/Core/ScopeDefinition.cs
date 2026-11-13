@@ -63,6 +63,7 @@ namespace RidiculousGaming.GarageBandIdle
         Permanent,  // always, subject to appliesWhen; merged with the node's stack for the same modifier
         Granted,    // modifierStacks holds a count at the node, subject to appliesWhen
         Cascade,    // fillCounts holds a count for the repeating bar at the node
+        Threshold,  // the generator's owned count at the node has reached the threshold's count
         Handicap    // the node's ActiveEvent record names the event
     }
 
@@ -73,7 +74,8 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public readonly LivenessKind Liveness;
 
-        // The upgrade, modifier, bar, or event whose fact decides this effect.
+        // The upgrade, modifier, bar, generator, or event whose fact decides
+        // this effect.
         public readonly Definition Carrier;
         public readonly Effect Effect;
 
@@ -82,13 +84,18 @@ namespace RidiculousGaming.GarageBandIdle
         // stacking kind instead, read off the carrier.
         public readonly Economy.GrowthKind Growth;
 
+        // Threshold entries only: the owned count of the carrying generator at
+        // which the effect switches on (design doc 12.7).
+        public readonly int AtCount;
+
         internal CarrierEffect(LivenessKind liveness, Definition carrier, in Effect effect,
-                               Economy.GrowthKind growth = Economy.GrowthKind.Multiply)
+                               Economy.GrowthKind growth = Economy.GrowthKind.Multiply, int atCount = 0)
         {
             Liveness = liveness;
             Carrier = carrier;
             Effect = effect;
             Growth = growth;
+            AtCount = atCount;
         }
     }
 
@@ -216,9 +223,10 @@ namespace RidiculousGaming.GarageBandIdle
         // Every (carrier, effect) pair this scope can apply, ONCE, in one place
         // (InteriorDefinition adds its handicaps). THE ORDER IS THE
         // MULTIPLICATION ORDER at a node: upgrades, permanent modifiers, granted
-        // modifiers, bar cascades, then handicaps, each kind in declaration
-        // order and effects in declaration order within a carrier. Adding a
-        // sixth carrier kind is an entry here and nowhere else.
+        // modifiers, bar cascades, generator thresholds, then handicaps, each
+        // kind in declaration order and effects in declaration order within a
+        // carrier. Adding a seventh carrier kind is an entry here and nowhere
+        // else.
         //
         // `grantable` is the modifiers declared on this node's CHAIN, self
         // outward, since a grant can only ever stack one of those (design doc
@@ -265,6 +273,25 @@ namespace RidiculousGaming.GarageBandIdle
                 foreach (var entry in bar.perFill)
                     if (entry != null)
                         yield return new CarrierEffect(LivenessKind.Cascade, bar, entry.effect, entry.growth);
+            }
+
+            // A generator's count thresholds, each effect live while the owned
+            // count at this node has reached its threshold's count (12.7). An
+            // effect naming no owner is a load error and is never compiled: its
+            // selector would be the wildcard.
+            foreach (var generator in generators)
+            {
+                if (generator == null)
+                    continue;
+                foreach (var threshold in generator.thresholds)
+                {
+                    if (threshold == null)
+                        continue;
+                    foreach (var entry in threshold.effects)
+                        if (entry != null && entry.target != null)
+                            yield return new CarrierEffect(LivenessKind.Threshold, generator, entry.Effect,
+                                                           atCount: threshold.count);
+                }
             }
         }
 

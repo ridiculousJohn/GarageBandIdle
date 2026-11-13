@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using NUnit.Framework;
 using RidiculousGaming.GarageBandIdle.Economy;
 using RidiculousGaming.GarageBandIdle.Editor;
+using RidiculousGaming.GarageBandIdle.UI;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEngine;
@@ -1030,6 +1031,106 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             Write("root.json", RootJson);
             Write("ch1.json", LevelledBarJson.Replace(@"""level"": ""draw""", @"""level"": ""standing"""));
+
+            Assert.Throws<ContentImportException>(Import);
+        }
+
+        // ---- a generator's count thresholds ----
+
+        // Two thresholds on the level generator: the first names no target, so
+        // it is the generator's own; the second names the bar, resolved outward
+        // from the generator's scope like every other reference (12.7).
+        private static string ThresholdJson => LevelledBarJson.Replace(
+            @"""produces"": [{ ""currency"": ""cash"", ""stat"": ""rate"", ""value"": 1 }]",
+            @"""produces"": [{ ""currency"": ""cash"", ""stat"": ""rate"", ""value"": 1 }],
+                    ""thresholds"": [
+                        { ""count"": 10, ""effects"": [{ ""stat"": ""rate"", ""multiplier"": 2 }] },
+                        {
+                            ""count"": 25,
+                            ""effects"": [{ ""target"": ""cover_1"", ""currencyId"": ""cash"", ""stat"": ""rate"", ""multiplier"": 3 }]
+                        }
+                    ]");
+
+        [Test]
+        public void A_generators_thresholds_import_with_their_targets_resolved()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ThresholdJson);
+
+            Import();
+
+            var draw = Load<GeneratorDefinition>("ch1/Generators/draw.asset");
+            var bar = Load<BarDefinition>("ch1/Bars/cover_1.asset");
+            Assert.AreEqual(new[] { 10, 25 }, draw.thresholds.Select(t => t.count).ToArray());
+
+            var own = draw.thresholds[0].effects.Single();
+            Assert.AreSame(draw, own.target, "an unnamed target is the generator carrying the threshold");
+            Assert.AreEqual(Stat.Rate, own.stat);
+            Assert.AreEqual((BigNumber)2, own.multiplier);
+
+            var other = draw.thresholds[1].effects.Single();
+            Assert.AreSame(bar, other.target, "a named target is the asset its scope declares, not a copy");
+            Assert.AreEqual("cash", other.currencyId);
+            Assert.AreEqual((BigNumber)3, other.multiplier);
+            Assert.AreEqual(bar.Id, other.Effect.target, "the gather's selector is the target's own id");
+        }
+
+        [Test]
+        public void A_generator_with_no_thresholds_imports_an_empty_list()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", LevelledBarJson);
+
+            Import();
+
+            Assert.AreEqual(0, Load<GeneratorDefinition>("ch1/Generators/draw.asset").thresholds.Count);
+        }
+
+        [Test]
+        public void A_threshold_target_nothing_on_the_chain_declares_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ThresholdJson.Replace(@"""target"": ""cover_1""", @"""target"": ""cover_9"""));
+
+            Assert.Throws<ContentImportException>(Import);
+        }
+
+        // The toast prints the factor as the gather multiplies it, so a
+        // threshold's factor is a constant (12.7).
+        [Test]
+        public void A_threshold_effect_with_a_formula_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", ThresholdJson.Replace(
+                @"{ ""stat"": ""rate"", ""multiplier"": 2 }",
+                @"{ ""stat"": ""rate"", ""formula"": { ""type"": ""LinearOnBalance"", ""currency"": ""cash"", ""coefficient"": 0.1 } }"));
+
+            var thrown = Assert.Throws<ContentImportException>(Import);
+            StringAssert.Contains("formula", thrown.Message);
+        }
+
+        // ---- a module's buy control ----
+
+        [Test]
+        public void A_modules_buy_control_imports_and_defaults_to_the_pair()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", SectionsJson.Replace(@"{ ""prefabId"": ""group"" }",
+                                                   @"{ ""prefabId"": ""group"", ""buyControl"": ""Cycle"" }"));
+
+            Import();
+
+            var modules = Load<ChapterDefinition>("ch1/ch1.asset").sections.Single().modules;
+            Assert.AreEqual(BuyControlKind.Cycle, modules[2].buyControl);
+            Assert.AreEqual(BuyControlKind.Pair, modules[0].buyControl, "an unauthored control is the pair");
+        }
+
+        [Test]
+        public void A_buy_control_outside_the_enum_aborts()
+        {
+            Write("root.json", RootJson);
+            Write("ch1.json", SectionsJson.Replace(@"{ ""prefabId"": ""group"" }",
+                                                   @"{ ""prefabId"": ""group"", ""buyControl"": ""Wheel"" }"));
 
             Assert.Throws<ContentImportException>(Import);
         }

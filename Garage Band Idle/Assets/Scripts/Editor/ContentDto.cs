@@ -312,6 +312,17 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public BigNumber baseCost;
         public BigNumber growth = 1;
         public List<ProducesDto> produces = new();
+        public List<ThresholdDto> thresholds = new();
+    }
+
+    // One count threshold on a generator (12.7): the count, and the effects it
+    // switches on in the Effect JSON shape. An effect's `target` names a row
+    // by id, resolved outward from the generator's scope; absent, it is the
+    // generator itself.
+    internal class ThresholdDto
+    {
+        public int count;
+        public List<EffectDto> effects = new();
     }
 
     internal class UpgradeDto : DefinitionDto
@@ -427,6 +438,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
         public string contentId;
         public ConditionDto visibleWhen;
         public string scopeId;
+        public UI.BuyControlKind buyControl = UI.BuyControlKind.Pair;
     }
 
     // One block per scope, nesting as authored: a document IS its top scope

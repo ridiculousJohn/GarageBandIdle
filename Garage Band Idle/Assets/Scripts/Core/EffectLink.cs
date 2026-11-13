@@ -22,7 +22,7 @@ namespace RidiculousGaming.GarageBandIdle
 
         public LivenessKind Liveness { get; }
 
-        // The upgrade, modifier, bar, or event the fact belongs to.
+        // The upgrade, modifier, bar, generator, or event the fact belongs to.
         public Definition Carrier { get; }
 
         public Effect Effect { get; }
@@ -31,12 +31,17 @@ namespace RidiculousGaming.GarageBandIdle
         // kind, read off the carrier.
         public GrowthKind Growth { get; }
 
+        // Threshold entries only - the owned count of the carrying generator
+        // at which the effect switches on (12.7).
+        public int AtCount { get; }
+
         internal EffectLink(in CarrierEffect carrier, ScopeState node)
         {
             Liveness = carrier.Liveness;
             Carrier = carrier.Carrier;
             Effect = carrier.Effect;
             Growth = carrier.Growth;
+            AtCount = carrier.AtCount;
             Node = node;
         }
 
@@ -82,16 +87,16 @@ namespace RidiculousGaming.GarageBandIdle
                     return Producer.Grown(Producer.FactorOf(Effect, origin), fills, Growth);
 
                 default:
-                    // An upgrade's latch and an event's record scale nothing:
-                    // there is one of each, so the live fact IS the factor
-                    // (12.6/12.8). A kind with no liveness never reaches here -
-                    // Live throws on one.
+                    // An upgrade's latch, a reached threshold and an event's
+                    // record scale nothing: there is one of each, so the live
+                    // fact IS the factor (12.6/12.7/12.8). A kind with no
+                    // liveness never reaches here - Live throws on one.
                     return Producer.FactorOf(Effect, origin);
             }
         }
 
         // Whether this link's fact exists at its node: the latch, the membership
-        // with its gate holding, a stack, a fill, the record. Factor is this
+        // with its gate holding, a stack, a fill, a reached count, the record. Factor is this
         // answer times the effect's scaled factor, and the autobuy switch reads
         // this answer alone (12.2).
         public bool Live(GameContext origin)
@@ -117,6 +122,13 @@ namespace RidiculousGaming.GarageBandIdle
 
                 case LivenessKind.Cascade:
                     return Node.fillCounts.TryGetValue(Carrier.Id, out var fills) && fills > 0;
+
+                case LivenessKind.Threshold:
+                    // Reached-ness is derived from the count every time, never
+                    // stored: the generator's owned count - purchased plus
+                    // granted, the read OwnedCountAtLeast makes - at the node
+                    // declaring it (12.7).
+                    return origin.Rebase(Node).GetOwnedCount(Carrier.Id) >= AtCount;
 
                 case LivenessKind.Handicap:
                 {

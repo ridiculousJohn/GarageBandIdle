@@ -2312,6 +2312,114 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Dump(report));
         }
 
+        // ---- a generator's count thresholds ----
+
+        private static CountThreshold Threshold(int count, params ThresholdEffect[] effects)
+        {
+            var threshold = new CountThreshold { count = count };
+            threshold.effects.AddRange(effects);
+            return threshold;
+        }
+
+        private static ThresholdEffect Doubles(Definition target, string stat) =>
+            new ThresholdEffect { target = target, stat = stat, multiplier = 2 };
+
+        // The generator's own rate at 10 and a bar its scope declares at 25:
+        // both owners are declared where the generator applies its thresholds
+        // (12.7).
+        [Test]
+        public void Threshold_OwnersOnTheGeneratorsScope_ReportNothing()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.thresholds.Add(Threshold(10, Doubles(f.Amp, Stat.Rate)));
+            f.Amp.thresholds.Add(Threshold(25, Doubles(f.Cover1, Stat.Rate)));
+            AssertClean(f.Run());
+        }
+
+        // "The next threshold" is the first count above the owned one, which
+        // only means something over strictly increasing counts.
+        [Test]
+        public void Threshold_CountNotAboveThePrevious_NumericRange_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.thresholds.Add(Threshold(25, Doubles(f.Amp, Stat.Rate)));
+            f.Amp.thresholds.Add(Threshold(25, Doubles(f.Amp, Stat.Rate)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "strictly increasing");
+        }
+
+        [Test]
+        public void Threshold_DescendingCounts_NumericRange_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.thresholds.Add(Threshold(25, Doubles(f.Amp, Stat.Rate)));
+            f.Amp.thresholds.Add(Threshold(10, Doubles(f.Amp, Stat.Rate)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "strictly increasing");
+        }
+
+        [Test]
+        public void Threshold_NonPositiveCount_NumericRange_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.thresholds.Add(Threshold(0, Doubles(f.Amp, Stat.Rate)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "count is 0");
+        }
+
+        [Test]
+        public void Threshold_WithNoEffects_NullEntry_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.thresholds.Add(Threshold(10));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NullEntry, "switches nothing on");
+        }
+
+        // A threshold's owner is an ordinary reference resolved outward from
+        // the generator's scope, so a sibling tier's row is off the chain.
+        [Test]
+        public void Threshold_TargetOffTheDeclaringChain_ChainReach_Error()
+        {
+            var f = new ValidatorFixture();
+            var theirs = TestTree.MakeDefinition<GeneratorDefinition>("their_draw");
+            theirs.availableWhen = new Always();
+            theirs.costCurrency = f.Cash;
+            theirs.baseCost = 5;
+            theirs.growth = 1.3;
+            f.Tier1b.generators.Add(theirs);
+            f.Amp.thresholds.Add(Threshold(10, Doubles(theirs, Stat.Yield)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.ChainReach,
+                "threshold target addresses 'their_draw'");
+        }
+
+        // On the chain but further out: the gather meets the factor only from
+        // an owner declared at the generator's scope or below it, so a currency
+        // homed at the chapter would never take it (12.7).
+        [Test]
+        public void Threshold_TargetDeclaredFurtherOut_InertOperand_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.thresholds.Add(Threshold(10, Doubles(f.Ch1Records, Stat.Rate)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.InertOperand,
+                "threshold target 'ch1_records' is declared at 'ch1'");
+        }
+
+        // A bar is asked for its fill, what is paid into it and what it
+        // consumes - never a price.
+        [Test]
+        public void Threshold_StatTheOwnersKindIsNeverAskedFor_InertOperand_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.thresholds.Add(Threshold(10, Doubles(f.Cover1, Stat.Cost)));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.InertOperand, "stat 'cost'");
+        }
+
+        [Test]
+        public void Threshold_NegativeMultiplier_NumericRange_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.thresholds.Add(Threshold(10,
+                new ThresholdEffect { target = f.Amp, stat = Stat.Rate, multiplier = -2 }));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.NumericRange, "never flips a number's sign");
+        }
+
         [Test]
         public void BarsCompleted_GroupOffTheActingChain_ChainReach_Error()
         {

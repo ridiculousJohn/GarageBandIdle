@@ -487,6 +487,8 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 generator.baseCost = generatorDto.baseCost;
                 generator.growth = generatorDto.growth;
                 generator.produces = generatorDto.produces.Select(e => Entry(build, scope, e)).ToList();
+                generator.thresholds = generatorDto.thresholds
+                    .Select(t => Threshold(build, scope, generator, t)).ToList();
                 if (generator.costCurrency == null || generator.baseCost <= BigNumber.Zero
                     || generator.growth <= BigNumber.Zero)
                     throw new ContentImportException(
@@ -711,6 +713,7 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 // module's own evaluation scope, not the section's.
                 visibleWhen = BuildCondition(build, moduleScope, dto.visibleWhen),
                 scope = moduleScope,
+                buyControl = dto.buyControl,
             };
         }
 
@@ -733,6 +736,38 @@ namespace RidiculousGaming.GarageBandIdle.Editor
                 throw new ContentImportException(
                     $"a produces entry at '{scope.Id}' names no target (currency, generator or bar).");
             return entry;
+        }
+
+        // One count threshold (12.7). Its effects take the Effect JSON keys, but
+        // the owner is a REFERENCE, not a selector: a threshold names one row,
+        // resolved outward from the generator's scope like every other
+        // reference, or the generator itself when it names none. The factor is
+        // a constant, since the toast prints it as the gather multiplies it.
+        private static CountThreshold Threshold(Build build, ScopeDefinition scope, GeneratorDefinition generator,
+                                                ThresholdDto dto)
+        {
+            if (dto == null)
+                throw new ContentImportException($"generator '{generator.Id}': a null threshold.");
+            var threshold = new CountThreshold { count = dto.count };
+            foreach (var effect in dto.effects)
+            {
+                if (effect == null)
+                    throw new ContentImportException(
+                        $"generator '{generator.Id}': a null effect on the threshold at {dto.count}.");
+                if (effect.formula != null)
+                    throw new ContentImportException(
+                        $"generator '{generator.Id}': the threshold at {dto.count} authors a formula - a threshold's factor is a constant multiplier (12.7).");
+                threshold.effects.Add(new ThresholdEffect
+                {
+                    target = string.IsNullOrEmpty(effect.target)
+                        ? generator
+                        : Resolve<Definition>(build, scope, effect.target, "threshold target"),
+                    currencyId = effect.currencyId,
+                    stat = effect.stat,
+                    multiplier = effect.multiplier,
+                });
+            }
+            return threshold;
         }
 
         private static Effect BuildEffect(Build build, ScopeDefinition scope, EffectDto dto)

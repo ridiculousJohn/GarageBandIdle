@@ -869,7 +869,7 @@ namespace RidiculousGaming.GarageBandIdle
                     if (generator == null)
                         continue;
                     ctx.EnterScope(scope);
-                    ValidateGenerator(ctx, generator);
+                    ValidateGenerator(ctx, generator, scope);
                 }
 
                 foreach (var bar in scope.bars)
@@ -1222,7 +1222,8 @@ namespace RidiculousGaming.GarageBandIdle
             ctx.RecordFlagSetter(beat.seenFlag);
         }
 
-        private static void ValidateGenerator(ValidationContext ctx, Economy.GeneratorDefinition generator)
+        private static void ValidateGenerator(ValidationContext ctx, Economy.GeneratorDefinition generator,
+                                              ScopeDefinition scope)
         {
             var site = $"generator '{generator.Id}'";
             ctx.SetSite(site);
@@ -1244,7 +1245,87 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"growth is {generator.growth} - the cost curve is a positive ratio.");
             ValidateProducesEntries(ctx, generator.produces, site);
+            ValidateThresholds(ctx, generator, scope, site);
         }
+
+        // A generator's count thresholds (12.7): positive counts in strictly
+        // increasing order, so "the next one" is the first above the owned
+        // count; at least one effect each; and every effect names one owner
+        // that resolves on the chain and is declared HERE. The effect is
+        // applied at the generator's scope, and a gather meets it only from an
+        // owner declared at that scope or below it - so an owner further out,
+        // though the outward walk reaches it, would never gather the factor.
+        // The stat must be one that owner's kind is asked for (12.2), since a
+        // threshold names one owner and any other stat is a factor nothing
+        // reads.
+        private static void ValidateThresholds(ValidationContext ctx, Economy.GeneratorDefinition generator,
+                                               ScopeDefinition scope, string site)
+        {
+            var previous = 0;
+            for (var i = 0; i < generator.thresholds.Count; i++)
+            {
+                var threshold = generator.thresholds[i];
+                var thresholdSite = $"{site} thresholds[{i}]";
+                ctx.SetSite(thresholdSite);
+                if (threshold == null)
+                {
+                    ctx.AddError(ValidationCheck.NullEntry, "null threshold entry.");
+                    continue;
+                }
+                if (threshold.count <= 0)
+                    ctx.AddError(ValidationCheck.NumericRange,
+                        $"count is {threshold.count} - a threshold is an owned count, at least 1 (12.7).");
+                else if (threshold.count <= previous)
+                    ctx.AddError(ValidationCheck.NumericRange,
+                        $"count {threshold.count} does not rise above the previous threshold's {previous} - counts are strictly increasing (12.7).");
+                previous = System.Math.Max(previous, threshold.count);
+                if (threshold.effects.Count == 0)
+                    ctx.AddError(ValidationCheck.NullEntry, "no effects - a threshold that switches nothing on (12.7).");
+
+                for (var j = 0; j < threshold.effects.Count; j++)
+                {
+                    var entry = threshold.effects[j];
+                    var effectSite = $"{thresholdSite} effects[{j}]";
+                    ctx.SetSite(effectSite);
+                    if (entry == null)
+                    {
+                        ctx.AddError(ValidationCheck.NullEntry, "null effect entry.");
+                        continue;
+                    }
+                    var home = ctx.RequireOnChain(entry.target, "threshold target");
+                    if (home != null && home != scope)
+                        ctx.AddError(ValidationCheck.InertOperand,
+                            $"threshold target '{entry.target.Id}' is declared at '{home.Id}', not at '{scope.Id}' where the generator applies its thresholds - no gather from there meets the factor (12.7).");
+                    if (string.IsNullOrEmpty(entry.stat))
+                        ctx.AddError(ValidationCheck.NullEntry,
+                            "no stat - the coordinate is required, and a stat-less effect matches nothing (12.2).");
+                    else if (entry.target != null && !AnswersStat(entry.target, entry.stat))
+                        ctx.AddError(ValidationCheck.InertOperand,
+                            $"stat '{entry.stat}' is not one a {entry.target.GetType().Name} is asked for - the factor would never be read (12.2).");
+                    ctx.SetSite(null);
+                    ValidateEffectNumbers(ctx, entry.Effect, effectSite);
+                }
+            }
+            ctx.SetSite(site);
+        }
+
+        // The stats each kind of owner is asked for (12.2): a source's entries
+        // at rate and yield, a currency's totals and what an AddCurrency pays
+        // it, a bar's fill, what is paid into it and its consumption, a
+        // generator's count, cost and switch, an upgrade's cost.
+        private static bool AnswersStat(Definition owner, string stat) => owner switch
+        {
+            Economy.CurrencyDefinition => stat == Economy.Stat.Rate || stat == Economy.Stat.Yield
+                                          || stat == Economy.Stat.Payout || stat == Economy.Stat.Exponent,
+            Economy.GeneratorDefinition => stat == Economy.Stat.Rate || stat == Economy.Stat.Yield
+                                           || stat == Economy.Stat.Count || stat == Economy.Stat.Cost
+                                           || stat == Economy.Stat.AutoBuy,
+            Economy.ProducerDefinition => stat == Economy.Stat.Rate || stat == Economy.Stat.Yield,
+            Economy.BarDefinition => stat == Economy.Stat.Rate || stat == Economy.Stat.Yield
+                                     || stat == Economy.Stat.Consumption,
+            Economy.UpgradeDefinition => stat == Economy.Stat.Cost,
+            _ => false,
+        };
 
         private static void ValidateUpgrade(ValidationContext ctx, Economy.UpgradeDefinition upgrade, ScopeDefinition scope)
         {

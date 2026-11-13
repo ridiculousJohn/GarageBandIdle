@@ -938,7 +938,7 @@ tap_producer.produces: [ { cash,      yield, 1 },
 ```
 
 **Generator** — the purchasable. Definition: `{id, tags, availableWhen, costCurrency, baseCost,
-growth, produces: [...]}` — the same entry shape as a producer, scaled by its owned count - purchased plus granted;
+growth, produces: [...], thresholds: [...]}` — the same entry shape as a producer, scaled by its owned count - purchased plus granted;
 state: `generatorCounts` (purchased, an int the player's buys bound) and `grantedCounts` (a BigNumber
 other sources' entries pay into, keeping its fraction) in its declaring scope. The price reads the
 purchased count alone, so granted copies never raise it; production and `OwnedCountAtLeast` read the
@@ -1086,6 +1086,25 @@ disabled" for as long as its record exists.
 every count read, purchased alone or purchased plus granted by its `purchasedOnly` flag, since the
 two are separate facts. Add and multiply are the two shapes: a produces entry adds, an Effect
 multiplies, and the factor inside an Effect is a formula kind; there is no expression language.
+
+**A generator's count thresholds** are "at this owned count, these effects" (Ctrl C's, 2026-11-12):
+`thresholds: [{count, effects: [{target?, currencyId?, stat, multiplier}]}]` on the generator, the
+effects in the Effect JSON keys. Each effect is live while the generator's owned count - purchased
+plus granted, the sum `OwnedCountAtLeast` reads - is at least its threshold's count, and only then;
+reached-ness is derived from the count on every read and nothing about it is stored or saved, so a
+reset that lowers the count withdraws the factor with it. A threshold is a CARRIER kind of the
+generator's declaring scope (12.6), between bar cascades and handicaps, so the coordinate plans
+compile its effects like every other carrier's and the tick, the idle offer and claim, the previews
+and `CompletionRate` all gather them with no path of their own. The one difference from an Effect
+is the owner: a threshold names one row, so `target` is a REFERENCE, resolved outward from the
+generator's scope like `level` - the generator itself when unauthored - and the gather's selector
+is that row's id. The factor is a constant (a formula is an import error), because the toast prints
+it (12.11). The gather meets an effect applied at a scope only from an owner declared there or
+below, so the target must be declared at the generator's own scope (12.12). Chapter 2's gig draws
+are the first content: a bar's speed is its fill `rate`, named by the bar's id; a gig's payout is its
+draw's `yield`, named by the draw's id. `GeneratorDefinition.NextThreshold` answers the first count
+not yet reached (at an owned count, or at the declaring scope's own count), and `ThresholdsCrossed`
+the thresholds a move between two counts reaches - none for a move down.
 
 **Debt is a factor that shrinks, not a term that subtracts.** `DebtFactor` is
 `max(0, 1 - coefficient x debt)`, where debt is a list of currencies' balances combined by sum or by
@@ -1492,8 +1511,8 @@ recorded, `appliesWhen` holding - which is exactly the fact column of the table 
 the half a plan does not fix.
 
 A scope names its own carriers in ONE enumeration, and that order IS the multiplication order at a
-node: upgrades, permanent modifiers, granted modifiers, bar cascades, then handicaps, each kind in
-declaration order and effects in declaration order within a carrier. The enumeration names no source
+node: upgrades, permanent modifiers, granted modifiers, bar cascades, generator thresholds, then
+handicaps, each kind in declaration order and effects in declaration order within a carrier. The enumeration names no source
 from outside, so a kind of scope with a source the others lack adds it in one override rather than as
 another read inside a walk. That is what lets `events` live on `InteriorDefinition` (§12.3) with
 nothing on the base naming them - the interior scope folds its handicaps in, and root, having no
@@ -1510,6 +1529,7 @@ named list off it. Across the tree the sources are:
 | Active events | an `ActiveEvent` record exists | the named event's handicaps, read through the declaring scope's `events` |
 | Granted modifiers | `modifierStacks` counts | the `ModifierDefinition`'s effects, per its `stacking` enum |
 | Repeating bars | `fillCounts` | the bar's `perFill` effects applied count times, read through the declaring scope's `bars` |
+| Generator thresholds | `generatorCounts` and `grantedCounts` | each threshold's effects once the owned count reaches its count, read through the declaring scope's `generators` (12.2) |
 | Permanent modifiers | none - the `permanentModifiers` usage list is authored, not stored (12.5) | the modifier's effects at an implicit application count of 1, merged with granted stacks; the factors of 3/5/7/8 (a prestige currency's balance, the Roadie allocation) live here as formula-shaped effects |
 
 **An effect's factor is a constant or a formula**: the authored `multiplier` when no formula is
@@ -1570,6 +1590,12 @@ the upgrade whose purchase makes the bar go again by itself - the purchase is wh
 answer, and whether the bar IS automated is `repeatWhen` holding at its home, never whether the
 upgrade is bought. Validated as `tap` is, each on the bar's chain; `automation` on a bar with no
 `repeatWhen` is an error, since a bar that fills once has nothing to make go again.
+
+**A level carries the bar's thresholds.** A levelled bar's milestones are its `level` generator's
+count thresholds (12.2): "at level 10, this gig x2 speed" is a threshold on the draw whose effect
+names the bar at `rate`, and "at level 25, the next gig's payout x2" one naming that gig's draw at
+`yield`. The bar declares nothing for them; the row that shows the level reads the next one for its
+Buy Next count and watches the count for crossings to toast (12.11).
 
 **What a completion is worth** is two reads beside the settlement, depositing nothing.
 `BarSystem.CompletionPayout` answers what the `onComplete` list would deposit to each currency if
@@ -2054,9 +2080,10 @@ number or a state keeps it in a public read-only member set on the line that wri
 the value that line formats: `ShownValue` and `ShownRate` on a currency line, `ShownPurchased`,
 `ShownGranted`, `ShownMax`, `ShownCost` and `ShownYields` on a generator row, `ShownBought` on an
 upgrade row, `Mark(member)` on a group (`MemberMark`, whose names are not the button's wording),
-`Row(bar)`, `BookTarget`, `ShownBookCost`, `BookEnabled`, `AutoTarget` and `AutoEnabled` on a
-levelled group with `ShownPurchased`, `ShownGranted`, `ShownProgress`, `ShownRates`, `ShownCost`,
-`ShownMax`, `Idle` and `Visible` on its rows, `IsOpen`, `ShownGroup` and `Rows` on the automation
+`Row(bar)`, `BookTarget`, `ShownBookCost`, `BookEnabled`, `AutoTarget`, `AutoEnabled`, `BuyControl`
+and `Mode` on a levelled group with `ShownPurchased`, `ShownGranted`, `ShownProgress`, `ShownRates`,
+`ShownCost`, `ShownMax`, `ShownCount`, `ControlKind`, `Idle` and `Visible` on its rows, `Shown` and
+`Queued` on the threshold toast, `IsOpen`, `ShownGroup` and `Rows` on the automation
 window with `Bar`, `State` and `ShownCost` on each row, `Upgrade`, `ShownCost`, `ShownOwned` and
 `ShownBuyable` on an upgrade tile, `IsOpen`, `ShownUpgrade` and `ShownOwned` on the upgrade details
 window,
@@ -2141,9 +2168,23 @@ module shows its bars:
   never removed - and works a running one through its `tap` producer; a bar that fills once and
   stands full takes no tap. There is no select control. A row available and not running carries
   `leveled-idle`, which the stylesheet draws as a bar waiting for its tap;
-- the buy control at the right is the generator row's "+1" and "+M" on the level, with its
-  enabling and arithmetic, over the next unit's cost; the row dims by `row-unaffordable`. The
-  control is its own element and its own class, so another buy control can replace it whole.
+- the buy control at the right is one of two, chosen by the module's `buyControl`
+  (`BuyControlKind`, JSON key `buyControl`, `Pair` when absent), which the host hands the card
+  before it binds. **Pair** is the generator row's "+1" and "+M" on the level, with its enabling and
+  arithmetic, over the next unit's cost. **Cycle** is Ctrl C's: one "Hire: xN" button over the price
+  of those N levels, N set by the card's cycle button below - Buy One is 1, Buy Max is
+  `Purchasing.MaxAffordable` at the level's declaring scope (1 while that is zero), and Buy Next is the
+  levels still needed to reach the level's next count threshold (`NextThreshold`; 1 when none is
+  left). Nothing about a threshold shows in One or Max, and a threshold's effect never shows before
+  it is reached. A press submits `TryBuy` with the N printed, fail-closed like every buy, and the
+  button is dimmed by a class (`leveled-hire-unaffordable`) and never disabled while N is not
+  affordable. Either way the row dims by `row-unaffordable` while what the control buys is not
+  affordable. Each control is its own class behind one base, so the row never reaches into it.
+A Cycle card opens with its **cycle button** at the top right, an accent text action reading "Buy
+One", "Buy Max" or "Buy Next" (`BuyMode`), each press stepping to the next and back round to Buy One
+and repainting the card; a Pair card draws none. The mode belongs to the card, in memory for as long
+as the card is built - a chapter switch or a return from the idle dialog builds it afresh at Buy One -
+and is never saved.
 The card ends in two buttons. **Book** names the first member in group order whose bar is not
 available and whose level is offered, as the bar's gate text (or its name when the gate has none)
 with the level's price; it buys one level and in the same press adds the bar to the active set, so
@@ -2173,10 +2214,26 @@ handler stops a press and a release where it handles them and a listener on the 
 neither, and it lets go of the pointer the button's click captured when it
 fires, so the click is no longer pressed and the release lands on the window, and a drag that takes
 the pointer ends the hold before it fires. The rows' and the buttons' presses are public actions
-(`Tap`, `BuyOne`, `BuyMax`, `OpenInfo`, `Book`, `Auto`, `OpenAutomation`, and the window's `Buy` and
-`Dismiss`) so a headless test presses what the pointer presses; an upgrade tile's are `Buy` and
+(`Tap`, `BuyOne`, `BuyMax`, the cycle row's `Buy`, `OpenInfo`, the card's `Cycle`, `Book`, `Auto`,
+`OpenAutomation`, and the window's `Buy` and `Dismiss`) so a headless test presses what the pointer
+presses, and the toast's `Advance` ends the shown toast as its last frame would; an upgrade tile's are `Buy` and
 `OpenDetails`, and its window's `Close`; a prestige card's are `Press` (what Confirm does) and
 `OpenInfo`, the info window's `Close`, and the confirmation window's `Confirm` and `Cancel`.
+
+**The threshold toast.** When a levelled row's level crosses a count threshold during play - a
+purchase, an autobuy, a grant, whatever moved the count - a toast names each effect the threshold
+switched on: "<target displayName> x<multiplier> <stat word>", "Tuesday Open Mic x2 speed", the stat
+word from one mapping (`ToastUI.StatWord`: `rate` is "speed", `yield` "payout", `cost` "cost", any
+other stat its own name). The row detects it: every refresh reads the level's owned count, and a
+count above the last one it read raises the effects of `ThresholdsCrossed` between them, in order,
+through `IToastOpener`, the shape `IGeneratorInfoOpener` has. The row's first refresh only takes the
+count as it stands, so nothing toasts on the first render after a bind, a chapter switch or a return
+to Live; a count that fell (a reset) raises nothing and is the new count measured from. The idle
+claim toasts nothing, since the return to Live after the dialog builds the rows afresh. The toast
+(`ToastUI`) is host-owned, a dark rounded pill near the bottom of the screen over the page and
+beneath every window, ignoring picking: each stands `ToastUI.Seconds` (2 s), fading in and out over
+`FadeSeconds` on the element's own scheduler, and crossings queue and show one after another. A
+chapter switch or the phase leaving Live drops the toast and its queue.
 
 ### 12.12 Validation at content load
 
@@ -2272,6 +2329,14 @@ the pointer ends the hold before it fires. The rows' and the buttons' presses ar
   can never be passed a coordinate to match, and one applied below chapter level is never on that
   walk. Both are warnings, and both are answered by the site's own KIND with nothing enumerated -
   which is what makes them checks where the general case is not one.
+- A generator's count thresholds have positive counts in strictly increasing order and at least one
+  effect each (a formula on one is an import error). Each effect names an owner that resolves on the
+  generator's chain (`ChainReach` otherwise) and is declared at the generator's OWN scope - the gather
+  meets an effect applied there only from an owner declared there or below, so an owner further out
+  would never take the factor (`InertOperand`) - and a stat that owner's kind is asked for: a
+  currency's `rate`, `yield`, `payout` or `exponent`; a generator's `rate`, `yield`, `count`, `cost` or
+  `autobuy`; a producer's `rate` or `yield`; a bar's `rate`, `yield` or `consumption`; an upgrade's
+  `cost`. The multiplier takes the Effect's numeric checks.
 - A group's `maxActive` is at least 1, and it lists no null member, no member twice
   (`DuplicateMember`) and only members its own scope declares (`MemberOffScope`) - the active set and
   the member share a home. A bar's `fillAmount` and `fillRate` are positive - a nonpositive threshold
@@ -2359,7 +2424,7 @@ Assets/Scripts/
   Economy/
     CurrencyDefinition.cs  ProducerDefinition.cs
     Producer.cs             // stateless resolution: a source's entries summed, times the product of its coordinate plan's links; GetRate and RatePairs read the contributor plan of the node they are asked at
-    GeneratorDefinition.cs  UpgradeDefinition.cs
+    GeneratorDefinition.cs  UpgradeDefinition.cs   // the generator with its count thresholds (CountThreshold, ThresholdEffect, NextThreshold, ThresholdsCrossed)
     Purchasing.cs           // CostOf(generator, n) the series, MaxAffordable, TryBuy(generator, count | upgrade): fail-closed gate, one spend, count or latch, payload; IsOwned(upgrade): the latch or ownedWhen
     MultiplierFormula.cs    // the formula family an Effect's factor can compute from
     ModifierDefinition.cs   // named List<Effect> + stacking enum (Replace|Linear|Multiply) + optional appliesWhen
@@ -2389,7 +2454,7 @@ Assets/Scripts/
     AdManager.cs           // rewarded only (the Encore placement's authored reward + Double it); polls its requests from the driver's Update
     IAPManager.cs          // Backstage Pass, Roadie bundles, Tip Jar; grant, save, acknowledge in that order
   UI/
-    SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs
+    SectionDefinition.cs  ModuleDefinition.cs  ModuleRegistry.cs   // ModuleDefinition carries BuyControlKind for a levelled card
     ModuleWidget.cs  ModuleWidgetFactory.cs   // the plain-C# controller base and the closed prefabId constructor table; direct factory/registry validation at import and development boot
     ScreenHost.cs  UIRoot.cs                  // the structure logic (the ONE Refreshed subscriber) and its MonoBehaviour shell
     GateFeedback.cs  RungFeedback.cs   // the feedback contract: legs, text, progress; the payout preview
@@ -2398,6 +2463,8 @@ Assets/Scripts/
     IAutomationOpener.cs    // the one method a levelled group's Auto asks of the host: open the automation window for a group at its declaring scope
     IUpgradeDetailsOpener.cs // the one method an upgrade tile asks of the host: open the details window for an upgrade at its declaring scope
     IRungOpener.cs          // the two methods a prestige card asks of the host: open the rung's info window, and its confirmation window at the card's scope
+    IToastOpener.cs         // the one method a levelled row asks of the host: show the toast for one effect a crossed threshold switched on
+    ToastUI.cs              // the threshold toast: a pill near the bottom, one effect at a time for 2 s with a fade, crossings queued
     LongPressManipulator.cs // the hold gesture over an element's own scheduler; never captures, lets go of a button's capture when it fires
     DragScrollManipulator.cs // a left-button mouse drag scrolls a view along its axis as a finger does - the page vertically, a strip sideways; a click stays a click
     PinnedHeadlineUI.cs     // the headline currency line as an overlay: over its line at rest, shrunk beneath the pills once scrolled away
@@ -2405,7 +2472,7 @@ Assets/Scripts/
     Widgets/  CurrencyHeaderUI  CurrencyReadout  JamButtonUI  GeneratorRowUI  UpgradeRowUI
               GroupUI  BarRowUI  RungButtonUI  EventUI  StoryRowUI   // every row module binds ONE thing; visibility is the module's visibleWhen
               // RungButtonUI is the prestige card (RungButton.uxml): title with the gain and the (i), Currently, requirement lines, Confirm
-              LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, Book and Auto; AutomationState
+              LeveledGroupUI  LeveledBarRowUI   // the levelled group (LeveledGroup.uxml): a bar with its level per row, the Pair or Cycle buy control, Book and Auto; AutomationState, BuyMode
               UpgradeTileUI   // an upgrade as a strip tile (UpgradeTile.uxml): icon, name, price or Owned; a tap buys, a hold opens the details window
     ChapterSelectUI.cs  CollectScreenUI.cs        // chapter select over Live (the screen while NoChapter), and the AwaitingIdleClaim screen
     StoryBeatUI.cs          // the story card overlay, host-owned like the two screens: title, text, one button

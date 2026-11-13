@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: edbbbf61-8b4e-4ea3-b5a3-e83d43fa518d
-  modified: 2026-11-11T04:47:25.980Z
+  modified: 2026-11-12T23:56:56.147Z
 ---
 
 John described these from his own play of Ctrl C on 2026-11-10, with two phone screenshots. They
@@ -58,6 +58,12 @@ widget it names.
   "Buy Next" has nothing to read and the row cannot show the next one. My proposal to him: author
   the thresholds on the levelled thing as a list of "at this count, this effect", the shape a
   bar's perFill entries already have. Order of work: thresholds, then the cycle button.
+  How Ctrl C shows them (John, 2026-11-12): the row shows NOTHING about thresholds normally. Only
+  while the card's cycle button is on "Buy Next" does the row's buy button show how many it takes
+  to reach the next level. The effect stays hidden until reached; reaching a level raises a toast
+  naming it ("Components x50 speed"). Chapter 8's Components/Switches/RAM/Motherboards bars are his
+  example (some effects target the row itself, some another row); the reference docs do not hold
+  the threshold numbers.
 - **The "Hire: xN" button and the Buy One/Max/Next cycle button.**
 
 **Why:** John reported these as he remembered them mid-session and asked that they be recorded

@@ -64,6 +64,15 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             public void OpenRungConfirm(Rung rung, ScopeState scope) { }
         }
 
+        // The one thing a levelled row asks of the host on a crossing,
+        // answered by nothing for the same reason.
+        private sealed class NoToasts : IToastOpener
+        {
+            public static readonly NoToasts Instance = new();
+
+            public void OpenToast(Economy.ThresholdEffect effect) { }
+        }
+
         // Computed amounts within tolerance, never bit-exact, for the reason
         // SessionPacingTests gives: BigDouble's base-10 mantissa is
         // binary-inexact. What a widget shows is read as the number it holds
@@ -123,7 +132,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Assert.IsNotNull(registry, "Assets/Settings/ModuleRegistry.asset is missing.");
                 var widget = ModuleWidgetFactory.Create(prefabId, asset.Instantiate(), registry,
                     NoStories.Instance, NoInfos.Instance, NoAutomations.Instance, NoDetails.Instance,
-                    NoRungs.Instance);
+                    NoRungs.Instance, NoToasts.Instance);
                 widget.Bind(Session, Tree.Tier1, content, Clock);
                 return widget;
             }
