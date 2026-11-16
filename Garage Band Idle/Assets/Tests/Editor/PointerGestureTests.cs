@@ -32,9 +32,16 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
         private GameObject host;
 
+        // Set when the editor has dispatched the hierarchy change that creating
+        // the host raises (see Settle).
+        private bool hierarchyChanged;
+
+        private void OnHierarchyChanged() => hierarchyChanged = true;
+
         [TearDown]
         public void TearDown()
         {
+            EditorApplication.hierarchyChanged -= OnHierarchyChanged;
             if (host != null)
                 UnityEngine.Object.DestroyImmediate(host);
             host = null;
@@ -56,6 +63,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         {
             var settings = AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/Settings/PanelSettings.asset");
             Assert.IsNotNull(settings, "Assets/Settings/PanelSettings.asset is missing");
+            hierarchyChanged = false;
+            EditorApplication.hierarchyChanged += OnHierarchyChanged;
             host = new GameObject("pointer_gesture_panel");
             var document = host.AddComponent<UIDocument>();
             document.panelSettings = settings;
@@ -102,10 +111,26 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             UpdatePanel();
         }
 
-        // Frames for layout, then a pick, which validates the layout itself,
-        // then a frame for what the layout dispatched.
-        private static IEnumerator Settle(IPanel panel)
+        // First the editor's reaction to the host's creation: it dispatches the
+        // hierarchy change on a later editor tick, and the UIDocument answers
+        // it in that same dispatch by removing its root from the panel and
+        // adding it back, which detaches the whole page and so disarms any
+        // hold armed at that moment. The editor runner's ticks fall inside a
+        // few frames; a batchmode run's are spaced in real time, so the wait
+        // is on the dispatch itself. Then frames for layout, then a pick,
+        // which validates the layout itself, then a frame for what the layout
+        // dispatched.
+        private IEnumerator Settle(IPanel panel)
         {
+            var until = EditorApplication.timeSinceStartup + 5;
+            while (!hierarchyChanged)
+            {
+                Assert.Less(EditorApplication.timeSinceStartup, until,
+                    "the editor never dispatched the hierarchy change the host's creation raises");
+                UpdatePanel();
+                yield return null;
+            }
+            EditorApplication.hierarchyChanged -= OnHierarchyChanged;
             yield return Frames(3);
             panel.Pick(Vector2.zero);
             yield return Frames(2);
