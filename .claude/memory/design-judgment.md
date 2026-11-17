@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-10T22:29:24.924Z
+  modified: 2026-11-16T22:34:34.357Z
 ---
 
 **Why:** feature creep killed this project's first attempt, and every repair since has been removing
@@ -44,6 +44,10 @@ a mechanism I added. The repo `CLAUDE.md` states the lookup rule; this is the re
   the answer. Diff size is never a design reason; "it was the smaller edit" reads as feature creep.
 - When proposing a fix, describe the smallest change that makes the finding false.
 - The elaborate option needs a constraint that breaks the simple one, not a benefit it adds.
+- When a rule wins where it should not, narrow THAT rule; never add a counter-rule that only wins by
+  order or specificity. 2026-11-13: an accent colour beat `.unity-button:disabled` by order; I
+  proposed another `:disabled` rule, John: "add yet another thing to color the disabled button so
+  it comes in the right order?" The fix was `:enabled` on the accent rules.
 
 **Systems, not tasks**
 - A mechanism is justified only by a statement true of every instance of its kind ("a bar is a

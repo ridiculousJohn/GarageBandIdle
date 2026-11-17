@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: cb7418da-6e5b-4e8a-805b-52c995ee2b57
-  modified: 2026-11-13T04:17:48.875Z
+  modified: 2026-11-16T22:34:37.205Z
 ---
 
 Unity batchmode is the ONLY compiler allowed here. No Roslyn, csc or dotnet. If batchmode cannot run,
@@ -69,6 +69,14 @@ compilation is unverified: say so and ask John to close the editor.
   its kin through `root.panel.visualTree.SendEvent`. Setting `target` and sending on an element
   skips the trickle-down path and proves nothing.
 - `run_tests` output lists every case; filter by class name or it floods the context.
+
+**A failure that happens only headless** (2026-11-16)
+- Diagnose it on a copy of the project in the scratchpad (Assets, Packages, ProjectSettings),
+  instrument the copy, run batchmode against it, delete the copy after. The tree is never touched.
+- An edit-mode test that creates a GameObject with a UIDocument: the editor later removes and
+  re-adds the document's root (hierarchy change -> `UIDocument.ReactToHierarchyChanged`), which
+  detaches the panel mid-test. Wait for `EditorApplication.hierarchyChanged` first
+  (`PointerGestureTests.Settle` does).
 
 **Shell traps that cost time that day**
 - In `sed`, `\u` in a replacement uppercases the next character. To write a literal backslash,
