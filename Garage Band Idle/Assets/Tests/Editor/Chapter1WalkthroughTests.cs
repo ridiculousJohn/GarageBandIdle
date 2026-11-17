@@ -594,7 +594,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var bar = f.Session.CurrentOffer.bars.Single();
             Assert.AreSame(f.Cover1, bar.bar);
             AssertClose(100, bar.progress, "filled to its threshold and drank no further");
-            Assert.AreEqual(1, bar.completions);
+            Assert.AreEqual((BigNumber)1, bar.completions);
             AssertClose(3600, Line(f, f.Rehearsal).amount, "the window's whole inflow");
             AssertClose(100, Draw(f, f.Rehearsal).amount, "and the 100 the cover drank of it");
 

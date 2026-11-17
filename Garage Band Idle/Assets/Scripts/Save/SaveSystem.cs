@@ -452,7 +452,7 @@ namespace RidiculousGaming.GarageBandIdle.Save
                     Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' is not declared by scope '{definition.Id}' - dropped.");
                 else if (bar.repeatWhen == null)
                     Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' names a bar that completes once, which acquires none - dropped.");
-                else if (pair.Value <= 0)
+                else if (pair.Value <= BigNumber.Zero)
                     Debug.LogWarning($"SaveSystem: fill count '{pair.Key}' is {pair.Value} - dropped.");
                 else
                     continue;
@@ -854,7 +854,10 @@ namespace RidiculousGaming.GarageBandIdle.Save
         }
 
         // BigNumber persists as its exact parts - a string round-trip through
-        // double would destroy every value past 1e308.
+        // double would destroy every value past 1e308. A bare integer is a
+        // count in its integer form - the form fillCounts takes in a save
+        // whose counts were ints - and reads as its value, so such a save
+        // loads with the same counts and the schema version stays put.
         private class BigNumberConverter : JsonConverter<BigNumber>
         {
             public override void WriteJson(JsonWriter writer, BigNumber value, JsonSerializer serializer)
@@ -870,6 +873,8 @@ namespace RidiculousGaming.GarageBandIdle.Save
             public override BigNumber ReadJson(JsonReader reader, Type objectType, BigNumber existingValue,
                 bool hasExistingValue, JsonSerializer serializer)
             {
+                if (reader.TokenType == JsonToken.Integer)
+                    return Convert.ToInt64(reader.Value, System.Globalization.CultureInfo.InvariantCulture);
                 var obj = JObject.Load(reader);
                 return BigNumber.FromMantissaExponent(obj.Value<double>("m"), obj.Value<long>("e"));
             }

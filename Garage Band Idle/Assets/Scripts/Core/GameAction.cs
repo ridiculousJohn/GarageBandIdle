@@ -30,6 +30,30 @@ namespace RidiculousGaming.GarageBandIdle
         // acting scope and records into the context's ledgers what the
         // cross-container checks need (fact writes, resets, grants, rungs).
         public virtual void Validate(ValidationContext ctx) { }
+
+        // Whether running this action N times in a row from one snapshot is
+        // exactly one ExecuteTimes(N) (design doc 12.5), with no state swapped
+        // or cleared along the way. A repeating bar whose whole list answers
+        // yes settles its completions in batches (12.7); false is always
+        // correct and settles one completion at a time, so a kind that cannot
+        // be sure keeps it.
+        public virtual bool RepeatsAsOne => false;
+
+        // N executions as one call. A kind that does not repeat as one runs
+        // exactly one, through Execute, and refuses any other count: a caller
+        // asking for more has skipped the RepeatsAsOne question.
+        public virtual void ExecuteTimes(GameContext ctx, BigNumber times)
+        {
+            if (times != BigNumber.One)
+                throw new InvalidOperationException(
+                    $"{GetType().Name} runs one execution at a time and was asked for {times} (design doc 12.5).");
+            Execute(ctx);
+        }
+
+        // What ONE execution changes that a condition can read, written into
+        // the delta (12.4/12.5). A kind that cannot say marks it unknown, and
+        // every condition then re-reads after each completion.
+        public virtual void Describe(GameContext ctx, CompletionDelta delta) => delta.MarkUnknown();
     }
 
     // Pays one or more target currencies (design doc 5/12.5). Every target is
@@ -59,15 +83,40 @@ namespace RidiculousGaming.GarageBandIdle
             return paid * Economy.Producer.GetMultiplier(atHome, plans.For(Economy.Stat.Payout));
         }
 
-        public override void Execute(GameContext ctx)
+        public override void Execute(GameContext ctx) => ExecuteTimes(ctx, BigNumber.One);
+
+        // N grants are one deposit of N times the amount: each amount is
+        // sized once, against the state the call sees, and the targets are
+        // paid together.
+        public override bool RepeatsAsOne => true;
+
+        public override void ExecuteTimes(GameContext ctx, BigNumber times)
         {
             // Every amount is computed before anything is paid, and committed
             // all-or-nothing: the targets are tied, so a refusal on the second
             // may not leave the first paid.
             var amounts = new List<BigNumber>(currencies.Count);
             foreach (var currency in currencies)
-                amounts.Add(AmountFor(ctx, currency));
+                amounts.Add(AmountFor(ctx, currency) * times);
             ctx.DepositAll(currencies, amounts);
+        }
+
+        // Each currency's amount at its home, found outward from the acting
+        // scope as the deposit finds it. A zero pays nothing, so it is no
+        // change.
+        public override void Describe(GameContext ctx, CompletionDelta delta)
+        {
+            foreach (var currency in currencies)
+            {
+                if (currency == null)
+                {
+                    delta.MarkUnknown();
+                    continue;
+                }
+                var amount = AmountFor(ctx, currency);
+                if (amount != BigNumber.Zero)
+                    delta.AddDeposit(currency, Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, currency), amount);
+            }
         }
 
         public override void Validate(ValidationContext ctx)
@@ -164,6 +213,34 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override void Execute(GameContext ctx) => Economy.Producer.FireGeneratorYield(ctx, generator);
 
+        // N firings from one snapshot are one firing paying N times each
+        // resolved amount. 12.12 refuses a generator's yield entry naming a
+        // bar, so every target is a currency or a generator's granted count.
+        public override bool RepeatsAsOne => generator != null;
+
+        public override void ExecuteTimes(GameContext ctx, BigNumber times) =>
+            Economy.Producer.FireGeneratorYield(ctx, generator, times);
+
+        // Each resolved (target, amount) at the home the payment lands at:
+        // found outward from the generator's declaring scope, which is where
+        // the firing pays from. 12.12 refuses a generator's yield entry naming
+        // a bar, so no target here runs a bar's settlement.
+        public override void Describe(GameContext ctx, CompletionDelta delta)
+        {
+            if (generator == null)
+            {
+                delta.MarkUnknown();
+                return;
+            }
+            var firing = Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, generator);
+            foreach (var (target, amount) in Economy.Producer.ResolveGeneratorYield(ctx, generator))
+            {
+                if (amount == BigNumber.Zero)
+                    continue;
+                delta.AddDeposit(target, Economy.Producer.DeclaringScope<ScopeState>(firing, target), amount);
+            }
+        }
+
         // Recorded so the pass can say which generators' yield entries nothing
         // fires; the reach check is what makes a recorded firer reachable.
         public override void Validate(ValidationContext ctx)
@@ -179,6 +256,13 @@ namespace RidiculousGaming.GarageBandIdle
         public string flagId;
 
         public override void Execute(GameContext ctx) => ctx.SetFlag(flagId);
+
+        // A set flag stays set, so N sets are one.
+        public override bool RepeatsAsOne => true;
+
+        public override void ExecuteTimes(GameContext ctx, BigNumber times) => Execute(ctx);
+
+        public override void Describe(GameContext ctx, CompletionDelta delta) => delta.AddFlag(flagId);
 
         public override void Validate(ValidationContext ctx)
         {
@@ -214,6 +298,13 @@ namespace RidiculousGaming.GarageBandIdle
         public double capSeconds;
 
         public override void Execute(GameContext ctx) => ctx.ExtendTimer(timer, seconds, capSeconds);
+
+        // Does not repeat as one. N grants reach min(from + N x seconds, cap)
+        // in arithmetic, but ExtendTimer refuses a grant above its cap, so one
+        // call of N x seconds throws wherever N x seconds passes capSeconds,
+        // and each call rounds its own AddSeconds, so N roundings are not one.
+
+        public override void Describe(GameContext ctx, CompletionDelta delta) => delta.AddTimer(timer);
 
         public override void Validate(ValidationContext ctx)
         {
@@ -256,6 +347,29 @@ namespace RidiculousGaming.GarageBandIdle
             target.modifierStacks[modifier.Id] =
                 modifier.stacking == Economy.StackingKind.Replace ? 1 : count + 1;
         }
+
+        // Replace holds every re-grant at one, so N grants are one. Linear and
+        // Multiply count up: N grants are count + N, which the int stack cannot
+        // hold for every N a batch reaches, and each grant moves the factor the
+        // next completion's payout resolves under - so those settle one at a
+        // time.
+        public override bool RepeatsAsOne =>
+            modifier != null && modifier.stacking == Economy.StackingKind.Replace;
+
+        public override void ExecuteTimes(GameContext ctx, BigNumber times)
+        {
+            if (!RepeatsAsOne)
+            {
+                base.ExecuteTimes(ctx, times);
+                return;
+            }
+            Execute(ctx);
+        }
+
+        // No condition kind reads a modifier stack (12.4): a stack moves
+        // multipliers, never a gate. One grant changes nothing a condition
+        // reads.
+        public override void Describe(GameContext ctx, CompletionDelta delta) { }
 
         public override void Validate(ValidationContext ctx)
         {
@@ -304,6 +418,29 @@ namespace RidiculousGaming.GarageBandIdle
             else
                 target.modifierStacks[modifier.Id] = count - 1;
         }
+
+        // N removals are one stack of N down: the entry goes once N reaches
+        // the count, and a count above N keeps the difference, which is below
+        // the int it came from. Absent stays absent.
+        public override bool RepeatsAsOne => true;
+
+        public override void ExecuteTimes(GameContext ctx, BigNumber times)
+        {
+            var target = ctx.Scope.FindOnChain(scope)
+                ?? throw new InvalidOperationException(
+                    $"RemoveModifier: scope '{scope.Id}' is not on the chain from '{ctx.Scope.ScopeId}'.");
+
+            if (!target.modifierStacks.TryGetValue(modifier.Id, out var count))
+                return;
+            if (times >= count)
+                target.modifierStacks.Remove(modifier.Id);
+            else
+                target.modifierStacks[modifier.Id] = count - (int)times.ToDouble();
+        }
+
+        // No condition kind reads a modifier stack (12.4), so one removal
+        // changes nothing a condition reads.
+        public override void Describe(GameContext ctx, CompletionDelta delta) { }
 
         public override void Validate(ValidationContext ctx)
         {

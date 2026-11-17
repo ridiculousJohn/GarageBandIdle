@@ -18,15 +18,14 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Math.Max(1e-9, Math.Abs(expected) * 1e-9), what ?? string.Empty);
 
         // The authored shape: the gig repeats, its completion fires the draw
-        // (3 rehearsal and 0.5 fans per unit, plus a yield into a second bar
-        // that is not income) and banks 7 shared at root. `idle` is a second
-        // gig nobody selects, paying buzz, so its absence from the report is
-        // readable on a currency nothing else pays.
+        // (3 rehearsal and 0.5 fans per unit) and banks 7 shared at root.
+        // `idle` is a second gig nobody selects, paying buzz, so its absence
+        // from the report is readable on a currency nothing else pays.
         private class Gigs
         {
             public readonly BarFixture F = new();
             public readonly GroupDefinition Calendar;
-            public readonly BarDefinition Gig, Idle, Other;
+            public readonly BarDefinition Gig, Idle;
             public readonly GeneratorDefinition Draw;
             public readonly CurrencyDefinition Buzz;
 
@@ -37,7 +36,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Calendar = F.Group(F.Tier1Def, "calendar", null, maxActive: 6);
                 Gig = F.Bar(Calendar, "gig", fillAmount, fillRate, new Always());
                 Idle = F.Bar(Calendar, "idle_gig", 10, 1, new Always());
-                Other = F.Bar(Calendar, "other", 1000, 1, new Always());
 
                 Draw = TestTree.MakeDefinition<GeneratorDefinition>("draw");
                 Draw.availableWhen = new Always();
@@ -46,7 +44,6 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Draw.growth = 1.3;
                 Draw.produces.Add(TestTree.Entry(F.Rehearsal, Stat.Yield, 3));
                 Draw.produces.Add(TestTree.Entry(F.Fans, Stat.Yield, 0.5));
-                Draw.produces.Add(TestTree.Entry(Other, Stat.Yield, 1));
                 F.Tier1Def.generators.Add(Draw);
 
                 Gig.onComplete.Add(new FireGeneratorYield { generator = Draw });
@@ -93,7 +90,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         // The preview and the deposit are one resolution: the draw's yield at
         // its owned count under its multiplier, and AddCurrency's AmountFor. A
         // real completion in a segment moves each balance by exactly what the
-        // preview named, and the bar target is not income.
+        // preview named.
         [Test]
         public void The_payout_preview_equals_what_a_real_completion_deposits()
         {
@@ -104,7 +101,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var payout = BarSystem.CompletionPayout(g.Ctx, g.Gig);
 
-            Assert.AreEqual(3, payout.Count, "rehearsal, fans and shared; the bar target is left out");
+            Assert.AreEqual(3, payout.Count, "rehearsal, fans and shared");
             AssertClose(3 * 3 * 2, g.Of(payout, g.F.Rehearsal, g.F.Tier1), "rehearsal");
             AssertClose(0.5 * 3 * 2, g.Of(payout, g.F.Fans, g.F.Tier1), "fans");
             AssertClose(7, g.Of(payout, g.F.Shared, g.F.Root), "shared, homed at root");
@@ -114,7 +111,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var shared = g.F.Balance(g.F.Root, g.F.Shared);
             g.F.Segment(1);
 
-            Assert.AreEqual(1, g.F.Fills(g.F.Tier1, g.Gig), "one crossing");
+            Assert.AreEqual((BigNumber)1, g.F.Fills(g.F.Tier1, g.Gig), "one crossing");
             AssertClose(g.Of(payout, g.F.Rehearsal, g.F.Tier1).ToDouble(),
                 g.F.Balance(g.F.Tier1, g.F.Rehearsal) - rehearsal, "rehearsal deposited");
             AssertClose(g.Of(payout, g.F.Fans, g.F.Tier1).ToDouble(),

@@ -325,6 +325,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 tree.Tier1Def.producers.Add(roadie);
                 tree.Cover1.tap = roadie;
             });
+            // The bar consumes Rehearsal, and a tap is that much of the bar
+            // running (12.7), so the pool holds what the tap's fill costs.
+            fx.Tree.Tier1.balances["rehearsal"] = 100;
 
             var widget = fx.Widget("group", "Group.uxml", fx.Tree.LearnCovers);
             widget.Refresh();

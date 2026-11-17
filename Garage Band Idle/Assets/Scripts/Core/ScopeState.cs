@@ -70,7 +70,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, int> upgradeLevels = new();          // levelled upgrades: the owned level, 1..levels; the latch stands beside it (design doc 4)
         public HashSet<string> firedTriggers = new();                  // one-shot trigger latches - a reset re-arms
         public Dictionary<string, BigNumber> barProgress = new();      // uncapped - overfill is allowed
-        public Dictionary<string, int> fillCounts = new();             // repeating bars
+        public Dictionary<string, BigNumber> fillCounts = new();       // repeating bars; BigNumber like every other count a run can grow
         public Dictionary<string, HashSet<string>> activeMembers = new(); // per group, the member ids that are ON (12.7)
         public Dictionary<string, int> modifierStacks = new();   // granted stacks, keyed like every other count fact
         public List<TimedBuff> timedBuffs = new();
@@ -155,7 +155,7 @@ namespace RidiculousGaming.GarageBandIdle
         public Dictionary<string, int> upgradeLevels => facts.upgradeLevels;
         public HashSet<string> firedTriggers => facts.firedTriggers;
         public Dictionary<string, BigNumber> barProgress => facts.barProgress;
-        public Dictionary<string, int> fillCounts => facts.fillCounts;
+        public Dictionary<string, BigNumber> fillCounts => facts.fillCounts;
         public Dictionary<string, HashSet<string>> activeMembers => facts.activeMembers;
         public Dictionary<string, int> modifierStacks => facts.modifierStacks;
         public List<TimedBuff> timedBuffs => facts.timedBuffs;

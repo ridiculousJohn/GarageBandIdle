@@ -352,7 +352,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // with no EPs Sold, Buzz or Roadies on the lump.
             var bar = f.Session.CurrentOffer.bars.Single();
             Assert.AreSame(f.OpenMic, bar.bar);
-            Assert.AreEqual(360, bar.completions, "3600 s at 0.5/s over a 5 unit gig");
+            Assert.AreEqual((BigNumber)360, bar.completions, "3600 s at 0.5/s over a 5 unit gig");
             AssertClose(360 * lump.ToDouble(), Line(f, f.Cash).amount, "cash");
             AssertClose(360 * 0.5 * 3, Line(f, f.Rep).amount, "rep");
             Assert.IsEmpty(f.Session.CurrentOffer.draws, "a time-fed gig drinks nothing");

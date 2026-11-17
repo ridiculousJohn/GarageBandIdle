@@ -16,7 +16,7 @@
       "BATTLE OF THE BANDS: a five-minute timed challenge, staged, reward doubles gig payouts.",
       "Roadie allocation UI unlocks here (Ch1's capstone deliberately left it locked)."
     ],
-    "deliberatelyNotHere": "No venue choice, no genre, no fan fatigue, no rehearsal, no song list. Rooms with taste and fatigue are Chapter 3 (`chapter-03-local-venues.json`); a band at the open-mic stage plays whatever will have it, and the calendar IS the chapter.",
+    "deliberatelyNotHere": "No venue choice, no genre, no fan fatigue, no rehearsal, no song list. Rooms fed by a scene's own material are Chapter 3 (`chapter-03-local-venues.json`), and fatigue waits in `design-backlog.md` for the touring chapters, 4 and 6; a band at the open-mic stage plays whatever will have it, and the calendar IS the chapter.",
     "modelNotes": {
       "conditions": "Discriminated Condition objects with a `type` field, threshold always `value`. Types used: `currency`, `currencyEarnedTotal`, `ownedCount`, `flagSet`, `compound`, `always`.",
       "gigAsBarPlusGenerator": "Every gig is a PAIR: a bar (the booking, fills from time) and a generator (the draw, whose owned count is the gig's level and whose yield entries are the payout). The bar's `onComplete` is `fireGeneratorYield` naming the draw. Multipliers reach the payout by naming the yield lines (ids) or their tag `gig_payout`; a buff on the BAR (`stat: rate`) would speed the cycle, which nothing in this chapter does — see §11 on prestige never raising a fill rate.",
@@ -333,7 +333,7 @@
             "note": "Twelve minutes. The top of the ladder and the gig whose standing booking makes an overnight absence pay real money."
           }
         ],
-        "note": "Cycle ladder 5s / 15s / 40s / 2m / 5m / 12m, payouts scaled so a fully leveled lower gig is roughly competitive with an unleveled higher one — the Ctrl C 'compare reward against cycle time' decision. No `perFill` on any gig: fatigue is Chapter 3's mechanic."
+        "note": "Cycle ladder 5s / 15s / 40s / 2m / 5m / 12m, payouts scaled so a fully leveled lower gig is roughly competitive with an unleveled higher one — the Ctrl C 'compare reward against cycle time' decision. No `perFill` on any gig: fatigue is a backlog mechanic for the touring chapters, 4 and 6."
       }
     ]
   },

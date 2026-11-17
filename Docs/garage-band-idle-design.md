@@ -66,7 +66,7 @@ of its own prestige currencies.
 |---|---|---|---|
 | 1 | Garage / Basement | Tap, gear/bandmate buffs, "learn covers" bars | First backyard / house party |
 | 2 | Open Mic | Gigs as timed bars you book then automate; taps add time; Buzz and Rep multiply Cash payouts, EPs Sold multiply Rep payouts; Roadie allocation opens | Win the talent-show slot |
-| 3 | Local Venues | The circuit: rooms with genre taste and fan fatigue; booking agent automates | Headline the ballroom |
+| 3 | Local Venues | Three scenes (punk, blues, metal), each its own tier and prestige; a room eats its scene's material and pays shared Cash and the scene's Following; booking agent automates | Headline the ballroom |
 | 4 | The Local Tour | The Van: routing across nearby cities; merch on the road | Complete the local circuit |
 | 5 | Record Deal / Studio | Songs: ideas become tracks, mixes and masters (§7) | Sign the deal & cut the record |
 | 6 | The Coast Tour | Sponsorships; long-haul routing, west to east; songs gain popularity on the road (§7) | Festival main stage |
@@ -923,7 +923,8 @@ class ProducerDefinition : Definition        // id + tags, like every Definition
 
 **An entry pays exactly one target**: a currency (its balance), a generator (its granted count), or
 a bar (its progress, 12.7) - `{ currency | generator | bar, stat, value, condition? }`, and two or
-none is a load error. A generator paying another generator's count is how a generator-generator is
+none is a load error. Only a tap pushes a bar: a producer's `yield` entry and any `rate` entry may name
+one, and a generator's `yield` entry naming a bar is a load error (12.12). A generator paying another generator's count is how a generator-generator is
 authored: Scoring's yield entry names Querying, and a bar firing Scoring's yield
 (`FireGeneratorYield`, 12.5) pays Querying so many per cycle, count and multipliers included. The
 compiler files the sources paying any target at that target's home, exactly as it does for a
@@ -1214,7 +1215,7 @@ class ScopeFacts   // the mutable state a reset DESTROYS; what a reset keeps sit
     Dictionary<string, int>       upgradeLevels;    // a levelled upgrade's owned level, 1..levels; the latch stands beside it (section 4)
     HashSet<string>               firedTriggers;    // one-shot trigger latches — a reset re-arms (§12.5)
     Dictionary<string, BigDouble> barProgress;      // uncapped — overfill is allowed
-    Dictionary<string, int>       fillCounts;       // bars with a repeatWhen, the ones that complete more than once
+    Dictionary<string, BigDouble> fillCounts;       // bars with a repeatWhen, the ones that complete more than once; a count a run can grow without bound
     Dictionary<string, HashSet<string>> activeMembers; // per group: the member ids that are ON (12.7)
     Dictionary<string, int>       modifierStacks;   // AddModifier grants, keyed like every other count
     List<TimedBuff>               timedBuffs;       // {buffId, expiresAt}, the id a declared TIMER's: the timer's value; root's encore_timer lives here
@@ -1320,6 +1321,7 @@ One polymorphic family for every gate, unlock, visibility, and pressability rule
 public abstract class Condition
 {
     public abstract bool Evaluate(GameContext ctx);   // pure — reads state, stores nothing
+    public virtual bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigDouble steps);
     public virtual void Validate(ContentDatabase db) { }
 }
 ```
@@ -1354,6 +1356,23 @@ dismissal stays one tap away and always legal - it clears the record and pays th
 goal was reached. A reset from above authors no such leg and cannot: protecting an armed reward
 from a parent's clear is the reset's own refusal (12.5).
 
+**Every condition answers how far it is from changing** (`StepsUntilChange`): given a
+`CompletionDelta`, which is what one completion of an action list changes that a condition can read
+(the deposits it makes to each (target, home), the flags it sets, the timers it extends, or unknown,
+12.5), it answers how many repetitions of it until `Evaluate`'s answer differs from its answer now, or
+false when repetitions of it never change it. That distance is a segment boundary: a repeating bar settles that
+many completions at once and asks again (12.7). The answers: `CurrencyAtLeast`, `EarnedTotalAtLeast`
+and `OwnedCountAtLeast` read what one completion pays the currency or the generator at the home their
+read resolves to, outward from the acting scope, and answer `ceil((threshold - current) / that)`, at
+least one, and false when it pays nothing there or the threshold is already met, since a completion
+only deposits; `CurrencyExceeds` answers one when either side is paid; `FlagSet` one when the delta
+sets its flag and it is not set; `BuffActive` one when the delta extends its timer; `UpgradePurchased`
+asks its `ownedWhen` at the declaring scope while no latch stands and the upgrade has no levels, and
+is false otherwise, since a latch and a level move only by a purchase; `All` and `Any` the least of
+their children's answers; `Not` its operand's; `Always`, `HasEntitlement`, `IdleAccumulation` and the
+two event kinds false. Any other kind (`BarsCompleted`) re-reads after every completion, and is false
+only for a delta that changes nothing. An unknown delta is one step for every kind - always correct.
+
 A condition may carry an optional **`uiText`** label ("Needs 50 fans", "Claim your event reward
 first") — pure presentation data, never read by evaluation, rendered by the rung feedback
 contract (§12.11). A condition's rendered **`Text`** follows one rule at every node: a leaf's is its
@@ -1384,6 +1403,9 @@ class at import — a kind can never be authored without code behind it.
 public abstract class Action
 {
     public abstract void Execute(GameContext ctx);
+    public virtual bool RepeatsAsOne => false;                            // N runs from one snapshot are one ExecuteTimes(N)
+    public virtual void ExecuteTimes(GameContext ctx, BigDouble times);    // default: exactly one, through Execute
+    public virtual void Describe(GameContext ctx, CompletionDelta delta);  // what ONE run changes; default: unknown
     public virtual void Validate(ContentDatabase db) { }
 }
 ```
@@ -1408,6 +1430,26 @@ Action kinds (§6.1, §12.11). Authored inline via
 No shared reward pool; a reused reward can be promoted to a shared asset later if duplication ever
 hurts. Actions are one-shot: they run at their moment and are never replayed on load — the state
 they mutated is what gets saved.
+
+**An action may repeat as one.** `RepeatsAsOne` is true only when running the action N times in a row
+from one snapshot is exactly one `ExecuteTimes(N)` and swaps or clears no state; then a list every
+executing action of which repeats as one runs N times as one call (`ActionList.RunTimes`: the refusal
+check once, as a single run makes it, then each action's `ExecuteTimes` in list order), and that is how
+a repeating bar settles its completions in segments (12.7) and the idle claim runs a window's count
+(12.9). `Describe` writes what ONE execution changes that a condition can read into a
+`CompletionDelta`, which the conditions measure their distance against (12.4). The kinds:
+`AddCurrency` repeats as one - each amount sized once and paid times N through the same all-or-nothing
+deposit - and describes each currency's amount at its home; `FireGeneratorYield` repeats as one - the
+yield resolved once and each target paid its amount times N - and describes each resolved (target,
+home, amount), every target a currency or a generator's granted count, since 12.12 refuses a
+generator's `yield` entry naming a bar; `SetFlag` repeats as one, a set flag staying set, and describes its flag;
+`AddModifier` repeats as one under `Replace` stacking, where every re-grant holds the stack at one, and
+not under `Linear` or `Multiply`, where each grant moves the factor the next completion resolves
+under; `RemoveModifier` repeats as one, N removals being the stack N down or gone; neither modifier
+kind describes anything, since no condition reads a stack. `ExtendTimer` does not repeat as one - one
+grant of N x seconds is refused above its cap and each grant rounds its own time - and describes its
+timer. `SetCurrency`, `AddSong`, `ResetScope`, `ExecuteRung` and `RestartScope` run one at a time
+and describe themselves as unknown.
 
 **`ResetScope`** clears the referenced scope and everything inside it (downward-closed). It only clears —
 it never executes nested lists — so no recursion exists via resets.
@@ -1626,7 +1668,8 @@ count for crossings to toast (12.11).
 it ran now: a `FireGeneratorYield` entry through the resolution its firing commits
 (`Producer.ResolveGeneratorYield`: the owned count and every multiplier), an `AddCurrency` entry
 through its `AmountFor`, one line per (currency, home), summed, zeros kept. Only currency targets
-are income, so a yield entry naming a bar or a generator is left out. Every entry is sized against
+are income, so a yield entry naming a generator is left out; a generator's yield entry naming a bar
+is refused (12.12). Every entry is sized against
 one state, so a list whose later action reads what an earlier one deposited is where the preview
 and the execution part; no authored completion list has that shape. `BarSystem.CompletionRate` is
 that payout times completions per REAL second - the bar's fill speed (`BarSystem.FillRate`, the
@@ -1691,14 +1734,24 @@ progress is monotonic until reset and **uncapped** — overfill is allowed and r
 once, and that is when `onComplete` fires. No completed-set is stored; `BarsCompleted(n)` counts
 bars at full. **Whether a bar goes again is its `repeatWhen`**, judged at its home the moment it
 completes; one condition, so an upgrade or a handicap flips a team between the two shapes below
-without a second field. **A bar whose `repeatWhen` holds settles a tick iteratively**: while
-`progress ≥ fillAmount` and the bar is still active and available, subtract `fillAmount`, increment `fillCount`, execute
-`onComplete` — re-reading state each iteration, so a completion action that resets the host or
-flips availability stops the loop honestly instead of executing precomputed fires against a changed
-world. Residual progress is retained; a buffed rate crossing several thresholds in one tick pays
-every crossing. (The arithmetic shortcut `fires = floor((progress + Δ)/fillAmount)` is a valid
-optimization only when `onComplete` cannot affect the bar's environment, which in practice means an
-EMPTY list; a bar with actions iterates.) **A `repeatWhen` that refuses is the manual team**: the
+without a second field. **A bar whose `repeatWhen` holds settles a tick in segments**: the thresholds
+crossed, `floor(progress / fillAmount)`, bound the run, and each pass - while the bar is alive, still
+active and available, its `repeatWhen` still holds at its home and `progress >= fillAmount` - settles
+as many completions as can run before anything its gates read changes, then re-reads state and goes
+again. A pass of N subtracts `fillAmount x N`, adds N to `fillCount` - written first, the latch-first
+order - and runs `onComplete` N times as one (`RunTimes`, 12.5). N is the rest of the run unless
+something sets a boundary: a bar with `perFill` entries settles one completion at a time, since each
+fill changes what the next one pays; so does a list holding an action that does not repeat as one (a
+reset, a rung, a recorded write, a song); otherwise N is clamped by `repeatWhen` and `availableWhen`
+(a payment does not ask `availableWhen`), each asked how many completions of what the list changes
+until its answer differs (`StepsUntilChange`, 12.4). A gate that turns the bar off after 10 fills
+clamps a run of 100 at 10, because the condition is the segment boundary; a completion that resets
+the host or flips availability stops the run honestly instead of executing precomputed fires against
+a changed world. The payout of a pass is resolved once, from the state the pass starts in - the
+start-of-segment snapshot rule of 12.9 applied to completions. Residual progress is retained; a
+buffed rate crossing several thresholds in one tick pays every crossing, and an empty list is a list
+every action of which repeats as one. `fillCount` is a BigDouble like every other count a run can
+grow, so a run of any length settles and is held. **A `repeatWhen` that refuses is the manual team**: the
 crossing pays once, progress returns to zero - the excess past the threshold is discarded, the team
 ran one cycle - the bar leaves the active set of every group listing it, and its fill count is bumped as a repeating bar's is,
 since a present `repeatWhen` counts completions whichever way it evaluated. Selecting it again is
@@ -1707,16 +1760,23 @@ how the player runs it again; there is no new command.
 **A bar is a payment target** (12.2), and it collects what pays it the way a currency does. A rate
 entry naming a bar is collected by the bar at its draw beside its own `fillRate`, so it fills only
 while the bar is drawing - selected, available, not full - and the rate phase deposits nothing into
-a bar. A yield entry naming a bar (a tap's, a fired generator's) moves progress the moment it is
-paid, and the bar settles its own crossing right there through the same settlement the tick runs,
+a bar. A yield entry naming a bar is a tap's - a producer's; a generator's is refused (12.12) - and
+it is that much of the bar running: it
+advances the bar the moment it is paid, through the same advance the tick's draw makes, so it takes
+the bar's consumption for the progress it adds - each `consumes` entry's `amount x factor` per unit,
+the progress capped by the tightest cover of the live balances, a free entry covering unboundedly,
+and nothing banked moving nothing - while a bar that consumes nothing takes the whole payment. The
+bar settles its own crossing right there through the same settlement the tick runs,
 because the tick settles only the bars its draw admitted and would read a bar filled between ticks
 as one that fired earlier. Each mover settles only the crossing its own fill made - a settlement
-compares the progress before its fill with that fill, never with live progress - so a payment
-landing inside a tick's settlement fires once and not again when the pass reaches that bar.
-Clamped at `fillAmount` for a bar with no `repeatWhen`; a bar with one takes the whole payment and
-settles by the condition's answer - every threshold crossed, or the manual team's one cycle. Membership and availability do not gate a paid
-completion - they govern drinking, and a payment is not a drink. A refused completion
-list leaves the payment undelivered, as the draw excludes the bar for its segment.
+compares the progress before its fill with that fill, never with live progress. A tap is a command,
+so its payment lands between ticks and never inside a tick's settlement.
+Clamped at `fillAmount` for a bar with no `repeatWhen`, before the advance, so the payment is
+charged only for the progress that fits; a bar with one takes what its balances cover of the whole
+payment and settles by the condition's answer - every threshold crossed, or the manual team's one
+cycle. Membership and availability gate the time-based draw and do not gate a paid fill. A refused
+completion list leaves the payment undelivered and spends nothing, as the draw excludes the bar for
+its segment.
 
 **The snapshot admits; live state may only disqualify.** Every rate and gate the draw needs is
 resolved BEFORE the segment's production deposits (12.9), and only the bars that snapshot
@@ -1787,7 +1847,7 @@ wrong multiplier. Within each segment the economy phases are **fixed**, resolved
 of effects and entry conditions** — every rate entry is judged and sized against pre-deposit state
 before any deposit lands, so definition order never changes production: rate production deposits
 (consumed currencies included) → bar
-consumption (§12.7) → iterative bar completion — production before
+consumption (§12.7) → bar completion in segments — production before
 consumption, so an empty consumed currency fed at +1/sec serves a 1/sec bar demand in the same tick.
 Bar DEMAND is resolved BEFORE the deposits, from the same start-of-segment snapshot as everything
 else; the consumed currency's BALANCE is the one thing read live, which is exactly what that carve-out says. Resolving demand after
@@ -1847,8 +1907,9 @@ paid: a Pass owner's are computed doubled, and the ad callback doubles them befo
 computes anything: it deposits the stored lines as they stand, spends the stored draws at their homes
 (a deposit is a grant and a draw is a spend, so the earned total moves by the inflow alone, 12.3),
 writes each bar entry - progress, the fill counts the crossings added, the manual team out of every
-group listing it, and its `onComplete` once per completion with the `FireGeneratorYield` actions skipped,
-since those were the lines - and advances the stamp to B, the window actually paid, in one
+group listing it, and its `onComplete` for every completion with the `FireGeneratorYield` actions skipped,
+since those were the lines - the whole count as one call when what is left of the list repeats as one
+(12.5), otherwise once per completion - and advances the stamp to B, the window actually paid, in one
 transaction. The dialog prints one row per balance the claim changes, the line less the draw, signed;
 bar progress is a write and never a row. A window that changed no balance - a bar part-way through a
 cycle, a bar that drank exactly what came in - settles on entry with no dialog: the same claim, the
@@ -2409,6 +2470,12 @@ chapter switch or the phase leaving Live drops the toast and its queue.
   error - and the target sits on the acting chain like every other ordinary read. A cost effect with
   a constant x0 is an error: a free generator is an unbounded rate printer. A generator with yield
   entries that no `FireGeneratorYield` names warns: nothing fires them.
+- **Only a tap pushes a bar.** A generator's `yield` entry naming a bar is an error (`KindPlacement`),
+  judged on the entry whatever fires the generator: on a bar's completion the away window pays a
+  fired generator's yield as a line at the claim (section 9), outside the window's own arithmetic, so
+  the pushed bar's fill and consumption are not counted and the claim's bar loop overwrites its
+  progress. A producer's `yield` entry naming a bar - the tap - and a `rate` entry naming a bar on
+  either kind are not refused.
 - Ordinary reads and writes (`AddCurrency`, `SetFlag`, `AddSong`, Condition reads, `produces`
   targets) may address only the acting scope's chain — itself or an ancestor. The runtime state
   walk cannot reach siblings, so a cross-tree reference is a load-time error rather than a silent

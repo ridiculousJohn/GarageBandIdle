@@ -1253,6 +1253,26 @@ namespace RidiculousGaming.GarageBandIdle
                 ctx.AddError(ValidationCheck.NumericRange,
                     $"growth is {generator.growth} - the cost curve is a positive ratio.");
             ValidateProducesEntries(ctx, generator.produces, site);
+
+            // Only a tap pushes a bar (12.12). A generator's yield is fired by
+            // FireGeneratorYield, and on a bar's completion the away window
+            // pays that firing as a line at the claim (section 9), outside its
+            // own arithmetic - so a bar it paid would fill and drink there
+            // uncounted, and the claim's bar loop would write over its
+            // progress. The rule sits on the entry, whatever fires it. A
+            // producer's yield entry naming a bar is the tap, and a rate entry
+            // naming a bar is collected at the bar's own draw; neither is this.
+            for (var i = 0; i < generator.produces.Count; i++)
+            {
+                var entry = generator.produces[i];
+                if (entry == null || entry.stat != Economy.Stat.Yield || entry.bar == null)
+                    continue;
+                ctx.SetSite($"{site} produces[{i}]");
+                ctx.AddError(ValidationCheck.KindPlacement,
+                    $"generator '{generator.Id}' has a yield entry naming bar '{entry.bar.Id}' - only a tap may push a bar: a fired generator's yield into a bar is paid by the away window at the claim, outside the window's own arithmetic, so the pushed bar's fill and consumption are not counted and the claim overwrites its progress (12.12).");
+            }
+            ctx.SetSite(site);
+
             ValidateThresholds(ctx, generator, scope, site);
         }
 

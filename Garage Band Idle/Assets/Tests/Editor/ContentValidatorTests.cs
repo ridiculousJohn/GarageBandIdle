@@ -2425,6 +2425,37 @@ namespace RidiculousGaming.GarageBandIdle.Tests
                 Dump(report));
         }
 
+        // Only a tap pushes a bar (12.12): a generator's yield entry naming a
+        // bar is refused on the entry, whatever fires the generator.
+        [Test]
+        public void Generator_YieldEntryNamingABar_KindPlacement_Error()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.produces.Add(TestTree.Entry(f.Cover1, Stat.Yield, 10));
+            AssertFinding(f.Run(), ValidationSeverity.Error, ValidationCheck.KindPlacement,
+                "generator 'practice_amp' has a yield entry naming bar 'cover_1'");
+        }
+
+        // A tap producer's yield into its bar is how a tap adds time (12.7).
+        [Test]
+        public void Bar_TapProducerYieldingIntoABar_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Tap.produces.Add(TestTree.Entry(f.Cover1, Stat.Yield, 25));
+            f.Cover1.tap = f.Tap;
+            AssertClean(f.Run());
+        }
+
+        // A rate entry naming a bar is collected at the bar's own draw, never
+        // paid by a firing.
+        [Test]
+        public void Generator_RateEntryNamingABar_NoFindings()
+        {
+            var f = new ValidatorFixture();
+            f.Amp.produces.Add(TestTree.Entry(f.Cover1, Stat.Rate, 1));
+            AssertClean(f.Run());
+        }
+
         // ---- a generator's count thresholds ----
 
         private static CountThreshold Threshold(int count, params ThresholdEffect[] effects)

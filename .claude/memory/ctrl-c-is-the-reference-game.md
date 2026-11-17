@@ -23,6 +23,14 @@ unresolved.
   live tick, the idle claim, the save and an event restart. Name the paths traced.
 - When John offers a shape and mine is chosen, record his shape too.
 - Record what he reports from play in this file.
+- Before DEFENDING or ABANDONING an existing mechanism, and before spending an agent on a
+  replacement, grep `Docs/ctrl-c` for it. 2026-11-16: asked to defend a gap in the away
+  calculation, I conceded the whole separate away calculation was wrong and commissioned a
+  220k-token plan to replace it with a replay of live play. One grep showed Ctrl C treats time
+  away as its own system paying a reduced estimate (Reference line 90; chapter 4 Work From Home at
+  10% of a recorded pace; Delegation buys only while open). The separate calculation was the
+  reference's design; only its handling of one shape (a completion paying another bar) was a bug.
+  A bug in a mechanism is not evidence against the mechanism ([[never-cave-to-pressure]]).
 
 **The look, from the four Play Store screenshots** (seen 2026-11-10 at
 `play.google.com/store/apps/details?id=com.amorfatite.pretentious`; stills of an unknown version, so
@@ -121,5 +129,10 @@ John's play wins where they differ - they show no top pills, only a "+" at the r
   Experience is about what is already banked (e.g. 1e10 banked, wait for 1e10 more), so each loop
   roughly doubled Experience; the next run's costs climbed too, so loops felt the same length. He
   does not recall how long a loop was.
+- Tapped bars that consume (2026-11-16): "Ctrl C does allow tapped bars to consume something,
+  there's specifically a chapter where the pool it's consuming can be empty." So a tap advances a
+  consuming bar and eats from its pool, and an empty pool is a real state there. The reference
+  agrees for chapter 3 (Attend Meeting eats Progress; VIPs: "Additional tapping advances time").
+  Built that day as `BarSystem.Advance` (one routine for time and taps).
 - Unknown to John: its font, whether idle accrual includes Overclock, and whether tokens moved while
   a chapter was dormant change that chapter's idle payout.

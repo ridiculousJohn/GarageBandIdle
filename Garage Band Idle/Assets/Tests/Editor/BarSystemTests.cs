@@ -82,6 +82,17 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             return bar;
         }
 
+        // A tap: a producer declared on tier1 whose one yield entry names the
+        // bar, which is how a tap adds progress (12.7). Declared before the
+        // build, like everything the gather compiles.
+        public ProducerDefinition Tap(BarDefinition bar, double value)
+        {
+            var tap = TestTree.MakeDefinition<ProducerDefinition>("tap_" + bar.Id);
+            tap.produces.Add(TestTree.Entry(bar, Stat.Yield, value));
+            Tier1Def.producers.Add(tap);
+            return tap;
+        }
+
         // One entry of a bar's consumes list, per unit of fill (12.7).
         public static void Drinks(BarDefinition bar, CurrencyDefinition currency, double amount) =>
             bar.consumes.Add(new ConsumesEntry { currency = currency, amount = amount });
@@ -150,8 +161,8 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public BigNumber Progress(ScopeState scope, BarDefinition bar) =>
             scope.barProgress.TryGetValue(bar.Id, out var value) ? value : BigNumber.Zero;
 
-        public int Fills(ScopeState scope, BarDefinition bar) =>
-            scope.fillCounts.TryGetValue(bar.Id, out var value) ? value : 0;
+        public BigNumber Fills(ScopeState scope, BarDefinition bar) =>
+            scope.fillCounts.TryGetValue(bar.Id, out var value) ? value : BigNumber.Zero;
 
         public BarDemand Resolve() => BarSystem.ResolveDemand(Root, Now);
 
@@ -576,29 +587,31 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Segment(1);
 
             AssertClose(2, f.Balance(f.Root, f.Shared), "two crossings pay twice");
-            Assert.AreEqual(2, f.Fills(f.Tier1, bar), "fill count");
+            Assert.AreEqual((BigNumber)2, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(5, f.Progress(f.Tier1, bar), "residual is retained");
         }
 
+        // An empty list is a list every action of which repeats as one, with
+        // nothing for a gate to measure, so it settles like an acting one.
         [Test]
-        public void The_empty_completion_shortcut_matches_the_iterative_result()
+        public void An_empty_completion_list_settles_like_an_acting_one()
         {
             var f = new BarFixture();
             var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
-            var shortcut = f.Bar(group, "shortcut", 10, 35, repeatWhen: new Always());
-            var iterative = f.Bar(group, "iterative", 10, 35, repeatWhen: new Always());
+            var empty = f.Bar(group, "empty", 10, 35, repeatWhen: new Always());
+            var acting = f.Bar(group, "acting", 10, 35, repeatWhen: new Always());
             f.Build();
-            CountFires(iterative, f.Shared);
+            CountFires(acting, f.Shared);
             f.Pour(f.Tier1, f.Rehearsal, 1000);
-            f.Select(f.Tier1, group, shortcut, iterative);
+            f.Select(f.Tier1, group, empty, acting);
 
             f.Segment(1);
 
-            Assert.AreEqual(3, f.Fills(f.Tier1, shortcut), "shortcut fill count");
-            Assert.AreEqual(3, f.Fills(f.Tier1, iterative), "iterative fill count");
-            AssertClose(5, f.Progress(f.Tier1, shortcut), "shortcut residual");
-            AssertClose(5, f.Progress(f.Tier1, iterative), "iterative residual");
-            AssertClose(3, f.Balance(f.Root, f.Shared), "only the iterative one has actions to run");
+            Assert.AreEqual((BigNumber)3, f.Fills(f.Tier1, empty), "empty fill count");
+            Assert.AreEqual((BigNumber)3, f.Fills(f.Tier1, acting), "acting fill count");
+            AssertClose(5, f.Progress(f.Tier1, empty), "empty residual");
+            AssertClose(5, f.Progress(f.Tier1, acting), "acting residual");
+            AssertClose(3, f.Balance(f.Root, f.Shared), "only the acting one has actions to run");
         }
 
         [Test]
@@ -619,8 +632,159 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // Ten crossings were paid for; the first completion shuts the gate,
             // and the loop stops honestly instead of running precomputed fires.
             AssertClose(1, f.Balance(f.Root, f.Shared), "one fire");
-            Assert.AreEqual(1, f.Fills(f.Tier1, bar), "fill count");
+            Assert.AreEqual((BigNumber)1, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(90, f.Progress(f.Tier1, bar), "the rest stays as residual");
+        }
+
+        // ---- settling in segments (12.7) ----
+
+        // A run with nothing between it and its gates settles as one batch:
+        // the payout is resolved once, from the state the batch starts in, and
+        // paid times the count. The crew's yield into its own granted count is
+        // what makes the batch readable - completion by completion it would
+        // compound, and the batch pays it at the owned count it started with.
+        [Test]
+        public void A_run_of_many_crossings_pays_the_payout_times_the_count_in_one_batch()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "loops", null);
+            var bar = f.Bar(group, "loop_a", 10, 1000, repeatWhen: new Always());
+            var crew = TestTree.MakeDefinition<GeneratorDefinition>("crew");
+            crew.availableWhen = new Always();
+            crew.costCurrency = f.Rehearsal;
+            crew.baseCost = 5;
+            crew.growth = 1.3;
+            crew.produces.Add(TestTree.Entry(f.Fans, Stat.Yield, 2));
+            crew.produces.Add(TestTree.Entry(crew, Stat.Yield, 1));
+            f.Tier1Def.generators.Add(crew);
+            bar.onComplete.Add(new FireGeneratorYield { generator = crew });
+            f.Build();
+            f.Tier1.generatorCounts[crew.Id] = 3;
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            Assert.AreEqual((BigNumber)100, f.Fills(f.Tier1, bar), "one count per crossing");
+            AssertClose(0, f.Progress(f.Tier1, bar), "nothing left over");
+            AssertClose(2 * 3 * 100, f.Balance(f.Tier1, f.Fans), "the payout at the starting count, times the count");
+            AssertClose(1 * 3 * 100, f.Tier1.grantedCounts[crew.Id], "the grant resolved once for the batch");
+        }
+
+        // The fill count is a BigNumber (12.3), so a run no int could count
+        // settles whole and the count holds it.
+        [Test]
+        public void A_run_far_past_int_range_settles_and_the_count_holds_it()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "loops", null);
+            var bar = f.Bar(group, "loop_a", 1, 0, repeatWhen: new Always());
+            f.Build();
+            CountFires(bar, f.Shared);
+            f.Tier1.barProgress[bar.Id] = 1e12;
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            AssertClose(1e12, f.Fills(f.Tier1, bar), "fill count");
+            AssertClose(1e12, f.Balance(f.Root, f.Shared), "every completion paid");
+            AssertClose(0, f.Progress(f.Tier1, bar), "nothing left over");
+        }
+
+        // A gate that turns the bar off after 10 fills clamps a run of 100 at
+        // 10: the condition is the segment boundary, asked of repeatWhen and of
+        // availableWhen alike.
+        [TestCase(true)]
+        [TestCase(false)]
+        public void A_gate_fed_by_the_bars_own_payout_stops_the_run_at_its_boundary(bool onRepeat)
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "loops", null);
+            var gate = new Not { condition = new CurrencyAtLeast { currency = f.Fans, threshold = 10 } };
+            var bar = f.Bar(group, "loop_a", 1, 100, repeatWhen: onRepeat ? gate : new Always());
+            bar.availableWhen = onRepeat ? null : gate;
+            bar.onComplete.Add(new AddCurrency { currencies = { f.Fans }, amount = 1 });
+            f.Build();
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            Assert.AreEqual((BigNumber)10, f.Fills(f.Tier1, bar), "ten fills of the hundred crossed");
+            AssertClose(10, f.Balance(f.Tier1, f.Fans), "one fan a fill");
+            AssertClose(90, f.Progress(f.Tier1, bar), "the rest stays as residual");
+        }
+
+        // A completion that sets the flag its own repeat reads through Not is
+        // a boundary one completion away.
+        [Test]
+        public void A_completion_setting_the_flag_its_repeat_reads_settles_exactly_one()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "loops", null);
+            var bar = f.Bar(group, "loop_a", 10, 100,
+                            repeatWhen: new Not { condition = new FlagSet { flagId = "encore" } });
+            f.Build();
+            CountFires(bar, f.Shared);
+            bar.onComplete.Add(new SetFlag { flagId = "encore" });
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            AssertClose(1, f.Balance(f.Root, f.Shared), "one fire");
+            Assert.AreEqual((BigNumber)1, f.Fills(f.Tier1, bar), "fill count");
+            AssertClose(90, f.Progress(f.Tier1, bar), "the rest stays as residual");
+        }
+
+        // A reset does not repeat as one, so a list holding one settles one
+        // completion at a time, and the first reset ends the scope-life the
+        // rest belonged to.
+        [Test]
+        public void A_list_holding_a_reset_settles_one_at_a_time_and_the_reset_stops_the_rest()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "loops", null);
+            var bar = f.Bar(group, "loop_a", 10, 50, repeatWhen: new Always());
+            CountFires(bar, f.Shared);                      // homed at root, so it survives the reset
+            bar.onComplete.Add(new ResetScope { scope = f.Tier1Def });
+            f.Build();
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            AssertClose(1, f.Balance(f.Root, f.Shared), "one completion of the five crossed");
+            Assert.AreEqual((BigNumber)0, f.Fills(f.Tier1, bar), "the count went with the payload");
+            AssertClose(0, f.Progress(f.Tier1, bar), "and so did the progress");
+        }
+
+        // Each fill changes what the next one pays through the cascade, so a
+        // bar with perFill entries settles one completion at a time, each paid
+        // at its own count: 2^1 + 2^2 + 2^3.
+        [Test]
+        public void A_perFill_bar_pays_each_fill_at_its_own_count()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "loops", null);
+            var bar = f.Bar(group, "loop_a", 10, 30, repeatWhen: new Always());
+            var crew = TestTree.MakeDefinition<GeneratorDefinition>("crew");
+            crew.availableWhen = new Always();
+            crew.costCurrency = f.Rehearsal;
+            crew.baseCost = 5;
+            crew.growth = 1.3;
+            crew.produces.Add(TestTree.Entry(f.Fans, Stat.Yield, 1));
+            f.Tier1Def.generators.Add(crew);
+            bar.onComplete.Add(new FireGeneratorYield { generator = crew });
+            bar.perFill.Add(new PerFillEntry
+            {
+                effect = new Effect { target = "crew", stat = Stat.Yield, multiplier = 2 },
+                growth = GrowthKind.Multiply
+            });
+            f.Build();
+            f.Tier1.generatorCounts[crew.Id] = 1;
+            f.Select(f.Tier1, group, bar);
+
+            f.Segment(1);
+
+            Assert.AreEqual((BigNumber)3, f.Fills(f.Tier1, bar), "fill count");
+            AssertClose(2 + 4 + 8, f.Balance(f.Tier1, f.Fans), "each fill at its own count");
         }
 
         // A repeatWhen that refuses is the manual team (12.7): it pays once,
@@ -640,7 +804,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Segment(1);
 
             AssertClose(1, f.Balance(f.Root, f.Shared), "one cycle, one payout");
-            Assert.AreEqual(1, f.Fills(f.Tier1, bar), "a present repeatWhen counts its fills either way");
+            Assert.AreEqual((BigNumber)1, f.Fills(f.Tier1, bar), "a present repeatWhen counts its fills either way");
             AssertClose(0, f.Progress(f.Tier1, bar), "the excess past the threshold is discarded");
             Assert.IsFalse(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "and it is no longer selected");
         }
@@ -684,7 +848,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Segment(1);
 
             AssertClose(0, f.Progress(f.Tier1, bar), "unbought, the condition refuses and one cycle ran");
-            Assert.AreEqual(1, f.Fills(f.Tier1, bar), "fill count");
+            Assert.AreEqual((BigNumber)1, f.Fills(f.Tier1, bar), "fill count");
             Assert.IsFalse(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "and it left the set");
 
             f.Tier1.purchasedUpgrades.Add(overtime.Id);
@@ -693,7 +857,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             // The same bar over the same second: the condition holds now, so
             // both crossings pay and the residual is kept.
-            Assert.AreEqual(3, f.Fills(f.Tier1, bar), "two more crossings");
+            Assert.AreEqual((BigNumber)3, f.Fills(f.Tier1, bar), "two more crossings");
             AssertClose(5, f.Progress(f.Tier1, bar), "residual is retained");
             Assert.IsTrue(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "a repeating bar stays selected");
         }
@@ -813,7 +977,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Settle(demand, 1);
 
             AssertClose(0, f.Balance(f.Root, f.Shared), "the backlog is not paid out");
-            Assert.AreEqual(0, f.Fills(f.Tier1, bar), "fill count");
+            Assert.AreEqual((BigNumber)0, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(100, f.Progress(f.Tier1, bar), "residual untouched");
         }
 
@@ -857,7 +1021,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             // settle none of it.
             AssertClose(100, f.Balance(f.Tier1, f.Rehearsal), "rehearsal");
             AssertClose(0, f.Progress(f.Tier1, bar), "progress");
-            Assert.AreEqual(0, f.Fills(f.Tier1, bar), "fill count");
+            Assert.AreEqual((BigNumber)0, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(0, f.Balance(f.Root, f.Shared), "nothing fired");
         }
 
@@ -872,7 +1036,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_yield_into_a_non_repeating_bar_clamps_at_full_and_fires_the_crossing()
         {
             var f = new BarFixture();
-            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var group = f.Group(f.Tier1Def, "covers", null);
             var bar = f.Bar(group, "cover_a", 100, 0);
             f.Build();
             CountFires(bar, f.Shared);
@@ -890,13 +1054,13 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             AssertClose(1, f.Balance(f.Root, f.Shared), "no second fire");
         }
 
-        // Selection governs DRINKING, and a payment is not a drink (12.7), so an
+        // Selection gates the time-based draw and not a paid fill (12.7), so an
         // unselected bar takes what is paid into it and settles.
         [Test]
         public void A_yield_into_an_unselected_bar_still_fires_its_crossing()
         {
             var f = new BarFixture();
-            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var group = f.Group(f.Tier1Def, "covers", null);
             var bar = f.Bar(group, "cover_a", 100, 0);
             f.Build();
             CountFires(bar, f.Shared);
@@ -911,7 +1075,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_yield_into_a_repeating_bar_settles_every_crossing_and_keeps_the_excess()
         {
             var f = new BarFixture();
-            var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
+            var group = f.Group(f.Tier1Def, "loops", null);
             var bar = f.Bar(group, "loop_a", 10, 0, repeatWhen: new Always());
             f.Build();
             CountFires(bar, f.Shared);
@@ -920,7 +1084,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             BarSystem.Deposit(new GameContext(f.Tier1, f.Now), bar, 25);
 
             AssertClose(2, f.Balance(f.Root, f.Shared), "two thresholds crossed");
-            Assert.AreEqual(2, f.Fills(f.Tier1, bar), "fill count");
+            Assert.AreEqual((BigNumber)2, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(5, f.Progress(f.Tier1, bar), "the residual is retained");
         }
 
@@ -931,7 +1095,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         public void A_payment_past_full_into_a_manual_team_pays_once_and_zeroes()
         {
             var f = new BarFixture();
-            var group = f.Group(f.Tier1Def, "teams", f.Rehearsal);
+            var group = f.Group(f.Tier1Def, "teams", null);
             var bar = f.Bar(group, "team_a", 100, 0, repeatWhen: new Not { condition = new Always() });
             f.Build();
             CountFires(bar, f.Shared);
@@ -940,40 +1104,9 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             BarSystem.Deposit(new GameContext(f.Tier1, f.Now), bar, 250);
 
             AssertClose(1, f.Balance(f.Root, f.Shared), "one crossing, settled at the write");
-            Assert.AreEqual(1, f.Fills(f.Tier1, bar), "fill count");
+            Assert.AreEqual((BigNumber)1, f.Fills(f.Tier1, bar), "fill count");
             AssertClose(0, f.Progress(f.Tier1, bar), "back to zero, the excess discarded");
             Assert.IsFalse(f.Tier1.activeMembers[group.Id].Contains(bar.Id), "and out of the active set");
-        }
-
-        // Each mover settles only the crossing its own fill made (12.7). Here the
-        // first bar's completion fires a generator yield that fills the second
-        // bar past full inside the tick's own settlement: the payment settles
-        // that crossing once, and the pass, reaching the second bar with a draw
-        // that crossed nothing, fires nothing more.
-        [Test]
-        public void A_payment_landing_inside_a_settlement_fires_its_crossing_once()
-        {
-            var f = new BarFixture();
-            var group = f.Group(f.Tier1Def, "teams", null);
-            var lead = f.Bar(group, "lead", 10, 1);
-            var follow = f.Bar(group, "follow", 100, 1);
-            CountFires(follow, f.Shared);
-
-            var crew = TestTree.MakeDefinition<GeneratorDefinition>("crew");
-            crew.availableWhen = new Always();
-            crew.produces.Add(TestTree.Entry(follow, Stat.Yield, 100));
-            f.Tier1Def.generators.Add(crew);
-            lead.onComplete.Add(new FireGeneratorYield { generator = crew });
-            f.Build();
-            f.Tier1.generatorCounts["crew"] = 1;
-            f.Select(f.Tier1, group, lead, follow);
-
-            // Ten seconds: lead crosses its 10, follow's own draw reaches 10 of
-            // 100, and lead's completion pays follow the other 90 and more.
-            f.Segment(10);
-
-            AssertClose(100, f.Progress(f.Tier1, follow), "paid to full and clamped");
-            AssertClose(1, f.Balance(f.Root, f.Shared), "one crossing, one reward");
         }
 
         [Test]
@@ -989,22 +1122,25 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsFalse(f.Tier1.barProgress.ContainsKey(bar.Id));
         }
 
-        // A refused completion list leaves the payment undelivered (12.5),
-        // exactly as the draw excludes that bar for the whole segment. The
-        // standing tree is what has an event to arm: only an armed reward
-        // refuses a clear.
+        // A refused completion list leaves the payment undelivered (12.5) and
+        // spends nothing, exactly as the draw excludes that bar for the whole
+        // segment. The standing tree is what has an event to arm: only an
+        // armed reward refuses a clear. cover_1 drinks Rehearsal, so the
+        // balance poured covers the payment once the refusal lifts.
         [Test]
         public void A_refused_completion_leaves_a_payment_into_the_bar_undelivered()
         {
             var tree = new TestTree();
             tree.Cover1.onComplete.Add(new ResetScope { scope = tree.Tier1Def });
             tree.Rebuild();
+            tree.Tier1.balances["rehearsal"] = 100;
             tree.Tier1.activeEvent = new ActiveEvent { eventId = "open_mic", goalReached = true };
 
             BarSystem.Deposit(tree.Ctx(tree.Tier1), tree.Cover1, 100);
 
             Assert.IsFalse(tree.Tier1.barProgress.ContainsKey("cover_1"), "no progress was written");
             Assert.IsFalse(tree.Tier1.modifierStacks.ContainsKey("cover_bonus_1"), "and nothing fired");
+            AssertClose(100, tree.Tier1.balances["rehearsal"], "and nothing was spent");
 
             // The reward claimed, the same payment lands and the completion runs.
             var facts = tree.Tier1.facts;
@@ -1012,6 +1148,204 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             BarSystem.Deposit(tree.Ctx(tree.Tier1), tree.Cover1, 100);
 
             Assert.AreNotSame(facts, tree.Tier1.facts, "the completion ran, and its reset took the payload");
+        }
+
+        // ---- a paid fill consumes (12.7) ----
+
+        // A yield paid into a bar is that much of the bar running, so it takes
+        // the bar's price for the progress it adds, as a spend.
+        [Test]
+        public void A_tap_into_a_consuming_bar_spends_its_price_for_the_progress_it_adds()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            var tap = f.Tap(bar, 10);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 50);
+            f.Tier1.earnedTotals[f.Rehearsal.Id] = 50;
+            f.Select(f.Tier1, group, bar);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(10, f.Progress(f.Tier1, bar), "the whole payment moved");
+            AssertClose(40, f.Balance(f.Tier1, f.Rehearsal), "ten units at one each");
+            AssertClose(50, f.Earned(f.Tier1, f.Rehearsal), "earned total is not a spend record");
+        }
+
+        [Test]
+        public void A_tap_short_of_cover_advances_only_as_far_as_the_balance_covers()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 10, 0);
+            var tap = f.Tap(bar, 10);
+            CountFires(bar, f.Fans);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 4);
+            f.Select(f.Tier1, group, bar);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(4, f.Progress(f.Tier1, bar), "four units covered");
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "the pool is spent out");
+            AssertClose(0, f.Balance(f.Tier1, f.Fans), "short of full, nothing completed");
+        }
+
+        [Test]
+        public void A_tap_into_a_consuming_bar_with_nothing_banked_moves_nothing()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 10, 0);
+            var tap = f.Tap(bar, 10);
+            CountFires(bar, f.Fans);
+            f.Build();
+            f.Select(f.Tier1, group, bar);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            Assert.IsFalse(f.Tier1.barProgress.ContainsKey(bar.Id), "no progress was written");
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "nothing was spent");
+            AssertClose(0, f.Balance(f.Tier1, f.Fans), "nothing settled");
+        }
+
+        // The price is the draw's: the entry's amount times its consumption
+        // factor, so x0.5 halves the take and the fill is untouched.
+        [Test]
+        public void A_consumption_factor_halves_what_a_tap_spends()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            var tap = f.Tap(bar, 10);
+            var thrifty = f.DeclareConsumption(f.Tier1Def, "thrifty", "cover_a", "rehearsal", 0.5);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 50);
+            f.Stack(f.Tier1, thrifty);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(10, f.Progress(f.Tier1, bar), "the fill is untouched");
+            AssertClose(45, f.Balance(f.Tier1, f.Rehearsal), "ten units at half of one each");
+        }
+
+        // A factor of zero is free, and a free entry covers unboundedly, so the
+        // tap moves the bar with nothing banked.
+        [Test]
+        public void A_consumption_factor_of_zero_makes_a_tap_free()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            var tap = f.Tap(bar, 10);
+            var free = f.DeclareConsumption(f.Tier1Def, "free", "cover_a", "rehearsal", 0);
+            f.Build();
+            f.Stack(f.Tier1, free);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(10, f.Progress(f.Tier1, bar), "the whole payment moved");
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "and nothing was spent");
+        }
+
+        [Test]
+        public void A_tap_into_a_two_entry_bar_is_capped_by_the_tightest_cover()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            BarFixture.Drinks(bar, f.Shared, 2);
+            var tap = f.Tap(bar, 10);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 100);      // covers 100 units
+            f.Pour(f.Root, f.Shared, 12);           // covers 6, which is the binding one
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(6, f.Progress(f.Tier1, bar), "the tightest cover decides the fill");
+            AssertClose(94, f.Balance(f.Tier1, f.Rehearsal), "6 units at 1 each");
+            AssertClose(0, f.Balance(f.Root, f.Shared), "6 units at 2 each");
+        }
+
+        // The clamp at full comes first: a tap cannot overshoot a bar that
+        // fills once, and it pays only for the progress that fits.
+        [Test]
+        public void A_tap_near_full_is_charged_only_for_the_progress_that_fits()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            var tap = f.Tap(bar, 20);
+            CountFires(bar, f.Fans);
+            f.Build();
+            f.Tier1.barProgress[bar.Id] = 95;
+            f.Pour(f.Tier1, f.Rehearsal, 50);
+            f.Select(f.Tier1, group, bar);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(100, f.Progress(f.Tier1, bar), "clamped at the fill amount");
+            AssertClose(45, f.Balance(f.Tier1, f.Rehearsal), "five units at one each");
+            AssertClose(1, f.Balance(f.Tier1, f.Fans), "the crossing fired");
+        }
+
+        [Test]
+        public void A_paid_consuming_fill_into_a_repeating_bar_fires_once_per_threshold()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "loops", f.Rehearsal);
+            var bar = f.Bar(group, "loop_a", 10, 0, repeatWhen: new Always());
+            var tap = f.Tap(bar, 30);
+            CountFires(bar, f.Fans);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 25);
+            f.Select(f.Tier1, group, bar);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "25 units covered and spent");
+            AssertClose(2, f.Balance(f.Tier1, f.Fans), "two thresholds crossed");
+            Assert.AreEqual((BigNumber)2, f.Fills(f.Tier1, bar), "fill count");
+            AssertClose(5, f.Progress(f.Tier1, bar), "the residual is retained");
+        }
+
+        // Selection and availability gate the time-based draw, not a paid fill:
+        // an unselected, unavailable bar that consumes takes its price for what
+        // is paid into it and completes.
+        [Test]
+        public void An_unselected_consuming_bar_that_is_paid_consumes_and_completes()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "covers", f.Rehearsal);
+            var bar = f.Bar(group, "cover_a", 100, 0);
+            bar.availableWhen = new FlagSet { flagId = "encore" };
+            var tap = f.Tap(bar, 100);
+            CountFires(bar, f.Fans);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 100);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(100, f.Progress(f.Tier1, bar), "progress");
+            AssertClose(0, f.Balance(f.Tier1, f.Rehearsal), "a hundred units at one each");
+            AssertClose(1, f.Balance(f.Tier1, f.Fans), "the crossing fired");
+        }
+
+        [Test]
+        public void A_tap_into_a_bar_that_consumes_nothing_takes_the_whole_payment_and_spends_nothing()
+        {
+            var f = new BarFixture();
+            var group = f.Group(f.Tier1Def, "timers", null);
+            var bar = f.Bar(group, "timer_a", 100, 0);
+            var tap = f.Tap(bar, 30);
+            f.Build();
+            f.Pour(f.Tier1, f.Rehearsal, 7);
+
+            Producer.FireProducer(new GameContext(f.Tier1, f.Now), tap);
+
+            AssertClose(30, f.Progress(f.Tier1, bar), "the whole payment moved");
+            AssertClose(7, f.Balance(f.Tier1, f.Rehearsal), "nothing is drained");
         }
 
         // ---- SetActiveMembers ----

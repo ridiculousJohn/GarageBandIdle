@@ -640,7 +640,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             var bar = f.Session.CurrentOffer.bars.Single();
             Assert.AreSame(drill, bar.bar);
             Assert.AreSame(f.Tree.Tier1, bar.home);
-            Assert.AreEqual(50, bar.completions, "0.5/s of fill over 1000s, at 10 a completion");
+            Assert.AreEqual((BigNumber)50, bar.completions, "0.5/s of fill over 1000s, at 10 a completion");
             AssertClose(0, bar.progress, "nothing left over");
             AssertClose(250, Line(f.Session, f.Tree.Fans).amount, "5 fans a completion, whole");
         }
@@ -723,7 +723,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var bar = f.Session.CurrentOffer.bars.Single();
             AssertClose(500, bar.progress, "0.5/s of fill over the window");
-            Assert.AreEqual(0, bar.completions);
+            Assert.AreEqual((BigNumber)0, bar.completions);
 
             f.Session.ClaimIdle(f.Tree.Now);
 
@@ -772,7 +772,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             var bar = f.Session.CurrentOffer.bars.Single();
             AssertClose(100, bar.progress, "full, not the 500 the window would have filled");
-            Assert.AreEqual(1, bar.completions);
+            Assert.AreEqual((BigNumber)1, bar.completions);
             Assert.IsNull(Line(f.Session, f.Tree.Rehearsal), "nothing paid rehearsal over the window");
             AssertClose(100, Draw(f.Session, f.Tree.Rehearsal).amount, "and it drew only the fill it took");
             Assert.IsTrue(bar.off, "complete, so it leaves its groups at the claim");
@@ -797,7 +797,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
 
             var bar = f.Session.CurrentOffer.bars.Single();
-            Assert.AreEqual(1, bar.completions, "one cycle, whatever the window would have filled");
+            Assert.AreEqual((BigNumber)1, bar.completions, "one cycle, whatever the window would have filled");
             AssertClose(0, bar.progress, "back to zero, the excess discarded");
             Assert.IsTrue(bar.off);
             Assert.IsTrue(f.Tree.Tier1.activeMembers["team_group"].Contains("team"), "nothing is written yet");
@@ -808,7 +808,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
         }
 
         // The claim writes what the computation carried and runs the completion
-        // list once per completion, with the payment actions skipped - those
+        // list for every completion, with the payment actions skipped - those
         // were the lines.
         [Test]
         public void The_claim_writes_the_counts_and_runs_a_non_payment_completion_once_per_crossing()
@@ -827,9 +827,35 @@ namespace RidiculousGaming.GarageBandIdle.Tests
 
             f.Session.ClaimIdle(f.Tree.Now);
 
-            Assert.AreEqual(50, f.Tree.Tier1.fillCounts["loop"], "one per crossing");
+            Assert.AreEqual((BigNumber)50, f.Tree.Tier1.fillCounts["loop"], "one per crossing");
             AssertClose(0, f.Tree.Tier1.barProgress["loop"], "the residual the computation carried");
             AssertClose(50, f.Tree.Tier1.balances["fans"], "the completion action ran once per crossing");
+        }
+
+        // A list whose actions all repeat as one once the yield is skipped
+        // runs the window's whole count as one call (12.5): the yield is the
+        // line, and the grant beside it lands once per completion, the same
+        // total a run per completion pays.
+        [Test]
+        public void The_claim_runs_a_list_that_repeats_as_one_for_the_whole_count()
+        {
+            BarDefinition drill = null;
+            var f = new Fixture(author: tree =>
+            {
+                var crew = AddCrew(tree, 5);
+                drill = AddBar(tree, "drill", 10, 1, repeatWhen: new Always());
+                drill.onComplete.Add(new FireGeneratorYield { generator = crew });
+                drill.onComplete.Add(new AddCurrency { currencies = { tree.Fans }, amount = 2 });
+            });
+            f.Tree.Tier1.generatorCounts["road_crew"] = 1;
+            Select(f.Tree, drill);
+            f.Tree.Ch1.lastActiveUtc = f.Tree.Now.AddSeconds(-1000);
+
+            f.Session.SwitchChapter(f.Tree.Ch1, f.Tree.Now);
+            f.Session.ClaimIdle(f.Tree.Now);
+
+            Assert.AreEqual((BigNumber)50, f.Tree.Tier1.fillCounts["drill"], "one per crossing");
+            AssertClose(250 + 2 * 50, f.Tree.Tier1.balances["fans"], "5 a completion as the line, 2 a completion as the grant");
         }
 
         // Twice the Cash, never twice the cover: the ad doubles what the window

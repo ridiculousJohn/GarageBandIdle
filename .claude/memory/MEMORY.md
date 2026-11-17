@@ -1,7 +1,7 @@
 # Memory index
 
 ## Read first, then delete when stale
-- [Session handoff](session-handoff-2026-11-10.md) - state at end of 2026-11-12: chapter 2 loop restructure (Rep, EPs Sold) committed, play-test next, items waiting on John, chapter 3 after
+- [Session handoff](session-handoff-2026-11-10.md) - state at end of 2026-11-16 (second session): chapter 3 sheet written with open rulings, three bar engine fixes committed (1327), ch2 play-test still John's
 
 ## The project
 - [Project layout and workflow](project-layout-and-workflow.md) - where things live, which docs are authority, editing mechanics that bite
@@ -20,6 +20,7 @@
 ## Before writing
 - [Quote directive before editing](quote-directive-before-editing.md) - what is never an order; what a commit contains; AGENTS.md is not mine
 - [Ask before the work, not after](ask-before-the-work-not-after.md) - four tests for an open point; picks asked in one message before the first write; nothing after the report; cleanup a change leaves (orphaned assets, dead flags) is done in the same run, never asked
+- [A reason is not a second ruling](a-reason-is-not-a-second-ruling.md) - a case his words do not cover is asked before it is built; a check covers the whole thing he named
 - [External review verdicts](external-review-verdicts.md) - confirm or deny each defect, accept or reject each fix, wait for "apply"
 - [Orchestrated slice workflow](orchestrated-slice-workflow.md) - I orchestrate and review, Opus agents do the bulk, I run Unity, their work is mine
 

@@ -130,12 +130,14 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // zero once n > 1/(1-m), and a negative factor would run production
         // backwards - a negative yield reaches Deposit, which would drive an
         // earned total DOWNWARD. Reduced to nothing is the semantic; reduced
-        // past nothing is not one.
-        internal static BigNumber Grown(BigNumber multiplier, int count, GrowthKind growth)
+        // past nothing is not one. The count is a BigNumber because a fill
+        // count is one; an integral count reads back from it exactly, so the
+        // power is the integer power a whole count names.
+        internal static BigNumber Grown(BigNumber multiplier, BigNumber count, GrowthKind growth)
         {
             if (growth == GrowthKind.Linear)
                 return BigNumber.Max(BigNumber.Zero, BigNumber.One + (multiplier - 1) * count);
-            return BigNumber.Pow(multiplier, count);
+            return BigNumber.Pow(multiplier, count.ToDouble());
         }
 
         // Granted stacks add the one case a cascade has no room for: Replace
@@ -360,12 +362,19 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // Fires a generator's yield the way FireProducer fires a producer's
         // (12.5), scaled by the owned count: one pre-fire snapshot, then the
         // commit, so no output can flip a sibling's condition mid-fire.
-        public static void FireGeneratorYield(GameContext ctx, GeneratorDefinition generator)
+        public static void FireGeneratorYield(GameContext ctx, GeneratorDefinition generator) =>
+            FireGeneratorYield(ctx, generator, BigNumber.One);
+
+        // `times` firings from the one snapshot (12.5/12.7): the yield is
+        // resolved ONCE and each target is paid its amount times the count, so
+        // a batch of completions pays one resolved amount per batch - the
+        // start-of-segment snapshot rule applied to completions.
+        public static void FireGeneratorYield(GameContext ctx, GeneratorDefinition generator, BigNumber times)
         {
             var declaringCtx = ctx.Rebase(DeclaringScope<ScopeState>(ctx.Scope, generator));
             foreach (var (target, amount) in ResolveGeneratorYield(ctx, generator))
                 if (amount != BigNumber.Zero)
-                    PayResolved(declaringCtx, target, amount);
+                    PayResolved(declaringCtx, target, amount * times);
         }
 
         // The one write a resolved payment makes, at the target's home (12.2): a

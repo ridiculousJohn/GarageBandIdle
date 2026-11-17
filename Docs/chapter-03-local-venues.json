@@ -1,444 +1,1446 @@
 {
   "_meta": {
-    "file": "Chapter 3 — Local Venues. DRAFT.",
-    "status": "SUPERSEDED 2026-11-10. This draft predates the 2026-11-09 restart (it gates on a universal Records currency that no longer exists) and the chapter map in build-plan.md (three scenes, one per genre, each its own tier with its own prestige). It is kept for its rooms, genre currencies and fatigue, and is replaced when chapter 3 is designed. The original note follows. DRAFT— not tuned and not ready to import. It carries the rooms design that was cut from Chapter 2 so it is not lost. Numbers are placeholders scaled off Ch2's; the shape is the part worth reviewing.",
-    "theChapterInOneLine": "Chapter 2 gave you a calendar of gigs that would take anyone. This chapter gives you venues with opinions: rooms that want a kind of song, and crowds that tire of hearing it.",
-    "newInThisChapter": [
-      "ROOMS — the stage group grows from one bar to several. Each room is a bar you tap to play, with its own size, payout and fatigue.",
-      "GENRE — songs gain tags and rooms gain taste. A room drinks ONE genre of setlist currency, so which songs you learn decides which rooms you can work. This is why Ch2's songs deliberately had no tags: there was nothing to match against.",
-      "FAN FATIGUE debuts here: each room carries a perFill factor below 1 scaled by its own fillCount, so the same room pays less every time you work it. Rotation is the answer, and this is the chapter that has rooms to rotate.",
-      "maxActive rises 1 → 2 → 3. Working several rooms at once is the chapter's arc and the mechanical meaning of 'a local circuit'. (Needs a setMaxActive payload; Ch2 sidestepped this by setting maxActive to the bar count.)",
-      "MERCH — a second income stream (provisional placement; it could equally sit in Ch4 with touring)."
+    "file": "Chapter 3 - Local Venues. Authoring sheet.",
+    "status": "First-pass authoring sheet written 2026-11-16, not yet typed into Assets/Content. Every number below is a first pass chosen with a simulator (balanceTargets.simulator) from Ctrl C's chapter 3 values, and play decides them. Two entries are NOT importable until engine work exists and John rules on it: the Red Tape event and the Days Off upgrade it unlocks (needsEngineWork).",
+    "usage": "The source a typed Assets/Content/chapter-03.json is written from, in the role chapter-02-open-mic.json plays for chapter 2. Two differences from that sheet: conditions, actions, effects and formulas are written in the typed content's own kinds (CurrencyAtLeast, FireGeneratorYield, LinearOnBalance, ...), and every declaration is filed under the scope that declares it (scopes.ch3, scopes.punk_scene, scopes.blues_scene, scopes.metal_scene), so its placement is read off the structure. Ctrl C's original number sits beside each scaled one as `ctrlC`.",
+    "theChapterInOneLine": "Three local scenes - punk, blues, metal - each writes its own material and fills its own room; every room pays into one shared pot of Cash, and each scene's farewell show trades that scene's Following for Cred that raises what the scene writes next time.",
+    "shape": "Ctrl C's chapter 3 (three divisions feeding a meeting, one prestige per division, a shared upgrade layer, five staged consumption challenges and two others) as a band working three scenes in town. Chapter 2's calendar of gigs gives way to a supply chain: a scene's writing bar and its bought pieces make that genre's Material, and its room turns Material into Cash and Following.",
+    "introduces": [
+      "THREE SCENES as three sibling tiers under the chapter (punk_scene, blues_scene, metal_scene), each with its own Material, Following, pieces, room and prestige. A scene's prestige resets that scene only; the other two keep running and are the head start.",
+      "THE ROOM: one per scene, a one-second bar that eats one of its scene's Material per set and pays one Cash and one Following (Ctrl C's Attend Meeting). Supply against consumption is the chapter's balance: a room with no Material stalls, and Material piled up with no room to play it earns nothing.",
+      "SHARED CASH ON THE CHAPTER: every room pays the same Cash, Cash buys everything, and every scene's prestige writes Cash to zero (SetCurrency, balance only - the chapter's earned total stands). Cash carries root's `income` tag; Material and Following do not.",
+      "CRED PER SCENE (punk_cred, blues_cred, metal_cred, on the chapter): each point raises that scene's Material production by 1% - a payout on what the scene makes, never a bar's fill rate (design 11). The capstone gates on all three.",
+      "SCENES OPEN IN ORDER: Punk from the start; Punk's first farewell show sets blues_open; Blues's first sets metal_open.",
+      "BIGGER ROOM: a levelled chapter upgrade raising what a room pays AND what it eats (Ctrl C's Larger Meetings) - the supply-versus-consumption decision, made shared.",
+      "BOOKING AGENT: one cheap chapter upgrade that makes every room re-book itself (Ctrl C's Schedules). Booked rooms, writing bars, piece bars and passive pieces all earn while away.",
+      "DOOR DEAL I-V: five staged events (Ctrl C's Pizza Rules). Stage I's reward is the late twist: rooms stop eating Material, and the Material a scene holds multiplies the Cash its room pays. Each later stage doubles that coefficient.",
+      "WRITER'S BLOCK: an event where the writing bars make nothing; the reward is ten times room speed and pay (Ctrl C's Management Styles).",
+      "RED TAPE: Ctrl C's Bureaucracy, written in full and marked not importable (needsEngineWork)."
     ],
-    "continuityFromCh2": "Chapter 2 is a gig-cycle economy (timed bars, standing bookings, Buzz). This chapter keeps the bar-as-gig shape but the bars are now ROOMS with genre taste, and FAN FATIGUE debuts here — the same crowd tires of you, so rotating rooms is the play. Do not assume fatigue was taught earlier; it was not.",
-    "openQuestions": [
-      "Does merch belong here or in Ch4? Here it is a second income stream in a chapter that already has rooms, genre and automation. Ch4 (touring) may need it more.",
-      "Three genres or four? Three keeps the song list short; four makes room taste more distinctive.",
-      "Should the booking agent automate the ROOM (fills on its own) or the TAP (fires the set for you)? The second is closer to Ch1's automation feel; the first is closer to an actual agent."
-    ]
+    "continuityFromCh2": "Chapter 2's gig was a bar firing a generator's yield; a room is the same pair (punk_room fires punk_door), and so are a writing bar and its songwriter and each Punk piece and its bar. Chapter 2's standing booking (a chapter flag a bar's repeatWhen reads) is Booking Agent here, one flag for all three rooms. Work the Crowd's taps are Jam here, on the writing and piece bars. Crowd Work's levelled upgrade shape carries Quick Changeovers, Bigger Room, Late-Night Practice and the rest. Battle of the Bands' stages gated on done flags are Door Deal's. What changes: chapter 2 had one tier holding everything; chapter 3 has three sibling tiers, and Cash moves out to the chapter so all three share it.",
+    "deliberatelyNotHere": "No fan fatigue: no room carries a perFill, and fatigue waits in design-backlog.md for the touring chapters, 4 and 6. No merch. No rising count of active rooms: one room per scene, always. No CurrencyExceeds counter: Cash is declared on the chapter, so each scene's rung writes it to zero itself and nothing needs a sibling clear.",
+    "ctrlCMapping": [
+      {"ctrlC": "Chapter 3: Embrace The Yak Shave", "garageBand": "Chapter 3: Local Venues (ch3)"},
+      {"ctrlC": "Divisions: Networking / Storage / Scripting", "garageBand": "Scenes: Punk / Blues / Metal, the tiers punk_scene / blues_scene / metal_scene"},
+      {"ctrlC": "Progress (one, common to all divisions)", "garageBand": "Material, one per scene: punk_material / blues_material / metal_material, each in its scene's tier"},
+      {"ctrlC": "Career Capital", "garageBand": "Cash (cash), on the chapter, `income` tag"},
+      {"ctrlC": "Division main bar (12 s; Progress 1 / 10.8482 / 80.158)", "garageBand": "Writing bar per scene (punk_writing / blues_writing / metal_writing) firing its songwriter generator"},
+      {
+        "ctrlC": "Networking components: Internal Networking, External Networking, Networking Protocols (timed 4 / 6 / 10 s)",
+        "garageBand": "Punk pieces: Three Chords, Fuzz Pedal, Four-Track - each a bar plus a generator"
+      },
+      {"ctrlC": "Storage components: HDD, SSD, CDN, Memory Cache (passive)", "garageBand": "Blues pieces: Slide Guitar, Harmonica, Hammond Organ, Horn Section - rate generators"},
+      {"ctrlC": "Scripting components: Javascript, C#, C++, Rust (passive)", "garageBand": "Metal pieces: Drop Tuning, Double Kick, Marshall Stack, Pyro Rig - rate generators"},
+      {"ctrlC": "Attend Meeting (1 s, eats 1 Progress, pays 1 Career Capital)", "garageBand": "One room per scene: The Basement / The Juke Joint / The Warehouse (eats 1 Material, pays 1 Cash and 1 Following)"},
+      {"ctrlC": "Networking / Storage / Scripting Boost (+1% per point)", "garageBand": "Punk / Blues / Metal Cred on the chapter, +1% to that scene's Material per point"},
+      {
+        "ctrlC": "Division prestige (clears that division's components, consumes common Progress and Career Capital)",
+        "garageBand": "Each scene's Farewell Show rung: pays Cred, writes Cash to zero, resets that scene's tier"
+      },
+      {
+        "ctrlC": "Prestige gain from cumulative Progress with a shared softcap",
+        "garageBand": "RootCurveFormula over the scene's Following earned this round (John's ruling: Following, and the root curve in place of the softcap)"
+      },
+      {"ctrlC": "Networking prestige initializing the Storage main bar", "garageBand": "Punk's rung sets blues_open; Blues's rung sets metal_open"},
+      {"ctrlC": "Schedules (20 CC)", "garageBand": "Booking Agent (booking_agent)"},
+      {"ctrlC": "VIPs", "garageBand": "Guest List (guest_list)"},
+      {"ctrlC": "Faster Meetings", "garageBand": "Quick Changeovers (quick_changeovers)"},
+      {"ctrlC": "Larger Meetings", "garageBand": "Bigger Room (bigger_room)"},
+      {"ctrlC": "Overtime", "garageBand": "Late-Night Practice (late_night_practice)"},
+      {"ctrlC": "WFH", "garageBand": "Home Studio (home_studio)"},
+      {"ctrlC": "Optimization (10x)", "garageBand": "Tight Arrangements (tight_arrangements)"},
+      {"ctrlC": "Hardware Acceleration (50x)", "garageBand": "Songwriting Retreat (songwriting_retreat)"},
+      {"ctrlC": "PTO (unlocked by Bureaucracy)", "garageBand": "Days Off (days_off), unlocked by Red Tape"},
+      {"ctrlC": "Better Cables (first division, cleared by its prestige)", "garageBand": "Better Cables (better_cables) in punk_scene"},
+      {"ctrlC": "Better Switches (first division, cleared by its prestige)", "garageBand": "Better Pickups (better_pickups) in punk_scene"},
+      {"ctrlC": "Two / Four / Eight / Sixteen / Thirty Two Pizza Rule", "garageBand": "Door Deal I-V (door_deal_1 .. door_deal_5)"},
+      {"ctrlC": "Management Styles", "garageBand": "Writer's Block (writers_block)"},
+      {"ctrlC": "Bureaucracy", "garageBand": "Red Tape (red_tape) - not importable"},
+      {"ctrlC": "Tapping (advances time)", "garageBand": "Jam: a tap on a writing or piece bar adds a second of progress"},
+      {"ctrlC": "Chapter finish at about 3.68e35 Career Capital, one completion token", "garageBand": "Headline the Ballroom: gates on all three Creds, pays one Roadie"}
+    ],
+    "progression": [
+      {"stage": 0, "name": "The Basement", "unlocks": "buy Punk Songwriting and the Basement Door (the opening grant pays both), start the writing bar and the room", "gate": "chapter open", "sim": "0 min"},
+      {"stage": 1, "name": "Booking Agent", "unlocks": "rooms re-book themselves; first idle income", "gate": "0.02 Cash", "sim": "under 1 min"},
+      {"stage": 2, "name": "Punk Pieces", "unlocks": "Three Chords, Fuzz Pedal, Four-Track", "gate": "Cash earned (each row shows at its price)", "sim": "1-10 min"},
+      {"stage": 3, "name": "The Office", "unlocks": "Quick Changeovers, Bigger Room, Late-Night Practice, Guest List, Better Cables", "gate": "Cash earned", "sim": "1-10 min"},
+      {"stage": 4, "name": "Punk Farewell Show", "unlocks": "Punk Cred; opens the Blues scene", "gate": "3,000,000 Punk Following", "target": "about 9 min"},
+      {"stage": 5, "name": "The Juke Joint", "unlocks": "Blues scene: writing bar, room, four passive pieces", "gate": "blues_open", "sim": "9 min"},
+      {"stage": 6, "name": "Blues Farewell Show", "unlocks": "Blues Cred; opens the Metal scene", "gate": "1e9 Blues Following", "target": "about 50 min"},
+      {"stage": 7, "name": "The Warehouse", "unlocks": "Metal scene: writing bar, room; its pieces start at 1.1e19 Cash", "gate": "metal_open", "sim": "52 min"},
+      {"stage": 8, "name": "Metal Farewell Show", "unlocks": "Metal Cred", "gate": "1,000,000 Metal Following", "sim": "64 min"},
+      {"stage": 9, "name": "Door Deal I", "unlocks": "the late twist: rooms stop eating, held Material multiplies room Cash", "gate": "metal_open and 1e10 Cash earned this chapter", "target": "about 2 h 10 min"},
+      {
+        "stage": 10,
+        "name": "Door Deal II-V, Writer's Block",
+        "unlocks": "larger twist coefficients; ten times room speed and pay",
+        "gate": "the previous stage cleared; metal_open",
+        "sim": "after the twist, within the hour"
+      },
+      {
+        "stage": 11,
+        "name": "Headline the Ballroom",
+        "unlocks": "capstone -> one Roadie, ch3_complete",
+        "gate": "400 Punk Cred, 100 Blues Cred, 50 Metal Cred",
+        "target": "about 2 h 10 min with Door Deal I; about 4 h 45 min with no event"
+      }
+    ],
+    "needsEngineWork": [
+      {
+        "item": "Red Tape (Ctrl C's Bureaucracy): 'buying anything drops yields to zero, recovering over a minute'.",
+        "status": "Not importable. Written in full in scopes.ch3.events.red_tape. John has not ruled whether to build these pieces.",
+        "pieces": [
+          "A purchase that runs an action: an upgrade can (UpgradeDefinition.actions), a generator purchase cannot - GeneratorDefinition declares no action list, so buying a piece has no moment content can hang a handicap on.",
+          "A multiplier that recovers over time: no MultiplierFormula kind reads time elapsed since a moment. A timer read through BuffActive in an appliesWhen switches a factor off and on; it does not ramp it back."
+        ],
+        "alsoBlocked": "Days Off (days_off, Ctrl C's PTO): its gate is red_tape_done, whose only setter is Red Tape's reward, so it is not importable either."
+      },
+      {
+        "item": "A false validator warning on every event here.",
+        "status": "Importable; warns.",
+        "pieces": [
+          "BalanceGoalWithoutReset fires for a Cash goal whose onEntry does not reset the HOST. The events here are hosted on the chapter and zero Cash with SetCurrency(cash, 0) after restarting the three scenes, which is the reset the warning asks for; the check only recognizes ResetScope or RestartScope of the host itself."
+        ]
+      }
+    ],
+    "modelNotes": {
+      "conditions": "Typed kinds with `type`, as Assets/Content writes them: CurrencyAtLeast / EarnedTotalAtLeast (threshold), OwnedCountAtLeast (count), FlagSet (flagId), All / Not, Always.",
+      "placement": "Lifetime is placement (design 2). The chapter (ch3) holds what all three scenes share and what every scene prestige keeps: Cash, the three Creds, the scene-open and event flags, the shared upgrades, the Cred and twist-free modifiers, the events and the capstone. Each scene tier holds what its own prestige clears: its Material, its Following, its writing bar and songwriter, its room and door, its pieces, its Jam producers, its opening trigger, its twist modifiers and (Punk only) Better Cables and Better Pickups.",
+      "scenePair": "Every bar here is a bar plus a generator, chapter 2's gig pair: the bar's onComplete is FireGeneratorYield naming the generator, and the generator's yield entries are the payout scaled by its owned count. A writing bar fires its songwriter (Material); a Punk piece bar fires its piece (Material, count = copies bought); a room fires its door (Cash and Following).",
+      "openingPurchase": "A fired yield is scaled by the generator's owned count, so a writing bar's songwriter and a room's door must be owned to pay. Each is bought once (baseCost 5, availableWhen Not(OwnedCountAtLeast(self, 1)) so the row cannot buy a second copy), and each scene's opening trigger grants the 10 Cash both cost. The trigger is declared in the scene's tier, so every reset of the scene re-arms it and the grant lands after the rung's SetCurrency(cash, 0). Validation refuses a generator baseCost of zero, which is why the grant exists.",
+      "room": "consumes [{scene material, 1}], fillAmount 1, fillRate 1: one set a second eats one Material. Bigger Room multiplies the door's yield (Cash and Following) and the room's consumption by the same factor, so a room short of Material earns the same and a room with spare Material earns more; Quick Changeovers multiplies the room's fill rate. A room carries no Jam tap: a tap is a payment into the bar's progress, and a paid completion does not drink, so a tapped room would pay Cash and Following for no Material.",
+      "cashWipe": "Each scene rung writes cash to 0 with SetCurrency. That moves the balance alone: the chapter's earned Cash total stands, so every reveal gated on EarnedTotalAtLeast(cash, ...) stays shown across scene prestiges. The capstone's ResetScope(ch3) is the only thing that clears that total.",
+      "credReach": "Each Cred modifier (punk_cred_material, ...) is declared on the chapter and listed in the chapter's permanentModifiers. Its effects target the scene's Material currency at `rate` and `yield` - the currency stage, gathered at the Material's home (the scene tier) outward, which meets the chapter. LinearOnBalance computes against that origin, so it reads the scene's Cred by walking out to the chapter. It multiplies Material production (the writing bar's and Punk pieces' fired lumps at yield, the Blues and Metal pieces at rate), never a bar's fill.",
+      "twistReach": "The twist's Cash factor reads the scene's Material balance, which lives in the scene tier; a modifier on the chapter cannot read it (its formula is validated, and computed, from where it is applied). So each scene declares its own five twist modifiers in its tier and lists them in its own permanentModifiers. Each targets that scene's door at Cash yield (stage 1, gathered from the door's scope, so LinearOnBalance finds the scene's Material) and is switched by appliesWhen on the chapter's Door Deal flags, which an event reward sets. Exactly one stage applies at a time: stage k applies while door_deal_k_done is set and door_deal_(k+1)_done is not.",
+      "roomsFree": "rooms_free is a chapter modifier with appliesWhen FlagSet(door_deal_1_done): {target: room, currencyId: material, stat: consumption, x0}. Zero is legal on consumption and means free, in the live tick and in the idle claim.",
+      "events": "All seven events are hosted on the chapter (design 6.1), one at a time. onEntry is RestartScope of each scene (each banks Cred through its own rung's gate, then clears the scene - verified in GameAction.RestartScope: the reach is the acting scope or a scope it encloses, and the scene tiers are enclosed by ch3), then SetCurrency(cash, 0). Cred, the shared upgrades and the flags are on the chapter and survive the entry. The opening triggers re-arm with the resets and grant their 10 Cash at the sweep after the list. onEnd is empty: the attempt is an ordinary run of the three scenes under a handicap, and it simply continues after dismissal. Rewards are lateral, never Cred.",
+      "jam": "One producer per writing bar and per Punk piece bar, named by the bar's `tap`, paying one second of progress (fillRate 1). They carry the `jam` tag, which Guest List multiplies.",
+      "groups": "One group per scene listing its bars; maxActive equals the bar count, so every bar runs at once, as Ctrl C runs every division bar. Writing and piece bars repeat always; a room repeats once Booking Agent is bought.",
+      "tags": "Declared on the chapter: material (the three Material currencies), room (the three room bars), door (the three door generators), writing (the three writing bars), songwriter (the three songwriter generators), piece (every piece generator and every Punk piece bar), jam (the Jam producers). The doors also carry root's `production`, so the Roadie active boost reaches their Cash line; their Following line is not income and the boost's currencyId narrowing keeps it out."
+    }
   },
   "chapter": {
-    "id": "ch03_local_venues",
+    "id": "ch3",
     "index": 3,
     "name": "Local Venues",
-    "theme": "The club on Third, the record store's back room, the legion hall. Places that book bands, each with its own crowd and its own idea of a good night.",
-    "storyBeatOpenDraft": "Turns out there are four stages in this town that will book a band, and every one of them wants something slightly different. You have a van, a set, and a phone number for a woman who books Thursdays."
+    "theme": "The club on Third books three nights a week and three different crowds. You play them all: loud and fast in the basement, slow and sad at the juke joint, heavy in the warehouse by the tracks. Each crowd wants new material, and each one you win over makes the next set easier to write."
   },
   "constants": {
-    "generatorCostGrowth": 1.2,
-    "recordBuff": {
-      "perRecord": 0.02,
-      "mode": "additive",
-      "affects": [
-        "cash"
-      ]
+    "priceScale": 0.001,
+    "priceScaleNote": "Every Ctrl C Career Capital amount - each price, each event goal - is multiplied by 0.001 here, and the original sits beside it as `ctrlC`. Simulated at 1x, a first clear takes well over ten hours: the room is the only Cash source and pays one per second at the start, so Ctrl C's first Faster Meetings level (4,045) alone is an hour away. At 0.001 the relative prices are Ctrl C's and the opening minutes move. Cycles, yields and multipliers are Ctrl C's unscaled.",
+    "generatorCostGrowth": 1.6,
+    "generatorCostGrowthNote": "Ctrl C's rate for chapters 1-3, on every piece.",
+    "credPerPoint": 0.01,
+    "credPerPointNote": "Ctrl C's +1% per Boost point, as LinearOnBalance(scene_cred, 0.01) on the scene's Material.",
+    "scenePrestige": {
+      "punk": {"gate": 3000000.0, "divisor": 100000.0, "exponent": 0.5, "reads": "EarnedThisRound", "firstPayout": 5, "capstoneGate": 400},
+      "blues": {"gate": 1000000000.0, "divisor": 10000000.0, "exponent": 0.5, "reads": "EarnedThisRound", "firstPayout": 10, "capstoneGate": 100},
+      "metal": {"gate": 1000000.0, "divisor": 40000.0, "exponent": 0.5, "reads": "EarnedThisRound", "firstPayout": 5, "capstoneGate": 50}
     },
-    "roomPayoutRecordBuff": {
-      "perRecord": 0.012,
-      "mode": "additive",
-      "affects": [
-        "room_payout"
-      ],
-      "note": "The chapter's prestige lever: Records raise what winning a room pays, never how fast a room fills (§11). Chapter 2 gets the same effect from the root Records modifier on Cash, since its payouts are Cash yields; rooms here pay Fans, so a chapter-local buff is needed and is deliberately NOT on the fan rate."
-    },
-    "fatigueFactorPerWin": 0.85,
-    "fatigueGrowthMode": "multiply",
-    "fatigueNote": "0.85 per win. Fatigue is introduced in THIS chapter, with rotation available from the start as its answer. With three rooms the player routes around it rather than hitting a wall."
+    "scenePrestigeNote": "Cred = floor((Following earned this round / divisor) ^ 0.5). The gate is set so the first press pays 5 to 10 Cred; each later press pays four times the Following for twice the Cred. Ctrl C's divisions scale their divisors apart (exp(-11.8), exp(-15.8), exp(-24.8)); here Metal's is the smallest, because before the twist Metal has only its writing bar (its pieces start at 1.1e19 Cash) and must still reach its capstone gate without any event.",
+    "doorDealCoefficients": [
+      {"stage": 1, "coefficient": 5.960464477539063e-08, "ctrlC": "2^-24"},
+      {"stage": 2, "coefficient": 1.1920928955078125e-07, "ctrlC": "2^-23"},
+      {"stage": 3, "coefficient": 2.384185791015625e-07, "ctrlC": "2^-22"},
+      {"stage": 4, "coefficient": 4.76837158203125e-07, "ctrlC": "2^-21"},
+      {"stage": 5, "coefficient": 9.5367431640625e-07, "ctrlC": "2^-20"}
+    ],
+    "doorDealOpensAtCashEarned": 10000000000.0,
+    "doorDealOpensNote": "Door Deal I opens once Metal is open and the chapter has earned 1e10 Cash. Its own goal (8.67e6 Cash) is quick by then; this gate is what places the twist late. Once rooms stop eating, every room plays at full speed whatever Material it holds, so Following and Cred jump within minutes (balanceTargets.twistNote)."
   },
-  "currencies": [
-    {
-      "id": "cash",
-      "group": "run"
-    },
-    {
-      "id": "fans",
-      "group": "run"
-    },
-    {
-      "id": "rehearsal",
-      "group": "run"
-    },
-    {
-      "id": "set_loud",
-      "group": "run",
-      "note": "One setlist currency per genre. A room names one as its fillCurrency — a direct reference, never an intersected target. This is how room taste is expressed without a preference table."
-    },
-    {
-      "id": "set_sad",
-      "group": "run"
-    },
-    {
-      "id": "set_fast",
-      "group": "run"
-    },
-    {
-      "id": "merch",
-      "group": "run",
-      "note": "Provisional — see openQuestions."
-    }
-  ],
-  "producers": [
-    {
-      "id": "set",
-      "contributions": [
+  "scopes": {
+    "ch3": {
+      "type": "ChapterDefinition",
+      "id": "ch3",
+      "displayName": "Local Venues",
+      "unlock": {"type": "FlagSet", "flagId": "ch2_complete", "uiText": "Win the Talent Show"},
+      "declaredTags": ["material", "room", "door", "writing", "songwriter", "piece", "jam"],
+      "flags": [
+        "blues_open",
+        "metal_open",
+        "rooms_booked",
+        "punk_release_revealed",
+        "blues_release_revealed",
+        "metal_release_revealed",
+        "door_deal_1_done",
+        "door_deal_2_done",
+        "door_deal_3_done",
+        "door_deal_4_done",
+        "door_deal_5_done",
+        "writers_block_done",
+        "red_tape_done"
+      ],
+      "flagsNote": "blues_open and metal_open are set by the Punk and Blues rungs and read by the Blues and Metal sections, opening triggers and the events. rooms_booked is Booking Agent's switch, read by every room's repeatWhen. The *_release_revealed flags keep each farewell show's card on screen once its gate was first met (a scene tier trigger sets them), since Following is a scene balance that the prestige clears. The done flags retire each event (completedWhen) and switch the twist modifiers and Days Off.",
+      "currencies": [
         {
-          "id": "set_loud_line",
-          "currency": "set_loud",
-          "amount": 1,
-          "feeds": "yield",
-          "gate": {
-            "type": "flagSet",
-            "flag": "songs_loud"
-          }
+          "id": "cash",
+          "displayName": "Cash",
+          "tags": ["income"],
+          "note": "The base resource, shared by all three scenes. Paid by the rooms; spent on everything; written to zero by every scene prestige and every event entry."
+        },
+        {"id": "punk_cred", "displayName": "Punk Cred", "note": "Prestige currency, paid by the Punk Farewell Show; +1% Punk Material per point; capstone gate 400."},
+        {"id": "blues_cred", "displayName": "Blues Cred", "note": "Paid by the Blues Farewell Show; +1% Blues Material per point; capstone gate 100."},
+        {"id": "metal_cred", "displayName": "Metal Cred", "note": "Paid by the Metal Farewell Show; +1% Metal Material per point; capstone gate 50."}
+      ],
+      "modifiers": [
+        {
+          "id": "punk_cred_material",
+          "effects": [
+            {"target": "punk_material", "stat": "rate", "formula": {"type": "LinearOnBalance", "currency": "punk_cred", "coefficient": 0.01}},
+            {"target": "punk_material", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "punk_cred", "coefficient": 0.01}}
+          ]
         },
         {
-          "id": "set_sad_line",
-          "currency": "set_sad",
-          "amount": 1,
-          "feeds": "yield",
-          "gate": {
-            "type": "flagSet",
-            "flag": "songs_sad"
-          }
+          "id": "blues_cred_material",
+          "effects": [
+            {"target": "blues_material", "stat": "rate", "formula": {"type": "LinearOnBalance", "currency": "blues_cred", "coefficient": 0.01}},
+            {"target": "blues_material", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "blues_cred", "coefficient": 0.01}}
+          ]
         },
         {
-          "id": "set_fast_line",
-          "currency": "set_fast",
-          "amount": 1,
-          "feeds": "yield",
-          "gate": {
-            "type": "flagSet",
-            "flag": "songs_fast"
-          }
+          "id": "metal_cred_material",
+          "effects": [
+            {"target": "metal_material", "stat": "rate", "formula": {"type": "LinearOnBalance", "currency": "metal_cred", "coefficient": 0.01}},
+            {"target": "metal_material", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "metal_cred", "coefficient": 0.01}}
+          ]
+        },
+        {
+          "id": "rooms_free",
+          "appliesWhen": {"type": "FlagSet", "flagId": "door_deal_1_done"},
+          "effects": [{"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 0}],
+          "note": "Door Deal I's first half: no room eats Material, live or idle."
+        },
+        {
+          "id": "room_x10",
+          "stacking": "Replace",
+          "effects": [{"target": "room", "stat": "rate", "multiplier": 10}, {"target": "door", "stat": "yield", "multiplier": 10}],
+          "note": "Writer's Block's reward, granted to ch3 by AddModifier: ten times every room's speed and ten times what its door pays."
         }
       ],
-      "note": "Fired by a room's `tap`. Pays every genre the player has songs for; each room drinks only its own, so a set you cannot play pays nothing into a room that wants it."
-    }
-  ],
-  "bars": {
-    "scope": "run",
-    "groups": [
-      {
-        "id": "song_list",
-        "name": "The Song List",
-        "maxActive": 1,
-        "note": "As Ch2, but songs now carry a genre tag and their reward multiplies that genre's line. The first song of a genre sets that genre's flag and opens its line.",
-        "bars": [
-          {
-            "id": "loud_1",
-            "name": "Feedback Symphony",
-            "tags": [
-              "loud"
-            ],
-            "fillCurrency": "rehearsal",
-            "fillAmount": 400,
-            "reward": "set_loud_x1_6",
-            "alsoSets": "songs_loud"
+      "permanentModifiers": ["punk_cred_material", "blues_cred_material", "metal_cred_material", "rooms_free"],
+      "upgrades": [
+        {
+          "id": "booking_agent",
+          "displayName": "Booking Agent",
+          "ctrlC": "Schedules",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "cost": 0.02,
+          "costCtrlC": 20,
+          "actions": [{"type": "SetFlag", "flagId": "rooms_booked"}],
+          "description": "Somebody else makes the calls: every room re-books itself after each set, and keeps playing while you are away.",
+          "note": "Bought once on the chapter, so it survives every scene prestige. Every room names it as its `automation`; its flag is what the rooms' repeatWhen reads.",
+          "scope": "ch3"
+        },
+        {
+          "id": "guest_list",
+          "displayName": "Guest List",
+          "ctrlC": "VIPs",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "levels": [
+            {"cost": 0.616, "ctrlC": 616, "effects": [{"target": "jam", "stat": "yield", "multiplier": 2}], "description": "Friends on the door: every Jam tap pushes a bar 2 times as far."},
+            {"cost": 1.34614, "ctrlC": 1346.14, "effects": [{"target": "jam", "stat": "yield", "multiplier": 4}], "description": "Friends on the door: every Jam tap pushes a bar 4 times as far."},
+            {"cost": 60.1743, "ctrlC": 60174.3, "effects": [{"target": "jam", "stat": "yield", "multiplier": 8}], "description": "Friends on the door: every Jam tap pushes a bar 8 times as far."},
+            {"cost": 543.074, "ctrlC": 543074, "effects": [{"target": "jam", "stat": "yield", "multiplier": 16}], "description": "Friends on the door: every Jam tap pushes a bar 16 times as far."},
+            {"cost": 2415080.0, "ctrlC": 2415080000.0, "effects": [{"target": "jam", "stat": "yield", "multiplier": 32}], "description": "Friends on the door: every Jam tap pushes a bar 32 times as far."}
+          ],
+          "note": "Ctrl C names no factor; x2 per level, replacing, is this sheet's pick.",
+          "scope": "ch3"
+        },
+        {
+          "id": "quick_changeovers",
+          "displayName": "Quick Changeovers",
+          "ctrlC": "Faster Meetings",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "levels": [
+            {"cost": 4.04473, "ctrlC": 4044.73, "effects": [{"target": "room", "stat": "rate", "multiplier": 3.198}], "description": "Gear off, gear on: every room plays 3.198 times as many sets a second."},
+            {"cost": 9.94674, "ctrlC": 9946.74, "effects": [{"target": "room", "stat": "rate", "multiplier": 5.194}], "description": "Gear off, gear on: every room plays 5.194 times as many sets a second."},
+            {"cost": 20.0303, "ctrlC": 20030.3, "effects": [{"target": "room", "stat": "rate", "multiplier": 8.564}], "description": "Gear off, gear on: every room plays 8.564 times as many sets a second."},
+            {"cost": 33.0243, "ctrlC": 33024.3, "effects": [{"target": "room", "stat": "rate", "multiplier": 14.32}], "description": "Gear off, gear on: every room plays 14.32 times as many sets a second."},
+            {"cost": 109.645, "ctrlC": 109645, "effects": [{"target": "room", "stat": "rate", "multiplier": 24.23}], "description": "Gear off, gear on: every room plays 24.23 times as many sets a second."},
+            {"cost": 364.033, "ctrlC": 364033, "effects": [{"target": "room", "stat": "rate", "multiplier": 41.48}], "description": "Gear off, gear on: every room plays 41.48 times as many sets a second."},
+            {"cost": 2433.89, "ctrlC": 2433890.0, "effects": [{"target": "room", "stat": "rate", "multiplier": 71.66}], "description": "Gear off, gear on: every room plays 71.66 times as many sets a second."},
+            {"cost": 14724.2, "ctrlC": 14724200.0, "effects": [{"target": "room", "stat": "rate", "multiplier": 124.8}], "description": "Gear off, gear on: every room plays 124.8 times as many sets a second."},
+            {"cost": 120240.0, "ctrlC": 120240000.0, "effects": [{"target": "room", "stat": "rate", "multiplier": 218.7}], "description": "Gear off, gear on: every room plays 218.7 times as many sets a second."},
+            {"cost": 799902.0, "ctrlC": 799902000.0, "effects": [{"target": "room", "stat": "rate", "multiplier": 385.5}], "description": "Gear off, gear on: every room plays 385.5 times as many sets a second."},
+            {"cost": 48508300.0, "ctrlC": 48508300000.0, "effects": [{"target": "room", "stat": "rate", "multiplier": 682.5}], "description": "Gear off, gear on: every room plays 682.5 times as many sets a second."},
+            {"cost": 239065000.0, "ctrlC": 239065000000.0, "effects": [{"target": "room", "stat": "rate", "multiplier": 1213.0}], "description": "Gear off, gear on: every room plays 1213 times as many sets a second."},
+            {"cost": 435604000.0, "ctrlC": 435604000000.0, "effects": [{"target": "room", "stat": "rate", "multiplier": 2160.0}], "description": "Gear off, gear on: every room plays 2160 times as many sets a second."},
+            {"cost": 2157560000.0, "ctrlC": 2157560000000.0, "effects": [{"target": "room", "stat": "rate", "multiplier": 3857.0}], "description": "Gear off, gear on: every room plays 3857 times as many sets a second."},
+            {
+              "cost": 17619000000.0,
+              "ctrlC": 17619000000000.0,
+              "effects": [{"target": "room", "stat": "rate", "multiplier": 6899.0}],
+              "description": "Gear off, gear on: every room plays 6899 times as many sets a second."
+            },
+            {
+              "cost": 159012000000.0,
+              "ctrlC": 159012000000000.0,
+              "effects": [{"target": "room", "stat": "rate", "multiplier": 12360.0}],
+              "description": "Gear off, gear on: every room plays 12360 times as many sets a second."
+            },
+            {
+              "cost": 583462000000.0,
+              "ctrlC": 583462000000000.0,
+              "effects": [{"target": "room", "stat": "rate", "multiplier": 22160.0}],
+              "description": "Gear off, gear on: every room plays 22160 times as many sets a second."
+            },
+            {
+              "cost": 4764650000000.0,
+              "ctrlC": 4764650000000000.0,
+              "effects": [{"target": "room", "stat": "rate", "multiplier": 39760.0}],
+              "description": "Gear off, gear on: every room plays 39760 times as many sets a second."
+            },
+            {
+              "cost": 47523500000000.0,
+              "ctrlC": 4.75235e+16,
+              "effects": [{"target": "room", "stat": "rate", "multiplier": 71400.0}],
+              "description": "Gear off, gear on: every room plays 71400 times as many sets a second."
+            }
+          ],
+          "factorFormula": "1.397941876^n + 1.8^n (Ctrl C's, recovered)",
+          "note": "A room's fill rate. It raises how fast a room plays and therefore what it eats per second; it is not a prestige currency, so design 11's rule on fill rates is not engaged.",
+          "scope": "ch3"
+        },
+        {
+          "id": "bigger_room",
+          "displayName": "Bigger Room",
+          "ctrlC": "Larger Meetings",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "levels": [
+            {
+              "cost": 27.0426,
+              "ctrlC": 27042.6,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 3.862}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 3.862}],
+              "description": "A bigger room: every set pays 3.862 times the Cash and Following, and eats 3.862 times the Material."
+            },
+            {
+              "cost": 66.1712,
+              "ctrlC": 66171.2,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 8.353}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 8.353}],
+              "description": "A bigger room: every set pays 8.353 times the Cash and Following, and eats 8.353 times the Material."
+            },
+            {
+              "cost": 179.872,
+              "ctrlC": 179872,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 19.59}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 19.59}],
+              "description": "A bigger room: every set pays 19.59 times the Cash and Following, and eats 19.59 times the Material."
+            },
+            {
+              "cost": 543.166,
+              "ctrlC": 543166,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 48.24}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 48.24}],
+              "description": "A bigger room: every set pays 48.24 times the Cash and Following, and eats 48.24 times the Material."
+            },
+            {
+              "cost": 19875.5,
+              "ctrlC": 19875500.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 122.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 122.0}],
+              "description": "A bigger room: every set pays 122 times the Cash and Following, and eats 122 times the Material."
+            },
+            {
+              "cost": 120240.0,
+              "ctrlC": 120240000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 313.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 313.0}],
+              "description": "A bigger room: every set pays 313 times the Cash and Following, and eats 313 times the Material."
+            },
+            {
+              "cost": 6564880.0,
+              "ctrlC": 6564880000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 808.3}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 808.3}],
+              "description": "A bigger room: every set pays 808.3 times the Cash and Following, and eats 808.3 times the Material."
+            },
+            {
+              "cost": 17845200.0,
+              "ctrlC": 17845200000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 2095.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 2095.0}],
+              "description": "A bigger room: every set pays 2095 times the Cash and Following, and eats 2095 times the Material."
+            },
+            {
+              "cost": 48508300.0,
+              "ctrlC": 48508300000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 5438.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 5438.0}],
+              "description": "A bigger room: every set pays 5438 times the Cash and Following, and eats 5438 times the Material."
+            },
+            {
+              "cost": 131859000.0,
+              "ctrlC": 131859000000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 14130.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 14130.0}],
+              "description": "A bigger room: every set pays 14130 times the Cash and Following, and eats 14130 times the Material."
+            },
+            {
+              "cost": 481417000.0,
+              "ctrlC": 481417000000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 36720.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 36720.0}],
+              "description": "A bigger room: every set pays 36720 times the Cash and Following, and eats 36720 times the Material."
+            },
+            {
+              "cost": 649845000.0,
+              "ctrlC": 649845000000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 95450.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 95450.0}],
+              "description": "A bigger room: every set pays 95450 times the Cash and Following, and eats 95450 times the Material."
+            },
+            {
+              "cost": 2157560000.0,
+              "ctrlC": 2157560000000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 248100.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 248100.0}],
+              "description": "A bigger room: every set pays 248100 times the Cash and Following, and eats 248100 times the Material."
+            },
+            {
+              "cost": 4344800000.0,
+              "ctrlC": 4344800000000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 645100.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 645100.0}],
+              "description": "A bigger room: every set pays 645100 times the Cash and Following, and eats 645100 times the Material."
+            },
+            {
+              "cost": 19472000000.0,
+              "ctrlC": 19472000000000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 1677000.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 1677000.0}],
+              "description": "A bigger room: every set pays 1.677e+06 times the Cash and Following, and eats 1.677e+06 times the Material."
+            },
+            {
+              "cost": 64649400000.0,
+              "ctrlC": 64649400000000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 4361000.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 4361000.0}],
+              "description": "A bigger room: every set pays 4.361e+06 times the Cash and Following, and eats 4.361e+06 times the Material."
+            },
+            {
+              "cost": 194218000000.0,
+              "ctrlC": 194218000000000.0,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 11340000.0}, {"target": "room", "currencyId": "material", "stat": "consumption", "multiplier": 11340000.0}],
+              "description": "A bigger room: every set pays 1.134e+07 times the Cash and Following, and eats 1.134e+07 times the Material."
+            }
+          ],
+          "factorFormula": "1.262266763^n + 2.6^n (Ctrl C's starting formula, recovered)",
+          "note": "The supply-versus-consumption decision: pay and appetite rise together, so it earns only where the scene makes more Material than its room eats. After Door Deal I the consumption half meets rooms_free's x0 and only the pay remains.",
+          "scope": "ch3"
+        },
+        {
+          "id": "late_night_practice",
+          "displayName": "Late-Night Practice",
+          "ctrlC": "Overtime",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "levels": [
+            {
+              "cost": 203.995,
+              "ctrlC": 203995,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 3.907}, {"target": "material", "stat": "yield", "multiplier": 3.907}],
+              "description": "Practice until the neighbors call: every scene makes 3.907 times the Material."
+            },
+            {
+              "cost": 111090.0,
+              "ctrlC": 111090000.0,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 9.325}, {"target": "material", "stat": "yield", "multiplier": 9.325}],
+              "description": "Practice until the neighbors call: every scene makes 9.325 times the Material."
+            },
+            {
+              "cost": 301974.0,
+              "ctrlC": 301974000.0,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 24.83}, {"target": "material", "stat": "yield", "multiplier": 24.83}],
+              "description": "Practice until the neighbors call: every scene makes 24.83 times the Material."
+            },
+            {
+              "cost": 820850.0,
+              "ctrlC": 820850000.0,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 69.31}, {"target": "material", "stat": "yield", "multiplier": 69.31}],
+              "description": "Practice until the neighbors call: every scene makes 69.31 times the Material."
+            },
+            {
+              "cost": 44816900.0,
+              "ctrlC": 44816900000.0,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 197.1}, {"target": "material", "stat": "yield", "multiplier": 197.1}],
+              "description": "Practice until the neighbors call: every scene makes 197.1 times the Material."
+            },
+            {
+              "cost": 1245930000.0,
+              "ctrlC": 1245930000000.0,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 564.1}, {"target": "material", "stat": "yield", "multiplier": 564.1}],
+              "description": "Practice until the neighbors call: every scene makes 564.1 times the Material."
+            },
+            {
+              "cost": 101482000000.0,
+              "ctrlC": 101482000000000.0,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 1619.0}, {"target": "material", "stat": "yield", "multiplier": 1619.0}],
+              "description": "Practice until the neighbors call: every scene makes 1619 times the Material."
+            },
+            {
+              "cost": 3714050000000.0,
+              "ctrlC": 3714050000000000.0,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 4649.0}, {"target": "material", "stat": "yield", "multiplier": 4649.0}],
+              "description": "Practice until the neighbors call: every scene makes 4649 times the Material."
+            },
+            {
+              "cost": 1148620000000000.0,
+              "ctrlC": 1.14862e+18,
+              "effects": [{"target": "material", "stat": "rate", "multiplier": 13360.0}, {"target": "material", "stat": "yield", "multiplier": 13360.0}],
+              "description": "Practice until the neighbors call: every scene makes 13360 times the Material."
+            }
+          ],
+          "factorFormula": "1.033456617^n + 2.873444387^n (Ctrl C's, recovered)",
+          "note": "Targets the three Material currencies by their tag at the currency stage, applied at the chapter, an ancestor of each Material's home.",
+          "scope": "ch3"
+        },
+        {
+          "id": "home_studio",
+          "displayName": "Home Studio",
+          "ctrlC": "WFH",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "levels": [
+            {"cost": 13316200000.0, "ctrlC": 13316200000000.0, "effects": [{"target": "piece", "stat": "cost", "multiplier": 0.01}], "description": "Gear bought for the house: every piece costs 0.01 of its price."},
+            {"cost": 120179000000.0, "ctrlC": 120179000000000.0, "effects": [{"target": "piece", "stat": "cost", "multiplier": 0.005}], "description": "Gear bought for the house: every piece costs 0.005 of its price."},
+            {
+              "cost": 2036480000000.0,
+              "ctrlC": 2036480000000000.0,
+              "effects": [{"target": "piece", "stat": "cost", "multiplier": 0.0025}],
+              "description": "Gear bought for the house: every piece costs 0.0025 of its price."
+            },
+            {"cost": 106828000000000.0, "ctrlC": 1.06828e+17, "effects": [{"target": "piece", "stat": "cost", "multiplier": 0.00125}], "description": "Gear bought for the house: every piece costs 0.00125 of its price."},
+            {"cost": 1.58547e+16, "ctrlC": 1.58547e+19, "effects": [{"target": "piece", "stat": "cost", "multiplier": 0.000625}], "description": "Gear bought for the house: every piece costs 0.000625 of its price."},
+            {"cost": 8.65639e+17, "ctrlC": 8.65639e+20, "effects": [{"target": "piece", "stat": "cost", "multiplier": 0.0003125}], "description": "Gear bought for the house: every piece costs 0.0003125 of its price."},
+            {"cost": 4.72623e+19, "ctrlC": 4.72623e+22, "effects": [{"target": "piece", "stat": "cost", "multiplier": 0.00015625}], "description": "Gear bought for the house: every piece costs 0.00015625 of its price."}
+          ],
+          "note": "Ctrl C: -99% at level 1, 'later levels apply further reductions' with no factor recovered; halving per level is this sheet's pick.",
+          "scope": "ch3"
+        },
+        {
+          "id": "tight_arrangements",
+          "displayName": "Tight Arrangements",
+          "ctrlC": "Optimization",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "cost": 7.87382e+20,
+          "costCtrlC": 7.87382e+23,
+          "effects": [{"target": "piece", "stat": "rate", "multiplier": 10}],
+          "description": "Every part locked in: every piece works ten times as fast.",
+          "note": "One target, two meanings by owner kind: on a Punk piece BAR `rate` is its fill speed, on a Blues or Metal piece GENERATOR it is its Material rate. Ctrl C's 10x.",
+          "scope": "ch3"
+        },
+        {
+          "id": "songwriting_retreat",
+          "displayName": "Songwriting Retreat",
+          "ctrlC": "Hardware Acceleration",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "cost": 3.52918e+27,
+          "costCtrlC": 3.52918e+30,
+          "effects": [{"target": "writing", "stat": "rate", "multiplier": 50}],
+          "description": "A week in a cabin with an acoustic: every writing bar runs fifty times as fast.",
+          "note": "Ctrl C's 50x on the main bars' speed.",
+          "scope": "ch3"
+        },
+        {
+          "id": "days_off",
+          "displayName": "Days Off",
+          "ctrlC": "PTO",
+          "gate": {"type": "FlagSet", "flagId": "red_tape_done", "uiText": "Clear Red Tape"},
+          "costCurrency": "cash",
+          "levels": [
+            {
+              "cost": 3.15282e+27,
+              "ctrlC": 3.15282e+30,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 10}, {"target": "material", "stat": "rate", "multiplier": 10}, {"target": "material", "stat": "yield", "multiplier": 10}],
+              "description": "Rested and hungry: rooms pay 10 times as much and every scene makes 10 times the Material."
+            },
+            {
+              "cost": 9.43751e+30,
+              "ctrlC": 9.43751e+33,
+              "effects": [{"target": "door", "stat": "yield", "multiplier": 100}, {"target": "material", "stat": "rate", "multiplier": 100}, {"target": "material", "stat": "yield", "multiplier": 100}],
+              "description": "Rested and hungry: rooms pay 100 times as much and every scene makes 100 times the Material."
+            }
+          ],
+          "note": "NOT IMPORTABLE until Red Tape is (needsEngineWork): red_tape_done has no other setter. Ctrl C: multiplies meeting yields and Progress growth; the factors x10 / x100 are this sheet's pick.",
+          "scope": "ch3"
+        }
+      ],
+      "events": [
+        {
+          "id": "door_deal_1",
+          "displayName": "Door Deal I",
+          "ctrlC": "Two Pizza Rule",
+          "description": "The club takes a bigger cut: rooms pay 1/2 of their Cash. Reach 8.66883e+06 Cash. Reward: rooms stop eating Material, and the Material a scene holds multiplies the Cash its room pays (x(1 + material x 2^-24)).",
+          "availableWhen": {
+            "type": "All",
+            "conditions": [{"type": "FlagSet", "flagId": "metal_open", "uiText": "Open the Metal scene"}, {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 10000000000.0, "uiText": "Earn 1e10 Cash this chapter"}]
           },
-          {
-            "id": "sad_1",
-            "name": "Basement Ballad",
-            "tags": [
-              "sad"
-            ],
-            "fillCurrency": "rehearsal",
-            "fillAmount": 400,
-            "reward": "set_sad_x1_6",
-            "alsoSets": "songs_sad"
-          },
-          {
-            "id": "fast_1",
-            "name": "Two-Minute Sprint",
-            "tags": [
-              "fast"
-            ],
-            "fillCurrency": "rehearsal",
-            "fillAmount": 400,
-            "reward": "set_fast_x1_6",
-            "alsoSets": "songs_fast"
-          },
-          {
-            "id": "loud_2",
-            "name": "The Loud One",
-            "tags": [
-              "loud"
-            ],
-            "fillCurrency": "rehearsal",
-            "fillAmount": 2400,
-            "reward": "set_loud_x2"
-          },
-          {
-            "id": "sad_2",
-            "name": "The Slow One",
-            "tags": [
-              "sad"
-            ],
-            "fillCurrency": "rehearsal",
-            "fillAmount": 2400,
-            "reward": "set_sad_x2"
-          },
-          {
-            "id": "fast_2",
-            "name": "Closing Number",
-            "tags": [
-              "fast"
-            ],
-            "fillCurrency": "rehearsal",
-            "fillAmount": 2400,
-            "reward": "set_fast_x2"
-          }
+          "completedWhen": {"type": "FlagSet", "flagId": "door_deal_1_done"},
+          "goal": {"type": "CurrencyAtLeast", "currency": "cash", "threshold": 8668830.0},
+          "goalCtrlC": 8668830000.0,
+          "timeLimitSeconds": 0,
+          "handicaps": [{"target": "door", "currencyId": "cash", "stat": "yield", "multiplier": 0.5}],
+          "onEntry": [{"type": "RestartScope", "scope": "punk_scene"}, {"type": "RestartScope", "scope": "blues_scene"}, {"type": "RestartScope", "scope": "metal_scene"}, {"type": "SetCurrency", "currency": "cash", "amount": 0}],
+          "rewards": [{"type": "SetFlag", "flagId": "door_deal_1_done"}],
+          "onEnd": []
+        },
+        {
+          "id": "door_deal_2",
+          "displayName": "Door Deal II",
+          "ctrlC": "Four Pizza Rule",
+          "description": "The club takes a bigger cut: rooms pay 1/4 of their Cash. Reach 2.94728e+16 Cash. Reward: the held-Material coefficient doubles to 2^-23.",
+          "availableWhen": {"type": "FlagSet", "flagId": "door_deal_1_done", "uiText": "Clear Door Deal I first"},
+          "completedWhen": {"type": "FlagSet", "flagId": "door_deal_2_done"},
+          "goal": {"type": "CurrencyAtLeast", "currency": "cash", "threshold": 2.94728e+16},
+          "goalCtrlC": 2.94728e+19,
+          "timeLimitSeconds": 0,
+          "handicaps": [{"target": "door", "currencyId": "cash", "stat": "yield", "multiplier": 0.25}],
+          "onEntry": [{"type": "RestartScope", "scope": "punk_scene"}, {"type": "RestartScope", "scope": "blues_scene"}, {"type": "RestartScope", "scope": "metal_scene"}, {"type": "SetCurrency", "currency": "cash", "amount": 0}],
+          "rewards": [{"type": "SetFlag", "flagId": "door_deal_2_done"}],
+          "onEnd": []
+        },
+        {
+          "id": "door_deal_3",
+          "displayName": "Door Deal III",
+          "ctrlC": "Eight Pizza Rule",
+          "description": "The club takes a bigger cut: rooms pay 1/8 of their Cash. Reach 5.05793e+21 Cash. Reward: the held-Material coefficient doubles to 2^-22.",
+          "availableWhen": {"type": "FlagSet", "flagId": "door_deal_2_done", "uiText": "Clear Door Deal II first"},
+          "completedWhen": {"type": "FlagSet", "flagId": "door_deal_3_done"},
+          "goal": {"type": "CurrencyAtLeast", "currency": "cash", "threshold": 5.05793e+21},
+          "goalCtrlC": 5.05793e+24,
+          "timeLimitSeconds": 0,
+          "handicaps": [{"target": "door", "currencyId": "cash", "stat": "yield", "multiplier": 0.125}],
+          "onEntry": [{"type": "RestartScope", "scope": "punk_scene"}, {"type": "RestartScope", "scope": "blues_scene"}, {"type": "RestartScope", "scope": "metal_scene"}, {"type": "SetCurrency", "currency": "cash", "amount": 0}],
+          "rewards": [{"type": "SetFlag", "flagId": "door_deal_3_done"}],
+          "onEnd": []
+        },
+        {
+          "id": "door_deal_4",
+          "displayName": "Door Deal IV",
+          "ctrlC": "Sixteen Pizza Rule",
+          "description": "The club takes a bigger cut: rooms pay 1/16 of their Cash. Reach 4.26253e+28 Cash. Reward: the held-Material coefficient doubles to 2^-21.",
+          "availableWhen": {"type": "FlagSet", "flagId": "door_deal_3_done", "uiText": "Clear Door Deal III first"},
+          "completedWhen": {"type": "FlagSet", "flagId": "door_deal_4_done"},
+          "goal": {"type": "CurrencyAtLeast", "currency": "cash", "threshold": 4.26253e+28},
+          "goalCtrlC": 4.26253e+31,
+          "timeLimitSeconds": 0,
+          "handicaps": [{"target": "door", "currencyId": "cash", "stat": "yield", "multiplier": 0.0625}],
+          "onEntry": [{"type": "RestartScope", "scope": "punk_scene"}, {"type": "RestartScope", "scope": "blues_scene"}, {"type": "RestartScope", "scope": "metal_scene"}, {"type": "SetCurrency", "currency": "cash", "amount": 0}],
+          "rewards": [{"type": "SetFlag", "flagId": "door_deal_4_done"}],
+          "onEnd": []
+        },
+        {
+          "id": "door_deal_5",
+          "displayName": "Door Deal V",
+          "ctrlC": "Thirty Two Pizza Rule",
+          "description": "The club takes a bigger cut: rooms pay 1/32 of their Cash. Reach 1.72854e+29 Cash. Reward: the held-Material coefficient doubles to 2^-20.",
+          "availableWhen": {"type": "FlagSet", "flagId": "door_deal_4_done", "uiText": "Clear Door Deal IV first"},
+          "completedWhen": {"type": "FlagSet", "flagId": "door_deal_5_done"},
+          "goal": {"type": "CurrencyAtLeast", "currency": "cash", "threshold": 1.72854e+29},
+          "goalCtrlC": 1.72854e+32,
+          "timeLimitSeconds": 0,
+          "handicaps": [{"target": "door", "currencyId": "cash", "stat": "yield", "multiplier": 0.03125}],
+          "onEntry": [{"type": "RestartScope", "scope": "punk_scene"}, {"type": "RestartScope", "scope": "blues_scene"}, {"type": "RestartScope", "scope": "metal_scene"}, {"type": "SetCurrency", "currency": "cash", "amount": 0}],
+          "rewards": [{"type": "SetFlag", "flagId": "door_deal_5_done"}],
+          "onEnd": []
+        },
+        {
+          "id": "writers_block",
+          "displayName": "Writer's Block",
+          "ctrlC": "Management Styles",
+          "description": "Nothing new comes: the writing bars make nothing. Reach 9.63471e+22 Cash on the pieces alone. Reward: every room plays ten times as fast and pays ten times as much.",
+          "availableWhen": {"type": "FlagSet", "flagId": "metal_open", "uiText": "Open the Metal scene"},
+          "completedWhen": {"type": "FlagSet", "flagId": "writers_block_done"},
+          "goal": {"type": "CurrencyAtLeast", "currency": "cash", "threshold": 9.63471e+22},
+          "goalCtrlC": 9.63471e+25,
+          "timeLimitSeconds": 0,
+          "handicaps": [{"target": "songwriter", "stat": "yield", "multiplier": 0}],
+          "onEntry": [{"type": "RestartScope", "scope": "punk_scene"}, {"type": "RestartScope", "scope": "blues_scene"}, {"type": "RestartScope", "scope": "metal_scene"}, {"type": "SetCurrency", "currency": "cash", "amount": 0}],
+          "rewards": [{"type": "AddModifier", "scope": "ch3", "modifier": "room_x10"}, {"type": "SetFlag", "flagId": "writers_block_done"}],
+          "onEnd": []
+        },
+        {
+          "id": "red_tape",
+          "displayName": "Red Tape",
+          "ctrlC": "Bureaucracy",
+          "importable": false,
+          "status": "NOT IMPORTABLE. Needs a purchase that can run an action (a generator purchase has none) and a multiplier that recovers over time (no formula reads elapsed time). John has not ruled whether to build either (_meta.needsEngineWork).",
+          "description": "Every purchase needs three signatures: buying anything drops every yield to zero, and yields recover to normal over a minute. Reach 4.25152e+29 Cash. Reward: unlocks Days Off.",
+          "availableWhen": {"type": "FlagSet", "flagId": "metal_open", "uiText": "Open the Metal scene"},
+          "completedWhen": {"type": "FlagSet", "flagId": "red_tape_done"},
+          "goal": {"type": "CurrencyAtLeast", "currency": "cash", "threshold": 4.25152e+29},
+          "goalCtrlC": 4.25152e+32,
+          "timeLimitSeconds": 0,
+          "handicapAsCtrlCHasIt": "On every purchase - a piece, a songwriter, a door, an upgrade level - every yield (every Material and Cash production, live and idle) falls to zero and recovers to its full value over 60 seconds after the purchase. Ctrl C's note: 'it may seem like purchases don't do anything for quite a long time upon buying them.'",
+          "onEntry": [{"type": "RestartScope", "scope": "punk_scene"}, {"type": "RestartScope", "scope": "blues_scene"}, {"type": "RestartScope", "scope": "metal_scene"}, {"type": "SetCurrency", "currency": "cash", "amount": 0}],
+          "rewards": [{"type": "SetFlag", "flagId": "red_tape_done"}],
+          "onEnd": []
+        }
+      ],
+      "rung": {
+        "label": "Headline the Ballroom",
+        "info": "The night the three scenes come to one show. Play it and you walk away with another Roadie who stays with the band for good.",
+        "confirmText": "The town starts over from nothing: every Cred, the Cash, all three scenes and every upgrade go, and only the Roadie comes with you.",
+        "offerCondition": {
+          "type": "All",
+          "conditions": [
+            {"type": "CurrencyAtLeast", "currency": "punk_cred", "threshold": 400, "uiText": "Requires 400 Punk Cred"},
+            {"type": "CurrencyAtLeast", "currency": "blues_cred", "threshold": 100, "uiText": "Requires 100 Blues Cred"},
+            {"type": "CurrencyAtLeast", "currency": "metal_cred", "threshold": 50, "uiText": "Requires 50 Metal Cred"}
+          ]
+        },
+        "actions": [{"type": "AddCurrency", "currencies": ["roadies"], "amount": 1}, {"type": "SetFlag", "flagId": "ch3_complete"}, {"type": "ResetScope", "scope": "ch3"}],
+        "note": "The capstone (design 6): gates on all three Creds, pays one Roadie, sets the root completion flag, resets the whole chapter. The three gates are the primary pacing knob."
+      },
+      "storyBeats": [
+        {
+          "id": "story_ch3_open",
+          "displayName": "The Club on Third",
+          "availableWhen": {"type": "Always"},
+          "seenFlag": "story_ch3_open_seen",
+          "text": "The woman from the club on Third books punk on Mondays, blues on Thursdays and metal when nobody else will take the room. She says the trick is to have something new every week. The basement has a PA, a drain in the floor and thirty kids who want it loud. Write fast."
+        },
+        {
+          "id": "story_ch3_end",
+          "displayName": "The Ballroom",
+          "availableWhen": {"type": "FlagSet", "flagId": "ch3_complete", "uiText": "Headline the Ballroom"},
+          "seenFlag": "story_ch3_end_seen",
+          "text": "The punks, the blues regulars and the metal kids have never been in one room before. Tonight it is the ballroom, your name at the top of the bill, and all three crowds sing the same chorus back at you. Someone from a booking agency two states over leaves a card on the monitor. Dave says the van will make it. Probably."
+        }
+      ],
+      "storyBeatsNote": "Placeholder text for John to revise. Root declares ch3_complete, story_ch3_open_seen and story_ch3_end_seen beside chapter 2's (a root.json addition when this is typed).",
+      "upgradesNote": "Ctrl C's shared upgrades, bought with Cash and declared on the chapter so they survive every scene prestige, as Ctrl C's survive division prestiges. Names are placeholders for John to revise; `ctrlC` names the original. A levelled upgrade's levels REPLACE (design 4): level n applies exactly level n's factor.",
+      "eventsNote": "Hosted on the chapter, one at a time (design 6.1). Untimed: the attempt pauses nothing and earns idle like any run. Goals are Ctrl C's Career Capital targets times priceScale. Door Deal's handicap halves room Cash per stage and leaves Following alone - Ctrl C halves the meeting's Career Capital, and Following is the release meter, not the Cash a room pays. Each stage is its own event gated on the previous stage's done flag and retired by its own (design 6.1 'Levels'). Writer's Block's handicap names the songwriter generators: the writing bars still run, and their yield pays nothing."
+    },
+    "punk_scene": {
+      "type": "TierDefinition",
+      "id": "punk_scene",
+      "parent": "ch3",
+      "ctrlC": "Networking division",
+      "currencies": [
+        {"id": "punk_material", "displayName": "Punk Material", "tags": ["material"], "note": "What the scene writes and its room eats. No income tag."},
+        {"id": "punk_following", "displayName": "Punk Following", "note": "The scene's release meter: paid by its room, read by its rung. Never spent; no income tag."}
+      ],
+      "generators": [
+        {
+          "id": "punk_songwriter",
+          "displayName": "Punk Songwriting",
+          "tags": ["songwriter"],
+          "availableWhen": {"type": "Not", "condition": {"type": "OwnedCountAtLeast", "generator": "punk_songwriter", "count": 1}},
+          "costCurrency": "cash",
+          "baseCost": 5,
+          "growth": 1.6,
+          "produces": [{"currency": "punk_material", "stat": "yield", "value": 1}],
+          "note": "Bought once (openingPurchase). Its yield is the writing bar's lump: Ctrl C's main-bar Progress."
+        },
+        {
+          "id": "punk_door",
+          "displayName": "Basement Door",
+          "tags": ["door", "production"],
+          "availableWhen": {"type": "Not", "condition": {"type": "OwnedCountAtLeast", "generator": "punk_door", "count": 1}},
+          "costCurrency": "cash",
+          "baseCost": 5,
+          "growth": 1.6,
+          "produces": [{"currency": "cash", "stat": "yield", "value": 1}, {"currency": "punk_following", "stat": "yield", "value": 1}],
+          "note": "Bought once. What one set pays: 1 Cash (the chapter's) and 1 Following (the scene's)."
+        },
+        {
+          "id": "three_chords",
+          "displayName": "Three Chords",
+          "tags": ["piece"],
+          "ctrlC": "Internal Networking",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 0.03},
+          "costCurrency": "cash",
+          "baseCost": 0.03,
+          "baseCostCtrlC": 30,
+          "growth": 1.6,
+          "produces": [{"currency": "punk_material", "stat": "yield", "value": 25.2797}]
+        },
+        {
+          "id": "fuzz_pedal",
+          "displayName": "Fuzz Pedal",
+          "tags": ["piece"],
+          "ctrlC": "External Networking",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 9.89713},
+          "costCurrency": "cash",
+          "baseCost": 9.89713,
+          "baseCostCtrlC": 9897.13,
+          "growth": 1.6,
+          "produces": [{"currency": "punk_material", "stat": "yield", "value": 38.5735}]
+        },
+        {
+          "id": "four_track",
+          "displayName": "Four-Track",
+          "tags": ["piece"],
+          "ctrlC": "Networking Protocols",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 3755.21},
+          "costCurrency": "cash",
+          "baseCost": 3755.21,
+          "baseCostCtrlC": 3755210.0,
+          "growth": 1.6,
+          "produces": [{"currency": "punk_material", "stat": "yield", "value": 64.4008}]
+        }
+      ],
+      "bars": [
+        {
+          "id": "punk_writing",
+          "displayName": "Write Punk Songs",
+          "tags": ["writing"],
+          "consumes": [],
+          "fillAmount": 12,
+          "fillRate": 1,
+          "repeatWhen": {"type": "Always"},
+          "tap": "jam_punk_writing",
+          "level": "punk_songwriter",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "punk_songwriter", "count": 1, "uiText": "Start writing punk songs"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "punk_songwriter"}],
+          "note": "Ctrl C's 12 s main bar. Fills from time and Jam taps; pays its songwriter's yield."
+        },
+        {
+          "id": "punk_room",
+          "displayName": "The Basement",
+          "tags": ["room"],
+          "consumes": [{"currency": "punk_material", "amount": 1}],
+          "fillAmount": 1,
+          "fillRate": 1,
+          "repeatWhen": {"type": "FlagSet", "flagId": "rooms_booked"},
+          "level": "punk_door",
+          "automation": "booking_agent",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "punk_door", "count": 1, "uiText": "Book The Basement"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "punk_door"}],
+          "note": "Ctrl C's Attend Meeting. No tap (modelNotes.room). Until Booking Agent it is the manual team: one set, then the player starts it again."
+        },
+        {
+          "id": "three_chords_bar",
+          "displayName": "Three Chords",
+          "tags": ["piece"],
+          "consumes": [],
+          "fillAmount": 4,
+          "fillRate": 1,
+          "repeatWhen": {"type": "Always"},
+          "tap": "jam_three_chords",
+          "level": "three_chords",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "three_chords", "count": 1, "uiText": "Buy Three Chords"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "three_chords"}]
+        },
+        {
+          "id": "fuzz_pedal_bar",
+          "displayName": "Fuzz Pedal",
+          "tags": ["piece"],
+          "consumes": [],
+          "fillAmount": 6,
+          "fillRate": 1,
+          "repeatWhen": {"type": "Always"},
+          "tap": "jam_fuzz_pedal",
+          "level": "fuzz_pedal",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "fuzz_pedal", "count": 1, "uiText": "Buy Fuzz Pedal"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "fuzz_pedal"}]
+        },
+        {
+          "id": "four_track_bar",
+          "displayName": "Four-Track",
+          "tags": ["piece"],
+          "consumes": [],
+          "fillAmount": 10,
+          "fillRate": 1,
+          "repeatWhen": {"type": "Always"},
+          "tap": "jam_four_track",
+          "level": "four_track",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "four_track", "count": 1, "uiText": "Buy Four-Track"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "four_track"}]
+        }
+      ],
+      "producers": [
+        {"id": "jam_punk_writing", "displayName": "Jam", "tags": ["jam"], "produces": [{"bar": "punk_writing", "stat": "yield", "value": 1}]},
+        {"id": "jam_three_chords", "displayName": "Jam", "tags": ["jam"], "produces": [{"bar": "three_chords_bar", "stat": "yield", "value": 1}]},
+        {"id": "jam_fuzz_pedal", "displayName": "Jam", "tags": ["jam"], "produces": [{"bar": "fuzz_pedal_bar", "stat": "yield", "value": 1}]},
+        {"id": "jam_four_track", "displayName": "Jam", "tags": ["jam"], "produces": [{"bar": "four_track_bar", "stat": "yield", "value": 1}]}
+      ],
+      "groups": [{"id": "punk_stage", "maxActive": 5, "members": ["punk_writing", "three_chords_bar", "fuzz_pedal_bar", "four_track_bar", "punk_room"]}],
+      "triggers": [
+        {
+          "id": "punk_opening",
+          "condition": {"type": "Always"},
+          "actions": [{"type": "AddCurrency", "currencies": ["cash"], "amount": 10}],
+          "note": "Pays for the songwriter and the door at every start of the scene's life (modelNotes.openingPurchase)."
+        },
+        {"id": "reveal_punk_release", "condition": {"type": "CurrencyAtLeast", "currency": "punk_following", "threshold": 3000000.0}, "actions": [{"type": "SetFlag", "flagId": "punk_release_revealed"}]}
+      ],
+      "modifiers": [
+        {
+          "id": "punk_twist_1",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_1_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_2_done"}}]},
+          "effects": [{"target": "punk_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "punk_material", "coefficient": 5.960464477539063e-08}}],
+          "coefficientCtrlC": "2^-24"
+        },
+        {
+          "id": "punk_twist_2",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_2_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_3_done"}}]},
+          "effects": [{"target": "punk_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "punk_material", "coefficient": 1.1920928955078125e-07}}],
+          "coefficientCtrlC": "2^-23"
+        },
+        {
+          "id": "punk_twist_3",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_3_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_4_done"}}]},
+          "effects": [{"target": "punk_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "punk_material", "coefficient": 2.384185791015625e-07}}],
+          "coefficientCtrlC": "2^-22"
+        },
+        {
+          "id": "punk_twist_4",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_4_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_5_done"}}]},
+          "effects": [{"target": "punk_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "punk_material", "coefficient": 4.76837158203125e-07}}],
+          "coefficientCtrlC": "2^-21"
+        },
+        {
+          "id": "punk_twist_5",
+          "appliesWhen": {"type": "FlagSet", "flagId": "door_deal_5_done"},
+          "effects": [{"target": "punk_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "punk_material", "coefficient": 9.5367431640625e-07}}],
+          "coefficientCtrlC": "2^-20"
+        }
+      ],
+      "permanentModifiers": ["punk_twist_1", "punk_twist_2", "punk_twist_3", "punk_twist_4", "punk_twist_5"],
+      "rung": {
+        "label": "Punk Farewell Show",
+        "info": "Say goodbye to the punk scene for now. The bigger the crowd you built, the more Cred you take with you, and every point of Punk Cred makes the scene write 1% more Material.",
+        "confirmText": "The punk scene starts over: its Material, Following, pieces and room go, and so does all your Cash. The other scenes and every Office upgrade stay.",
+        "offerCondition": {"type": "CurrencyAtLeast", "currency": "punk_following", "threshold": 3000000.0, "uiText": "Requires 3,000,000 Punk Following"},
+        "actions": [
+          {"type": "AddCurrency", "currencies": ["punk_cred"], "formula": {"type": "RootCurveFormula", "currency": "punk_following", "reads": "EarnedThisRound", "divisor": 100000.0, "exponent": 0.5}},
+          {"type": "SetFlag", "flagId": "blues_open"},
+          {"type": "SetCurrency", "currency": "cash", "amount": 0},
+          {"type": "ResetScope", "scope": "punk_scene"}
         ]
       },
-      {
-        "id": "the_circuit",
-        "name": "The Circuit",
-        "maxActive": 1,
-        "maxActiveUnlocks": [
-          {
-            "value": 2,
-            "grantedBy": "upgrade:book_two_nights"
-          },
-          {
-            "value": 3,
-            "grantedBy": "upgrade:the_circuit_run"
-          }
-        ],
-        "maxActiveNote": "The chapter's arc. One room is a residency; three is a circuit. §12.7: raising maxActive is an unlock, not a multiplier. `setMaxActive` as an upgrade payload does not exist in code yet.",
-        "bars": [
-          {
-            "id": "the_club_on_third",
-            "name": "The Club on Third",
-            "tags": [
-              "room",
-              "loud"
-            ],
-            "fillCurrency": "set_loud",
-            "fillAmount": 60,
-            "tap": "set",
-            "repeatWhen": {
-              "type": "always"
+      "upgrades": [
+        {
+          "id": "better_cables",
+          "displayName": "Better Cables",
+          "ctrlC": "Better Cables",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "levels": [
+            {
+              "cost": 3.05031,
+              "ctrlC": 3050.31,
+              "effects": [
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "three_chords", "coefficient": 0.01, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "fuzz_pedal", "coefficient": 0.01, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "four_track", "coefficient": 0.01, "purchasedOnly": true}}
+              ],
+              "description": "Every Punk piece you own speeds the punk writing bar by 1% (each piece's count, multiplied together)."
             },
-            "reward": "room_won_small",
-            "perFill": [
-              {
-                "effect": "room_fatigue",
-                "growth": "multiply"
-              }
-            ]
-          },
-          {
-            "id": "the_back_room",
-            "name": "The Record Store Back Room",
-            "tags": [
-              "room",
-              "sad"
-            ],
-            "fillCurrency": "set_sad",
-            "fillAmount": 60,
-            "tap": "set",
-            "repeatWhen": {
-              "type": "always"
+            {
+              "cost": 13565.0,
+              "ctrlC": 13565000.0,
+              "effects": [
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "three_chords", "coefficient": 0.02, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "fuzz_pedal", "coefficient": 0.02, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "four_track", "coefficient": 0.02, "purchasedOnly": true}}
+              ],
+              "description": "Every Punk piece you own speeds the punk writing bar by 2% (each piece's count, multiplied together)."
             },
-            "reward": "room_won_small",
-            "perFill": [
-              {
-                "effect": "room_fatigue",
-                "growth": "multiply"
-              }
-            ]
-          },
-          {
-            "id": "the_all_ages",
-            "name": "The All-Ages Matinee",
-            "tags": [
-              "room",
-              "fast"
-            ],
-            "fillCurrency": "set_fast",
-            "fillAmount": 60,
-            "tap": "set",
-            "repeatWhen": {
-              "type": "always"
+            {
+              "cost": 35756600.0,
+              "ctrlC": 35756600000.0,
+              "effects": [
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "three_chords", "coefficient": 0.04, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "fuzz_pedal", "coefficient": 0.04, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "four_track", "coefficient": 0.04, "purchasedOnly": true}}
+              ],
+              "description": "Every Punk piece you own speeds the punk writing bar by 4% (each piece's count, multiplied together)."
             },
-            "reward": "room_won_small",
-            "perFill": [
-              {
-                "effect": "room_fatigue",
-                "growth": "multiply"
-              }
-            ]
-          },
-          {
-            "id": "the_legion_hall",
-            "name": "The Legion Hall",
-            "tags": [
-              "room",
-              "loud"
-            ],
-            "fillCurrency": "set_loud",
-            "fillAmount": 400,
-            "tap": "set",
-            "repeatWhen": {
-              "type": "always"
+            {
+              "cost": 99382800000.0,
+              "ctrlC": 99382800000000.0,
+              "effects": [
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "three_chords", "coefficient": 0.08, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "fuzz_pedal", "coefficient": 0.08, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "four_track", "coefficient": 0.08, "purchasedOnly": true}}
+              ],
+              "description": "Every Punk piece you own speeds the punk writing bar by 8% (each piece's count, multiplied together)."
             },
-            "reward": "room_won_large",
-            "perFill": [
-              {
-                "effect": "room_fatigue",
-                "growth": "multiply"
-              }
-            ],
-            "availableWhen": {
-              "type": "currency",
-              "currency": "fans",
-              "value": 1500
+            {
+              "cost": 296256000000000.0,
+              "ctrlC": 2.96256e+17,
+              "effects": [
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "three_chords", "coefficient": 0.16, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "fuzz_pedal", "coefficient": 0.16, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "four_track", "coefficient": 0.16, "purchasedOnly": true}}
+              ],
+              "description": "Every Punk piece you own speeds the punk writing bar by 16% (each piece's count, multiplied together)."
             },
-            "note": "A big room of a genre the player already has. Two loud rooms is deliberate — it tests whether genre or room size drives the choice."
-          }
+            {
+              "cost": 6.52547e+18,
+              "ctrlC": 6.52547e+21,
+              "effects": [
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "three_chords", "coefficient": 0.32, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "fuzz_pedal", "coefficient": 0.32, "purchasedOnly": true}},
+                {"target": "punk_writing", "stat": "rate", "formula": {"type": "LinearOnOwnedCount", "generator": "four_track", "coefficient": 0.32, "purchasedOnly": true}}
+              ],
+              "description": "Every Punk piece you own speeds the punk writing bar by 32% (each piece's count, multiplied together)."
+            }
+          ],
+          "note": "Ctrl C: 'component upgrades increase the speed of their accompanying main bar', coefficient not recovered; 1% per piece doubling per level is this sheet's pick. Declared in punk_scene, so the Punk prestige clears it and it reaches Punk's writing bar alone.",
+          "scope": "punk_scene"
+        },
+        {
+          "id": "better_pickups",
+          "displayName": "Better Pickups",
+          "ctrlC": "Better Switches",
+          "gate": {"type": "Always"},
+          "costCurrency": "cash",
+          "levels": [
+            {
+              "cost": 42741700000.0,
+              "ctrlC": 42741700000000.0,
+              "effects": [{"target": "punk_songwriter", "stat": "yield", "multiplier": 2}],
+              "description": "Hotter pickups: every punk song written pays 2 times the Material."
+            },
+            {
+              "cost": 301147000000.0,
+              "ctrlC": 301147000000000.0,
+              "effects": [{"target": "punk_songwriter", "stat": "yield", "multiplier": 4}],
+              "description": "Hotter pickups: every punk song written pays 4 times the Material."
+            },
+            {
+              "cost": 897707000000000.0,
+              "ctrlC": 8.97707e+17,
+              "effects": [{"target": "punk_songwriter", "stat": "yield", "multiplier": 8}],
+              "description": "Hotter pickups: every punk song written pays 8 times the Material."
+            },
+            {"cost": 2.24851e+17, "ctrlC": 2.24851e+20, "effects": [{"target": "punk_songwriter", "stat": "yield", "multiplier": 16}], "description": "Hotter pickups: every punk song written pays 16 times the Material."},
+            {"cost": 2.70407e+23, "ctrlC": 2.70407e+26, "effects": [{"target": "punk_songwriter", "stat": "yield", "multiplier": 32}], "description": "Hotter pickups: every punk song written pays 32 times the Material."},
+            {"cost": 4.14554e+26, "ctrlC": 4.14554e+29, "effects": [{"target": "punk_songwriter", "stat": "yield", "multiplier": 64}], "description": "Hotter pickups: every punk song written pays 64 times the Material."}
+          ],
+          "note": "Ctrl C: 'increases the yields of each main bar', factor not recovered; x2 per level, replacing, is this sheet's pick. In punk_scene, so it reaches Punk's writing alone and the Punk prestige clears it.",
+          "scope": "punk_scene"
+        }
+      ],
+      "declaresNote": "Ctrl C's first division also carries Better Cables and Better Switches, which its prestige clears; here they are tier upgrades, so their placement is that clear."
+    },
+    "blues_scene": {
+      "type": "TierDefinition",
+      "id": "blues_scene",
+      "parent": "ch3",
+      "ctrlC": "Storage division",
+      "currencies": [
+        {"id": "blues_material", "displayName": "Blues Material", "tags": ["material"], "note": "What the scene writes and its room eats. No income tag."},
+        {"id": "blues_following", "displayName": "Blues Following", "note": "The scene's release meter: paid by its room, read by its rung. Never spent; no income tag."}
+      ],
+      "generators": [
+        {
+          "id": "blues_songwriter",
+          "displayName": "Blues Songwriting",
+          "tags": ["songwriter"],
+          "availableWhen": {"type": "Not", "condition": {"type": "OwnedCountAtLeast", "generator": "blues_songwriter", "count": 1}},
+          "costCurrency": "cash",
+          "baseCost": 5,
+          "growth": 1.6,
+          "produces": [{"currency": "blues_material", "stat": "yield", "value": 10.8482}],
+          "note": "Bought once (openingPurchase). Its yield is the writing bar's lump: Ctrl C's main-bar Progress."
+        },
+        {
+          "id": "blues_door",
+          "displayName": "Juke Joint Door",
+          "tags": ["door", "production"],
+          "availableWhen": {"type": "Not", "condition": {"type": "OwnedCountAtLeast", "generator": "blues_door", "count": 1}},
+          "costCurrency": "cash",
+          "baseCost": 5,
+          "growth": 1.6,
+          "produces": [{"currency": "cash", "stat": "yield", "value": 1}, {"currency": "blues_following", "stat": "yield", "value": 1}],
+          "note": "Bought once. What one set pays: 1 Cash (the chapter's) and 1 Following (the scene's)."
+        },
+        {
+          "id": "slide_guitar",
+          "displayName": "Slide Guitar",
+          "tags": ["piece"],
+          "ctrlC": "HDD",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 55873.5},
+          "costCurrency": "cash",
+          "baseCost": 55873.5,
+          "baseCostCtrlC": 55873500.0,
+          "growth": 1.6,
+          "produces": [{"currency": "blues_material", "stat": "rate", "value": 85}]
+        },
+        {
+          "id": "harmonica",
+          "displayName": "Harmonica",
+          "tags": ["piece"],
+          "ctrlC": "SSD",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 613076.0},
+          "costCurrency": "cash",
+          "baseCost": 613076.0,
+          "baseCostCtrlC": 613076000.0,
+          "growth": 1.6,
+          "produces": [{"currency": "blues_material", "stat": "rate", "value": 83.6392}]
+        },
+        {
+          "id": "hammond_organ",
+          "displayName": "Hammond Organ",
+          "tags": ["piece"],
+          "ctrlC": "CDN",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 1318820.0},
+          "costCurrency": "cash",
+          "baseCost": 1318820.0,
+          "baseCostCtrlC": 1318820000.0,
+          "growth": 1.6,
+          "produces": [{"currency": "blues_material", "stat": "rate", "value": 75.6799}]
+        },
+        {
+          "id": "horn_section",
+          "displayName": "Horn Section",
+          "tags": ["piece"],
+          "ctrlC": "Memory Cache",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 72004900.0},
+          "costCurrency": "cash",
+          "baseCost": 72004900.0,
+          "baseCostCtrlC": 72004900000.0,
+          "growth": 1.6,
+          "produces": [{"currency": "blues_material", "stat": "rate", "value": 75.6799}]
+        }
+      ],
+      "bars": [
+        {
+          "id": "blues_writing",
+          "displayName": "Write Blues Songs",
+          "tags": ["writing"],
+          "consumes": [],
+          "fillAmount": 12,
+          "fillRate": 1,
+          "repeatWhen": {"type": "Always"},
+          "tap": "jam_blues_writing",
+          "level": "blues_songwriter",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "blues_songwriter", "count": 1, "uiText": "Start writing blues songs"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "blues_songwriter"}],
+          "note": "Ctrl C's 12 s main bar. Fills from time and Jam taps; pays its songwriter's yield."
+        },
+        {
+          "id": "blues_room",
+          "displayName": "The Juke Joint",
+          "tags": ["room"],
+          "consumes": [{"currency": "blues_material", "amount": 1}],
+          "fillAmount": 1,
+          "fillRate": 1,
+          "repeatWhen": {"type": "FlagSet", "flagId": "rooms_booked"},
+          "level": "blues_door",
+          "automation": "booking_agent",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "blues_door", "count": 1, "uiText": "Book The Juke Joint"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "blues_door"}],
+          "note": "Ctrl C's Attend Meeting. No tap (modelNotes.room). Until Booking Agent it is the manual team: one set, then the player starts it again."
+        }
+      ],
+      "producers": [{"id": "jam_blues_writing", "displayName": "Jam", "tags": ["jam"], "produces": [{"bar": "blues_writing", "stat": "yield", "value": 1}]}],
+      "groups": [{"id": "blues_stage", "maxActive": 2, "members": ["blues_writing", "blues_room"]}],
+      "triggers": [
+        {
+          "id": "blues_opening",
+          "condition": {"type": "FlagSet", "flagId": "blues_open"},
+          "actions": [{"type": "AddCurrency", "currencies": ["cash"], "amount": 10}],
+          "note": "Pays for the songwriter and the door at every start of the scene's life (modelNotes.openingPurchase)."
+        },
+        {"id": "reveal_blues_release", "condition": {"type": "CurrencyAtLeast", "currency": "blues_following", "threshold": 1000000000.0}, "actions": [{"type": "SetFlag", "flagId": "blues_release_revealed"}]}
+      ],
+      "modifiers": [
+        {
+          "id": "blues_twist_1",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_1_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_2_done"}}]},
+          "effects": [{"target": "blues_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "blues_material", "coefficient": 5.960464477539063e-08}}],
+          "coefficientCtrlC": "2^-24"
+        },
+        {
+          "id": "blues_twist_2",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_2_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_3_done"}}]},
+          "effects": [{"target": "blues_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "blues_material", "coefficient": 1.1920928955078125e-07}}],
+          "coefficientCtrlC": "2^-23"
+        },
+        {
+          "id": "blues_twist_3",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_3_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_4_done"}}]},
+          "effects": [{"target": "blues_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "blues_material", "coefficient": 2.384185791015625e-07}}],
+          "coefficientCtrlC": "2^-22"
+        },
+        {
+          "id": "blues_twist_4",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_4_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_5_done"}}]},
+          "effects": [{"target": "blues_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "blues_material", "coefficient": 4.76837158203125e-07}}],
+          "coefficientCtrlC": "2^-21"
+        },
+        {
+          "id": "blues_twist_5",
+          "appliesWhen": {"type": "FlagSet", "flagId": "door_deal_5_done"},
+          "effects": [{"target": "blues_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "blues_material", "coefficient": 9.5367431640625e-07}}],
+          "coefficientCtrlC": "2^-20"
+        }
+      ],
+      "permanentModifiers": ["blues_twist_1", "blues_twist_2", "blues_twist_3", "blues_twist_4", "blues_twist_5"],
+      "rung": {
+        "label": "Blues Farewell Show",
+        "info": "Say goodbye to the blues scene for now. The bigger the crowd you built, the more Cred you take with you, and every point of Blues Cred makes the scene write 1% more Material.",
+        "confirmText": "The blues scene starts over: its Material, Following, pieces and room go, and so does all your Cash. The other scenes and every Office upgrade stay.",
+        "offerCondition": {"type": "CurrencyAtLeast", "currency": "blues_following", "threshold": 1000000000.0, "uiText": "Requires 1,000,000,000 Blues Following"},
+        "actions": [
+          {"type": "AddCurrency", "currencies": ["blues_cred"], "formula": {"type": "RootCurveFormula", "currency": "blues_following", "reads": "EarnedThisRound", "divisor": 10000000.0, "exponent": 0.5}},
+          {"type": "SetFlag", "flagId": "metal_open"},
+          {"type": "SetCurrency", "currency": "cash", "amount": 0},
+          {"type": "ResetScope", "scope": "blues_scene"}
         ]
       }
-    ]
-  },
-  "rewards": [
-    {
-      "id": "set_loud_x1_6",
-      "type": "multiplier",
-      "value": 1.6,
-      "targets": [
-        "set_loud_line"
-      ]
     },
-    {
-      "id": "set_sad_x1_6",
-      "type": "multiplier",
-      "value": 1.6,
-      "targets": [
-        "set_sad_line"
-      ]
-    },
-    {
-      "id": "set_fast_x1_6",
-      "type": "multiplier",
-      "value": 1.6,
-      "targets": [
-        "set_fast_line"
-      ]
-    },
-    {
-      "id": "set_loud_x2",
-      "type": "multiplier",
-      "value": 2.0,
-      "targets": [
-        "set_loud_line"
-      ]
-    },
-    {
-      "id": "set_sad_x2",
-      "type": "multiplier",
-      "value": 2.0,
-      "targets": [
-        "set_sad_line"
-      ]
-    },
-    {
-      "id": "set_fast_x2",
-      "type": "multiplier",
-      "value": 2.0,
-      "targets": [
-        "set_fast_line"
-      ]
-    },
-    {
-      "id": "room_won_small",
-      "name": "Room Won",
-      "type": "grantCurrency",
-      "currency": "fans",
-      "amount": 60,
-      "tags": [
-        "room_payout"
-      ]
-    },
-    {
-      "id": "room_won_large",
-      "name": "Big Room Won",
-      "type": "grantCurrency",
-      "currency": "fans",
-      "amount": 450,
-      "tags": [
-        "room_payout"
-      ]
-    },
-    {
-      "id": "room_fatigue",
-      "name": "Same Crowd Again",
-      "type": "multiplier",
-      "value": 0.85,
-      "targets": [
-        "room_payout"
-      ]
-    }
-  ],
-  "upgradesDraft": [
-    {
-      "id": "book_two_nights",
-      "name": "Book Two Nights",
-      "type": "contentUnlock",
-      "payload": {
-        "effect": "setMaxActive",
-        "group": "the_circuit",
-        "value": 2
-      },
-      "gate": {
-        "type": "recordsCumulative",
-        "value": 15
+    "metal_scene": {
+      "type": "TierDefinition",
+      "id": "metal_scene",
+      "parent": "ch3",
+      "ctrlC": "Scripting division",
+      "currencies": [
+        {"id": "metal_material", "displayName": "Metal Material", "tags": ["material"], "note": "What the scene writes and its room eats. No income tag."},
+        {"id": "metal_following", "displayName": "Metal Following", "note": "The scene's release meter: paid by its room, read by its rung. Never spent; no income tag."}
+      ],
+      "generators": [
+        {
+          "id": "metal_songwriter",
+          "displayName": "Metal Songwriting",
+          "tags": ["songwriter"],
+          "availableWhen": {"type": "Not", "condition": {"type": "OwnedCountAtLeast", "generator": "metal_songwriter", "count": 1}},
+          "costCurrency": "cash",
+          "baseCost": 5,
+          "growth": 1.6,
+          "produces": [{"currency": "metal_material", "stat": "yield", "value": 80.158}],
+          "note": "Bought once (openingPurchase). Its yield is the writing bar's lump: Ctrl C's main-bar Progress."
+        },
+        {
+          "id": "metal_door",
+          "displayName": "Warehouse Door",
+          "tags": ["door", "production"],
+          "availableWhen": {"type": "Not", "condition": {"type": "OwnedCountAtLeast", "generator": "metal_door", "count": 1}},
+          "costCurrency": "cash",
+          "baseCost": 5,
+          "growth": 1.6,
+          "produces": [{"currency": "cash", "stat": "yield", "value": 1}, {"currency": "metal_following", "stat": "yield", "value": 1}],
+          "note": "Bought once. What one set pays: 1 Cash (the chapter's) and 1 Following (the scene's)."
+        },
+        {
+          "id": "drop_tuning",
+          "displayName": "Drop Tuning",
+          "tags": ["piece"],
+          "ctrlC": "Javascript",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 1.0976e+19},
+          "costCurrency": "cash",
+          "baseCost": 1.0976e+19,
+          "baseCostCtrlC": 1.0976e+22,
+          "growth": 1.6,
+          "produces": [{"currency": "metal_material", "stat": "rate", "value": 4640.84}]
+        },
+        {
+          "id": "double_kick",
+          "displayName": "Double Kick",
+          "tags": ["piece"],
+          "ctrlC": "C#",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 1.20367e+22},
+          "costCurrency": "cash",
+          "baseCost": 1.20367e+22,
+          "baseCostCtrlC": 1.20367e+25,
+          "growth": 1.6,
+          "produces": [{"currency": "metal_material", "stat": "rate", "value": 5046.81}]
+        },
+        {
+          "id": "marshall_stack",
+          "displayName": "Marshall Stack",
+          "tags": ["piece"],
+          "ctrlC": "C++",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 5.82185e+25},
+          "costCurrency": "cash",
+          "baseCost": 5.82185e+25,
+          "baseCostCtrlC": 5.82185e+28,
+          "growth": 1.6,
+          "produces": [{"currency": "metal_material", "stat": "rate", "value": 5577.59}]
+        },
+        {
+          "id": "pyro_rig",
+          "displayName": "Pyro Rig",
+          "tags": ["piece"],
+          "ctrlC": "Rust",
+          "availableWhen": {"type": "EarnedTotalAtLeast", "currency": "cash", "threshold": 5.05239e+28},
+          "costCurrency": "cash",
+          "baseCost": 5.05239e+28,
+          "baseCostCtrlC": 5.05239e+31,
+          "growth": 1.6,
+          "produces": [{"currency": "metal_material", "stat": "rate", "value": 6812.49}]
+        }
+      ],
+      "bars": [
+        {
+          "id": "metal_writing",
+          "displayName": "Write Metal Songs",
+          "tags": ["writing"],
+          "consumes": [],
+          "fillAmount": 12,
+          "fillRate": 1,
+          "repeatWhen": {"type": "Always"},
+          "tap": "jam_metal_writing",
+          "level": "metal_songwriter",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "metal_songwriter", "count": 1, "uiText": "Start writing metal songs"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "metal_songwriter"}],
+          "note": "Ctrl C's 12 s main bar. Fills from time and Jam taps; pays its songwriter's yield."
+        },
+        {
+          "id": "metal_room",
+          "displayName": "The Warehouse",
+          "tags": ["room"],
+          "consumes": [{"currency": "metal_material", "amount": 1}],
+          "fillAmount": 1,
+          "fillRate": 1,
+          "repeatWhen": {"type": "FlagSet", "flagId": "rooms_booked"},
+          "level": "metal_door",
+          "automation": "booking_agent",
+          "availableWhen": {"type": "OwnedCountAtLeast", "generator": "metal_door", "count": 1, "uiText": "Book The Warehouse"},
+          "onComplete": [{"type": "FireGeneratorYield", "generator": "metal_door"}],
+          "note": "Ctrl C's Attend Meeting. No tap (modelNotes.room). Until Booking Agent it is the manual team: one set, then the player starts it again."
+        }
+      ],
+      "producers": [{"id": "jam_metal_writing", "displayName": "Jam", "tags": ["jam"], "produces": [{"bar": "metal_writing", "stat": "yield", "value": 1}]}],
+      "groups": [{"id": "metal_stage", "maxActive": 2, "members": ["metal_writing", "metal_room"]}],
+      "triggers": [
+        {
+          "id": "metal_opening",
+          "condition": {"type": "FlagSet", "flagId": "metal_open"},
+          "actions": [{"type": "AddCurrency", "currencies": ["cash"], "amount": 10}],
+          "note": "Pays for the songwriter and the door at every start of the scene's life (modelNotes.openingPurchase)."
+        },
+        {"id": "reveal_metal_release", "condition": {"type": "CurrencyAtLeast", "currency": "metal_following", "threshold": 1000000.0}, "actions": [{"type": "SetFlag", "flagId": "metal_release_revealed"}]}
+      ],
+      "modifiers": [
+        {
+          "id": "metal_twist_1",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_1_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_2_done"}}]},
+          "effects": [{"target": "metal_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "metal_material", "coefficient": 5.960464477539063e-08}}],
+          "coefficientCtrlC": "2^-24"
+        },
+        {
+          "id": "metal_twist_2",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_2_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_3_done"}}]},
+          "effects": [{"target": "metal_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "metal_material", "coefficient": 1.1920928955078125e-07}}],
+          "coefficientCtrlC": "2^-23"
+        },
+        {
+          "id": "metal_twist_3",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_3_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_4_done"}}]},
+          "effects": [{"target": "metal_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "metal_material", "coefficient": 2.384185791015625e-07}}],
+          "coefficientCtrlC": "2^-22"
+        },
+        {
+          "id": "metal_twist_4",
+          "appliesWhen": {"type": "All", "conditions": [{"type": "FlagSet", "flagId": "door_deal_4_done"}, {"type": "Not", "condition": {"type": "FlagSet", "flagId": "door_deal_5_done"}}]},
+          "effects": [{"target": "metal_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "metal_material", "coefficient": 4.76837158203125e-07}}],
+          "coefficientCtrlC": "2^-21"
+        },
+        {
+          "id": "metal_twist_5",
+          "appliesWhen": {"type": "FlagSet", "flagId": "door_deal_5_done"},
+          "effects": [{"target": "metal_door", "currencyId": "cash", "stat": "yield", "formula": {"type": "LinearOnBalance", "currency": "metal_material", "coefficient": 9.5367431640625e-07}}],
+          "coefficientCtrlC": "2^-20"
+        }
+      ],
+      "permanentModifiers": ["metal_twist_1", "metal_twist_2", "metal_twist_3", "metal_twist_4", "metal_twist_5"],
+      "rung": {
+        "label": "Metal Farewell Show",
+        "info": "Say goodbye to the metal scene for now. The bigger the crowd you built, the more Cred you take with you, and every point of Metal Cred makes the scene write 1% more Material.",
+        "confirmText": "The metal scene starts over: its Material, Following, pieces and room go, and so does all your Cash. The other scenes and every Office upgrade stay.",
+        "offerCondition": {"type": "CurrencyAtLeast", "currency": "metal_following", "threshold": 1000000.0, "uiText": "Requires 1,000,000 Metal Following"},
+        "actions": [
+          {"type": "AddCurrency", "currencies": ["metal_cred"], "formula": {"type": "RootCurveFormula", "currency": "metal_following", "reads": "EarnedThisRound", "divisor": 40000.0, "exponent": 0.5}},
+          {"type": "SetCurrency", "currency": "cash", "amount": 0},
+          {"type": "ResetScope", "scope": "metal_scene"}
+        ]
       }
-    },
-    {
-      "id": "the_circuit_run",
-      "name": "The Circuit",
-      "type": "contentUnlock",
-      "payload": {
-        "effect": "setMaxActive",
-        "group": "the_circuit",
-        "value": 3
-      },
-      "gate": {
-        "type": "recordsCumulative",
-        "value": 70
-      }
-    },
-    {
-      "id": "the_booking_agent",
-      "name": "The Booking Agent",
-      "type": "contentUnlock",
-      "payload": {
-        "effect": "unlockAutomation",
-        "target": "the_circuit"
-      },
-      "gate": {
-        "type": "recordsCumulative",
-        "value": 110
-      },
-      "note": "The chapter's idle step. See openQuestions on whether the agent fills rooms or fires the set."
     }
-  ],
-  "capstoneDraft": {
-    "id": "the_big_room",
-    "name": "Headline the Ballroom",
-    "unlock": {
-      "type": "recordsCumulative",
-      "value": 300
-    },
-    "onComplete": {
-      "grantRoadies": 1,
-      "completionFlag": "chapter_4_unlocked"
-    },
-    "note": "The regional 'big' private venue — the room everyone in town plays once they matter."
   },
-  "importerExtensionsNeeded": [
-    "grantCurrency as a reward type (shared with Ch2)",
-    "tags on a reward, so fatigue targets the payouts as a set (shared with Ch2)",
-    "setMaxActive as an upgrade payload — §12.7 sanctions the concept, no code yet",
-    "unlockAutomation for the booking agent — shape undecided"
-  ]
+  "sections": [
+    {
+      "title": "Local Venues",
+      "scopeId": "ch3",
+      "visibleWhen": {"type": "Always"},
+      "modules": [
+        "currency_line cash",
+        "currency_line punk_cred (CurrencyAtLeast 1)",
+        "currency_line blues_cred (CurrencyAtLeast 1)",
+        "currency_line metal_cred (CurrencyAtLeast 1)",
+        "story_row story_ch3_open",
+        "story_row story_ch3_end (FlagSet ch3_complete)"
+      ]
+    },
+    {
+      "title": "The Office",
+      "scopeId": "ch3",
+      "layout": "Strip",
+      "visibleWhen": {"type": "Always"},
+      "modules": ["upgrade_tile per chapter upgrade, each visible on Any[UpgradePurchased(it), EarnedTotalAtLeast(cash, its first price)]; days_off on FlagSet(red_tape_done)"]
+    },
+    {
+      "title": "Punk",
+      "scopeId": "punk_scene",
+      "visibleWhen": {"type": "Always"},
+      "modules": [
+        "currency_line punk_material",
+        "currency_line punk_following",
+        "leveled_group punk_stage",
+        "upgrade_tile better_cables / better_pickups (EarnedTotalAtLeast(cash, first price))",
+        "rung_button (FlagSet punk_release_revealed)"
+      ]
+    },
+    {
+      "title": "Blues",
+      "scopeId": "blues_scene",
+      "visibleWhen": {"type": "FlagSet", "flagId": "blues_open"},
+      "modules": [
+        "currency_line blues_material",
+        "currency_line blues_following",
+        "leveled_group blues_stage",
+        "generator_row per Blues piece (EarnedTotalAtLeast(cash, its base price))",
+        "rung_button (FlagSet blues_release_revealed)"
+      ]
+    },
+    {
+      "title": "Metal",
+      "scopeId": "metal_scene",
+      "visibleWhen": {"type": "FlagSet", "flagId": "metal_open"},
+      "modules": [
+        "currency_line metal_material",
+        "currency_line metal_following",
+        "leveled_group metal_stage",
+        "generator_row per Metal piece (EarnedTotalAtLeast(cash, its base price))",
+        "rung_button (FlagSet metal_release_revealed)"
+      ]
+    },
+    {
+      "title": "Hard Nights",
+      "scopeId": "ch3",
+      "visibleWhen": {"type": "FlagSet", "flagId": "metal_open"},
+      "modules": ["event_row door_deal_1 .. door_deal_5", "event_row writers_block", "event_row red_tape (when importable)"]
+    },
+    {"title": "The Ballroom", "scopeId": "ch3", "visibleWhen": {"type": "FlagSet", "flagId": "metal_open"}, "modules": ["rung_button"]}
+  ],
+  "sectionsNote": "Every region gates on a flag or on the chapter's earned Cash total, never a spendable balance (design 2). The chapter's earned Cash survives scene prestiges (SetCurrency moves the balance only), so a row shown once stays shown until the capstone. The farewell-show cards gate on chapter flags because Following is a scene balance the prestige clears.",
+  "balanceTargets": {
+    "simulator": "C:/Users/jsp73/AppData/Local/Temp/claude/bfcb6f51b40d725f/a5c44597-f301-4be2-b0f6-f18880a62607/scratchpad/ch3sim.py (scratch, not kept in the repo). Active play at one-second steps; no taps, no Encore, no Roadies, no idle. The player buys whatever repays soonest (time to afford plus time to repay), saves for it when it is not affordable, presses a farewell show when it pays at least twice the Cred banked (the first press of each scene at once), and enters an event when a trial run shows its goal reachable within 20 minutes.",
+    "simulatedFirstClear": {
+      "withDoorDealI": "Punk farewell 9 min (Blues opens), Blues farewell 52 min (Metal opens), Metal farewell 64 min, Door Deal I opens and clears 130-131 min, capstone armed 132 min. Farewell shows: Punk 6, Blues 4, Metal 7.",
+      "withNoEvent": "Same to 110 min, then the pre-twist plateau: capstone armed 287 min. Farewell shows: Punk 5, Blues 4, Metal 4 - thirteen, chapter 2's 10-14.",
+      "pressRule": "Pressing at the first doubling instead: 152 min with Door Deal I, 230 min without. At a tripling: 132 and 297."
+    },
+    "timeToFirstFarewellSeconds": 560,
+    "targetClear": "About 2 h 10 min with Door Deal I, about 4 h 45 min with no event: past chapter 2's 1.5-2 h, as a three-scene chapter should be, and completable without any event (design 6.1).",
+    "twistNote": "Door Deal I ends the chapter's pacing: with rooms no longer eating, every room plays at the full speed the shared upgrades allow whatever Material it holds, so Following - and through it Cred - stops depending on the scene's own supply, and the twist's Cash buys out Quick Changeovers and Bigger Room within minutes. The capstone arms within two minutes of the twist. Play past it reaches what the first clear does not: in the simulator Door Deal II and III, Writer's Block, Tight Arrangements, every Metal piece and Songwriting Retreat all land within 50 minutes of the twist. Under Ctrl C the same reward frees the meeting but its prestige reads Progress, so its prestige still depends on supply; here it reads Following.",
+    "notReachedBeforeTheCapstone": "Late-Night Practice 7-9, Quick Changeovers 16-19, Bigger Room 17, Home Studio 2-7, Better Cables 4-6, Better Pickups, Tight Arrangements, Songwriting Retreat, every Metal piece, Door Deal II-V, Writer's Block (all reachable after the twist, before the player chooses to press the capstone).",
+    "primaryPacingKnob": "the three capstone gates (400 / 100 / 50 Cred) - raise or lower before touching a curve",
+    "secondaryKnobs": [
+      "priceScale (0.001) - the whole Cash ladder against a room's one Cash a set.",
+      "doorDealOpensAtCashEarned (1e10) - where the twist lands, and therefore where the evented clear ends.",
+      "each scene's gate and divisor - when a scene's first farewell show comes and how fast its Cred doubles.",
+      "the opening price (5) and grant (10) - only that the first purchases are affordable."
+    ],
+    "watchList": [
+      "If the plateau before the twist (about 110 to 280 min without events) feels like a wall, lower the capstone gates or move Door Deal I earlier before touching prices.",
+      "If Metal's farewell shows feel pointless before the twist (Metal writes from its writing bar alone until 1.1e19 Cash), lower Metal's gate rather than its piece prices.",
+      "Tapping is not simulated: Jam on the writing and piece bars speeds the opening minutes, never a room."
+    ],
+    "tuneAgainst": "a player with Encore up to 4x and Roadies stationed from chapters 1 and 2; confirm the plateau still takes play time and that Door Deal I is beatable unbuffed when it opens."
+  },
+  "importerNotes": {
+    "ctrlCKeys": "`ctrlC`, `costCtrlC`, `baseCostCtrlC`, `goalCtrlC`, `coefficientCtrlC`, `factorFormula`, `note` and `*Note` keys are sheet annotations for John; the typed file drops them.",
+    "parent": "A tier's `parent` names where it sits; in typed content the chapter lists the three tiers under `children`.",
+    "modules": "`sections[].modules` are written as prose rows (`prefabId contentId (visibleWhen)`), not typed module objects.",
+    "redTape": "red_tape and days_off are left out of the typed file until needsEngineWork's first entry is built; red_tape_done is then a flag with no setter, so it is left out too."
+  }
 }

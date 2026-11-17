@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 9bcd0e53-5626-49e8-9aa2-6f02854d91fd
-  modified: 2026-11-11T01:11:21.973Z
+  modified: 2026-11-16T22:54:10.119Z
 ---
 
 On 2026-11-10 John approved a remap of Ctrl C chapters 3-8 onto Garage Band chapters 3-8 as the
@@ -159,6 +159,33 @@ played chapter 2 by hand: "chapter 2 is fine for now, it might change".
   own copy, then copies the counter back in. This is design 12.5's "child writes a fact outward, the
   owner resets itself", and design 12.4 lists a state-computed threshold the code lacks. One rung
   per scope stays; reset reach does not widen.
+
+**Chapter 3's layout, approved 2026-11-16 ("your layout seems fine for the moment, we can tweak it
+as I can play the chapter. Lets go with your recommendation") - design only, no order to write docs
+or content was given that day**
+- One scene: a writing bar plus bought pieces make the genre's material; ONE room per scene eats
+  material and pays Cash plus Following; a "bigger room" upgrade pays more and eats more (Ctrl C's
+  Larger Meetings, the supply-versus-consumption decision). Booking Agent = early Cash upgrade that
+  makes rooms repeat (Ctrl C's Schedules). Jam advances the bars as in chapter 2.
+- No fan fatigue in chapter 3 (reverses my 2026-11-10 proposal; it stays in the backlog for the
+  touring chapters). Merch goes to chapter 4. The rising active-room count is dropped.
+- Cred raises that scene's material yield. The Cred payout reads Following, paid by each show.
+- Scenes open in order: the first scene's first prestige opens the second, the second's the third.
+- Genres: Punk, Blues, Metal (my suggestion, accepted with the rest; his taste may change it).
+- Late twist kept: rooms stop eating material and held material boosts Cash (Ctrl C's Pizza Rule
+  reward). The event list is designed after the core.
+- John does not recall Ctrl C chapter 3's prestige cadence, whether the third division felt like a
+  repeat, or how the Pizza change felt; he would have to replay it.
+- Expect tuning from play, as with chapter 2.
+- Cash filing CHANGED 2026-11-16: the sibling "shared Cash tier" below cannot be authored (a scene
+  cannot reach a sibling tier, so rooms could not pay Cash nor purchases spend it;
+  ContentValidator ChainReach). John: "Cash on the chapter with the balance-only wipe is fine for
+  now, if we need the total wiped we can add it later." So Cash is declared on the chapter and each
+  scene's rung does `SetCurrency(cash, 0)`; the earned total is not wiped. The counter +
+  `CurrencyExceeds` mechanism is not used by chapter 3.
+- Verified in code that day: x0 `consumption` is a free bar in the live tick and the idle claim.
+  Not proven: three sibling tiers with three prestige cards on screen (no shipped chapter has more
+  than one tier).
 
 **Chapter 4's tours while away, as John settled it on 2026-11-10 ("ok, that's fine")**
 - Follows Ctrl C's Work From Home: away, the game repeats the tour last run at the time the player

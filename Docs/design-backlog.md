@@ -10,8 +10,8 @@ the chapter's JSON, and delete it from this file.
 
 Chapter 1 authors `growth: 1.15` on every generator's cost block *and* restates it as
 `constants.generatorCostGrowth` â€” two homes for one number. Chapter 2 authors one chapter default
-(1.3) and no per-generator growth; Chapter 3's draft wants two curves in one chapter (cash gear vs
-rehearsal gear) and would get it by overriding per generator.
+(1.3) and no per-generator growth; Chapter 3's sheet authors Ctrl C's 1.6 on every piece. A chapter
+that wants two curves in one chapter would get it by overriding per generator.
 
 The fix is scope resolution, not a new content kind: declare a cost-growth default on a scope and let
 a generator's own `cost.growth` win when present, otherwise the outward walk finds the default
@@ -31,9 +31,9 @@ Ch4/5/7/8, 1.1 plus a 10x bonus tier in Ch6).
 
 ## Fan fatigue extensions
 
-Base fatigue is Chapter 3's mechanic (`chapter-03-local-venues.json`): each room carries a `perFill`
-factor below 1 scaled by its own `fillCount`, and it resets with the run. These are two ways it could
-grow.
+Base fatigue is a mechanic for the touring chapters, 4 and 6, and no chapter authors it yet (Chapter
+3's rooms carry none): each room or town carries a `perFill` factor below 1 scaled by its own
+`fillCount`, and it resets with the run. These are two ways it could grow.
 
 **Fatigue softens as the band gets big.** A local band that plays the same room three weekends running
 stops drawing; a band people travel to see sells out four nights. Scaling the penalty down with
@@ -55,7 +55,7 @@ standing Cash-vs-Fans tension into a per-show decision and pairs with fatigue â€
 price is empty. Without that trade it is an income multiplier with extra steps. It would be a third
 lever on one action, so it belongs in a chapter that has retired something else.
 
-**Where fatigue recurs.** Chapter 3's rooms (the same crowd in the same room). The touring chapters,
+**Where fatigue recurs.** The touring chapters,
 4 and 6, where per-town fatigue is a breadth-vs-depth question. By chapters 7 and 8 the floor should
 be high enough that fatigue is mostly flavor.
 

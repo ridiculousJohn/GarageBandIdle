@@ -51,12 +51,67 @@ namespace RidiculousGaming.GarageBandIdle
         public static void Run(IReadOnlyList<GameAction> list, GameContext ctx, ScopeState ignoring = null,
                                Predicate<GameAction> skip = null)
         {
+            RequireUnrefused(list, ctx, ignoring);
+            ExecuteAll(list, ctx, skip);
+        }
+
+        // Whether the list run `times` times in a row from one snapshot is
+        // exactly one RunTimes (design doc 12.5/12.7): every action that would
+        // execute repeats as one. Null and skipped entries execute nothing, so
+        // they repeat as anything does, and an empty list is a list every
+        // action of which repeats as one.
+        public static bool RepeatsAsOne(IReadOnlyList<GameAction> list, Predicate<GameAction> skip = null)
+        {
+            if (list == null)
+                return true;
+            for (var i = 0; i < list.Count; i++)
+            {
+                var action = list[i];
+                if (action == null || (skip != null && skip(action)))
+                    continue;
+                if (!action.RepeatsAsOne)
+                    return false;
+            }
+            return true;
+        }
+
+        // What one run of the list changes that a condition can read, each
+        // action describing its own execution against the one state the call
+        // sees (12.4/12.5).
+        public static void Describe(IReadOnlyList<GameAction> list, GameContext ctx, CompletionDelta delta)
+        {
+            if (list == null)
+                return;
+            for (var i = 0; i < list.Count; i++)
+                list[i]?.Describe(ctx, delta);
+        }
+
+        // The list run `times` times as one: the refusal check once, exactly
+        // as Run makes it - a list runs whole or not at all, whatever the
+        // count - and then each action's ExecuteTimes in list order. For a
+        // caller that asked RepeatsAsOne; an action that does not repeat as
+        // one refuses a count other than one.
+        public static void RunTimes(IReadOnlyList<GameAction> list, GameContext ctx, BigNumber times,
+                                    ScopeState ignoring = null, Predicate<GameAction> skip = null)
+        {
+            RequireUnrefused(list, ctx, ignoring);
+            if (list == null)
+                return;
+            for (var i = 0; i < list.Count; i++)
+            {
+                var action = list[i];
+                if (action != null && (skip == null || !skip(action)))
+                    action.ExecuteTimes(ctx, times);
+            }
+        }
+
+        private static void RequireUnrefused(IReadOnlyList<GameAction> list, GameContext ctx, ScopeState ignoring)
+        {
             var refusal = Refuses(list, ctx, ignoring);
             if (refusal != null)
                 throw new InvalidOperationException(
                     $"An action list was run past a refusal: scope '{refusal.Host.ScopeId}' holds the unclaimed reward of event "
                     + $"'{(refusal.Event == null ? refusal.Record.eventId : refusal.Event.Id)}' (design doc 12.5).");
-            ExecuteAll(list, ctx, skip);
         }
 
         private static void ExecuteAll(IReadOnlyList<GameAction> list, GameContext ctx,

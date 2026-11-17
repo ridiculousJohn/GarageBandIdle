@@ -33,9 +33,10 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         public IReadOnlyList<(CurrencyDefinition currency, ScopeState home, BigNumber amount)> payout =
             Array.Empty<(CurrencyDefinition, ScopeState, BigNumber)>();
 
-        // A payment into the bar rather than a draw of what it consumes (12.7):
-        // selection and availability govern DRINKING, and a payment is not a
-        // drink, so the settlement's entry gate does not ask them of one.
+        // A payment into the bar rather than the time-based draw (12.7). A paid
+        // fill takes the bar's consumption for the progress it adds (Deposit),
+        // but selection and availability gate the draw and not a paid fill, so
+        // the settlement's entry gate does not ask them of one.
         public bool payment;
     }
 
@@ -52,7 +53,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
     // covers, and spends every entry for what it took. No totals, no shared
     // throughput, no proportional split - when a currency cannot cover its bars
     // they simply stall, which is correct feedback rather than unfairness, and
-    // the amount delivered per second is the inflow either way.
+    // the amount delivered per second is the inflow either way. A yield paid
+    // into a bar is that much of the bar running, so it pays the same price for
+    // the progress it adds, through the same cover and spend (Deposit).
     //
     // The one thing that IS two calls: 12.9's phases straddle the draw. Rates,
     // prices and gates come from the start-of-segment snapshot taken BEFORE the
@@ -94,7 +97,7 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     scope = node,
                     facts = node.facts,
                     bar = entry.Bar,
-                    consumes = PerUnitCosts(ctx, entry),
+                    consumes = PerUnitCosts(ctx, entry.Consumes),
                     rate = FillRate(subtreeCtx, entry),
                     progressBefore = progress,
                     payout = CompletionPayout(ctx, entry.Bar),
@@ -105,13 +108,15 @@ namespace RidiculousGaming.GarageBandIdle.Economy
 
         // What one unit of fill costs in each consumed currency, judged in the
         // snapshot: the authored amount times the entry's own consumption
-        // factor, stage 1 only (12.7). Zero is legal and means free.
-        private static List<(ConsumesPlan plan, BigNumber perUnit)> PerUnitCosts(GameContext barCtx, BarPlan plan)
+        // factor, stage 1 only (12.7). Zero is legal and means free. The draw
+        // and a payment into the bar (Deposit) both price through this.
+        private static List<(ConsumesPlan plan, BigNumber perUnit)> PerUnitCosts(
+            GameContext barCtx, IReadOnlyList<ConsumesPlan> planned)
         {
-            var costs = new List<(ConsumesPlan, BigNumber)>(plan.Consumes.Count);
-            for (var i = 0; i < plan.Consumes.Count; i++)
+            var costs = new List<(ConsumesPlan, BigNumber)>(planned.Count);
+            for (var i = 0; i < planned.Count; i++)
             {
-                var consumes = plan.Consumes[i];
+                var consumes = planned[i];
                 costs.Add((consumes, consumes.Entry.amount * Producer.GetMultiplier(barCtx, consumes.Factor)));
             }
             return costs;
@@ -161,7 +166,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // (Producer.ResolveGeneratorYield - the owned count and every
         // multiplier), an AddCurrency entry through the same AmountFor its
         // Execute deposits. Only currency targets are income, so a yield entry
-        // naming a bar or a generator is left out; other kinds pay no currency.
+        // naming a generator is left out (12.12 refuses a generator's yield
+        // entry naming a bar); other kinds pay no currency.
         // Amounts to one (currency, home) are summed, in first-seen order, and
         // zeros are kept, so a level nobody bought still names what it pays.
         //
@@ -285,42 +291,17 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Settle(demand, settlementUtc);
         }
 
-        // Each bar takes what it wants or what its tightest entry covers, in the
-        // deterministic order the snapshot fixed. The balance is read live per
-        // bar, so an earlier bar's draw is visible to a later one and an empty
-        // currency stalls the rest - no totals to compute and nothing to divide.
-        // The move is a SPEND: earnedTotals is untouched, because a bar's fill is
-        // not income.
+        // Each bar advances by its rate times dt, in the deterministic order the
+        // snapshot fixed, through the one advance a payment also takes.
         private static void Draw(BarDemand demand, double dtSeconds, DateTime settlementUtc, TickReport report)
         {
             foreach (var entry in demand.bars)
             {
                 if (entry.rate <= BigNumber.Zero || !Alive(entry))
                     continue;
-                var fill = entry.rate * dtSeconds;
-                foreach (var (plan, perUnit) in entry.consumes)
-                {
-                    // A free entry covers unboundedly, and dividing by it would
-                    // be a division by zero rather than an unlimited cover.
-                    if (perUnit <= BigNumber.Zero)
-                        continue;
-                    fill = BigNumber.Min(fill, Balance(plan, settlementUtc) / perUnit);
-                }
+                var fill = Advance(entry, entry.rate * dtSeconds, settlementUtc, report);
                 if (fill <= BigNumber.Zero)
                     continue;
-
-                foreach (var (plan, perUnit) in entry.consumes)
-                {
-                    if (perUnit <= BigNumber.Zero)
-                        continue;
-                    // Clamped at the balance the cover came from: the quotient's
-                    // last digits can put the product a hair above it, and Spend
-                    // throws on a balance that does not cover the amount.
-                    var balance = Balance(plan, settlementUtc);
-                    var take = BigNumber.Min(fill * perUnit, balance);
-                    new GameContext(plan.Home, settlementUtc).Spend(plan.Entry.currency.Id, take);
-                    report.RecordDraw(plan.Home, plan.Entry.currency.Id, take);
-                }
 
                 entry.filled = fill;
                 // Progress lands from the snapshot's pre-fill value, which is the
@@ -336,6 +317,47 @@ namespace RidiculousGaming.GarageBandIdle.Economy
                     if (amount != BigNumber.Zero)
                         report.RecordCompletionIncome(home, currency.Id, amount * fill / entry.bar.fillAmount);
             }
+        }
+
+        // The one way a bar moves forward (12.7), for the tick's time and for a
+        // yield paid into it alike: the bar wants `want` units of fill and takes
+        // what its tightest consumed entry covers, then spends every entry for
+        // what it took. Returns the fill realized; nothing moves the progress
+        // here, since where it lands is the caller's. A bar that consumes
+        // nothing takes the whole want and spends nothing; a pool that is low
+        // takes what it can; an empty one takes nothing. The balance is read
+        // live, so an earlier bar's take is visible to a later one and an empty
+        // currency stalls the rest - no totals to compute and nothing to divide.
+        // The move is a SPEND: earnedTotals is untouched, because a bar's fill is
+        // not income. `report` is the tick's, and null on a payment, which the
+        // report does not read.
+        private static BigNumber Advance(BarFill entry, BigNumber want, DateTime nowUtc, TickReport report)
+        {
+            var fill = want;
+            foreach (var (plan, perUnit) in entry.consumes)
+            {
+                // A free entry covers unboundedly, and dividing by it would
+                // be a division by zero rather than an unlimited cover.
+                if (perUnit <= BigNumber.Zero)
+                    continue;
+                fill = BigNumber.Min(fill, Balance(plan, nowUtc) / perUnit);
+            }
+            if (fill <= BigNumber.Zero)
+                return BigNumber.Zero;
+
+            foreach (var (plan, perUnit) in entry.consumes)
+            {
+                if (perUnit <= BigNumber.Zero)
+                    continue;
+                // Clamped at the balance the cover came from: the quotient's
+                // last digits can put the product a hair above it, and Spend
+                // throws on a balance that does not cover the amount.
+                var balance = Balance(plan, nowUtc);
+                var take = BigNumber.Min(fill * perUnit, balance);
+                new GameContext(plan.Home, nowUtc).Spend(plan.Entry.currency.Id, take);
+                report?.RecordDraw(plan.Home, plan.Entry.currency.Id, take);
+            }
+            return fill;
         }
 
         // The consumed currency's balance at its own home, read live - the one
@@ -384,10 +406,8 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // A non-repeating bar fires on the CROSSING its own fill made, detected
         // within the pass: the snapshot holds the pre-fill progress and the entry
         // holds what its fill added, so a bar already full when the segment
-        // began was below nothing, a save loaded at full progress never fires
-        // because no fill crossed it, and a payment that landed inside this
-        // settlement and settled its own crossing (Deposit) is not fired again
-        // when the pass reaches the bar - live progress is never the test. That
+        // began was below nothing, and a save loaded at full progress never fires
+        // because no fill crossed it - live progress is never the test. That
         // is what "no completed-set is stored" costs, and it is why filling and
         // settling are one call. A completed bar has nothing left to run, so it
         // leaves the active set of every group listing it as the manual team
@@ -404,47 +424,76 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             Execute(entry, bar, settlementUtc);
         }
 
-        // A repeating bar settles iteratively, re-reading state each iteration so
-        // a completion action that resets the host or flips availability stops the
-        // loop honestly instead of executing precomputed fires against a changed
-        // world. Residual progress is retained; increment before execute, for the
-        // same reason the trigger latch is written first.
+        // A repeating bar settles in segments (12.7): each pass re-reads state,
+        // asks how many completions can run before anything the gates read
+        // changes, settles that many at once, and goes again from the new
+        // state - so a completion action that resets the host or flips
+        // availability stops the run honestly at its boundary instead of
+        // executing precomputed fires against a changed world. A gate that
+        // would close after 10 fills clamps a run of 100 at 10, because the
+        // condition is the segment boundary. Residual progress is retained;
+        // the progress and the count are written before the actions run, for
+        // the same reason the trigger latch is written first.
+        //
+        // `remaining` is the run's BOUND as well as its expected count. Nothing
+        // adds progress during settlement, so no run can exceed it.
         private static void SettleRepeating(BarFill entry, DateTime settlementUtc)
         {
             var bar = entry.bar;
-            var progress = Progress(entry, bar);
-            var fires = FireCount(entry, bar, progress);
-            if (fires <= 0)
-                return;
-
-            // The arithmetic shortcut 12.7 sanctions: with no completion actions
-            // nothing can change between fills, so the whole run is one
-            // subtraction and one live check.
-            if (!HasActions(bar))
-            {
-                if (!Eligible(entry, bar, settlementUtc))
-                    return;
-                entry.scope.barProgress[bar.Id] = progress - bar.fillAmount * fires;
-                Bump(entry, bar, fires);
-                return;
-            }
-
-            // `fires` is the loop's BOUND as well as its expected count. Nothing
-            // adds progress during settlement, so no run can exceed it, and
-            // bounding the loop is what keeps the subtraction out of the range
-            // where it stops moving the value.
-            for (var i = 0; i < fires; i++)
+            var remaining = Crossings(bar, Progress(entry, bar));
+            while (remaining > BigNumber.Zero)
             {
                 if (!Alive(entry) || !Eligible(entry, bar, settlementUtc))
                     return;
-                progress = Progress(entry, bar);
+                var ctx = new GameContext(entry.scope, settlementUtc);
+                if (!bar.repeatWhen.Evaluate(ctx))
+                    return;
+                var progress = Progress(entry, bar);
                 if (progress < bar.fillAmount)
                     return;
-                entry.scope.barProgress[bar.Id] = progress - bar.fillAmount;
-                Bump(entry, bar, 1);
-                Execute(entry, bar, settlementUtc);
+
+                var batch = Batch(entry, bar, ctx, remaining);
+                // A run that settles one at a time and is counted past the
+                // range a subtraction moves would never end; past that range
+                // it is a count no loop of single completions can finish.
+                if (remaining - batch == remaining)
+                    throw new InvalidOperationException(
+                        $"Bar '{bar.Id}' crossed {remaining} thresholds and settles one completion at a time - "
+                        + "a run past the range one completion moves cannot be settled (12.7).");
+
+                entry.scope.barProgress[bar.Id] = progress - bar.fillAmount * batch;
+                Bump(entry, bar, batch);
+                ActionList.RunTimes(bar.onComplete, ctx, batch);
+                remaining -= batch;
             }
         }
+
+        // How many of the remaining completions settle as one (12.7). A bar
+        // with perFill entries goes one at a time, since each fill changes
+        // what the next one pays, and so does a list some action of which does
+        // not repeat as one (a reset, a rung, a recorded write). Otherwise the
+        // batch runs to the nearest boundary its own gates report: what one
+        // completion changes, asked of repeatWhen and of availableWhen, each
+        // answering how many completions until its answer differs. A payment
+        // does not ask availableWhen, as Eligible does not. The payout of the
+        // batch is resolved once, from the state the batch starts in - the
+        // start-of-segment snapshot rule of 12.9 applied to completions.
+        private static BigNumber Batch(BarFill entry, BarDefinition bar, GameContext ctx, BigNumber remaining)
+        {
+            if (bar.perFill.Count > 0 || !ActionList.RepeatsAsOne(bar.onComplete))
+                return BigNumber.One;
+            var delta = new CompletionDelta();
+            ActionList.Describe(bar.onComplete, ctx, delta);
+            var batch = Bounded(remaining, bar.repeatWhen, ctx, delta);
+            if (!entry.payment && bar.availableWhen != null)
+                batch = Bounded(batch, bar.availableWhen, ctx, delta);
+            return batch;
+        }
+
+        private static BigNumber Bounded(BigNumber batch, Condition gate, GameContext ctx, CompletionDelta delta) =>
+            gate.StepsUntilChange(ctx, delta, out var steps)
+                ? BigNumber.Min(batch, BigNumber.Max(steps, BigNumber.One))
+                : batch;
 
         // The manual team: one cycle per selection (12.7). The crossing is the
         // one SettleOnce tests, so a bar already full when the segment began
@@ -489,9 +538,9 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         // gate and pay the whole backlog, the very coupling ResolveDemand closes.
         private static bool Eligible(BarFill entry, BarDefinition bar, DateTime nowUtc)
         {
-            // A payment is not a drink (12.7): what the snapshot admits to
-            // DRINKING is what membership and availability decide, and a bar paid
-            // directly settles its crossing whether or not it was selected.
+            // Membership and availability gate the time-based draw, not a paid
+            // fill (12.7): a bar paid directly settles its crossing whether or
+            // not it was selected or available.
             if (entry.payment)
                 return true;
             var ctx = new GameContext(entry.scope, nowUtc);
@@ -500,16 +549,21 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             return bar.availableWhen == null || bar.availableWhen.Evaluate(ctx);
         }
 
-        // A yield paid into this bar (12.7): progress moves and the bar settles
-        // its own crossing at the moment it is paid, through the settlement the
-        // tick runs, since the tick only ever settles the bars its draw admitted
-        // and would read a bar filled between ticks as one that fired earlier.
-        // Clamped at fillAmount for a non-repeating bar (a tap cannot overshoot
-        // full); a repeating bar keeps the excess and settles every threshold it
-        // crossed. Membership and availability do not gate the completion: they
-        // govern drinking, and a payment is not a drink. A refused completion
-        // list (12.5) leaves the payment undelivered, exactly as the draw
-        // excludes that bar for the segment.
+        // A yield paid into this bar (12.7) - a tap's: 12.12 refuses a
+        // generator's yield entry naming a bar - is that much of the bar running: it
+        // advances through the same Advance the draw takes, so it takes the
+        // bar's consumption for the progress it adds, as far as the balances
+        // cover, and a bar that consumes nothing takes the whole payment. The
+        // bar then settles its own crossing at the moment it is paid, through
+        // the settlement the tick runs, since the tick only ever settles the
+        // bars its draw admitted and would read a bar filled between ticks as
+        // one that fired earlier. Clamped at fillAmount for a non-repeating bar
+        // (a tap cannot overshoot full) before the advance, so consumption is
+        // charged only for the progress that fits; a repeating bar keeps the
+        // excess and settles every threshold it crossed. Membership and
+        // availability gate the time-based draw and do not gate a paid fill. A
+        // refused completion list (12.5) leaves the payment undelivered and
+        // spends nothing, exactly as the draw excludes that bar for the segment.
         public static void Deposit(GameContext ctx, BarDefinition bar, BigNumber amount)
         {
             if (amount < BigNumber.Zero)
@@ -527,21 +581,49 @@ namespace RidiculousGaming.GarageBandIdle.Economy
             var moved = progress + amount;
             if (bar.repeatWhen == null && moved > bar.fillAmount)
                 moved = BigNumber.Max(progress, bar.fillAmount);
-            home.barProgress[bar.Id] = moved;
 
-            // One entry through the one settlement, so a payment's crossing and a
-            // draw's are the same code (12.7).
-            var demand = new BarDemand();
-            demand.bars.Add(new BarFill
+            // One entry through the one advance and the one settlement, so a
+            // payment's fill and crossing and a draw's are the same code (12.7).
+            // Priced now, in the state the payment lands in: a payment has no
+            // segment, so its snapshot is this moment.
+            var entry = new BarFill
             {
                 scope = home,
                 facts = home.facts,
                 bar = bar,
+                consumes = PerUnitCosts(homeCtx, PlanAt(home, bar).Consumes),
                 progressBefore = progress,
-                filled = moved - progress,
                 payment = true,
-            });
+            };
+            var want = moved - progress;
+            var fill = Advance(entry, want, ctx.NowUtc, null);
+            if (fill <= BigNumber.Zero)
+                return;
+
+            // The whole want realized lands exactly where the clamp put it, so a
+            // tap that fills a bar lands ON fillAmount and the crossing holds; a
+            // want the balances cut short lands where the fill reached.
+            if (fill < want)
+                moved = progress + fill;
+            home.barProgress[bar.Id] = moved;
+            entry.filled = moved - progress;
+
+            var demand = new BarDemand();
+            demand.bars.Add(entry);
             Settle(demand, ctx.NowUtc);
+        }
+
+        // The bar's compiled plan, read off its home's own contributor plan:
+        // a scope's plan lists the bars it declares, so the bar is found in the
+        // one subtree the caller already holds, never searched for (12.14.8).
+        private static BarPlan PlanAt(ScopeState home, BarDefinition bar)
+        {
+            var planned = ContributorPlan.At(home).Bars;
+            for (var i = 0; i < planned.Count; i++)
+                if (planned[i].Node == home && planned[i].Bar == bar)
+                    return planned[i];
+            throw new InvalidOperationException(
+                $"Bar '{bar.Id}' has no compiled plan at its home '{home.ScopeId}' (12.7).");
         }
 
         // Fail-closed and all-or-nothing (12.7/12.11): a refusal changes nothing,
@@ -589,43 +671,20 @@ namespace RidiculousGaming.GarageBandIdle.Economy
         private static BigNumber Progress(BarFill entry, BarDefinition bar) =>
             entry.scope.barProgress.TryGetValue(bar.Id, out var value) ? value : BigNumber.Zero;
 
-        private static void Bump(BarFill entry, BarDefinition bar, int fires)
+        // The fill count is a BigNumber like every other count a run can grow
+        // (12.3), so a run of any length is a number it holds.
+        private static void Bump(BarFill entry, BarDefinition bar, BigNumber fires)
         {
-            entry.scope.fillCounts.TryGetValue(bar.Id, out var count);
+            var count = entry.scope.fillCounts.TryGetValue(bar.Id, out var stored) ? stored : BigNumber.Zero;
             entry.scope.fillCounts[bar.Id] = count + fires;
         }
 
-        // How many thresholds the progress crosses. fillCounts is an int and 12.7
-        // writes no overflow policy - no authored bar repeats at all yet - so a
-        // run past the range throws, which is the answer this codebase gives
-        // everywhere content reaches a state validation cannot describe.
-        private static int FireCount(BarFill entry, BarDefinition bar, BigNumber progress)
-        {
-            entry.scope.fillCounts.TryGetValue(bar.Id, out var count);
-            return Crossings(bar, progress, count);
-        }
-
-        // The same count over an explicit stored total, so the idle offer's
-        // completions and the tick's fires are one arithmetic (section 9).
-        public static int Crossings(BarDefinition bar, BigNumber progress, int recorded)
+        // How many thresholds the progress crosses, the one arithmetic the
+        // idle offer's completions and the tick's fires share (section 9).
+        public static BigNumber Crossings(BarDefinition bar, BigNumber progress)
         {
             var fires = BigNumber.Floor(progress / bar.fillAmount);
-            if (fires <= BigNumber.Zero)
-                return 0;
-            if (fires > int.MaxValue - recorded)
-                throw new InvalidOperationException(
-                    $"Bar '{bar.Id}' crossed {fires} thresholds with {recorded} already recorded - fillCounts cannot hold the result.");
-            return (int)fires.ToDouble();
-        }
-
-        // An all-null completion list is an authoring fault the validator
-        // reports, but it cannot affect anything, so the shortcut still applies.
-        private static bool HasActions(BarDefinition bar)
-        {
-            foreach (var action in bar.onComplete)
-                if (action != null)
-                    return true;
-            return false;
+            return fires <= BigNumber.Zero ? BigNumber.Zero : fires;
         }
 
         private static void Execute(BarFill entry, BarDefinition bar, DateTime settlementUtc) =>

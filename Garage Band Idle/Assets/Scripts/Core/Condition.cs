@@ -27,6 +27,68 @@ namespace RidiculousGaming.GarageBandIdle
             return false;
         }
 
+        // How many repetitions of `delta` - what one completion of a list
+        // changes (CompletionDelta) - until Evaluate's answer differs from its
+        // answer now (12.4). False when repetitions of this delta never change
+        // it. The answer is a segment boundary: a repeating bar settles that
+        // many completions at once and asks again from the new state (12.7).
+        // A kind with nothing sharper to say re-reads after every completion,
+        // which is always correct; a delta that changes nothing a condition
+        // reads changes no answer; an unknown delta is one step for every kind.
+        public virtual bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            steps = BigNumber.One;
+            return delta.Unknown || !delta.Empty;
+        }
+
+        // The answer of a kind no delta can move: an unknown one is one step,
+        // and otherwise the answer stands for good.
+        protected static bool OnlyIfUnknown(CompletionDelta delta, out BigNumber steps)
+        {
+            steps = BigNumber.One;
+            return delta.Unknown;
+        }
+
+        // The threshold kinds' distance: a value that only rises by `perStep`
+        // per completion reaches `threshold` after ceil((threshold - current) /
+        // perStep) of them. Nothing paid, or already there, never changes the
+        // answer, since a completion only deposits. The ceiling is taken from
+        // Floor, and the step before it is checked against the sum the
+        // deposits will make, so a quotient a last digit high does not carry
+        // the batch one completion past the boundary.
+        protected static bool StepsToReach(BigNumber current, BigNumber threshold, BigNumber perStep,
+                                           out BigNumber steps)
+        {
+            steps = BigNumber.One;
+            if (perStep <= BigNumber.Zero || current >= threshold)
+                return false;
+            var needed = -BigNumber.Floor(-((threshold - current) / perStep));
+            if (needed > BigNumber.One && current + perStep * (needed - BigNumber.One) >= threshold)
+                needed -= BigNumber.One;
+            steps = BigNumber.Max(needed, BigNumber.One);
+            return true;
+        }
+
+        // The least of the children's distances, over the children a delta
+        // can move at all: the compound's answer can differ only where one of
+        // theirs does. Null children are skipped - validation reports them.
+        protected static bool LeastSteps(GameContext ctx, CompletionDelta delta, IReadOnlyList<Condition> children,
+                                         out BigNumber steps)
+        {
+            steps = BigNumber.One;
+            if (delta.Unknown)
+                return true;
+            var found = false;
+            for (var i = 0; i < children.Count; i++)
+            {
+                if (children[i] == null || !children[i].StepsUntilChange(ctx, delta, out var childSteps))
+                    continue;
+                steps = found ? BigNumber.Min(steps, childSteps) : childSteps;
+                found = true;
+            }
+            return found;
+        }
+
         // What this condition asks of the player, as the button renders it
         // (12.11). A leaf's text is its uiText; a compound formats its uiText as
         // a string.Format pattern over its children's texts ({0}, {1}, ...), so
@@ -84,6 +146,16 @@ namespace RidiculousGaming.GarageBandIdle
             return true;
         }
 
+        // A completion only deposits, so the balance at the home the read
+        // resolves to rises by what one completion pays there.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            if (delta.Unknown)
+                return OnlyIfUnknown(delta, out steps);
+            var home = Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, currency);
+            return StepsToReach(ctx.GetBalance(currency.Id), threshold, delta.DepositTo(currency, home), out steps);
+        }
+
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(currency, "CurrencyAtLeast");
     }
 
@@ -100,6 +172,15 @@ namespace RidiculousGaming.GarageBandIdle
             current = ctx.GetEarnedTotal(currency.Id);
             target = threshold;
             return true;
+        }
+
+        // A deposit moves the earned total by what it moves the balance.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            if (delta.Unknown)
+                return OnlyIfUnknown(delta, out steps);
+            var home = Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, currency);
+            return StepsToReach(ctx.GetEarnedTotal(currency.Id), threshold, delta.DepositTo(currency, home), out steps);
         }
 
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(currency, "EarnedTotalAtLeast");
@@ -119,6 +200,17 @@ namespace RidiculousGaming.GarageBandIdle
         public Economy.CurrencyDefinition other;
 
         public override bool Evaluate(GameContext ctx) => ctx.GetBalance(currency.Id) > ctx.GetBalance(other.Id);
+
+        // Either side moving can move the answer, so a completion paying
+        // either one is re-read after one step.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            if (delta.Unknown)
+                return OnlyIfUnknown(delta, out steps);
+            steps = BigNumber.One;
+            return delta.DepositTo(currency, Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, currency)) > BigNumber.Zero
+                || delta.DepositTo(other, Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, other)) > BigNumber.Zero;
+        }
 
         public override void Validate(ValidationContext ctx)
         {
@@ -148,6 +240,17 @@ namespace RidiculousGaming.GarageBandIdle
             return true;
         }
 
+        // The purchased half moves only by a purchase, so a completion moves
+        // the owned count by the granted count it pays at the generator's
+        // home.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            if (delta.Unknown)
+                return OnlyIfUnknown(delta, out steps);
+            var home = Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, generator);
+            return StepsToReach(ctx.GetOwnedCount(generator.Id), count, delta.DepositTo(generator, home), out steps);
+        }
+
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(generator, "OwnedCountAtLeast");
     }
 
@@ -157,6 +260,16 @@ namespace RidiculousGaming.GarageBandIdle
         public string flagId;
 
         public override bool Evaluate(GameContext ctx) => ctx.IsFlagSet(flagId);
+
+        // Nothing a completion runs clears a flag, so the answer moves once,
+        // on the first completion that sets it.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            if (delta.Unknown)
+                return OnlyIfUnknown(delta, out steps);
+            steps = BigNumber.One;
+            return delta.SetsFlag(flagId) && !Evaluate(ctx);
+        }
 
         public override void Validate(ValidationContext ctx)
         {
@@ -185,6 +298,21 @@ namespace RidiculousGaming.GarageBandIdle
         public override bool Evaluate(GameContext ctx) =>
             ctx.IsUpgradePurchased(upgrade.Id) || Economy.Purchasing.IsOwned(ctx, upgrade);
 
+        // The latch and a level move only by a purchase, so a completion can
+        // move the answer only through ownedWhen, asked at the declaring
+        // scope where ownership asks it - and only while no latch already
+        // holds the answer true.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            if (delta.Unknown)
+                return OnlyIfUnknown(delta, out steps);
+            steps = BigNumber.One;
+            if (upgrade.ownedWhen == null || upgrade.IsLevelled || ctx.IsUpgradePurchased(upgrade.Id))
+                return false;
+            var declaringCtx = ctx.Rebase(Economy.Producer.DeclaringScope<ScopeState>(ctx.Scope, upgrade));
+            return upgrade.ownedWhen.StepsUntilChange(declaringCtx, delta, out steps);
+        }
+
         public override void Validate(ValidationContext ctx) => ctx.RequireOnChain(upgrade, "UpgradePurchased");
     }
 
@@ -201,6 +329,16 @@ namespace RidiculousGaming.GarageBandIdle
         public Economy.ModifierDefinition modifier;
 
         public override bool Evaluate(GameContext ctx) => ctx.IsBuffActive(modifier.timer, modifier.activeAfterSeconds);
+
+        // Only a grant to the timer it reads can move it within a settlement,
+        // whose time does not pass.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            if (delta.Unknown)
+                return OnlyIfUnknown(delta, out steps);
+            steps = BigNumber.One;
+            return delta.ExtendsTimer(modifier.timer);
+        }
 
         // The modifier resolves on the acting chain like every reference, and it has
         // to name a timer: a buff with no timer to read would never be active.
@@ -224,6 +362,10 @@ namespace RidiculousGaming.GarageBandIdle
         public string entitlementId;
 
         public override bool Evaluate(GameContext ctx) => ctx.HasEntitlement(entitlementId);
+
+        // The store callback is the only writer, never a completion.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps) =>
+            OnlyIfUnknown(delta, out steps);
 
         // Root is on every chain, so there is no reach variant of the miss: an
         // id root does not declare is unresolvable from everywhere at once.
@@ -299,6 +441,11 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public override bool Evaluate(GameContext ctx) => ctx.EventRecord() != null;
 
+        // A record is written and removed by the event commands, never by a
+        // completion a delta describes.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps) =>
+            OnlyIfUnknown(delta, out steps);
+
         public override void Validate(ValidationContext ctx) => RequireHostableActor(ctx, "EventRecordExists");
 
         // The one check either kind has, shared: there is no operand to
@@ -322,6 +469,9 @@ namespace RidiculousGaming.GarageBandIdle
     {
         public override bool Evaluate(GameContext ctx) => ctx.EventRecord()?.goalReached == true;
 
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps) =>
+            OnlyIfUnknown(delta, out steps);
+
         public override void Validate(ValidationContext ctx) =>
             EventRecordExists.RequireHostableActor(ctx, "EventRewardPending");
     }
@@ -332,6 +482,9 @@ namespace RidiculousGaming.GarageBandIdle
     public class Always : Condition
     {
         public override bool Evaluate(GameContext ctx) => true;
+
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps) =>
+            OnlyIfUnknown(delta, out steps);
     }
 
     // The claim's circumstance (design doc 12.5): true only under a context the
@@ -341,6 +494,10 @@ namespace RidiculousGaming.GarageBandIdle
     public class IdleAccumulation : Condition
     {
         public override bool Evaluate(GameContext ctx) => ctx.IdleAccumulation;
+
+        // The circumstance is the context's, fixed for its life.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps) =>
+            OnlyIfUnknown(delta, out steps);
 
         // Only a modifier's appliesWhen and a chapter-reachable RATE entry's
         // condition are ever evaluated under a claim's context; anywhere else
@@ -380,6 +537,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override bool Evaluate(GameContext ctx) => conditions.TrueForAll(c => c.Evaluate(ctx));
 
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps) =>
+            LeastSteps(ctx, delta, conditions, out steps);
+
         public override string Text => string.IsNullOrEmpty(uiText) ? JoinWith(conditions, "and") : FormatOver(uiText, conditions);
 
         public override void Validate(ValidationContext ctx)
@@ -401,6 +561,9 @@ namespace RidiculousGaming.GarageBandIdle
 
         public override bool Evaluate(GameContext ctx) => conditions.Any(c => c.Evaluate(ctx));
 
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps) =>
+            LeastSteps(ctx, delta, conditions, out steps);
+
         public override string Text => string.IsNullOrEmpty(uiText) ? JoinWith(conditions, "or") : FormatOver(uiText, conditions);
 
         public override void Validate(ValidationContext ctx)
@@ -421,6 +584,15 @@ namespace RidiculousGaming.GarageBandIdle
         [UnityEngine.SerializeReference, SubclassPicker] public Condition condition;
 
         public override bool Evaluate(GameContext ctx) => condition != null && !condition.Evaluate(ctx);
+
+        // A negation flips where its operand flips. With no operand it never
+        // holds, whatever a completion does.
+        public override bool StepsUntilChange(GameContext ctx, CompletionDelta delta, out BigNumber steps)
+        {
+            if (delta.Unknown || condition == null)
+                return OnlyIfUnknown(delta, out steps);
+            return condition.StepsUntilChange(ctx, delta, out steps);
+        }
 
         // No default: prose does not negate mechanically (12.4), so an
         // unauthored Not renders empty and an author writes the line.

@@ -106,7 +106,7 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(tier1.purchasedUpgrades.Contains("stage_presence"));
             Assert.IsTrue(tier1.firedTriggers.Contains("tier1_trigger"));
             Assert.AreEqual((BigNumber)42, tier1.barProgress["cover_1"]);
-            Assert.AreEqual(2, tier1.fillCounts["cover_1"]);
+            Assert.AreEqual((BigNumber)2, tier1.fillCounts["cover_1"]);
             Assert.IsTrue(tier1.activeMembers["learn_covers"].Contains("cover_1"));
             Assert.AreEqual(2, tier1.modifierStacks["gj_tap_1"]);
             Assert.AreEqual("timed_gig", tier1.Facts.activeEvent.eventId);
@@ -693,6 +693,54 @@ namespace RidiculousGaming.GarageBandIdle.Tests
             Assert.IsTrue(Load(json, out var root, out var loaded));
 
             Assert.IsEmpty(TestNavigation.Node(root, loaded.Tier1Def).fillCounts);
+        }
+
+        // A fill count is a BigNumber (12.3), so a count no int holds goes to
+        // disk and comes back whole.
+        [Test]
+        public void A_fill_count_past_int_range_round_trips()
+        {
+            var count = BigNumber.FromMantissaExponent(3.25, 15);
+            var saved = new TestTree();
+            saved.Cover1.repeatWhen = new Always();
+            saved.Tier1.fillCounts["cover_1"] = count;
+            var json = SaveSystem.Serialize(saved.Root);
+
+            var fresh = new TestTree();
+            fresh.Cover1.repeatWhen = new Always();
+            Assert.IsTrue(SaveSystem.TryDeserialize(json, fresh.Content, out var root));
+
+            Assert.AreEqual(count, TestNavigation.Node(root, fresh.Tier1Def).fillCounts["cover_1"]);
+        }
+
+        // A save whose counts were ints carries each one as a bare integer,
+        // and it loads with the same counts.
+        [Test]
+        public void A_save_carrying_integer_fill_counts_loads_the_same_counts()
+        {
+            var saved = new TestTree();
+            saved.Cover1.repeatWhen = new Always();
+            saved.Tier1.fillCounts["cover_1"] = 1;
+            var envelope = Newtonsoft.Json.Linq.JObject.Parse(SaveSystem.Serialize(saved.Root));
+            var payload = Newtonsoft.Json.Linq.JToken.Parse(envelope.Value<string>("payload"));
+            var written = 0;
+            foreach (var map in payload.SelectTokens("$..fillCounts"))
+            {
+                if (map["cover_1"] == null)
+                    continue;
+                map["cover_1"] = 7;
+                written++;
+            }
+            Assert.AreEqual(1, written, "the payload carries the count this test rewrites");
+            envelope["payload"] = payload.ToString(Newtonsoft.Json.Formatting.None);
+            StringAssert.Contains("\"fillCounts\":{\"cover_1\":7}", envelope.Value<string>("payload"),
+                "the integer form a save of int counts holds");
+
+            var fresh = new TestTree();
+            fresh.Cover1.repeatWhen = new Always();
+            Assert.IsTrue(SaveSystem.TryDeserialize(Rechecksum(envelope), fresh.Content, out var root));
+
+            Assert.AreEqual((BigNumber)7, TestNavigation.Node(root, fresh.Tier1Def).fillCounts["cover_1"]);
         }
 
         [Test]

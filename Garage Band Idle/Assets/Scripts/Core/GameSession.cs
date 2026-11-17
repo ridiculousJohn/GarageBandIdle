@@ -41,7 +41,7 @@ namespace RidiculousGaming.GarageBandIdle
         public BarDefinition bar;
         public ScopeState home;
         public BigNumber progress;      // carried progress after the window's completions
-        public int completions;
+        public BigNumber completions = BigNumber.Zero;   // a count like the fill count it adds to (12.3)
 
         // The manual team that completed: it leaves the active set of every
         // group listing it, and the claim is where that write lands (12.7).
@@ -452,7 +452,7 @@ namespace RidiculousGaming.GarageBandIdle
                     if (fill < BigNumber.Zero)
                         fill = BigNumber.Zero;
 
-                    var completions = 0;
+                    var completions = BigNumber.Zero;
                     var off = false;
                     if (plan.Bar.repeatWhen == null)
                     {
@@ -478,9 +478,7 @@ namespace RidiculousGaming.GarageBandIdle
                         // residual is kept - the same arithmetic the tick's own
                         // settlement takes, over the counts this window adds.
                         progress += fill;
-                        plan.Node.fillCounts.TryGetValue(plan.Bar.Id, out var recorded);
-                        completions = BarSystem.Crossings(plan.Bar, progress,
-                            recorded + (line == null ? 0 : line.completions));
+                        completions = BarSystem.Crossings(plan.Bar, progress);
                         progress -= plan.Bar.fillAmount * completions;
                     }
                     else if (progress + fill >= plan.Bar.fillAmount)
@@ -502,7 +500,7 @@ namespace RidiculousGaming.GarageBandIdle
                     // What the completions fired, resolved once under the segment
                     // context and multiplied - the resolution the live completion
                     // uses, so the window pays what presence would have.
-                    for (var i = 0; completions > 0 && i < plan.Bar.onComplete.Count; i++)
+                    for (var i = 0; completions > BigNumber.Zero && i < plan.Bar.onComplete.Count; i++)
                     {
                         if (plan.Bar.onComplete[i] is not FireGeneratorYield fire)
                             continue;
@@ -594,20 +592,35 @@ namespace RidiculousGaming.GarageBandIdle
             // Then what the window's bars did: the progress, the fill counts the
             // crossings added, the manual team leaving its groups, and each
             // completion's own actions - with the payment ones skipped, because
-            // those were the lines (section 9).
+            // those were the lines (section 9). A list whose every remaining
+            // action repeats as one runs the whole count as one call (12.5);
+            // any other runs once per completion.
+            Predicate<GameAction> paid = a => a is FireGeneratorYield;
             foreach (var line in offer.bars)
             {
                 var ctx = new GameContext(line.home, offer.windowEndUtc);
                 line.home.barProgress[line.bar.Id] = line.progress;
-                if (line.bar.repeatWhen != null && line.completions > 0)
+                if (line.bar.repeatWhen != null && line.completions > BigNumber.Zero)
                 {
-                    line.home.fillCounts.TryGetValue(line.bar.Id, out var recorded);
+                    var recorded = line.home.fillCounts.TryGetValue(line.bar.Id, out var stored) ? stored : BigNumber.Zero;
                     line.home.fillCounts[line.bar.Id] = recorded + line.completions;
                 }
                 if (line.off)
                     BarSystem.Deselect(line.home, line.bar);
-                for (var i = 0; i < line.completions; i++)
-                    ActionList.Run(line.bar.onComplete, ctx, skip: a => a is FireGeneratorYield);
+                if (line.completions <= BigNumber.Zero)
+                    continue;
+                if (ActionList.RepeatsAsOne(line.bar.onComplete, paid))
+                {
+                    ActionList.RunTimes(line.bar.onComplete, ctx, line.completions, skip: paid);
+                    continue;
+                }
+                if (line.completions > int.MaxValue)
+                    throw new InvalidOperationException(
+                        $"Idle claim: bar '{line.bar.Id}' completed {line.completions} times and its completion list runs "
+                        + "one completion at a time - past what one loop can count (section 9).");
+                var count = (int)line.completions.ToDouble();
+                for (var i = 0; i < count; i++)
+                    ActionList.Run(line.bar.onComplete, ctx, skip: paid);
             }
             chapter.StampActive(offer.windowEndUtc);
             CurrentOffer = null;
